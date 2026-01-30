@@ -1,0 +1,34 @@
+/* Diff */
+.tool-diff {
+  font-size: 11px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.diff-added { color: var(--toolDiffAdded); }
+.diff-removed { color: var(--toolDiffRemoved); }
+.diff-context { color: var(--toolDiffContext); }
+
+.tool-diff.expandable {
+  cursor: pointer;
+}
+
+.tool-diff.expandable:hover {
+  opacity: 0.9;
+}
+
+.tool-diff.expandable .diff-preview {
+  display: block;
+}
+
+.tool-diff.expandable .diff-full {
+  display: none;
+}
+
+.tool-diff.expandable.expanded .diff-preview {
+  display: none;
+}
+
+.tool-diff.expandable.expanded .diff-full {
+  display: block;
+}
