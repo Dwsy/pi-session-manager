@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Pierre Diffs 主题覆盖 - 跟随应用主题而非系统偏好 */
+@layer base {
+  /* 默认使用浅色主题 */
+  :root {
+    color-scheme: light;
+  }
+
+  /* 当应用设置为深色主题时 */
+  .theme-dark {
+    color-scheme: dark;
+  }
+
+  /* 当应用设置为浅色主题时 */
+  .theme-light {
+    color-scheme: light;
+  }
+
+  /* 当应用使用系统主题时，跟随系统偏好 */
+  :root:not(.theme-dark):not(.theme-light) {
+    color-scheme: light dark;
+  }
+}
+
 /* Glassmorphism utilities */
 @layer utilities {
   .glass {
@@ -399,6 +422,26 @@ body {
   font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
   font-size: 11px;
   background: rgba(0, 0, 0, 0.2);
+  overflow-x: auto;
+}
+
+/* Pierre Diffs overrides */
+.tool-diff [class*='pierre-'] {
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  font-size: 11px;
+}
+
+.tool-diff .pierre-dark {
+  --pierre-bg-primary: #1e1e2e;
+  --pierre-bg-secondary: #282838;
+  --pierre-border: rgba(255, 255, 255, 0.1);
+  --pierre-text: #e5e5e7;
+  --pierre-text-muted: #808080;
+  --pierre-diff-add-bg: rgba(181, 189, 104, 0.15);
+  --pierre-diff-add-text: #b5bd68;
+  --pierre-diff-remove-bg: rgba(204, 102, 102, 0.15);
+  --pierre-diff-remove-text: #cc6666;
+  --pierre-line-number: #666666;
 }
 
 .expand-hint {

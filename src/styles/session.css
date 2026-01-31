@@ -451,3 +451,43 @@
  .tool-diff.expandable.expanded .diff-full {
    display: block;
  }
+
+ /*
+ =====================================================
+ =======
+    Tool Toggle Button Styles
+
+ =====================================================
+ ======= */
+
+ .tool-toggle-button {
+   padding: 4px 8px;
+   background: transparent;
+   color: #6a6f85;
+   border: 1px solid rgba(138, 190, 183, 0.2);
+   border-radius: 4px;
+   cursor: pointer;
+   transition: all 0.2s ease;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   font-size: 12px;
+ }
+
+ .tool-toggle-button:hover {
+   color: #d4d4d8;
+   border-color: rgba(138, 190, 183, 0.4);
+   background: rgba(138, 190, 183, 0.05);
+ }
+
+ .tool-toggle-button:active {
+   transform: scale(0.98);
+ }
+
+ .tool-diff-wrapper {
+   margin-top: 8px;
+ }
+
+ .tool-output-wrapper {
+   margin-top: 8px;
+ }
