@@ -18,7 +18,7 @@ export function useSessionBadges(sessions: SessionInfo[]) {
   const previousSessionsRef = useRef<Map<string, SessionInfo>>(new Map())
   const isInitializedRef = useRef(false)
 
-  // 从 localStorage 加载 badge 状态
+  // 从 localStorage 加载 badge 状态（只在组件挂载时执行一次）
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -35,7 +35,7 @@ export function useSessionBadges(sessions: SessionInfo[]) {
     } catch (error) {
       console.error('[BadgeManager] Failed to load badge states:', error)
     }
-  }, [])
+  }, []) // 空依赖数组，只执行一次
 
   // 保存 badge 状态到 localStorage
   const saveBadgeStates = useCallback((states: Record<string, BadgeState>) => {
@@ -50,7 +50,7 @@ export function useSessionBadges(sessions: SessionInfo[]) {
   useEffect(() => {
     // 首次加载：初始化 previousSessions，但不标记任何 badge
     if (!isInitializedRef.current) {
-      console.log('[BadgeManager] Initial load, setting baseline with', sessions.length, 'sessions')
+      console.log('[BadgeManager] 🎯 Initial load, setting baseline with', sessions.length, 'sessions')
       const initialSessions = new Map<string, SessionInfo>()
       for (const session of sessions) {
         initialSessions.set(session.id, session)
@@ -60,9 +60,11 @@ export function useSessionBadges(sessions: SessionInfo[]) {
       return
     }
 
-    const newBadgeStates = { ...badgeStates }
+    console.log('[BadgeManager] 🔍 Checking for changes...')
+    
     const previousSessions = previousSessionsRef.current
-    let hasChanges = false
+    const newBadges: Record<string, BadgeState> = {}
+    let hasNewBadges = false
 
     // 检测新增和更新的会话
     for (const session of sessions) {
@@ -70,40 +72,37 @@ export function useSessionBadges(sessions: SessionInfo[]) {
       
       if (!prevSession) {
         // 新会话：首次出现（在初始化之后）
-        if (!badgeStates[session.id]) {
-          console.log('[BadgeManager] 🆕 New session detected:', session.id, session.name || session.first_message.substring(0, 50))
-          newBadgeStates[session.id] = {
-            type: 'new',
+        console.log('[BadgeManager] 🆕 New session detected:', session.id, session.name || session.first_message.substring(0, 50))
+        newBadges[session.id] = {
+          type: 'new',
+          timestamp: Date.now(),
+        }
+        hasNewBadges = true
+      } else {
+        // 检测更新的会话（message_count 增加）
+        const messageCountChanged = session.message_count > prevSession.message_count
+        
+        if (messageCountChanged) {
+          console.log('[BadgeManager] 🔄 Session updated:', session.id, {
+            messageCount: `${prevSession.message_count} -> ${session.message_count}`,
+          })
+          newBadges[session.id] = {
+            type: 'updated',
             timestamp: Date.now(),
           }
-          hasChanges = true
-        }
-      } else {
-        // 检测更新的会话（message_count 增加或 modified 时间变化）
-        const messageCountChanged = session.message_count > prevSession.message_count
-        const modifiedChanged = new Date(session.modified).getTime() > new Date(prevSession.modified).getTime()
-        
-        if (messageCountChanged || modifiedChanged) {
-          // 会话已更新，但不覆盖 'new' 状态
-          if (!badgeStates[session.id] || badgeStates[session.id].type !== 'new') {
-            console.log('[BadgeManager] 🔄 Session updated:', session.id, {
-              messageCount: `${prevSession.message_count} -> ${session.message_count}`,
-              modified: modifiedChanged ? 'changed' : 'same'
-            })
-            newBadgeStates[session.id] = {
-              type: 'updated',
-              timestamp: Date.now(),
-            }
-            hasChanges = true
-          }
+          hasNewBadges = true
         }
       }
     }
 
-    if (hasChanges) {
-      console.log('[BadgeManager] Badge states updated:', Object.keys(newBadgeStates).length, 'total badges')
-      setBadgeStates(newBadgeStates)
-      saveBadgeStates(newBadgeStates)
+    // 只有检测到新的 badge 时才更新状态
+    if (hasNewBadges) {
+      console.log('[BadgeManager] ✅ Adding', Object.keys(newBadges).length, 'new badges')
+      setBadgeStates(prev => {
+        const updated = { ...prev, ...newBadges }
+        saveBadgeStates(updated)
+        return updated
+      })
     }
 
     // 更新 previousSessions
@@ -112,11 +111,11 @@ export function useSessionBadges(sessions: SessionInfo[]) {
       newPreviousSessions.set(session.id, session)
     }
     previousSessionsRef.current = newPreviousSessions
-  }, [sessions, badgeStates, saveBadgeStates])
+  }, [sessions, saveBadgeStates]) // 移除 badgeStates 依赖
 
   // 清除指定会话的 badge
   const clearBadge = useCallback((sessionId: string) => {
-    console.log('[BadgeManager] Clearing badge for session:', sessionId)
+    console.log('[BadgeManager] 🗑️ Clearing badge for session:', sessionId)
     setBadgeStates(prev => {
       const newStates = { ...prev }
       delete newStates[sessionId]
@@ -127,10 +126,10 @@ export function useSessionBadges(sessions: SessionInfo[]) {
 
   // 清除所有 badge
   const clearAllBadges = useCallback(() => {
-    console.log('[BadgeManager] Clearing all badges')
+    console.log('[BadgeManager] 🗑️ Clearing all badges')
     setBadgeStates({})
-    saveBadgeStates({})
-  }, [saveBadgeStates])
+    localStorage.removeItem(STORAGE_KEY)
+  }, [])
 
   // 获取指定会话的 badge 类型
   const getBadgeType = useCallback((sessionId: string): 'new' | 'updated' | null => {
