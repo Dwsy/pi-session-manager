@@ -28,9 +28,10 @@ export default function Dashboard({ sessions, onSessionSelect, projectName }: Da
   const { t } = useTranslation()
   const [stats, setStats] = useState<SessionStats | null>(null)
 
+  // 只在组件挂载时加载统计，不自动跟随 sessions 变化
   useEffect(() => {
     loadStats()
-  }, [sessions])
+  }, []) // 空依赖数组
 
   const loadStats = async () => {
     try {

@@ -16,7 +16,12 @@ const MODEL_COLORS = [
 export default function TopModelsChart({ stats, title = 'Most Used AI Models', limit = 8 }: TopModelsChartProps) {
   const { t } = useTranslation()
   const topModels = Object.entries(stats.sessions_by_model)
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => {
+      if (b[1] !== a[1]) {
+        return b[1] - a[1]
+      }
+      return a[0].localeCompare(b[0])
+    })
     .slice(0, limit)
 
   // Format model name to be more readable

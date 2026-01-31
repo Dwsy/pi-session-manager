@@ -2,6 +2,7 @@ import type { Content, SessionEntry } from '../types'
 import MarkdownContent from './MarkdownContent'
 import ThinkingBlock from './ThinkingBlock'
 import ToolCallList from './ToolCallList'
+import { useSessionView } from '../contexts/SessionViewContext'
 
 interface AssistantMessageProps {
   content: Content[]
@@ -12,6 +13,7 @@ interface AssistantMessageProps {
 }
 
 export default function AssistantMessage({ content, timestamp, entryId, entries = [], searchQuery = '' }: AssistantMessageProps) {
+  const { showThinking } = useSessionView()
   const textBlocks = content.filter(c => c.type === 'text' && c.text)
   const thinkingBlocks = content.filter(c => c.type === 'thinking' && c.thinking)
   const toolCalls = content.filter(c => c.type === 'toolCall')
@@ -28,7 +30,7 @@ export default function AssistantMessage({ content, timestamp, entryId, entries 
       ))}
 
       {/* Thinking content */}
-      {thinkingBlocks.map((block, index) => (
+      {showThinking && thinkingBlocks.map((block, index) => (
         <ThinkingBlock key={`thinking-${index}`} content={block.thinking!} />
       ))}
 

@@ -40,9 +40,10 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
     { id: 'achievements' as TabType, label: t('stats.tabs.achievements'), icon: Award },
   ]
 
+  // 只在组件挂载时加载统计，不自动跟随 sessions 变化
   useEffect(() => {
     loadStats()
-  }, [sessions])
+  }, []) // 空依赖数组
 
   const loadStats = async () => {
     try {

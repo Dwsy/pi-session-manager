@@ -118,11 +118,15 @@ function App() {
     loadSettings()
   }, [loadSessions, loadSettings])
 
-  // 文件监听：自动刷新会话列表（暂时禁用，性能问题）
-  // useFileWatcher({
-  //   enabled: true,
-  //   onSessionsChanged: loadSessions,
-  // })
+  // 文件监听：自动刷新会话列表（带 2 秒防抖）
+  useFileWatcher({
+    enabled: true,
+    debounceMs: 2000, // 2 秒防抖，合并频繁的文件变化
+    onSessionsChanged: () => {
+      console.log('[App] 📡 File watcher triggered, reloading sessions...')
+      loadSessions()
+    },
+  })
 
   // Badge 状态管理
   const { getBadgeType, clearBadge } = useSessionBadges(sessions)

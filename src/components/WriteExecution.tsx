@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { escapeHtml, getLanguageFromPath } from '../utils/markdown'
 import { shortenPath } from '../utils/format'
 import CodeBlock from './CodeBlock'
@@ -9,15 +9,21 @@ interface WriteExecutionProps {
   content: string
   output?: string
   timestamp?: string
+  expanded?: boolean
 }
 
 export default function WriteExecution({
   filePath,
   content,
   output,
-  timestamp
+  timestamp,
+  expanded = false,
 }: WriteExecutionProps) {
-  const [expanded, setExpanded] = useState(false)
+  const [localExpanded, setLocalExpanded] = useState(false)
+
+  useEffect(() => {
+    setLocalExpanded(expanded)
+  }, [expanded])
 
   const lang = getLanguageFromPath(filePath)
   const displayPath = shortenPath(filePath)
@@ -40,14 +46,14 @@ export default function WriteExecution({
 
       {content && (
         <div className="tool-output">
-          {remaining > 0 && !expanded ? (
+          {remaining > 0 && !localExpanded ? (
             <>
               <CodeBlock code={lines.slice(0, 20).join('\n')} language={lang} showLineNumbers={false} />
               <HoverPreview
                 content={
-                  <div 
+                  <div
                     className="expand-hint"
-                    onClick={() => setExpanded(true)}
+                    onClick={() => setLocalExpanded(true)}
                     style={{ cursor: 'pointer' }}
                   >
                     ... {remaining} more lines
@@ -61,10 +67,10 @@ export default function WriteExecution({
           ) : (
             <CodeBlock code={content} language={lang} showLineNumbers={false} />
           )}
-          {remaining > 0 && expanded && (
-            <div 
+          {remaining > 0 && localExpanded && (
+            <div
               className="expand-hint"
-              onClick={() => setExpanded(false)}
+              onClick={() => setLocalExpanded(false)}
               style={{ cursor: 'pointer' }}
             >
               Show less

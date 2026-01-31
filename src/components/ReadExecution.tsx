@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { escapeHtml, getLanguageFromPath } from '../utils/markdown'
 import { shortenPath } from '../utils/format'
@@ -12,6 +12,7 @@ interface ReadExecutionProps {
   output?: string
   images?: Array<{ mimeType: string; data: string }>
   timestamp?: string
+  expanded?: boolean
 }
 
 export default function ReadExecution({
@@ -20,10 +21,15 @@ export default function ReadExecution({
   limit,
   output,
   images = [],
-  timestamp
+  timestamp,
+  expanded = false,
 }: ReadExecutionProps) {
   const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(false)
+  const [localExpanded, setLocalExpanded] = useState(false)
+
+  useEffect(() => {
+    setLocalExpanded(expanded)
+  }, [expanded])
 
   const lang = getLanguageFromPath(filePath)
   const displayPath = shortenPath(filePath)
@@ -67,14 +73,14 @@ export default function ReadExecution({
 
       {output && (
         <div className="tool-output">
-          {remaining > 0 && !expanded ? (
+          {remaining > 0 && !localExpanded ? (
             <>
               <CodeBlock code={previewLines.join('\n')} language={lang} showLineNumbers={false} />
               <HoverPreview
                 content={
-                  <div 
+                  <div
                     className="expand-hint"
-                    onClick={() => setExpanded(true)}
+                    onClick={() => setLocalExpanded(true)}
                     style={{ cursor: 'pointer' }}
                   >
                     ... {t('components.expandableOutput.moreLines', { count: remaining })}
@@ -88,10 +94,10 @@ export default function ReadExecution({
           ) : (
             <CodeBlock code={output} language={lang} showLineNumbers={false} />
           )}
-          {remaining > 0 && expanded && (
-            <div 
+          {remaining > 0 && localExpanded && (
+            <div
               className="expand-hint"
-              onClick={() => setExpanded(false)}
+              onClick={() => setLocalExpanded(false)}
               style={{ cursor: 'pointer' }}
             >
               Show less

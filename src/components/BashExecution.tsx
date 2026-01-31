@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { escapeHtml } from '../utils/markdown'
 import ExpandableOutput from './ExpandableOutput'
 
@@ -9,6 +9,7 @@ interface BashExecutionProps {
   cancelled?: boolean
   timestamp?: string
   entryId: string
+  expanded?: boolean
 }
 
 export default function BashExecution({
@@ -18,7 +19,13 @@ export default function BashExecution({
   cancelled,
   timestamp,
   entryId,
+  expanded = false,
 }: BashExecutionProps) {
+  const [localExpanded, setLocalExpanded] = useState(false)
+
+  useEffect(() => {
+    setLocalExpanded(expanded)
+  }, [expanded])
   const isError = cancelled || (exitCode !== undefined && exitCode !== null && exitCode !== 0)
   const statusClass = isError ? 'error' : 'success'
   
@@ -91,6 +98,21 @@ export default function BashExecution({
           <div className="tool-output-header">
             <span className="tool-output-label">Output</span>
             <button
+              onClick={() => setLocalExpanded(!localExpanded)}
+              className="tool-toggle-button"
+              title={localExpanded ? 'Collapse' : 'Expand'}
+            >
+              {localExpanded ? (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              )}
+            </button>
+            <button
               onClick={handleCopyOutput}
               className="tool-copy-button"
               title={outputCopied ? 'Copied!' : 'Copy output'}
@@ -106,9 +128,11 @@ export default function BashExecution({
               )}
             </button>
           </div>
-          <div className="tool-output">
-            <ExpandableOutput text={output} maxLines={20} />
-          </div>
+          {localExpanded && (
+            <div className="tool-output">
+              <ExpandableOutput text={output} maxLines={20} />
+            </div>
+          )}
         </div>
       )}
     </div>

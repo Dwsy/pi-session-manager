@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { escapeHtml } from '../utils/markdown'
 import HoverPreview from './HoverPreview'
 
@@ -8,6 +8,7 @@ interface GenericToolCallProps {
   output?: string
   isError?: boolean
   timestamp?: string
+  expanded?: boolean
 }
 
 export default function GenericToolCall({
@@ -15,10 +16,16 @@ export default function GenericToolCall({
   arguments: args,
   output,
   isError = false,
-  timestamp
+  timestamp,
+  expanded = false,
 }: GenericToolCallProps) {
   const [argsExpanded, setArgsExpanded] = useState(false)
   const [outputExpanded, setOutputExpanded] = useState(false)
+
+  useEffect(() => {
+    setArgsExpanded(expanded)
+    setOutputExpanded(expanded)
+  }, [expanded])
 
   const statusClass = isError ? 'error' : 'success'
 
