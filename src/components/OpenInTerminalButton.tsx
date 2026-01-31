@@ -6,6 +6,9 @@ import type { SessionInfo } from '../types'
 
 interface OpenInTerminalButtonProps {
   session: SessionInfo
+  terminal?: 'iterm2' | 'terminal' | 'vscode' | 'custom'
+  piPath?: string
+  customCommand?: string
   size?: 'sm' | 'md' | 'lg'
   variant?: 'default' | 'outline' | 'ghost'
   className?: string
@@ -15,6 +18,9 @@ interface OpenInTerminalButtonProps {
 
 export default function OpenInTerminalButton({
   session,
+  terminal = 'iterm2',
+  piPath,
+  customCommand,
   size = 'sm',
   variant = 'ghost',
   className = '',
@@ -51,8 +57,9 @@ export default function OpenInTerminalButton({
     try {
       await invoke('open_session_in_terminal', {
         path: session.path,
-        terminal: 'iterm2', // 默认使用 iTerm2，后续可从配置读取
-        piPath: null, // 使用默认 pi 命令
+        cwd: session.cwd,
+        terminal: terminal === 'custom' ? customCommand : terminal,
+        piPath: piPath || null,
       })
       onSuccess?.()
     } catch (err) {

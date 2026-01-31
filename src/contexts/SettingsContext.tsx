@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import type { AppSettings, defaultSettings } from '../types/settings'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import type { AppSettings } from '../components/settings/types'
+import { defaultSettings } from '../components/settings/types'
 
 interface SettingsContextType {
   settings: AppSettings

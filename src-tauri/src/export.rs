@@ -1,40 +1,60 @@
 use serde_json::Value;
 use std::fs;
+use std::process::Command;
 
 pub async fn export_session(
     session_path: &str,
     format: &str,
     output_path: &str,
 ) -> Result<(), String> {
-    let content = fs::read_to_string(session_path)
-        .map_err(|e| format!("Failed to read session file: {}", e))?;
+    match format {
+        "html" => export_using_pi_command(session_path, output_path),
+        "json" => export_as_json(session_path, output_path),
+        "md" | "markdown" => export_as_markdown(session_path, output_path),
+        _ => Err(format!("Unsupported format: {}", format)),
+    }
+}
 
-    let export_content = match format {
-        "json" => export_as_json(&content)?,
-        "md" | "markdown" => export_as_markdown(&content)?,
-        "html" => export_as_html(&content)?,
-        _ => return Err(format!("Unsupported format: {}", format)),
-    };
+fn export_using_pi_command(session_path: &str, output_path: &str) -> Result<(), String> {
+    // 使用 PI 的 export 命令生成 HTML
+    let output = Command::new("pi")
+        .arg("--export")
+        .arg(session_path)
+        .arg(output_path)
+        .output()
+        .map_err(|e| format!("Failed to execute pi command: {}", e))?;
 
-    fs::write(output_path, export_content)
-        .map_err(|e| format!("Failed to write export file: {}", e))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Pi export command failed: {}", stderr));
+    }
 
     Ok(())
 }
 
-fn export_as_json(content: &str) -> Result<String, String> {
-    // Parse and pretty print JSONL as JSON array
+fn export_as_json(session_path: &str, output_path: &str) -> Result<(), String> {
+    let content = fs::read_to_string(session_path)
+        .map_err(|e| format!("Failed to read session file: {}", e))?;
+
     let entries: Vec<Value> = content
         .lines()
         .filter(|line| !line.trim().is_empty())
         .filter_map(|line| serde_json::from_str(line).ok())
         .collect();
 
-    serde_json::to_string_pretty(&entries)
-        .map_err(|e| format!("Failed to serialize JSON: {}", e))
+    let json_content = serde_json::to_string_pretty(&entries)
+        .map_err(|e| format!("Failed to serialize JSON: {}", e))?;
+
+    fs::write(output_path, json_content)
+        .map_err(|e| format!("Failed to write export file: {}", e))?;
+
+    Ok(())
 }
 
-fn export_as_markdown(content: &str) -> Result<String, String> {
+fn export_as_markdown(session_path: &str, output_path: &str) -> Result<(), String> {
+    let content = fs::read_to_string(session_path)
+        .map_err(|e| format!("Failed to read session file: {}", e))?;
+
     let mut md = String::new();
     let mut session_name = String::from("Session Export");
     let mut session_date = String::new();
@@ -87,138 +107,8 @@ fn export_as_markdown(content: &str) -> Result<String, String> {
         }
     }
 
-    Ok(md)
-}
+    fs::write(output_path, md)
+        .map_err(|e| format!("Failed to write export file: {}", e))?;
 
-fn export_as_html(content: &str) -> Result<String, String> {
-    let mut messages = Vec::new();
-    let mut session_name = String::from("Session Export");
-
-    for line in content.lines() {
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        if let Ok(entry) = serde_json::from_str::<Value>(line) {
-            let entry_type = entry["type"].as_str().unwrap_or("unknown");
-
-            if entry_type == "session" {
-                if let Some(name) = entry["name"].as_str() {
-                    session_name = name.to_string();
-                }
-            }
-
-            if entry_type == "message" {
-                if let Some(message) = entry.get("message") {
-                    let role = message["role"].as_str().unwrap_or("unknown").to_string();
-                    let timestamp = entry["timestamp"].as_str().unwrap_or("").to_string();
-
-                    let mut text_parts = Vec::new();
-                    if let Some(content_arr) = message["content"].as_array() {
-                        for item in content_arr {
-                            if let Some(text) = item["text"].as_str() {
-                                text_parts.push(escape_html(text));
-                            }
-                        }
-                    }
-
-                    messages.push((role, timestamp, text_parts.join("")));
-                }
-            }
-        }
-    }
-
-    let messages_html: String = messages
-        .iter()
-        .map(|(role, timestamp, text)| {
-            let role_class = if role == "user" { "user-message" } else { "assistant-message" };
-            format!(
-                r#"<div class="message {}">
-                    <div class="message-header">{} - {}</div>
-                    <div class="message-content">{}</div>
-                </div>"#,
-                role_class, role, timestamp, text
-            )
-        })
-        .collect();
-
-    Ok(format!(
-        r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{}</title>
-    <style>
-        :root {{
-            --bg: #1e1e1e;
-            --fg: #d4d4d4;
-            --user-bg: #2d2d2d;
-            --assistant-bg: #1e1e1e;
-            --border: #3e3e3e;
-            --accent: #569cd6;
-        }}
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--fg);
-            line-height: 1.6;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }}
-        h1 {{
-            color: var(--accent);
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 10px;
-        }}
-        .message {{
-            margin: 20px 0;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-        }}
-        .user-message {{
-            background: var(--user-bg);
-        }}
-        .assistant-message {{
-            background: var(--assistant-bg);
-        }}
-        .message-header {{
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-        }}
-        .message-content {{
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }}
-        pre {{
-            background: #2d2d2d;
-            padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
-        }}
-        code {{
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 14px;
-        }}
-    </style>
-</head>
-<body>
-    <h1>{}</h1>
-    {}
-</body>
-</html>"#,
-        session_name, session_name, messages_html
-    ))
-}
-
-fn escape_html(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\n', "<br>")
+    Ok(())
 }

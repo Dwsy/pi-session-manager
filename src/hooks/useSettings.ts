@@ -4,7 +4,12 @@
  */
 
 import { useSettings as useSettingsContext } from '../contexts/SettingsContext'
-import type { AppSettings, ValidationError } from '../types/settings'
+import type { AppSettings } from '../components/settings/types'
+
+export interface ValidationError {
+  field: string
+  message: string
+}
 
 /**
  * 使用设置 Hook

@@ -5,7 +5,9 @@
 
 import { useEffect } from 'react'
 import { useSettings } from './useSettings'
-import type { AppearanceSettings } from '../types/settings'
+import type { AppSettings } from '../components/settings/types'
+
+export type AppearanceSettings = AppSettings['appearance']
 
 /**
  * 使用外观设置 Hook

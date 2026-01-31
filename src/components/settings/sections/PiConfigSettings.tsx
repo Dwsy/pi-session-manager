@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { invoke } from '@tauri-apps/api/core'
 import { Loader2, Puzzle, FileText, Power, PowerOff } from 'lucide-react'
-import type { SkillInfo, PromptInfo, PiSettings } from '../../types'
+import type { SkillInfo, PromptInfo, PiSettings } from '../../../types'
 
 export default function PiConfigSettings() {
   const { t } = useTranslation()

@@ -2,7 +2,54 @@
  * 设置工具函数
  */
 
-import type { AppSettings, ValidationError } from '../types/settings'
+import type { AppSettings } from '../components/settings/types'
+
+export interface ValidationError {
+  field: string
+  message: string
+}
+
+export const settingsValidationRules: Record<string, (value: unknown) => ValidationError | null> = {
+  'terminal.piCommandPath': (value) => {
+    if (typeof value !== 'string' || value.trim() === '') {
+      return { field: 'terminal.piCommandPath', message: 'Pi 命令路径不能为空' }
+    }
+    return null
+  },
+  'session.refreshInterval': (value) => {
+    if (typeof value !== 'number' || value < 5 || value > 300) {
+      return { field: 'session.refreshInterval', message: '刷新间隔必须在 5-300 秒之间' }
+    }
+    return null
+  },
+  'advanced.maxCacheSize': (value) => {
+    if (typeof value !== 'number' || value < 10 || value > 1000) {
+      return { field: 'advanced.maxCacheSize', message: '缓存大小必须在 10-1000 MB 之间' }
+    }
+    return null
+  },
+  'appearance.sidebarWidth': (value) => {
+    if (typeof value !== 'number' || value < 200 || value > 600) {
+      return { field: 'appearance.sidebarWidth', message: '侧边栏宽度必须在 200-600 px 之间' }
+    }
+    return null
+  },
+}
+
+export function validateSettings(settings: AppSettings): ValidationError[] {
+  const errors: ValidationError[] = []
+
+  for (const [field, validator] of Object.entries(settingsValidationRules)) {
+    const [section, key] = field.split('.')
+    const value = (settings as any)[section]?.[key]
+    const error = validator(value)
+    if (error) {
+      errors.push(error)
+    }
+  }
+
+  return errors
+}
 
 /**
  * 深度合并设置
