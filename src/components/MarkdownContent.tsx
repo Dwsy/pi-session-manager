@@ -1,19 +1,25 @@
 import { useEffect, useRef } from 'react'
 import { parseMarkdown } from '../utils/markdown'
+import { highlightSearchInHTML } from '../utils/search'
 
 interface MarkdownContentProps {
   content: string
   className?: string
+  searchQuery?: string
 }
 
-export default function MarkdownContent({ content, className = '' }: MarkdownContentProps) {
+export default function MarkdownContent({ content, className = '', searchQuery = '' }: MarkdownContentProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (containerRef.current) {
-      containerRef.current.innerHTML = parseMarkdown(content)
+      let html = parseMarkdown(content)
+      if (searchQuery) {
+        html = highlightSearchInHTML(html, searchQuery)
+      }
+      containerRef.current.innerHTML = html
     }
-  }, [content])
+  }, [content, searchQuery])
 
   return (
     <div

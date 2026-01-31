@@ -1,0 +1,33 @@
+export const command = {
+  placeholder: 'Search sessions, projects, messages...',
+  empty: 'No results found',
+  emptyHint: 'Try searching with different keywords',
+  loading: 'Searching...',
+  error: 'Search Error',
+  errorHint: 'Please try again later or check console logs',
+  shortcuts: {
+    open: 'Open command palette',
+    close: 'Close',
+    navigate: 'Navigate',
+    select: 'Select',
+  },
+  plugins: {
+    messageSearch: 'Message Search',
+    projectSearch: 'Project Search',
+    sessionSearch: 'Session Search',
+  },
+  hints: {
+    title: 'Search Tips',
+    messages: 'Search Messages',
+    messageExample1: '"auth" - Search messages containing auth',
+    messageExample2: '"error" - Search error-related messages',
+    projects: 'Search Projects',
+    projectExample1: '"pi-session" - Search project name',
+    projectExample2: '"/Users/..." - Search project path',
+    sessions: 'Search Sessions',
+    sessionExample1: '"implement feature" - Search session name',
+    sessionExample2: '"today" - Search recent sessions',
+    navigate: 'Use ↑↓ to navigate',
+    select: 'Press Enter to select',
+  },
+} as const

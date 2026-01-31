@@ -1,8 +1,8 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
-import { enUS } from './locales/en-US'
-import { zhCN } from './locales/zh-CN'
+import { enUS } from './locales/en-US/index'
+import { zhCN } from './locales/zh-CN/index'
 
 const resources = {
   'en-US': { translation: enUS },

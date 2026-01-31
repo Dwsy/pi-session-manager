@@ -14,11 +14,16 @@ export default function SearchPanel({ onSearch, resultCount, isSearching }: Sear
   const debounceRef = useRef<NodeJS.Timeout>()
 
   useEffect(() => {
+    console.log('[SearchPanel] query changed:', query)
+    console.log('[SearchPanel] isSearching:', isSearching)
+    console.log('[SearchPanel] resultCount:', resultCount)
+
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
     }
 
     debounceRef.current = setTimeout(() => {
+      console.log('[SearchPanel] Debounced search triggered for query:', query)
       onSearch(query)
     }, 200)
 
@@ -27,38 +32,38 @@ export default function SearchPanel({ onSearch, resultCount, isSearching }: Sear
         clearTimeout(debounceRef.current)
       }
     }
-  }, [query, onSearch])
+  }, [query, onSearch, isSearching, resultCount])
 
   const handleClear = () => {
     setQuery('')
   }
 
   return (
-    <div className="p-4 border-b border-border">
+    <div className="px-3 py-2.5 border-b border-border/50">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <input
           type="text"
-          placeholder={t('search.placeholder')}
+          placeholder={t('search.panel.placeholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full pl-9 pr-9 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          className="w-full pl-8 pr-7 py-1.5 bg-[#252636] border-0 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-400/50 placeholder:text-muted-foreground/60"
           autoFocus
         />
         {query && (
           <button
             type="button"
             onClick={handleClear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
             aria-label={t('search.clear')}
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
 
-      <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mt-1.5 text-[11px] text-muted-foreground h-4">
+        <div className="flex items-center gap-1.5">
           {isSearching && (
             <>
               <Loader2 className="h-3 w-3 animate-spin" />

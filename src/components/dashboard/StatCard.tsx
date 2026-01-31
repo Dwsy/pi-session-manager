@@ -22,20 +22,52 @@ export default function StatCard({ icon: Icon, label, value, color, change, tren
     return ''
   }
 
+  const getGlowClass = () => {
+    if (color === '#569cd6') return 'group-hover:shadow-[0_0_30px_rgba(86,156,214,0.25)]'
+    if (color === '#7ee787') return 'group-hover:shadow-[0_0_30px_rgba(126,231,135,0.25)]'
+    if (color === '#ffa657') return 'group-hover:shadow-[0_0_30px_rgba(255,166,87,0.25)]'
+    if (color === '#ff6b6b') return 'group-hover:shadow-[0_0_30px_rgba(255,107,107,0.25)]'
+    return ''
+  }
+
   return (
-    <div className="bg-[#2c2d3b] rounded-xl p-5 hover:bg-[#323344] transition-all duration-300 group cursor-pointer">
-      <div className="flex items-start justify-between mb-3">
-        <div className="p-2.5 rounded-lg group-hover:scale-110 transition-transform" style={{ backgroundColor: `${color}20` }}>
-          <Icon className="h-5 w-5" style={{ color }} />
+    <div className={`glass-card glass-card-hover rounded-lg p-3 group cursor-pointer relative overflow-hidden ${getGlowClass()}`}>
+      {/* Subtle gradient overlay */}
+      <div
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+        style={{
+          background: `radial-gradient(circle at top right, ${color}08 0%, transparent 70%)`
+        }}
+      />
+
+      <div className="relative z-10">
+        <div className="flex items-start justify-between mb-2">
+          <div
+            className="p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+            style={{
+              backgroundColor: `${color}15`,
+              boxShadow: `0 2px 8px ${color}10`
+            }}
+          >
+            <Icon className="h-4 w-4 transition-transform duration-300 group-hover:rotate-3" style={{ color }} />
+          </div>
+          {change && (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full bg-[#1a1b26]/80 border border-white/5 ${getTrendColor()} flex items-center gap-0.5 backdrop-blur-sm`}>
+              {getTrendIcon()} {change}
+            </span>
+          )}
         </div>
-        {change && (
-          <span className={`text-xs px-2 py-1 rounded-full bg-[#1a1b26] ${getTrendColor()} flex items-center gap-1`}>
-            {getTrendIcon()} {change}
-          </span>
-        )}
+        <div className="text-xl font-bold mb-0.5 text-gradient">{value}</div>
+        <div className="text-[10px] text-[#6a6f85] uppercase tracking-wider font-medium">{label}</div>
       </div>
-      <div className="text-2xl font-bold mb-1 text-white">{value}</div>
-      <div className="text-xs text-[#6a6f85] uppercase tracking-wide">{label}</div>
+
+      {/* Bottom glow line */}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        style={{
+          background: `linear-gradient(90deg, transparent 0%, ${color}60 50%, transparent 100%)`
+        }}
+      />
     </div>
   )
 }

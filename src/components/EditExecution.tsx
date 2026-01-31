@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { escapeHtml, replaceTabs } from '../utils/markdown'
-import { shortenPath } from '../utils/format'
+import { escapeHtml } from '../utils/markdown'
+import { replaceTabs, shortenPath } from '../utils/format'
+import HoverPreview from './HoverPreview'
 
 interface EditExecutionProps {
   filePath: string
@@ -44,45 +45,73 @@ export default function EditExecution({
     <div className="tool-execution success">
       {timestamp && <div className="message-timestamp">{timestamp}</div>}
       <div className="tool-header">
-        <span className="tool-name">edit</span>
+        <span className="tool-name">
+          <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
+          Edit
+        </span>
         <span className="tool-path">{escapeHtml(displayPath)}</span>
       </div>
 
-      {/* Diff display */}
       {diff && (
-        <div className={`tool-diff ${diffLines.length > 20 ? 'expandable' : ''} ${expanded ? 'expanded' : ''}`}>
-          {diffLines.length > 20 ? (
+        <div className="tool-diff">
+          {diffLines.length > 20 && !expanded ? (
             <>
-              <div className="diff-preview">
-                {previewDiffLines.map((line, idx) => {
-                  let className = 'diff-context'
-                  if (line.startsWith('+')) {
-                    className = 'diff-added'
-                  } else if (line.startsWith('-')) {
-                    className = 'diff-removed'
-                  }
-                  return (
-                    <div key={idx} className={className}>
-                      {escapeHtml(replaceTabs(line))}
-                    </div>
-                  )
-                })}
-                <div className="expand-hint">... ({remainingDiffLines} more lines)</div>
-              </div>
-              <div className="diff-full">
-                {renderDiff(diff)}
-              </div>
+              {previewDiffLines.map((line, idx) => {
+                let className = 'diff-context'
+                if (line.startsWith('+')) {
+                  className = 'diff-added'
+                } else if (line.startsWith('-')) {
+                  className = 'diff-removed'
+                }
+                return (
+                  <div key={idx} className={className}>
+                    {escapeHtml(replaceTabs(line))}
+                  </div>
+                )
+              })}
+              <HoverPreview
+                content={
+                  <div 
+                    className="expand-hint"
+                    onClick={() => setExpanded(true)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    ... {remainingDiffLines} more lines
+                  </div>
+                }
+                previewContent={
+                  <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {renderDiff(diff)}
+                  </div>
+                }
+              />
             </>
           ) : (
             renderDiff(diff)
           )}
+          {diffLines.length > 20 && expanded && (
+            <div 
+              className="expand-hint"
+              onClick={() => setExpanded(false)}
+              style={{ cursor: 'pointer' }}
+            >
+              Show less
+            </div>
+          )}
         </div>
       )}
 
-      {/* Output message */}
       {output && (
         <div className="tool-output">
           <div>{escapeHtml(output)}</div>
+        </div>
+      )}
+
+      {!diff && !output && (
+        <div className="tool-output" style={{ color: '#6a6f85', fontStyle: 'italic' }}>
+          No changes
         </div>
       )}
     </div>

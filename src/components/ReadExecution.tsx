@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { escapeHtml, getLanguageFromPath } from '../utils/markdown'
 import { shortenPath } from '../utils/format'
 import CodeBlock from './CodeBlock'
+import HoverPreview from './HoverPreview'
 
 interface ReadExecutionProps {
   filePath: string
@@ -20,12 +22,12 @@ export default function ReadExecution({
   images = [],
   timestamp
 }: ReadExecutionProps) {
-  const [expanded] = useState(false)
+  const { t } = useTranslation()
+  const [expanded, setExpanded] = useState(false)
 
   const lang = getLanguageFromPath(filePath)
   const displayPath = shortenPath(filePath)
 
-  // Build line number display
   let pathWithLines = displayPath
   if (offset !== undefined || limit !== undefined) {
     const startLine = offset ?? 1
@@ -41,11 +43,15 @@ export default function ReadExecution({
     <div className="tool-execution success">
       {timestamp && <div className="message-timestamp">{timestamp}</div>}
       <div className="tool-header">
-        <span className="tool-name">read</span>
+        <span className="tool-name">
+          <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Read
+        </span>
         <span className="tool-path">{escapeHtml(pathWithLines)}</span>
       </div>
 
-      {/* Images */}
       {images.length > 0 && (
         <div className="tool-images">
           {images.map((img, idx) => (
@@ -53,28 +59,50 @@ export default function ReadExecution({
               key={idx}
               src={`data:${img.mimeType};base64,${img.data}`}
               className="tool-image"
-              alt="Read image"
+              alt={t('components.readExecution.imageAlt')}
             />
           ))}
         </div>
       )}
 
-      {/* Code output */}
       {output && (
-        <div className={`tool-output ${remaining > 0 ? 'expandable' : ''} ${expanded ? 'expanded' : ''}`}>
-          {remaining > 0 ? (
+        <div className="tool-output">
+          {remaining > 0 && !expanded ? (
             <>
-              <div className="output-preview">
-                <CodeBlock code={previewLines.join('\n')} language={lang} />
-                <div className="expand-hint">... ({remaining} more lines)</div>
-              </div>
-              <div className="output-full">
-                <CodeBlock code={output} language={lang} />
-              </div>
+              <CodeBlock code={previewLines.join('\n')} language={lang} showLineNumbers={false} />
+              <HoverPreview
+                content={
+                  <div 
+                    className="expand-hint"
+                    onClick={() => setExpanded(true)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    ... {t('components.expandableOutput.moreLines', { count: remaining })}
+                  </div>
+                }
+                previewContent={
+                  <CodeBlock code={output} language={lang} showLineNumbers={false} />
+                }
+              />
             </>
           ) : (
-            <CodeBlock code={output} language={lang} />
+            <CodeBlock code={output} language={lang} showLineNumbers={false} />
           )}
+          {remaining > 0 && expanded && (
+            <div 
+              className="expand-hint"
+              onClick={() => setExpanded(false)}
+              style={{ cursor: 'pointer' }}
+            >
+              Show less
+            </div>
+          )}
+        </div>
+      )}
+
+      {!output && !images.length && (
+        <div className="tool-output" style={{ color: '#6a6f85', fontStyle: 'italic' }}>
+          No output
         </div>
       )}
     </div>

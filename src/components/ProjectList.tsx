@@ -1,5 +1,5 @@
 import type { SessionInfo } from '../types'
-import { FolderOpen, Calendar, FileText, Loader2, ArrowLeft } from 'lucide-react'
+import { FolderOpen, Loader2, ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatDistanceToNow } from 'date-fns'
@@ -7,7 +7,9 @@ import { formatDistanceToNow } from 'date-fns'
 interface ProjectListProps {
   sessions: SessionInfo[]
   selectedSession: SessionInfo | null
+  selectedProject?: string | null
   onSelectSession: (session: SessionInfo) => void
+  onSelectProject?: (project: string | null) => void
   loading: boolean
 }
 
@@ -22,13 +24,17 @@ interface Project {
 export default function ProjectList({
   sessions,
   selectedSession,
+  selectedProject: externalSelectedProject,
   onSelectSession,
+  onSelectProject,
   loading,
 }: ProjectListProps) {
   const { t } = useTranslation()
-  const [selectedProject, setSelectedProject] = useState<string | null>(null)
+  // Use external selectedProject if provided, otherwise use internal state
+  const [internalSelectedProject, setInternalSelectedProject] = useState<string | null>(null)
+  const selectedProject = externalSelectedProject !== undefined ? externalSelectedProject : internalSelectedProject
+  const setSelectedProject = onSelectProject || setInternalSelectedProject
 
-  // Group sessions by directory
   const projectMap = sessions.reduce((acc, session) => {
     const cwd = session.cwd || t('common.unknown')
     if (!acc[cwd]) {
@@ -38,7 +44,6 @@ export default function ProjectList({
     return acc
   }, {} as Record<string, SessionInfo[]>)
 
-  // Calculate project stats
   const projects: Project[] = Object.entries(projectMap).map(([dir, dirSessions]) => ({
     dir,
     dirName: getDirectoryName(dir),
@@ -47,7 +52,6 @@ export default function ProjectList({
     lastModified: Math.max(...dirSessions.map(s => new Date(s.modified).getTime())),
   }))
 
-  // Sort by last modified
   projects.sort((a, b) => b.lastModified - a.lastModified)
 
   const handleBackToProjects = () => {
@@ -58,50 +62,44 @@ export default function ProjectList({
     setSelectedProject(dir)
   }
 
-  // Show project list
   if (!selectedProject) {
     if (loading) {
       return (
-        <div className="p-8 text-center text-muted-foreground">
-          <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin" />
-          <p className="text-sm">{t('project.loading')}</p>
+        <div className="p-6 text-center text-muted-foreground">
+          <Loader2 className="h-6 w-6 mx-auto mb-2 animate-spin" />
+          <p className="text-xs">{t('project.list.loading')}</p>
         </div>
       )
     }
 
     if (projects.length === 0) {
       return (
-        <div className="p-8 text-center text-muted-foreground">
-          <FolderOpen className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p className="text-sm">{t('project.noProjects')}</p>
+        <div className="p-6 text-center text-muted-foreground">
+          <FolderOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p className="text-xs">{t('project.list.empty')}</p>
         </div>
       )
     }
 
     return (
       <div>
-        <div className="px-4 py-3 text-xs text-muted-foreground">
-          {projects.length} {t('project.projects')}
+        <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border/30">
+          {t('project.list.count', { count: projects.length })}
         </div>
         {projects.map((project) => (
           <div
             key={project.dir}
             onClick={() => handleSelectProject(project.dir)}
-            className="px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border/50"
+            className="px-3 py-2.5 hover:bg-accent cursor-pointer transition-colors border-b border-border/30"
           >
-            <div className="flex items-center gap-3">
-              <FolderOpen className="h-5 w-5 text-blue-400 flex-shrink-0" />
+            <div className="flex items-center gap-2.5">
+              <FolderOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{project.dirName}</div>
-                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                  <span>{project.sessionCount} {t('session.sessions')}</span>
-                  <span>•</span>
-                  <span>{project.messageCount} {t('session.messages')}</span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {formatDistanceToNow(new Date(project.lastModified), { addSuffix: true })}
-                  </span>
+                <div className="text-sm font-medium truncate leading-tight">{project.dirName}</div>
+                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+                  <span>{project.sessionCount} {t('project.list.sessions')}</span>
+                  <span className="text-border">·</span>
+                  <span>{project.messageCount} {t('session.list.messages')}</span>
                 </div>
               </div>
             </div>
@@ -111,56 +109,43 @@ export default function ProjectList({
     )
   }
 
-  // Show sessions in selected project
   const projectSessions = projectMap[selectedProject] || []
   const projectInfo = projects.find(p => p.dir === selectedProject)
 
   return (
     <div>
-      {/* Back button */}
-      <button
-        onClick={handleBackToProjects}
-        className="w-full px-4 py-3 flex items-center gap-2 hover:bg-accent transition-colors text-left border-b border-border"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        <span className="text-sm">{t('project.back')}</span>
-      </button>
-
-      {/* Project info */}
-      <div className="px-4 py-3 bg-background/50 border-b border-border">
-        <div className="flex items-center gap-2">
-          <FolderOpen className="h-5 w-5 text-blue-400" />
-          <div>
-            <div className="text-sm font-medium">{projectInfo?.dirName}</div>
-            <div className="text-xs text-muted-foreground">
-              {projectSessions.length} {t('session.sessions')}
-            </div>
-          </div>
+      {/* Header: Back + Project Info Combined */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30">
+        <button
+          onClick={handleBackToProjects}
+          className="p-1 hover:bg-accent rounded transition-colors flex-shrink-0"
+          title={t('project.list.back')}
+        >
+          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+        </button>
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <FolderOpen className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
+          <span className="text-sm font-medium truncate">{projectInfo?.dirName}</span>
+          <span className="text-[11px] text-muted-foreground flex-shrink-0">({projectSessions.length})</span>
         </div>
       </div>
 
-      {/* Sessions list */}
-      <div className="divide-y divide-border/50">
+      <div className="divide-y divide-border/30">
         {projectSessions.map((session) => (
           <div
             key={session.id}
             onClick={() => onSelectSession(session)}
-            className={`px-4 py-3 cursor-pointer hover:bg-accent transition-colors group ${
+            className={`px-3 py-2 cursor-pointer hover:bg-accent transition-colors group ${
               selectedSession?.id === session.id ? 'bg-accent' : ''
             }`}
           >
-            <div className="text-sm truncate mb-1">
-              {session.name || session.first_message || t('session.untitled')}
+            <div className="text-sm truncate leading-tight">
+              {session.name || session.first_message || t('session.list.untitled')}
             </div>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {formatDistanceToNow(new Date(session.modified), { addSuffix: true })}
-              </div>
-              <div className="flex items-center gap-1">
-                <FileText className="h-3 w-3" />
-                {session.message_count}
-              </div>
+            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+              <span>{formatShortTime(session.modified)}</span>
+              <span className="text-border">·</span>
+              <span>{session.message_count}</span>
             </div>
           </div>
         ))}
@@ -186,4 +171,19 @@ function getDirectoryName(cwd: string): string {
   }
 
   return cwd
+}
+
+function formatShortTime(date: string): string {
+  const now = new Date()
+  const then = new Date(date)
+  const diffMs = now.getTime() - then.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return '刚刚'
+  if (diffMins < 60) return `${diffMins}分钟前`
+  if (diffHours < 24) return `${diffHours}小时前`
+  if (diffDays < 30) return `${diffDays}天前`
+  return `${Math.floor(diffDays / 30)}月前`
 }

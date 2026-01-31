@@ -1,0 +1,33 @@
+export const command = {
+  placeholder: '搜索会话、项目、消息...',
+  empty: '未找到结果',
+  emptyHint: '尝试使用不同的关键词搜索',
+  loading: '搜索中...',
+  error: '搜索出错',
+  errorHint: '请稍后重试或查看控制台日志',
+  shortcuts: {
+    open: '打开命令面板',
+    close: '关闭',
+    navigate: '导航',
+    select: '选择',
+  },
+  plugins: {
+    messageSearch: '消息搜索',
+    projectSearch: '项目搜索',
+    sessionSearch: '会话搜索',
+  },
+  hints: {
+    title: '搜索提示',
+    messages: '搜索消息',
+    messageExample1: '"auth" - 搜索包含 auth 的消息',
+    messageExample2: '"error" - 搜索错误相关消息',
+    projects: '搜索项目',
+    projectExample1: '"pi-session" - 搜索项目名称',
+    projectExample2: '"/Users/..." - 搜索项目路径',
+    sessions: '搜索会话',
+    sessionExample1: '"实现功能" - 搜索会话名称',
+    sessionExample2: '"今天" - 搜索最近会话',
+    navigate: '使用 ↑↓ 导航',
+    select: '按 Enter 选择',
+  },
+} as const

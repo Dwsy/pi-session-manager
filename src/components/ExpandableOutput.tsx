@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { escapeHtml } from '../utils/markdown'
 import CodeBlock from './CodeBlock'
+import HoverPreview from './HoverPreview'
 
 interface ExpandableOutputProps {
   text: string
@@ -15,6 +17,7 @@ export default function ExpandableOutput({
   language,
   code = false
 }: ExpandableOutputProps) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
 
   const lines = text.split('\n')
@@ -23,7 +26,7 @@ export default function ExpandableOutput({
 
   const renderContent = (content: string) => {
     if (code && language) {
-      return <CodeBlock code={content} language={language} />
+      return <CodeBlock code={content} language={language} showLineNumbers={false} />
     }
     return content.split('\n').map((line, idx) => (
       <div key={idx}>{escapeHtml(line)}</div>
@@ -39,18 +42,38 @@ export default function ExpandableOutput({
   }
 
   return (
-    <div
-      className={`tool-output expandable ${expanded ? 'expanded' : ''}`}
-      onClick={() => setExpanded(!expanded)}
-      style={{ cursor: 'pointer' }}
-    >
+    <div className="tool-output">
       <div className="output-preview">
         {renderContent(previewLines.join('\n'))}
-        <div className="expand-hint">... ({remaining} more lines)</div>
+        <HoverPreview
+          content={
+            <div 
+              className="expand-hint"
+              onClick={() => setExpanded(!expanded)}
+              style={{ cursor: 'pointer' }}
+            >
+              ... ({t('components.expandableOutput.moreLinesText', { count: remaining })})
+            </div>
+          }
+          previewContent={
+            <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {renderContent(text)}
+            </div>
+          }
+        />
       </div>
-      <div className="output-full">
-        {renderContent(text)}
-      </div>
+      {expanded && (
+        <div className="output-full">
+          {renderContent(text)}
+          <div 
+            className="expand-hint"
+            onClick={() => setExpanded(false)}
+            style={{ cursor: 'pointer' }}
+          >
+            Show less
+          </div>
+        </div>
+      )}
     </div>
   )
 }

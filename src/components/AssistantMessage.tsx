@@ -8,9 +8,10 @@ interface AssistantMessageProps {
   timestamp?: string
   entryId: string
   entries?: SessionEntry[]
+  searchQuery?: string
 }
 
-export default function AssistantMessage({ content, timestamp, entryId, entries = [] }: AssistantMessageProps) {
+export default function AssistantMessage({ content, timestamp, entryId, entries = [], searchQuery = '' }: AssistantMessageProps) {
   const textBlocks = content.filter(c => c.type === 'text' && c.text)
   const thinkingBlocks = content.filter(c => c.type === 'thinking' && c.thinking)
   const toolCalls = content.filter(c => c.type === 'toolCall')
@@ -22,7 +23,7 @@ export default function AssistantMessage({ content, timestamp, entryId, entries 
       {/* Text content */}
       {textBlocks.map((block, index) => (
         <div key={`text-${index}`} className="assistant-text markdown-content">
-          <MarkdownContent content={block.text!} />
+          <MarkdownContent content={block.text!} searchQuery={searchQuery} />
         </div>
       ))}
 

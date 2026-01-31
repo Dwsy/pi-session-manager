@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { escapeHtml } from '../utils/markdown'
 import { formatTokens } from '../utils/format'
 
@@ -8,6 +9,7 @@ interface CompactionProps {
 }
 
 export default function Compaction({ tokensBefore, summary }: CompactionProps) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -16,12 +18,12 @@ export default function Compaction({ tokensBefore, summary }: CompactionProps) {
       onClick={() => setExpanded(!expanded)}
       style={{ cursor: 'pointer' }}
     >
-      <div className="compaction-label">[compaction]</div>
+      <div className="compaction-label">{t('components.compaction.label')}</div>
       <div className="compaction-collapsed">
-        Compacted from {tokensBefore ? formatTokens(tokensBefore) : '0'} tokens
+        {t('components.compaction.collapsed', { tokens: formatTokens(tokensBefore || 0) })}
       </div>
       <div className="compaction-content">
-        <strong>Compacted from {tokensBefore ? formatTokens(tokensBefore) : '0'} tokens</strong>
+        <strong>{t('components.compaction.content', { tokens: formatTokens(tokensBefore || 0) })}</strong>
         {'\n\n'}
         {summary ? escapeHtml(summary) : ''}
       </div>

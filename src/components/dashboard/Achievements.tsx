@@ -1,4 +1,5 @@
 import { Trophy, Star, Flame, Target, Zap, Award, CheckCircle2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { SessionStats, HeatmapPoint } from '../../types'
 
 interface Achievement {
@@ -17,6 +18,7 @@ interface AchievementsProps {
 }
 
 export default function Achievements({ stats, title = 'Achievements' }: AchievementsProps) {
+  const { t } = useTranslation()
   const calculateAchievements = (): Achievement[] => {
     const achievements: Achievement[] = []
 
@@ -219,7 +221,7 @@ export default function Achievements({ stats, title = 'Achievements' }: Achievem
             <Trophy className="h-4 w-4 text-[#ffa657]" />
             <span className="text-sm font-medium text-[#ffa657]">All Achievements Unlocked!</span>
           </div>
-          <div className="text-[10px] text-[#6a6f85]">You're a true Pi Agent power user!</div>
+          <div className="text-[10px] text-[#6a6f85]">{t('dashboard.achievements.powerUserMessage')}</div>
         </div>
       )}
 
