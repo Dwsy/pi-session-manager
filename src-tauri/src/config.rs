@@ -54,6 +54,16 @@ impl Default for Config {
     }
 }
 
+impl Config {
+    pub fn load() -> Result<Self, String> {
+        load_config()
+    }
+
+    pub fn load_config() -> Result<Self, String> {
+        load_config()
+    }
+}
+
 pub fn get_config_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let config_dir = home.join(".pi").join("agent");
