@@ -118,11 +118,11 @@ function App() {
     loadSettings()
   }, [loadSessions, loadSettings])
 
-  // 文件监听：自动刷新会话列表
-  useFileWatcher({
-    enabled: true,
-    onSessionsChanged: loadSessions,
-  })
+  // 文件监听：自动刷新会话列表（暂时禁用，性能问题）
+  // useFileWatcher({
+  //   enabled: true,
+  //   onSessionsChanged: loadSessions,
+  // })
 
   // Badge 状态管理
   const { getBadgeType, clearBadge } = useSessionBadges(sessions)
@@ -412,6 +412,9 @@ function App() {
               onExport={() => setShowExportDialog(true)}
               onRename={() => setShowRenameDialog(true)}
               onBack={() => setSelectedSession(null)}
+              terminal={terminal}
+              piPath={piPath}
+              customCommand={customCommand}
             />
           ) : (
             <Dashboard 
