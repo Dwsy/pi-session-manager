@@ -40,6 +40,7 @@ export const components = {
     lines: 'lines',
     moreLines: '{count} more lines',
     write: 'write',
+    showLess: 'Show less',
   },
   editExecution: {
     filePath: 'File Path',
@@ -48,6 +49,11 @@ export const components = {
     changes: 'Changes',
     moreLines: '{count} more lines',
     edit: 'edit',
+    expand: 'Expand',
+    collapse: 'Collapse',
+    copied: 'Copied!',
+    copyDiff: 'Copy diff',
+    noChanges: 'No changes',
   },
   codeBlock: {
     copy: 'Copy',

@@ -40,6 +40,7 @@ export const components = {
     lines: '行',
     moreLines: '还有 {count} 行',
     write: '写入',
+    showLess: '收起',
   },
   editExecution: {
     filePath: '文件路径',
@@ -48,6 +49,11 @@ export const components = {
     changes: '变更',
     moreLines: '还有 {count} 行',
     edit: '编辑',
+    expand: '展开',
+    collapse: '收起',
+    copied: '已复制！',
+    copyDiff: '复制差异',
+    noChanges: '无变更',
   },
   codeBlock: {
     copy: '复制',

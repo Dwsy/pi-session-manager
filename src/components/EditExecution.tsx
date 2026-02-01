@@ -1,5 +1,6 @@
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react'
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { escapeHtml } from '../utils/markdown'
 import { shortenPath, formatDate } from '../utils/format'
 
@@ -18,6 +19,7 @@ export default function EditExecution({
   timestamp,
   expanded = false,
 }: EditExecutionProps) {
+  const { t } = useTranslation()
   const [localExpanded, setLocalExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
   const displayPath = shortenPath(filePath)
@@ -229,7 +231,7 @@ export default function EditExecution({
             <button
               onClick={() => setLocalExpanded(!localExpanded)}
               className="tool-action-button"
-              title={localExpanded ? 'Collapse' : 'Expand'}
+              title={localExpanded ? t('components.editExecution.collapse') : t('components.editExecution.expand')}
             >
               {localExpanded ? (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -244,7 +246,7 @@ export default function EditExecution({
             <button
               onClick={copyDiffToClipboard}
               className="tool-action-button"
-              title={copied ? 'Copied!' : 'Copy diff'}
+              title={copied ? t('components.editExecution.copied') : t('components.editExecution.copyDiff')}
             >
               {copied ? (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -269,7 +271,7 @@ export default function EditExecution({
 
       {!diff && !output && (
         <div className="tool-output" style={{ color: '#6a6f85', fontStyle: 'italic' }}>
-          No changes
+          {t('components.editExecution.noChanges')}
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { escapeHtml, getLanguageFromPath } from '../utils/markdown'
 import { shortenPath, formatDate } from '../utils/format'
 import CodeBlock from './CodeBlock'
@@ -19,6 +20,7 @@ export default function WriteExecution({
   timestamp,
   expanded = false,
 }: WriteExecutionProps) {
+  const { t } = useTranslation()
   const [localExpanded, setLocalExpanded] = useState(false)
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export default function WriteExecution({
           Write
         </span>
         <span className="tool-path">{escapeHtml(displayPath)}</span>
-        <span className="tool-meta">({lines.length} lines)</span>
+        <span className="tool-meta">({lines.length} {t('components.writeExecution.lines')})</span>
       </div>
 
       {content && (
@@ -56,7 +58,7 @@ export default function WriteExecution({
                     onClick={() => setLocalExpanded(true)}
                     style={{ cursor: 'pointer' }}
                   >
-                    ... {remaining} more lines
+                    ... {t('components.writeExecution.moreLines', { count: remaining })}
                   </div>
                 }
                 previewContent={
@@ -73,7 +75,7 @@ export default function WriteExecution({
               onClick={() => setLocalExpanded(false)}
               style={{ cursor: 'pointer' }}
             >
-              Show less
+              {t('components.writeExecution.showLess', 'Show less')}
             </div>
           )}
         </div>
