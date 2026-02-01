@@ -9,6 +9,12 @@ export const command = {
   searchAllProjects: '搜索所有项目',
   noProjectSelected: '请先选择项目',
   allProjects: '所有项目',
+  tabs: {
+    all: '全部',
+    message: '消息',
+    session: '会话',
+    project: '项目',
+  },
   shortcuts: {
     open: '打开命令面板',
     close: '关闭',

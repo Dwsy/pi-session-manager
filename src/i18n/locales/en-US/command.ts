@@ -9,6 +9,12 @@ export const command = {
   searchAllProjects: 'Search all projects',
   noProjectSelected: 'Please select a project first',
   allProjects: 'All Projects',
+  tabs: {
+    all: 'All',
+    message: 'Messages',
+    session: 'Sessions',
+    project: 'Projects',
+  },
   shortcuts: {
     open: 'Open command palette',
     close: 'Close',

@@ -1,5 +1,5 @@
 import { Command } from 'cmdk'
-import { Search, Loader2, FolderOpen } from 'lucide-react'
+import { Search, Loader2, FolderOpen, MessageSquare, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useRef, useState } from 'react'
 import type { SearchPluginResult, SearchContext } from '../../plugins/types'
@@ -23,6 +23,17 @@ interface CommandMenuProps {
   setSearchCurrentProjectOnly: (value: boolean) => void
 }
 
+// Tab 类型定义
+type TabType = 'all' | 'message' | 'session' | 'project'
+
+// Tab 配置（会在组件中使用 i18n）
+const TABS: { id: TabType; key: string; pluginId?: string }[] = [
+  { id: 'all', key: 'tabs.all' },
+  { id: 'message', key: 'tabs.message', pluginId: 'message-search' },
+  { id: 'session', key: 'tabs.session', pluginId: 'session-search' },
+  { id: 'project', key: 'tabs.project', pluginId: 'project-search' },
+]
+
 export default function CommandMenu({
   query,
   setQuery,
@@ -40,21 +51,18 @@ export default function CommandMenu({
   const debounceRef = useRef<NodeJS.Timeout>()
   const abortControllerRef = useRef<AbortController>()
   const [searchError, setSearchError] = useState<string | undefined>()
+  const [activeTab, setActiveTab] = useState<TabType>('all')
   
   // 获取当前项目名称
   const currentProjectName = context.selectedProject 
     ? context.selectedProject.split('/').pop() || context.selectedProject
     : null
   
-  console.log('[CommandMenu] selectedProject:', context.selectedProject)
-  console.log('[CommandMenu] currentProjectName:', currentProjectName)
-  
   // 防抖搜索
   useEffect(() => {
     // 取消之前的搜索
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
-      console.log('[CommandMenu] Aborted previous search')
     }
     
     if (debounceRef.current) {
@@ -68,27 +76,22 @@ export default function CommandMenu({
       return
     }
     
-    console.log('[CommandMenu] Starting debounced search for:', query)
     setIsSearching(true)
     setSearchError(undefined)
     
     debounceRef.current = setTimeout(async () => {
       try {
-        console.log('[CommandMenu] Executing search after debounce')
         abortControllerRef.current = new AbortController()
         
         // 添加超时保护
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
-            console.error('[CommandMenu] Search timeout!')
             reject(new Error('Search timeout after 15 seconds'))
           }, 15000) // 15秒总超时
         })
         
         const searchPromise = search(query)
         const searchResults = await Promise.race([searchPromise, timeoutPromise])
-        
-        console.log('[CommandMenu] Search completed, results:', searchResults.length)
         
         if (!abortControllerRef.current.signal.aborted) {
           setResults(searchResults)
@@ -97,7 +100,6 @@ export default function CommandMenu({
       } catch (error) {
         console.error('[CommandMenu] Search error:', error)
         if (error instanceof Error && error.name !== 'AbortError') {
-          console.error('[CommandMenu] Search failed:', error.message)
           setSearchError(error.message)
           // 显示错误状态
           setResults([])
@@ -186,6 +188,42 @@ export default function CommandMenu({
         </kbd>
       </div>
       
+      {/* Tabs */}
+      <div className="flex items-center gap-1 px-4 py-2 border-b border-[#2a2b36] bg-[#1a1b26]">
+        {TABS.map(tab => {
+          const isActive = activeTab === tab.id
+          let Icon = null
+          if (tab.id === 'message') Icon = MessageSquare
+          else if (tab.id === 'session') Icon = FileText
+          else if (tab.id === 'project') Icon = FolderOpen
+
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors
+                ${isActive
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-[#2a2b36]'
+                }
+              `}
+            >
+              {Icon && <Icon className="w-3.5 h-3.5" />}
+              <span>{t(`command.${tab.key}`)}</span>
+              {tab.pluginId && groupedResults[tab.pluginId] && (
+                <span className={`
+                  px-1.5 py-0.5 rounded text-[10px]
+                  ${isActive ? 'bg-blue-500/30 text-blue-300' : 'bg-[#2a2b36] text-muted-foreground'}
+                `}>
+                  {groupedResults[tab.pluginId]?.length || 0}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
       {/* 结果列表 */}
       <Command.List className="max-h-[50vh] overflow-y-auto p-2">
         {isSearching && <CommandLoading />}
@@ -203,13 +241,18 @@ export default function CommandMenu({
         )}
         
         {!isSearching && !searchError && Object.entries(groupedResults).map(([pluginId, pluginResults]) => {
+          // 根据 activeTab 过滤结果
+          if (activeTab !== 'all' && activeTab !== TABS.find(t => t.pluginId === pluginId)?.id) {
+            return null
+          }
+
           const plugin = registry.get(pluginId)
           if (!plugin) return null
           
           return (
             <Command.Group
               key={pluginId}
-              heading={plugin.name}
+              heading={activeTab === 'all' ? plugin.name : undefined}
               className="mb-2"
             >
               {pluginResults.map(result => (
