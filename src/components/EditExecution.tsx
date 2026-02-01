@@ -1,7 +1,7 @@
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react'
 import { useState, useEffect } from 'react'
 import { escapeHtml } from '../utils/markdown'
-import { shortenPath } from '../utils/format'
+import { shortenPath, formatDate } from '../utils/format'
 
 interface EditExecutionProps {
   filePath: string
@@ -150,9 +150,9 @@ export default function EditExecution({
             newFile={newFile}
             options={{
               theme: { dark: 'pierre-dark', light: 'pierre-light' },
-              themeType: 'system', // 自动跟随系统主题
+              themeType: 'dark',
               diffStyle: 'split',
-              overflow: 'wrap', // 启用换行
+              overflow: 'wrap',
             }}
           />
         </div>
@@ -212,7 +212,7 @@ export default function EditExecution({
 
   return (
     <div className="tool-execution success">
-      {timestamp && <div className="message-timestamp">{timestamp}</div>}
+      {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
       <div className="tool-header">
         <span className="tool-name">
           <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -225,10 +225,10 @@ export default function EditExecution({
 
       {diff && (
         <div className="tool-diff-wrapper">
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+          <div className="tool-diff-actions">
             <button
               onClick={() => setLocalExpanded(!localExpanded)}
-              className="tool-toggle-button"
+              className="tool-action-button"
               title={localExpanded ? 'Collapse' : 'Expand'}
             >
               {localExpanded ? (
@@ -243,7 +243,7 @@ export default function EditExecution({
             </button>
             <button
               onClick={copyDiffToClipboard}
-              className="tool-copy-button"
+              className="tool-action-button"
               title={copied ? 'Copied!' : 'Copy diff'}
             >
               {copied ? (
