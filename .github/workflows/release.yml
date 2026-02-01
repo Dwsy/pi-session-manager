@@ -46,7 +46,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: updater-json-${{ matrix.platform }}-${{ strategy.job-index }}
-          path: src-tauri/target/**/release/bundle/updater/*.json
+          path: target/**/release/bundle/updater/*.json
           if-no-files-found: warn
 
       # 2. 直接上传安装包到 GitHub Release (避免 artifact 下载超时)
@@ -62,7 +62,7 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           files: |
-            src-tauri/target/**/release/bundle/dmg/*.dmg
+            target/**/release/bundle/dmg/*.dmg
 
   publish-release:
     needs: build-tauri
