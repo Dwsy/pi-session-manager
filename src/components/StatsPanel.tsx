@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useTranslation } from 'react-i18next'
 import { X, BarChart3, Calendar, Folder, Clock, Zap, RefreshCw, Download, Settings, Award } from 'lucide-react'
@@ -29,6 +29,7 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
   const [stats, setStats] = useState<SessionStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabType>('overview')
+  const isLoadingRef = useRef(false)
 
   const TABS = [
     { id: 'overview' as TabType, label: t('stats.tabs.overview'), icon: BarChart3 },
@@ -46,6 +47,9 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
   }, []) // 空依赖数组
 
   const loadStats = async () => {
+    if (isLoadingRef.current) return
+    isLoadingRef.current = true
+
     try {
       setLoading(true)
       const result = await invoke<SessionStats>('get_session_stats', { sessions })
@@ -57,6 +61,7 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
       console.error('Failed to load stats:', error)
     } finally {
       setLoading(false)
+      isLoadingRef.current = false
     }
   }
 

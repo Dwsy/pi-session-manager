@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useTranslation } from 'react-i18next'
 import { BarChart3, Clock, RefreshCw, Activity, Zap, DollarSign } from 'lucide-react'
@@ -27,6 +27,7 @@ function getProjectName(path: string): string {
 export default function Dashboard({ sessions, onSessionSelect, projectName }: DashboardProps) {
   const { t } = useTranslation()
   const [stats, setStats] = useState<SessionStats | null>(null)
+  const isLoadingRef = useRef(false)
 
   // 只在组件挂载时加载统计，不自动跟随 sessions 变化
   useEffect(() => {
@@ -34,11 +35,16 @@ export default function Dashboard({ sessions, onSessionSelect, projectName }: Da
   }, []) // 空依赖数组
 
   const loadStats = async () => {
+    if (isLoadingRef.current) return
+    isLoadingRef.current = true
+
     try {
       const result = await invoke<SessionStats>('get_session_stats', { sessions })
       setStats(result)
     } catch (error) {
       console.error('Failed to load stats:', error)
+    } finally {
+      isLoadingRef.current = false
     }
   }
 
