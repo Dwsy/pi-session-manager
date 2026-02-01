@@ -4,9 +4,9 @@
 
 /* Pierre Diffs 主题覆盖 - 跟随应用主题而非系统偏好 */
 @layer base {
-  /* 默认使用浅色主题 */
+  /* 默认使用暗色主题，与应用默认主题保持一致 */
   :root {
-    color-scheme: light;
+    color-scheme: dark;
   }
 
   /* 当应用设置为深色主题时 */
@@ -239,6 +239,11 @@ body {
   border: 1px solid rgba(138, 190, 183, 0.2);
   overflow: hidden;
   background: rgba(0, 0, 0, 0.2);
+}
+
+.tool-execution > .message-timestamp {
+  padding-left: 12px;
+  padding-top: 6px;
 }
 
 .tool-execution.pending { 
