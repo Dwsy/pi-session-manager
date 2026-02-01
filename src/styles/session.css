@@ -486,8 +486,116 @@
 
  .tool-diff-wrapper {
    margin-top: 8px;
+   padding: 0 12px 12px 12px;
+ }
+
+ .tool-diff-actions {
+   display: flex;
+   gap: 6px;
+   margin-bottom: 12px;
+ }
+
+ .tool-action-button {
+   padding: 6px;
+   background: rgba(0, 0, 0, 0.3);
+   color: #6a6f85;
+   border: 1px solid rgba(138, 190, 183, 0.2);
+   border-radius: 6px;
+   cursor: pointer;
+   transition: all 0.2s ease;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+ }
+
+ .tool-action-button:hover {
+   color: #d4d4d8;
+   border-color: rgba(138, 190, 183, 0.4);
+   background: rgba(138, 190, 183, 0.1);
  }
 
  .tool-output-wrapper {
    margin-top: 8px;
  }
+
+/*
+ =====================================================
+ =======
+    Bash Command Highlight Styles
+
+ =====================================================
+ ======= */
+
+.tool-command-wrapper {
+  position: relative;
+  margin-top: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(138, 190, 183, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.tool-command-highlighted {
+  margin: 0;
+  padding: 12px 40px 12px 16px;
+  background: transparent;
+  overflow-x: auto;
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tool-command-highlighted code {
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+  color: #d4d4d8;
+}
+
+/* Bash syntax highlighting colors */
+.tool-command-highlighted .hljs-keyword {
+  color: #cc7832;
+}
+
+.tool-command-highlighted .hljs-string {
+  color: #6a8759;
+}
+
+.tool-command-highlighted .hljs-number {
+  color: #6897bb;
+}
+
+.tool-command-highlighted .hljs-comment {
+  color: #808080;
+}
+
+.tool-command-highlighted .hljs-operator {
+  color: #d4d4d8;
+}
+
+.tool-command-highlighted .hljs-punctuation {
+  color: #d4d4d8;
+}
+
+.tool-command-wrapper .tool-copy-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  color: #6a6f85;
+  border: 1px solid rgba(138, 190, 183, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.tool-command-wrapper .tool-copy-button:hover {
+  color: #d4d4d8;
+  border-color: rgba(138, 190, 183, 0.4);
+  background: rgba(138, 190, 183, 0.1);
+}

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
-import { escapeHtml } from '../utils/markdown'
+import { useState, useEffect, useRef } from 'react'
+import { formatDate } from '../utils/format'
 import ExpandableOutput from './ExpandableOutput'
+import hljs from 'highlight.js'
 
 interface BashExecutionProps {
   command: string
@@ -22,15 +23,26 @@ export default function BashExecution({
   expanded = false,
 }: BashExecutionProps) {
   const [localExpanded, setLocalExpanded] = useState(false)
+  const [outputCopied, setOutputCopied] = useState(false)
+  const [commandCopied, setCommandCopied] = useState(false)
+  const codeRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     setLocalExpanded(expanded)
   }, [expanded])
+
+  useEffect(() => {
+    if (codeRef.current) {
+      try {
+        hljs.highlightElement(codeRef.current)
+      } catch (e) {
+        console.warn('Failed to highlight bash code:', e)
+      }
+    }
+  }, [command])
+
   const isError = cancelled || (exitCode !== undefined && exitCode !== null && exitCode !== 0)
   const statusClass = isError ? 'error' : 'success'
-  
-  const [commandCopied, setCommandCopied] = useState(false)
-  const [outputCopied, setOutputCopied] = useState(false)
 
   const handleCopyCommand = async () => {
     try {
@@ -56,7 +68,7 @@ export default function BashExecution({
 
   return (
     <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
-      {timestamp && <div className="message-timestamp">{timestamp}</div>}
+      {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
       <div className="tool-header">
         <span className="tool-name">
           <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -76,7 +88,9 @@ export default function BashExecution({
         )}
       </div>
       <div className="tool-command-wrapper">
-        <div className="tool-command">$ {escapeHtml(command)}</div>
+        <pre className="tool-command-highlighted">
+          <code ref={codeRef} className="language-bash">{command}</code>
+        </pre>
         <button
           onClick={handleCopyCommand}
           className="tool-copy-button"
