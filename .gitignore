@@ -68,3 +68,4 @@ pi-session-*.html
 
 # Development tasks
 tasks/
+.ace-tool/
