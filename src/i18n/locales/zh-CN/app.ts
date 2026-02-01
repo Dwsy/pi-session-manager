@@ -4,7 +4,6 @@ export const app = {
   projects: '项目',
   viewMode: {
     list: '列表视图',
-    directory: '目录视图',
     project: '项目视图',
   },
   shortcuts: {

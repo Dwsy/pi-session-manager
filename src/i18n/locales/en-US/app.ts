@@ -4,7 +4,6 @@ export const app = {
   projects: 'Projects',
   viewMode: {
     list: 'List view',
-    directory: 'Directory view',
     project: 'Project view',
   },
   shortcuts: {
