@@ -102,6 +102,8 @@ export const components = {
       user: 'User',
       labeled: 'Labeled',
       all: 'All',
+      read: 'Read',
+      edit: 'Edit',
     },
     filterTitles: {
       default: 'Hide settings entries',
@@ -109,6 +111,8 @@ export const components = {
       user: 'Only user messages',
       labeled: 'Only labeled entries',
       all: 'Show everything',
+      read: 'Only read tools',
+      edit: 'Only edit tools',
     },
     status: '{filtered} / {total} entries',
     entries: 'entries',

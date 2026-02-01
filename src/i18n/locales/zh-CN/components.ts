@@ -102,6 +102,8 @@ export const components = {
       user: '用户',
       labeled: '已标记',
       all: '全部',
+      read: '读取',
+      edit: '编辑',
     },
     filterTitles: {
       default: '隐藏设置条目',
@@ -109,6 +111,8 @@ export const components = {
       user: '仅用户消息',
       labeled: '仅已标记条目',
       all: '显示所有',
+      read: '仅读取工具',
+      edit: '仅编辑工具',
     },
     status: '{filtered} / {total} 条目',
     entries: '条目',
