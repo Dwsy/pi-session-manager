@@ -1,9 +1,11 @@
 use crate::config::Config;
+use crate::session_parser::SessionDetails;
 use crate::models::SessionInfo;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Result as SqliteResult};
 use std::fs;
 use std::path::{Path, PathBuf};
+use serde_json;
 
 pub fn get_db_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
@@ -42,6 +44,25 @@ pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
         )",
         [],
     ).map_err(|e| format!("Failed to create table: {}", e))?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS session_details_cache (
+            path TEXT PRIMARY KEY,
+            file_modified TEXT NOT NULL,
+            user_messages INTEGER NOT NULL,
+            assistant_messages INTEGER NOT NULL,
+            input_tokens INTEGER NOT NULL,
+            output_tokens INTEGER NOT NULL,
+            cache_read_tokens INTEGER NOT NULL,
+            cache_write_tokens INTEGER NOT NULL,
+            input_cost REAL NOT NULL,
+            output_cost REAL NOT NULL,
+            cache_read_cost REAL NOT NULL,
+            cache_write_cost REAL NOT NULL,
+            models_json TEXT NOT NULL
+        )",
+        [],
+    ).map_err(|e| format!("Failed to create table session_details_cache: {}", e))?;
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_modified ON sessions(modified DESC)",
@@ -287,6 +308,99 @@ pub fn get_session_count(conn: &Connection) -> Result<usize, String> {
     let count: i64 = conn.query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
         .map_err(|e| format!("Failed to count sessions: {}", e))?;
     Ok(count as usize)
+}
+
+#[derive(Debug, Clone)]
+pub struct SessionDetailsCache {
+    pub file_modified: DateTime<Utc>,
+    pub user_messages: usize,
+    pub assistant_messages: usize,
+    pub input_tokens: usize,
+    pub output_tokens: usize,
+    pub cache_read_tokens: usize,
+    pub cache_write_tokens: usize,
+    pub input_cost: f64,
+    pub output_cost: f64,
+    pub cache_read_cost: f64,
+    pub cache_write_cost: f64,
+    pub models_json: String,
+}
+
+pub fn get_session_details_cache(conn: &Connection, path: &str) -> Result<Option<SessionDetailsCache>, String> {
+    let mut stmt = conn.prepare(
+        "SELECT file_modified, user_messages, assistant_messages, input_tokens, output_tokens,
+                cache_read_tokens, cache_write_tokens, input_cost, output_cost, cache_read_cost,
+                cache_write_cost, models_json
+         FROM session_details_cache
+         WHERE path = ?"
+    ).map_err(|e| format!("Failed to prepare session_details_cache statement: {}", e))?;
+
+    let row = stmt.query_row(params![path], |row| {
+        Ok(SessionDetailsCache {
+            file_modified: parse_timestamp(&row.get::<_, String>(0)?),
+            user_messages: row.get::<_, i64>(1)? as usize,
+            assistant_messages: row.get::<_, i64>(2)? as usize,
+            input_tokens: row.get::<_, i64>(3)? as usize,
+            output_tokens: row.get::<_, i64>(4)? as usize,
+            cache_read_tokens: row.get::<_, i64>(5)? as usize,
+            cache_write_tokens: row.get::<_, i64>(6)? as usize,
+            input_cost: row.get::<_, f64>(7)?,
+            output_cost: row.get::<_, f64>(8)?,
+            cache_read_cost: row.get::<_, f64>(9)?,
+            cache_write_cost: row.get::<_, f64>(10)?,
+            models_json: row.get::<_, String>(11)?,
+        })
+    }).ok();
+
+    Ok(row)
+}
+
+pub fn upsert_session_details_cache(
+    conn: &Connection,
+    path: &str,
+    file_modified: DateTime<Utc>,
+    details: &SessionDetails,
+) -> Result<(), String> {
+    let models_json = serde_json::to_string(&details.models)
+        .map_err(|e| format!("Failed to serialize models: {}", e))?;
+
+    conn.execute(
+        "INSERT INTO session_details_cache (
+            path, file_modified, user_messages, assistant_messages, input_tokens, output_tokens,
+            cache_read_tokens, cache_write_tokens, input_cost, output_cost, cache_read_cost,
+            cache_write_cost, models_json
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+        ON CONFLICT(path) DO UPDATE SET
+            file_modified = excluded.file_modified,
+            user_messages = excluded.user_messages,
+            assistant_messages = excluded.assistant_messages,
+            input_tokens = excluded.input_tokens,
+            output_tokens = excluded.output_tokens,
+            cache_read_tokens = excluded.cache_read_tokens,
+            cache_write_tokens = excluded.cache_write_tokens,
+            input_cost = excluded.input_cost,
+            output_cost = excluded.output_cost,
+            cache_read_cost = excluded.cache_read_cost,
+            cache_write_cost = excluded.cache_write_cost,
+            models_json = excluded.models_json",
+        params![
+            path,
+            &file_modified.to_rfc3339(),
+            details.user_messages as i64,
+            details.assistant_messages as i64,
+            details.input_tokens as i64,
+            details.output_tokens as i64,
+            details.cache_read_tokens as i64,
+            details.cache_write_tokens as i64,
+            details.input_cost,
+            details.output_cost,
+            details.cache_read_cost,
+            details.cache_write_cost,
+            models_json,
+        ],
+    ).map_err(|e| format!("Failed to upsert session_details_cache: {}", e))?;
+
+    Ok(())
 }
 
 pub fn vacuum(conn: &Connection) -> Result<(), String> {

@@ -1,8 +1,10 @@
 use crate::models::SessionInfo;
 use crate::session_parser::parse_session_details;
+use crate::sqlite_cache;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{Datelike, Timelike, Weekday};
+use serde_json;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionStats {
@@ -20,6 +22,14 @@ pub struct SessionStats {
     pub heatmap_data: Vec<HeatmapPoint>,
     pub time_distribution: Vec<TimeDistributionPoint>,
     pub token_details: TokenDetails,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionStatsInput {
+    pub path: String,
+    pub cwd: String,
+    pub modified: String,
+    pub message_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,9 +71,25 @@ pub struct DailyActivity {
 }
 
 pub fn calculate_stats(sessions: &[SessionInfo]) -> SessionStats {
+    let light_sessions: Vec<SessionStatsInput> = sessions
+        .iter()
+        .map(|session| SessionStatsInput {
+            path: session.path.clone(),
+            cwd: session.cwd.clone(),
+            modified: session.modified.to_rfc3339(),
+            message_count: session.message_count,
+        })
+        .collect();
+
+    calculate_stats_from_inputs(&light_sessions)
+}
+
+pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionStats {
     let total_sessions = sessions.len();
 
     println!("Calculating stats for {} sessions", total_sessions);
+
+    let conn = sqlite_cache::init_db().ok();
 
     let mut sessions_by_project: HashMap<String, usize> = HashMap::new();
     let mut sessions_by_model: HashMap<String, usize> = HashMap::new();
@@ -85,40 +111,89 @@ pub fn calculate_stats(sessions: &[SessionInfo]) -> SessionStats {
     let tokens_by_model: HashMap<String, ModelTokenStats> = HashMap::new();
 
     for session in sessions {
+        let session_modified = parse_modified(&session.modified);
         // Extract project from cwd
         let project = extract_project_name(&session.cwd);
         *sessions_by_project.entry(project).or_insert(0) += 1;
 
-        // Parse session file for detailed stats
+        let cached_details = conn.as_ref().and_then(|conn| {
+            sqlite_cache::get_session_details_cache(conn, &session.path)
+                .ok()
+                .flatten()
+                .filter(|cached| cached.file_modified >= session_modified)
+        });
+
+        if let Some(cached) = cached_details {
+            if let Ok(models) = serde_json::from_str::<Vec<String>>(&cached.models_json) {
+                for model in models {
+                    *sessions_by_model.entry(model).or_insert(0) += 1;
+                }
+            }
+
+            total_user_messages += cached.user_messages;
+            total_assistant_messages += cached.assistant_messages;
+            total_messages += cached.user_messages + cached.assistant_messages;
+
+            total_input += cached.input_tokens;
+            total_output += cached.output_tokens;
+            total_cache_read += cached.cache_read_tokens;
+            total_cache_write += cached.cache_write_tokens;
+            total_cost += cached.input_cost + cached.output_cost + cached.cache_read_cost + cached.cache_write_cost;
+
+            let date = session_modified.format("%Y-%m-%d").to_string();
+            *messages_by_date.entry(date.clone()).or_insert(0) += cached.user_messages + cached.assistant_messages;
+
+            let hour = session_modified.hour();
+            *messages_by_hour.entry(hour.to_string()).or_insert(0) += cached.user_messages + cached.assistant_messages;
+
+            let weekday = session_modified.weekday();
+            let day_name = match weekday {
+                Weekday::Mon => "Monday",
+                Weekday::Tue => "Tuesday",
+                Weekday::Wed => "Wednesday",
+                Weekday::Thu => "Thursday",
+                Weekday::Fri => "Friday",
+                Weekday::Sat => "Saturday",
+                Weekday::Sun => "Sunday",
+            };
+            *messages_by_day_of_week.entry(day_name.to_string()).or_insert(0) += cached.user_messages + cached.assistant_messages;
+            continue;
+        }
+
+        // Parse session file for detailed stats (cache miss or stale)
         if let Ok(content) = std::fs::read_to_string(&session.path) {
             let session_stats = parse_session_details(&content);
-            // Update model usage
+
+            if let Some(conn) = conn.as_ref() {
+                let _ = sqlite_cache::upsert_session_details_cache(
+                    conn,
+                    &session.path,
+                    session_modified,
+                    &session_stats,
+                );
+            }
+
             for model in &session_stats.models {
                 *sessions_by_model.entry(model.clone()).or_insert(0) += 1;
             }
 
-            // Update message counts
             total_user_messages += session_stats.user_messages;
             total_assistant_messages += session_stats.assistant_messages;
             total_messages += session_stats.user_messages + session_stats.assistant_messages;
 
-            // Update token counts
             total_input += session_stats.input_tokens as usize;
             total_output += session_stats.output_tokens as usize;
             total_cache_read += session_stats.cache_read_tokens as usize;
             total_cache_write += session_stats.cache_write_tokens as usize;
             total_cost += session_stats.input_cost + session_stats.output_cost + session_stats.cache_read_cost + session_stats.cache_write_cost;
 
-            // Messages by date (use session modified time as fallback)
-            let date = session.modified.format("%Y-%m-%d").to_string();
+            let date = session_modified.format("%Y-%m-%d").to_string();
             *messages_by_date.entry(date.clone()).or_insert(0) += session_stats.user_messages + session_stats.assistant_messages;
 
-            // Messages by hour
-            let hour = session.modified.hour();
+            let hour = session_modified.hour();
             *messages_by_hour.entry(hour.to_string()).or_insert(0) += session_stats.user_messages + session_stats.assistant_messages;
 
-            // Messages by day of week
-            let weekday = session.modified.weekday();
+            let weekday = session_modified.weekday();
             let day_name = match weekday {
                 Weekday::Mon => "Monday",
                 Weekday::Tue => "Tuesday",
@@ -134,16 +209,13 @@ pub fn calculate_stats(sessions: &[SessionInfo]) -> SessionStats {
             *sessions_by_model.entry("unknown".to_string()).or_insert(0) += 1;
             total_messages += session.message_count;
 
-            // Messages by date (use session modified time)
-            let date = session.modified.format("%Y-%m-%d").to_string();
+            let date = session_modified.format("%Y-%m-%d").to_string();
             *messages_by_date.entry(date.clone()).or_insert(0) += session.message_count;
 
-            // Messages by hour
-            let hour = session.modified.hour();
+            let hour = session_modified.hour();
             *messages_by_hour.entry(hour.to_string()).or_insert(0) += session.message_count;
 
-            // Messages by day of week
-            let weekday = session.modified.weekday();
+            let weekday = session_modified.weekday();
             let day_name = match weekday {
                 Weekday::Mon => "Monday",
                 Weekday::Tue => "Tuesday",
@@ -268,4 +340,49 @@ pub fn get_activity_timeline(sessions: &[SessionInfo]) -> Vec<DailyActivity> {
 
     timeline.sort_by(|a, b| a.date.cmp(&b.date));
     timeline
+}
+
+fn parse_modified(value: &str) -> chrono::DateTime<chrono::Utc> {
+    chrono::DateTime::parse_from_rfc3339(value)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .unwrap_or_else(|_| chrono::Utc::now())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn calculate_stats_from_inputs_fallback_counts_messages() {
+        let sessions = vec![
+            SessionStatsInput {
+                path: "/tmp/does-not-exist-1.jsonl".to_string(),
+                cwd: "/Users/example/project-alpha".to_string(),
+                modified: chrono::Utc
+                    .with_ymd_and_hms(2025, 1, 2, 10, 0, 0)
+                    .unwrap()
+                    .to_rfc3339(),
+                message_count: 5,
+            },
+            SessionStatsInput {
+                path: "/tmp/does-not-exist-2.jsonl".to_string(),
+                cwd: "/Users/example/project-beta".to_string(),
+                modified: chrono::Utc
+                    .with_ymd_and_hms(2025, 1, 3, 16, 0, 0)
+                    .unwrap()
+                    .to_rfc3339(),
+                message_count: 3,
+            },
+        ];
+
+        let stats = calculate_stats_from_inputs(&sessions);
+
+        assert_eq!(stats.total_sessions, 2);
+        assert_eq!(stats.total_messages, 8);
+        assert_eq!(stats.sessions_by_project.get("project-alpha"), Some(&1));
+        assert_eq!(stats.sessions_by_project.get("project-beta"), Some(&1));
+        assert_eq!(stats.messages_by_hour.get("10"), Some(&5));
+        assert_eq!(stats.messages_by_hour.get("16"), Some(&3));
+    }
 }
