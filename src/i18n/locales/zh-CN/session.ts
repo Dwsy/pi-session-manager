@@ -49,7 +49,7 @@ export const session = {
   loading: '加载会话中...',
   messages: '条消息',
   noMessages: '此会话中没有消息',
-  messageCount: '{count} 条消息',
+  messageCount: '{{count}} 条消息',
   showSidebar: '显示侧边栏',
   hideSidebar: '隐藏侧边栏',
   title: '会话',

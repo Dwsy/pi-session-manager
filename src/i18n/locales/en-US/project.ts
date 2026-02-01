@@ -2,7 +2,7 @@ export const project = {
   list: {
     loading: 'Loading projects...',
     empty: 'No projects found',
-    count: '{count} projects',
+    count: '{{count}} projects',
     sessions: 'sessions',
     backToProjects: 'Back to projects',
     unknownDirectory: 'Unknown Directory',
@@ -10,5 +10,5 @@ export const project = {
     back: 'Back',
     projects: 'projects',
   },
-  sessionCount: '{count} sessions',
+  sessionCount: '{{count}} sessions',
 } as const

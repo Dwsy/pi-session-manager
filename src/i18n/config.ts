@@ -18,8 +18,6 @@ i18n
     lng: localStorage.getItem('app-language') || 'en-US',
     interpolation: {
       escapeValue: false,
-      prefix: '{',
-      suffix: '}',
     },
     detection: {
       order: ['localStorage', 'navigator'],

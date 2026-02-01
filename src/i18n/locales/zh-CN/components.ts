@@ -1,8 +1,8 @@
 export const components = {
   expandableOutput: {
-    moreLines: '还有 {count} 行',
+    moreLines: '还有 {{count}} 行',
     more: '更多',
-    moreLinesText: '还有 {count} 行',
+    moreLinesText: '还有 {{count}} 行',
   },
   thinkingBlock: {
     collapsed: '思考中 ...',
@@ -20,7 +20,7 @@ export const components = {
     executionTime: '执行时间',
     exit: 'exit',
     cancelledText: '(已取消)',
-    exitCodeText: '(退出 {code})',
+    exitCodeText: '(退出 {{code}})',
   },
   readExecution: {
     filePath: '文件路径',
@@ -28,7 +28,7 @@ export const components = {
     limit: '限制',
     output: '输出',
     images: '图片',
-    moreLines: '还有 {count} 行',
+    moreLines: '还有 {{count}} 行',
     read: '读取',
     imageAlt: '读取图片',
   },
@@ -38,7 +38,7 @@ export const components = {
     output: '输出',
     success: '文件写入成功',
     lines: '行',
-    moreLines: '还有 {count} 行',
+    moreLines: '还有 {{count}} 行',
     write: '写入',
     showLess: '收起',
   },
@@ -47,7 +47,7 @@ export const components = {
     diff: '差异',
     output: '输出',
     changes: '变更',
-    moreLines: '还有 {count} 行',
+    moreLines: '还有 {{count}} 行',
     edit: '编辑',
     expand: '展开',
     collapse: '收起',
@@ -87,9 +87,9 @@ export const components = {
   },
   compaction: {
     label: '[压缩]',
-    compactedFrom: '从 {tokens} 个令牌压缩',
-    collapsed: '从 {tokens} 个令牌压缩',
-    content: '从 {tokens} 个令牌压缩',
+    compactedFrom: '从 {{tokens}} 个令牌压缩',
+    collapsed: '从 {{tokens}} 个令牌压缩',
+    content: '从 {{tokens}} 个令牌压缩',
   },
   branchSummary: {
     header: '分支摘要',
@@ -120,7 +120,7 @@ export const components = {
       read: '仅读取工具',
       edit: '仅编辑工具',
     },
-    status: '{filtered} / {total} 条目',
+    status: '{{filtered}} / {{total}} 条目',
     entries: '条目',
     filterDefault: '默认',
     filterNoTools: '无工具',

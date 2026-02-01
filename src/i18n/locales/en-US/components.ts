@@ -1,8 +1,8 @@
 export const components = {
   expandableOutput: {
-    moreLines: '{count} more lines',
+    moreLines: '{{count}} more lines',
     more: 'more',
-    moreLinesText: '{count} more lines',
+    moreLinesText: '{{count}} more lines',
   },
   thinkingBlock: {
     collapsed: 'Thinking ...',
@@ -20,7 +20,7 @@ export const components = {
     executionTime: 'Execution Time',
     exit: 'exit',
     cancelledText: '(Cancelled)',
-    exitCodeText: '(exit {code})',
+    exitCodeText: '(exit {{code}})',
   },
   readExecution: {
     filePath: 'File Path',
@@ -28,7 +28,7 @@ export const components = {
     limit: 'Limit',
     output: 'Output',
     images: 'Images',
-    moreLines: '{count} more lines',
+    moreLines: '{{count}} more lines',
     read: 'read',
     imageAlt: 'Read image',
   },
@@ -38,7 +38,7 @@ export const components = {
     output: 'Output',
     success: 'File written successfully',
     lines: 'lines',
-    moreLines: '{count} more lines',
+    moreLines: '{{count}} more lines',
     write: 'write',
     showLess: 'Show less',
   },
@@ -47,7 +47,7 @@ export const components = {
     diff: 'Diff',
     output: 'Output',
     changes: 'Changes',
-    moreLines: '{count} more lines',
+    moreLines: '{{count}} more lines',
     edit: 'edit',
     expand: 'Expand',
     collapse: 'Collapse',
@@ -87,9 +87,9 @@ export const components = {
   },
   compaction: {
     label: '[compaction]',
-    compactedFrom: 'Compacted from {tokens} tokens',
-    collapsed: 'Compacted from {tokens} tokens',
-    content: 'Compacted from {tokens} tokens',
+    compactedFrom: 'Compacted from {{tokens}} tokens',
+    collapsed: 'Compacted from {{tokens}} tokens',
+    content: 'Compacted from {{tokens}} tokens',
   },
   branchSummary: {
     header: 'Branch Summary',
@@ -120,7 +120,7 @@ export const components = {
       read: 'Only read tools',
       edit: 'Only edit tools',
     },
-    status: '{filtered} / {total} entries',
+    status: '{{filtered}} / {{total}} entries',
     entries: 'entries',
     filterDefault: 'Default',
     filterNoTools: 'No-tools',

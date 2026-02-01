@@ -49,7 +49,7 @@ export const session = {
   loading: 'Loading session...',
   messages: 'messages',
   noMessages: 'No messages',
-  messageCount: '{count} messages',
+  messageCount: '{{count}} messages',
   showSidebar: 'Show sidebar',
   hideSidebar: 'Hide sidebar',
   title: 'Session',
