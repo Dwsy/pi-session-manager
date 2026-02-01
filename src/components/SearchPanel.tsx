@@ -39,7 +39,7 @@ export default function SearchPanel({ onSearch, resultCount, isSearching }: Sear
   }
 
   return (
-    <div className="px-3 py-2.5 border-b border-border/50">
+    <div className="px-3 py-2 border-b border-border/50">
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <input
@@ -62,7 +62,7 @@ export default function SearchPanel({ onSearch, resultCount, isSearching }: Sear
         )}
       </div>
 
-      <div className="flex items-center justify-between mt-1.5 text-[11px] text-muted-foreground h-4">
+      <div className="flex items-center justify-between mt-1 text-[11px] text-muted-foreground h-3.5">
         <div className="flex items-center gap-1.5">
           {isSearching && (
             <>

@@ -19,6 +19,7 @@ interface ProjectListProps {
   customCommand?: string
   getBadgeType?: (sessionId: string) => 'new' | 'updated' | null
   scrollParentRef?: RefObject<HTMLDivElement>
+  showHeader?: boolean
 }
 
 interface Project {
@@ -41,6 +42,7 @@ export default function ProjectList({
   customCommand,
   getBadgeType,
   scrollParentRef,
+  showHeader = true,
 }: ProjectListProps) {
   const { t } = useTranslation()
   // Use external selectedProject if provided, otherwise use internal state
@@ -150,7 +152,7 @@ export default function ProjectList({
                   </div>
                   <div className="min-w-0 flex-1 space-y-2">
                     <div>
-                      <div className="text-sm font-semibold truncate leading-tight">{project.dirName}</div>
+                      <div className="text-xs font-semibold truncate leading-tight">{project.dirName}</div>
                       <div className="text-[11px] text-muted-foreground/80 truncate">{project.dir}</div>
                     </div>
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums flex-wrap">
@@ -176,21 +178,22 @@ export default function ProjectList({
 
   return (
     <div>
-      {/* Header: Back + Project Info Combined */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30">
-        <button
-          onClick={handleBackToProjects}
-          className="p-1 hover:bg-accent rounded transition-colors flex-shrink-0"
-          title={t('project.list.back')}
-        >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-        </button>
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <FolderOpen className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
-          <span className="text-sm font-medium truncate">{projectInfo?.dirName}</span>
-          <span className="text-[11px] text-muted-foreground flex-shrink-0">({projectSessions.length})</span>
+      {showHeader && (
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30">
+          <button
+            onClick={handleBackToProjects}
+            className="p-1 hover:bg-accent rounded transition-colors flex-shrink-0"
+            title={t('project.list.back')}
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <FolderOpen className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
+            <span className="text-xs font-medium truncate">{projectInfo?.dirName}</span>
+            <span className="text-[11px] text-muted-foreground flex-shrink-0">({projectSessions.length})</span>
+          </div>
         </div>
-      </div>
+      )}
 
       <div
         className="relative w-full"
@@ -227,18 +230,20 @@ export default function ProjectList({
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <div className="text-sm font-medium truncate leading-tight flex-1">
+                    <div className="flex items-start gap-2">
+                      <div className="text-xs font-medium truncate leading-tight flex-1 min-w-0">
                         {session.name || session.first_message || t('session.list.untitled')}
                       </div>
                       {getBadgeType && getBadgeType(session.id) && (
-                        <SessionBadge type={getBadgeType(session.id)!} />
+                        <div className="flex-shrink-0 mt-0.5">
+                          <SessionBadge type={getBadgeType(session.id)!} />
+                        </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground/80 tabular-nums">
-                      <span>{t('common.created', '创建')} {formatShortTime(session.created)}</span>
+                    <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground/80">
+                      <span className="whitespace-nowrap">{t('common.created', '创建')} {formatShortTime(session.created)}</span>
                       <span className="text-border/60">·</span>
-                      <span>{t('common.updated', '更新')} {formatShortTime(session.modified)}</span>
+                      <span className="whitespace-nowrap">{t('common.updated', '更新')} {formatShortTime(session.modified)}</span>
                     </div>
                   </div>
                 </div>
