@@ -54,7 +54,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
           pluginId: this.id,
           title: session.name || this.truncateText(session.first_message, 60),
           subtitle: this.getProjectName(session.cwd),
-          description: `${session.message_count} ${context.t('session.messageCount', '条消息')} • ${this.formatDate(session.modified)}`,
+          description: `${context.t('session.messageCount', { count: session.message_count, defaultValue: `${session.message_count} 条消息` })} • ${this.formatDate(session.modified)}`,
           icon: <MessageSquare className="w-4 h-4 text-blue-400" />,
           metadata: {
             sessionId: session.id,

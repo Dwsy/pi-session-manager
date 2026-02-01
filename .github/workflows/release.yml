@@ -1,0 +1,154 @@
+name: 'Build and Release'
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+env:
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
+
+jobs:
+  # 验证 tag 格式和版本一致性
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate version
+        run: |
+          TAG_VERSION=${GITHUB_REF_NAME#v}
+          CARGO_VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | cut -d'"' -f2)
+          echo "Tag version: $TAG_VERSION"
+          echo "Cargo version: $CARGO_VERSION"
+
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "❌ Version mismatch! Tag: $TAG_VERSION, Cargo.toml: $CARGO_VERSION"
+            exit 1
+          fi
+          echo "✅ Version validated"
+
+  # 构建 macOS ARM 版本
+  build-macos-arm:
+    needs: validate
+    permissions:
+      contents: write
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Rust (ARM target)
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Tauri App (ARM64)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: '--target aarch64-apple-darwin'
+
+  # 构建 macOS Intel 版本
+  build-macos-intel:
+    needs: validate
+    permissions:
+      contents: write
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Rust (x86 target)
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: x86_64-apple-darwin
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Tauri App (x86_64)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: '--target x86_64-apple-darwin'
+
+  # 创建 Release
+  release:
+    needs: [build-macos-arm, build-macos-intel]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # 获取上一个 tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "changes<<EOF" >> $GITHUB_OUTPUT
+            echo "### What's Changed" >> $GITHUB_OUTPUT
+            git log --pretty=format:"- %s by @%an" "$PREV_TAG"..HEAD | grep -v "Merge pull request" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "changes<<EOF" >> $GITHUB_OUTPUT
+            echo "### What's Changed" >> $GITHUB_OUTPUT
+            echo "Initial release of Pi Session Manager v$VERSION" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Pi Session Manager v${{ steps.changelog.outputs.version }}"
+          body: |
+            ${{ steps.changelog.outputs.changes }}
+
+            ## Installation
+
+            ### macOS (Apple Silicon - M1/M2/M3)
+            Download `Pi Session Manager_*_aarch64.dmg`
+
+            ### macOS (Intel)
+            Download `Pi Session Manager_*_x64.dmg`
+
+            ## Requirements
+            - macOS 11.0 or later
+            - [Pi](https://github.com/mariozechner/pi) must be installed for terminal integration
+
+            ## Verification
+            ```bash
+            # Verify the app signature
+            codesign -dv --verbose=4 /Applications/Pi\ Session\ Manager.app
+            ```
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
