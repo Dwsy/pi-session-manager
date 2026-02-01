@@ -5,7 +5,27 @@ export function formatTokens(tokens: number): string {
 }
 
 export function formatDate(timestamp: string): string {
-  return new Date(timestamp).toLocaleString()
+  const date = new Date(timestamp)
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+
+  const timeStr = date.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
+
+  if (isToday) {
+    return timeStr
+  }
+
+  const dateStr = date.toLocaleDateString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit'
+  })
+
+  return `${dateStr} ${timeStr}`
 }
 
 export function shortenPath(path: string, maxLength: number = 50): string {
