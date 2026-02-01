@@ -349,6 +349,53 @@ pub async fn scan_skills() -> Result<Vec<SkillInfo>, String> {
     Ok(skills)
 }
 
+/// 获取 skill 的完整内容
+#[tauri::command]
+pub async fn get_skill_content(skill_name: String) -> Result<String, String> {
+    use std::fs;
+
+    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    let skill_md_path = home_dir.join(".pi/agent/skills").join(&skill_name).join("SKILL.md");
+
+    fs::read_to_string(&skill_md_path)
+        .map_err(|e| format!("Failed to read skill content: {}", e))
+}
+
+/// 获取 prompt 的完整内容
+#[tauri::command]
+pub async fn get_prompt_content(prompt_name: String) -> Result<String, String> {
+    use std::fs;
+
+    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    let prompt_md_path = home_dir.join(".pi/agent/prompts").join(format!("{}.md", prompt_name));
+
+    fs::read_to_string(&prompt_md_path)
+        .map_err(|e| format!("Failed to read prompt content: {}", e))
+}
+
+/// 获取当前启用的 System Prompt 内容（APPEND_SYSTEM.md）
+#[tauri::command]
+pub async fn get_system_prompt() -> Result<String, String> {
+    use std::fs;
+
+    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    let system_prompt_path = home_dir.join(".pi/agent/APPEND_SYSTEM.md");
+
+    // 如果 APPEND_SYSTEM.md 不存在，尝试读取默认 prompts
+    if !system_prompt_path.exists() {
+        // 尝试读取 default.md 或 base.md
+        let default_prompt = home_dir.join(".pi/agent/prompts/default.md");
+        if default_prompt.exists() {
+            return fs::read_to_string(&default_prompt)
+                .map_err(|e| format!("Failed to read default prompt: {}", e));
+        }
+        return Ok(String::new());
+    }
+
+    fs::read_to_string(&system_prompt_path)
+        .map_err(|e| format!("Failed to read system prompt: {}", e))
+}
+
 /// 扫描可用的 prompts
 #[tauri::command]
 pub async fn scan_prompts() -> Result<Vec<PromptInfo>, String> {

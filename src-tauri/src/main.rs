@@ -8,10 +8,9 @@ fn main() {
             // 启动文件监听器
             if let Ok(sessions_dir) = pi_session_manager::scanner::get_sessions_dir() {
                 let app_handle = app.handle().clone();
-                if let Err(e) = pi_session_manager::file_watcher::start_file_watcher(
-                    sessions_dir,
-                    app_handle,
-                ) {
+                if let Err(e) =
+                    pi_session_manager::file_watcher::start_file_watcher(sessions_dir, app_handle)
+                {
                     eprintln!("Failed to start file watcher: {}", e);
                 }
             }
@@ -31,6 +30,9 @@ fn main() {
             pi_session_manager::open_session_in_terminal,
             pi_session_manager::scan_skills,
             pi_session_manager::scan_prompts,
+            pi_session_manager::get_skill_content,
+            pi_session_manager::get_prompt_content,
+            pi_session_manager::get_system_prompt,
             pi_session_manager::load_pi_settings,
             pi_session_manager::save_pi_settings,
             pi_session_manager::list_models,
