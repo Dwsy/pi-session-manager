@@ -56,7 +56,7 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
     }
 
     try {
-      const content = await invoke<string>('get_skill_content', { skillName });
+      const content = await invoke<string>('get_skill_content', { skill_name: skillName });
       setSkills(prev =>
         prev.map(skill =>
           skill.name === skillName ? { ...skill, content } : skill

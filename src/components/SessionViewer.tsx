@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowUp, ArrowDown, Loader2 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo, SessionEntry } from '../types'
-import { parseSessionEntries, computeStats } from '../utils/session'
+import { parseSessionEntries, computeStats, isTauriReady } from '../utils/session'
 import { extractTextFromHTML, containsSearchQuery } from '../utils/search'
 import { parseMarkdown } from '../utils/markdown'
 import SessionHeader from './SessionHeader'
@@ -105,6 +105,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
 
     const checkFileChanges = async () => {
       if (isScrollingRef.current) return
+      if (!isTauriReady()) return
       try {
         await loadIncremental()
       } catch (err) {
@@ -144,12 +145,10 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
         e.preventDefault()
         e.stopPropagation()
         toggleThinking()
-        console.log('[SessionViewer] Ctrl+T triggered: toggleThinking')
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
         e.preventDefault()
         e.stopPropagation()
         toggleToolsExpanded()
-        console.log('[SessionViewer] Ctrl+O triggered: toggleToolsExpanded')
       }
     }
 
@@ -417,8 +416,6 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
         const newEntries = parseSessionEntries(newContent)
 
         if (newEntries.length > 0) {
-          console.log(`[SessionViewer] Incremental update: ${newEntries.length} new entries`)
-
           // 追加到现有列表
           setEntries(prev => [...prev, ...newEntries])
 
@@ -628,10 +625,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
               {t('common.rename')}
             </button>
             <button
-              onClick={() => {
-                console.log('[SessionViewer] Export button clicked')
-                onExport()
-              }}
+              onClick={onExport}
               className="px-3 py-1 text-xs bg-[#2c2d3b] hover:bg-[#3c3d4b] rounded transition-colors cursor-pointer"
             >
               {t('common.export')}

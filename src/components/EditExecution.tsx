@@ -108,7 +108,7 @@ export default function EditExecution({
     const parsed = parsePiDiff(diff)
     
     if (!parsed) {
-      console.warn('Failed to parse diff, showing raw content')
+      // Failed to parse diff, showing raw content
       return (
         <div className="tool-output">
           <div style={{ 
@@ -161,7 +161,6 @@ export default function EditExecution({
       )
     } catch (error) {
       console.error('Error rendering MultiFileDiff:', error)
-      console.log('Parsed content:', parsed)
       
       // 降级显示：彩色文本
       return (

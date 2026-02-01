@@ -29,7 +29,6 @@ const SIDEBAR_WIDTH_KEY = 'pi-session-manager-sidebar-width'
 export default function SessionViewer({ session, onExport, onRename }: SessionViewerProps) {
   const { t } = useTranslation()
   const [entries, setEntries] = useState<SessionEntry[]>([])
-  const [loading, setLoading] = useState(true)
   const [showLoading, setShowLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSidebar, setShowSidebar] = useState(false)
@@ -104,7 +103,6 @@ export default function SessionViewer({ session, onExport, onRename }: SessionVi
 
   const loadSession = async () => {
     try {
-      setLoading(true)
       setShowLoading(false)
       setError(null)
 
@@ -130,7 +128,6 @@ export default function SessionViewer({ session, onExport, onRename }: SessionVi
         clearTimeout(loadingTimerRef.current)
         loadingTimerRef.current = null
       }
-      setLoading(false)
       setShowLoading(false)
     }
   }

@@ -5,8 +5,8 @@ const validDiff = `--- a/example.ts
 +++ b/example.ts
 @@ -1,3 +1,3 @@
  function hello() {
--  console.log('old')
-+  console.log('new')
+-  old
++  new
  }
 `
 
