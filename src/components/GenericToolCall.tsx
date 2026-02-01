@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { escapeHtml } from '../utils/markdown'
+import { formatDate } from '../utils/format'
 import HoverPreview from './HoverPreview'
 
 interface GenericToolCallProps {
@@ -42,7 +43,7 @@ export default function GenericToolCall({
 
   return (
     <div className={`tool-execution ${statusClass}`}>
-      {timestamp && <div className="message-timestamp">{timestamp}</div>}
+      {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
       <div className="tool-header">
         <span className="tool-name">
           <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">

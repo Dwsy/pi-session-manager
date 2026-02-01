@@ -3,6 +3,7 @@ import MarkdownContent from './MarkdownContent'
 import ThinkingBlock from './ThinkingBlock'
 import ToolCallList from './ToolCallList'
 import { useSessionView } from '../contexts/SessionViewContext'
+import { formatDate } from '../utils/format'
 
 interface AssistantMessageProps {
   content: Content[]
@@ -20,7 +21,7 @@ export default function AssistantMessage({ content, timestamp, entryId, entries 
 
   return (
     <div className="assistant-message" id={`entry-${entryId}`}>
-      {timestamp && <div className="message-timestamp">{timestamp}</div>}
+      {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
 
       {/* Text content */}
       {textBlocks.map((block, index) => (
