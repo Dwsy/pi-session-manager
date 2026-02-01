@@ -5,13 +5,14 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Result as SqliteResult};
 use std::fs;
 use std::path::{Path, PathBuf};
+use serde::{Serialize, Deserialize};
 use serde_json;
 
 pub fn get_db_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
-    let db_dir = home.join(".pi").join("agent");
-    fs::create_dir_all(&db_dir).map_err(|e| format!("Failed to create db dir: {}", e))?;
-    Ok(db_dir.join("sessions.db"))
+    let sessions_dir = home.join(".pi").join("agent").join("sessions");
+    fs::create_dir_all(&sessions_dir).map_err(|e| format!("Failed to create sessions dir: {}", e))?;
+    Ok(sessions_dir.join("sessions.db"))
 }
 
 pub fn init_db() -> Result<Connection, String> {
@@ -78,6 +79,18 @@ pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
         "CREATE INDEX IF NOT EXISTS idx_file_modified ON sessions(file_modified)",
         [],
     ).map_err(|e| format!("Failed to create index idx_file_modified: {}", e))?;
+
+    // Create favorites table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS favorites (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL CHECK(type IN ('session', 'project')),
+            name TEXT NOT NULL,
+            path TEXT NOT NULL,
+            added_at TEXT NOT NULL
+        )",
+        [],
+    ).map_err(|e| format!("Failed to create favorites table: {}", e))?;
 
     // 迁移：添加 last_message 和 last_message_role 字段（如果不存在）
     conn.execute(
@@ -486,4 +499,66 @@ fn parse_timestamp(s: &str) -> DateTime<Utc> {
     DateTime::parse_from_rfc3339(s)
         .map(|dt| dt.with_timezone(&Utc))
         .unwrap_or_else(|_| Utc::now())
+}
+
+// Favorites functions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DbFavoriteItem {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub favorite_type: String,
+    pub name: String,
+    pub path: String,
+    pub added_at: String,
+}
+
+pub fn add_favorite(conn: &Connection, id: &str, favorite_type: &str, name: &str, path: &str) -> Result<(), String> {
+    conn.execute(
+        "INSERT OR REPLACE INTO favorites (id, type, name, path, added_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![id, favorite_type, name, path, Utc::now().to_rfc3339()],
+    ).map_err(|e| format!("Failed to add favorite: {}", e))?;
+    Ok(())
+}
+
+pub fn remove_favorite(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM favorites WHERE id = ?", params![id])
+        .map_err(|e| format!("Failed to remove favorite: {}", e))?;
+    Ok(())
+}
+
+pub fn get_all_favorites(conn: &Connection) -> Result<Vec<DbFavoriteItem>, String> {
+    let mut stmt = conn.prepare(
+        "SELECT id, type, name, path, added_at FROM favorites ORDER BY added_at DESC"
+    ).map_err(|e| format!("Failed to prepare favorites statement: {}", e))?;
+
+    let favorites = stmt.query_map([], |row| {
+        Ok(DbFavoriteItem {
+            id: row.get(0)?,
+            favorite_type: row.get(1)?,
+            name: row.get(2)?,
+            path: row.get(3)?,
+            added_at: row.get(4)?,
+        })
+    }).map_err(|e| format!("Failed to query favorites: {}", e))?
+        .collect::<SqliteResult<Vec<_>>>()
+        .map_err(|e| format!("Failed to collect favorites: {}", e))?;
+
+    Ok(favorites)
+}
+
+pub fn is_favorite(conn: &Connection, id: &str) -> Result<bool, String> {
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM favorites WHERE id = ?", params![id], |row| row.get(0))
+        .map_err(|e| format!("Failed to check favorite: {}", e))?;
+    Ok(count > 0)
+}
+
+pub fn toggle_favorite(conn: &Connection, id: &str, favorite_type: &str, name: &str, path: &str) -> Result<bool, String> {
+    let exists = is_favorite(conn, id)?;
+    if exists {
+        remove_favorite(conn, id)?;
+        Ok(false)
+    } else {
+        add_favorite(conn, id, favorite_type, name, path)?;
+        Ok(true)
+    }
 }

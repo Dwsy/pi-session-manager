@@ -43,7 +43,12 @@ pub fn run() {
             test_model,
             test_models_batch,
             load_app_settings,
-            save_app_settings
+            save_app_settings,
+            add_favorite,
+            remove_favorite,
+            get_all_favorites,
+            is_favorite,
+            toggle_favorite
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
