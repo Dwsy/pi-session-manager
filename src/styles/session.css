@@ -595,7 +595,160 @@
 }
 
 .tool-command-wrapper .tool-copy-button:hover {
+   color: #d4d4d8;
+   border-color: rgba(138, 190, 183, 0.4);
+   background: rgba(138, 190, 183, 0.1);
+}
+
+/*
+  =====================================================
+  =======
+     Session Tree Search Styles
+
+  =====================================================
+  =======
+*/
+
+.session-tree-search {
+  padding: 12px 12px 8px 12px;
+  border-bottom: 1px solid rgba(138, 190, 183, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.session-tree-search-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-input-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-wrapper .search-icon {
+  position: absolute;
+  left: 8px;
+  color: #6a6f85;
+  pointer-events: none;
+}
+
+.session-tree-search .search-input {
+  width: 100%;
+  padding: 6px 10px 6px 28px;
+  font-size: 12px;
+  font-family: inherit;
+  background: rgba(0, 0, 0, 0.2);
+  color: #d4d4d8;
+  border: 1px solid rgba(138, 190, 183, 0.2);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.session-tree-search .search-input:focus {
+  outline: none;
+  border-color: rgba(138, 190, 183, 0.5);
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 2px rgba(138, 190, 183, 0.1);
+}
+
+.session-tree-search .search-input::placeholder {
+  color: #6a6f85;
+}
+
+.search-input-wrapper .clear-button {
+  position: absolute;
+  right: 6px;
+  padding: 2px;
+  background: transparent;
+  color: #6a6f85;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.search-input-wrapper .clear-button:hover {
+  color: #d4d4d8;
+  background: rgba(138, 190, 183, 0.1);
+}
+
+.search-results-info {
+  flex-shrink: 0;
+  min-width: 50px;
+  text-align: center;
+}
+
+.search-results-info .results-count {
+  font-size: 11px;
+  color: #8abeb7;
+  font-weight: 500;
+}
+
+.search-results-info .no-results {
+  font-size: 11px;
+  color: #6a6f85;
+}
+
+.search-navigation {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.search-navigation .nav-button {
+  padding: 6px;
+  min-width: 32px;
+  min-height: 32px;
+  background: transparent;
+  color: #6a6f85;
+  border: 1px solid rgba(138, 190, 183, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-navigation .nav-button:hover:not(:disabled) {
   color: #d4d4d8;
   border-color: rgba(138, 190, 183, 0.4);
-  background: rgba(138, 190, 183, 0.1);
+  background: rgba(138, 190, 183, 0.05);
+}
+
+.search-navigation .nav-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.search-navigation .close-button:hover {
+  color: #cc6666;
+  border-color: rgba(204, 102, 102, 0.4);
+  background: rgba(204, 102, 102, 0.05);
+}
+
+/* 搜索结果匹配高亮 */
+.tree-node.search-match {
+  background: rgba(255, 215, 0, 0.15);
+  border-left: 2px solid rgba(255, 215, 0, 0.5);
+}
+
+.tree-node.search-match:hover {
+  background: rgba(255, 215, 0, 0.25);
+}
+
+.tree-node.search-match-current {
+  background: rgba(255, 165, 0, 0.25);
+  border-left: 2px solid rgba(255, 165, 0, 0.8);
+  box-shadow: 0 0 0 1px rgba(255, 165, 0, 0.3);
+}
+
+.tree-node.search-match-current:hover {
+  background: rgba(255, 165, 0, 0.35);
 }

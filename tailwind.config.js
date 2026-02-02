@@ -6,6 +6,34 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        mono: [
+          'Cascadia Code',
+          'Fira Code',
+          'JetBrains Mono',
+          'SF Mono',
+          'ui-monospace',
+          'SFMono-Regular',
+          'Menlo',
+          'Monaco',
+          'Consolas',
+          'Liberation Mono',
+          'Courier New',
+          'monospace',
+        ],
+        sans: [
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
+          'PingFang SC',
+          'Microsoft YaHei',
+          'Noto Sans CJK SC',
+          'WenQuanYi Micro Hei',
+          'Helvetica Neue',
+          'Arial',
+          'sans-serif',
+        ],
+      },
       colors: {
         background: '#1a1b26',
         foreground: '#e5e5e7',
