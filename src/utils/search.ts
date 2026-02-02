@@ -11,10 +11,10 @@ export function highlightSearchInHTML(html: string, searchQuery: string): string
 
   // 转义正则表达式特殊字符
   const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  
+
   // 创建正则表达式（大小写不敏感）
   const regex = new RegExp(`(${escapedQuery})`, 'gi')
-  
+
   // 临时替换 HTML 标签，避免在标签内搜索
   const tagPlaceholders: string[] = []
   let processedHtml = html.replace(/<[^>]+>/g, (match) => {
@@ -22,15 +22,15 @@ export function highlightSearchInHTML(html: string, searchQuery: string): string
     tagPlaceholders.push(match)
     return placeholder
   })
-  
+
   // 高亮搜索关键词
   processedHtml = processedHtml.replace(regex, '<mark class="search-highlight">$1</mark>')
-  
+
   // 恢复 HTML 标签
   tagPlaceholders.forEach((tag, index) => {
     processedHtml = processedHtml.replace(`__TAG_${index}__`, tag)
   })
-  
+
   return processedHtml
 }
 
@@ -44,7 +44,7 @@ export function containsSearchQuery(text: string, searchQuery: string): boolean 
   if (!searchQuery.trim()) {
     return false
   }
-  
+
   return text.toLowerCase().includes(searchQuery.toLowerCase())
 }
 
