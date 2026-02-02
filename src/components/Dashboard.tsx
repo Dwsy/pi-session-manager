@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { useTranslation } from 'react-i18next'
 import { BarChart3, Clock, RefreshCw, Activity, Zap, DollarSign } from 'lucide-react'
 import type { SessionInfo, SessionStats, SessionStatsInput } from '../types'
+import { getDemoStats } from '../hooks/useDemoMode'
 import StatCard from './dashboard/StatCard'
 import ActivityHeatmap from './dashboard/ActivityHeatmap'
 import MessageDistribution from './dashboard/MessageDistribution'
@@ -55,6 +56,18 @@ export default function Dashboard({ sessions, onSessionSelect, projectName }: Da
     isLoadingRef.current = true
 
     try {
+      // Check if in demo mode
+      const isDemoMode = localStorage.getItem('pi-session-manager-settings')
+        ? JSON.parse(localStorage.getItem('pi-session-manager-settings') || '{}')?.advanced?.demoMode === true
+        : false
+
+      if (isDemoMode) {
+        // Use demo stats in demo mode
+        const result = getDemoStats()
+        setStats(result)
+        return
+      }
+
       const statsSessions: SessionStatsInput[] = sessions.map((session) => ({
         path: session.path,
         cwd: session.cwd,
