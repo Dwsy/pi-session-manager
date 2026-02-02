@@ -91,6 +91,8 @@ export const settings = {
     maxCacheSize: '最大缓存大小',
     debugMode: '调试模式',
     debugModeHelp: '启用详细日志记录',
+    demoMode: '演示模式',
+    demoModeHelp: '查看演示数据以探索所有功能',
     clearCache: '清除缓存',
     cacheCleared: '缓存已清除',
   },

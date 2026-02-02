@@ -2,6 +2,8 @@ export const app = {
   title: 'Pi 会话管理器',
   subtitle: '选择一个会话查看详情',
   projects: '项目',
+  demoMode: '演示模式',
+  demoModeDescription: '查看演示数据以探索所有功能',
   viewMode: {
     list: '列表视图',
     project: '项目视图',

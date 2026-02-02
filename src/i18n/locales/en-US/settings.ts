@@ -91,6 +91,8 @@ export const settings = {
     maxCacheSize: 'Max Cache Size',
     debugMode: 'Debug Mode',
     debugModeHelp: 'Enable detailed logging',
+    demoMode: 'Demo Mode',
+    demoModeHelp: 'View demo data to explore all features',
     clearCache: 'Clear Cache',
     cacheCleared: 'Cache cleared',
   },

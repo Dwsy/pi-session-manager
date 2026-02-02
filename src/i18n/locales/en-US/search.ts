@@ -5,6 +5,7 @@ export const search = {
     results: '{count} result{count, plural, =1 {} other{s}}',
   },
   clear: 'Clear',
+  clearAll: 'Clear search (Esc)',
   placeholder: 'Search in session...',
   noResults: 'No results',
   previous: 'Previous result (Shift+Enter)',

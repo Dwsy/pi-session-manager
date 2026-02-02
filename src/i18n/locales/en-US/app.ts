@@ -2,6 +2,8 @@ export const app = {
   title: 'Pi Session Manager',
   subtitle: 'Select a session to view details',
   projects: 'Projects',
+  demoMode: 'Demo Mode',
+  demoModeDescription: 'View demo data to explore all features',
   viewMode: {
     list: 'List view',
     project: 'Project view',

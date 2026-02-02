@@ -28,4 +28,13 @@ export const common = {
   disabled: 'Disabled',
   yes: 'Yes',
   no: 'No',
+  created: 'Created',
+  updated: 'Updated',
+  time: {
+    justNow: 'Just now',
+    minutesAgo: '{{count}} min ago',
+    hoursAgo: '{{count}} hr ago',
+    daysAgo: '{{count}} days ago',
+    monthsAgo: '{{count}} months ago',
+  },
 } as const

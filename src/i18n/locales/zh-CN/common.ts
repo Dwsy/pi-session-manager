@@ -28,4 +28,13 @@ export const common = {
   disabled: '已禁用',
   yes: '是',
   no: '否',
+  created: '创建',
+  updated: '更新',
+  time: {
+    justNow: '刚刚',
+    minutesAgo: '{{count}}分钟前',
+    hoursAgo: '{{count}}小时前',
+    daysAgo: '{{count}}天前',
+    monthsAgo: '{{count}}个月前',
+  },
 } as const

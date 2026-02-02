@@ -11,6 +11,7 @@ export const session = {
     unknownDirectory: 'Unknown directory',
     messages: 'messages',
     noSessions: 'No sessions',
+    path: 'Path',
   },
   viewer: {
     loading: 'Loading session...',

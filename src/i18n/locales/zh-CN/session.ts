@@ -11,6 +11,7 @@ export const session = {
     unknownDirectory: '未知目录',
     messages: '条消息',
     noSessions: '无会话',
+    path: '路径',
   },
   viewer: {
     loading: '加载会话中...',
