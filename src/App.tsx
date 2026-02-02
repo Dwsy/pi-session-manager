@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, Star, Settings, ArrowLeft } from 'lucide-react'
+import { FolderOpen, Star, Settings, ArrowLeft, Play } from 'lucide-react'
 import SessionList from './components/SessionList'
 import ProjectList from './components/ProjectList'
 import SessionViewer from './components/SessionViewer'
-import SearchPanel from './components/SearchPanel'
 import ExportDialog from './components/ExportDialog'
 import RenameDialog from './components/RenameDialog'
 import Dashboard from './components/Dashboard'
@@ -15,11 +14,12 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useSessionBadges } from './hooks/useSessionBadges'
 import { useSessions } from './hooks/useSessions'
-import { useSearch } from './hooks/useSearch'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useSessionActions } from './hooks/useSessionActions'
+import { useDemoMode } from './hooks/useDemoMode'
+import { useAllSettings } from './hooks/useAllSettings'
 import { registerBuiltinPlugins } from './plugins'
-import type { SessionInfo, SearchResult, FavoriteItem } from './types'
+import type { SessionInfo, FavoriteItem } from './types'
 import type { SearchContext } from './plugins/types'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauriReady } from './utils/session'
@@ -114,13 +114,10 @@ function App() {
     }
   }, [loadFavorites])
 
-  const { searchResults, isSearching, handleSearch, clearSearch } = useSearch(setSelectedSession)
-
   const handleSelectSession = useCallback((session: SessionInfo) => {
     setSelectedSession(session)
-    clearSearch()
     clearBadge(session.id)
-  }, [setSelectedSession, clearSearch, clearBadge])
+  }, [setSelectedSession, clearBadge])
 
   useEffect(() => {
     registerBuiltinPlugins()
@@ -151,7 +148,6 @@ function App() {
 
   const shortcuts = useMemo(() => ({
     'cmd+r': () => loadSessions(),
-    'cmd+f': () => document.querySelector<HTMLInputElement>('input[type="text"]')?.focus(),
     'cmd+,': () => setShowSettings(true),
     'escape': () => {
       if (showSettings) {
@@ -164,10 +160,9 @@ function App() {
         setSelectedProject(null)
       } else {
         setSelectedSession(null)
-        clearSearch()
       }
     },
-  }), [showSettings, showExportDialog, showRenameDialog, selectedProject, loadSessions, setSelectedSession, clearSearch])
+  }), [showSettings, showExportDialog, showRenameDialog, selectedProject, loadSessions, setSelectedSession])
 
   useKeyboardShortcuts(shortcuts)
 
@@ -194,15 +189,18 @@ function App() {
     setShowExportDialog(false)
   }
 
-  const displayedSessions = isSearching
-    ? mapSearchResults(searchResults, sessions)
-    : sessions
-
   return (
     <div className="flex h-screen bg-background text-foreground">
       <div className="w-80 border-r border-[#2c2d3b] flex flex-col">
-        <div className="flex items-center justify-end px-3 py-2.5 border-b border-[#2c2d3b]">
-          <div className="flex items-center gap-0.5">
+        <div
+          className="h-8 border-b border-[#2c2d3b] flex items-center px-3 select-none"
+          data-tauri-drag-region
+          style={{
+            WebkitAppRegion: 'drag',
+            userSelect: 'none'
+          }}
+        >
+          <div className="flex items-center gap-0.5 ml-auto" style={{ WebkitAppRegion: 'no-drag' }}>
             <div className="flex items-center bg-[#252636] rounded-lg p-0.5 mr-1">
               <button
                 onClick={() => { setViewMode('list'); setSelectedProject(null) }}
@@ -240,11 +238,6 @@ function App() {
           </div>
         </div>
 
-        <SearchPanel
-          onSearch={(query) => handleSearch(query, sessions)}
-          resultCount={searchResults.length}
-          isSearching={isSearching}
-        />
         <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
           {showFavorites ? (
             <FavoritesPanel
@@ -269,16 +262,16 @@ function App() {
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <FolderOpen className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
                   <span className="text-sm font-medium truncate">
-                    {displayedSessions.find(s => s.cwd === selectedProject)?.cwd.split('/').pop() || selectedProject.split('/').pop()}
+                    {sessions.find(s => s.cwd === selectedProject)?.cwd.split('/').pop() || selectedProject.split('/').pop()}
                   </span>
                   <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                    ({displayedSessions.filter(s => s.cwd === selectedProject).length})
+                    ({sessions.filter(s => s.cwd === selectedProject).length})
                   </span>
                 </div>
               </div>
               <div>
                 <ProjectList
-                  sessions={displayedSessions}
+                  sessions={sessions}
                   selectedSession={selectedSession}
                   selectedProject={selectedProject}
                   onSelectSession={handleSelectSession}
@@ -297,7 +290,7 @@ function App() {
             </div>
           ) : viewMode === 'project' ? (
             <ProjectList
-              sessions={displayedSessions}
+              sessions={sessions}
               selectedSession={selectedSession}
               selectedProject={selectedProject}
               onSelectSession={handleSelectSession}
@@ -313,7 +306,7 @@ function App() {
             />
           ) : (
             <SessionList
-              sessions={displayedSessions}
+              sessions={sessions}
               selectedSession={selectedSession}
               onSelectSession={handleSelectSession}
               onDeleteSession={handleDeleteSession}
@@ -331,6 +324,14 @@ function App() {
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
+        <div
+          className="h-8 flex-shrink-0 select-none"
+          data-tauri-drag-region
+          style={{
+            WebkitAppRegion: 'drag',
+            userSelect: 'none'
+          }}
+        />
         <div className="flex-1 overflow-hidden">
           {selectedSession ? (
             <SessionViewer
@@ -379,26 +380,6 @@ function App() {
       <CommandPalette context={commandContext} />
     </div>
   )
-}
-
-function mapSearchResults(results: SearchResult[], allSessions: SessionInfo[]): SessionInfo[] {
-  return results.map((r) => {
-    const originalSession = allSessions.find(s => s.id === r.session_id)
-
-    return {
-      path: r.session_path,
-      id: r.session_id,
-      cwd: originalSession?.cwd || '',
-      name: r.session_name || originalSession?.name,
-      created: originalSession?.created || new Date().toISOString(),
-      modified: originalSession?.modified || new Date().toISOString(),
-      message_count: r.matches.length,
-      first_message: r.first_message,
-      all_messages_text: '',
-      last_message: originalSession?.last_message || '',
-      last_message_role: originalSession?.last_message_role || 'user',
-    }
-  })
 }
 
 export default App

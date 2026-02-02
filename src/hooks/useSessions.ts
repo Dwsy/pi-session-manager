@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo } from '../types'
+import { useDemoMode } from './useDemoMode'
 
 export interface UseSessionsReturn {
   sessions: SessionInfo[]
@@ -15,6 +16,7 @@ export interface UseSessionsReturn {
 
 export function useSessions(): UseSessionsReturn {
   const { t } = useTranslation()
+  const { isDemoMode, getDemoSessions } = useDemoMode()
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,13 +28,18 @@ export function useSessions(): UseSessionsReturn {
 
   const loadSessions = useCallback(async () => {
     try {
-      const result = await invoke<SessionInfo[]>('scan_sessions')
-      setSessions(result)
+      let loadedSessions: SessionInfo[] = []
+      if (isDemoMode) {
+        loadedSessions = getDemoSessions()
+      } else {
+        loadedSessions = await invoke<SessionInfo[]>('scan_sessions')
+      }
+      setSessions(loadedSessions)
 
       const currentSelection = selectedSessionRef.current
       if (currentSelection) {
-        const matchedByPath = result.find(s => s.path === currentSelection.path)
-        const matchedById = result.find(s => s.id === currentSelection.id)
+        const matchedByPath = loadedSessions.find(s => s.path === currentSelection.path)
+        const matchedById = loadedSessions.find(s => s.id === currentSelection.id)
         const matched = matchedByPath || matchedById
 
         if (matched) {
@@ -55,8 +62,13 @@ export function useSessions(): UseSessionsReturn {
           }
         } else {
           try {
-            await invoke('read_session_file', { path: currentSelection.path })
-            // Selected session file still readable but not in scan results, keeping selection
+            if (isDemoMode) {
+              // Demo mode doesn't need to check file existence
+              setSelectedSession(currentSelection)
+            } else {
+              await invoke('read_session_file', { path: currentSelection.path })
+              // Selected session file still readable but not in scan results, keeping selection
+            }
           } catch (error) {
             console.warn('[useSessions] Selected session file not readable, clearing selection:', error)
             setSelectedSession(null)
@@ -69,7 +81,7 @@ export function useSessions(): UseSessionsReturn {
     } finally {
       setLoading(false)
     }
-  }, [t])
+  }, [t, isDemoMode, getDemoSessions])
 
   const handleDeleteSession = useCallback(async (session: SessionInfo) => {
     if (!confirm(t('app.confirm.deleteSession', { name: session.name || t('common.untitled') }))) {
@@ -77,8 +89,13 @@ export function useSessions(): UseSessionsReturn {
     }
 
     try {
-      await invoke('delete_session', { path: session.path })
-      setSessions(prev => prev.filter(s => s.id !== session.id))
+      if (isDemoMode) {
+        // In demo mode, just remove from local state
+        setSessions(prev => prev.filter(s => s.id !== session.id))
+      } else {
+        await invoke('delete_session', { path: session.path })
+        setSessions(prev => prev.filter(s => s.id !== session.id))
+      }
       if (selectedSession?.id === session.id) {
         setSelectedSession(null)
       }
@@ -86,18 +103,24 @@ export function useSessions(): UseSessionsReturn {
       console.error('Failed to delete session:', error)
       alert(t('app.errors.deleteSession'))
     }
-  }, [selectedSession, t])
+  }, [selectedSession, t, isDemoMode])
 
   const handleRenameSession = useCallback(async (session: SessionInfo, newName: string) => {
     try {
-      await invoke('rename_session', {
-        path: session.path,
-        new_name: newName
-      })
-
-      setSessions(prev => prev.map(s =>
-        s.id === session.id ? { ...s, name: newName } : s
-      ))
+      if (isDemoMode) {
+        // In demo mode, just update local state
+        setSessions(prev => prev.map(s =>
+          s.id === session.id ? { ...s, name: newName } : s
+        ))
+      } else {
+        await invoke('rename_session', {
+          path: session.path,
+          new_name: newName
+        })
+        setSessions(prev => prev.map(s =>
+          s.id === session.id ? { ...s, name: newName } : s
+        ))
+      }
 
       if (selectedSession?.id === session.id) {
         setSelectedSession(prev => prev ? { ...prev, name: newName } : null)
@@ -106,7 +129,7 @@ export function useSessions(): UseSessionsReturn {
       console.error('Failed to rename session:', error)
       alert(t('app.errors.renameSession'))
     }
-  }, [selectedSession, t])
+  }, [selectedSession, t, isDemoMode])
 
   return {
     sessions,

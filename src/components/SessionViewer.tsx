@@ -5,8 +5,6 @@ import { ArrowUp, ArrowDown, Loader2 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo, SessionEntry } from '../types'
 import { parseSessionEntries, computeStats, isTauriReady } from '../utils/session'
-import { extractTextFromHTML, containsSearchQuery } from '../utils/search'
-import { parseMarkdown } from '../utils/markdown'
 import SessionHeader from './SessionHeader'
 import UserMessage from './UserMessage'
 import AssistantMessage from './AssistantMessage'
@@ -14,8 +12,7 @@ import ModelChange from './ModelChange'
 import Compaction from './Compaction'
 import BranchSummary from './BranchSummary'
 import CustomMessage from './CustomMessage'
-import SessionTree from './SessionTree'
-import SearchBar from './SearchBar'
+import SessionTree, { type SessionTreeRef } from './SessionTree'
 import OpenInTerminalButton from './OpenInTerminalButton'
 import { SessionViewProvider, useSessionView } from '../contexts/SessionViewContext'
 import '../styles/session.css'
@@ -58,11 +55,6 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
   const [lineCount, setLineCount] = useState(0)
   const lastModifiedTimeRef = useRef(0)
 
-  // 搜索状态
-  const [showSearch, setShowSearch] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<string[]>([])
-  const [currentResultIndex, setCurrentResultIndex] = useState(0)
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [hasNewMessages, setHasNewMessages] = useState(false)
 
@@ -70,6 +62,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
   const sidebarRef = useRef<HTMLDivElement>(null)
   const resizeHandleRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
+  const treeRef = useRef<SessionTreeRef>(null)
 
   const measuredHeightsRef = useRef<Map<number, number>>(new Map())
   const isScrollingRef = useRef(false)
@@ -125,18 +118,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
     }
   }, [session.path, lineCount, loading])
 
-  // 快捷键监听：cmd+f / ctrl+f 打开搜索
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-        e.preventDefault()
-        setShowSearch(true)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  
 
   // 快捷键监听：ctrl+t 切换思考显示，ctrl+o 切换工具调用展开
   useEffect(() => {
@@ -149,58 +131,19 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
         e.preventDefault()
         e.stopPropagation()
         toggleToolsExpanded()
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault()
+        e.stopPropagation()
+        setShowSidebar(true)
+        setTimeout(() => {
+          treeRef.current?.focusSearch()
+        }, 100)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleThinking, toggleToolsExpanded])
-
-  const searchableMessages = useMemo(() => {
-    if (!searchQuery.trim()) return []
-    const results: { id: string; plainText: string }[] = []
-    entries.forEach(entry => {
-      if (entry.type !== 'message' || !entry.message) return
-      const content = entry.message.content
-      const textItems = content.filter(c => c.type === 'text' && c.text)
-      const text = textItems.map(c => c.text).join('\n')
-      if (!text) return
-      const html = parseMarkdown(text)
-      const plainText = extractTextFromHTML(html)
-      if (plainText) {
-        results.push({ id: entry.id, plainText })
-      }
-    })
-    return results
-  }, [entries, searchQuery])
-
-  // 执行搜索
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([])
-      setCurrentResultIndex(0)
-      return
-    }
-
-    const results: string[] = []
-    
-    searchableMessages.forEach(({ id, plainText }) => {
-      if (containsSearchQuery(plainText, searchQuery)) {
-        results.push(id)
-      }
-    })
-
-    setSearchResults(results)
-    setCurrentResultIndex(0)
-  }, [searchQuery, searchableMessages])
-
-  // 滚动到当前搜索结果
-  useEffect(() => {
-    if (searchResults.length > 0 && messagesContainerRef.current) {
-      const currentEntryId = searchResults[currentResultIndex]
-      setActiveEntryId(currentEntryId)
-    }
-  }, [currentResultIndex, searchResults])
+  }, [toggleThinking, toggleToolsExpanded, setShowSidebar])
 
   const renderableEntries = useMemo(() => {
     return entries.filter(entry => {
@@ -459,7 +402,6 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
               content={entry.message.content}
               timestamp={entry.timestamp}
               id={entry.id}
-              searchQuery={searchQuery}
             />
           )
         } else if (role === 'assistant') {
@@ -470,7 +412,6 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
               timestamp={entry.timestamp}
               entryId={entry.id}
               entries={entries}
-              searchQuery={searchQuery}
             />
           )
         }
@@ -517,7 +458,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
       default:
         return null
     }
-  }, [entries, searchQuery])
+  }, [entries])
 
   const messageEntries = useMemo(() => entries.filter(e => e.type === 'message'), [entries])
 
@@ -525,42 +466,8 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
     setActiveEntryId(targetId)
   }, [])
 
-  // 搜索导航
-  const handleSearchNext = useCallback(() => {
-    if (searchResults.length === 0) return
-    setCurrentResultIndex((prev) => (prev + 1) % searchResults.length)
-  }, [searchResults])
-
-  const handleSearchPrevious = useCallback(() => {
-    if (searchResults.length === 0) return
-    setCurrentResultIndex((prev) => (prev - 1 + searchResults.length) % searchResults.length)
-  }, [searchResults])
-
-  const handleSearchClose = useCallback(() => {
-    setShowSearch(false)
-    setSearchQuery('')
-    setSearchResults([])
-    setCurrentResultIndex(0)
-  }, [])
-
-  const handleSearchChange = useCallback((query: string) => {
-    setSearchQuery(query)
-  }, [])
-
   return (
     <div className="h-full flex relative">
-      {showSearch && (
-        <SearchBar
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          onClose={handleSearchClose}
-          onNext={handleSearchNext}
-          onPrevious={handleSearchPrevious}
-          currentIndex={currentResultIndex}
-          totalResults={searchResults.length}
-        />
-      )}
-
       {showSidebar && (
         <>
           <aside 
@@ -569,6 +476,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
             style={{ width: `${sidebarWidth}px` }}
           >
             <SessionTree
+              ref={treeRef}
               entries={entries}
               activeLeafId={activeEntryId ?? undefined}
               onNodeClick={handleTreeNodeClick}
@@ -636,7 +544,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
               piPath={piPath}
               customCommand={customCommand}
               size="sm"
-              variant="default"
+              variant="ghost"
               label={t('session.resume', '恢复')}
               showLabel={true}
               className="px-3 py-1"
