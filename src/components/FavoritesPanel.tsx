@@ -2,6 +2,7 @@ import { Star, FolderOpen, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo, FavoriteItem } from '../types'
 import { SessionBadge } from './SessionBadge'
+import { FavoritesSkeleton } from './Skeleton'
 
 interface FavoritesPanelProps {
   sessions: SessionInfo[]
@@ -28,12 +29,7 @@ export default function FavoritesPanel({
   const favoriteProjects = favorites.filter(f => f.type === 'project')
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-border border-t-foreground/50 mb-3" />
-        <p className="text-sm text-center">{t('session.list.loading')}</p>
-      </div>
-    )
+    return <FavoritesSkeleton />
   }
 
   if (favorites.length === 0) {

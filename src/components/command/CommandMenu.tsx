@@ -124,6 +124,28 @@ export default function CommandMenu({
       }
     }
   }, [])
+
+  // Tab 键切换标签页
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        e.preventDefault()
+        setActiveTab(prev => {
+          const currentIndex = TABS.findIndex(tab => tab.id === prev)
+          if (e.shiftKey) {
+            // Shift+Tab: 向前切换
+            return TABS[(currentIndex - 1 + TABS.length) % TABS.length].id
+          } else {
+            // Tab: 向后切换
+            return TABS[(currentIndex + 1) % TABS.length].id
+          }
+        })
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
   
   // 按插件分组结果
   const groupedResults = results.reduce((acc, result) => {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, Star, Settings, ArrowLeft } from 'lucide-react'
+import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard } from 'lucide-react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import SessionList from './components/SessionList'
 import ProjectList from './components/ProjectList'
@@ -62,9 +62,11 @@ function App() {
   const [isInitialized, setIsInitialized] = useState(false)
 
   const loadFavorites = useCallback(async () => {
+    console.log('[Favorites] Loading favorites...')
     setLoadingFavorites(true)
     try {
       const result = await invoke<sqlite_cache.FavoriteItem[]>('get_all_favorites')
+      console.log('[Favorites] Raw result from backend:', result)
       const formattedFavorites: FavoriteItem[] = result.map(f => ({
         id: f.id,
         type: f.favorite_type as 'session' | 'project',
@@ -72,9 +74,10 @@ function App() {
         path: f.path,
         addedAt: f.added_at,
       }))
+      console.log('[Favorites] Formatted favorites:', formattedFavorites)
       setFavorites(formattedFavorites)
     } catch (error) {
-      console.error('Failed to load favorites:', error)
+      console.error('[Favorites] Failed to load favorites:', error)
       setFavorites([])
     } finally {
       setLoadingFavorites(false)
@@ -91,16 +94,20 @@ function App() {
   }, [loadFavorites])
 
   const toggleFavorite = useCallback(async (item: Omit<FavoriteItem, 'addedAt'>) => {
+    console.log('[Favorites] Toggle favorite called with:', item)
     try {
-      await invoke('toggle_favorite', {
+      const params = {
         id: item.id,
         favoriteType: item.type,
         name: item.name,
         path: item.path,
-      })
+      }
+      console.log('[Favorites] Invoking toggle_favorite with params:', params)
+      const result = await invoke('toggle_favorite', params)
+      console.log('[Favorites] Toggle result:', result)
       await loadFavorites()
     } catch (error) {
-      console.error('Failed to toggle favorite:', error)
+      console.error('[Favorites] Failed to toggle favorite:', error)
     }
   }, [loadFavorites])
 
@@ -153,8 +160,33 @@ function App() {
     },
   })
 
+  const handleResumeSession = useCallback(async () => {
+    if (!selectedSession) return
+    try {
+      await invoke('open_session_in_terminal', {
+        path: selectedSession.path,
+        cwd: selectedSession.cwd,
+        terminal: terminal === 'custom' ? customCommand : terminal,
+        pi_path: piPath || null,
+      })
+    } catch (err) {
+      console.error('Failed to resume session:', err)
+    }
+  }, [selectedSession, terminal, customCommand, piPath])
+
+  const handleExportAndOpen = useCallback(async () => {
+    if (!selectedSession) return
+    try {
+      await invoke('open_session_in_browser', { path: selectedSession.path })
+    } catch (err) {
+      console.error('Failed to export and open session:', err)
+    }
+  }, [selectedSession])
+
   const shortcuts = useMemo(() => ({
-    'cmd+r': () => loadSessions(),
+    'cmd+r': handleResumeSession,
+    'cmd+e': handleExportAndOpen,
+    'cmd+p': () => { setViewMode('project'); setSelectedProject(null); setShowFavorites(false) },
     'cmd+,': () => setShowSettings(true),
     'escape': () => {
       if (showSettings) {
@@ -169,7 +201,7 @@ function App() {
         setSelectedSession(null)
       }
     },
-  }), [showSettings, showExportDialog, showRenameDialog, selectedProject, loadSessions, setSelectedSession])
+  }), [showSettings, showExportDialog, showRenameDialog, selectedProject, setSelectedSession, handleResumeSession, handleExportAndOpen])
 
   useKeyboardShortcuts(shortcuts)
 
@@ -205,10 +237,17 @@ function App() {
           onMouseDown={() => getCurrentWindow().startDragging()}
         >
           <div className="flex items-center gap-0.5 ml-auto no-drag">
+            <button
+              onClick={() => setSelectedSession(null)}
+              className="p-1 rounded transition-colors mr-1 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b]"
+              title={t('dashboard.title')}
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" />
+            </button>
             <div className="flex items-center bg-[#252636] rounded-lg p-0.5 mr-1">
               <button
-                onClick={() => { setViewMode('list'); setSelectedProject(null) }}
-                className={`p-1 rounded transition-colors ${viewMode === 'list' ? 'text-blue-400 bg-[#2c2d3b]' : 'text-[#6a6f85] hover:text-white'}`}
+                onClick={() => { setViewMode('list'); setSelectedProject(null); setShowFavorites(false) }}
+                className={`p-1 rounded transition-colors ${viewMode === 'list' && !showFavorites ? 'text-blue-400 bg-[#2c2d3b]' : 'text-[#6a6f85] hover:text-white'}`}
                 title={t('app.viewMode.list')}
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,8 +255,8 @@ function App() {
                 </svg>
               </button>
               <button
-                onClick={() => { setViewMode('project'); setSelectedProject(null) }}
-                className={`p-1 rounded transition-colors ${viewMode === 'project' ? 'text-blue-400 bg-[#2c2d3b]' : 'text-[#6a6f85] hover:text-white'}`}
+                onClick={() => { setViewMode('project'); setSelectedProject(null); setShowFavorites(false) }}
+                className={`p-1 rounded transition-colors ${viewMode === 'project' && !showFavorites ? 'text-blue-400 bg-[#2c2d3b]' : 'text-[#6a6f85] hover:text-white'}`}
                 title={t('app.viewMode.project')}
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -282,21 +321,20 @@ function App() {
                 </div>
               </div>
               <div>
-                <ProjectList
-                  sessions={sessions}
+                <SessionList
+                  sessions={sessions.filter(s => s.cwd === selectedProject)}
                   selectedSession={selectedSession}
-                  selectedProject={selectedProject}
                   onSelectSession={handleSelectSession}
-                  onSelectProject={setSelectedProject}
+                  onDeleteSession={handleDeleteSession}
                   loading={loading}
+                  getBadgeType={getBadgeType}
                   terminal={terminal}
                   piPath={piPath}
                   customCommand={customCommand}
-                  getBadgeType={getBadgeType}
                   scrollParentRef={listScrollRef}
-                  showHeader={false}
                   favorites={favorites}
                   onToggleFavorite={toggleFavorite}
+                  showDirectory={false}
                 />
               </div>
             </div>
@@ -307,6 +345,7 @@ function App() {
               selectedProject={selectedProject}
               onSelectSession={handleSelectSession}
               onSelectProject={setSelectedProject}
+              onDeleteSession={handleDeleteSession}
               loading={loading}
               terminal={terminal}
               piPath={piPath}
@@ -360,6 +399,7 @@ function App() {
               }
               onSessionSelect={setSelectedSession}
               projectName={selectedProject || undefined}
+              loading={loading}
             />
           )}
         </div>

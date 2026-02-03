@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo } from '../types'
-import { MessageSquare, Calendar, Trash2, FolderOpen, ChevronDown, ChevronRight, Loader2, Search } from 'lucide-react'
+import { MessageSquare, Calendar, Trash2, FolderOpen, ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { DirectoryListSkeleton } from './Skeleton'
 import OpenInTerminalButton from './OpenInTerminalButton'
 import { SessionBadge } from './SessionBadge'
 
@@ -70,12 +71,7 @@ export default function SessionListByDirectory({
   }
 
   if (loading) {
-    return (
-      <div className="p-6 text-center text-muted-foreground">
-        <Loader2 className="h-6 w-6 mx-auto mb-2 animate-spin" />
-        <p className="text-xs">{t('session.list.loading')}</p>
-      </div>
-    )
+    return <DirectoryListSkeleton />
   }
 
   if (sessions.length === 0) {

@@ -1,7 +1,46 @@
-import { useState, useMemo, useCallback, useEffect, forwardRef, useRef, useImperativeHandle } from 'react'
+import { useState, useMemo, useCallback, useEffect, forwardRef, useRef, useImperativeHandle, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SessionEntry } from '../types'
 import SessionTreeSearch, { type SessionTreeSearchRef } from './SessionTreeSearch'
+
+// 高亮搜索关键词
+function highlightText(text: string, tokens: string[]): ReactNode {
+  if (!tokens.length || !text) return text
+
+  const regex = new RegExp(`(${tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
+  const parts = text.split(regex)
+
+  return parts.map((part, i) => {
+    const isMatch = tokens.some(t => part.toLowerCase() === t.toLowerCase())
+    return isMatch ? <mark key={i} className="search-keyword">{part}</mark> : part
+  })
+}
+
+// 提取匹配摘要
+function extractSnippet(text: string, tokens: string[], maxLen = 60): string | null {
+  if (!text || !tokens.length) return null
+
+  const lowerText = text.toLowerCase()
+  let firstMatchIdx = -1
+
+  for (const token of tokens) {
+    const idx = lowerText.indexOf(token.toLowerCase())
+    if (idx !== -1 && (firstMatchIdx === -1 || idx < firstMatchIdx)) {
+      firstMatchIdx = idx
+    }
+  }
+
+  if (firstMatchIdx === -1) return null
+
+  const start = Math.max(0, firstMatchIdx - 20)
+  const end = Math.min(text.length, firstMatchIdx + maxLen)
+  let snippet = text.slice(start, end).trim()
+
+  if (start > 0) snippet = '...' + snippet
+  if (end < text.length) snippet = snippet + '...'
+
+  return snippet
+}
 
 export interface SessionTreeRef {
   focusSearch: () => void
@@ -433,6 +472,35 @@ ref
     }
   }
 
+  // 获取完整文本用于摘要
+  const getFullText = (entry: SessionEntry, label?: string): string => {
+    const parts: string[] = []
+    if (label) parts.push(label)
+
+    switch (entry.type) {
+      case 'message': {
+        const msg = entry.message
+        if (msg?.content) {
+          if (Array.isArray(msg.content)) {
+            msg.content.forEach((c: any) => {
+              if (c.type === 'text' && c.text) parts.push(c.text)
+            })
+          } else if (typeof msg.content === 'string') {
+            parts.push(msg.content)
+          }
+        }
+        break
+      }
+      case 'custom_message':
+        if (typeof entry.content === 'string') parts.push(entry.content)
+        break
+      case 'branch_summary':
+        if (entry.summary) parts.push(entry.summary)
+        break
+    }
+    return parts.join(' ')
+  }
+
   // 计算搜索结果列表
   const matchedEntryIds = useMemo(() => {
     if (!searchQuery.trim()) return []
@@ -525,9 +593,30 @@ ref
   }, [])
 
   const handleNodeClick = (flatNode: FlatNode) => {
-    const entryId = flatNode.node.entry.id
+    const entry = flatNode.node.entry
+    let targetId = entry.id
+
+    // toolResult 不会单独渲染，需要跳转到对应的 assistant 消息
+    if (entry.type === 'message' && entry.message?.role === 'toolResult') {
+      const content = Array.isArray(entry.message.content) ? entry.message.content : []
+      const toolResultContent = content.find((c: any) => c.type === 'toolResult')
+
+      if (toolResultContent?.id) {
+        // 找到包含对应 toolCall 的 assistant 消息
+        const assistantEntry = entries.find(e =>
+          e.type === 'message' &&
+          e.message?.role === 'assistant' &&
+          Array.isArray(e.message.content) &&
+          e.message.content.some((c: any) => c.type === 'toolCall' && c.id === toolResultContent.id)
+        )
+        if (assistantEntry) {
+          targetId = assistantEntry.id
+        }
+      }
+    }
+
     if (onNodeClick) {
-      onNodeClick(entryId, entryId)
+      onNodeClick(entry.id, targetId)
     }
   }
 
@@ -604,6 +693,14 @@ ref
 
           const isSearchMatch = searchResults.includes(entry.id)
           const isCurrentMatch = isSearchMatch && searchResults[currentResultIndex] === entry.id
+          const searchTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean)
+
+          // 获取匹配摘要
+          let snippet: string | null = null
+          if (isSearchMatch && searchQuery) {
+            const fullText = getFullText(entry, label)
+            snippet = extractSnippet(fullText, searchTokens)
+          }
 
           return (
             <div
@@ -614,6 +711,9 @@ ref
               <span className="tree-prefix">{prefix}</span>
               <span className="tree-marker">{marker}</span>
               <span className={`tree-content ${roleClass}`}>{displayText}</span>
+              {snippet && (
+                <span className="tree-snippet">{highlightText(snippet, searchTokens)}</span>
+              )}
             </div>
           )
         })}

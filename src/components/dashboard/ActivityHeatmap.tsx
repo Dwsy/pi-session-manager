@@ -20,7 +20,7 @@ const HEATMAP_COLORS = [
 
 export default function ActivityHeatmap({
   data,
-  title = 'Activity Heatmap',
+  title = 'Heatmap',
   size = 'full',
 }: ActivityHeatmapProps) {
   const weeks = 20 // Show last 20 weeks

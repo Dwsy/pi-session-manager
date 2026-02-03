@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useTranslation } from 'react-i18next'
-import { ArrowUp, ArrowDown, Loader2 } from 'lucide-react'
+import { ArrowUp, ArrowDown, Loader2, Bot } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo, SessionEntry } from '../types'
 import { parseSessionEntries, computeStats, isTauriReady } from '../utils/session'
@@ -14,6 +14,7 @@ import BranchSummary from './BranchSummary'
 import CustomMessage from './CustomMessage'
 import SessionTree, { type SessionTreeRef } from './SessionTree'
 import OpenInTerminalButton from './OpenInTerminalButton'
+import SystemPromptDialog from './SystemPromptDialog'
 import { SessionViewProvider, useSessionView } from '../contexts/SessionViewContext'
 import '../styles/session.css'
 
@@ -57,6 +58,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
 
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [hasNewMessages, setHasNewMessages] = useState(false)
+  const [showSystemPromptDialog, setShowSystemPromptDialog] = useState(false)
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
@@ -68,15 +70,95 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
   const isScrollingRef = useRef(false)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const pendingScrollToBottomRef = useRef(false)
+  const prevEntriesLengthRef = useRef(0)
 
   useEffect(() => {
+    console.log('[SessionViewer] useEffect triggered, session.path:', session.path)
+    let cancelled = false
+
+    // 清除之前的 loading timer
+    if (loadingTimerRef.current) {
+      clearTimeout(loadingTimerRef.current)
+      loadingTimerRef.current = null
+    }
+
     lastModifiedTimeRef.current = 0
     setLineCount(0)
     setEntries([])
     setActiveEntryId(null)
     setHasNewMessages(false)
-    loadSession()
-  }, [session.path])
+    prevEntriesLengthRef.current = 0
+    pendingScrollToBottomRef.current = false
+
+    const doLoad = async () => {
+      console.log('[SessionViewer] loadSession called, path:', session.path)
+      try {
+        setLoading(true)
+        setShowLoading(false)
+        setError(null)
+        measuredHeightsRef.current.clear()
+
+        loadingTimerRef.current = setTimeout(() => {
+          if (!cancelled) {
+            console.log('[SessionViewer] Setting showLoading to true after 300ms')
+            setShowLoading(true)
+          }
+        }, 300)
+
+        console.log('[SessionViewer] Invoking read_session_file...')
+        const jsonlContent = await invoke<string>('read_session_file', { path: session.path })
+
+        if (cancelled) {
+          console.log('[SessionViewer] Load cancelled, ignoring result')
+          return
+        }
+
+        console.log('[SessionViewer] read_session_file returned, content length:', jsonlContent?.length)
+
+        const lines = jsonlContent.split('\n').filter(line => line.trim()).length
+        setLineCount(lines)
+
+        const parsedEntries = parseSessionEntries(jsonlContent)
+        console.log('[SessionViewer] Parsed entries count:', parsedEntries.length)
+        setEntries(parsedEntries)
+
+        const lastMessage = parsedEntries.filter(e => e.type === 'message').pop()
+        if (lastMessage) {
+          setActiveEntryId(lastMessage.id)
+        }
+
+        // 首次加载后滚动到底部
+        pendingScrollToBottomRef.current = true
+      } catch (err) {
+        if (!cancelled) {
+          console.error('[SessionViewer] Failed to load session:', err)
+          setError(err instanceof Error ? err.message : t('session.loadError'))
+        }
+      } finally {
+        if (!cancelled) {
+          console.log('[SessionViewer] loadSession finally block, clearing loading states')
+          if (loadingTimerRef.current) {
+            clearTimeout(loadingTimerRef.current)
+            loadingTimerRef.current = null
+          }
+          setLoading(false)
+          setShowLoading(false)
+        }
+      }
+    }
+
+    doLoad()
+
+    return () => {
+      console.log('[SessionViewer] useEffect cleanup, cancelling load')
+      cancelled = true
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current)
+        loadingTimerRef.current = null
+      }
+    }
+  }, [session.path, t])
 
   useEffect(() => {
     if (!session.path || loading) return
@@ -219,11 +301,15 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
   }, [renderableEntries.length, rowVirtualizer])
 
   // 滚动到底部
-  const scrollToBottom = useCallback(() => {
-    if (!messagesContainerRef.current) return
-    if (renderableEntries.length === 0) return
-    rowVirtualizer.scrollToIndex(renderableEntries.length - 1, { align: 'end' })
-  }, [renderableEntries.length, rowVirtualizer])
+  const scrollToBottom = useCallback((smooth = false) => {
+    const container = messagesContainerRef.current
+    if (!container) return
+    // 直接滚动到容器最大滚动位置，比 scrollToIndex 更可靠
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: smooth ? 'smooth' : 'instant'
+    })
+  }, [])
 
   useEffect(() => {
     if (activeEntryId && messagesContainerRef.current) {
@@ -271,6 +357,22 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
     return () => container.removeEventListener('scroll', handleScroll)
   }, [loading, error])
 
+  // 监听新消息，延迟执行自动滚动
+  useEffect(() => {
+    if (loading || showLoading || error) return
+
+    const currentLength = renderableEntries.length
+    if (currentLength > prevEntriesLengthRef.current && pendingScrollToBottomRef.current) {
+      // 延迟滚动，确保虚拟滚动已测量新元素
+      const timeoutId = setTimeout(() => {
+        scrollToBottom()
+        pendingScrollToBottomRef.current = false
+      }, 50)
+      return () => clearTimeout(timeoutId)
+    }
+    prevEntriesLengthRef.current = currentLength
+  }, [renderableEntries.length, scrollToBottom, loading, showLoading, error])
+
   // 拖拽调整宽度
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -306,44 +408,6 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
     }
   }, [isResizing])
 
-  const loadSession = async () => {
-    try {
-      setLoading(true)
-      setShowLoading(false)
-      setError(null)
-      measuredHeightsRef.current.clear()
-
-      // 300ms 后才显示加载动画，避免快速加载时的闪烁
-      loadingTimerRef.current = setTimeout(() => {
-        setShowLoading(true)
-      }, 300)
-
-      const jsonlContent = await invoke<string>('read_session_file', { path: session.path })
-
-      // 计算行数
-      const lineCount = jsonlContent.split('\n').filter(line => line.trim()).length
-      setLineCount(lineCount)
-
-      const parsedEntries = parseSessionEntries(jsonlContent)
-      setEntries(parsedEntries)
-
-      const lastMessage = parsedEntries.filter(e => e.type === 'message').pop()
-      if (lastMessage) {
-        setActiveEntryId(lastMessage.id)
-      }
-    } catch (err) {
-      console.error('Failed to load session:', err)
-      setError(err instanceof Error ? err.message : t('session.loadError'))
-    } finally {
-      if (loadingTimerRef.current) {
-        clearTimeout(loadingTimerRef.current)
-        loadingTimerRef.current = null
-      }
-      setLoading(false)
-      setShowLoading(false)
-    }
-  }
-
   // 增量加载新内容
   const loadIncremental = async () => {
     try {
@@ -373,9 +437,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
 
           // 自动滚动到底部
           if (isAtBottomRef.current && messagesContainerRef.current) {
-            requestAnimationFrame(() => {
-              scrollToBottom()
-            })
+            pendingScrollToBottomRef.current = true
           } else {
             setHasNewMessages(true)
           }
@@ -496,10 +558,10 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <div className="flex items-center justify-between px-4 py-2 border-b border-[#2c2d3b]">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-baseline gap-2 min-w-0">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
-              className="p-1.5 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b] rounded transition-colors flex-shrink-0"
+              className="p-1.5 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b] rounded transition-colors flex-shrink-0 self-center"
               title={showSidebar ? t('session.hideSidebar') : t('session.showSidebar')}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -513,6 +575,13 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
+              onClick={() => setShowSystemPromptDialog(true)}
+              className="px-2 py-1 text-xs bg-[#2c2d3b] hover:bg-[#3c3d4b] rounded transition-colors cursor-pointer"
+              title={t('session.systemPromptAndTools', '系统提示词和工具')}
+            >
+              <Bot className="h-3.5 w-3.5" />
+            </button>
+            <button
               onClick={scrollToTop}
               className="px-2 py-1 text-xs bg-[#2c2d3b] hover:bg-[#3c3d4b] rounded transition-colors cursor-pointer"
               title={t('session.scrollToTop', '滚动到顶部')}
@@ -520,7 +589,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
               <ArrowUp className="h-3.5 w-3.5" />
             </button>
             <button
-              onClick={scrollToBottom}
+              onClick={() => scrollToBottom()}
               className="px-2 py-1 text-xs bg-[#2c2d3b] hover:bg-[#3c3d4b] rounded transition-colors cursor-pointer"
               title={t('session.scrollToBottom', '滚动到底部')}
             >
@@ -621,6 +690,11 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
         </div>
         )}
       </div>
+      <SystemPromptDialog
+        isOpen={showSystemPromptDialog}
+        onClose={() => setShowSystemPromptDialog(false)}
+        entries={entries}
+      />
     </div>
   )
 }

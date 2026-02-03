@@ -92,16 +92,6 @@ const SessionTreeSearch = forwardRef<SessionTreeSearchRef, SessionTreeSearchProp
             )}
           </div>
         )}
-
-        <div className="search-navigation">
-          <button
-            onClick={onClear}
-            className="nav-button close-button"
-            title={t('search.clearAll')}
-          >
-            <X size={20} />
-          </button>
-        </div>
       </div>
     </div>
   )

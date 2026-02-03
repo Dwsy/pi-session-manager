@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo, FavoriteItem } from '../types'
-import { Trash2, Loader2, Search, Star, Clock } from 'lucide-react'
+import { Trash2, Search, Star, Clock } from 'lucide-react'
+import { SessionListSkeleton } from './Skeleton'
 import OpenInBrowserButton from './OpenInBrowserButton'
 import OpenInTerminalButton from './OpenInTerminalButton'
 import { SessionBadge } from './SessionBadge'
@@ -22,6 +23,7 @@ interface SessionListProps {
   scrollParentRef?: RefObject<HTMLDivElement>
   favorites?: FavoriteItem[]
   onToggleFavorite?: (item: Omit<FavoriteItem, 'addedAt'>) => void
+  showDirectory?: boolean
 }
 
 export default function SessionList({
@@ -37,6 +39,7 @@ export default function SessionList({
   scrollParentRef,
   favorites = [],
   onToggleFavorite,
+  showDirectory = true,
 }: SessionListProps) {
   const { t } = useTranslation()
   const rowVirtualizer = useVirtualizer({
@@ -47,12 +50,7 @@ export default function SessionList({
   })
 
   if (loading) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60">
-        <Loader2 className="h-5 w-5 mb-3 animate-spin" />
-        <span className="text-[11px]">{t('session.list.loading')}</span>
-      </div>
-    )
+    return <SessionListSkeleton showDirectory={showDirectory} />
   }
 
   if (sessions.length === 0) {
@@ -109,9 +107,14 @@ export default function SessionList({
                     <SessionBadge type={getBadgeType(session.id)!} />
                   </div>
                 )}
-                <div className="flex items-center gap-1 text-[9px] text-muted-foreground flex-shrink-0">
-                  <Clock className="h-2.5 w-2.5" />
-                  <span className="whitespace-nowrap">{updatedLabel}</span>
+                <div className="flex items-center gap-2 text-[9px] text-muted-foreground flex-shrink-0">
+                  <span className="px-1.5 py-0.5 rounded bg-muted/30 tabular-nums">
+                    {session.message_count}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-2.5 w-2.5" />
+                    <span className="whitespace-nowrap">{updatedLabel}</span>
+                  </div>
                 </div>
               </div>
 
@@ -122,13 +125,12 @@ export default function SessionList({
               )}
 
               <div className="flex items-center gap-2">
-                <span className="text-[9px] text-muted-foreground/70 font-mono truncate flex-1 min-w-0">
-                  {formatDirectory(session.cwd) || t('session.list.unknownDirectory')}
-                </span>
-
-                <span className="text-[9px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/30 flex-shrink-0">
-                  {session.message_count}
-                </span>
+                {showDirectory && (
+                  <span className="text-[9px] text-muted-foreground/70 font-mono truncate flex-1 min-w-0">
+                    {formatDirectory(session.cwd) || t('session.list.unknownDirectory')}
+                  </span>
+                )}
+                {!showDirectory && <span className="flex-1" />}
 
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                   {onToggleFavorite && (

@@ -201,12 +201,20 @@ function ShortcutHints() {
         <div className="text-xs text-[#6a6f85] mb-2">{t('settings.shortcuts.title', '快捷键')}</div>
         <div className="space-y-1">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-[#6a6f85]">{t('app.shortcuts.settings', '打开设置')}</span>
-            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Cmd+,</span>
+            <span className="text-[#6a6f85]">{t('app.shortcuts.resume', '恢复会话')}</span>
+            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Cmd+R</span>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span className="text-[#6a6f85]">{t('app.shortcuts.refresh', '刷新会话列表')}</span>
-            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Cmd+R</span>
+            <span className="text-[#6a6f85]">{t('app.shortcuts.exportHtml', '导出并打开')}</span>
+            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Cmd+E</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[#6a6f85]">{t('app.shortcuts.projectView', '项目视图')}</span>
+            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Cmd+P</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[#6a6f85]">{t('app.shortcuts.settings', '打开设置')}</span>
+            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Cmd+,</span>
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="text-[#6a6f85]">{t('app.shortcuts.search', '聚焦搜索框')}</span>

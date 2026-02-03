@@ -12,11 +12,13 @@ import RecentSessions from './dashboard/RecentSessions'
 import TopModelsChart from './dashboard/TopModelsChart'
 import TimeDistribution from './dashboard/TimeDistribution'
 import TokenTrendChart from './dashboard/TokenTrendChart'
+import { DashboardSkeleton } from './Skeleton'
 
 interface DashboardProps {
   sessions: SessionInfo[]
   onSessionSelect?: (session: SessionInfo) => void
   projectName?: string
+  loading?: boolean
 }
 
 // Helper function to extract project name from path
@@ -25,10 +27,12 @@ function getProjectName(path: string): string {
   return parts[parts.length - 1] || path
 }
 
-export default function Dashboard({ sessions, onSessionSelect, projectName }: DashboardProps) {
+export default function Dashboard({ sessions, onSessionSelect, projectName, loading: parentLoading = false }: DashboardProps) {
   const { t } = useTranslation()
   const [stats, setStats] = useState<SessionStats | null>(null)
+  const [showSkeleton, setShowSkeleton] = useState(true)
   const isLoadingRef = useRef(false)
+  const minShowSkeletonTimeRef = useRef<number>(0)
   const statsKey = useMemo(() => {
     const first = sessions[0]
     const last = sessions[sessions.length - 1]
@@ -44,16 +48,25 @@ export default function Dashboard({ sessions, onSessionSelect, projectName }: Da
 
   // sessions 或项目切换时重新加载统计
   useEffect(() => {
-    if (sessions.length === 0) {
-      setStats(null)
+    // 如果父组件还在加载 sessions，显示骨架屏
+    if (parentLoading) {
+      setShowSkeleton(true)
       return
     }
+    if (sessions.length === 0) {
+      setStats(null)
+      setShowSkeleton(false)
+      return
+    }
+    // 设置最小显示骨架屏的时间（300ms）
+    minShowSkeletonTimeRef.current = Date.now() + 300
     loadStats()
-  }, [statsKey])
+  }, [statsKey, parentLoading])
 
   const loadStats = async () => {
     if (isLoadingRef.current) return
     isLoadingRef.current = true
+    setShowSkeleton(true)
 
     try {
       // Check if in demo mode
@@ -65,32 +78,43 @@ export default function Dashboard({ sessions, onSessionSelect, projectName }: Da
         // Use demo stats in demo mode
         const result = getDemoStats()
         setStats(result)
-        return
-      }
-
-      const statsSessions: SessionStatsInput[] = sessions.map((session) => ({
-        path: session.path,
-        cwd: session.cwd,
-        modified: session.modified,
-        message_count: session.message_count,
-      }))
-      let result: SessionStats
-      try {
-        result = await invoke<SessionStats>('get_session_stats_light', { sessions: statsSessions })
-      } catch (error: any) {
-        const message = typeof error === 'string' ? error : error?.message
-        if (message && String(message).includes('get_session_stats_light')) {
-          result = await invoke<SessionStats>('get_session_stats', { sessions })
-        } else {
-          throw error
+      } else {
+        const statsSessions: SessionStatsInput[] = sessions.map((session) => ({
+          path: session.path,
+          cwd: session.cwd,
+          modified: session.modified,
+          message_count: session.message_count,
+        }))
+        let result: SessionStats
+        try {
+          result = await invoke<SessionStats>('get_session_stats_light', { sessions: statsSessions })
+        } catch (error: any) {
+          const message = typeof error === 'string' ? error : error?.message
+          if (message && String(message).includes('get_session_stats_light')) {
+            result = await invoke<SessionStats>('get_session_stats', { sessions })
+          } else {
+            throw error
+          }
         }
+        setStats(result)
       }
-      setStats(result)
     } catch (error) {
       console.error('Failed to load stats:', error)
     } finally {
       isLoadingRef.current = false
+      // 确保骨架屏至少显示最小时间，避免闪烁
+      const remainingTime = minShowSkeletonTimeRef.current - Date.now()
+      if (remainingTime > 0) {
+        setTimeout(() => setShowSkeleton(false), remainingTime)
+      } else {
+        setShowSkeleton(false)
+      }
     }
+  }
+
+  // 显示骨架屏加载状态
+  if (showSkeleton) {
+    return <DashboardSkeleton />
   }
 
   // 不显示加载状态，直接显示空数据或实际数据

@@ -31,10 +31,10 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
   // 全局快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+K (Mac) 或 Ctrl+K (Windows/Linux)
+      // Cmd+K (Mac) 或 Ctrl+K (Windows/Linux) - 切换面板
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        open()
+        isOpen ? close() : open()
       }
       
       // ESC 关闭

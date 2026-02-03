@@ -1,12 +1,12 @@
 import type { RefObject } from 'react'
 import type { SessionInfo, FavoriteItem } from '../types'
-import { FolderOpen, Loader2, ArrowLeft, Star } from 'lucide-react'
+import { FolderOpen, ArrowLeft, Star } from 'lucide-react'
+import { ProjectListSkeleton } from './Skeleton'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import OpenInTerminalButton from './OpenInTerminalButton'
-import { SessionBadge } from './SessionBadge'
+import SessionList from './SessionList'
 
 interface ProjectListProps {
   sessions: SessionInfo[]
@@ -14,6 +14,7 @@ interface ProjectListProps {
   selectedProject?: string | null
   onSelectSession: (session: SessionInfo) => void
   onSelectProject?: (project: string | null) => void
+  onDeleteSession?: (session: SessionInfo) => void
   loading: boolean
   terminal?: 'iterm2' | 'terminal' | 'vscode' | 'custom'
   piPath?: string
@@ -39,6 +40,7 @@ export default function ProjectList({
   selectedProject: externalSelectedProject,
   onSelectSession,
   onSelectProject,
+  onDeleteSession,
   loading,
   terminal = 'iterm2',
   piPath,
@@ -96,21 +98,9 @@ export default function ProjectList({
     overscan: 8,
   })
 
-  const sessionsVirtualizer = useVirtualizer({
-    count: selectedProject ? projectSessions.length : 0,
-    getScrollElement: () => scrollParentRef?.current ?? null,
-    estimateSize: () => 44,
-    overscan: 8,
-  })
-
   if (!selectedProject) {
     if (loading) {
-      return (
-        <div className="p-6 text-center text-muted-foreground">
-          <Loader2 className="h-6 w-6 mx-auto mb-2 animate-spin" />
-          <p className="text-xs">{t('project.list.loading')}</p>
-        </div>
-      )
+      return <ProjectListSkeleton />
     }
 
     if (projects.length === 0) {
@@ -126,7 +116,7 @@ export default function ProjectList({
 
     return (
       <div>
-        <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border/30">
+        <div className="px-3 py-2 text-[11px] text-muted-foreground border-b border-border/10">
           {t('project.list.count', { count: projects.length })}
         </div>
         <div
@@ -142,7 +132,7 @@ export default function ProjectList({
                 key={project.dir}
                 data-index={virtualRow.index}
                 ref={projectsVirtualizer.measureElement}
-                className="px-3 py-3 hover:bg-[#262738] cursor-pointer transition-colors border-b border-border/20"
+                className="px-3 py-2 hover:bg-[#1a1b26] cursor-pointer transition-colors border-b border-border/10 group"
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -151,28 +141,17 @@ export default function ProjectList({
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                <div className="flex items-start gap-3">
-                  <div
-                    onClick={() => handleSelectProject(project.dir)}
-                    className="h-10 w-10 rounded-lg bg-[#1f2130] border border-border/40 flex items-center justify-center flex-shrink-0 mt-0.5"
-                  >
-                    <FolderOpen className="h-4 w-4 text-blue-400" />
-                  </div>
-                  <div className="min-w-0 flex-1 space-y-2" onClick={() => handleSelectProject(project.dir)}>
-                    <div>
-                      <div className="text-xs font-semibold truncate leading-tight">{project.dirName}</div>
-                      <div className="text-[11px] text-muted-foreground/80 truncate">{project.dir}</div>
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1" onClick={() => handleSelectProject(project.dir)}>
+                    <div className="flex items-center gap-1.5">
+                      <FolderOpen className="h-3 w-3 text-blue-400 flex-shrink-0" />
+                      <div className="text-[11px] font-medium truncate leading-tight">{project.dirName}</div>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums flex-wrap">
-                      <span className="px-2 py-0.5 rounded-md bg-[#222334] border border-border/30">
-                        {project.sessionCount} {t('project.list.sessions')}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-md bg-[#222334] border border-border/30">
-                        {project.messageCount} {t('session.list.messages')}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-md bg-[#222334] border border-border/30">
-                        {t('common.updated')} {formatShortTime(new Date(project.lastModified).toISOString(), t)}
-                      </span>
+                    <div className="text-[10px] text-muted-foreground/70 truncate mt-0.5">{formatDirectory(project.dir)}</div>
+                    <div className="flex items-center gap-3 mt-1.5 text-[9px] text-muted-foreground tabular-nums">
+                      <span className="w-16 truncate">{project.sessionCount} {t('project.list.sessions')}</span>
+                      <span className="w-20 truncate">{project.messageCount} {t('session.list.messages')}</span>
+                      <span className="w-16 truncate">{formatShortTime(new Date(project.lastModified).toISOString(), t)}</span>
                     </div>
                   </div>
                   {onToggleFavorite && (
@@ -186,12 +165,12 @@ export default function ProjectList({
                           path: project.dir,
                         })
                       }}
-                      className={`p-1.5 rounded-lg transition-colors flex-shrink-0 mt-0.5 z-10 ${
-                        isFavorite ? 'text-yellow-400 bg-yellow-400/10' : 'text-muted-foreground hover:text-yellow-400 hover:bg-yellow-400/10'
+                      className={`p-1 rounded transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100 ${
+                        isFavorite ? 'text-yellow-400 opacity-100' : 'text-muted-foreground hover:text-yellow-400'
                       }`}
                       title={isFavorite ? t('favorites.remove') : t('favorites.add')}
                     >
-                      <Star className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
+                      <Star className={`h-3 w-3 ${isFavorite ? 'fill-current' : ''}`} />
                     </button>
                   )}
                 </div>
@@ -204,7 +183,7 @@ export default function ProjectList({
   }
 
   return (
-    <div>
+    <div className="flex flex-col">
       {showHeader && (
         <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30">
           <button
@@ -222,101 +201,32 @@ export default function ProjectList({
         </div>
       )}
 
-      <div
-        className="relative w-full"
-        style={{ height: `${sessionsVirtualizer.getTotalSize()}px` }}
-      >
-        {sessionsVirtualizer.getVirtualItems().map((virtualRow) => {
-          const session = projectSessions[virtualRow.index]
-          if (!session) return null
-          const isFavorite = favorites.some(f => f.type === 'session' && f.id === session.id)
-          const hoverTitle = [
-            session.name || session.first_message || t('session.list.untitled'),
-            `路径: ${session.path}`,
-            `创建: ${new Date(session.created).toLocaleString()}`,
-            `更新: ${new Date(session.modified).toLocaleString()}`,
-            `消息: ${session.message_count}`,
-          ].join('\n')
-          return (
-            <div
-              key={session.id}
-              data-index={virtualRow.index}
-              ref={sessionsVirtualizer.measureElement}
-              onClick={() => onSelectSession(session)}
-              title={hoverTitle}
-              className={`px-3 py-2.5 cursor-pointer transition-colors group border-b border-border/20 ${
-                selectedSession?.id === session.id ? 'bg-[#262738]' : 'hover:bg-[#222334]'
-              }`}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start gap-2">
-                    <div className="text-xs font-medium truncate leading-tight flex-1 min-w-0">
-                      {session.name || session.first_message || t('session.list.untitled')}
-                    </div>
-                    {getBadgeType && getBadgeType(session.id) && (
-                      <div className="flex-shrink-0 mt-0.5">
-                        <SessionBadge type={getBadgeType(session.id)!} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground/80">
-                    <span className="whitespace-nowrap">{t('common.created')} {formatShortTime(session.created, t)}</span>
-                    <span className="text-border/60">·</span>
-                    <span className="whitespace-nowrap">{t('common.updated')} {formatShortTime(session.modified, t)}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
-                  <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-                    {session.message_count}
-                  </span>
-                  {onToggleFavorite && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onToggleFavorite({
-                          type: 'session',
-                          id: session.id,
-                          name: session.name || session.first_message || t('session.list.untitled'),
-                          path: session.path,
-                        })
-                      }}
-                      className={`p-1 rounded transition-all ${
-                        isFavorite 
-                          ? 'text-yellow-400 opacity-100' 
-                          : 'text-muted-foreground/50 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
-                      }`}
-                      title={isFavorite ? t('favorites.remove') : t('favorites.add')}
-                    >
-                      <Star className={`h-3 w-3 ${isFavorite ? 'fill-current' : ''}`} />
-                    </button>
-                  )}
-                  <div className="opacity-0 group-hover:opacity-100 transition-all">
-                    <OpenInTerminalButton
-                      session={session}
-                      terminal={terminal}
-                      piPath={piPath}
-                      customCommand={customCommand}
-                      size="sm"
-                      variant="ghost"
-                      onError={(error) => console.error('Failed to open in terminal:', error)}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      <SessionList
+        sessions={projectSessions}
+        selectedSession={selectedSession}
+        onSelectSession={onSelectSession}
+        onDeleteSession={onDeleteSession}
+        loading={loading}
+        getBadgeType={getBadgeType}
+        terminal={terminal}
+        piPath={piPath}
+        customCommand={customCommand}
+        scrollParentRef={scrollParentRef}
+        favorites={favorites}
+        onToggleFavorite={onToggleFavorite}
+        showDirectory={false}
+      />
     </div>
   )
+}
+
+function formatDirectory(path: string): string {
+  if (!path) return ''
+
+  const parts = path.split('/').filter(Boolean)
+  if (parts.length <= 2) return path
+
+  return '.../' + parts.slice(-2).join('/')
 }
 
 function getDirectoryName(cwd: string): string {
