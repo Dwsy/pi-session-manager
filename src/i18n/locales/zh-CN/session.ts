@@ -4,6 +4,7 @@ export const session = {
   resume: '恢复',
   scrollToTop: '滚动到顶部',
   scrollToBottom: '滚动到底部',
+  systemPromptAndTools: '系统提示词和工具',
   list: {
     empty: '未找到会话',
     loading: '加载会话中...',

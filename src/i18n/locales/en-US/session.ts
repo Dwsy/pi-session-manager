@@ -4,6 +4,7 @@ export const session = {
   resume: 'Resume',
   scrollToTop: 'Scroll to top',
   scrollToBottom: 'Scroll to bottom',
+  systemPromptAndTools: 'System Prompt & Tools',
   list: {
     empty: 'No sessions found',
     loading: 'Loading sessions...',

@@ -9,10 +9,11 @@ export const app = {
     project: 'Project view',
   },
   shortcuts: {
-    refresh: 'Refresh session list (Cmd+R)',
+    resume: 'Resume session (Cmd+R)',
+    exportHtml: 'Export & open (Cmd+E)',
+    projectView: 'Project view (Cmd+P)',
     search: 'Focus search (Cmd+F)',
     settings: 'Open settings (Cmd+,)',
-    stats: 'Open statistics (Cmd+Shift+S)',
     close: 'Close (Esc)',
   },
   errors: {
