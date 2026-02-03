@@ -189,6 +189,8 @@ export const components = {
       sessions: 'Total Sessions',
       messages: 'Total Messages',
       avgPerSession: 'Avg/Session',
+      totalTokens: 'Total Tokens',
+      totalCost: 'Total Cost',
     },
   },
 } as const

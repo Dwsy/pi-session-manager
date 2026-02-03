@@ -10,10 +10,10 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
   const { t } = useTranslation()
 
   const terminals = [
-    { id: 'iterm2', name: 'iTerm2', description: '推荐的 macOS 终端' },
-    { id: 'terminal', name: 'Terminal.app', description: 'macOS 自带终端' },
-    { id: 'vscode', name: 'VS Code', description: 'Visual Studio Code 终端' },
-    { id: 'custom', name: '自定义', description: '使用自定义命令' },
+    { id: 'iterm2', name: t('settings.terminal.options.iterm2.name'), description: t('settings.terminal.options.iterm2.description') },
+    { id: 'terminal', name: t('settings.terminal.options.terminal.name'), description: t('settings.terminal.options.terminal.description') },
+    { id: 'vscode', name: t('settings.terminal.options.vscode.name'), description: t('settings.terminal.options.vscode.description') },
+    { id: 'custom', name: t('settings.terminal.options.custom.name'), description: t('settings.terminal.options.custom.description') },
   ]
 
   return (

@@ -173,25 +173,25 @@ export default function Dashboard({ sessions, onSessionSelect, projectName, load
       <div className="grid grid-cols-5 gap-3 mb-4">
         <StatCard
           icon={BarChart3}
-          label={t('displayStats.cards.sessions')}
+          label={t('components.displayStats.cards.sessions')}
           value={displayStats.total_sessions}
           color="#569cd6"
         />
         <StatCard
           icon={Activity}
-          label={t('displayStats.cards.messages')}
+          label={t('components.displayStats.cards.messages')}
           value={displayStats.total_messages}
           color="#7ee787"
         />
         <StatCard
           icon={Clock}
-          label={t('displayStats.cards.avgPerSession')}
+          label={t('components.displayStats.cards.avgPerSession')}
           value={displayStats.average_messages_per_session.toFixed(1)}
           color="#ffa657"
         />
         <StatCard
           icon={Zap}
-          label="Total Tokens"
+          label={t('components.displayStats.cards.totalTokens')}
           value={displayStats.total_tokens > 1000000 
             ? `${(displayStats.total_tokens / 1000000).toFixed(1)}M` 
             : displayStats.total_tokens > 1000 
@@ -202,7 +202,7 @@ export default function Dashboard({ sessions, onSessionSelect, projectName, load
         />
         <StatCard
           icon={DollarSign}
-          label="Total Cost"
+          label={t('components.displayStats.cards.totalCost')}
           value={displayStats.token_details.total_cost < 0.01 
             ? `$${displayStats.token_details.total_cost.toFixed(4)}` 
             : displayStats.token_details.total_cost < 1
