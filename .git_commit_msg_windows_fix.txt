@@ -1,4 +1,0 @@
-fix: rename file to avoid Windows path issues
-
-Rename file with colon character to hyphens to fix Windows build failure.
-Colons are not allowed in Windows file paths.
