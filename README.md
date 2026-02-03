@@ -1,6 +1,7 @@
 # Pi Session Manager
 
 A Tauri2 desktop application for managing and searching Pi Agent sessions. Built with Rust backend and React frontend, providing fast performance and efficient session handling.
+<img width="1400" height="900" alt="image" src="https://github.com/user-attachments/assets/2779e8e5-3eae-48bd-996d-57c91461e6c9" />
 
 ## Features
 
