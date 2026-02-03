@@ -189,6 +189,8 @@ export const components = {
       sessions: '总会话数',
       messages: '总消息数',
       avgPerSession: '平均/会话',
+      totalTokens: '总 Tokens',
+      totalCost: '总成本',
     },
   },
 } as const

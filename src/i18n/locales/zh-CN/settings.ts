@@ -25,6 +25,12 @@ export const settings = {
     piCommandPath: 'Pi 命令路径',
     piCommandPathHelp: '如果 pi 不在系统 PATH 中，请指定完整路径',
     commandExample: '例如：alacritty -e',
+    options: {
+      iterm2: { name: 'iTerm2', description: '推荐的 macOS 终端' },
+      terminal: { name: 'Terminal.app', description: 'macOS 自带终端' },
+      vscode: { name: 'VS Code', description: 'Visual Studio Code 终端' },
+      custom: { name: '自定义', description: '使用自定义命令' },
+    },
   },
   appearance: {
     theme: '主题',

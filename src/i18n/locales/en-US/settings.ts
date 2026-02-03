@@ -25,6 +25,12 @@ export const settings = {
     piCommandPath: 'Pi Command Path',
     piCommandPathHelp: 'Specify full path if pi is not in system PATH',
     commandExample: 'e.g., alacritty -e',
+    options: {
+      iterm2: { name: 'iTerm2', description: 'Recommended macOS terminal' },
+      terminal: { name: 'Terminal.app', description: 'Built-in macOS terminal' },
+      vscode: { name: 'VS Code', description: 'Visual Studio Code terminal' },
+      custom: { name: 'Custom', description: 'Use custom command' },
+    },
   },
   appearance: {
     theme: 'Theme',
