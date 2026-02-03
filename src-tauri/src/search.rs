@@ -13,6 +13,11 @@ pub enum RoleFilter {
     Assistant,
 }
 
+/// 搜索会话
+/// 优化点：
+/// 1. 使用小写查询词缓存，避免重复转换
+/// 2. 快速过滤：先检查 all_messages_text 是否包含查询词
+/// 3. 减少不必要的字符串分配
 pub fn search_sessions(
     sessions: &[SessionInfo],
     query: &str,
@@ -20,18 +25,24 @@ pub fn search_sessions(
     role_filter: RoleFilter,
     include_tools: bool,
 ) -> Vec<SearchResult> {
-    if query.trim().is_empty() {
+    let query_trimmed = query.trim();
+    if query_trimmed.is_empty() {
         return vec![];
     }
 
-    let query_lower = query.to_lowercase();
+    // 预计算查询词（小写），避免重复转换
+    let query_lower = query_trimmed.to_lowercase();
     let query_words: Vec<&str> = query_lower.split_whitespace().collect();
+
+    if query_words.is_empty() {
+        return vec![];
+    }
 
     let mut results = Vec::new();
 
     for session in sessions {
         if search_mode == SearchMode::Name {
-            // Search in session name and first message
+            // 搜索会话名称和第一条消息
             if matches_session_name(session, &query_words) {
                 results.push(SearchResult {
                     session_id: session.id.clone(),
@@ -43,7 +54,13 @@ pub fn search_sessions(
                 });
             }
         } else {
-            // Search in message content
+            // 快速过滤：先检查 all_messages_text 是否包含查询词
+            // 避免对每个会话都读取文件
+            if !has_match_in_text(&session.all_messages_text, &query_words) {
+                continue;
+            }
+
+            // 搜索消息内容
             let matches = find_matches(session, &query_words, role_filter, include_tools);
             if !matches.is_empty() {
                 let score = calculate_score(&matches, &query_words);
@@ -63,19 +80,35 @@ pub fn search_sessions(
     results
 }
 
+/// 快速检查文本是否包含任何查询词（OR 逻辑）
+/// 用于快速过滤，只要包含任意一个词就返回 true
+fn has_match_in_text(text: &str, query_words: &[&str]) -> bool {
+    let text_lower = text.to_lowercase();
+    query_words.iter().any(|word| text_lower.contains(word))
+}
+
+/// 匹配会话名称
+/// 优化：减少字符串分配，避免创建中间字符串
 fn matches_session_name(session: &SessionInfo, query_words: &[&str]) -> bool {
     if query_words.is_empty() {
         return false;
     }
 
-    let name_lower = session.name.as_deref().unwrap_or("").to_lowercase();
-    let first_msg_lower = session.first_message.to_lowercase();
-    let combined = format!("{} {}", name_lower, first_msg_lower);
+    let name = session.name.as_deref().unwrap_or("");
+    let first_msg = &session.first_message;
 
-    // All words must match (AND logic) for more precise name search
-    query_words.iter().all(|word| combined.contains(word))
+    // 检查每个查询词是否匹配名称或第一条消息
+    // 避免创建合并字符串，减少内存分配
+    query_words.iter().all(|word| {
+        name.to_lowercase().contains(word) || first_msg.to_lowercase().contains(word)
+    })
 }
 
+/// 查找匹配项
+/// 优化点：
+/// 1. 移除重复的 all_messages_text 检查（已在 search_sessions 中检查）
+/// 2. 使用 BufReader 逐行读取大文件，避免一次性加载整个文件
+/// 3. 减少字符串分配
 fn find_matches(
     session: &SessionInfo,
     query_words: &[&str],
@@ -86,26 +119,26 @@ fn find_matches(
         return vec![];
     }
 
-    // Fast filter using all_messages_text (already in memory)
-    let all_text_lower = session.all_messages_text.to_lowercase();
-    let has_any_match = query_words.iter().any(|word| all_text_lower.contains(word));
-    if !has_any_match {
-        return vec![];
-    }
-
     let mut matches = Vec::new();
 
-    // Parse session entries to get detailed match information with roles
-    let entries = parse_session_entries(session.path.as_str(), role_filter, include_tools);
+    // 使用 BufReader 逐行读取文件，避免大文件内存问题
+    let file = match std::fs::File::open(&session.path) {
+        Ok(f) => f,
+        Err(_) => return vec![],
+    };
+    let reader = std::io::BufReader::new(file);
+
+    // 解析会话条目
+    let entries = parse_session_entries_from_reader(reader, role_filter, include_tools);
 
     for entry in &entries {
         let content_lower = entry.content.to_lowercase();
 
-        // Check if ANY query word matches in this entry (OR logic)
+        // 检查是否有任何查询词匹配（OR 逻辑）
         let any_word_match = query_words.iter().any(|word| content_lower.contains(word));
 
         if any_word_match {
-            // Find the position of the first matching word for snippet
+            // 找到第一个匹配词的位置，生成片段
             for word in query_words {
                 if let Some(word_pos) = content_lower.find(word) {
                     let snippet_start = word_pos.saturating_sub(30);
@@ -118,7 +151,7 @@ fn find_matches(
                         snippet,
                         timestamp: entry.timestamp,
                     });
-                    break; // Only add one snippet per entry
+                    break; // 每个条目只添加一个片段
                 }
             }
         }
@@ -136,24 +169,27 @@ struct MessageEntry {
     timestamp: chrono::DateTime<chrono::Utc>,
 }
 
-fn parse_session_entries(
-    path: &str,
+/// 从 BufReader 解析会话条目
+/// 优化：支持流式读取，避免大文件内存问题
+fn parse_session_entries_from_reader<R: std::io::BufRead>(
+    reader: R,
     role_filter: RoleFilter,
     include_tools: bool,
 ) -> Vec<MessageEntry> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read session file: {}", e))
-        .unwrap_or_default();
-
     let mut entries = Vec::new();
 
-    for line in content.lines() {
+    for line_result in reader.lines() {
+        let line = match line_result {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+
         if line.trim().is_empty() {
             continue;
         }
 
-        if let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) {
-            // Only process message entries
+        if let Ok(entry) = serde_json::from_str::<serde_json::Value>(&line) {
+            // 只处理消息条目
             if entry["type"] != "message" {
                 continue;
             }
@@ -165,7 +201,7 @@ fn parse_session_entries(
                     .map(|dt| dt.with_timezone(&chrono::Utc))
                     .unwrap_or_else(|_| chrono::Utc::now());
 
-                // Filter by role
+                // 按角色过滤
                 let include = match role_filter {
                     RoleFilter::All => true,
                     RoleFilter::User => role == "user",
@@ -184,7 +220,7 @@ fn parse_session_entries(
                             }
                         }
 
-                        // Include thinking content if include_tools is true
+                        // 如果 include_tools 为 true，包含 thinking 内容
                         if include_tools {
                             if let Some(thinking) = item.get("thinking") {
                                 if let Some(s) = thinking.as_str() {
@@ -303,28 +339,34 @@ fn get_full_session_content(path: &str) -> Result<String, String> {
     Ok(full_text)
 }
 
+/// 计算匹配分数
+/// 优化：减少字符串分配，使用更高效的边界检查
 fn calculate_score(matches: &[Match], query_words: &[&str]) -> f32 {
     if matches.is_empty() {
         return 0.0;
     }
 
-    // Base score: number of matches
+    // 基础分数：匹配数量
     let mut score = matches.len() as f32;
 
-    // Bonus for exact matches (word boundaries)
+    // 精确匹配加分（词边界）
     for m in matches {
         let snippet_lower = m.snippet.to_lowercase();
         for word in query_words {
-            // Check for word boundary match
-            let word_with_boundary = format!(" {} ", word);
-            let start_with_boundary = format!("{} ", word);
-            let end_with_boundary = format!(" {}", word);
+            // 检查词边界匹配，避免创建过多临时字符串
+            if let Some(pos) = snippet_lower.find(word) {
+                let word_len = word.len();
+                let snippet_bytes = snippet_lower.as_bytes();
 
-            if snippet_lower.contains(&word_with_boundary)
-                || snippet_lower.starts_with(&start_with_boundary)
-                || snippet_lower.ends_with(&end_with_boundary)
-            {
-                score += 0.5;
+                // 检查是否是词边界
+                let is_word_boundary_start = pos == 0
+                    || !snippet_bytes[pos - 1].is_ascii_alphanumeric();
+                let is_word_boundary_end = pos + word_len >= snippet_bytes.len()
+                    || !snippet_bytes[pos + word_len].is_ascii_alphanumeric();
+
+                if is_word_boundary_start && is_word_boundary_end {
+                    score += 0.5;
+                }
             }
         }
     }

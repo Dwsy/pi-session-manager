@@ -2,6 +2,7 @@ use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, FileIdMap};
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
 use tracing::{error, info};
@@ -14,7 +15,7 @@ pub fn start_file_watcher(sessions_dir: PathBuf, app_handle: AppHandle) -> Resul
     let (tx, rx) = channel();
 
     // 创建防抖动的监听器（3秒防抖，合并多次变化）
-    let mut debouncer = new_debouncer(
+    let debouncer = new_debouncer(
         Duration::from_secs(3),
         None,
         move |result: DebounceEventResult| {
@@ -26,20 +27,30 @@ pub fn start_file_watcher(sessions_dir: PathBuf, app_handle: AppHandle) -> Resul
     .map_err(|e| format!("Failed to create file watcher: {}", e))?;
 
     // 监听 sessions 目录
-    debouncer
+    let mut debouncer_guard = debouncer;
+    debouncer_guard
         .watcher()
         .watch(&sessions_dir, RecursiveMode::Recursive)
         .map_err(|e| format!("Failed to watch directory: {}", e))?;
 
     info!("File watcher started successfully (3s debounce + batch merge)");
 
+    // 使用 Arc<Mutex> 管理 debouncer 生命周期，避免内存泄漏
+    let debouncer_arc = Arc::new(Mutex::new(debouncer_guard));
+
+    // 克隆 app_handle 用于线程
+    let app_handle_for_thread = app_handle.clone();
+
     // 启动后台线程处理文件事件（带批量合并）
+    let debouncer_for_thread = Arc::clone(&debouncer_arc);
     std::thread::spawn(move || {
-        process_events_with_merge(rx, app_handle);
+        // 保持 debouncer 引用存活，直到线程结束
+        let _debouncer = debouncer_for_thread;
+        process_events_with_merge(rx, app_handle_for_thread);
     });
 
-    // 将 debouncer 泄漏到静态生命周期，保持运行
-    Box::leak(Box::new(debouncer));
+    // 将 Arc 存储到 Tauri 应用状态中以保持生命周期
+    app_handle.manage(debouncer_arc);
 
     Ok(())
 }
