@@ -4,6 +4,7 @@ use crate::sqlite_cache;
 use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 pub fn get_sessions_dir() -> Result<PathBuf, String> {
@@ -91,16 +92,20 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
     Ok(sessions)
 }
 
+/// 解析会话信息
+/// 优化：使用 BufReader 流式读取，减少大文件内存占用
 pub fn parse_session_info(path: &Path) -> Result<SessionInfo, String> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+    let file = fs::File::open(path)
+        .map_err(|e| format!("Failed to open file: {}", e))?;
+    let reader = BufReader::new(file);
+    let mut lines = reader.lines();
 
-    let lines: Vec<&str> = content.lines().collect();
-    if lines.is_empty() {
-        return Err("Empty session file".to_string());
-    }
+    // 读取并解析头部
+    let header_line = lines.next()
+        .ok_or("Empty session file")?
+        .map_err(|e| format!("Failed to read header: {}", e))?;
 
-    let header: Value = serde_json::from_str(lines[0])
+    let header: Value = serde_json::from_str(&header_line)
         .map_err(|e| format!("Failed to parse header: {}", e))?;
 
     if header["type"] != "session" {
@@ -123,12 +128,18 @@ pub fn parse_session_info(path: &Path) -> Result<SessionInfo, String> {
     let mut last_message = String::new();
     let mut last_message_role = String::new();
 
-    for line in &lines[1..] {
+    // 流式读取剩余行，减少内存占用
+    for line_result in lines {
+        let line = match line_result {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+
         if line.trim().is_empty() {
             continue;
         }
 
-        if let Ok(entry) = serde_json::from_str::<Value>(line) {
+        if let Ok(entry) = serde_json::from_str::<Value>(&line) {
             if entry["type"] == "session_info" {
                 if let Some(n) = entry["name"].as_str() {
                     name = Some(n.trim().to_string());

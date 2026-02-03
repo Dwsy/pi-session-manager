@@ -50,6 +50,8 @@ fn test_search_integration() {
             message_count: 1,
             first_message: "How to implement search in Rust?".to_string(),
             all_messages_text: "How to implement search in Rust?".to_string(),
+        last_message: "How to implement search in Rust?".to_string(),
+        last_message_role: "user".to_string(),
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -65,6 +67,8 @@ fn test_search_integration() {
             message_count: 1,
             first_message: "I want to learn React".to_string(),
             all_messages_text: "I want to learn React".to_string(),
+        last_message: "I want to learn React".to_string(),
+        last_message_role: "user".to_string(),
         },
         SessionInfo {
             path: session3_path.clone(),
@@ -80,6 +84,8 @@ fn test_search_integration() {
             message_count: 1,
             first_message: "Here is how you implement search in Rust...".to_string(),
             all_messages_text: "Here is how you implement search in Rust...".to_string(),
+        last_message: "Here is how you implement search in Rust...".to_string(),
+        last_message_role: "user".to_string(),
         },
     ];
 
@@ -169,6 +175,8 @@ fn test_search_results_mapping() {
         message_count: 1,
         first_message: "Test search functionality".to_string(),
         all_messages_text: "Test search functionality".to_string(),
+        last_message: "Test search functionality".to_string(),
+        last_message_role: "user".to_string(),
     }];
 
     let results = search_sessions(&sessions, "test", SearchMode::Content, RoleFilter::All, true);
@@ -192,6 +200,8 @@ fn test_search_results_mapping() {
             message_count: result.matches.len(),
             first_message: result.first_message.clone(),
             all_messages_text: String::new(),
+            last_message: result.first_message.clone(),
+            last_message_role: "user".to_string(),
         };
 
         println!("Mapped session cwd: {}", mapped.cwd);
