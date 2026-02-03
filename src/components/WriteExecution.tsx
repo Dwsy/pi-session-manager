@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { escapeHtml, getLanguageFromPath } from '../utils/markdown'
 import { shortenPath, formatDate } from '../utils/format'
 import CodeBlock from './CodeBlock'
-import HoverPreview from './HoverPreview'
 
 interface WriteExecutionProps {
   filePath: string
@@ -51,20 +50,13 @@ export default function WriteExecution({
           {remaining > 0 && !localExpanded ? (
             <>
               <CodeBlock code={lines.slice(0, 20).join('\n')} language={lang} showLineNumbers={false} />
-              <HoverPreview
-                content={
-                  <div
-                    className="expand-hint"
-                    onClick={() => setLocalExpanded(true)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    ... {t('components.writeExecution.moreLines', { count: remaining })}
-                  </div>
-                }
-                previewContent={
-                  <CodeBlock code={content} language={lang} showLineNumbers={false} />
-                }
-              />
+              <div
+                className="expand-hint"
+                onClick={() => setLocalExpanded(true)}
+                style={{ cursor: 'pointer' }}
+              >
+                ... {t('components.writeExecution.moreLines', { count: remaining })}
+              </div>
             </>
           ) : (
             <CodeBlock code={content} language={lang} showLineNumbers={false} />

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SessionEntry } from '../types'
 
@@ -165,8 +165,8 @@ export default function SessionTree({
     return result
   }, [treeData, activePathIds])
 
-  // Build tree prefix (ASCII art)
-  const buildTreePrefix = (flatNode: FlatNode): string => {
+  // Build tree prefix (ASCII art) - 使用 useCallback 缓存函数
+  const buildTreePrefix = useCallback((flatNode: FlatNode): string => {
     const { indent, showConnector, isLast, gutters, isVirtualRootChild, multipleRoots } = flatNode
     const displayIndent = multipleRoots ? Math.max(0, indent - 1) : indent
     const connector = showConnector && !isVirtualRootChild ? (isLast ? '└─ ' : '├─ ') : ''
@@ -194,7 +194,7 @@ export default function SessionTree({
       }
     }
     return prefixChars.join('')
-  }
+  }, [])
 
   // Filter nodes
   const filteredNodes = useMemo(() => {
@@ -301,8 +301,8 @@ export default function SessionTree({
     })
   }, [flatNodes, searchQuery, currentFilter])
 
-  // Get node display text
-  const getNodeDisplayText = (entry: SessionEntry, label?: string): string => {
+  // Get node display text - 使用 useCallback 缓存函数
+  const getNodeDisplayText = useCallback((entry: SessionEntry, label?: string): string => {
     if (label) return label
 
     switch (entry.type) {
@@ -338,10 +338,10 @@ export default function SessionTree({
       default:
         return entry.type
     }
-  }
+  }, [])
 
-  // Get node role class
-  const getNodeRoleClass = (entry: SessionEntry): string => {
+  // Get node role class - 使用 useCallback 缓存函数
+  const getNodeRoleClass = useCallback((entry: SessionEntry): string => {
     switch (entry.type) {
       case 'message': {
         const role = entry.message?.role
@@ -359,14 +359,14 @@ export default function SessionTree({
       default:
         return 'tree-muted'
     }
-  }
+  }, [])
 
-  const handleNodeClick = (flatNode: FlatNode) => {
+  const handleNodeClick = useCallback((flatNode: FlatNode) => {
     const entryId = flatNode.node.entry.id
     if (onNodeClick) {
       onNodeClick(entryId, entryId)
     }
-  }
+  }, [onNodeClick])
 
   return (
     <div className="flex flex-col h-full">

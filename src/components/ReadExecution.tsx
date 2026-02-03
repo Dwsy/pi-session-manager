@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { escapeHtml, getLanguageFromPath } from '../utils/markdown'
 import { shortenPath, formatDate } from '../utils/format'
 import CodeBlock from './CodeBlock'
-import HoverPreview from './HoverPreview'
 
 interface ReadExecutionProps {
   filePath: string
@@ -76,20 +75,13 @@ export default function ReadExecution({
           {remaining > 0 && !localExpanded ? (
             <>
               <CodeBlock code={previewLines.join('\n')} language={lang} showLineNumbers={false} />
-              <HoverPreview
-                content={
-                  <div
-                    className="expand-hint"
-                    onClick={() => setLocalExpanded(true)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    ... {t('components.expandableOutput.moreLines', { count: remaining })}
-                  </div>
-                }
-                previewContent={
-                  <CodeBlock code={output} language={lang} showLineNumbers={false} />
-                }
-              />
+              <div
+                className="expand-hint"
+                onClick={() => setLocalExpanded(true)}
+                style={{ cursor: 'pointer' }}
+              >
+                ... {t('components.expandableOutput.moreLines', { count: remaining })}
+              </div>
             </>
           ) : (
             <CodeBlock code={output} language={lang} showLineNumbers={false} />
