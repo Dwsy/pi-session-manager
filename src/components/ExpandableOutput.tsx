@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { escapeHtml } from '../utils/markdown'
 import CodeBlock from './CodeBlock'
-import HoverPreview from './HoverPreview'
 
 interface ExpandableOutputProps {
   text: string
@@ -45,27 +44,18 @@ export default function ExpandableOutput({
     <div className="tool-output">
       <div className="output-preview">
         {renderContent(previewLines.join('\n'))}
-        <HoverPreview
-          content={
-            <div 
-              className="expand-hint"
-              onClick={() => setExpanded(!expanded)}
-              style={{ cursor: 'pointer' }}
-            >
-              ... ({t('components.expandableOutput.moreLinesText', { count: remaining })})
-            </div>
-          }
-          previewContent={
-            <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {renderContent(text)}
-            </div>
-          }
-        />
+        <div
+          className="expand-hint"
+          onClick={() => setExpanded(!expanded)}
+          style={{ cursor: 'pointer' }}
+        >
+          ... ({t('components.expandableOutput.moreLinesText', { count: remaining })})
+        </div>
       </div>
       {expanded && (
         <div className="output-full">
           {renderContent(text)}
-          <div 
+          <div
             className="expand-hint"
             onClick={() => setExpanded(false)}
             style={{ cursor: 'pointer' }}

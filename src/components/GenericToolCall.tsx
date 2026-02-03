@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { escapeHtml } from '../utils/markdown'
 import { formatDate } from '../utils/format'
-import HoverPreview from './HoverPreview'
 
 interface GenericToolCallProps {
   name: string
@@ -61,26 +60,19 @@ export default function GenericToolCall({
             {argsRemaining > 0 && !argsExpanded ? (
               <>
                 <pre><code>{escapeHtml(argsLines.slice(0, 10).join('\n'))}</code></pre>
-                <HoverPreview
-                  content={
-                    <div 
-                      className="expand-hint"
-                      onClick={() => setArgsExpanded(true)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      ... {argsRemaining} more lines
-                    </div>
-                  }
-                  previewContent={
-                    <pre><code>{escapeHtml(argsText)}</code></pre>
-                  }
-                />
+                <div
+                  className="expand-hint"
+                  onClick={() => setArgsExpanded(true)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  ... {argsRemaining} more lines
+                </div>
               </>
             ) : (
               <pre><code>{escapeHtml(argsText)}</code></pre>
             )}
             {argsRemaining > 0 && argsExpanded && (
-              <div 
+              <div
                 className="expand-hint"
                 onClick={() => setArgsExpanded(false)}
                 style={{ cursor: 'pointer' }}
@@ -99,24 +91,13 @@ export default function GenericToolCall({
               {outputLines.slice(0, 20).map((line, idx) => (
                 <div key={idx}>{escapeHtml(line)}</div>
               ))}
-              <HoverPreview
-                content={
-                  <div 
-                    className="expand-hint"
-                    onClick={() => setOutputExpanded(true)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    ... {outputRemaining} more lines
-                  </div>
-                }
-                previewContent={
-                  <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                    {outputLines.map((line, idx) => (
-                      <div key={idx}>{escapeHtml(line)}</div>
-                    ))}
-                  </div>
-                }
-              />
+              <div
+                className="expand-hint"
+                onClick={() => setOutputExpanded(true)}
+                style={{ cursor: 'pointer' }}
+              >
+                ... {outputRemaining} more lines
+              </div>
             </>
           ) : (
             outputLines.map((line, idx) => (
@@ -124,7 +105,7 @@ export default function GenericToolCall({
             ))
           )}
           {outputRemaining > 0 && outputExpanded && (
-            <div 
+            <div
               className="expand-hint"
               onClick={() => setOutputExpanded(false)}
               style={{ cursor: 'pointer' }}

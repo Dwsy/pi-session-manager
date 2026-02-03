@@ -41,9 +41,7 @@ export function useSessionBadges(sessions: SessionInfo[]) {
       if (!baselineSession) {
         newBadges[session.id] = { type: 'new' }
       } else if (prevSession && session.message_count > prevSession.message_count) {
-        if (!badgeStates[session.id] || badgeStates[session.id].type !== 'new') {
-          newBadges[session.id] = { type: 'updated' }
-        }
+        newBadges[session.id] = { type: 'updated' }
       }
     }
 
@@ -56,7 +54,7 @@ export function useSessionBadges(sessions: SessionInfo[]) {
       newPreviousSessions.set(session.id, session)
     }
     previousSessionsRef.current = newPreviousSessions
-  }, [sessions, badgeStates])
+  }, [sessions])
 
   const clearBadge = useCallback((sessionId: string) => {
     setBadgeStates(prev => {
