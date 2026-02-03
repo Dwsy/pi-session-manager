@@ -12,38 +12,67 @@ A Tauri2 desktop application for managing and searching Pi Agent sessions. Built
 **Session Management**
 - Browse all Pi sessions from `~/.pi/agent/sessions/`
 - View session details with embedded Pi HTML template
+- Hierarchical tree view with parent-child message navigation
 - Delete unwanted sessions with confirmation
 - Rename sessions for easy identification
 - Export sessions to HTML, Markdown, or JSON formats
+- Favorites system for bookmarking sessions and projects
+- Resume sessions directly in terminal (iTerm2 / custom terminal)
 
 **Search Capabilities**
 - Full-text search across user messages and AI responses
 - Real-time search with match count badges
 - Filter search results by role (user/assistant/all)
 - Tool call filtering support
+- Tree-based search with snippet extraction and highlighting
+- Plugin-based search architecture (Message / Project / Session plugins)
 
-**Analytics Dashboard**
+**Analytics Dashboard (14 charts)**
 - Statistics overview with key metrics
 - Message breakdown (user vs assistant)
 - Top projects visualization
 - Activity heatmap showing usage patterns
-- Token usage tracking and cost analysis
+- Token usage tracking and cost analysis (per-model pricing)
 - Time distribution charts (hourly/daily)
+- Activity trend analysis
+- Weekly comparison charts
+- Session length distribution
+- Model usage statistics
+- Achievements / gamification metrics
+
+**Skills & Model Management**
+- Scan and browse available skills from `~/.pi/agent/skills/`
+- Scan and browse prompts from `~/.pi/agent/prompts/`
+- System prompt viewer and editor
+- List available models via `pi --list-models`
+- Single model / batch model connectivity testing
+- Pi settings (JSON) read and write
 
 ### User Experience
 
 **Multiple View Modes**
 - List view: Simple chronological session list
-- Directory view: Sessions organized by project directory
 - Project view: Grouped by project with session counts
+- Session Tree: Hierarchical directory tree with collapsible nodes
 
 **Keyboard Shortcuts**
-- `Cmd/Ctrl + R` - Refresh session list
-- `Cmd/Ctrl + F` - Focus search input
-- `Cmd/Ctrl + Shift + S` - Open statistics panel
-- `Cmd/Ctrl + K` - Open command palette
-- `Cmd/Ctrl + ,` - Open settings
-- `Esc` - Clear selection / Close dialogs
+
+*Global*
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + R` | Resume session in terminal |
+| `Cmd/Ctrl + E` | Export and open session in browser |
+| `Cmd/Ctrl + P` | Switch to project view |
+| `Cmd/Ctrl + K` | Open command palette |
+| `Cmd/Ctrl + ,` | Open settings |
+| `Esc` | Close dialogs / clear selection |
+
+*Session Viewer*
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + T` | Toggle thinking block display |
+| `Cmd/Ctrl + O` | Toggle tool call expansion |
+| `Cmd/Ctrl + F` | Focus sidebar search |
 
 **Internationalization**
 - English (en-US) - Default language
@@ -70,20 +99,27 @@ A Tauri2 desktop application for managing and searching Pi Agent sessions. Built
 
 ```
 src-tauri/src/
-├── commands.rs          # Tauri IPC commands
-├── scanner.rs           # Session scanner (2-layer cache)
+├── commands/           # Modularized Tauri IPC commands
+│   ├── mod.rs
+│   ├── session.rs      # Session operations (scan, read, delete, export, rename)
+│   ├── search.rs       # Full-text search
+│   ├── favorites.rs    # Favorite management
+│   ├── models.rs       # Model testing (list, test_single, test_batch)
+│   ├── skills.rs       # Skills & prompts scanning
+│   └── settings.rs     # App settings management
+├── scanner.rs          # Session scanner (2-layer cache)
 ├── scanner_scheduler.rs # Background scanner (30s interval)
-├── sqlite_cache.rs      # SQLite storage layer
-├── search.rs            # Full-text search engine
-├── session_parser.rs    # JSONL parser
-├── export.rs            # Export functionality
-├── stats.rs             # Statistics calculation
-├── config.rs            # Configuration management
-├── file_watcher.rs      # File system monitoring
-├── tantivy_search.rs    # Tantivy integration (placeholder)
-├── models.rs            # Data models
-├── lib.rs               # Library entry point
-└── main.rs              # Application entry point
+├── sqlite_cache.rs     # SQLite storage layer
+├── search.rs           # Full-text search engine
+├── session_parser.rs   # JSONL parser
+├── export.rs           # Export functionality
+├── stats.rs            # Statistics calculation
+├── config.rs           # Configuration management
+├── file_watcher.rs     # File system monitoring (3s debounce + batch merge)
+├── tantivy_search.rs   # Tantivy integration (placeholder)
+├── models.rs           # Serde data structures
+├── lib.rs              # Library entry point
+└── main.rs             # Application entry point
 ```
 
 ### Frontend (React + TypeScript)
@@ -366,20 +402,65 @@ Located in `src-tauri/tauri.conf.json`:
 - `cmdk` 1.1 - Command palette
 - `tailwindcss` 3.4 - CSS framework
 
-## Tauri Commands
+## Tauri Commands (31 total)
 
+### Session Operations
 | Command | Parameters | Returns | Description |
 |---------|-----------|---------|-------------|
 | `scan_sessions` | - | `SessionInfo[]` | Scan all sessions (2-layer cache) |
 | `read_session_file` | `path: String` | `String` | Read JSONL file content |
+| `read_session_file_incremental` | `path, from_line` | `String` | Streaming read from line |
+| `get_file_stats` | `path: String` | `FileStats` | File metadata |
 | `get_session_entries` | `path: String` | `SessionEntry[]` | Parse session entries |
-| `search_sessions` | `sessions, query, searchMode, roleFilter, includeTools` | `SearchResult[]` | Full-text search |
 | `delete_session` | `path: String` | `()` | Delete a session |
-| `export_session` | `path, format, outputPath` | `String` | Export session |
+| `export_session` | `path, format, output_path` | `String` | Export session |
 | `rename_session` | `path, newName` | `()` | Rename a session |
+
+### Search & Analytics
+| Command | Parameters | Returns | Description |
+|---------|-----------|---------|-------------|
+| `search_sessions` | `sessions, query, mode, filter, includeTools` | `SearchResult[]` | Full-text search |
 | `get_session_stats` | `sessions` | `SessionStats` | Get session statistics |
+
+### Skills & Prompts
+| Command | Parameters | Returns | Description |
+|---------|-----------|---------|-------------|
+| `scan_skills` | - | `SkillInfo[]` | List available skills |
+| `scan_prompts` | - | `PromptInfo[]` | List available prompts |
+| `get_skill_content` | `skill_name: String` | `String` | Read SKILL.md |
+| `get_prompt_content` | `prompt_name: String` | `String` | Read prompt file |
+| `get_system_prompt` | - | `String` | Get system prompt |
+| `load_pi_settings` | - | `JSON` | Load Pi settings |
+| `save_pi_settings` | `settings: JSON` | `()` | Save Pi settings |
+
+### Models
+| Command | Parameters | Returns | Description |
+|---------|-----------|---------|-------------|
+| `list_models` | `search: String?` | `ModelInfo[]` | Parse pi CLI output |
+| `test_model` | `provider, model, prompt` | `TestResult` | Single model test |
+| `test_models_batch` | `models, prompt` | `TestResult[]` | Batch testing |
+
+### Settings & Terminal
+| Command | Parameters | Returns | Description |
+|---------|-----------|---------|-------------|
 | `load_app_settings` | - | `Settings` | Load application settings |
-| `save_app_settings` | `settings` | `()` | Save application settings |
+| `save_app_settings` | `settings: Settings` | `()` | Save application settings |
+| `open_session_in_terminal` | `path, session_cwd` | `()` | Resume in terminal |
+| `open_session_in_browser` | `path: String` | `()` | Export and open |
+
+### Favorites
+| Command | Parameters | Returns | Description |
+|---------|-----------|---------|-------------|
+| `add_favorite` | `id, type, name, path` | `()` | Add favorite |
+| `remove_favorite` | `id: String` | `()` | Remove favorite |
+| `get_all_favorites` | - | `FavoriteItem[]` | List all favorites |
+| `is_favorite` | `id: String` | `boolean` | Check if favorited |
+| `toggle_favorite` | `id, type, name, path` | `boolean` | Toggle favorite status |
+
+### Utilities
+| Command | Parameters | Returns | Description |
+|---------|-----------|---------|-------------|
+| `toggle_devtools` | - | `()` | Toggle dev tools |
 
 ## Internationalization
 

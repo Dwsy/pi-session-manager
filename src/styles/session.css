@@ -319,7 +319,7 @@
  }
 
  .tree-node {
-   padding: 2px 12px;
+   padding: 2px 8px;
    margin: 1px 0;
    cursor: pointer;
    display: flex;
@@ -733,22 +733,38 @@
   background: rgba(204, 102, 102, 0.05);
 }
 
-/* 搜索结果匹配高亮 */
+/* 搜索结果匹配 - 极客风格 */
 .tree-node.search-match {
-  background: rgba(255, 215, 0, 0.15);
-  border-left: 2px solid rgba(255, 215, 0, 0.5);
+  flex-wrap: wrap;
+}
+
+.tree-node.search-match .tree-prefix {
+  display: none;
 }
 
 .tree-node.search-match:hover {
-  background: rgba(255, 215, 0, 0.25);
-}
-
-.tree-node.search-match-current {
-  background: rgba(255, 165, 0, 0.25);
-  border-left: 2px solid rgba(255, 165, 0, 0.8);
-  box-shadow: 0 0 0 1px rgba(255, 165, 0, 0.3);
+  background: rgba(56, 189, 248, 0.12);
 }
 
 .tree-node.search-match-current:hover {
-  background: rgba(255, 165, 0, 0.35);
+  background: rgba(34, 211, 238, 0.15);
+}
+
+/* 搜索摘要 - 第二行 */
+.tree-snippet {
+  width: 100%;
+  padding-left: 1.5em;
+  font-size: 11px;
+  color: #6b7280;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 搜索关键词高亮 - 青色极客风 */
+.search-keyword {
+  background: transparent;
+  color: #22d3ee;
+  font-weight: 500;
 }

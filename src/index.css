@@ -31,7 +31,7 @@
   }
 
   .glass-card {
-    background: linear-gradient(145deg, rgba(44, 45, 59, 0.8) 0%, rgba(36, 37, 46, 0.9) 100%);
+    /* background: linear-gradient(145deg, rgba(44, 45, 59, 0.8) 0%, rgba(36, 37, 46, 0.9) 100%); */
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.06);
