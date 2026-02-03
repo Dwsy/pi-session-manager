@@ -48,7 +48,8 @@ pub fn run() {
             remove_favorite,
             get_all_favorites,
             is_favorite,
-            toggle_favorite
+            toggle_favorite,
+            toggle_devtools
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

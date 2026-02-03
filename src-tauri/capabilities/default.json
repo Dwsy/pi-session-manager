@@ -7,6 +7,7 @@
     "core:default",
     "core:event:allow-listen",
     "core:event:allow-emit",
+    "core:window:allow-start-dragging",
     "shell:default",
     "dialog:default"
   ]

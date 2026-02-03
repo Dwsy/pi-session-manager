@@ -961,3 +961,22 @@ pub async fn toggle_favorite(id: String, favorite_type: String, name: String, pa
     let is_fav = sqlite_cache::toggle_favorite(&conn, &id, &favorite_type, &name, &path)?;
     Ok(is_fav)
 }
+
+/// 切换开发者工具显示状态
+#[tauri::command]
+pub async fn toggle_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
+    // 在 Tauri 2.x 中，使用内置的 devtools 功能
+    #[cfg(debug_assertions)]
+    {
+        // Debug 构建中，开发者工具总是可用
+        let _ = window;
+        Ok(())
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        // Release 构建中，需要 devtools feature 才能使用
+        // 使用 close_devtools 方法
+        window.close_devtools();
+        Ok(())
+    }
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, Star, Settings, ArrowLeft, Play } from 'lucide-react'
+import { FolderOpen, Star, Settings, ArrowLeft } from 'lucide-react'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import SessionList from './components/SessionList'
 import ProjectList from './components/ProjectList'
 import SessionViewer from './components/SessionViewer'
@@ -16,13 +17,10 @@ import { useSessionBadges } from './hooks/useSessionBadges'
 import { useSessions } from './hooks/useSessions'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useSessionActions } from './hooks/useSessionActions'
-import { useDemoMode } from './hooks/useDemoMode'
-import { useAllSettings } from './hooks/useAllSettings'
 import { registerBuiltinPlugins } from './plugins'
 import type { SessionInfo, FavoriteItem } from './types'
 import type { SearchContext } from './plugins/types'
 import { invoke } from '@tauri-apps/api/core'
-import { isTauriReady } from './utils/session'
 
 // Define sqlite_cache types for Tauri responses
 namespace sqlite_cache {
@@ -84,10 +82,6 @@ function App() {
   }, [])
 
   const removeFavorite = useCallback(async (item: FavoriteItem) => {
-    if (!isTauriReady()) {
-      console.warn('Tauri not ready, skipping remove favorite')
-      return
-    }
     try {
       await invoke('remove_favorite', { id: item.id })
       await loadFavorites()
@@ -97,10 +91,6 @@ function App() {
   }, [loadFavorites])
 
   const toggleFavorite = useCallback(async (item: Omit<FavoriteItem, 'addedAt'>) => {
-    if (!isTauriReady()) {
-      console.warn('Tauri not ready, skipping toggle favorite')
-      return
-    }
     try {
       await invoke('toggle_favorite', {
         id: item.id,
@@ -128,6 +118,23 @@ function App() {
     }
 
     initialize()
+  }, [])
+
+  // F12 to toggle devtools in production builds
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (e.key === 'F12') {
+        e.preventDefault()
+        try {
+          await invoke('toggle_devtools')
+        } catch (error) {
+          console.warn('Failed to toggle devtools:', error)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   useEffect(() => {
@@ -195,12 +202,9 @@ function App() {
         <div
           className="h-8 border-b border-[#2c2d3b] flex items-center px-3 select-none"
           data-tauri-drag-region
-          style={{
-            WebkitAppRegion: 'drag',
-            userSelect: 'none'
-          }}
+          onMouseDown={() => getCurrentWindow().startDragging()}
         >
-          <div className="flex items-center gap-0.5 ml-auto" style={{ WebkitAppRegion: 'no-drag' }}>
+          <div className="flex items-center gap-0.5 ml-auto no-drag">
             <div className="flex items-center bg-[#252636] rounded-lg p-0.5 mr-1">
               <button
                 onClick={() => { setViewMode('list'); setSelectedProject(null) }}
@@ -222,9 +226,17 @@ function App() {
               </button>
             </div>
             <button
-              onClick={() => setShowFavorites(!showFavorites)}
+              onClick={() => {
+                if (showFavorites) {
+                  // 如果已经在收藏视图，返回到会话列表
+                  setShowFavorites(false)
+                } else {
+                  // 打开收藏视图
+                  setShowFavorites(true)
+                }
+              }}
               className={`p-1 rounded transition-colors ml-0.5 ${showFavorites ? 'text-yellow-400 bg-[#2c2d3b]' : 'text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b]'}`}
-              title={t('favorites.title')}
+              title={showFavorites ? t('favorites.back') : t('favorites.title')}
             >
               <Star className="h-3.5 w-3.5" />
             </button>
@@ -327,10 +339,7 @@ function App() {
         <div
           className="h-8 flex-shrink-0 select-none"
           data-tauri-drag-region
-          style={{
-            WebkitAppRegion: 'drag',
-            userSelect: 'none'
-          }}
+          onMouseDown={() => getCurrentWindow().startDragging()}
         />
         <div className="flex-1 overflow-hidden">
           {selectedSession ? (
