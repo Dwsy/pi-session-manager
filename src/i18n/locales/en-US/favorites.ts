@@ -7,4 +7,5 @@ export const favorites = {
   add: 'Add to favorites',
   added: 'Added to favorites',
   removed: 'Removed from favorites',
+  back: 'Back to session list',
 } as const
