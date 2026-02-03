@@ -9,10 +9,11 @@ export const app = {
     project: '项目视图',
   },
   shortcuts: {
-    refresh: '刷新会话列表 (Cmd+R)',
+    resume: '恢复会话 (Cmd+R)',
+    exportHtml: '导出并打开 (Cmd+E)',
+    projectView: '项目视图 (Cmd+P)',
     search: '聚焦搜索框 (Cmd+F)',
     settings: '打开设置 (Cmd+,)',
-    stats: '打开统计面板 (Cmd+Shift+S)',
     close: '关闭 (Esc)',
   },
   errors: {

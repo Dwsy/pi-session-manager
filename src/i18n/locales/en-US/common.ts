@@ -37,4 +37,11 @@ export const common = {
     daysAgo: '{{count}} days ago',
     monthsAgo: '{{count}} months ago',
   },
+  systemPrompt: {
+    systemPrompt: 'System Prompt',
+    toolsUsed: 'Tools Used',
+    noPrompt: 'No system prompt configured',
+    noToolsUsed: 'No tools used in this session',
+    calls: 'calls',
+  },
 } as const

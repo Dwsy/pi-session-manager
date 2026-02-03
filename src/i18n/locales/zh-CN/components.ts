@@ -132,7 +132,7 @@ export const components = {
     custom: '自定义',
   },
   activityHeatmap: {
-    title: '活动热力图',
+    title: '热力图',
     activeDays: '活跃天数',
     less: '少',
     more: '多',
@@ -178,10 +178,17 @@ export const components = {
       avgCostPer1kTokens: '平均每千令牌成本',
     },
     activityHeatmap: {
-      title: '活动热力图',
+      title: '热力图',
       less: '少',
       more: '多',
       activeDays: '活跃天数',
+    },
+  },
+  displayStats: {
+    cards: {
+      sessions: '总会话数',
+      messages: '总消息数',
+      avgPerSession: '平均/会话',
     },
   },
 } as const

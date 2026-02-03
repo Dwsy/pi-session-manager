@@ -132,7 +132,7 @@ export const components = {
     custom: 'custom',
   },
   activityHeatmap: {
-    title: 'Activity Heatmap',
+    title: 'Heatmap',
     activeDays: 'Active Days',
     less: 'Less',
     more: 'More',
@@ -178,10 +178,17 @@ export const components = {
       avgCostPer1kTokens: 'Avg Cost/1k Tokens',
     },
     activityHeatmap: {
-      title: 'Activity Heatmap',
+      title: 'Heatmap',
       less: 'Less',
       more: 'More',
       activeDays: 'Active Days',
+    },
+  },
+  displayStats: {
+    cards: {
+      sessions: 'Total Sessions',
+      messages: 'Total Messages',
+      avgPerSession: 'Avg/Session',
     },
   },
 } as const

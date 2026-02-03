@@ -37,4 +37,11 @@ export const common = {
     daysAgo: '{{count}}天前',
     monthsAgo: '{{count}}个月前',
   },
+  systemPrompt: {
+    systemPrompt: '系统提示词',
+    toolsUsed: '使用的工具',
+    noPrompt: '未配置系统提示词',
+    noToolsUsed: '此会话未使用任何工具',
+    calls: '次调用',
+  },
 } as const
