@@ -7,4 +7,5 @@ export const favorites = {
   add: '添加收藏',
   added: '已添加到收藏',
   removed: '已取消收藏',
+  back: '返回会话列表',
 } as const
