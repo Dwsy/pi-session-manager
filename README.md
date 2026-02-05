@@ -20,6 +20,27 @@ Tauri 2 + React desktop app for exploring and auditing Pi Agent sessions without
 - i18n: English + Simplified Chinese out of the box, extendable
 - Performance: dual-layer cache (FS + SQLite), virtualized UI, parallel parsing
 
+## Keyboard Shortcuts
+
+### Global
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + R` | Resume selected session in terminal |
+| `Cmd/Ctrl + E` | Export session and open in browser |
+| `Cmd/Ctrl + P` | Switch to project view |
+| `Cmd/Ctrl + K` | Open command palette |
+| `Cmd/Ctrl + ,` | Open settings panel |
+| `Esc` | Close dialogs or clear selection |
+
+### Session Viewer
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + T` | Toggle thinking blocks |
+| `Cmd/Ctrl + O` | Toggle tool call expansion |
+| `Cmd/Ctrl + F` | Focus sidebar search |
+
 ## Architecture Snapshot
 
 ```
@@ -105,3 +126,4 @@ Roadmap (excerpt): Tantivy-based search, batch session ops, tags, live FS watche
 - License: MIT
 - Issues / feature ideas: open tickets in this repo
 - Changelog: see [CHANGELOG.md](CHANGELOG.md)
+- Related project: [badlogic/pi-mono](https://github.com/badlogic/pi-mono/)
