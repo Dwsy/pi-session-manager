@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { listen, UnlistenFn } from '@tauri-apps/api/event'
+import { listen } from '../transport'
+type UnlistenFn = () => void
 
 interface UseFileWatcherOptions {
   enabled?: boolean

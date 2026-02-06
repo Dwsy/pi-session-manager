@@ -8,7 +8,48 @@ export interface AppSettings {
     theme: 'dark' | 'light' | 'system'
     sidebarWidth: number
     fontSize: 'small' | 'medium' | 'large'
-    codeBlockTheme: 'github' | 'monokai' | 'dracula' | 'one-dark'
+    codeBlockTheme: 
+      | 'github-dark'
+      | 'github-light'
+      | 'github-dark-dimmed'
+      | 'github-dark-high-contrast'
+      | 'github-light-high-contrast'
+      | 'dark-plus'
+      | 'light-plus'
+      | 'monokai'
+      | 'dracula'
+      | 'dracula-soft'
+      | 'one-dark-pro'
+      | 'one-light'
+      | 'nord'
+      | 'tokyo-night'
+      | 'catppuccin-mocha'
+      | 'catppuccin-latte'
+      | 'catppuccin-frappe'
+      | 'catppuccin-macchiato'
+      | 'rose-pine'
+      | 'rose-pine-moon'
+      | 'rose-pine-dawn'
+      | 'vitesse-dark'
+      | 'vitesse-light'
+      | 'vitesse-black'
+      | 'solarized-dark'
+      | 'solarized-light'
+      | 'gruvbox-dark-medium'
+      | 'gruvbox-light-medium'
+      | 'material-theme'
+      | 'material-theme-darker'
+      | 'material-theme-lighter'
+      | 'material-theme-ocean'
+      | 'material-theme-palenight'
+      | 'night-owl'
+      | 'synthwave-84'
+      | 'ayu-dark'
+      | 'everforest-dark'
+      | 'everforest-light'
+      | 'min-dark'
+      | 'min-light'
+    mermaidRenderMode: 'ascii' | 'svg'
     messageSpacing: 'compact' | 'comfortable' | 'spacious'
   }
   language: {
@@ -50,7 +91,8 @@ export const defaultSettings: AppSettings = {
     theme: 'dark',
     sidebarWidth: 320,
     fontSize: 'medium',
-    codeBlockTheme: 'github',
+    codeBlockTheme: 'github-dark',
+    mermaidRenderMode: 'svg',
     messageSpacing: 'comfortable',
   },
   language: {

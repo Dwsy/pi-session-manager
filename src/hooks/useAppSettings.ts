@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../transport'
 import i18n from '../i18n'
 
 export type TerminalType = 'iterm2' | 'terminal' | 'vscode' | 'custom'

@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../transport'
 import { save } from '@tauri-apps/plugin-dialog'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo } from '../types'

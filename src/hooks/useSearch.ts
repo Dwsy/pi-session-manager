@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../transport'
 import type { SessionInfo, SearchResult } from '../types'
 
 export interface UseSearchReturn {

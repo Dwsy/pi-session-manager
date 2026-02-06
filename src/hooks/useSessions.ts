@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../transport'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo } from '../types'
 import { useDemoMode } from './useDemoMode'
@@ -38,6 +38,11 @@ export function useSessions(): UseSessionsReturn {
 
       const currentSelection = selectedSessionRef.current
       if (currentSelection) {
+        if (currentSelection.isDraft) {
+          setSelectedSession(currentSelection)
+          return
+        }
+
         const matchedByPath = loadedSessions.find(s => s.path === currentSelection.path)
         const matchedById = loadedSessions.find(s => s.id === currentSelection.id)
         const matched = matchedByPath || matchedById

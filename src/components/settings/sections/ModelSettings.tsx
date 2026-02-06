@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../../../transport'
 import {
   Loader2,
   Play,
@@ -47,9 +47,13 @@ export default function ModelSettings() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedModel, setSelectedModel] = useState<ModelInfo | null>(null)
   const [showDetails, setShowDetails] = useState(false)
+  const [currentRPCModel, setCurrentRPCModel] = useState<string | null>(null)
+  const [switchingModel, setSwitchingModel] = useState<string | null>(null)
+  const [switchError, setSwitchError] = useState<string | null>(null)
 
   useEffect(() => {
     loadModels()
+    loadCurrentRPCModel()
   }, [])
 
   const loadModels = async () => {
@@ -64,9 +68,38 @@ export default function ModelSettings() {
     }
   }
 
+  const loadCurrentRPCModel = async () => {
+    try {
+      const state = await invoke<{ model?: { provider: string; id: string } }>('get_rpc_state')
+      if (state?.model) {
+        setCurrentRPCModel(`${state.model.provider}/${state.model.id}`)
+      } else {
+        setCurrentRPCModel(null)
+      }
+    } catch {
+      setCurrentRPCModel(null)
+    }
+  }
+
+  const setAsCurrentModel = async (model: ModelInfo) => {
+    const modelKey = `${model.provider}/${model.model}`
+    setSwitchingModel(modelKey)
+    setSwitchError(null)
+    try {
+      await invoke('set_rpc_model', { provider: model.provider, modelId: model.model })
+      setCurrentRPCModel(modelKey)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setSwitchError(message)
+    } finally {
+      setSwitchingModel(null)
+    }
+  }
+
   const handleRefresh = async () => {
     setRefreshing(true)
     await loadModels()
+    await loadCurrentRPCModel()
     setRefreshing(false)
   }
 
@@ -154,6 +187,9 @@ export default function ModelSettings() {
     setSelectedModel(model)
     setShowDetails(true)
   }
+
+  const isCurrentModel = (model: ModelInfo) =>
+    Boolean(currentRPCModel && currentRPCModel === `${model.provider}/${model.model}`)
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -265,6 +301,11 @@ export default function ModelSettings() {
                   <span className="text-sm font-medium text-white">{model.provider}</span>
                   <span className="text-[#6a6f85]">/</span>
                   <span className="text-sm text-[#6a6f85]">{model.model}</span>
+                  {isCurrentModel(model) && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1f2a22] text-green-400 border border-green-500/20">
+                      当前
+                    </span>
+                  )}
                 </div>
                 {model.tested && model.response_time !== null && (
                   <div className="flex items-center gap-2 mt-1">
@@ -290,6 +331,19 @@ export default function ModelSettings() {
                     )}
                   </div>
                 )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setAsCurrentModel(model)
+                  }}
+                  disabled={switchingModel !== null || isCurrentModel(model)}
+                  className="px-2 py-1 bg-[#252636] border border-[#2c2d3b] rounded text-xs text-[#6a6f85] hover:text-white hover:border-[#3a3b4f] disabled:opacity-50 transition-colors"
+                  title={t('settings.models.setCurrent', '设为当前模型')}
+                >
+                  {switchingModel === `${model.provider}/${model.model}`
+                    ? t('common.loading', '切换中...')
+                    : t('settings.models.setCurrent', '设为当前')}
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
@@ -434,6 +488,17 @@ export default function ModelSettings() {
                 </button>
                 <button
                   onClick={() => {
+                    setAsCurrentModel(selectedModel)
+                  }}
+                  disabled={switchingModel !== null || isCurrentModel(selectedModel)}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#252636] border border-[#2c2d3b] hover:border-[#3a3b4f] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {switchingModel === `${selectedModel.provider}/${selectedModel.model}`
+                    ? t('common.loading', '切换中...')
+                    : t('settings.models.setCurrent', '设为当前')}
+                </button>
+                <button
+                  onClick={() => {
                     // 在终端中打开 pi 命令
                     const command = `pi --provider ${selectedModel.provider} --model ${selectedModel.model}`
                     navigator.clipboard?.writeText(command)
@@ -445,6 +510,11 @@ export default function ModelSettings() {
                   {t('settings.models.openInTerminal', '打开终端')}
                 </button>
               </div>
+              {switchError && (
+                <div className="text-xs text-red-400">
+                  {t('settings.models.switchFailed', '切换失败')}: {switchError}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -453,6 +523,11 @@ export default function ModelSettings() {
       {/* 说明文字 */}
       <div className="text-xs text-[#6a6f85] bg-[#252636] p-3 rounded-lg">
         <p>{t('settings.models.help', '点击模型查看详情，点击播放按钮测试模型响应速度。')}</p>
+        {switchError && (
+          <p className="mt-2 text-red-400">
+            {t('settings.models.switchFailed', '切换失败')}: {switchError}
+          </p>
+        )}
       </div>
     </div>
   )

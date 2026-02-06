@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../transport'
 import i18n from '../i18n'
 import type { AppSettings } from '../components/settings/types'
 
@@ -18,7 +18,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     theme: 'dark',
     sidebarWidth: 320,
     fontSize: 'medium',
-    codeBlockTheme: 'github',
+    codeBlockTheme: 'github-dark',
+    mermaidRenderMode: 'svg',
     messageSpacing: 'comfortable',
   },
   language: {
