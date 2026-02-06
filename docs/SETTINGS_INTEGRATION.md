@@ -294,6 +294,7 @@ export interface AppSettings {
     sidebarWidth: number
     fontSize: 'small' | 'medium' | 'large'
     codeBlockTheme: 'github' | 'monokai' | 'dracula' | 'one-dark'
+    mermaidRenderMode: 'ascii' | 'svg'
     messageSpacing: 'compact' | 'comfortable' | 'spacious'
   }
   language: {
