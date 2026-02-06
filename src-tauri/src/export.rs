@@ -107,8 +107,7 @@ fn export_as_markdown(session_path: &str, output_path: &str) -> Result<(), Strin
         }
     }
 
-    fs::write(output_path, md)
-        .map_err(|e| format!("Failed to write export file: {}", e))?;
+    fs::write(output_path, md).map_err(|e| format!("Failed to write export file: {}", e))?;
 
     Ok(())
 }
