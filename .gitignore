@@ -64,8 +64,11 @@ Thumbs.db
 session-index.db*
 
 # Temporary exports
+
 pi-session-*.html
 
 # Development tasks
 tasks/
 .ace-tool/
+pi-mono
+pi-island-refcraft-agents-oss/
