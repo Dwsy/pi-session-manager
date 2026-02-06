@@ -1,42 +1,40 @@
+import { memo } from 'react'
+
 import type { Content, SessionEntry } from '../types'
-import MarkdownContent from './MarkdownContent'
-import ThinkingBlock from './ThinkingBlock'
-import ToolCallList from './ToolCallList'
-import { useSessionView } from '../contexts/SessionViewContext'
 import { formatDate } from '../utils/format'
+
+import MessagePartsRenderer from './MessagePartsRenderer'
 
 interface AssistantMessageProps {
   content: Content[]
   timestamp?: string
   entryId: string
   entries?: SessionEntry[]
-  searchQuery?: string
+  showToolCalls?: boolean
+  hiddenToolCallIds?: string[]
+  isStreaming?: boolean
 }
 
-export default function AssistantMessage({ content, timestamp, entryId, entries = [], searchQuery = '' }: AssistantMessageProps) {
-  const { showThinking } = useSessionView()
-  const textBlocks = content.filter(c => c.type === 'text' && c.text)
-  const thinkingBlocks = content.filter(c => c.type === 'thinking' && c.thinking)
-  const toolCalls = content.filter(c => c.type === 'toolCall')
-
+export default memo(function AssistantMessage({
+  content,
+  timestamp,
+  entryId,
+  entries = [],
+  showToolCalls = true,
+  hiddenToolCallIds = [],
+  isStreaming = false,
+}: AssistantMessageProps) {
   return (
     <div className="assistant-message" id={`entry-${entryId}`}>
       {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
-
-      {/* Thinking content */}
-      {showThinking && thinkingBlocks.map((block, index) => (
-        <ThinkingBlock key={`thinking-${index}`} content={block.thinking!} />
-      ))}
-
-      {/* Text content */}
-      {textBlocks.map((block, index) => (
-        <div key={`text-${index}`} className="assistant-text markdown-content">
-          <MarkdownContent content={block.text!} searchQuery={searchQuery} />
-        </div>
-      ))}
-
-      {/* Tool calls */}
-      {toolCalls.length > 0 && <ToolCallList toolCalls={toolCalls} entries={entries} />}
+      <MessagePartsRenderer
+        role="assistant"
+        content={content}
+        entries={entries}
+        showToolCalls={showToolCalls}
+        hiddenToolCallIds={hiddenToolCallIds}
+        isStreaming={isStreaming}
+      />
     </div>
   )
-}
+})

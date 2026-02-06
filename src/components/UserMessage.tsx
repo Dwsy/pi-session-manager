@@ -1,31 +1,45 @@
-import type { Content } from '../types'
+import { memo, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { parseMarkdown } from '../utils/markdown'
-import { highlightSearchInHTML } from '../utils/search'
+import { Streamdown } from 'streamdown'
+import type { BundledTheme } from 'shiki'
+
+import MermaidBlock from './MermaidBlock'
+
+import { useAllSettings } from '../hooks/useAllSettings'
+import { useCodeTheme } from '../hooks/useCodeTheme'
+import { useStreamdownPlugins } from '../hooks/useStreamdownPlugins'
 import { formatDate } from '../utils/format'
+import { splitMermaidSegments } from '../utils/mermaid'
+
+import type { Content } from '../types'
 
 interface UserMessageProps {
   id: string
   timestamp?: string
   content: Content[]
   className?: string
-  searchQuery?: string
 }
 
-export default function UserMessage({ id, timestamp, content, className = '', searchQuery = '' }: UserMessageProps) {
+export default memo(function UserMessage({ id, timestamp, content, className = '' }: UserMessageProps) {
   const { t } = useTranslation()
+  const { settings } = useAllSettings()
+  const theme = useCodeTheme()
+  const shikiTheme = useMemo(
+    () => [theme as BundledTheme, theme as BundledTheme] as [BundledTheme, BundledTheme],
+    [theme]
+  )
+  const streamdownPlugins = useStreamdownPlugins(theme)
+  
   // Extract images
   const images = content.filter(c => c.type === 'image' && c.data)
 
   // Extract text content
-  const textItems = content.filter(c => c.type === 'text' && c.text)
-  const text = textItems.map(c => c.text).join('\n')
+  const text = useMemo(() => {
+    const textItems = content.filter(c => c.type === 'text' && c.text)
+    return textItems.map(c => c.text).join('\n')
+  }, [content])
 
-  // 解析 Markdown 并高亮搜索结果
-  let html = parseMarkdown(text)
-  if (searchQuery) {
-    html = highlightSearchInHTML(html, searchQuery)
-  }
+  const segments = useMemo(() => splitMermaidSegments(text), [text])
 
   return (
     <div className={`user-message ${className}`} id={`entry-${id}`}>
@@ -44,9 +58,25 @@ export default function UserMessage({ id, timestamp, content, className = '', se
         </div>
       )}
 
-      {text.trim() && (
-        <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />
-      )}
+      {segments.map((segment, index) => {
+        if (segment.type === 'mermaid') {
+          return (
+            <MermaidBlock
+              key={`mermaid-${id}-${index}`}
+              code={segment.content}
+              mode={settings.appearance.mermaidRenderMode}
+            />
+          )
+        }
+
+        return (
+          <div key={`text-${id}-${index}`} className="markdown-content">
+            <Streamdown mode="static" shikiTheme={shikiTheme} plugins={streamdownPlugins}>
+              {segment.content}
+            </Streamdown>
+          </div>
+        )
+      })}
     </div>
   )
-}
+})
