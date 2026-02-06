@@ -70,8 +70,10 @@ pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
                 if let Some(timestamp_str) = value["timestamp"].as_str() {
                     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(timestamp_str) {
                         let utc_time = dt.with_timezone(&chrono::Utc);
-                        first_message_time = Some(first_message_time.unwrap_or(utc_time).min(utc_time));
-                        last_message_time = Some(last_message_time.unwrap_or(utc_time).max(utc_time));
+                        first_message_time =
+                            Some(first_message_time.unwrap_or(utc_time).min(utc_time));
+                        last_message_time =
+                            Some(last_message_time.unwrap_or(utc_time).max(utc_time));
                     }
                 }
             } else if entry_type == "compaction" {
