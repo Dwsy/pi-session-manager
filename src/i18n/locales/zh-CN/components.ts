@@ -4,6 +4,14 @@ export const components = {
     more: '更多',
     moreLinesText: '还有 {{count}} 行',
   },
+  modelSelector: {
+    defaultLabel: '模型',
+    loading: '加载中...',
+    searchPlaceholder: '搜索模型...',
+    emptySearch: '无匹配模型',
+    emptyDefault: '暂无模型',
+    currentFlag: '当前',
+  },
   thinkingBlock: {
     collapsed: '思考中 ...',
   },
@@ -65,6 +73,14 @@ export const components = {
   userMessage: {
     you: '你',
     imageAlt: '消息图片',
+  },
+  messageInput: {
+    placeholder: '输入消息...',
+    contextLabel: '上下文',
+    contextHint: '上下文窗口数据未就绪',
+    contextMentionSuffix: ' · 已附加 {{count}} 个 @上下文',
+    abort: '中止',
+    send: '发送',
   },
   sessionHeader: {
     createdAt: '创建于',
@@ -137,6 +153,9 @@ export const components = {
     less: '少',
     more: '多',
     activityLevel: '活动等级',
+  },
+  streamingMessage: {
+    generating: '正在生成...',
   },
   dashboard: {
     title: '仪表板',

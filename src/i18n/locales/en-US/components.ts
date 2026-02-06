@@ -4,6 +4,14 @@ export const components = {
     more: 'more',
     moreLinesText: '{{count}} more lines',
   },
+  modelSelector: {
+    defaultLabel: 'Model',
+    loading: 'Loading...',
+    searchPlaceholder: 'Search models...',
+    emptySearch: 'No matching models',
+    emptyDefault: 'No models available',
+    currentFlag: 'Current',
+  },
   thinkingBlock: {
     collapsed: 'Thinking ...',
   },
@@ -65,6 +73,14 @@ export const components = {
   userMessage: {
     you: 'You',
     imageAlt: 'Message image',
+  },
+  messageInput: {
+    placeholder: 'Type a message...',
+    contextLabel: 'Context',
+    contextHint: 'Context window data is not ready',
+    contextMentionSuffix: ' · Attached {{count}} context references',
+    abort: 'Abort',
+    send: 'Send',
   },
   sessionHeader: {
     createdAt: 'Created at',
@@ -137,6 +153,9 @@ export const components = {
     less: 'Less',
     more: 'More',
     activityLevel: 'Activity Level',
+  },
+  streamingMessage: {
+    generating: 'Generating...',
   },
   dashboard: {
     title: 'Dashboard',
