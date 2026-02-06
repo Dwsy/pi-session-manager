@@ -24,6 +24,8 @@ pub struct AppearanceSettings {
     pub sidebar_width: u32,
     pub font_size: String,
     pub code_block_theme: String,
+    #[serde(default = "default_mermaid_render_mode")]
+    pub mermaid_render_mode: String,
     pub message_spacing: String,
 }
 
@@ -66,9 +68,7 @@ pub struct AdvancedSettings {
 
 fn get_app_settings_path() -> Result<std::path::PathBuf, String> {
     let config_dir = dirs::config_dir().ok_or("Failed to get config directory")?;
-    Ok(config_dir
-        .join("pi-session-manager")
-        .join("settings.json"))
+    Ok(config_dir.join("pi-session-manager").join("settings.json"))
 }
 
 impl Default for AppSettings {
@@ -79,13 +79,7 @@ impl Default for AppSettings {
                 custom_terminal_command: None,
                 pi_command_path: "pi".to_string(),
             },
-            appearance: AppearanceSettings {
-                theme: "dark".to_string(),
-                sidebar_width: 320,
-                font_size: "medium".to_string(),
-                code_block_theme: "github".to_string(),
-                message_spacing: "comfortable".to_string(),
-            },
+            appearance: AppearanceSettings::default(),
             language: LanguageSettings {
                 locale: "zh-CN".to_string(),
             },
@@ -117,18 +111,39 @@ impl Default for AppSettings {
     }
 }
 
-#[tauri::command]
-pub async fn load_app_settings() -> Result<AppSettings, String> {
+impl Default for AppearanceSettings {
+    fn default() -> Self {
+        Self {
+            theme: "dark".to_string(),
+            sidebar_width: 320,
+            font_size: "medium".to_string(),
+            code_block_theme: "github".to_string(),
+            mermaid_render_mode: "svg".to_string(),
+            message_spacing: "comfortable".to_string(),
+        }
+    }
+}
+
+fn default_mermaid_render_mode() -> String {
+    "svg".to_string()
+}
+
+pub async fn load_app_settings_internal() -> Result<AppSettings, String> {
     let settings_path = get_app_settings_path()?;
 
     if !settings_path.exists() {
         return Ok(AppSettings::default());
     }
 
-    let content =
-        fs::read_to_string(&settings_path).map_err(|e| format!("Failed to read settings: {}", e))?;
+    let content = fs::read_to_string(&settings_path)
+        .map_err(|e| format!("Failed to read settings: {}", e))?;
 
     serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {}", e))
+}
+
+#[tauri::command]
+pub async fn load_app_settings() -> Result<AppSettings, String> {
+    load_app_settings_internal().await
 }
 
 #[tauri::command]

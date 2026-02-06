@@ -2,6 +2,7 @@ use crate::models::{SessionEntry, SessionInfo};
 use crate::{export, scanner, stats};
 use serde_json::Value;
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -43,8 +44,59 @@ pub async fn read_session_file_incremental(
 }
 
 #[tauri::command]
+pub async fn get_file_completions(
+    cwd: String,
+    query: String,
+    limit: usize,
+) -> Result<Vec<String>, String> {
+    if query.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let cwd_path = Path::new(&cwd);
+    if !cwd_path.exists() {
+        return Err("Invalid working directory".to_string());
+    }
+
+    let output = Command::new("fd")
+        .arg("--type")
+        .arg("f")
+        .arg("--hidden")
+        .arg("--follow")
+        .arg("--max-results")
+        .arg(limit.to_string())
+        .arg(&query)
+        .arg(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to execute fd: {}", e))?;
+
+    if !output.status.success() {
+        return Err("fd failed to search files".to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut results = Vec::new();
+    for line in stdout.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let rel = if let Ok(stripped) = Path::new(trimmed).strip_prefix(cwd_path) {
+            stripped.to_string_lossy().to_string()
+        } else {
+            trimmed.to_string()
+        };
+        results.push(rel);
+    }
+
+    Ok(results)
+}
+
+#[tauri::command]
 pub async fn get_file_stats(path: String) -> Result<FileStats, String> {
-    let metadata = fs::metadata(&path).map_err(|e| format!("Failed to get file metadata: {}", e))?;
+    let metadata =
+        fs::metadata(&path).map_err(|e| format!("Failed to get file metadata: {}", e))?;
 
     let modified = metadata
         .modified()
@@ -107,7 +159,11 @@ pub async fn delete_session(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn export_session(path: String, format: String, output_path: String) -> Result<(), String> {
+pub async fn export_session(
+    path: String,
+    format: String,
+    output_path: String,
+) -> Result<(), String> {
     export::export_session(&path, &format, &output_path).await
 }
 
@@ -147,7 +203,8 @@ pub async fn rename_session(path: String, new_name: String) -> Result<(), String
             "timestamp": chrono::Utc::now().to_rfc3339()
         });
         lines.push(
-            serde_json::to_string(&session_info).map_err(|e| format!("Failed to serialize: {}", e))?,
+            serde_json::to_string(&session_info)
+                .map_err(|e| format!("Failed to serialize: {}", e))?,
         );
     }
 
@@ -158,9 +215,7 @@ pub async fn rename_session(path: String, new_name: String) -> Result<(), String
 }
 
 #[tauri::command]
-pub async fn get_session_stats(
-    sessions: Vec<SessionInfo>,
-) -> Result<stats::SessionStats, String> {
+pub async fn get_session_stats(sessions: Vec<SessionInfo>) -> Result<stats::SessionStats, String> {
     Ok(stats::calculate_stats(&sessions))
 }
 
