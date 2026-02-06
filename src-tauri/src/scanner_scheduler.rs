@@ -23,7 +23,10 @@ impl ScannerScheduler {
     }
 
     pub async fn start(&self) {
-        info!("Starting scanner scheduler with {}s interval", self.scan_interval.as_secs());
+        info!(
+            "Starting scanner scheduler with {}s interval",
+            self.scan_interval.as_secs()
+        );
         let mut ticker = interval(self.scan_interval);
         ticker.tick().await;
 
@@ -55,7 +58,11 @@ impl ScannerScheduler {
                     if let Ok(files) = fs::read_dir(&path) {
                         for file in files.flatten() {
                             let file_path = file.path();
-                            if file_path.extension().map(|ext| ext == "jsonl").unwrap_or(false) {
+                            if file_path
+                                .extension()
+                                .map(|ext| ext == "jsonl")
+                                .unwrap_or(false)
+                            {
                                 match self.process_file(&conn, &file_path)? {
                                     FileUpdateResult::Updated => updated += 1,
                                     FileUpdateResult::Added => added += 1,
@@ -87,10 +94,11 @@ impl ScannerScheduler {
     ) -> Result<FileUpdateResult, String> {
         let path_str = file_path.to_string_lossy().to_string();
 
-        let metadata = fs::metadata(file_path)
-            .map_err(|e| format!("Failed to get metadata: {}", e))?;
+        let metadata =
+            fs::metadata(file_path).map_err(|e| format!("Failed to get metadata: {}", e))?;
         let file_modified = DateTime::from(
-            metadata.modified()
+            metadata
+                .modified()
                 .map_err(|e| format!("Failed to get modified time: {}", e))?,
         );
 
