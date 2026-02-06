@@ -16,8 +16,8 @@ export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListPr
   const findToolResult = (toolCallId: string) => {
     return entries.find(
       (e: any) => e.type === 'message' &&
-      e.message?.role === 'toolResult' &&
-      e.message?.toolCallId === toolCallId
+      (e.message?.role === 'toolResult' || e.message?.role === 'tool' || e.message?.role === 'tool_result') &&
+      (e.message?.toolCallId === toolCallId || e.id === toolCallId)
     )
   }
 
@@ -28,9 +28,19 @@ export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListPr
     return result.message.content[0] || null
   }
 
+  const uniqueToolCalls = (() => {
+    const seen = new Set<string>()
+    return toolCalls.filter((call, index) => {
+      const key = call.id || `${call.name || 'tool'}-${index}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  })()
+
   return (
     <div className="tool-call-list">
-      {toolCalls.map((toolCall, index) => {
+      {uniqueToolCalls.map((toolCall, index) => {
         const name = toolCall.name || 'unknown'
         const args = toolCall.arguments || {}
         const toolCallId = toolCall.id || ''

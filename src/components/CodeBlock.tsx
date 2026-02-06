@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import hljs from 'highlight.js'
+import { codeToHtml } from 'shiki'
 import { getLanguageFromPath } from '../utils/markdown'
+import { useCodeTheme } from '../hooks/useCodeTheme'
 
 interface CodeBlockProps {
   code: string
@@ -12,22 +13,41 @@ interface CodeBlockProps {
 
 export default function CodeBlock({ code, language, filename, showLineNumbers = true }: CodeBlockProps) {
   const { t } = useTranslation()
-  const codeRef = useRef<HTMLElement>(null)
+  const codeRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
+  const [highlightedHtml, setHighlightedHtml] = useState<string>('')
+  const theme = useCodeTheme()
+  
+  const resolvedLanguage = useMemo(() => {
+    const rawLanguage = (language || (filename ? getLanguageFromPath(filename) : '') || '').trim()
+    return rawLanguage || 'text'
+  }, [language, filename])
 
   useEffect(() => {
-    if (codeRef.current) {
-      const lang = language || (filename ? getLanguageFromPath(filename) : undefined)
-
-      if (lang) {
-        try {
-          hljs.highlightElement(codeRef.current)
-        } catch (e) {
-          console.warn('Failed to highlight code:', e)
-        }
+    const highlight = async () => {
+      try {
+        const html = await codeToHtml(code, {
+          lang: resolvedLanguage,
+          theme: theme,
+          rootStyle: false, // 移除背景色
+        })
+        setHighlightedHtml(html)
+      } catch (e) {
+        console.warn('Failed to highlight code:', e)
+        setHighlightedHtml(`<pre><code>${escapeHtml(code)}</code></pre>`)
       }
     }
-  }, [code, language, filename])
+    highlight()
+  }, [code, resolvedLanguage, theme])
+
+  useEffect(() => {
+    const container = codeRef.current
+    if (!container) return
+    const highlightedNodes = container.querySelectorAll<HTMLElement>('code[data-highlighted]')
+    highlightedNodes.forEach((node) => {
+      node.removeAttribute('data-highlighted')
+    })
+  }, [highlightedHtml])
 
   const handleCopy = async () => {
     try {
@@ -37,6 +57,12 @@ export default function CodeBlock({ code, language, filename, showLineNumbers = 
     } catch (err) {
       console.error('Failed to copy code:', err)
     }
+  }
+
+  const escapeHtml = (text: string): string => {
+    const div = document.createElement('div')
+    div.textContent = text
+    return div.innerHTML
   }
 
   // 计算行号
@@ -77,11 +103,7 @@ export default function CodeBlock({ code, language, filename, showLineNumbers = 
             ))}
           </div>
         )}
-        <pre className="code-block">
-          <code ref={codeRef} className={language || ''}>
-            {code}
-          </code>
-        </pre>
+        <div ref={codeRef} className="code-block-shiki" dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
       </div>
     </div>
   )
