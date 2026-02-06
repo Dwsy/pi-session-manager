@@ -10,6 +10,7 @@ interface FavoritesPanelProps {
   selectedSession: SessionInfo | null
   onSelectSession: (session: SessionInfo) => void
   onRemoveFavorite: (item: FavoriteItem) => void
+  onSelectProject?: (projectPath: string) => void
   getBadgeType?: (sessionId: string) => 'new' | 'updated' | null
   loading?: boolean
 }
@@ -20,6 +21,7 @@ export default function FavoritesPanel({
   selectedSession,
   onSelectSession,
   onRemoveFavorite,
+  onSelectProject,
   getBadgeType,
   loading = false,
 }: FavoritesPanelProps) {
@@ -53,6 +55,7 @@ export default function FavoritesPanel({
             return (
               <div
                 key={favorite.id}
+                onClick={() => onSelectProject?.(favorite.path)}
                 className="group px-3 py-2 hover:bg-[#2c2d3b] cursor-pointer border-b border-border/50"
               >
                 <div className="flex items-center gap-2">
