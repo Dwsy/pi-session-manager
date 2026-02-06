@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { formatDate } from '../utils/format'
 import ExpandableOutput from './ExpandableOutput'
-import hljs from 'highlight.js'
+import { codeToHtml } from 'shiki'
+import { useCodeTheme } from '../hooks/useCodeTheme'
 
 interface BashExecutionProps {
   command: string
@@ -25,21 +26,36 @@ export default function BashExecution({
   const [localExpanded, setLocalExpanded] = useState(false)
   const [outputCopied, setOutputCopied] = useState(false)
   const [commandCopied, setCommandCopied] = useState(false)
-  const codeRef = useRef<HTMLElement>(null)
+  const [highlightedCommand, setHighlightedCommand] = useState<string>('')
+  const codeRef = useRef<HTMLDivElement>(null)
+  const theme = useCodeTheme()
 
   useEffect(() => {
     setLocalExpanded(expanded)
   }, [expanded])
 
   useEffect(() => {
-    if (codeRef.current) {
+    const highlight = async () => {
       try {
-        hljs.highlightElement(codeRef.current)
+        const html = await codeToHtml(command, {
+          lang: 'bash',
+          theme: theme,
+          rootStyle: false, // 移除背景色
+        })
+        setHighlightedCommand(html)
       } catch (e) {
         console.warn('Failed to highlight bash code:', e)
+        setHighlightedCommand(`<pre><code>${escapeHtml(command)}</code></pre>`)
       }
     }
-  }, [command])
+    highlight()
+  }, [command, theme])
+
+  const escapeHtml = (text: string): string => {
+    const div = document.createElement('div')
+    div.textContent = text
+    return div.innerHTML
+  }
 
   const isError = cancelled || (exitCode !== undefined && exitCode !== null && exitCode !== 0)
   const statusClass = isError ? 'error' : 'success'
@@ -88,9 +104,11 @@ export default function BashExecution({
         )}
       </div>
       <div className="tool-command-wrapper">
-        <pre className="tool-command-highlighted">
-          <code ref={codeRef} className="language-bash">{command}</code>
-        </pre>
+        <div 
+          ref={codeRef} 
+          className="tool-command-highlighted" 
+          dangerouslySetInnerHTML={{ __html: highlightedCommand }} 
+        />
         <button
           onClick={handleCopyCommand}
           className="tool-copy-button"

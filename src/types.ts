@@ -3,6 +3,7 @@ export interface SessionInfo {
   id: string
   cwd: string
   name?: string
+  isDraft?: boolean
   created: string
   modified: string
   message_count: number
@@ -130,6 +131,8 @@ export interface Message {
   usage?: TokenUsage
   stopReason?: string
   errorMessage?: string
+  toolCallId?: string
+  isError?: boolean
   cancelled?: boolean
   exitCode?: number
   command?: string

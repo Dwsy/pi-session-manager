@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
-import { parseMarkdown } from '../utils/markdown'
+import { useEffect, useState } from 'react'
+import { parseMarkdownAsync } from '../utils/markdown'
 import { highlightSearchInHTML } from '../utils/search'
+import { useCodeTheme } from '../hooks/useCodeTheme'
 
 interface MarkdownContentProps {
   content: string
@@ -10,18 +11,24 @@ interface MarkdownContentProps {
 
 /**
  * Markdown 内容渲染组件
- * 使用 useMemo 缓存解析结果，避免重复计算
+ * 使用异步解析和 useState 管理 HTML
  * 使用 dangerouslySetInnerHTML 替代直接操作 DOM
  */
 export default function MarkdownContent({ content, className = '', searchQuery = '' }: MarkdownContentProps) {
-  // 使用 useMemo 缓存解析后的 HTML，避免重复计算
-  const html = useMemo(() => {
-    let parsed = parseMarkdown(content)
-    if (searchQuery) {
-      parsed = highlightSearchInHTML(parsed, searchQuery)
+  const [html, setHtml] = useState<string>('')
+  const theme = useCodeTheme()
+
+  // 异步解析 Markdown 并高亮搜索结果
+  useEffect(() => {
+    const parseContent = async () => {
+      let parsed = await parseMarkdownAsync(content, theme)
+      if (searchQuery) {
+        parsed = highlightSearchInHTML(parsed, searchQuery)
+      }
+      setHtml(parsed)
     }
-    return parsed
-  }, [content, searchQuery])
+    parseContent()
+  }, [content, searchQuery, theme])
 
   return (
     <div
