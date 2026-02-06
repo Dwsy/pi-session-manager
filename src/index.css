@@ -587,6 +587,63 @@ body {
   color: var(--text);
 }
 
+/* Mermaid blocks */
+.mermaid-block {
+  margin: var(--line-height) 0;
+  width: 100%;
+}
+
+.mermaid-ascii {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(15, 19, 27, 0.72);
+  border: 1px solid rgba(95, 135, 255, 0.18);
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.mermaid-svg {
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(11, 15, 22, 0.55);
+  border: 1px solid rgba(95, 135, 255, 0.2);
+  overflow-x: auto;
+  backdrop-filter: blur(4px);
+}
+
+.mermaid-svg svg {
+  display: block;
+  margin: 0 auto;
+  width: auto;
+  max-width: min(100%, 980px);
+  height: auto;
+}
+
+.mermaid-svg [data-streamdown="mermaid"] {
+  margin: 0;
+}
+
+.mermaid-error {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(204, 102, 102, 0.15);
+  border: 1px solid rgba(204, 102, 102, 0.4);
+  color: #f29d9d;
+  font-size: 12px;
+}
+
+.mermaid-loading {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(128, 128, 128, 0.15);
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  color: var(--text);
+  font-size: 12px;
+}
+
 /* Code Block Styles */
 .code-block-wrapper {
   background: rgba(0, 0, 0, 0.3);
