@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Puzzle,
   Cpu,
+  Keyboard,
 } from 'lucide-react'
 import type { AppSettings, SettingsSection } from './types'
 import { defaultSettings } from './types'
@@ -26,6 +27,7 @@ import ExportSettings from './sections/ExportSettings'
 import PiConfigSettings from './sections/PiConfigSettings'
 import ModelSettings from './sections/ModelSettings'
 import AdvancedSettings from './sections/AdvancedSettings'
+import ShortcutSettings from './sections/ShortcutSettings'
 
 interface SettingsPanelProps {
   isOpen: boolean
@@ -53,10 +55,6 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       if (saved) {
         const parsedSettings = JSON.parse(saved)
         setSettings({ ...defaultSettings, ...parsedSettings })
-        // 同步语言到 i18n
-        if (parsedSettings?.language?.locale) {
-          i18n.changeLanguage(parsedSettings.language.locale)
-        }
       }
     } catch (error) {
       console.error('Failed to load settings:', error)
@@ -110,6 +108,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     { id: 'export', icon: <ChevronRight className="h-4 w-4" />, label: t('settings.sections.export', '导出') },
     { id: 'pi-config', icon: <Puzzle className="h-4 w-4" />, label: t('settings.sections.piConfig', 'Pi 配置') },
     { id: 'models', icon: <Cpu className="h-4 w-4" />, label: t('settings.sections.models', '模型') },
+    { id: 'shortcuts', icon: <Keyboard className="h-4 w-4" />, label: t('settings.sections.shortcuts', '快捷键') },
     { id: 'advanced', icon: <Shield className="h-4 w-4" />, label: t('settings.sections.advanced', '高级') },
   ]
 
@@ -149,8 +148,8 @@ function SettingsSidebar({ menuItems, activeSection, onSectionChange, onReset }:
   const { t } = useTranslation()
 
   return (
-    <div className="w-64 bg-[#191a26] border-r border-[#2c2d3b] flex flex-col">
-      <div className="p-4 border-b border-[#2c2d3b]">
+    <div className="w-64 bg-[#191a26] border-r border-[#2c2d3b] flex flex-col overflow-y-auto">
+      <div className="p-4 border-b border-[#2c2d3b] flex-shrink-0">
         <h2 className="text-lg font-semibold text-white">{t('settings.title', '设置')}</h2>
         <p className="text-xs text-[#6a6f85] mt-1">{t('settings.subtitle', '自定义您的体验')}</p>
       </div>
@@ -177,7 +176,7 @@ function SettingsSidebar({ menuItems, activeSection, onSectionChange, onReset }:
         ))}
       </nav>
 
-      <div className="p-4 border-t border-[#2c2d3b]">
+      <div className="p-4 border-t border-[#2c2d3b] flex-shrink-0">
         <button
           onClick={onReset}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b] rounded-lg transition-colors"
@@ -185,46 +184,6 @@ function SettingsSidebar({ menuItems, activeSection, onSectionChange, onReset }:
           <RefreshCw className="h-4 w-4" />
           {t('settings.reset', '重置设置')}
         </button>
-      </div>
-
-      <ShortcutHints />
-    </div>
-  )
-}
-
-function ShortcutHints() {
-  const { t } = useTranslation()
-
-  return (
-    <div className="px-4 pb-4">
-      <div className="bg-[#252636] rounded-lg p-3">
-        <div className="text-xs text-[#6a6f85] mb-2">{t('settings.shortcuts.title', '快捷键')}</div>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[#6a6f85]">{t('app.shortcuts.resume', '恢复会话')}</span>
-            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Cmd+R</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[#6a6f85]">{t('app.shortcuts.exportHtml', '导出并打开')}</span>
-            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Cmd+E</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[#6a6f85]">{t('app.shortcuts.projectView', '项目视图')}</span>
-            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Cmd+P</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[#6a6f85]">{t('app.shortcuts.settings', '打开设置')}</span>
-            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Cmd+,</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[#6a6f85]">{t('app.shortcuts.search', '聚焦搜索框')}</span>
-            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Cmd+F</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[#6a6f85]">{t('app.shortcuts.close', '关闭')}</span>
-            <span className="text-white bg-[#2c2d3b] px-1.5 py-0.5 rounded">Esc</span>
-          </div>
-        </div>
       </div>
     </div>
   )
@@ -284,6 +243,7 @@ function SettingsContent({
             {activeSection === 'export' && <ExportSettings settings={settings} onUpdate={onUpdate} />}
             {activeSection === 'pi-config' && <PiConfigSettings />}
             {activeSection === 'models' && <ModelSettings />}
+            {activeSection === 'shortcuts' && <ShortcutSettings />}
             {activeSection === 'advanced' && <AdvancedSettings settings={settings} onUpdate={onUpdate} />}
           </div>
         )}

@@ -41,6 +41,16 @@ export interface AppSettings {
   }
 }
 
+/**
+ * 检测系统语言，优先使用用户已保存的偏好
+ */
+function getDefaultLocale(): string {
+  const saved = localStorage.getItem('app-language')
+  if (saved) return saved
+  const lang = navigator.language || 'en-US'
+  return lang.startsWith('zh') ? 'zh-CN' : 'en-US'
+}
+
 export const defaultSettings: AppSettings = {
   terminal: {
     defaultTerminal: 'iterm2',
@@ -54,7 +64,7 @@ export const defaultSettings: AppSettings = {
     messageSpacing: 'comfortable',
   },
   language: {
-    locale: 'zh-CN',
+    locale: getDefaultLocale(),
   },
   session: {
     autoRefresh: true,
@@ -92,6 +102,7 @@ export type SettingsSection =
   | 'export'
   | 'pi-config'
   | 'models'
+  | 'shortcuts'
   | 'advanced'
 
 export type SettingsProps<T extends keyof AppSettings> = {
