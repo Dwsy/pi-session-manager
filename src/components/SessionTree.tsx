@@ -67,6 +67,7 @@ interface FlatNode {
   gutters: Array<{ position: number; show: boolean }>
   isVirtualRootChild: boolean
   multipleRoots: boolean
+  hasChildren: boolean
 }
 
 const SessionTree = forwardRef<SessionTreeRef, SessionTreeProps>(function SessionTree({
@@ -83,12 +84,26 @@ ref
   const [currentFilter, setCurrentFilter] = useState(filter)
   const [currentResultIndex, setCurrentResultIndex] = useState(0)
   const [searchResults, setSearchResults] = useState<string[]>([])
+  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set())
 
   useImperativeHandle(ref, () => ({
     focusSearch: () => {
       searchRef.current?.focus()
     }
   }))
+
+  const toggleCollapse = useCallback((nodeId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCollapsedNodes(prev => {
+      const next = new Set(prev)
+      if (next.has(nodeId)) {
+        next.delete(nodeId)
+      } else {
+        next.add(nodeId)
+      }
+      return next
+    })
+  }, [])
 
   // Build tree structure
   const treeData = useMemo(() => {
@@ -180,8 +195,14 @@ ref
 
     while (stack.length > 0) {
       const [node, indent, justBranched, showConnector, isLast, gutters, isVirtualRootChild] = stack.pop()!
+      const hasChildren = node.children.length > 0
 
-      result.push({ node, indent, showConnector, isLast, gutters, isVirtualRootChild, multipleRoots })
+      result.push({ node, indent, showConnector, isLast, gutters, isVirtualRootChild, multipleRoots, hasChildren })
+
+      // 如果当前节点被折叠，跳过子节点
+      if (collapsedNodes.has(node.entry.id)) {
+        continue
+      }
 
       const children = node.children
       const multipleChildren = children.length > 1
@@ -217,7 +238,7 @@ ref
     }
 
     return result
-  }, [treeData, activePathIds])
+  }, [treeData, activePathIds, collapsedNodes])
 
   // Build tree prefix (ASCII art)
   const buildTreePrefix = (flatNode: FlatNode): string => {
@@ -690,12 +711,12 @@ ref
           const marker = isInPath ? '• ' : '· '
           const displayText = getNodeDisplayText(entry, label)
           const roleClass = getNodeRoleClass(entry)
+          const isCollapsed = collapsedNodes.has(entry.id)
 
           const isSearchMatch = searchResults.includes(entry.id)
           const isCurrentMatch = isSearchMatch && searchResults[currentResultIndex] === entry.id
           const searchTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean)
 
-          // 获取匹配摘要
           let snippet: string | null = null
           if (isSearchMatch && searchQuery) {
             const fullText = getFullText(entry, label)
@@ -709,8 +730,20 @@ ref
               onClick={() => handleNodeClick(flatNode)}
             >
               <span className="tree-prefix">{prefix}</span>
-              <span className="tree-marker">{marker}</span>
+              {flatNode.hasChildren ? (
+                <span
+                  className="tree-toggle"
+                  onClick={(e) => toggleCollapse(entry.id, e)}
+                >
+                  {isCollapsed ? '▸ ' : '▾ '}
+                </span>
+              ) : (
+                <span className="tree-marker">{marker}</span>
+              )}
               <span className={`tree-content ${roleClass}`}>{displayText}</span>
+              {isCollapsed && flatNode.hasChildren && (
+                <span className="tree-collapsed-hint">...</span>
+              )}
               {snippet && (
                 <span className="tree-snippet">{highlightText(snippet, searchTokens)}</span>
               )}

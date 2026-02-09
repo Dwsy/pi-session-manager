@@ -363,6 +363,27 @@
    font-weight: 600;
  }
 
+ .tree-toggle {
+   color: #6a6f85;
+   flex-shrink: 0;
+   cursor: pointer;
+   font-size: 10px;
+   line-height: 16px;
+   transition: color 0.15s ease;
+   user-select: none;
+ }
+
+ .tree-toggle:hover {
+   color: #8abeb7;
+ }
+
+ .tree-collapsed-hint {
+   color: #6a6f85;
+   font-size: 10px;
+   margin-left: 4px;
+   opacity: 0.6;
+ }
+
  .tree-content {
    color: #d4d4d8;
    overflow: hidden;
