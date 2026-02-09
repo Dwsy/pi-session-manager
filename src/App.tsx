@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard } from 'lucide-react'
+import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search } from 'lucide-react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import SessionList from './components/SessionList'
 import ProjectList from './components/ProjectList'
@@ -10,6 +10,7 @@ import RenameDialog from './components/RenameDialog'
 import Dashboard from './components/Dashboard'
 import FavoritesPanel from './components/FavoritesPanel'
 import SettingsPanel from './components/settings/SettingsPanel'
+import Onboarding from './components/Onboarding'
 import { CommandPalette } from './components/command'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useFileWatcher } from './hooks/useFileWatcher'
@@ -26,7 +27,7 @@ import { invoke } from '@tauri-apps/api/core'
 namespace sqlite_cache {
   export interface FavoriteItem {
     id: string
-    favorite_type: string
+    type: string
     name: string
     path: string
     added_at: string
@@ -60,6 +61,9 @@ function App() {
   const [favorites, setFavorites] = useState<FavoriteItem[]>([])
   const [loadingFavorites, setLoadingFavorites] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return !localStorage.getItem('onboarding-completed')
+  })
 
   const loadFavorites = useCallback(async () => {
     console.log('[Favorites] Loading favorites...')
@@ -69,7 +73,7 @@ function App() {
       console.log('[Favorites] Raw result from backend:', result)
       const formattedFavorites: FavoriteItem[] = result.map(f => ({
         id: f.id,
-        type: f.favorite_type as 'session' | 'project',
+        type: f.type as 'session' | 'project',
         name: f.name,
         path: f.path,
         addedAt: f.added_at,
@@ -280,6 +284,15 @@ function App() {
               <Star className="h-3.5 w-3.5" />
             </button>
             <button
+              onClick={() => {
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
+              }}
+              className="p-1 rounded transition-colors ml-0.5 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b] group relative"
+              title={t('app.shortcuts.searchAll', '搜索所有会话') + ' (Cmd+K)'}
+            >
+              <Search className="h-3.5 w-3.5" />
+            </button>
+            <button
               onClick={() => setShowSettings(true)}
               className="p-1 rounded transition-colors ml-0.5 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b]"
               title={t('settings.title')}
@@ -297,6 +310,11 @@ function App() {
               selectedSession={selectedSession}
               onSelectSession={handleSelectSession}
               onRemoveFavorite={removeFavorite}
+              onSelectProject={(path) => {
+                setSelectedProject(path)
+                setViewMode('project')
+                setShowFavorites(false)
+              }}
               getBadgeType={getBadgeType}
               loading={loadingFavorites}
             />
@@ -427,6 +445,15 @@ function App() {
       />
 
       <CommandPalette context={commandContext} />
+
+      {showOnboarding && (
+        <Onboarding
+          onComplete={() => {
+            localStorage.setItem('onboarding-completed', 'true')
+            setShowOnboarding(false)
+          }}
+        />
+      )}
     </div>
   )
 }
