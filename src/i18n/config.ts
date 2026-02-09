@@ -9,13 +9,24 @@ const resources = {
   'zh-CN': { translation: zhCN },
 }
 
+/**
+ * 检测系统语言，优先使用用户已保存的偏好
+ * 中文系统自动切换为中文，其余默认英文
+ */
+export function detectSystemLocale(): string {
+  const saved = localStorage.getItem('app-language')
+  if (saved) return saved
+  const lang = navigator.language || 'en-US'
+  return lang.startsWith('zh') ? 'zh-CN' : 'en-US'
+}
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources,
     fallbackLng: 'en-US',
-    lng: localStorage.getItem('app-language') || 'en-US',
+    lng: detectSystemLocale(),
     interpolation: {
       escapeValue: false,
     },

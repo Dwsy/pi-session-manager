@@ -6,6 +6,14 @@ export const settings = {
   confirmReset: 'Are you sure you want to reset all settings?',
   shortcuts: {
     title: 'Keyboard Shortcuts',
+    description: 'All available keyboard shortcuts. Use Cmd on macOS and Ctrl on Windows/Linux.',
+    devtools: 'Developer Tools',
+    categories: {
+      search: 'Search',
+      navigation: 'Navigation',
+      session: 'Session',
+      general: 'General',
+    },
   },
   sections: {
     terminal: 'Terminal',
@@ -16,6 +24,7 @@ export const settings = {
     export: 'Export',
     piConfig: 'Pi Config',
     models: 'Models',
+    shortcuts: 'Shortcuts',
     advanced: 'Advanced',
   },
   terminal: {
@@ -101,6 +110,8 @@ export const settings = {
     demoModeHelp: 'View demo data to explore all features',
     clearCache: 'Clear Cache',
     cacheCleared: 'Cache cleared',
+    showOnboarding: 'Show Onboarding Guide',
+    onboardingReset: 'Onboarding guide will show next time you open the app',
   },
   piConfig: {
     skills: 'Skills',

@@ -6,6 +6,14 @@ export const settings = {
   confirmReset: '确定要重置所有设置吗？',
   shortcuts: {
     title: '快捷键',
+    description: '查看所有可用的键盘快捷键。在 macOS 上使用 Cmd，在 Windows/Linux 上使用 Ctrl。',
+    devtools: '开发者工具',
+    categories: {
+      search: '搜索',
+      navigation: '导航',
+      session: '会话',
+      general: '通用',
+    },
   },
   sections: {
     terminal: '终端',
@@ -16,6 +24,7 @@ export const settings = {
     export: '导出',
     piConfig: 'Pi 配置',
     models: '模型',
+    shortcuts: '快捷键',
     advanced: '高级',
   },
   terminal: {
@@ -101,6 +110,8 @@ export const settings = {
     demoModeHelp: '查看演示数据以探索所有功能',
     clearCache: '清除缓存',
     cacheCleared: '缓存已清除',
+    showOnboarding: '重新显示新手引导',
+    onboardingReset: '下次打开应用时将显示引导',
   },
   piConfig: {
     skills: 'Skills',

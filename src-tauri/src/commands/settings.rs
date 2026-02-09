@@ -87,7 +87,7 @@ impl Default for AppSettings {
                 message_spacing: "comfortable".to_string(),
             },
             language: LanguageSettings {
-                locale: "zh-CN".to_string(),
+                locale: "en-US".to_string(),
             },
             session: SessionSettings {
                 auto_refresh: true,

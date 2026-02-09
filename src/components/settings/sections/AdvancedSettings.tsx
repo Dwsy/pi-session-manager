@@ -113,7 +113,16 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
         </label>
       </div>
 
-      <div className="pt-4 border-t border-[#2c2d3b]">
+      <div className="pt-4 border-t border-[#2c2d3b] space-y-3">
+        <button
+          onClick={() => {
+            localStorage.removeItem('onboarding-completed')
+            alert(t('settings.advanced.onboardingReset', '下次打开应用时将显示引导'))
+          }}
+          className="px-4 py-2 bg-[#569cd6]/10 text-[#569cd6] hover:bg-[#569cd6]/20 rounded-lg text-sm transition-colors"
+        >
+          {t('settings.advanced.showOnboarding', '重新显示新手引导')}
+        </button>
         <button
           onClick={() => {
             localStorage.clear()

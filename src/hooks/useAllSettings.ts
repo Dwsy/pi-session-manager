@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import i18n from '../i18n'
+import i18n, { detectSystemLocale } from '../i18n'
 import type { AppSettings } from '../components/settings/types'
 
 export interface UseAllSettingsReturn {
@@ -22,7 +22,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     messageSpacing: 'comfortable',
   },
   language: {
-    locale: 'zh-CN',
+    locale: detectSystemLocale(),
   },
   session: {
     autoRefresh: true,

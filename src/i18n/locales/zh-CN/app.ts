@@ -12,6 +12,7 @@ export const app = {
     resume: '恢复会话 (Cmd+R)',
     exportHtml: '导出并打开 (Cmd+E)',
     projectView: '项目视图 (Cmd+P)',
+    searchAll: '搜索所有会话 (Cmd+K)',
     search: '聚焦搜索框 (Cmd+F)',
     settings: '打开设置 (Cmd+,)',
     close: '关闭 (Esc)',

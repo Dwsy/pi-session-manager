@@ -12,6 +12,7 @@ export const app = {
     resume: 'Resume session (Cmd+R)',
     exportHtml: 'Export & open (Cmd+E)',
     projectView: 'Project view (Cmd+P)',
+    searchAll: 'Search all sessions (Cmd+K)',
     search: 'Focus search (Cmd+F)',
     settings: 'Open settings (Cmd+,)',
     close: 'Close (Esc)',
