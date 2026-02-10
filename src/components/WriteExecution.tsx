@@ -46,28 +46,31 @@ export default function WriteExecution({
       </div>
 
       {content && (
-        <div className="tool-output">
-          {remaining > 0 && !localExpanded ? (
+        <div className="tool-output-wrapper">
+          {remaining > 0 ? (
             <>
-              <CodeBlock code={lines.slice(0, 20).join('\n')} language={lang} showLineNumbers={false} />
               <div
-                className="expand-hint"
-                onClick={() => setLocalExpanded(true)}
+                className="tool-output-header"
+                onClick={() => setLocalExpanded(!localExpanded)}
                 style={{ cursor: 'pointer' }}
               >
-                ... {t('components.writeExecution.moreLines', { count: remaining })}
+                <span className="tool-output-label">
+                  {localExpanded ? '▾ Content' : `▸ Content (${remaining} more lines)`}
+                </span>
               </div>
+              {localExpanded ? (
+                <div className="tool-output">
+                  <CodeBlock code={content} language={lang} showLineNumbers={false} />
+                </div>
+              ) : (
+                <div className="tool-output">
+                  <CodeBlock code={lines.slice(0, 20).join('\n')} language={lang} showLineNumbers={false} />
+                </div>
+              )}
             </>
           ) : (
-            <CodeBlock code={content} language={lang} showLineNumbers={false} />
-          )}
-          {remaining > 0 && localExpanded && (
-            <div
-              className="expand-hint"
-              onClick={() => setLocalExpanded(false)}
-              style={{ cursor: 'pointer' }}
-            >
-              {t('components.writeExecution.showLess', 'Show less')}
+            <div className="tool-output" style={{ paddingTop: '8px' }}>
+              <CodeBlock code={content} language={lang} showLineNumbers={false} />
             </div>
           )}
         </div>

@@ -109,25 +109,19 @@ export default function BashExecution({
       </div>
       {output && (
         <div className="tool-output-wrapper">
-          <div className="tool-output-header">
-            <span className="tool-output-label">Output</span>
+          <div
+            className="tool-output-header"
+            onClick={() => setLocalExpanded(!localExpanded)}
+            style={{ cursor: 'pointer' }}
+          >
+            <span className="tool-output-label">
+              {localExpanded ? '▾ Output' : '▸ Output'}
+            </span>
             <button
-              onClick={() => setLocalExpanded(!localExpanded)}
-              className="tool-toggle-button"
-              title={localExpanded ? 'Collapse' : 'Expand'}
-            >
-              {localExpanded ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              )}
-            </button>
-            <button
-              onClick={handleCopyOutput}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCopyOutput()
+              }}
               className="tool-copy-button"
               title={outputCopied ? 'Copied!' : 'Copy output'}
             >

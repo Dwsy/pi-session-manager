@@ -226,24 +226,20 @@ export default function EditExecution({
 
       {diff && (
         <div className="tool-diff-wrapper">
-          <div className="tool-diff-actions">
+          <div
+            className="tool-diff-actions"
+            onClick={() => setLocalExpanded(!localExpanded)}
+            style={{ cursor: 'pointer' }}
+          >
+            <span style={{ color: '#6a6f85', fontSize: '11px' }}>
+              {localExpanded ? '▾ Diff' : '▸ Diff'}
+            </span>
+            <div style={{ flex: 1 }} />
             <button
-              onClick={() => setLocalExpanded(!localExpanded)}
-              className="tool-action-button"
-              title={localExpanded ? t('components.editExecution.collapse') : t('components.editExecution.expand')}
-            >
-              {localExpanded ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              )}
-            </button>
-            <button
-              onClick={copyDiffToClipboard}
+              onClick={(e) => {
+                e.stopPropagation()
+                copyDiffToClipboard()
+              }}
               className="tool-action-button"
               title={copied ? t('components.editExecution.copied') : t('components.editExecution.copyDiff')}
             >
