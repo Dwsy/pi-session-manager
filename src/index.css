@@ -180,8 +180,8 @@ body {
 /* Message Styles */
 .message-timestamp {
   font-size: 10px;
-  color: var(--dim);
-  opacity: 0.8;
+  color: #6a6f85;
+  opacity: 0.7;
 }
 
 .user-message {
@@ -246,58 +246,53 @@ body {
   margin-top: var(--line-height);
 }
 
-/* Tool Execution Styles */
+/* Tool Execution Styles - Simplified */
 .tool-execution {
-  margin: 12px 0;
+  margin: 16px 0;
   border-radius: 8px;
-  border: 1px solid rgba(138, 190, 183, 0.2);
+  background: rgba(0, 0, 0, 0.15);
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.2);
 }
 
 .tool-execution > .message-timestamp {
   padding-left: 12px;
-  padding-top: 6px;
+  padding-top: 8px;
+  font-size: 10px;
+  color: #6a6f85;
+  opacity: 0.7;
 }
 
-.tool-execution.pending { 
-  background: var(--toolPendingBg);
-  border-color: rgba(138, 190, 183, 0.3);
+.tool-execution.pending {
+  background: rgba(40, 50, 60, 0.3);
 }
 
-.tool-execution.success { 
-  background: var(--toolSuccessBg);
-  border-color: rgba(181, 189, 104, 0.3);
+.tool-execution.success {
+  background: rgba(40, 60, 40, 0.2);
 }
 
-.tool-execution.error { 
-  background: var(--toolErrorBg);
-  border-color: rgba(204, 102, 102, 0.3);
+.tool-execution.error {
+  background: rgba(60, 40, 40, 0.2);
 }
 
 .tool-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid rgba(138, 190, 183, 0.15);
+  padding: 8px 12px;
   font-size: 11px;
 }
 
 .tool-name {
-  font-weight: 600;
+  font-weight: 500;
   color: #8abeb7;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .tool-icon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
 }
 
@@ -307,56 +302,64 @@ body {
 }
 
 .tool-command {
-  padding: 10px 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid rgba(138, 190, 183, 0.15);
+  padding: 12px 16px;
   font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-  font-size: 11px;
-  color: #b5bd68;
+  font-size: 12px;
+  color: #d4d4d8;
   flex: 1;
 }
 
 .tool-command-wrapper {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid rgba(138, 190, 183, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  margin: 0 12px 8px 12px;
   padding-right: 8px;
 }
 
 .tool-command-wrapper .tool-command {
-  padding: 10px 12px;
+  padding: 12px 40px 12px 16px;
   background: transparent;
-  border: none;
 }
 
 .tool-output-wrapper {
   position: relative;
+  margin: 0 12px 12px 12px;
 }
 
 .tool-output-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid rgba(138, 190, 183, 0.15);
+  padding: 6px 0;
+  font-size: 10px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.tool-output-header:hover {
+  color: #d4d4d8;
+}
+
+.tool-output-header:hover .tool-output-label {
+  color: #8abeb7;
 }
 
 .tool-output-label {
   font-size: 10px;
   color: #6a6f85;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
+  font-weight: 500;
+  transition: color 0.2s ease;
 }
 
 .tool-copy-button {
   padding: 4px;
   background: transparent;
   color: #6a6f85;
-  border: 1px solid rgba(138, 190, 183, 0.2);
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -368,8 +371,7 @@ body {
 
 .tool-copy-button:hover {
   color: #d4d4d8;
-  border-color: rgba(138, 190, 183, 0.4);
-  background: rgba(138, 190, 183, 0.05);
+  background: rgba(138, 190, 183, 0.1);
 }
 
 .tool-copy-button svg {
@@ -378,10 +380,10 @@ body {
 }
 
 .tool-output {
-  padding: 12px;
+  padding: 8px 0;
   font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
   font-size: 11px;
-  color: #d4d4d8;
+  color: #b0b0b8;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -464,19 +466,17 @@ body {
 }
 
 .expand-hint {
-  padding: 8px 12px;
-  text-align: center;
+  padding: 8px 0;
+  text-align: left;
   color: #6a6f85;
-  font-size: 11px;
+  font-size: 10px;
   cursor: pointer;
-  background: rgba(0, 0, 0, 0.2);
-  border-top: 1px solid rgba(138, 190, 183, 0.15);
   transition: all 0.2s ease;
+  font-style: italic;
 }
 
 .expand-hint:hover {
   color: #8abeb7;
-  background: rgba(138, 190, 183, 0.05);
 }
 
 /* Hover Preview Styles */
@@ -587,10 +587,9 @@ body {
   color: var(--text);
 }
 
-/* Code Block Styles */
+/* Code Block Styles - Simplified */
 .code-block-wrapper {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(138, 190, 183, 0.2);
+  background: rgba(0, 0, 0, 0.2);
   border-radius: 8px;
   margin: 16px 0;
   overflow: hidden;
@@ -601,8 +600,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid rgba(138, 190, 183, 0.15);
+  font-size: 11px;
 }
 
 .code-filename,
@@ -616,11 +614,11 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   font-size: 11px;
   background: transparent;
   color: #6a6f85;
-  border: 1px solid rgba(138, 190, 183, 0.2);
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -628,8 +626,7 @@ body {
 
 .code-copy-button:hover {
   color: #d4d4d8;
-  border-color: rgba(138, 190, 183, 0.4);
-  background: rgba(138, 190, 183, 0.05);
+  background: rgba(138, 190, 183, 0.1);
 }
 
 .code-copy-button svg {
@@ -649,8 +646,7 @@ body {
 .code-line-numbers {
   flex-shrink: 0;
   padding: 12px 0;
-  background: rgba(0, 0, 0, 0.2);
-  border-right: 1px solid rgba(138, 190, 183, 0.15);
+  background: transparent;
   user-select: none;
   text-align: right;
 }

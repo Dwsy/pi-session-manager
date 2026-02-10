@@ -13,7 +13,12 @@
    flex-direction: column;
    border-right: 1px solid rgba(138, 190, 183, 0.15);
    height: 100%;
-   position: relative;
+   position: absolute;
+   left: 0;
+   top: 0;
+   bottom: 0;
+   z-index: 20;
+   box-shadow: 4px 0 12px rgba(0, 0, 0, 0.4);
  }
 
  /*
@@ -99,7 +104,7 @@
    font-family: inherit;
    background: rgba(0, 0, 0, 0.3);
    color: #d4d4d8;
-   border: 1px solid rgba(138, 190, 183, 0.2);
+   border: none;
    border-radius: 6px;
    transition: all 0.2s ease;
  }
@@ -131,7 +136,7 @@
    padding: 6px;
    background: transparent;
    color: #6a6f85;
-   border: 1px solid rgba(138, 190, 183, 0.2);
+   border: none;
    border-radius: 4px;
    cursor: pointer;
    transition: all 0.2s ease;
@@ -142,7 +147,7 @@
 
  .search-button:hover:not(:disabled) {
    color: #d4d4d8;
-   border-color: rgba(138, 190, 183, 0.4);
+  
    background: rgba(138, 190, 183, 0.05);
  }
 
@@ -169,11 +174,12 @@
    width: 4px;
    height: 100%;
    cursor: col-resize;
-   position: relative;
-   flex-shrink: 0;
+   position: absolute;
+   top: 0;
+   bottom: 0;
    background: transparent;
    transition: background 0.2s ease;
-   z-index: 10;
+   z-index: 30;
  }
 
  .sidebar-resize-handle:hover {
@@ -242,7 +248,7 @@
    font-family: inherit;
    background: rgba(0, 0, 0, 0.2);
    color: #d4d4d8;
-   border: 1px solid rgba(138, 190, 183, 0.2);
+   border: none;
    border-radius: 6px;
    transition: all 0.2s ease;
  }
@@ -272,7 +278,7 @@
    font-family: inherit;
    background: transparent;
    color: #6a6f85;
-   border: 1px solid rgba(138, 190, 183, 0.2);
+   border: none;
    border-radius: 4px;
    cursor: pointer;
    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -280,14 +286,14 @@
 
  .filter-btn:hover {
    color: #d4d4d8;
-   border-color: rgba(138, 190, 183, 0.4);
+  
    background: rgba(138, 190, 183, 0.05);
  }
 
  .filter-btn.active {
    background: rgba(138, 190, 183, 0.15);
    color: #8abeb7;
-   border-color: rgba(138, 190, 183, 0.4);
+  
    font-weight: 500;
  }
 
@@ -485,7 +491,7 @@
    padding: 4px 8px;
    background: transparent;
    color: #6a6f85;
-   border: 1px solid rgba(138, 190, 183, 0.2);
+   border: none;
    border-radius: 4px;
    cursor: pointer;
    transition: all 0.2s ease;
@@ -497,7 +503,7 @@
 
  .tool-toggle-button:hover {
    color: #d4d4d8;
-   border-color: rgba(138, 190, 183, 0.4);
+  
    background: rgba(138, 190, 183, 0.05);
  }
 
@@ -512,15 +518,22 @@
 
  .tool-diff-actions {
    display: flex;
+   align-items: center;
    gap: 6px;
-   margin-bottom: 12px;
+   padding: 6px 0;
+   margin-bottom: 8px;
+   transition: all 0.2s ease;
+ }
+
+ .tool-diff-actions:hover {
+   color: #d4d4d8;
  }
 
  .tool-action-button {
    padding: 6px;
    background: rgba(0, 0, 0, 0.3);
    color: #6a6f85;
-   border: 1px solid rgba(138, 190, 183, 0.2);
+   border: none;
    border-radius: 6px;
    cursor: pointer;
    transition: all 0.2s ease;
@@ -531,7 +544,7 @@
 
  .tool-action-button:hover {
    color: #d4d4d8;
-   border-color: rgba(138, 190, 183, 0.4);
+  
    background: rgba(138, 190, 183, 0.1);
  }
 
@@ -550,8 +563,7 @@
 .tool-command-wrapper {
   position: relative;
   margin-top: 8px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(138, 190, 183, 0.2);
+  background: rgba(0, 0, 0, 0.25);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -603,9 +615,9 @@
   top: 8px;
   right: 8px;
   padding: 6px;
-  background: rgba(0, 0, 0, 0.4);
+  background: transparent;
   color: #6a6f85;
-  border: 1px solid rgba(138, 190, 183, 0.2);
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -617,7 +629,6 @@
 
 .tool-command-wrapper .tool-copy-button:hover {
    color: #d4d4d8;
-   border-color: rgba(138, 190, 183, 0.4);
    background: rgba(138, 190, 183, 0.1);
 }
 
@@ -663,7 +674,7 @@
   font-family: inherit;
   background: rgba(0, 0, 0, 0.2);
   color: #d4d4d8;
-  border: 1px solid rgba(138, 190, 183, 0.2);
+  border: none;
   border-radius: 6px;
   transition: all 0.2s ease;
 }
@@ -728,7 +739,7 @@
   min-height: 32px;
   background: transparent;
   color: #6a6f85;
-  border: 1px solid rgba(138, 190, 183, 0.2);
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -739,7 +750,7 @@
 
 .search-navigation .nav-button:hover:not(:disabled) {
   color: #d4d4d8;
-  border-color: rgba(138, 190, 183, 0.4);
+ 
   background: rgba(138, 190, 183, 0.05);
 }
 
