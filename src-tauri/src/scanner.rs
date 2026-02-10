@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::models::SessionInfo;
 use crate::sqlite_cache;
+use crate::write_buffer;
 use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 use std::fs;
@@ -69,18 +70,18 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                         if file_modified > realtime_cutoff {
                             if let Ok(info) = parse_session_info(&file_path) {
                                 sessions.push(info);
-                                sqlite_cache::upsert_session(&conn, &sessions.last().unwrap(), file_modified)?;
+                                write_buffer::buffer_session_write(&sessions.last().unwrap(), file_modified);
                             }
                         } else {
                             if let Some(cached_mtime) = sqlite_cache::get_cached_file_modified(&conn, &path_str)? {
                                 if file_modified > cached_mtime {
                                     if let Ok(info) = parse_session_info(&file_path) {
-                                        sqlite_cache::upsert_session(&conn, &info, file_modified)?;
+                                        write_buffer::buffer_session_write(&info, file_modified);
                                     }
                                 }
                             } else {
                                 if let Ok(info) = parse_session_info(&file_path) {
-                                    sqlite_cache::upsert_session(&conn, &info, file_modified)?;
+                                    write_buffer::buffer_session_write(&info, file_modified);
                                 }
                             }
                         }
