@@ -74,7 +74,7 @@ const SessionTree = forwardRef<SessionTreeRef, SessionTreeProps>(function Sessio
   entries,
   activeLeafId,
   onNodeClick,
-  filter = 'default'
+  filter = 'no-tools'
 }: SessionTreeProps,
 ref
 ) {
