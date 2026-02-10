@@ -54,63 +54,64 @@ export default function GenericToolCall({
       </div>
 
       {args && Object.keys(args).length > 0 && (
-        <>
-          <div className="tool-arguments-title">Arguments</div>
-          <div className="tool-arguments">
-            {argsRemaining > 0 && !argsExpanded ? (
-              <>
-                <pre><code>{escapeHtml(argsLines.slice(0, 10).join('\n'))}</code></pre>
-                <div
-                  className="expand-hint"
-                  onClick={() => setArgsExpanded(true)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  ... {argsRemaining} more lines
-                </div>
-              </>
-            ) : (
-              <pre><code>{escapeHtml(argsText)}</code></pre>
-            )}
-            {argsRemaining > 0 && argsExpanded && (
-              <div
-                className="expand-hint"
-                onClick={() => setArgsExpanded(false)}
-                style={{ cursor: 'pointer' }}
-              >
-                Show less
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {output && (
-        <div className="tool-output">
-          {outputRemaining > 0 && !outputExpanded ? (
+        <div className="tool-output-wrapper" style={{ marginTop: '8px' }}>
+          {argsRemaining > 0 ? (
             <>
-              {outputLines.slice(0, 20).map((line, idx) => (
-                <div key={idx}>{escapeHtml(line)}</div>
-              ))}
               <div
-                className="expand-hint"
-                onClick={() => setOutputExpanded(true)}
+                className="tool-output-header"
+                onClick={() => setArgsExpanded(!argsExpanded)}
                 style={{ cursor: 'pointer' }}
               >
-                ... {outputRemaining} more lines
+                <span className="tool-output-label">
+                  {argsExpanded ? '▾ Arguments' : `▸ Arguments (${argsRemaining} more lines)`}
+                </span>
+              </div>
+              <div className="tool-arguments" style={{ margin: 0 }}>
+                {argsExpanded ? (
+                  <pre><code>{escapeHtml(argsText)}</code></pre>
+                ) : (
+                  <pre><code>{escapeHtml(argsLines.slice(0, 10).join('\n'))}</code></pre>
+                )}
               </div>
             </>
           ) : (
-            outputLines.map((line, idx) => (
-              <div key={idx}>{escapeHtml(line)}</div>
-            ))
+            <div className="tool-arguments" style={{ margin: '0 12px 12px 12px' }}>
+              <pre><code>{escapeHtml(argsText)}</code></pre>
+            </div>
           )}
-          {outputRemaining > 0 && outputExpanded && (
-            <div
-              className="expand-hint"
-              onClick={() => setOutputExpanded(false)}
-              style={{ cursor: 'pointer' }}
-            >
-              Show less
+        </div>
+      )}
+
+      {output && (
+        <div className="tool-output-wrapper">
+          {outputRemaining > 0 ? (
+            <>
+              <div
+                className="tool-output-header"
+                onClick={() => setOutputExpanded(!outputExpanded)}
+                style={{ cursor: 'pointer' }}
+              >
+                <span className="tool-output-label">
+                  {outputExpanded ? '▾ Output' : `▸ Output (${outputRemaining} more lines)`}
+                </span>
+              </div>
+              <div className="tool-output">
+                {outputExpanded ? (
+                  outputLines.map((line, idx) => (
+                    <div key={idx}>{escapeHtml(line)}</div>
+                  ))
+                ) : (
+                  outputLines.slice(0, 20).map((line, idx) => (
+                    <div key={idx}>{escapeHtml(line)}</div>
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="tool-output" style={{ paddingTop: '8px' }}>
+              {outputLines.map((line, idx) => (
+                <div key={idx}>{escapeHtml(line)}</div>
+              ))}
             </div>
           )}
         </div>
