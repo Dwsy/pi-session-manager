@@ -6,6 +6,11 @@ use serde_json::Value;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::time::Instant;
+
+static SCAN_CACHE: Mutex<Option<(Instant, Vec<SessionInfo>)>> = Mutex::new(None);
+const SCAN_CACHE_TTL_SECS: u64 = 2;
 
 pub fn get_sessions_dir() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
@@ -13,8 +18,22 @@ pub fn get_sessions_dir() -> Result<PathBuf, String> {
 }
 
 pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
+    if let Ok(guard) = SCAN_CACHE.lock() {
+        if let Some((ts, ref cached)) = *guard {
+            if ts.elapsed().as_secs() < SCAN_CACHE_TTL_SECS {
+                return Ok(cached.clone());
+            }
+        }
+    }
+
     let config = Config::load().unwrap_or_default();
-    scan_sessions_with_config(&config).await
+    let result = scan_sessions_with_config(&config).await?;
+
+    if let Ok(mut guard) = SCAN_CACHE.lock() {
+        *guard = Some((Instant::now(), result.clone()));
+    }
+
+    Ok(result)
 }
 
 pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInfo>, String> {
@@ -84,7 +103,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
     let realtime_count = sessions.iter().filter(|s| s.modified > realtime_cutoff).count();
     let historical_count = sessions.len() - realtime_count;
 
-    eprintln!(
+    log::trace!(
         "Scan complete: {} realtime (≤{}d), {} historical (>{}d), total {}",
         realtime_count, config.realtime_cutoff_days, historical_count, config.realtime_cutoff_days, sessions.len()
     );
