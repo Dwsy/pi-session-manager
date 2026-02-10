@@ -87,7 +87,7 @@ pub fn calculate_stats(sessions: &[SessionInfo]) -> SessionStats {
 pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionStats {
     let total_sessions = sessions.len();
 
-    println!("Calculating stats for {} sessions", total_sessions);
+    log::trace!("Calculating stats for {} sessions", total_sessions);
 
     let conn = sqlite_cache::init_db().ok();
 
@@ -241,7 +241,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
     // Generate time distribution
     let time_distribution = generate_time_distribution(&messages_by_hour);
 
-    println!("Stats: {} user messages, {} assistant messages, {} total tokens", total_user_messages, total_assistant_messages, total_input + total_output);
+    log::trace!("Stats: {} user messages, {} assistant messages, {} total tokens", total_user_messages, total_assistant_messages, total_input + total_output);
 
     SessionStats {
         total_sessions,
