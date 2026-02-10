@@ -83,6 +83,11 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Session tree sidebar now floats over content with `position: absolute` instead of pushing the main view
+- Main content area auto-adjusts with `padding-left` to avoid being covered by the sidebar
+- Smooth transition animation when toggling sidebar visibility (200ms)
+
 ### Planned
 - Tantivy full-text search engine implementation
 - Session merge functionality

@@ -216,10 +216,15 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()
         e.stopPropagation()
-        setShowSidebar(true)
-        setTimeout(() => {
-          treeRef.current?.focusSearch()
-        }, 100)
+        setShowSidebar(prev => {
+          const newState = !prev
+          if (newState) {
+            setTimeout(() => {
+              treeRef.current?.focusSearch()
+            }, 100)
+          }
+          return newState
+        })
       }
     }
 
@@ -534,7 +539,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
         <>
           <aside 
             ref={sidebarRef}
-            className="session-sidebar" 
+            className="session-sidebar absolute left-0 top-0 bottom-0 z-20 shadow-xl" 
             style={{ width: `${sidebarWidth}px` }}
           >
             <SessionTree
@@ -545,10 +550,11 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
             />
           </aside>
           
-          {/* 拖拽手柄 */}
+          {/* 拖拽手柄 - 跟随侧边栏 */}
           <div
             ref={resizeHandleRef}
-            className={`sidebar-resize-handle ${isResizing ? 'resizing' : ''}`}
+            className={`sidebar-resize-handle absolute z-30 ${isResizing ? 'resizing' : ''}`}
+            style={{ left: `${sidebarWidth}px` }}
             onMouseDown={handleMouseDown}
           >
             <div className="sidebar-resize-handle-inner" />
@@ -556,7 +562,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
         </>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 transition-all duration-200" style={{ paddingLeft: showSidebar ? `${sidebarWidth}px` : 0 }}>
         <div className="flex items-center justify-between px-4 py-2 border-b border-[#2c2d3b]">
           <div className="flex items-baseline gap-2 min-w-0">
             <button
