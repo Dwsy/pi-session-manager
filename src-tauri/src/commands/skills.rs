@@ -23,8 +23,7 @@ pub struct PiSettings {
     pub extensions: Vec<String>,
 }
 
-#[tauri::command]
-pub async fn scan_skills() -> Result<Vec<SkillInfo>, String> {
+pub async fn scan_skills_internal() -> Result<Vec<SkillInfo>, String> {
     let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
     let skills_dir = home_dir.join(".pi/agent/skills");
 
@@ -67,6 +66,11 @@ pub async fn scan_skills() -> Result<Vec<SkillInfo>, String> {
 }
 
 #[tauri::command]
+pub async fn scan_skills() -> Result<Vec<SkillInfo>, String> {
+    scan_skills_internal().await
+}
+
+#[tauri::command]
 pub async fn get_skill_content(skill_name: String) -> Result<String, String> {
     let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
     let skill_md_path = home_dir
@@ -105,8 +109,7 @@ pub async fn get_system_prompt() -> Result<String, String> {
         .map_err(|e| format!("Failed to read system prompt: {}", e))
 }
 
-#[tauri::command]
-pub async fn scan_prompts() -> Result<Vec<PromptInfo>, String> {
+pub async fn scan_prompts_internal() -> Result<Vec<PromptInfo>, String> {
     let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
     let prompts_dir = home_dir.join(".pi/agent/prompts");
 
@@ -147,7 +150,11 @@ pub async fn scan_prompts() -> Result<Vec<PromptInfo>, String> {
 }
 
 #[tauri::command]
-pub async fn load_pi_settings() -> Result<PiSettings, String> {
+pub async fn scan_prompts() -> Result<Vec<PromptInfo>, String> {
+    scan_prompts_internal().await
+}
+
+pub async fn load_pi_settings_internal() -> Result<PiSettings, String> {
     let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
     let settings_path = home_dir.join(".pi/agent/settings.json");
 
@@ -200,6 +207,11 @@ pub async fn load_pi_settings() -> Result<PiSettings, String> {
         prompts,
         extensions,
     })
+}
+
+#[tauri::command]
+pub async fn load_pi_settings() -> Result<PiSettings, String> {
+    load_pi_settings_internal().await
 }
 
 #[tauri::command]

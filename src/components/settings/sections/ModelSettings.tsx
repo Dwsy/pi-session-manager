@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../../../transport'
 import {
   Loader2,
   Play,

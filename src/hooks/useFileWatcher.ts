@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { listen, UnlistenFn } from '@tauri-apps/api/event'
+import { listen } from '../transport'
 
 interface UseFileWatcherOptions {
   enabled?: boolean
@@ -30,7 +30,7 @@ export function useFileWatcher({
       return
     }
 
-    let unlisten: UnlistenFn | null = null
+    let unlisten: (() => void) | null = null
 
     const setupListener = async () => {
       try {

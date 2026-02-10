@@ -1,3 +1,4 @@
+pub mod app_state;
 pub mod commands;
 pub mod config;
 pub mod export;
@@ -8,8 +9,9 @@ pub mod scanner_scheduler;
 pub mod search;
 mod session_parser;
 mod sqlite_cache;
-mod stats;
+pub mod stats;
 mod tantivy_search;
+pub mod ws_adapter;
 
 pub use commands::*;
 

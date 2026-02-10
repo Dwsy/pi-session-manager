@@ -2,6 +2,12 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search } from 'lucide-react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+
+const startDragging = () => {
+  if (isTauri()) {
+    getCurrentWindow().startDragging()
+  }
+}
 import SessionList from './components/SessionList'
 import ProjectList from './components/ProjectList'
 import SessionViewer from './components/SessionViewer'
@@ -21,7 +27,7 @@ import { useSessionActions } from './hooks/useSessionActions'
 import { registerBuiltinPlugins } from './plugins'
 import type { SessionInfo, FavoriteItem } from './types'
 import type { SearchContext } from './plugins/types'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke, isTauri } from './transport'
 
 // Define sqlite_cache types for Tauri responses
 namespace sqlite_cache {
@@ -133,6 +139,7 @@ function App() {
 
   // F12 to toggle devtools in production builds
   useEffect(() => {
+    if (!isTauri()) return
     const handleKeyDown = async (e: KeyboardEvent) => {
       if (e.key === 'F12') {
         e.preventDefault()
@@ -165,7 +172,7 @@ function App() {
   })
 
   const handleResumeSession = useCallback(async () => {
-    if (!selectedSession) return
+    if (!selectedSession || !isTauri()) return
     try {
       await invoke('open_session_in_terminal', {
         path: selectedSession.path,
@@ -179,7 +186,7 @@ function App() {
   }, [selectedSession, terminal, customCommand, piPath])
 
   const handleExportAndOpen = useCallback(async () => {
-    if (!selectedSession) return
+    if (!selectedSession || !isTauri()) return
     try {
       await invoke('open_session_in_browser', { path: selectedSession.path })
     } catch (err) {
@@ -238,7 +245,7 @@ function App() {
         <div
           className="h-8 border-b border-[#2c2d3b] flex items-center px-3 select-none"
           data-tauri-drag-region
-          onMouseDown={() => getCurrentWindow().startDragging()}
+          onMouseDown={startDragging}
         >
           <div className="flex items-center gap-0.5 ml-auto no-drag">
             <button
@@ -396,7 +403,7 @@ function App() {
         <div
           className="h-8 flex-shrink-0 select-none"
           data-tauri-drag-region
-          onMouseDown={() => getCurrentWindow().startDragging()}
+          onMouseDown={startDragging}
         />
         <div className="flex-1 overflow-hidden">
           {selectedSession ? (

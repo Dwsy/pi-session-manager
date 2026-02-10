@@ -1,0 +1,256 @@
+import { listen as tauriListen } from '@tauri-apps/api/event'
+import { invoke as tauriInvoke } from '@tauri-apps/api/core'
+
+export interface Transport {
+  invoke<T>(command: string, payload?: unknown): Promise<T>
+  onEvent<T>(event: string, callback: (payload: T) => void): Promise<() => void>
+  isConnected(): boolean
+}
+
+export class TauriTransport implements Transport {
+  private connected = true
+
+  async invoke<T>(command: string, payload?: unknown): Promise<T> {
+    return tauriInvoke<T>(command, payload as Record<string, unknown>)
+  }
+
+  async onEvent<T>(event: string, callback: (payload: T) => void): Promise<() => void> {
+    const unlisten = await tauriListen<T>(event, (e) => callback(e.payload))
+    return unlisten
+  }
+
+  isConnected(): boolean {
+    return this.connected
+  }
+}
+
+const enum WsState {
+  Disconnected,
+  Connecting,
+  Connected,
+}
+
+export class WebSocketTransport implements Transport {
+  private ws: WebSocket | null = null
+  private state = WsState.Disconnected
+  private messageId = 0
+  private retryCount = 0
+  private pendingRequests = new Map<string, { resolve: (value: unknown) => void; reject: (reason: Error) => void; timer: ReturnType<typeof setTimeout> }>()
+  private eventListeners = new Map<string, Set<(payload: unknown) => void>>()
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private pingTimer: ReturnType<typeof setInterval> | null = null
+  private readonly url: string
+  private disposed = false
+
+  constructor(url = 'ws://localhost:52130') {
+    this.url = url
+    this.connect()
+  }
+
+  private connect(): void {
+    if (this.disposed || this.state === WsState.Connecting) return
+    this.state = WsState.Connecting
+
+    this.cleanupSocket()
+
+    try {
+      const ws = new WebSocket(this.url)
+      this.ws = ws
+
+      ws.onopen = () => {
+        if (ws !== this.ws) return
+        this.state = WsState.Connected
+        this.retryCount = 0
+        this.startPing()
+        console.log('[WS] connected')
+      }
+
+      ws.onmessage = (event) => {
+        if (ws !== this.ws) return
+        try {
+          const data = JSON.parse(event.data)
+          if (data.pong) return
+          this.handleMessage(data)
+        } catch (e) {
+          console.error('[WS] parse error:', e)
+        }
+      }
+
+      ws.onclose = () => {
+        if (ws !== this.ws) return
+        this.handleDisconnect()
+      }
+
+      ws.onerror = () => {
+        // onclose will always fire after onerror, do nothing here
+      }
+    } catch {
+      this.state = WsState.Disconnected
+      this.scheduleReconnect()
+    }
+  }
+
+  private handleDisconnect(): void {
+    this.state = WsState.Disconnected
+    this.stopPing()
+    this.rejectAllPending('WebSocket disconnected')
+    if (!this.disposed) {
+      this.scheduleReconnect()
+    }
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer || this.disposed) return
+    const delay = Math.min(1000 * Math.pow(1.5, this.retryCount), 10000)
+    this.retryCount++
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
+      this.connect()
+    }, delay)
+  }
+
+  private startPing(): void {
+    this.stopPing()
+    this.pingTimer = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send('{"ping":true}')
+      }
+    }, 25000)
+  }
+
+  private stopPing(): void {
+    if (this.pingTimer) {
+      clearInterval(this.pingTimer)
+      this.pingTimer = null
+    }
+  }
+
+  private cleanupSocket(): void {
+    if (this.ws) {
+      const old = this.ws
+      old.onopen = null
+      old.onmessage = null
+      old.onclose = null
+      old.onerror = null
+      if (old.readyState === WebSocket.OPEN || old.readyState === WebSocket.CONNECTING) {
+        old.close()
+      }
+      this.ws = null
+    }
+  }
+
+  private rejectAllPending(reason: string): void {
+    for (const [, req] of this.pendingRequests) {
+      clearTimeout(req.timer)
+      req.reject(new Error(reason))
+    }
+    this.pendingRequests.clear()
+  }
+
+  private handleMessage(data: { id?: string; event?: string; event_type?: string; payload?: unknown; success?: boolean; data?: unknown; error?: string }): void {
+    if (data.id && this.pendingRequests.has(data.id)) {
+      const request = this.pendingRequests.get(data.id)!
+      clearTimeout(request.timer)
+      this.pendingRequests.delete(data.id)
+
+      if (data.success) {
+        request.resolve(data.data)
+      } else {
+        request.reject(new Error(data.error || 'Command failed'))
+      }
+      return
+    }
+
+    if (data.event_type === 'event' && data.event) {
+      const listeners = this.eventListeners.get(data.event)
+      if (listeners) {
+        listeners.forEach((callback) => callback(data.payload))
+      }
+    }
+  }
+
+  async invoke<T>(command: string, payload?: unknown): Promise<T> {
+    if (this.state !== WsState.Connected || !this.ws) {
+      throw new Error('WebSocket not connected')
+    }
+
+    const id = `ws-${++this.messageId}`
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(id)
+        reject(new Error(`Command ${command} timeout`))
+      }, 30000)
+
+      this.pendingRequests.set(id, { resolve: resolve as (value: unknown) => void, reject, timer })
+
+      this.ws!.send(
+        JSON.stringify({ id, command, payload: payload ?? {} })
+      )
+    })
+  }
+
+  async onEvent<T>(event: string, callback: (payload: T) => void): Promise<() => void> {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, new Set())
+    }
+
+    const wrappedCallback = (payload: unknown) => callback(payload as T)
+    this.eventListeners.get(event)!.add(wrappedCallback)
+
+    return () => {
+      this.eventListeners.get(event)?.delete(wrappedCallback)
+    }
+  }
+
+  isConnected(): boolean {
+    return this.state === WsState.Connected
+  }
+
+  disconnect(): void {
+    this.disposed = true
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+    this.stopPing()
+    this.rejectAllPending('Transport disposed')
+    this.cleanupSocket()
+  }
+}
+
+export function createTransport(): Transport {
+  if (typeof window !== 'undefined' && (window as { __TAURI__?: unknown }).__TAURI__) {
+    console.log('Using Tauri IPC transport')
+    return new TauriTransport()
+  }
+
+  console.log('Using WebSocket transport')
+  return new WebSocketTransport()
+}
+
+let _transport: Transport | null = null
+
+function getTransport(): Transport {
+  if (!_transport) {
+    _transport = createTransport()
+  }
+  return _transport
+}
+
+export async function invoke<T>(command: string, payload?: Record<string, unknown>): Promise<T> {
+  return getTransport().invoke<T>(command, payload)
+}
+
+export async function listen<T>(
+  event: string,
+  callback: (event: { payload: T }) => void
+): Promise<() => void> {
+  return getTransport().onEvent<T>(event, (payload) => {
+    callback({ payload })
+  })
+}
+
+export function isTauri(): boolean {
+  return typeof window !== 'undefined' && !!(window as { __TAURI__?: unknown }).__TAURI__
+}

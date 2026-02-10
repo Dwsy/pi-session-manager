@@ -1,5 +1,5 @@
 import { MessageSquare } from 'lucide-react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../../transport'
 import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '../types'
 import type { SessionInfo } from '../../types'

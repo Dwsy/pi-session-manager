@@ -165,6 +165,13 @@ pub async fn get_session_stats(
 }
 
 #[tauri::command]
+pub async fn get_session_stats_light(
+    sessions: Vec<stats::SessionStatsInput>,
+) -> Result<stats::SessionStats, String> {
+    Ok(stats::calculate_stats_from_inputs(&sessions))
+}
+
+#[tauri::command]
 pub async fn open_session_in_terminal(
     path: String,
     cwd: String,

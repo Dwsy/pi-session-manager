@@ -117,8 +117,7 @@ impl Default for AppSettings {
     }
 }
 
-#[tauri::command]
-pub async fn load_app_settings() -> Result<AppSettings, String> {
+pub async fn load_app_settings_internal() -> Result<AppSettings, String> {
     let settings_path = get_app_settings_path()?;
 
     if !settings_path.exists() {
@@ -129,6 +128,11 @@ pub async fn load_app_settings() -> Result<AppSettings, String> {
         fs::read_to_string(&settings_path).map_err(|e| format!("Failed to read settings: {}", e))?;
 
     serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {}", e))
+}
+
+#[tauri::command]
+pub async fn load_app_settings() -> Result<AppSettings, String> {
+    load_app_settings_internal().await
 }
 
 #[tauri::command]

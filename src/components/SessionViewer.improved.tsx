@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../transport'
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import type { SessionInfo, SessionEntry } from '../types'

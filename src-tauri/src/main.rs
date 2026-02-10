@@ -5,15 +5,25 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            // 启动文件监听器
+            let app_handle = app.handle().clone();
+
+            // Start file watcher
             if let Ok(sessions_dir) = pi_session_manager::scanner::get_sessions_dir() {
-                let app_handle = app.handle().clone();
                 if let Err(e) =
-                    pi_session_manager::file_watcher::start_file_watcher(sessions_dir, app_handle)
+                    pi_session_manager::file_watcher::start_file_watcher(sessions_dir, app_handle.clone())
                 {
                     eprintln!("Failed to start file watcher: {}", e);
                 }
             }
+
+            // Initialize WebSocket adapter
+            let app_state = pi_session_manager::app_state::create_app_state(app_handle);
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = pi_session_manager::ws_adapter::init_ws_adapter(app_state, 52130).await {
+                    eprintln!("Failed to init WebSocket adapter: {}", e);
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -28,6 +38,7 @@ fn main() {
             pi_session_manager::export_session,
             pi_session_manager::rename_session,
             pi_session_manager::get_session_stats,
+            pi_session_manager::get_session_stats_light,
             pi_session_manager::open_session_in_browser,
             pi_session_manager::open_session_in_terminal,
             pi_session_manager::scan_skills,

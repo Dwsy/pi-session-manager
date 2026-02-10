@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
+import { TransportProvider } from './contexts/TransportContext'
 import './i18n'
 import './index.css'
 
@@ -54,6 +55,8 @@ window.copyCode = async (button: HTMLButtonElement) => {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <TransportProvider>
+      <App />
+    </TransportProvider>
   </React.StrictMode>,
 )

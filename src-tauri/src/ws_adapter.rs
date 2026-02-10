@@ -1,0 +1,481 @@
+use crate::app_state::{SharedAppState, WsEvent};
+use futures_util::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use tauri::Listener;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::broadcast;
+use tokio_tungstenite::{accept_async, tungstenite::Message};
+
+#[derive(Debug, Deserialize)]
+struct WsRequest {
+    id: String,
+    command: String,
+    #[serde(default)]
+    payload: Value,
+}
+
+#[derive(Debug, Serialize)]
+struct WsResponse {
+    id: String,
+    command: String,
+    success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+fn extract_string(payload: &Value, key: &str) -> Result<String, String> {
+    payload
+        .get(key)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| format!("Missing required parameter: {}", key))
+}
+
+fn extract_optional_string(payload: &Value, key: &str) -> Option<String> {
+    payload.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+}
+
+fn extract_usize(payload: &Value, key: &str) -> Result<usize, String> {
+    payload
+        .get(key)
+        .and_then(|v| v.as_u64())
+        .map(|v| v as usize)
+        .ok_or_else(|| format!("Missing required parameter: {}", key))
+}
+
+pub struct WsAdapter {
+    app_state: SharedAppState,
+    port: u16,
+}
+
+impl WsAdapter {
+    pub fn new(app_state: SharedAppState, port: u16) -> Self {
+        Self { app_state, port }
+    }
+
+    pub async fn start(self: Arc<Self>) -> Result<(), String> {
+        let addr: SocketAddr = format!("127.0.0.1:{}", self.port)
+            .parse()
+            .map_err(|e| format!("Invalid address: {}", e))?;
+
+        let listener = TcpListener::bind(&addr)
+            .await
+            .map_err(|e| format!("Failed to bind: {}", e))?;
+
+        log::info!("WebSocket server listening on ws://{}", addr);
+
+        self.clone().start_event_forwarding();
+
+        while let Ok((stream, peer_addr)) = listener.accept().await {
+            log::info!("New WebSocket connection from: {}", peer_addr);
+            let adapter = self.clone();
+            tokio::spawn(async move {
+                if let Err(e) = adapter.handle_connection(stream).await {
+                    let msg = e.to_string();
+                    if msg.contains("Connection reset") || msg.contains("Broken pipe") || msg.contains("closing handshake") {
+                        log::debug!("WebSocket peer gone: {}", msg);
+                    } else {
+                        log::warn!("WebSocket connection error: {}", msg);
+                    }
+                }
+            });
+        }
+
+        Ok(())
+    }
+
+    async fn handle_connection(
+        &self,
+        stream: TcpStream,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let ws_stream = accept_async(stream).await?;
+        let (mut ws_sender, mut ws_receiver) = ws_stream.split();
+
+        let mut event_rx = self.app_state.subscribe_events();
+
+        loop {
+            tokio::select! {
+                msg = ws_receiver.next() => {
+                    match msg {
+                        Some(Ok(Message::Text(text))) => {
+                            // Handle ping from client
+                            if text.contains("\"ping\"") {
+                                let _ = ws_sender.send(Message::Text(r#"{"pong":true}"#.to_string())).await;
+                                continue;
+                            }
+
+                            match serde_json::from_str::<WsRequest>(&text) {
+                                Ok(request) => {
+                                    let response = self.handle_request(request).await;
+                                    let response_text = serde_json::to_string(&response)?;
+                                    if ws_sender.send(Message::Text(response_text)).await.is_err() {
+                                        break;
+                                    }
+                                }
+                                Err(e) => {
+                                    let error_response = WsResponse {
+                                        id: "unknown".to_string(),
+                                        command: "unknown".to_string(),
+                                        success: false,
+                                        data: None,
+                                        error: Some(format!("Invalid request format: {}", e)),
+                                    };
+                                    let error_text = serde_json::to_string(&error_response)?;
+                                    if ws_sender.send(Message::Text(error_text)).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        Some(Ok(Message::Ping(data))) => {
+                            let _ = ws_sender.send(Message::Pong(data)).await;
+                        }
+                        Some(Ok(Message::Close(_))) | None => {
+                            log::info!("WebSocket connection closed");
+                            break;
+                        }
+                        Some(Err(e)) => {
+                            let msg = e.to_string();
+                            if msg.contains("Connection reset") || msg.contains("Broken pipe") {
+                                log::debug!("WebSocket peer disconnected: {}", msg);
+                            } else {
+                                log::warn!("WebSocket error: {}", msg);
+                            }
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+
+                event = event_rx.recv() => {
+                    match event {
+                        Ok(ws_event) => {
+                            let event_text = serde_json::to_string(&ws_event)?;
+                            if ws_sender.send(Message::Text(event_text)).await.is_err() {
+                                break;
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            log::debug!("Event channel lagged by {}", n);
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_request(&self, request: WsRequest) -> WsResponse {
+        log::debug!("Handling command: {} (id: {})", request.command, request.id);
+
+        let result = self
+            .dispatch_command(&request.command, &request.payload)
+            .await;
+
+        match result {
+            Ok(data) => WsResponse {
+                id: request.id,
+                command: request.command,
+                success: true,
+                data: Some(data),
+                error: None,
+            },
+            Err(error) => WsResponse {
+                id: request.id,
+                command: request.command,
+                success: false,
+                data: None,
+                error: Some(error),
+            },
+        }
+    }
+
+    async fn dispatch_command(&self, command: &str, payload: &Value) -> Result<Value, String> {
+        match command {
+            "scan_sessions" => {
+                let result = crate::scanner::scan_sessions().await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "read_session_file" => {
+                let path = extract_string(payload, "path")?;
+                let result = std::fs::read_to_string(&path)
+                    .map_err(|e| format!("Failed to read session file: {}", e))?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "read_session_file_incremental" => {
+                let path = extract_string(payload, "path")?;
+                let from_line = extract_usize(payload, "fromLine")?;
+                let content = std::fs::read_to_string(&path)
+                    .map_err(|e| format!("Failed to read session file: {}", e))?;
+                let lines: Vec<&str> = content.lines().collect();
+                let total_lines = lines.len();
+                let new_content = if from_line >= total_lines {
+                    String::new()
+                } else {
+                    lines[from_line..].join("\n")
+                };
+                Ok(serde_json::json!([total_lines, new_content]))
+            }
+            "get_file_stats" => {
+                let path = extract_string(payload, "path")?;
+                let metadata = std::fs::metadata(&path)
+                    .map_err(|e| format!("Failed to get file metadata: {}", e))?;
+                let modified = metadata
+                    .modified()
+                    .map_err(|e| format!("Failed to get modified time: {}", e))?;
+                let modified_at = modified
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|e| format!("Failed to convert modified time: {}", e))?
+                    .as_millis() as u64;
+                Ok(serde_json::json!({
+                    "size": metadata.len(),
+                    "modified_at": modified_at,
+                    "is_file": metadata.is_file()
+                }))
+            }
+            "get_session_entries" => {
+                let path = extract_string(payload, "path")?;
+                let result = crate::get_session_entries(path).await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "delete_session" => {
+                let path = extract_string(payload, "path")?;
+                std::fs::remove_file(&path)
+                    .map_err(|e| format!("Failed to delete session: {}", e))?;
+                Ok(Value::Null)
+            }
+            "export_session" => {
+                let path = extract_string(payload, "path")?;
+                let format = extract_string(payload, "format")?;
+                let output_path = extract_string(payload, "outputPath")?;
+                crate::export::export_session(&path, &format, &output_path).await?;
+                Ok(Value::Null)
+            }
+            "rename_session" => {
+                let path = extract_string(payload, "path")?;
+                let new_name = extract_string(payload, "newName")?;
+                crate::rename_session(path, new_name).await?;
+                Ok(Value::Null)
+            }
+            "get_session_stats" => {
+                let sessions: Vec<crate::models::SessionInfo> = serde_json::from_value(
+                    payload
+                        .get("sessions")
+                        .cloned()
+                        .unwrap_or(Value::Array(vec![])),
+                )
+                .map_err(|e| format!("Invalid sessions: {}", e))?;
+                let result = crate::stats::calculate_stats(&sessions);
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "get_session_stats_light" => {
+                let sessions: Vec<crate::stats::SessionStatsInput> = serde_json::from_value(
+                    payload
+                        .get("sessions")
+                        .cloned()
+                        .unwrap_or(Value::Array(vec![])),
+                )
+                .map_err(|e| format!("Invalid sessions: {}", e))?;
+                let result = crate::stats::calculate_stats_from_inputs(&sessions);
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "search_sessions" => {
+                let sessions: Vec<crate::models::SessionInfo> = serde_json::from_value(
+                    payload
+                        .get("sessions")
+                        .cloned()
+                        .unwrap_or(Value::Array(vec![])),
+                )
+                .map_err(|e| format!("Invalid sessions: {}", e))?;
+                let query = extract_string(payload, "query")?;
+                let search_mode =
+                    extract_string(payload, "searchMode").unwrap_or_else(|_| "content".to_string());
+                let role_filter =
+                    extract_string(payload, "roleFilter").unwrap_or_else(|_| "all".to_string());
+                let include_tools = payload
+                    .get("includeTools")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let result = crate::search_sessions(
+                    sessions,
+                    query,
+                    search_mode,
+                    role_filter,
+                    include_tools,
+                )
+                .await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "search_sessions_fts" => {
+                let query = extract_string(payload, "query")?;
+                let limit = payload.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
+                let result = crate::search_sessions_fts(query, limit).await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+
+            // Favorites
+            "get_all_favorites" => {
+                let result = crate::get_all_favorites().await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "add_favorite" => {
+                let id = extract_string(payload, "id")?;
+                let favorite_type = extract_string(payload, "favoriteType")?;
+                let name = extract_string(payload, "name")?;
+                let path = extract_string(payload, "path")?;
+                crate::add_favorite(id, favorite_type, name, path).await?;
+                Ok(Value::Null)
+            }
+            "remove_favorite" => {
+                let id = extract_string(payload, "id")?;
+                crate::remove_favorite(id).await?;
+                Ok(Value::Null)
+            }
+            "is_favorite" => {
+                let id = extract_string(payload, "id")?;
+                let result = crate::is_favorite(id).await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "toggle_favorite" => {
+                let id = extract_string(payload, "id")?;
+                let favorite_type = extract_string(payload, "favoriteType")?;
+                let name = extract_string(payload, "name")?;
+                let path = extract_string(payload, "path")?;
+                let result = crate::toggle_favorite(id, favorite_type, name, path).await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+
+            // Skills & prompts
+            "scan_skills" => {
+                let result = crate::scan_skills_internal().await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "scan_prompts" => {
+                let result = crate::scan_prompts_internal().await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "get_skill_content" => {
+                let path = extract_string(payload, "path")?;
+                let content = std::fs::read_to_string(&path)
+                    .map_err(|e| format!("Failed to read skill file: {}", e))?;
+                Ok(serde_json::to_value(content).unwrap())
+            }
+            "get_prompt_content" => {
+                let path = extract_string(payload, "path")?;
+                let content = std::fs::read_to_string(&path)
+                    .map_err(|e| format!("Failed to read prompt file: {}", e))?;
+                Ok(serde_json::to_value(content).unwrap())
+            }
+            "get_system_prompt" => {
+                let result = crate::get_system_prompt().await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+
+            // Settings
+            "load_pi_settings" => {
+                let result = crate::load_pi_settings_internal().await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "save_pi_settings" => {
+                let settings = serde_json::from_value(
+                    payload
+                        .get("settings")
+                        .cloned()
+                        .unwrap_or(Value::Object(Default::default())),
+                )
+                .map_err(|e| format!("Invalid settings: {}", e))?;
+                crate::save_pi_settings(settings).await?;
+                Ok(Value::Null)
+            }
+            "load_app_settings" => {
+                let result = crate::load_app_settings_internal().await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "save_app_settings" => {
+                let settings = serde_json::from_value(
+                    payload
+                        .get("settings")
+                        .cloned()
+                        .unwrap_or(Value::Object(Default::default())),
+                )
+                .map_err(|e| format!("Invalid settings: {}", e))?;
+                crate::save_app_settings(settings).await?;
+                Ok(Value::Null)
+            }
+
+            // Models
+            "list_models" => {
+                let search = extract_optional_string(payload, "search");
+                let result = crate::list_models(search).await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "test_model" => {
+                let provider = extract_string(payload, "provider")?;
+                let model = extract_string(payload, "model")?;
+                let prompt = extract_optional_string(payload, "prompt");
+                let result = crate::test_model(provider, model, prompt).await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+            "test_models_batch" => {
+                let models: Vec<(String, String)> = serde_json::from_value(
+                    payload
+                        .get("models")
+                        .cloned()
+                        .unwrap_or(Value::Array(vec![])),
+                )
+                .map_err(|e| format!("Invalid models: {}", e))?;
+                let prompt = extract_optional_string(payload, "prompt");
+                let result = crate::test_models_batch(models, prompt).await?;
+                Ok(serde_json::to_value(result).unwrap())
+            }
+
+            // Desktop-only commands
+            "open_session_in_browser" => Err("open_session_in_browser is desktop-only".to_string()),
+            "open_session_in_terminal" => {
+                Err("open_session_in_terminal is desktop-only".to_string())
+            }
+            "toggle_devtools" => Err("toggle_devtools is not supported via WebSocket".to_string()),
+
+            _ => Err(format!("Unknown command: {}", command)),
+        }
+    }
+
+    fn start_event_forwarding(self: Arc<Self>) {
+        let app_handle = self.app_state.app_handle.clone();
+        let event_tx = self.app_state.event_tx.clone();
+
+        app_handle.listen("sessions-changed", move |_event| {
+            let ws_event = WsEvent {
+                event_type: "event".to_string(),
+                event: "sessions-changed".to_string(),
+                payload: Value::Null,
+            };
+            let _ = event_tx.send(ws_event);
+        });
+    }
+}
+
+pub async fn init_ws_adapter(
+    app_state: SharedAppState,
+    port: u16,
+) -> Result<Arc<WsAdapter>, String> {
+    let adapter = Arc::new(WsAdapter::new(app_state, port));
+    let adapter_clone = adapter.clone();
+
+    tokio::spawn(async move {
+        if let Err(e) = adapter_clone.start().await {
+            log::error!("WebSocket server error: {}", e);
+        }
+    });
+
+    Ok(adapter)
+}

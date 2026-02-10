@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../transport'
 import { useTranslation } from 'react-i18next'
 import { X, BarChart3, Calendar, Folder, Clock, Zap, RefreshCw, Download, Settings, Award } from 'lucide-react'
 import type { SessionInfo, SessionStats, SessionStatsInput } from '../types'

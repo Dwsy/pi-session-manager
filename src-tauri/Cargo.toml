@@ -24,6 +24,9 @@ tracing-subscriber = "0.3"
 toml = "0.8"
 notify = "6.1"
 notify-debouncer-full = "0.3"
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
+log = "0.4"
 
 [features]
 default = ["custom-protocol"]

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../transport'
 import i18n, { detectSystemLocale } from '../i18n'
 import type { AppSettings } from '../components/settings/types'
 

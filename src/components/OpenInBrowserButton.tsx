@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke, isTauri } from '../transport'
 import { ExternalLink, Loader2 } from 'lucide-react'
 import type { SessionInfo } from '../types'
 
@@ -61,6 +61,8 @@ export default function OpenInBrowserButton({
       setLoading(false)
     }
   }
+
+  if (!isTauri()) return null
 
   return (
     <button

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../transport'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo } from '../types'
 import { useDemoMode } from './useDemoMode'

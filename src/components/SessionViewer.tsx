@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '../transport'
 import { useTranslation } from 'react-i18next'
 import { ArrowUp, ArrowDown, Loader2, Bot } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
