@@ -54,19 +54,19 @@ export default function GenericToolCall({
       </div>
 
       {args && Object.keys(args).length > 0 && (
-        <div className="tool-output-wrapper" style={{ marginTop: '8px' }}>
+        <div
+          className="tool-output-wrapper"
+          style={{ marginTop: '8px', cursor: argsRemaining > 0 ? 'pointer' : 'default' }}
+          onClick={argsRemaining > 0 ? () => setArgsExpanded(!argsExpanded) : undefined}
+        >
           {argsRemaining > 0 ? (
             <>
-              <div
-                className="tool-output-header"
-                onClick={() => setArgsExpanded(!argsExpanded)}
-                style={{ cursor: 'pointer' }}
-              >
+              <div className="tool-output-header">
                 <span className="tool-output-label">
                   {argsExpanded ? '▾ Arguments' : `▸ Arguments (${argsRemaining} more lines)`}
                 </span>
               </div>
-              <div className="tool-arguments" style={{ margin: 0 }}>
+              <div className="tool-arguments" style={{ margin: 0 }} onClick={(e) => e.stopPropagation()}>
                 {argsExpanded ? (
                   <pre><code>{escapeHtml(argsText)}</code></pre>
                 ) : (
@@ -75,7 +75,7 @@ export default function GenericToolCall({
               </div>
             </>
           ) : (
-            <div className="tool-arguments" style={{ margin: '0 12px 12px 12px' }}>
+            <div className="tool-arguments" style={{ margin: '0 12px 12px 12px' }} onClick={(e) => e.stopPropagation()}>
               <pre><code>{escapeHtml(argsText)}</code></pre>
             </div>
           )}
@@ -83,19 +83,19 @@ export default function GenericToolCall({
       )}
 
       {output && (
-        <div className="tool-output-wrapper">
+        <div
+          className="tool-output-wrapper"
+          style={{ cursor: outputRemaining > 0 ? 'pointer' : 'default' }}
+          onClick={outputRemaining > 0 ? () => setOutputExpanded(!outputExpanded) : undefined}
+        >
           {outputRemaining > 0 ? (
             <>
-              <div
-                className="tool-output-header"
-                onClick={() => setOutputExpanded(!outputExpanded)}
-                style={{ cursor: 'pointer' }}
-              >
+              <div className="tool-output-header">
                 <span className="tool-output-label">
                   {outputExpanded ? '▾ Output' : `▸ Output (${outputRemaining} more lines)`}
                 </span>
               </div>
-              <div className="tool-output">
+              <div className="tool-output" onClick={(e) => e.stopPropagation()}>
                 {outputExpanded ? (
                   outputLines.map((line, idx) => (
                     <div key={idx}>{escapeHtml(line)}</div>
@@ -108,7 +108,7 @@ export default function GenericToolCall({
               </div>
             </>
           ) : (
-            <div className="tool-output" style={{ paddingTop: '8px' }}>
+            <div className="tool-output" style={{ paddingTop: '8px' }} onClick={(e) => e.stopPropagation()}>
               {outputLines.map((line, idx) => (
                 <div key={idx}>{escapeHtml(line)}</div>
               ))}

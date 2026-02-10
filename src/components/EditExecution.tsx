@@ -225,12 +225,12 @@ export default function EditExecution({
       </div>
 
       {diff && (
-        <div className="tool-diff-wrapper">
-          <div
-            className="tool-diff-actions"
-            onClick={() => setLocalExpanded(!localExpanded)}
-            style={{ cursor: 'pointer' }}
-          >
+        <div
+          className="tool-diff-wrapper"
+          onClick={() => setLocalExpanded(!localExpanded)}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="tool-diff-actions">
             <span style={{ color: '#6a6f85', fontSize: '11px' }}>
               {localExpanded ? '▾ Diff' : '▸ Diff'}
             </span>
@@ -254,7 +254,7 @@ export default function EditExecution({
               )}
             </button>
           </div>
-          {localExpanded && renderDiff()}
+          {localExpanded && <div onClick={(e) => e.stopPropagation()}>{renderDiff()}</div>}
         </div>
       )}
 

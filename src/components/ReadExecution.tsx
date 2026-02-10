@@ -71,30 +71,30 @@ export default function ReadExecution({
       )}
 
       {output && (
-        <div className="tool-output-wrapper">
+        <div
+          className="tool-output-wrapper"
+          onClick={remaining > 0 ? () => setLocalExpanded(!localExpanded) : undefined}
+          style={{ cursor: remaining > 0 ? 'pointer' : 'default' }}
+        >
           {remaining > 0 ? (
             <>
-              <div
-                className="tool-output-header"
-                onClick={() => setLocalExpanded(!localExpanded)}
-                style={{ cursor: 'pointer' }}
-              >
+              <div className="tool-output-header">
                 <span className="tool-output-label">
                   {localExpanded ? '▾ Content' : `▸ Content (${remaining} more lines)`}
                 </span>
               </div>
               {localExpanded ? (
-                <div className="tool-output">
+                <div className="tool-output" onClick={(e) => e.stopPropagation()}>
                   <CodeBlock code={output} language={lang} showLineNumbers={false} />
                 </div>
               ) : (
-                <div className="tool-output">
+                <div className="tool-output" onClick={(e) => e.stopPropagation()}>
                   <CodeBlock code={previewLines.join('\n')} language={lang} showLineNumbers={false} />
                 </div>
               )}
             </>
           ) : (
-            <div className="tool-output" style={{ paddingTop: '8px' }}>
+            <div className="tool-output" style={{ paddingTop: '8px' }} onClick={(e) => e.stopPropagation()}>
               <CodeBlock code={output} language={lang} showLineNumbers={false} />
             </div>
           )}

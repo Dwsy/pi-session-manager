@@ -108,12 +108,12 @@ export default function BashExecution({
         </button>
       </div>
       {output && (
-        <div className="tool-output-wrapper">
-          <div
-            className="tool-output-header"
-            onClick={() => setLocalExpanded(!localExpanded)}
-            style={{ cursor: 'pointer' }}
-          >
+        <div
+          className="tool-output-wrapper"
+          onClick={() => setLocalExpanded(!localExpanded)}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="tool-output-header">
             <span className="tool-output-label">
               {localExpanded ? '▾ Output' : '▸ Output'}
             </span>
@@ -137,7 +137,7 @@ export default function BashExecution({
             </button>
           </div>
           {localExpanded && (
-            <div className="tool-output">
+            <div className="tool-output" onClick={(e) => e.stopPropagation()}>
               <ExpandableOutput text={output} maxLines={20} />
             </div>
           )}

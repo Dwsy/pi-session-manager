@@ -41,28 +41,35 @@ export default function ExpandableOutput({
   }
 
   return (
-    <div className="tool-output">
-      <div className="output-preview">
-        {renderContent(previewLines.join('\n'))}
-        <div
-          className="expand-hint"
-          onClick={() => setExpanded(!expanded)}
-          style={{ cursor: 'pointer' }}
-        >
-          ... ({t('components.expandableOutput.moreLinesText', { count: remaining })})
-        </div>
-      </div>
-      {expanded && (
-        <div className="output-full">
+    <div className="tool-output" onClick={(e) => e.stopPropagation()}>
+      {!expanded ? (
+        <>
+          {renderContent(previewLines.join('\n'))}
+          <div
+            className="expand-hint"
+            onClick={(e) => {
+              e.stopPropagation()
+              setExpanded(true)
+            }}
+            style={{ cursor: 'pointer', marginTop: '8px' }}
+          >
+            ... ({t('components.expandableOutput.moreLinesText', { count: remaining })})
+          </div>
+        </>
+      ) : (
+        <>
           {renderContent(text)}
           <div
             className="expand-hint"
-            onClick={() => setExpanded(false)}
-            style={{ cursor: 'pointer' }}
+            onClick={(e) => {
+              e.stopPropagation()
+              setExpanded(false)
+            }}
+            style={{ cursor: 'pointer', marginTop: '8px' }}
           >
             Show less
           </div>
-        </div>
+        </>
       )}
     </div>
   )
