@@ -24,11 +24,11 @@
 [cmdk-item] {
   @apply px-3 py-2 rounded-md cursor-pointer;
   @apply transition-colors duration-150;
-  @apply hover:bg-[#2a2b36];
+  @apply hover:bg-surface;
 }
 
 [cmdk-item][data-selected="true"] {
-  @apply bg-[#2a2b36];
+  @apply bg-surface;
 }
 
 [cmdk-empty] {
