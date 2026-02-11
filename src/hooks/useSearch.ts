@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { invoke } from '../transport'
+import { getCachedSettings } from '../utils/settingsApi'
 import type { SessionInfo, SearchResult } from '../types'
 
 export interface UseSearchReturn {
@@ -23,13 +24,14 @@ export function useSearch(
 
     try {
       setIsSearching(true)
+      const searchPrefs = getCachedSettings().search
 
       const results = await invoke<SearchResult[]>('search_sessions', {
         sessions,
         query,
-        search_mode: 'content',
+        search_mode: searchPrefs.defaultSearchMode || 'content',
         role_filter: 'all',
-        include_tools: false,
+        include_tools: searchPrefs.includeToolCalls ?? false,
       })
 
       setSearchResults(results)
