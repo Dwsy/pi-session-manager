@@ -68,15 +68,15 @@ export default function TokenTrendChart({ stats, title = 'Token Usage Trend', da
     if (active && payload && payload.length) {
       const data = payload[0].payload
       return (
-        <div className="bg-[#1a1b26] border border-white/10 rounded-lg px-3 py-2 text-xs shadow-xl backdrop-blur-sm">
-          <div className="text-white font-medium mb-1">
+        <div className="bg-background border border-foreground/10 rounded-lg px-3 py-2 text-xs shadow-xl backdrop-blur-sm">
+          <div className="text-foreground font-medium mb-1">
             {data.displayDate}
           </div>
-          <div className="text-[#7ee787] flex items-center gap-1">
+          <div className="text-success flex items-center gap-1">
             <Zap className="h-3 w-3" />
             {formatTokens(data.tokens)}
           </div>
-          <div className="text-[#ff6b6b]">
+          <div className="text-destructive">
             {formatCost(data.cost)}
           </div>
         </div>
@@ -88,29 +88,29 @@ export default function TokenTrendChart({ stats, title = 'Token Usage Trend', da
   return (
     <div className="glass-card rounded-lg p-3 relative overflow-hidden group">
       {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#7ee787]/5 via-transparent to-[#569cd6]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-success/5 via-transparent to-info/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-medium flex items-center gap-1.5 text-white">
-            <div className="p-1 rounded bg-[#7ee787]/10">
-              <TrendingUp className="h-3 w-3 text-[#7ee787]" />
+          <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
+            <div className="p-1 rounded bg-success/10">
+              <TrendingUp className="h-3 w-3 text-success" />
             </div>
             {title}
           </h3>
           <div className="flex items-center gap-2 text-[10px]">
-            <div className="text-[#6a6f85]">
-              {days} days: <span className="text-white font-medium">{formatTokens(totalPeriodTokens)}</span>
+            <div className="text-muted-foreground">
+              {days} days: <span className="text-foreground font-medium">{formatTokens(totalPeriodTokens)}</span>
             </div>
-            <div className="text-[#6a6f85]">
-              <span className="text-[#ff6b6b] font-medium">{formatCost(totalPeriodCost)}</span>
+            <div className="text-muted-foreground">
+              <span className="text-destructive font-medium">{formatCost(totalPeriodCost)}</span>
             </div>
           </div>
         </div>
 
         {/* Chart or Empty State */}
         {!hasData ? (
-          <div className="h-24 flex items-center justify-center text-[#6a6f85] text-xs">
+          <div className="h-24 flex items-center justify-center text-muted-foreground text-xs">
             <div className="text-center">
               <TrendingUp className="h-6 w-6 mx-auto mb-2 opacity-30" />
               <p>No token usage data available</p>
@@ -161,15 +161,15 @@ export default function TokenTrendChart({ stats, title = 'Token Usage Trend', da
             </div>
 
             {/* Legend */}
-            <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[9px]">
+            <div className="mt-2 pt-2 border-t border-foreground/5 flex items-center justify-between text-[9px]">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-[#7ee787]" />
-                  <span className="text-[#6a6f85]">Token Usage</span>
+                  <div className="w-2 h-2 rounded-full bg-success" />
+                  <span className="text-muted-foreground">Token Usage</span>
                 </div>
               </div>
-              <div className="text-[#6a6f85]">
-                Avg: <span className="text-white font-medium">{formatTokens(Math.round(totalPeriodTokens / days))}/day</span>
+              <div className="text-muted-foreground">
+                Avg: <span className="text-foreground font-medium">{formatTokens(Math.round(totalPeriodTokens / days))}/day</span>
               </div>
             </div>
           </>

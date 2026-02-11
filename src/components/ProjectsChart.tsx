@@ -23,18 +23,18 @@ export default function ProjectsChart({ stats, title, limit = 8 }: ProjectsChart
 
   return (
     <div className="glass-card rounded-xl p-5 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#c792ea]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-purple/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium flex items-center gap-2 text-white">
-            <div className="p-1.5 rounded-lg bg-[#c792ea]/10">
-              <Folder className="h-4 w-4 text-[#c792ea]" />
+          <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
+            <div className="p-1.5 rounded-lg bg-purple/10">
+              <Folder className="h-4 w-4 text-purple" />
             </div>
             {displayTitle}
           </h3>
-          <div className="text-xs text-[#6a6f85] bg-[#1a1b26]/60 px-2.5 py-1 rounded-lg">
-            <span className="text-white font-medium">{topProjects.length}</span> {t('dashboard.projectsChart.projects')}
+          <div className="text-xs text-muted-foreground bg-background/60 px-2.5 py-1 rounded-lg">
+            <span className="text-foreground font-medium">{topProjects.length}</span> {t('dashboard.projectsChart.projects')}
           </div>
         </div>
 
@@ -46,7 +46,7 @@ export default function ProjectsChart({ stats, title, limit = 8 }: ProjectsChart
             return (
               <div
                 key={project}
-                className="flex items-center justify-between p-3 bg-[#1a1b26]/60 rounded-xl border border-white/5 hover:bg-[#1a1b26]/90 hover:border-white/10 transition-all duration-300 group/item cursor-pointer"
+                className="flex items-center justify-between p-3 bg-background/60 rounded-xl border border-foreground/5 hover:bg-background/90 hover:border-foreground/10 transition-all duration-300 group/item cursor-pointer"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div
@@ -56,10 +56,10 @@ export default function ProjectsChart({ stats, title, limit = 8 }: ProjectsChart
                       boxShadow: `0 0 8px ${color}60`
                     }}
                   />
-                  <span className="text-sm truncate text-white/90">{project}</span>
+                  <span className="text-sm truncate text-foreground/90">{project}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="w-24 h-2 bg-[#1e1f2e]/80 rounded-full overflow-hidden inner-shadow">
+                  <div className="w-24 h-2 bg-surface-dark/80 rounded-full overflow-hidden inner-shadow">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{
@@ -69,7 +69,7 @@ export default function ProjectsChart({ stats, title, limit = 8 }: ProjectsChart
                       }}
                     />
                   </div>
-                  <span className="text-xs text-[#6a6f85] w-12 text-right font-medium">{count}</span>
+                  <span className="text-xs text-muted-foreground w-12 text-right font-medium">{count}</span>
                 </div>
               </div>
             )

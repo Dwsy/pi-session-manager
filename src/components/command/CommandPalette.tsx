@@ -69,7 +69,7 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
       onClick={close}
     >
       <div
-        className="w-full max-w-2xl max-h-[60vh] bg-[#1a1b26] border border-[#2a2b36] rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+        className="w-full max-w-2xl max-h-[60vh] bg-background border border-border rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <CommandMenu

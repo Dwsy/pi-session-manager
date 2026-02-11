@@ -97,10 +97,10 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-[#1a1b26] border border-[#2c2d3b] rounded-xl p-8">
+        <div className="bg-background border border-border rounded-xl p-8">
           <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-3 border-[#569cd6] border-t-transparent rounded-full animate-spin" />
-            <div className="text-[#6a6f85]">{t('stats.panel.loading')}</div>
+            <div className="w-12 h-12 border-3 border-info border-t-transparent rounded-full animate-spin" />
+            <div className="text-muted-foreground">{t('stats.panel.loading')}</div>
           </div>
         </div>
       </div>
@@ -110,8 +110,8 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
   if (!stats || !stats.heatmap_data) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-[#1a1b26] border border-[#2c2d3b] rounded-xl p-8">
-          <div className="text-center text-[#6a6f85]">{t('stats.panel.noData')}</div>
+        <div className="bg-background border border-border rounded-xl p-8">
+          <div className="text-center text-muted-foreground">{t('stats.panel.noData')}</div>
         </div>
       </div>
     )
@@ -119,35 +119,35 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1a1b26] border border-[#2c2d3b] rounded-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+      <div className="bg-background border border-border rounded-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#2c2d3b] bg-[#1e1f2e]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-dark">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-[#569cd6]/10 rounded-xl">
-              <BarChart3 className="h-5 w-5 text-[#569cd6]" />
+            <div className="p-2.5 bg-info/10 rounded-xl">
+              <BarChart3 className="h-5 w-5 text-info" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">{t('stats.panel.title')}</h2>
-              <p className="text-xs text-[#6a6f85]">{t('stats.panel.subtitle')}</p>
+              <h2 className="text-lg font-semibold text-foreground">{t('stats.panel.title')}</h2>
+              <p className="text-xs text-muted-foreground">{t('stats.panel.subtitle')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={loadStats}
-              className="p-2 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b] rounded-lg transition-colors"
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
               title={t('stats.panel.tooltips.refresh')}
             >
               <RefreshCw className="h-4 w-4" />
             </button>
-            <button className="p-2 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b] rounded-lg transition-colors" title={t('stats.panel.tooltips.export')}>
+            <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors" title={t('stats.panel.tooltips.export')}>
               <Download className="h-4 w-4" />
             </button>
-            <button className="p-2 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b] rounded-lg transition-colors" title={t('stats.panel.tooltips.settings')}>
+            <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors" title={t('stats.panel.tooltips.settings')}>
               <Settings className="h-4 w-4" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b] rounded-lg transition-colors"
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
               title={t('stats.panel.tooltips.close')}
             >
               <X className="h-5 w-5" />
@@ -156,7 +156,7 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 px-6 py-2 border-b border-[#2c2d3b] bg-[#1a1b26] overflow-x-auto">
+        <div className="flex items-center gap-1 px-6 py-2 border-b border-border bg-background overflow-x-auto">
           {TABS.map(tab => {
             const Icon = tab.icon
             return (
@@ -165,8 +165,8 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'text-[#569cd6] bg-[#569cd6]/10'
-                    : 'text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b]'
+                    ? 'text-info bg-info/10'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                 }`}
               >
                 <Icon className="h-4 w-4" />
@@ -261,7 +261,7 @@ function ActivityTab({ stats }: { stats: SessionStats }) {
 
       <div className="grid grid-cols-2 gap-6">
         <SessionLengthChart sessions={[]} />
-        <div className="bg-[#2c2d3b] rounded-xl p-5">
+        <div className="bg-secondary rounded-xl p-5">
           <h3 className="text-sm font-medium mb-4">Activity Levels</h3>
           <div className="space-y-3">
             {[5, 4, 3, 2, 1].map(level => {
@@ -271,8 +271,8 @@ function ActivityTab({ stats }: { stats: SessionStats }) {
 
               return (
                 <div key={level} className="flex items-center gap-3">
-                  <div className="w-24 text-xs text-[#6a6f85]">{labels[level - 1]}</div>
-                  <div className="flex-1 h-3 bg-[#1a1b26] rounded-full overflow-hidden">
+                  <div className="w-24 text-xs text-muted-foreground">{labels[level - 1]}</div>
+                  <div className="flex-1 h-3 bg-background rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full"
                       style={{
@@ -281,7 +281,7 @@ function ActivityTab({ stats }: { stats: SessionStats }) {
                       }}
                     />
                   </div>
-                  <div className="w-12 text-right text-xs text-white">{count}</div>
+                  <div className="w-12 text-right text-xs text-foreground">{count}</div>
                 </div>
               )
             })}
@@ -331,28 +331,28 @@ function ProductivityTab({ stats, sessions }: { stats: SessionStats; sessions: S
       <ProductivityMetrics stats={stats} />
       <div className="grid grid-cols-2 gap-6">
         <SessionLengthChart sessions={sessions} />
-        <div className="bg-[#2c2d3b] rounded-xl p-5">
+        <div className="bg-secondary rounded-xl p-5">
           <h3 className="text-sm font-medium mb-4">Session Insights</h3>
           <div className="space-y-3">
-            <div className="flex justify-between items-center p-3 bg-[#1a1b26] rounded-lg">
-              <span className="text-xs text-[#6a6f85]">Total Sessions</span>
-              <span className="text-sm font-medium text-white">{stats.total_sessions}</span>
+            <div className="flex justify-between items-center p-3 bg-background rounded-lg">
+              <span className="text-xs text-muted-foreground">Total Sessions</span>
+              <span className="text-sm font-medium text-foreground">{stats.total_sessions}</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-[#1a1b26] rounded-lg">
-              <span className="text-xs text-[#6a6f85]">Total Messages</span>
-              <span className="text-sm font-medium text-white">{stats.total_messages.toLocaleString()}</span>
+            <div className="flex justify-between items-center p-3 bg-background rounded-lg">
+              <span className="text-xs text-muted-foreground">Total Messages</span>
+              <span className="text-sm font-medium text-foreground">{stats.total_messages.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-[#1a1b26] rounded-lg">
-              <span className="text-xs text-[#6a6f85]">Messages/Session</span>
-              <span className="text-sm font-medium text-white">{stats.average_messages_per_session.toFixed(1)}</span>
+            <div className="flex justify-between items-center p-3 bg-background rounded-lg">
+              <span className="text-xs text-muted-foreground">Messages/Session</span>
+              <span className="text-sm font-medium text-foreground">{stats.average_messages_per_session.toFixed(1)}</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-[#1a1b26] rounded-lg">
-              <span className="text-xs text-[#6a6f85]">User Messages</span>
-              <span className="text-sm font-medium text-white">{stats.user_messages.toLocaleString()}</span>
+            <div className="flex justify-between items-center p-3 bg-background rounded-lg">
+              <span className="text-xs text-muted-foreground">User Messages</span>
+              <span className="text-sm font-medium text-foreground">{stats.user_messages.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-[#1a1b26] rounded-lg">
-              <span className="text-xs text-[#6a6f85]">Assistant Messages</span>
-              <span className="text-sm font-medium text-white">{stats.assistant_messages.toLocaleString()}</span>
+            <div className="flex justify-between items-center p-3 bg-background rounded-lg">
+              <span className="text-xs text-muted-foreground">Assistant Messages</span>
+              <span className="text-sm font-medium text-foreground">{stats.assistant_messages.toLocaleString()}</span>
             </div>
           </div>
         </div>

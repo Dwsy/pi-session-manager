@@ -44,7 +44,7 @@ export default function SearchPanel({ onSearch, resultCount, isSearching }: Sear
           placeholder={t('search.panel.placeholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full pl-8 pr-7 py-1.5 bg-[#252636] border-0 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-400/50 placeholder:text-muted-foreground/60"
+          className="w-full pl-8 pr-7 py-1.5 bg-surface border-0 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-400/50 placeholder:text-muted-foreground/60"
           autoFocus
         />
         {query && (

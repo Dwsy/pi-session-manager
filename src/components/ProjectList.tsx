@@ -132,7 +132,7 @@ export default function ProjectList({
                 key={project.dir}
                 data-index={virtualRow.index}
                 ref={projectsVirtualizer.measureElement}
-                className="px-3 py-2 hover:bg-[#1a1b26] cursor-pointer transition-colors border-b border-border/10 group"
+                className="px-3 py-2 hover:bg-background cursor-pointer transition-colors border-b border-border/10 group"
                 style={{
                   position: 'absolute',
                   top: 0,

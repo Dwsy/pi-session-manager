@@ -564,11 +564,11 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
       )}
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 transition-all duration-200" style={{ paddingLeft: showSidebar ? `${sidebarWidth}px` : 0 }}>
-        <div className="flex items-center justify-between px-4 py-2 border-b border-[#2c2d3b]">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border">
           <div className="flex items-baseline gap-2 min-w-0">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
-              className="p-1.5 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b] rounded transition-colors flex-shrink-0 self-center"
+              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors flex-shrink-0 self-center"
               title={showSidebar ? t('session.hideSidebar') : t('session.showSidebar')}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -576,41 +576,41 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
               </svg>
             </button>
             <span className="text-sm font-medium truncate">{session.name || t('session.title')}</span>
-            <span className="text-xs text-[#6a6f85] flex-shrink-0">
+            <span className="text-xs text-muted-foreground flex-shrink-0">
               {messageEntries.length} {t('session.messages')}
             </span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={() => setShowSystemPromptDialog(true)}
-              className="px-2 py-1 text-xs bg-[#2c2d3b] hover:bg-[#3c3d4b] rounded transition-colors cursor-pointer"
+              className="px-2 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors cursor-pointer"
               title={t('session.systemPromptAndTools', '系统提示词和工具')}
             >
               <Bot className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={scrollToTop}
-              className="px-2 py-1 text-xs bg-[#2c2d3b] hover:bg-[#3c3d4b] rounded transition-colors cursor-pointer"
+              className="px-2 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors cursor-pointer"
               title={t('session.scrollToTop', '滚动到顶部')}
             >
               <ArrowUp className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => scrollToBottom()}
-              className="px-2 py-1 text-xs bg-[#2c2d3b] hover:bg-[#3c3d4b] rounded transition-colors cursor-pointer"
+              className="px-2 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors cursor-pointer"
               title={t('session.scrollToBottom', '滚动到底部')}
             >
               <ArrowDown className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={onRename}
-              className="px-3 py-1 text-xs bg-[#2c2d3b] hover:bg-[#3c3d4b] rounded transition-colors cursor-pointer"
+              className="px-3 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors cursor-pointer"
             >
               {t('common.rename')}
             </button>
             <button
               onClick={onExport}
-              className="px-3 py-1 text-xs bg-[#2c2d3b] hover:bg-[#3c3d4b] rounded transition-colors cursor-pointer"
+              className="px-3 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors cursor-pointer"
             >
               {t('common.export')}
             </button>
@@ -632,7 +632,7 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
 
         {showLoading ? (
           <div className="flex-1 flex items-center justify-center">
-            <div className="flex items-center gap-2 text-[#6a6f85]">
+            <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>{t('session.loading')}</span>
             </div>
@@ -641,7 +641,7 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
           <div className="flex-1 flex items-center justify-center text-red-400">
             <div className="text-center">
               <p className="mb-2">{t('session.error')}</p>
-              <p className="text-sm text-[#6a6f85]">{error}</p>
+              <p className="text-sm text-muted-foreground">{error}</p>
             </div>
           </div>
         ) : (
@@ -652,7 +652,7 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
                   scrollToBottom()
                   setHasNewMessages(false)
                 }}
-                className="absolute bottom-4 right-4 z-10 flex items-center gap-1 rounded-full bg-[#2c2d3b] hover:bg-[#3c3d4b] text-xs text-white px-3 py-2 shadow-lg transition-colors"
+                className="absolute bottom-4 right-4 z-10 flex items-center gap-1 rounded-full bg-secondary hover:bg-secondary-hover text-xs text-foreground px-3 py-2 shadow-lg transition-colors"
                 title={t('session.scrollToBottom', '滚动到底部')}
               >
                 <ArrowDown className="h-3.5 w-3.5" />

@@ -231,7 +231,7 @@ export default function EditExecution({
           style={{ cursor: 'pointer' }}
         >
           <div className="tool-diff-actions">
-            <span style={{ color: '#6a6f85', fontSize: '11px' }}>
+            <span style={{ color: 'var(--muted)', fontSize: '11px' }}>
               {localExpanded ? '▾ Diff' : '▸ Diff'}
             </span>
             <div style={{ flex: 1 }} />
@@ -265,7 +265,7 @@ export default function EditExecution({
       )}
 
       {!diff && !output && (
-        <div className="tool-output" style={{ color: '#6a6f85', fontStyle: 'italic' }}>
+        <div className="tool-output" style={{ color: 'var(--muted)', fontStyle: 'italic' }}>
           {t('components.editExecution.noChanges')}
         </div>
       )}

@@ -38,25 +38,25 @@ export default function ShortcutSettings() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-[#6a6f85]">
+      <p className="text-sm text-muted-foreground">
         {t('settings.shortcuts.description', '查看所有可用的键盘快捷键。在 macOS 上使用 Cmd，在 Windows/Linux 上使用 Ctrl。')}
       </p>
 
       {grouped.map(group => (
         <div key={group.category} className="space-y-2">
-          <h4 className="text-xs font-semibold text-[#8a8fa0] uppercase tracking-wider">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             {t(group.label.key, group.label.fallback)}
           </h4>
-          <div className="bg-[#252636] rounded-lg divide-y divide-[#2c2d3b]">
+          <div className="bg-surface rounded-lg divide-y divide-border">
             {group.items.map(item => (
               <div
                 key={item.keys}
                 className="flex items-center justify-between px-4 py-3"
               >
-                <span className="text-sm text-[#d4d4d8]">
+                <span className="text-sm text-foreground">
                   {t(item.labelKey, item.fallback)}
                 </span>
-                <kbd className="inline-flex items-center gap-1 px-2 py-1 bg-[#1e1f2e] border border-[#3a3b4f] rounded text-xs font-mono text-white shadow-sm">
+                <kbd className="inline-flex items-center gap-1 px-2 py-1 bg-surface-dark border border-border-hover rounded text-xs font-mono text-foreground shadow-sm">
                   {item.keys}
                 </kbd>
               </div>

@@ -52,11 +52,11 @@ export default function WeeklyComparison({ stats, title = 'Weekly Comparison' }:
   const getChangeColor = () => {
     switch (changeDirection) {
       case 'up':
-        return 'text-[#7ee787] bg-[#7ee787]/10'
+        return 'text-success bg-success/10'
       case 'down':
-        return 'text-[#ff6b6b] bg-[#ff6b6b]/10'
+        return 'text-destructive bg-destructive/10'
       default:
-        return 'text-[#6a6f85] bg-[#6a6f85]/10'
+        return 'text-muted-foreground bg-muted-foreground/10'
     }
   }
 
@@ -77,10 +77,10 @@ export default function WeeklyComparison({ stats, title = 'Weekly Comparison' }:
   const maxMessages = Math.max(...currentWeekDays.map(d => d.messages), 1)
 
   return (
-    <div className="bg-[#2c2d3b] rounded-xl p-5">
+    <div className="bg-secondary rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium flex items-center gap-2 text-white">
-          <Calendar className="h-4 w-4 text-[#6a6f85]" />
+        <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
           {title}
         </h3>
         <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${getChangeColor()}`}>
@@ -95,35 +95,35 @@ export default function WeeklyComparison({ stats, title = 'Weekly Comparison' }:
       {/* Week Overview */}
       <div className="grid grid-cols-2 gap-4 mb-4">
         {/* This Week */}
-        <div className="bg-[#1a1b26] rounded-lg p-4">
-          <div className="text-[10px] text-[#6a6f85] uppercase tracking-wide mb-1">This Week</div>
-          <div className="text-2xl font-bold text-white mb-1">{currentWeekMessages}</div>
-          <div className="text-[10px] text-[#6a6f85]">messages</div>
+        <div className="bg-background rounded-lg p-4">
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">This Week</div>
+          <div className="text-2xl font-bold text-foreground mb-1">{currentWeekMessages}</div>
+          <div className="text-[10px] text-muted-foreground">messages</div>
         </div>
 
         {/* Last Week */}
-        <div className="bg-[#1a1b26] rounded-lg p-4">
-          <div className="text-[10px] text-[#6a6f85] uppercase tracking-wide mb-1">Last Week</div>
-          <div className="text-2xl font-bold text-white mb-1">{previousWeekMessages}</div>
-          <div className="text-[10px] text-[#6a6f85]">messages</div>
+        <div className="bg-background rounded-lg p-4">
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Last Week</div>
+          <div className="text-2xl font-bold text-foreground mb-1">{previousWeekMessages}</div>
+          <div className="text-[10px] text-muted-foreground">messages</div>
         </div>
       </div>
 
       {/* Daily Breakdown */}
       <div className="space-y-2">
-        <div className="text-[10px] text-[#6a6f85] uppercase tracking-wide mb-2">Daily Breakdown</div>
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Daily Breakdown</div>
         {currentWeekDays.map((dayData) => (
           <div key={dayData.day} className="flex items-center gap-3">
-            <div className={`w-8 text-right text-xs ${dayData.isToday ? 'text-[#569cd6] font-bold' : 'text-[#6a6f85]'}`}>
+            <div className={`w-8 text-right text-xs ${dayData.isToday ? 'text-info font-bold' : 'text-muted-foreground'}`}>
               {dayData.day}
             </div>
-            <div className="flex-1 h-6 bg-[#1a1b26] rounded-lg overflow-hidden relative">
+            <div className="flex-1 h-6 bg-background rounded-lg overflow-hidden relative">
               <div
-                className={`h-full rounded-lg transition-all duration-500 ${dayData.isToday ? 'bg-[#569cd6]' : 'bg-[#3d3d4d]'}`}
+                className={`h-full rounded-lg transition-all duration-500 ${dayData.isToday ? 'bg-info' : 'bg-secondary'}`}
                 style={{ width: `${(dayData.messages / maxMessages) * 100}%` }}
               />
               <div className="absolute inset-0 flex items-center px-2">
-                <span className={`text-xs font-medium ${dayData.messages > 0 ? 'text-white' : 'text-[#6a6f85]'}`}>
+                <span className={`text-xs font-medium ${dayData.messages > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
                   {dayData.messages}
                 </span>
               </div>
@@ -133,9 +133,9 @@ export default function WeeklyComparison({ stats, title = 'Weekly Comparison' }:
       </div>
 
       {/* Weekly Average */}
-      <div className="mt-4 pt-4 border-t border-[#1a1b26] flex items-center justify-between">
-        <span className="text-xs text-[#6a6f85]">Weekly Average</span>
-        <span className="text-sm font-medium text-white">
+      <div className="mt-4 pt-4 border-t border-background flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">Weekly Average</span>
+        <span className="text-sm font-medium text-foreground">
           {(currentWeekMessages / 7).toFixed(1)} messages/day
         </span>
       </div>

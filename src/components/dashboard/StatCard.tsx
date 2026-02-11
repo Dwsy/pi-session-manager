@@ -11,9 +11,9 @@ interface StatCardProps {
 
 export default function StatCard({ icon: Icon, label, value, color, change, trend = 'neutral' }: StatCardProps) {
   const getTrendColor = () => {
-    if (trend === 'up') return 'text-[#7ee787]'
-    if (trend === 'down') return 'text-[#ff6b6b]'
-    return 'text-[#6a6f85]'
+    if (trend === 'up') return 'text-success'
+    if (trend === 'down') return 'text-destructive'
+    return 'text-muted-foreground'
   }
 
   const getTrendIcon = () => {
@@ -52,13 +52,13 @@ export default function StatCard({ icon: Icon, label, value, color, change, tren
             <Icon className="h-4 w-4 transition-transform duration-300 group-hover:rotate-3" style={{ color }} />
           </div>
           {change && (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full bg-[#1a1b26]/80 border border-white/5 ${getTrendColor()} flex items-center gap-0.5 backdrop-blur-sm`}>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full bg-background/80 border border-foreground/5 ${getTrendColor()} flex items-center gap-0.5 backdrop-blur-sm`}>
               {getTrendIcon()} {change}
             </span>
           )}
         </div>
         <div className="text-xl font-bold mb-0.5 text-gradient">{value}</div>
-        <div className="text-[10px] text-[#6a6f85] uppercase tracking-wider font-medium">{label}</div>
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
       </div>
 
       {/* Bottom glow line */}

@@ -10,9 +10,9 @@ export function TerminalToggleButton({ isOpen, onToggle }: TerminalToggleButtonP
     <button
       onClick={onToggle}
       className={`p-1 rounded transition-colors ${
-        isOpen 
-          ? 'text-green-400 bg-[#2c2d3b]' 
-          : 'text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b]'
+        isOpen
+          ? 'text-green-400 bg-secondary'
+          : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
       }`}
       title={isOpen ? 'Close terminal' : 'Open terminal'}
     >

@@ -21,7 +21,7 @@ export default function RenameDialog({ session, onRename, onClose }: RenameDialo
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#1a1b26] border border-[#2c2d3b] rounded-lg p-6 w-96">
+      <div className="bg-background border border-border rounded-lg p-6 w-96">
         <h3 className="text-lg font-semibold mb-4">{t('rename.title')}</h3>
 
         <form onSubmit={handleSubmit}>
@@ -30,7 +30,7 @@ export default function RenameDialog({ session, onRename, onClose }: RenameDialo
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder={t('rename.placeholder')}
-            className="w-full px-3 py-2 bg-[#2c2d3b] border border-[#3c3d4b] rounded text-sm focus:outline-none focus:border-[#569cd6] mb-4"
+            className="w-full px-3 py-2 bg-secondary border border-border-hover rounded text-sm focus:outline-none focus:border-info mb-4"
             autoFocus
           />
 
@@ -38,14 +38,14 @@ export default function RenameDialog({ session, onRename, onClose }: RenameDialo
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-[#6a6f85] hover:text-white transition-colors"
+              className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={!newName.trim()}
-              className="px-4 py-2 text-sm bg-[#569cd6] hover:bg-[#4a8bc2] disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
+              className="px-4 py-2 text-sm bg-info hover:bg-info/80 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
             >
               {t('rename.confirm')}
             </button>

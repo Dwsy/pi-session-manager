@@ -162,7 +162,7 @@ export default function CommandMenu({
       shouldFilter={false} // 我们自己处理过滤
     >
       {/* 搜索框 */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-[#2a2b36]">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
         <Search className="w-5 h-5 text-muted-foreground" />
         <Command.Input
           value={query}
@@ -185,10 +185,10 @@ export default function CommandMenu({
           className={`
             flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
             ${!currentProjectName 
-              ? 'bg-[#1f2029] text-muted-foreground/50 cursor-not-allowed border border-[#2a2b36]'
-              : searchCurrentProjectOnly 
-                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30' 
-                : 'bg-[#252636] text-muted-foreground hover:bg-[#2a2b36] border border-transparent'
+              ? 'bg-surface-dark text-muted-foreground/50 cursor-not-allowed border border-border'
+              : searchCurrentProjectOnly
+                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30'
+                : 'bg-surface text-muted-foreground hover:bg-surface border border-transparent'
             }
           `}
           title={
@@ -205,13 +205,13 @@ export default function CommandMenu({
           </span>
         </button>
         
-        <kbd className="px-2 py-1 text-xs text-muted-foreground bg-[#252636] rounded">
+        <kbd className="px-2 py-1 text-xs text-muted-foreground bg-surface rounded">
           ESC
         </kbd>
       </div>
       
       {/* Tabs */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b border-[#2a2b36] bg-[#1a1b26]">
+      <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-background">
         {TABS.map(tab => {
           const isActive = activeTab === tab.id
           let Icon = null
@@ -227,7 +227,7 @@ export default function CommandMenu({
                 flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors
                 ${isActive
                   ? 'bg-blue-500/20 text-blue-400'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-[#2a2b36]'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-surface'
                 }
               `}
             >
@@ -236,7 +236,7 @@ export default function CommandMenu({
               {tab.pluginId && groupedResults[tab.pluginId] && (
                 <span className={`
                   px-1.5 py-0.5 rounded text-[10px]
-                  ${isActive ? 'bg-blue-500/30 text-blue-300' : 'bg-[#2a2b36] text-muted-foreground'}
+                  ${isActive ? 'bg-blue-500/30 text-blue-300' : 'bg-surface text-muted-foreground'}
                 `}>
                   {groupedResults[tab.pluginId]?.length || 0}
                 </span>

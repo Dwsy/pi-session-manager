@@ -83,7 +83,7 @@ export default function PiConfigSettings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-[#569cd6]" />
+        <Loader2 className="h-8 w-8 animate-spin text-info" />
       </div>
     )
   }
@@ -91,18 +91,18 @@ export default function PiConfigSettings() {
   return (
     <div className="space-y-4">
       {/* 标签页切换 */}
-      <div className="flex gap-2 border-b border-[#2c2d3b]">
+      <div className="flex gap-2 border-b border-border">
         <button
           onClick={() => setActiveTab('skills')}
           className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
             activeTab === 'skills'
-              ? 'text-[#569cd6] border-[#569cd6]'
-              : 'text-[#6a6f85] border-transparent hover:text-white'
+              ? 'text-info border-info'
+              : 'text-muted-foreground border-transparent hover:text-foreground'
           }`}
         >
           <Puzzle className="h-4 w-4" />
           {t('settings.piConfig.skills', 'Skills')}
-          <span className="ml-1 px-1.5 py-0.5 text-xs bg-[#2c2d3b] rounded-full">
+          <span className="ml-1 px-1.5 py-0.5 text-xs bg-secondary rounded-full">
             {skills.filter((s) => s.enabled).length}/{skills.length}
           </span>
         </button>
@@ -110,13 +110,13 @@ export default function PiConfigSettings() {
           onClick={() => setActiveTab('prompts')}
           className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
             activeTab === 'prompts'
-              ? 'text-[#569cd6] border-[#569cd6]'
-              : 'text-[#6a6f85] border-transparent hover:text-white'
+              ? 'text-info border-info'
+              : 'text-muted-foreground border-transparent hover:text-foreground'
           }`}
         >
           <FileText className="h-4 w-4" />
           {t('settings.piConfig.prompts', 'Prompts')}
-          <span className="ml-1 px-1.5 py-0.5 text-xs bg-[#2c2d3b] rounded-full">
+          <span className="ml-1 px-1.5 py-0.5 text-xs bg-secondary rounded-full">
             {prompts.filter((p) => p.enabled).length}/{prompts.length}
           </span>
         </button>
@@ -126,7 +126,7 @@ export default function PiConfigSettings() {
       {activeTab === 'skills' && (
         <div className="space-y-2 max-h-[450px] overflow-y-auto">
           {skills.length === 0 ? (
-            <div className="text-center py-8 text-[#6a6f85]">
+            <div className="text-center py-8 text-muted-foreground">
               {t('settings.piConfig.noSkills', '未找到 Skills')}
             </div>
           ) : (
@@ -135,8 +135,8 @@ export default function PiConfigSettings() {
                 key={skill.name}
                 className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
                   skill.enabled
-                    ? 'border-[#569cd6]/30 bg-[#569cd6]/5'
-                    : 'border-[#2c2d3b] opacity-60'
+                    ? 'border-info/30 bg-info/5'
+                    : 'border-border opacity-60'
                 }`}
               >
                 <button
@@ -144,19 +144,19 @@ export default function PiConfigSettings() {
                   className={`flex-shrink-0 p-1.5 rounded-md transition-colors ${
                     skill.enabled
                       ? 'text-green-400 hover:bg-green-400/10'
-                      : 'text-[#6a6f85] hover:bg-[#2c2d3b]'
+                      : 'text-muted-foreground hover:bg-secondary'
                   }`}
                   title={skill.enabled ? t('common.enabled', '已启用') : t('common.disabled', '已禁用')}
                 >
                   {skill.enabled ? <Power className="h-4 w-4" /> : <PowerOff className="h-4 w-4" />}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white">{skill.name}</div>
+                  <div className="text-sm font-medium text-foreground">{skill.name}</div>
                   {skill.description && (
-                    <div className="text-xs text-[#6a6f85] truncate">{skill.description}</div>
+                    <div className="text-xs text-muted-foreground truncate">{skill.description}</div>
                   )}
                 </div>
-                <code className="text-xs text-[#6a6f85] bg-[#252636] px-2 py-1 rounded">
+                <code className="text-xs text-muted-foreground bg-surface px-2 py-1 rounded">
                   {skill.path}
                 </code>
               </div>
@@ -169,7 +169,7 @@ export default function PiConfigSettings() {
       {activeTab === 'prompts' && (
         <div className="space-y-2 max-h-[450px] overflow-y-auto">
           {prompts.length === 0 ? (
-            <div className="text-center py-8 text-[#6a6f85]">
+            <div className="text-center py-8 text-muted-foreground">
               {t('settings.piConfig.noPrompts', '未找到 Prompts')}
             </div>
           ) : (
@@ -178,8 +178,8 @@ export default function PiConfigSettings() {
                 key={prompt.name}
                 className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
                   prompt.enabled
-                    ? 'border-[#569cd6]/30 bg-[#569cd6]/5'
-                    : 'border-[#2c2d3b] opacity-60'
+                    ? 'border-info/30 bg-info/5'
+                    : 'border-border opacity-60'
                 }`}
               >
                 <button
@@ -187,19 +187,19 @@ export default function PiConfigSettings() {
                   className={`flex-shrink-0 p-1.5 rounded-md transition-colors ${
                     prompt.enabled
                       ? 'text-green-400 hover:bg-green-400/10'
-                      : 'text-[#6a6f85] hover:bg-[#2c2d3b]'
+                      : 'text-muted-foreground hover:bg-secondary'
                   }`}
                   title={prompt.enabled ? t('common.enabled', '已启用') : t('common.disabled', '已禁用')}
                 >
                   {prompt.enabled ? <Power className="h-4 w-4" /> : <PowerOff className="h-4 w-4" />}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white">{prompt.name}</div>
+                  <div className="text-sm font-medium text-foreground">{prompt.name}</div>
                   {prompt.description && (
-                    <div className="text-xs text-[#6a6f85] truncate">{prompt.description}</div>
+                    <div className="text-xs text-muted-foreground truncate">{prompt.description}</div>
                   )}
                 </div>
-                <code className="text-xs text-[#6a6f85] bg-[#252636] px-2 py-1 rounded">
+                <code className="text-xs text-muted-foreground bg-surface px-2 py-1 rounded">
                   {prompt.path}
                 </code>
               </div>
@@ -209,7 +209,7 @@ export default function PiConfigSettings() {
       )}
 
       {/* 说明文字 */}
-      <div className="text-xs text-[#6a6f85] bg-[#252636] p-3 rounded-lg">
+      <div className="text-xs text-muted-foreground bg-surface p-3 rounded-lg">
         <p>
           {t('settings.piConfig.help', '点击电源图标切换启用/禁用状态。禁用的项目会以 - 前缀保存到 settings.json。')}
         </p>
@@ -220,7 +220,7 @@ export default function PiConfigSettings() {
         <button
           onClick={saveConfig}
           disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-[#569cd6] hover:bg-[#4a8bc2] disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-info hover:bg-info/80 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           {t('common.save', '保存到 settings.json')}

@@ -50,13 +50,13 @@ export default function ProjectsChart({ stats, sessions, title, limit = 8, onPro
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-medium flex items-center gap-1.5 text-white">
+          <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
             <div className="p-1 rounded bg-[#82aaff]/10">
               <Folder className="h-3 w-3 text-[#82aaff]" />
             </div>
             {displayTitle}
           </h3>
-          <div className="text-[10px] text-[#6a6f85] bg-[#1a1b26]/60 px-2 py-0.5 rounded">
+          <div className="text-[10px] text-muted-foreground bg-background/60 px-2 py-0.5 rounded">
             {topProjects.length} projects
           </div>
         </div>
@@ -69,7 +69,7 @@ export default function ProjectsChart({ stats, sessions, title, limit = 8, onPro
             return (
               <div
                 key={project}
-                className={`flex items-center justify-between p-2 bg-[#1a1b26]/60 rounded-lg border border-white/5 hover:bg-[#1a1b26]/90 hover:border-white/10 transition-all duration-300 ${onProjectSelect ? 'cursor-pointer' : ''}`}
+                className={`flex items-center justify-between p-2 bg-background/60 rounded-lg border border-foreground/5 hover:bg-background/90 hover:border-foreground/10 transition-all duration-300 ${onProjectSelect ? 'cursor-pointer' : ''}`}
                 onClick={() => handleProjectClick(project)}
                 title={onProjectSelect ? t('dashboard.projectsChart.clickToView', { project }) : undefined}
               >
@@ -81,10 +81,10 @@ export default function ProjectsChart({ stats, sessions, title, limit = 8, onPro
                       boxShadow: `0 0 6px ${color}50`
                     }}
                   />
-                  <span className="text-xs truncate text-white/90 hover:text-white transition-colors">{project}</span>
+                  <span className="text-xs truncate text-foreground/90 hover:text-foreground transition-colors">{project}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-16 h-1.5 bg-[#1e1f2e]/80 rounded-full overflow-hidden inner-shadow">
+                  <div className="w-16 h-1.5 bg-surface-dark/80 rounded-full overflow-hidden inner-shadow">
                     <div
                       className="h-full rounded-full"
                       style={{
@@ -93,7 +93,7 @@ export default function ProjectsChart({ stats, sessions, title, limit = 8, onPro
                       }}
                     />
                   </div>
-                  <span className="text-[10px] text-[#6a6f85] w-6 text-right">{count}</span>
+                  <span className="text-[10px] text-muted-foreground w-6 text-right">{count}</span>
                 </div>
               </div>
             )

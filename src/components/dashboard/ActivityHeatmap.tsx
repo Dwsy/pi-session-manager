@@ -88,13 +88,13 @@ export default function ActivityHeatmap({
       <div className="relative z-10">
         {title && (
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium flex items-center gap-2 text-white">
+            <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
               <div className="p-1.5 rounded-lg bg-[#46c492]/10">
                 <Calendar className="h-4 w-4 text-[#46c492]" />
               </div>
               {title}
             </h3>
-            <div className="flex items-center gap-2 text-xs text-[#6a6f85]">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Less</span>
               <div className="flex gap-0.5">
                 {HEATMAP_COLORS.slice(1).map((color, i) => (
@@ -132,9 +132,9 @@ export default function ActivityHeatmap({
         </div>
 
         {size === 'full' && (
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
-            <div className="flex items-center gap-4 text-xs text-[#6a6f85]">
-              <span>Active Days: <strong className="text-white">{data.filter(p => p.level > 0).length}</strong></span>
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/5">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span>Active Days: <strong className="text-foreground">{data.filter(p => p.level > 0).length}</strong></span>
             </div>
           </div>
         )}

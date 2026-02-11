@@ -76,10 +76,10 @@ export default function ProductivityMetrics({ stats, title = 'Productivity Metri
   ]
 
   const getStreakColor = (streak: number) => {
-    if (streak >= 30) return 'text-[#7ee787]'
-    if (streak >= 14) return 'text-[#ffa657]'
-    if (streak >= 7) return 'text-[#569cd6]'
-    return 'text-[#6a6f85]'
+    if (streak >= 30) return 'text-success'
+    if (streak >= 14) return 'text-warning'
+    if (streak >= 7) return 'text-info'
+    return 'text-muted-foreground'
   }
 
   const getStreakLabel = (streak: number) => {
@@ -91,14 +91,14 @@ export default function ProductivityMetrics({ stats, title = 'Productivity Metri
   }
 
   return (
-    <div className="bg-[#2c2d3b] rounded-xl p-5">
+    <div className="bg-secondary rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium flex items-center gap-2 text-white">
-          <Target className="h-4 w-4 text-[#6a6f85]" />
+        <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
+          <Target className="h-4 w-4 text-muted-foreground" />
           {title}
         </h3>
         {streak > 0 && (
-          <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-[#1a1b26] ${getStreakColor(streak)}`}>
+          <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-background ${getStreakColor(streak)}`}>
             <Award className="h-3 w-3" />
             <span>{getStreakLabel(streak)}</span>
           </div>
@@ -111,14 +111,14 @@ export default function ProductivityMetrics({ stats, title = 'Productivity Metri
           return (
             <div
               key={index}
-              className="bg-[#1a1b26] rounded-lg p-3 hover:bg-[#252638] transition-colors group cursor-pointer"
+              className="bg-background rounded-lg p-3 hover:bg-surface transition-colors group cursor-pointer"
             >
               <div className="flex items-center justify-between mb-2">
                 <Icon className="h-4 w-4" style={{ color: metric.color }} />
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: metric.color }} />
               </div>
-              <div className="text-lg font-bold text-white mb-0.5">{metric.value}</div>
-              <div className="text-[10px] text-[#6a6f85] uppercase tracking-wide">
+              <div className="text-lg font-bold text-foreground mb-0.5">{metric.value}</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
                 {metric.label}
               </div>
             </div>
@@ -126,30 +126,30 @@ export default function ProductivityMetrics({ stats, title = 'Productivity Metri
         })}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[#1a1b26]">
-        <div className="bg-[#1a1b26] rounded-lg p-3">
+      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-background">
+        <div className="bg-background rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
-            <Calendar className="h-3 w-3 text-[#ffa657]" />
-            <span className="text-[10px] text-[#6a6f85] uppercase tracking-wide">Peak Day</span>
+            <Calendar className="h-3 w-3 text-warning" />
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Peak Day</span>
           </div>
-          <div className="text-sm font-medium text-white">{peakDay?.[0] || 'N/A'}</div>
-          <div className="text-[10px] text-[#6a6f85]">{peakDay?.[1]?.toLocaleString() || 0} messages</div>
+          <div className="text-sm font-medium text-foreground">{peakDay?.[0] || 'N/A'}</div>
+          <div className="text-[10px] text-muted-foreground">{peakDay?.[1]?.toLocaleString() || 0} messages</div>
         </div>
 
-        <div className="bg-[#1a1b26] rounded-lg p-3">
+        <div className="bg-background rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
-            <Clock className="h-3 w-3 text-[#569cd6]" />
-            <span className="text-[10px] text-[#6a6f85] uppercase tracking-wide">Peak Hour</span>
+            <Clock className="h-3 w-3 text-info" />
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Peak Hour</span>
           </div>
-          <div className="text-sm font-medium text-white">{peakHour.hour}:00</div>
-          <div className="text-[10px] text-[#6a6f85]">{peakHour.message_count} messages</div>
+          <div className="text-sm font-medium text-foreground">{peakHour.hour}:00</div>
+          <div className="text-[10px] text-muted-foreground">{peakHour.message_count} messages</div>
         </div>
       </div>
 
       {streak > 0 && (
-        <div className="mt-4 pt-4 border-t border-[#1a1b26]">
+        <div className="mt-4 pt-4 border-t border-background">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-[#6a6f85]">Current Streak</span>
+            <span className="text-xs text-muted-foreground">Current Streak</span>
             <span className={`text-sm font-bold ${getStreakColor(streak)}`}>{streak} days</span>
           </div>
           <div className="flex gap-0.5">

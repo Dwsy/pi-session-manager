@@ -78,7 +78,7 @@ export default function WriteExecution({
 
       {output && (
         <div className="tool-output">
-          <div style={{ color: '#b5bd68' }}>{escapeHtml(output)}</div>
+          <div style={{ color: 'var(--success)' }}>{escapeHtml(output)}</div>
         </div>
       )}
     </div>

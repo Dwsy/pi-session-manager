@@ -102,7 +102,7 @@ export default function ReadExecution({
       )}
 
       {!output && !images.length && (
-        <div className="tool-output" style={{ color: '#6a6f85', fontStyle: 'italic' }}>
+        <div className="tool-output" style={{ color: 'var(--muted)', fontStyle: 'italic' }}>
           No output
         </div>
       )}

@@ -33,12 +33,12 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
 
   if (recentSessions.length === 0) {
     return (
-      <div className="bg-[#2c2d3b] rounded-xl p-5">
-        <h3 className="text-sm font-medium flex items-center gap-2 text-white mb-4">
-          <Clock className="h-4 w-4 text-[#6a6f85]" />
+      <div className="bg-secondary rounded-xl p-5">
+        <h3 className="text-sm font-medium flex items-center gap-2 text-foreground mb-4">
+          <Clock className="h-4 w-4 text-muted-foreground" />
           {displayTitle}
         </h3>
-        <div className="text-center py-8 text-[#6a6f85]">
+        <div className="text-center py-8 text-muted-foreground">
           <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p className="text-sm">{t('dashboard.noRecentSessions')}</p>
         </div>
@@ -65,30 +65,30 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
   return (
     <div className="glass-card rounded-lg p-3 relative overflow-hidden group">
       {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#569cd6]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-info/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-medium flex items-center gap-1.5 text-white">
-            <div className="p-1 rounded bg-[#569cd6]/10">
-              <Clock className="h-3 w-3 text-[#569cd6]" />
+          <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
+            <div className="p-1 rounded bg-info/10">
+              <Clock className="h-3 w-3 text-info" />
             </div>
             {displayTitle}
           </h3>
           <div className="flex items-center gap-1">
-            <div className="text-[10px] text-[#6a6f85] bg-[#1a1b26]/60 px-2 py-0.5 rounded">
+            <div className="text-[10px] text-muted-foreground bg-background/60 px-2 py-0.5 rounded">
               {recentSessions.length} {t('common.sessions')}
             </div>
             {/* Toggle button for first/last message */}
             <button
               onClick={() => setShowFirstMessage(!showFirstMessage)}
-              className="p-1 rounded bg-[#1a1b26]/60 hover:bg-[#1a1b26]/90 transition-all duration-200 group/toggle"
+              className="p-1 rounded bg-background/60 hover:bg-background/90 transition-all duration-200 group/toggle"
               title={showFirstMessage ? 'Show last message' : 'Show first message'}
             >
               {showFirstMessage ? (
-                <MessageCircle className="h-3 w-3 text-[#569cd6] group-hover/toggle:text-[#7ee787] transition-colors" />
+                <MessageCircle className="h-3 w-3 text-info group-hover/toggle:text-success transition-colors" />
               ) : (
-                <MessageCircleReply className="h-3 w-3 text-[#7ee787] group-hover/toggle:text-[#569cd6] transition-colors" />
+                <MessageCircleReply className="h-3 w-3 text-success group-hover/toggle:text-info transition-colors" />
               )}
             </button>
           </div>
@@ -104,7 +104,7 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
               <div
                 key={session.id}
                 onClick={() => onSessionSelect?.(session)}
-                className="group/item flex items-center gap-2 p-2 bg-[#1a1b26]/60 rounded-lg border border-white/5 hover:bg-[#1a1b26]/90 hover:border-[#569cd6]/20 transition-all duration-300 cursor-pointer relative overflow-hidden"
+                className="group/item flex items-center gap-2 p-2 bg-background/60 rounded-lg border border-foreground/5 hover:bg-background/90 hover:border-info/20 transition-all duration-300 cursor-pointer relative overflow-hidden"
               >
                 {/* Hover glow effect */}
                 <div
@@ -114,25 +114,25 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
                   }}
                 />
 
-                <div className="flex-shrink-0 w-5 h-5 rounded bg-[#569cd6]/10 flex items-center justify-center relative z-10">
-                  <span className="text-[9px] font-bold text-[#569cd6]">{index + 1}</span>
+                <div className="flex-shrink-0 w-5 h-5 rounded bg-info/10 flex items-center justify-center relative z-10">
+                  <span className="text-[9px] font-bold text-info">{index + 1}</span>
                 </div>
 
                 <div className="flex-1 min-w-0 relative z-10">
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="text-xs font-medium text-white truncate" title={displayName}>
+                    <span className="text-xs font-medium text-foreground truncate" title={displayName}>
                       {displayName}
                     </span>
                     {activity.level !== 'low' && (
                       <Zap className="h-2.5 w-2.5 flex-shrink-0 transition-transform duration-300 group-hover/item:scale-110" style={{ color: activity.color }} />
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 text-[9px] text-[#6a6f85]">
+                  <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
                     <span className="flex items-center gap-0.5">
                       <Folder className="h-2.5 w-2.5" />
                       {getProjectName(session.cwd)}
                     </span>
-                    <span className="text-[#4a4f65]">•</span>
+                    <span className="text-muted-foreground">•</span>
                     <span className="flex items-center gap-0.5">
                       <MessageSquare className="h-2.5 w-2.5" />
                       {session.message_count}
@@ -141,7 +141,7 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
                 </div>
 
                 <div className="flex-shrink-0 text-right relative z-10">
-                  <div className="text-[9px] text-[#6a6f85]">{timeAgo}</div>
+                  <div className="text-[9px] text-muted-foreground">{timeAgo}</div>
                   <div
                     className="text-[8px] px-1.5 py-0.5 rounded mt-0.5 inline-block font-medium backdrop-blur-sm"
                     style={{

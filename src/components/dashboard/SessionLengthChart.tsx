@@ -44,10 +44,10 @@ export default function SessionLengthChart({ sessions, title = 'Session Length D
     if (active && payload && payload.length) {
       const entry = payload[0].payload
       return (
-        <div className="bg-[#1a1b26] border border-[#2c2d3b] rounded-lg p-3 shadow-xl">
-          <div className="text-xs text-[#6a6f85] mb-1">{entry.range} messages</div>
-          <div className="text-sm font-medium text-white mb-1">{entry.count} sessions</div>
-          <div className="text-xs text-[#6a6f85]">{entry.percent.toFixed(1)}% of total</div>
+        <div className="bg-background border border-secondary rounded-lg p-3 shadow-xl">
+          <div className="text-xs text-muted-foreground mb-1">{entry.range} messages</div>
+          <div className="text-sm font-medium text-foreground mb-1">{entry.count} sessions</div>
+          <div className="text-xs text-muted-foreground">{entry.percent.toFixed(1)}% of total</div>
         </div>
       )
     }
@@ -55,28 +55,28 @@ export default function SessionLengthChart({ sessions, title = 'Session Length D
   }
 
   return (
-    <div className="bg-[#2c2d3b] rounded-xl p-5">
+    <div className="bg-secondary rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium flex items-center gap-2 text-white">
-          <Ruler className="h-4 w-4 text-[#6a6f85]" />
+        <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
+          <Ruler className="h-4 w-4 text-muted-foreground" />
           {title}
         </h3>
-        <BarChart3 className="h-4 w-4 text-[#6a6f85]" />
+        <BarChart3 className="h-4 w-4 text-muted-foreground" />
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="bg-[#1a1b26] rounded-lg p-3 text-center">
-          <div className="text-lg font-bold text-white">{avgLength.toFixed(0)}</div>
-          <div className="text-[10px] text-[#6a6f85] uppercase tracking-wide">Avg Length</div>
+        <div className="bg-background rounded-lg p-3 text-center">
+          <div className="text-lg font-bold text-foreground">{avgLength.toFixed(0)}</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg Length</div>
         </div>
-        <div className="bg-[#1a1b26] rounded-lg p-3 text-center">
-          <div className="text-lg font-bold text-white">{minLength}</div>
-          <div className="text-[10px] text-[#6a6f85] uppercase tracking-wide">Min</div>
+        <div className="bg-background rounded-lg p-3 text-center">
+          <div className="text-lg font-bold text-foreground">{minLength}</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Min</div>
         </div>
-        <div className="bg-[#1a1b26] rounded-lg p-3 text-center">
-          <div className="text-lg font-bold text-white">{maxLength}</div>
-          <div className="text-[10px] text-[#6a6f85] uppercase tracking-wide">Max</div>
+        <div className="bg-background rounded-lg p-3 text-center">
+          <div className="text-lg font-bold text-foreground">{maxLength}</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Max</div>
         </div>
       </div>
 
@@ -108,14 +108,14 @@ export default function SessionLengthChart({ sessions, title = 'Session Length D
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-[#1a1b26]">
+      <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-background">
         {data.map((entry, index) => (
           <div key={index} className="flex items-center gap-1.5">
             <div
               className="w-2 h-2 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-[10px] text-[#6a6f85]">
+            <span className="text-[10px] text-muted-foreground">
               {entry.range}: {entry.count}
             </span>
           </div>

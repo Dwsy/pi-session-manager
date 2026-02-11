@@ -55,61 +55,61 @@ export default function ActivityTrend({
   const getTrendColor = () => {
     switch (trendDirection) {
       case 'up':
-        return 'text-[#7ee787]'
+        return 'text-success'
       case 'down':
-        return 'text-[#ff6b6b]'
+        return 'text-destructive'
       default:
-        return 'text-[#6a6f85]'
+        return 'text-muted-foreground'
     }
   }
 
   const maxValue = Math.max(...trendData.map(d => d.value), 1)
 
   return (
-    <div className="bg-[#2c2d3b] rounded-xl p-5">
+    <div className="bg-secondary rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium flex items-center gap-2 text-white">
-          <Activity className="h-4 w-4 text-[#6a6f85]" />
+        <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
+          <Activity className="h-4 w-4 text-muted-foreground" />
           {title}
         </h3>
-        <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-[#1a1b26] ${getTrendColor()}`}>
+        <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-background ${getTrendColor()}`}>
           {getTrendIcon()}
           <span>{trendPercent > 0 ? '+' : ''}{trendPercent.toFixed(1)}%</span>
-          <span className="text-[#6a6f85]">vs last week</span>
+          <span className="text-muted-foreground">vs last week</span>
         </div>
       </div>
 
       <div className="space-y-2">
         {trendData.map((item, index) => (
           <div key={index} className="flex items-center gap-3">
-            <div className="w-12 text-right text-xs text-[#6a6f85]">{item.date}</div>
-            <div className="flex-1 h-6 bg-[#1a1b26] rounded-lg overflow-hidden">
+            <div className="w-12 text-right text-xs text-muted-foreground">{item.date}</div>
+            <div className="flex-1 h-6 bg-background rounded-lg overflow-hidden">
               <div
-                className={`h-full rounded-lg transition-all duration-500 ${type === 'area' ? 'bg-gradient-to-r from-[#569cd6]/50 to-[#569cd6]' : 'bg-[#569cd6]'}`}
+                className={`h-full rounded-lg transition-all duration-500 ${type === 'area' ? 'bg-gradient-to-r from-info/50 to-info' : 'bg-info'}`}
                 style={{ width: `${(item.value / maxValue) * 100}%` }}
               />
             </div>
-            <div className="w-12 text-right text-xs text-white">{item.value}</div>
+            <div className="w-12 text-right text-xs text-foreground">{item.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-[#1a1b26]">
+      <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-background">
         <div className="text-center">
-          <div className="text-lg font-bold text-white">{trendData.length}</div>
-          <div className="text-[10px] text-[#6a6f85] uppercase tracking-wide">Active Days</div>
+          <div className="text-lg font-bold text-foreground">{trendData.length}</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Active Days</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-bold text-white">
+          <div className="text-lg font-bold text-foreground">
             {trendData.reduce((sum, d) => sum + d.value, 0).toLocaleString()}
           </div>
-          <div className="text-[10px] text-[#6a6f85] uppercase tracking-wide">Total Messages</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Total Messages</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-bold text-white">
+          <div className="text-lg font-bold text-foreground">
             {trendData.length > 0 ? (trendData.reduce((sum, d) => sum + d.value, 0) / trendData.length).toFixed(0) : 0}
           </div>
-          <div className="text-[10px] text-[#6a6f85] uppercase tracking-wide">Avg/Day</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg/Day</div>
         </div>
       </div>
     </div>

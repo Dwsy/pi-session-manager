@@ -129,26 +129,26 @@ export default function Achievements({ stats, title = 'Achievements' }: Achievem
   const progressPercent = (unlockedCount / totalCount) * 100
 
   return (
-    <div className="bg-[#2c2d3b] rounded-xl p-5">
+    <div className="bg-secondary rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium flex items-center gap-2 text-white">
-          <Trophy className="h-4 w-4 text-[#6a6f85]" />
+        <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
+          <Trophy className="h-4 w-4 text-muted-foreground" />
           {title}
         </h3>
-        <div className="text-xs text-[#6a6f85]">
-          <span className="text-white font-medium">{unlockedCount}</span>/{totalCount}
+        <div className="text-xs text-muted-foreground">
+          <span className="text-foreground font-medium">{unlockedCount}</span>/{totalCount}
         </div>
       </div>
 
       {/* Overall Progress */}
       <div className="mb-4">
         <div className="flex justify-between text-xs mb-2">
-          <span className="text-[#6a6f85]">Overall Progress</span>
-          <span className="text-white font-medium">{progressPercent.toFixed(0)}%</span>
+          <span className="text-muted-foreground">Overall Progress</span>
+          <span className="text-foreground font-medium">{progressPercent.toFixed(0)}%</span>
         </div>
-        <div className="h-2 bg-[#1a1b26] rounded-full overflow-hidden">
+        <div className="h-2 bg-background rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-[#569cd6] via-[#7ee787] to-[#ffa657] rounded-full transition-all duration-500"
+            className="h-full bg-gradient-to-r from-info via-success to-warning rounded-full transition-all duration-500"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -163,8 +163,8 @@ export default function Achievements({ stats, title = 'Achievements' }: Achievem
               key={achievement.id}
               className={`relative p-3 rounded-lg transition-all ${
                 achievement.unlocked
-                  ? 'bg-[#1a1b26] border border-[#3d3d4d]'
-                  : 'bg-[#1a1b26]/50 border border-transparent opacity-60'
+                  ? 'bg-background border border-border'
+                  : 'bg-background/50 border border-transparent opacity-60'
               }`}
             >
               {/* Icon */}
@@ -181,15 +181,15 @@ export default function Achievements({ stats, title = 'Achievements' }: Achievem
               </div>
 
               {/* Title */}
-              <div className="text-xs font-medium text-white mb-1">{achievement.title}</div>
+              <div className="text-xs font-medium text-foreground mb-1">{achievement.title}</div>
 
               {/* Description */}
-              <div className="text-[10px] text-[#6a6f85] mb-2">{achievement.description}</div>
+              <div className="text-[10px] text-muted-foreground mb-2">{achievement.description}</div>
 
               {/* Progress Bar (if not fully unlocked) */}
               {achievement.progress !== undefined && !achievement.unlocked && (
                 <div>
-                  <div className="h-1 bg-[#1e1f2e] rounded-full overflow-hidden">
+                  <div className="h-1 bg-surface-dark rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{
@@ -204,8 +204,8 @@ export default function Achievements({ stats, title = 'Achievements' }: Achievem
               {/* Unlocked Badge */}
               {achievement.unlocked && (
                 <div className="absolute top-2 right-2">
-                  <div className="w-4 h-4 rounded-full bg-[#7ee787] flex items-center justify-center">
-                    <CheckCircle2 className="h-2.5 w-2.5 text-[#1a1b26]" />
+                  <div className="w-4 h-4 rounded-full bg-success flex items-center justify-center">
+                    <CheckCircle2 className="h-2.5 w-2.5 text-background" />
                   </div>
                 </div>
               )}
@@ -216,18 +216,18 @@ export default function Achievements({ stats, title = 'Achievements' }: Achievem
 
       {/* Motivational Message */}
       {unlockedCount === totalCount && (
-        <div className="mt-4 pt-4 border-t border-[#1a1b26] text-center">
+        <div className="mt-4 pt-4 border-t border-background text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <Trophy className="h-4 w-4 text-[#ffa657]" />
-            <span className="text-sm font-medium text-[#ffa657]">All Achievements Unlocked!</span>
+            <Trophy className="h-4 w-4 text-warning" />
+            <span className="text-sm font-medium text-warning">All Achievements Unlocked!</span>
           </div>
-          <div className="text-[10px] text-[#6a6f85]">{t('dashboard.achievements.powerUserMessage')}</div>
+          <div className="text-[10px] text-muted-foreground">{t('dashboard.achievements.powerUserMessage')}</div>
         </div>
       )}
 
       {unlockedCount > 0 && unlockedCount < totalCount && (
-        <div className="mt-4 pt-4 border-t border-[#1a1b26] text-center">
-          <div className="text-[10px] text-[#6a6f85]">
+        <div className="mt-4 pt-4 border-t border-background text-center">
+          <div className="text-[10px] text-muted-foreground">
             {totalCount - unlockedCount} more achievement{totalCount - unlockedCount > 1 ? 's' : ''} to go!
           </div>
         </div>

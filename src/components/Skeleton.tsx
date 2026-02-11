@@ -214,7 +214,7 @@ export function RecentSessionsSkeleton({ count = 5 }: { count?: number }) {
         </div>
         <div className="space-y-1.5">
           {Array.from({ length: count }).map((_, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 bg-[#1a1b26]/60 rounded-lg border border-white/5">
+            <div key={index} className="flex items-center gap-2 p-2 bg-background/60 rounded-lg border border-foreground/5">
               <Skeleton className="h-5 w-5 rounded flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <Skeleton className="h-3 w-full mb-1" style={{ maxWidth: '70%' }} />

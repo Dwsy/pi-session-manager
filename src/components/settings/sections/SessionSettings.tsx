@@ -12,10 +12,10 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <label className="text-sm font-medium text-white">
+          <label className="text-sm font-medium text-foreground">
             {t('settings.session.autoRefresh', '自动刷新')}
           </label>
-          <p className="text-xs text-[#6a6f85]">
+          <p className="text-xs text-muted-foreground">
             {t('settings.session.autoRefreshHelp', '自动检测新会话')}
           </p>
         </div>
@@ -26,13 +26,13 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
             onChange={(e) => onUpdate('session', 'autoRefresh', e.target.checked)}
             className="sr-only peer"
           />
-          <div className="w-11 h-6 bg-[#2c2d3b] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#569cd6]"></div>
+          <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
         </label>
       </div>
 
       {settings.session.autoRefresh && (
         <div className="space-y-2">
-          <label className="text-sm font-medium text-white">
+          <label className="text-sm font-medium text-foreground">
             {t('settings.session.refreshInterval', '刷新间隔')}
           </label>
           <div className="flex items-center gap-3">
@@ -43,9 +43,9 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
               step="5"
               value={settings.session.refreshInterval}
               onChange={(e) => onUpdate('session', 'refreshInterval', parseInt(e.target.value))}
-              className="flex-1 h-2 bg-[#2c2d3b] rounded-lg appearance-none cursor-pointer accent-[#569cd6]"
+              className="flex-1 h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-info"
             />
-            <span className="text-sm text-[#6a6f85] w-16 text-right">
+            <span className="text-sm text-muted-foreground w-16 text-right">
               {settings.session.refreshInterval}s
             </span>
           </div>
@@ -53,7 +53,7 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
       )}
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-white">
+        <label className="text-sm font-medium text-foreground">
           {t('settings.session.defaultViewMode', '默认视图模式')}
         </label>
         <div className="grid grid-cols-3 gap-2">
@@ -63,8 +63,8 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
               onClick={() => onUpdate('session', 'defaultViewMode', mode)}
               className={`py-2 rounded-lg border text-sm transition-all ${
                 settings.session.defaultViewMode === mode
-                  ? 'border-[#569cd6] bg-[#569cd6]/10 text-white'
-                  : 'border-[#2c2d3b] text-[#6a6f85] hover:border-[#3a3b4f]'
+                  ? 'border-info bg-info/10 text-foreground'
+                  : 'border-border text-muted-foreground hover:border-border-hover'
               }`}
             >
               {t(
@@ -78,10 +78,10 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
 
       <div className="flex items-center justify-between">
         <div>
-          <label className="text-sm font-medium text-white">
+          <label className="text-sm font-medium text-foreground">
             {t('settings.session.showMessagePreview', '显示消息预览')}
           </label>
-          <p className="text-xs text-[#6a6f85]">
+          <p className="text-xs text-muted-foreground">
             {t('settings.session.showMessagePreviewHelp', '在会话列表中显示最后一条消息')}
           </p>
         </div>
@@ -92,13 +92,13 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
             onChange={(e) => onUpdate('session', 'showMessagePreview', e.target.checked)}
             className="sr-only peer"
           />
-          <div className="w-11 h-6 bg-[#2c2d3b] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#569cd6]"></div>
+          <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
         </label>
       </div>
 
       {settings.session.showMessagePreview && (
         <div className="space-y-2">
-          <label className="text-sm font-medium text-white">
+          <label className="text-sm font-medium text-foreground">
             {t('settings.session.previewLines', '预览行数')}
           </label>
           <div className="flex items-center gap-3">
@@ -108,9 +108,9 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
               max="5"
               value={settings.session.previewLines}
               onChange={(e) => onUpdate('session', 'previewLines', parseInt(e.target.value))}
-              className="flex-1 h-2 bg-[#2c2d3b] rounded-lg appearance-none cursor-pointer accent-[#569cd6]"
+              className="flex-1 h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-info"
             />
-            <span className="text-sm text-[#6a6f85] w-8 text-right">
+            <span className="text-sm text-muted-foreground w-8 text-right">
               {settings.session.previewLines}
             </span>
           </div>

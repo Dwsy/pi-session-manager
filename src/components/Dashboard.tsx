@@ -150,13 +150,13 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
           <h1 className="text-2xl font-bold text-gradient mb-0.5">
             {projectName ? (
               <>
-                {t('dashboard.title')} - <span className="text-[#569cd6]">{getProjectName(projectName)}</span>
+                {t('dashboard.title')} - <span className="text-info">{getProjectName(projectName)}</span>
               </>
             ) : (
               t('dashboard.title')
             )}
           </h1>
-          <p className="text-xs text-[#6a6f85]">
+          <p className="text-xs text-muted-foreground">
             {projectName ? t('dashboard.projectSubtitle') : t('dashboard.subtitle')}
           </p>
         </div>

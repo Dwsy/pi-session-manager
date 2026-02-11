@@ -36,49 +36,49 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium flex items-center gap-2 text-white">
+          <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
             <div className="p-1.5 rounded-lg bg-[#ffcb6b]/10">
               <Coins className="h-4 w-4 text-[#ffcb6b]" />
             </div>
             {title}
           </h3>
-          <div className="text-xs text-[#6a6f85] bg-[#1a1b26]/60 px-2.5 py-1 rounded-lg">
-            Total: <span className="text-white font-medium">{formatTokens(stats.total_tokens)}</span>
+          <div className="text-xs text-muted-foreground bg-background/60 px-2.5 py-1 rounded-lg">
+            Total: <span className="text-foreground font-medium">{formatTokens(stats.total_tokens)}</span>
           </div>
         </div>
 
         {/* Token Overview */}
         <div className="grid grid-cols-4 gap-3 mb-4">
-          <div className="bg-[#1a1b26]/60 rounded-xl p-3 text-center border border-[#569cd6]/10 hover:border-[#569cd6]/30 transition-all duration-300">
-            <div className="text-lg font-bold text-[#569cd6]">{formatTokens(token_details.total_input)}</div>
-            <div className="text-[10px] text-[#6a6f85] uppercase tracking-wider font-medium">Input</div>
+          <div className="bg-background/60 rounded-xl p-3 text-center border border-info/10 hover:border-info/30 transition-all duration-300">
+            <div className="text-lg font-bold text-info">{formatTokens(token_details.total_input)}</div>
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Input</div>
           </div>
-          <div className="bg-[#1a1b26]/60 rounded-xl p-3 text-center border border-[#7ee787]/10 hover:border-[#7ee787]/30 transition-all duration-300">
-            <div className="text-lg font-bold text-[#7ee787]">{formatTokens(token_details.total_output)}</div>
-            <div className="text-[10px] text-[#6a6f85] uppercase tracking-wider font-medium">Output</div>
+          <div className="bg-background/60 rounded-xl p-3 text-center border border-success/10 hover:border-success/30 transition-all duration-300">
+            <div className="text-lg font-bold text-success">{formatTokens(token_details.total_output)}</div>
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Output</div>
           </div>
-          <div className="bg-[#1a1b26]/60 rounded-xl p-3 text-center border border-[#ffa657]/10 hover:border-[#ffa657]/30 transition-all duration-300">
-            <div className="text-lg font-bold text-[#ffa657]">{formatTokens(token_details.total_cache_read)}</div>
-            <div className="text-[10px] text-[#6a6f85] uppercase tracking-wider font-medium">Cache Read</div>
+          <div className="bg-background/60 rounded-xl p-3 text-center border border-warning/10 hover:border-warning/30 transition-all duration-300">
+            <div className="text-lg font-bold text-warning">{formatTokens(token_details.total_cache_read)}</div>
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Cache Read</div>
           </div>
-          <div className="bg-[#1a1b26]/60 rounded-xl p-3 text-center border border-[#ff6b6b]/10 hover:border-[#ff6b6b]/30 transition-all duration-300">
-            <div className="text-lg font-bold text-[#ff6b6b]">{formatCost(token_details.total_cost)}</div>
-            <div className="text-[10px] text-[#6a6f85] uppercase tracking-wider font-medium">Cost</div>
+          <div className="bg-background/60 rounded-xl p-3 text-center border border-destructive/10 hover:border-destructive/30 transition-all duration-300">
+            <div className="text-lg font-bold text-destructive">{formatCost(token_details.total_cost)}</div>
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Cost</div>
           </div>
         </div>
 
         {/* Token Distribution */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-[#6a6f85]">Token Distribution</span>
+            <span className="text-xs text-muted-foreground">Token Distribution</span>
           </div>
 
           <div className="space-y-2.5">
             <div className="flex items-center gap-3">
-              <div className="w-24 text-xs text-[#6a6f85]">Input</div>
-              <div className="flex-1 h-2.5 bg-[#1a1b26]/80 rounded-full overflow-hidden inner-shadow">
+              <div className="w-24 text-xs text-muted-foreground">Input</div>
+              <div className="flex-1 h-2.5 bg-background/80 rounded-full overflow-hidden inner-shadow">
                 <div
-                  className="h-full bg-gradient-to-r from-[#569cd6] to-[#6bb8ff] rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-info to-[#6bb8ff] rounded-full transition-all duration-500"
                   style={{
                     width: stats.total_tokens > 0
                       ? `${(token_details.total_input / stats.total_tokens) * 100}%`
@@ -87,7 +87,7 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
                   }}
                 />
               </div>
-              <div className="w-16 text-right text-xs text-white font-medium">
+              <div className="w-16 text-right text-xs text-foreground font-medium">
                 {stats.total_tokens > 0
                   ? `${((token_details.total_input / stats.total_tokens) * 100).toFixed(1)}%`
                   : '0%'}
@@ -95,10 +95,10 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="w-24 text-xs text-[#6a6f85]">Output</div>
-              <div className="flex-1 h-2.5 bg-[#1a1b26]/80 rounded-full overflow-hidden inner-shadow">
+              <div className="w-24 text-xs text-muted-foreground">Output</div>
+              <div className="flex-1 h-2.5 bg-background/80 rounded-full overflow-hidden inner-shadow">
                 <div
-                  className="h-full bg-gradient-to-r from-[#7ee787] to-[#a3ff9e] rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-success to-[#a3ff9e] rounded-full transition-all duration-500"
                   style={{
                     width: stats.total_tokens > 0
                       ? `${(token_details.total_output / stats.total_tokens) * 100}%`
@@ -107,7 +107,7 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
                   }}
                 />
               </div>
-              <div className="w-16 text-right text-xs text-white font-medium">
+              <div className="w-16 text-right text-xs text-foreground font-medium">
                 {stats.total_tokens > 0
                   ? `${((token_details.total_output / stats.total_tokens) * 100).toFixed(1)}%`
                   : '0%'}
@@ -115,10 +115,10 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="w-24 text-xs text-[#6a6f85]">Cache</div>
-              <div className="flex-1 h-2.5 bg-[#1a1b26]/80 rounded-full overflow-hidden inner-shadow">
+              <div className="w-24 text-xs text-muted-foreground">Cache</div>
+              <div className="flex-1 h-2.5 bg-background/80 rounded-full overflow-hidden inner-shadow">
                 <div
-                  className="h-full bg-gradient-to-r from-[#ffa657] to-[#ffc48c] rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-warning to-[#ffc48c] rounded-full transition-all duration-500"
                   style={{
                     width: stats.total_tokens > 0
                       ? `${((token_details.total_cache_read / stats.total_tokens) * 100)}%`
@@ -127,7 +127,7 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
                   }}
                 />
               </div>
-              <div className="w-16 text-right text-xs text-white font-medium">
+              <div className="w-16 text-right text-xs text-foreground font-medium">
                 {stats.total_tokens > 0
                   ? `${((token_details.total_cache_read / stats.total_tokens) * 100).toFixed(1)}%`
                   : '0%'}
@@ -138,9 +138,9 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
 
         {/* Top Models by Cost */}
         {topModels.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="mt-4 pt-4 border-t border-foreground/5">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs text-[#6a6f85]">{t('components.dashboard.topModelsByCost')}</span>
+              <span className="text-xs text-muted-foreground">{t('components.dashboard.topModelsByCost')}</span>
             </div>
 
             <div className="space-y-2">
@@ -152,22 +152,22 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
                 return (
                   <div
                     key={model}
-                    className="flex items-center justify-between p-2.5 bg-[#1a1b26]/60 rounded-xl border border-white/5 hover:bg-[#1a1b26]/90 hover:border-[#c792ea]/20 transition-all duration-300"
+                    className="flex items-center justify-between p-2.5 bg-background/60 rounded-xl border border-foreground/5 hover:bg-background/90 hover:border-purple/20 transition-all duration-300"
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="text-xs font-medium text-white/90 truncate">{model}</div>
+                      <div className="text-xs font-medium text-foreground/90 truncate">{model}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-20 h-1.5 bg-[#1e1f2e]/80 rounded-full overflow-hidden inner-shadow">
+                      <div className="w-20 h-1.5 bg-surface-dark/80 rounded-full overflow-hidden inner-shadow">
                         <div
-                          className="h-full bg-gradient-to-r from-[#c792ea] to-[#d4a8f0] rounded-full"
+                          className="h-full bg-gradient-to-r from-purple to-[#d4a8f0] rounded-full"
                           style={{
                             width: `${percent}%`,
                             boxShadow: '0 0 6px rgba(199, 146, 234, 0.3)'
                           }}
                         />
                       </div>
-                      <div className="text-[10px] text-[#6a6f85] w-12 text-right font-medium">
+                      <div className="text-[10px] text-muted-foreground w-12 text-right font-medium">
                         {formatCost(modelTokens.cost)}
                       </div>
                     </div>
@@ -179,20 +179,20 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
         )}
 
         {/* Efficiency Metrics */}
-        <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-2 text-xs bg-[#1a1b26]/40 px-3 py-2 rounded-lg">
-            <Zap className="h-3 w-3 text-[#ffa657]" />
-            <span className="text-[#6a6f85]">Cache Hit Rate:</span>
-            <span className="text-white font-medium">
+        <div className="mt-4 pt-4 border-t border-foreground/5 grid grid-cols-2 gap-3">
+          <div className="flex items-center gap-2 text-xs bg-background/40 px-3 py-2 rounded-lg">
+            <Zap className="h-3 w-3 text-warning" />
+            <span className="text-muted-foreground">Cache Hit Rate:</span>
+            <span className="text-foreground font-medium">
               {token_details.total_input > 0
                 ? `${((token_details.total_cache_read / token_details.total_input) * 100).toFixed(1)}%`
                 : '0%'}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-xs bg-[#1a1b26]/40 px-3 py-2 rounded-lg">
-            <DollarSign className="h-3 w-3 text-[#ff6b6b]" />
-            <span className="text-[#6a6f85]">Avg Cost/1k Tokens:</span>
-            <span className="text-white font-medium">
+          <div className="flex items-center gap-2 text-xs bg-background/40 px-3 py-2 rounded-lg">
+            <DollarSign className="h-3 w-3 text-destructive" />
+            <span className="text-muted-foreground">Avg Cost/1k Tokens:</span>
+            <span className="text-foreground font-medium">
               {stats.total_tokens > 0
                 ? formatCost((token_details.total_cost / stats.total_tokens) * 1000)
                 : '$0'}

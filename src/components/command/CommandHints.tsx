@@ -60,7 +60,7 @@ export default function CommandHints() {
         ))}
       </div>
       
-      <div className="mt-4 pt-4 border-t border-[#2a2b36]">
+      <div className="mt-4 pt-4 border-t border-border">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{t('command.hints.navigate', '使用 ↑↓ 导航')}</span>
           <span>{t('command.hints.select', '按 Enter 选择')}</span>

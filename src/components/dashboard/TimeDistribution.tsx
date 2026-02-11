@@ -36,7 +36,7 @@ export default function TimeDistribution({
       }))
 
     if (hourlyData.length === 0) {
-      return <div className="text-center text-[#6a6f85] py-4 text-xs">{t('components.dashboard.noActivityData')}</div>
+      return <div className="text-center text-muted-foreground py-4 text-xs">{t('components.dashboard.noActivityData')}</div>
     }
 
     const maxValue = Math.max(...hourlyData.map(d => d.value), 1)
@@ -49,13 +49,13 @@ export default function TimeDistribution({
       <div className="space-y-1.5">
         {hourlyData.map((item, index) => (
           <div key={index} className="flex items-center gap-2">
-            <div className="w-6 text-right text-[10px] text-[#6a6f85] font-medium">{item.hour}</div>
-            <div className="flex-1 h-4 bg-[#1a1b26]/60 rounded overflow-hidden inner-shadow relative">
+            <div className="w-6 text-right text-[10px] text-muted-foreground font-medium">{item.hour}</div>
+            <div className="flex-1 h-4 bg-background/60 rounded overflow-hidden inner-shadow relative">
               <div
                 className={`h-full rounded transition-all duration-500 ${
-                  item.isPeak 
-                    ? 'bg-gradient-to-r from-[#ffa657] to-[#ff6b6b]' 
-                    : 'bg-gradient-to-r from-[#569cd6]/60 to-[#569cd6]'
+                  item.isPeak
+                    ? 'bg-gradient-to-r from-warning to-destructive'
+                    : 'bg-gradient-to-r from-info/60 to-info'
                 }`}
                 style={{ 
                   width: `${Math.min((item.value / maxValue) * 100, 100)}%`,
@@ -63,9 +63,9 @@ export default function TimeDistribution({
                 }}
               />
             </div>
-            <div className="w-6 text-right text-[10px] text-white font-medium">{item.value}</div>
+            <div className="w-6 text-right text-[10px] text-foreground font-medium">{item.value}</div>
             {item.isPeak && (
-              <div className="text-[8px] text-[#ffa657]">★</div>
+              <div className="text-[8px] text-warning">★</div>
             )}
           </div>
         ))}
@@ -85,14 +85,14 @@ export default function TimeDistribution({
       <div className="space-y-1.5">
         {weeklyData.map((item, index) => (
           <div key={index} className="flex items-center gap-2">
-            <div className="w-6 text-right text-[10px] text-[#6a6f85]">{item.day}</div>
-            <div className="flex-1 h-4 bg-[#1a1b26]/60 rounded overflow-hidden inner-shadow">
+            <div className="w-6 text-right text-[10px] text-muted-foreground">{item.day}</div>
+            <div className="flex-1 h-4 bg-background/60 rounded overflow-hidden inner-shadow">
               <div
-                className="h-full bg-gradient-to-r from-[#7ee787]/60 to-[#7ee787] rounded transition-all duration-500"
+                className="h-full bg-gradient-to-r from-success/60 to-success rounded transition-all duration-500"
                 style={{ width: `${Math.min((item.value / maxValue) * 100, 100)}%` }}
               />
             </div>
-            <div className="w-6 text-right text-[10px] text-white">{item.value}</div>
+            <div className="w-6 text-right text-[10px] text-foreground">{item.value}</div>
           </div>
         ))}
       </div>
@@ -101,19 +101,19 @@ export default function TimeDistribution({
 
   return (
     <div className="glass-card rounded-lg p-3 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#ffa657]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-medium flex items-center gap-1.5 text-white">
-            <div className="p-1 rounded bg-[#ffa657]/10">
-              <Clock className="h-3 w-3 text-[#ffa657]" />
+          <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
+            <div className="p-1 rounded bg-warning/10">
+              <Clock className="h-3 w-3 text-warning" />
             </div>
             {title}
           </h3>
         </div>
 
-        <div className="text-[9px] text-[#6a6f85] mb-2 px-1">
+        <div className="text-[9px] text-muted-foreground mb-2 px-1">
           {type === 'hourly' && 'Your most active hours of the day'}
           {type === 'weekly' && 'Your most active days of the week'}
           {type === 'daily' && 'Daily activity distribution'}
@@ -121,7 +121,7 @@ export default function TimeDistribution({
 
         {type === 'hourly' && renderHourly()}
         {type === 'weekly' && renderWeekly()}
-        {type === 'daily' && <div className="text-center text-[#6a6f85] py-4 text-xs">{t('components.dashboard.dailyViewComingSoon')}</div>}
+        {type === 'daily' && <div className="text-center text-muted-foreground py-4 text-xs">{t('components.dashboard.dailyViewComingSoon')}</div>}
       </div>
     </div>
   )

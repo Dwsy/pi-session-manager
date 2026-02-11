@@ -82,12 +82,12 @@ export default function BashExecution({
           Bash
         </span>
         {exitCode !== undefined && exitCode !== null && (
-          <span className="tool-meta" style={{ color: exitCode === 0 ? '#b5bd68' : '#cc6666' }}>
+          <span className="tool-meta" style={{ color: exitCode === 0 ? 'var(--success)' : 'var(--error)' }}>
             exit {exitCode}
           </span>
         )}
         {cancelled && (
-          <span className="tool-meta" style={{ color: '#ffff00' }}>
+          <span className="tool-meta" style={{ color: 'var(--warning)' }}>
             cancelled
           </span>
         )}
