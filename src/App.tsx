@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search } from 'lucide-react'
+import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search, Terminal } from 'lucide-react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const startDragging = () => {
@@ -18,6 +18,7 @@ import FavoritesPanel from './components/FavoritesPanel'
 import SettingsPanel from './components/settings/SettingsPanel'
 import Onboarding from './components/Onboarding'
 import { CommandPalette } from './components/command'
+import TerminalPanel from './components/TerminalPanel'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useSessionBadges } from './hooks/useSessionBadges'
@@ -28,6 +29,7 @@ import { registerBuiltinPlugins } from './plugins'
 import type { SessionInfo, FavoriteItem } from './types'
 import type { SearchContext } from './plugins/types'
 import { invoke, isTauri } from './transport'
+import { getCachedSettings } from './utils/settingsApi'
 
 // Define sqlite_cache types for Tauri responses
 namespace sqlite_cache {
@@ -70,13 +72,28 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem('onboarding-completed')
   })
+  const [showTerminal, setShowTerminal] = useState(false)
+  const [terminalConfig, setTerminalConfig] = useState({ enabled: true, defaultShell: '/bin/zsh', fontSize: 13 })
+  const hasInitializedRef = useRef(false)
+
+  const reloadTerminalConfig = useCallback(() => {
+    try {
+      const s = getCachedSettings()
+      setTerminalConfig({
+        enabled: s.terminal?.builtinTerminalEnabled !== false,
+        defaultShell: s.terminal?.defaultShell || '/bin/zsh',
+        fontSize: s.terminal?.terminalFontSize || 13,
+      })
+      if (s.terminal?.builtinTerminalEnabled === false) {
+        setShowTerminal(false)
+      }
+    } catch {}
+  }, [])
 
   const loadFavorites = useCallback(async () => {
-    console.log('[Favorites] Loading favorites...')
     setLoadingFavorites(true)
     try {
       const result = await invoke<sqlite_cache.FavoriteItem[]>('get_all_favorites')
-      console.log('[Favorites] Raw result from backend:', result)
       const formattedFavorites: FavoriteItem[] = result.map(f => ({
         id: f.id,
         type: f.type as 'session' | 'project',
@@ -84,7 +101,6 @@ function App() {
         path: f.path,
         addedAt: f.added_at,
       }))
-      console.log('[Favorites] Formatted favorites:', formattedFavorites)
       setFavorites(formattedFavorites)
     } catch (error) {
       console.error('[Favorites] Failed to load favorites:', error)
@@ -104,7 +120,6 @@ function App() {
   }, [loadFavorites])
 
   const toggleFavorite = useCallback(async (item: Omit<FavoriteItem, 'addedAt'>) => {
-    console.log('[Favorites] Toggle favorite called with:', item)
     try {
       const params = {
         id: item.id,
@@ -112,9 +127,7 @@ function App() {
         name: item.name,
         path: item.path,
       }
-      console.log('[Favorites] Invoking toggle_favorite with params:', params)
-      const result = await invoke('toggle_favorite', params)
-      console.log('[Favorites] Toggle result:', result)
+      await invoke('toggle_favorite', params)
       await loadFavorites()
     } catch (error) {
       console.error('[Favorites] Failed to toggle favorite:', error)
@@ -128,6 +141,7 @@ function App() {
 
   useEffect(() => {
     registerBuiltinPlugins()
+    reloadTerminalConfig()
 
     const initialize = async () => {
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -156,8 +170,9 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!isInitialized) return
+    if (!isInitialized || hasInitializedRef.current) return
 
+    hasInitializedRef.current = true
     loadSessions()
     loadSettings()
     loadFavorites()
@@ -172,7 +187,11 @@ function App() {
   })
 
   const handleResumeSession = useCallback(async () => {
-    if (!selectedSession || !isTauri()) return
+    if (!selectedSession) return
+    if (!isTauri()) {
+      setShowTerminal(true)
+      return
+    }
     try {
       await invoke('open_session_in_terminal', {
         path: selectedSession.path,
@@ -199,6 +218,7 @@ function App() {
     'cmd+e': handleExportAndOpen,
     'cmd+p': () => { setViewMode('project'); setSelectedProject(null); setShowFavorites(false) },
     'cmd+,': () => setShowSettings(true),
+    'cmd+`': () => { if (terminalConfig.enabled) setShowTerminal(v => !v) },
     'escape': () => {
       if (showSettings) {
         setShowSettings(false)
@@ -206,13 +226,15 @@ function App() {
         setShowExportDialog(false)
       } else if (showRenameDialog) {
         setShowRenameDialog(false)
+      } else if (showTerminal) {
+        setShowTerminal(false)
       } else if (selectedProject) {
         setSelectedProject(null)
       } else {
         setSelectedSession(null)
       }
     },
-  }), [showSettings, showExportDialog, showRenameDialog, selectedProject, setSelectedSession, handleResumeSession, handleExportAndOpen])
+  }), [showSettings, showExportDialog, showRenameDialog, showTerminal, selectedProject, setSelectedSession, handleResumeSession, handleExportAndOpen, terminalConfig.enabled])
 
   useKeyboardShortcuts(shortcuts)
 
@@ -299,6 +321,19 @@ function App() {
             >
               <Search className="h-3.5 w-3.5" />
             </button>
+            {terminalConfig.enabled && (
+            <button
+              onClick={() => setShowTerminal(!showTerminal)}
+              className={`p-1 rounded transition-colors ml-0.5 ${
+                showTerminal
+                  ? 'text-green-400 bg-[#2c2d3b]'
+                  : 'text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b]'
+              }`}
+              title={showTerminal ? 'Close terminal (Ctrl+`)' : 'Open terminal (Ctrl+`)'}
+            >
+              <Terminal className="h-3.5 w-3.5" />
+            </button>
+            )}
             <button
               onClick={() => setShowSettings(true)}
               className="p-1 rounded transition-colors ml-0.5 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b]"
@@ -405,27 +440,45 @@ function App() {
           data-tauri-drag-region
           onMouseDown={startDragging}
         />
-        <div className="flex-1 overflow-hidden">
-          {selectedSession ? (
-            <SessionViewer
-              session={selectedSession}
-              onExport={() => setShowExportDialog(true)}
-              onRename={() => setShowRenameDialog(true)}
-              onBack={() => setSelectedSession(null)}
-              terminal={terminal}
-              piPath={piPath}
-              customCommand={customCommand}
-            />
-          ) : (
-            <Dashboard
-              sessions={selectedProject
-                ? sessions.filter(s => s.cwd === selectedProject)
-                : sessions
-              }
-              onSessionSelect={setSelectedSession}
-              projectName={selectedProject || undefined}
-              loading={loading}
-            />
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-hidden">
+            {selectedSession ? (
+              <SessionViewer
+                session={selectedSession}
+                onExport={() => setShowExportDialog(true)}
+                onRename={() => setShowRenameDialog(true)}
+                onBack={() => setSelectedSession(null)}
+                onWebResume={() => setShowTerminal(true)}
+                terminal={terminal}
+                piPath={piPath}
+                customCommand={customCommand}
+              />
+            ) : (
+              <Dashboard
+                sessions={selectedProject
+                  ? sessions.filter(s => s.cwd === selectedProject)
+                  : sessions
+                }
+                onSessionSelect={setSelectedSession}
+                onProjectSelect={(path) => {
+                  setSelectedProject(path)
+                  setViewMode('project')
+                  setShowFavorites(false)
+                }}
+                projectName={selectedProject || undefined}
+                loading={loading}
+              />
+            )}
+          </div>
+          {terminalConfig.enabled && (
+          <TerminalPanel
+            isOpen={showTerminal}
+            onClose={() => setShowTerminal(false)}
+            cwd={selectedSession?.cwd || selectedProject || sessions[0]?.cwd || '/'}
+            height={280}
+            defaultShell={terminalConfig.defaultShell}
+            fontSize={terminalConfig.fontSize}
+          />
           )}
         </div>
       </div>
@@ -448,7 +501,7 @@ function App() {
 
       <SettingsPanel
         isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
+        onClose={() => { setShowSettings(false); reloadTerminalConfig() }}
       />
 
       <CommandPalette context={commandContext} />
