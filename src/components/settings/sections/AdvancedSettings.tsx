@@ -2,8 +2,9 @@
  * 高级设置组件
  */
 
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen } from 'lucide-react'
+import { FolderOpen, AlertTriangle } from 'lucide-react'
 import { invoke } from '../../../transport'
 import type { AdvancedSettingsProps } from '../types'
 
@@ -12,8 +13,37 @@ interface ClearCacheResult {
   details_deleted: number
 }
 
+interface ServerSettings {
+  ws_enabled: boolean
+  ws_port: number
+  http_enabled: boolean
+  http_port: number
+  auth_enabled: boolean
+}
+
 export default function AdvancedSettings({ settings, onUpdate }: AdvancedSettingsProps) {
   const { t } = useTranslation()
+  const [serverSettings, setServerSettings] = useState<ServerSettings | null>(null)
+  const [serverDirty, setServerDirty] = useState(false)
+
+  useEffect(() => {
+    invoke<ServerSettings>('load_server_settings').then(setServerSettings).catch(console.error)
+  }, [])
+
+  const updateServer = <K extends keyof ServerSettings>(key: K, value: ServerSettings[K]) => {
+    setServerSettings((prev) => prev ? { ...prev, [key]: value } : prev)
+    setServerDirty(true)
+  }
+
+  const saveServerSettings = async () => {
+    if (!serverSettings) return
+    try {
+      await invoke('save_server_settings', { settings: serverSettings })
+      setServerDirty(false)
+    } catch (error) {
+      console.error('Failed to save server settings:', error)
+    }
+  }
 
   const handleClearCache = async () => {
     if (!confirm(t('settings.advanced.clearCacheConfirm', '确定要清除所有缓存数据吗？这将删除所有会话缓存，但保留收藏夹。'))) {
@@ -33,8 +63,110 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
 
   return (
     <div className="space-y-6">
+      {/* Server Settings */}
+      {serverSettings && (
+        <div className="space-y-4">
+          <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            {t('settings.advanced.serverSection', '服务设置')}
+          </h4>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-foreground">WebSocket</label>
+              <p className="text-xs text-muted-foreground">ws://0.0.0.0:{serverSettings.ws_port}</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={serverSettings.ws_enabled}
+                onChange={(e) => updateServer('ws_enabled', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
+            </label>
+          </div>
+
+          {serverSettings.ws_enabled && (
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">{t('settings.advanced.wsPort', 'WebSocket 端口')}</label>
+              <input
+                type="number"
+                min="1024"
+                max="65535"
+                value={serverSettings.ws_port}
+                onChange={(e) => updateServer('ws_port', parseInt(e.target.value) || 52130)}
+                className="w-32 px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-foreground">HTTP API</label>
+              <p className="text-xs text-muted-foreground">http://0.0.0.0:{serverSettings.http_port}/api</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={serverSettings.http_enabled}
+                onChange={(e) => updateServer('http_enabled', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
+            </label>
+          </div>
+
+          {serverSettings.http_enabled && (
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">{t('settings.advanced.httpPort', 'HTTP 端口')}</label>
+              <input
+                type="number"
+                min="1024"
+                max="65535"
+                value={serverSettings.http_port}
+                onChange={(e) => updateServer('http_port', parseInt(e.target.value) || 52131)}
+                className="w-32 px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-foreground">{t('settings.advanced.auth', '认证')}</label>
+              <p className="text-xs text-muted-foreground">{t('settings.advanced.authHelp', '非本地连接需要 Token 认证')}</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={serverSettings.auth_enabled}
+                onChange={(e) => updateServer('auth_enabled', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
+            </label>
+          </div>
+
+          {serverDirty && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={saveServerSettings}
+                className="px-4 py-1.5 bg-info hover:bg-info/80 text-white text-sm rounded-lg transition-colors"
+              >
+                {t('settings.advanced.saveServer', '保存服务设置')}
+              </button>
+              <span className="flex items-center gap-1 text-xs text-amber-400">
+                <AlertTriangle className="h-3 w-3" />
+                {t('settings.advanced.restartRequired', '需重启应用生效')}
+              </span>
+            </div>
+          )}
+
+          <div className="border-b border-border" />
+        </div>
+      )}
+
       <div className="space-y-2">
-        <label className="text-sm font-medium text-white">
+        <label className="text-sm font-medium text-foreground">
           {t('settings.advanced.sessionDir', '会话目录')}
         </label>
         <div className="flex gap-2">
@@ -42,23 +174,23 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
             type="text"
             value={settings.advanced.sessionDir}
             onChange={(e) => onUpdate('advanced', 'sessionDir', e.target.value)}
-            className="flex-1 px-3 py-2 bg-[#252636] border border-[#2c2d3b] rounded-lg text-sm text-white focus:outline-none focus:border-[#569cd6]"
+            className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
           />
-          <button className="px-3 py-2 bg-[#252636] border border-[#2c2d3b] rounded-lg text-[#6a6f85] hover:text-white transition-colors">
+          <button className="px-3 py-2 bg-surface border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">
             <FolderOpen className="h-4 w-4" />
           </button>
         </div>
-        <p className="text-xs text-[#6a6f85]">
+        <p className="text-xs text-muted-foreground">
           {t('settings.advanced.sessionDirHelp', 'Pi 会话文件的存储位置')}
         </p>
       </div>
 
       <div className="flex items-center justify-between">
         <div>
-          <label className="text-sm font-medium text-white">
+          <label className="text-sm font-medium text-foreground">
             {t('settings.advanced.cacheEnabled', '启用缓存')}
           </label>
-          <p className="text-xs text-[#6a6f85]">
+          <p className="text-xs text-muted-foreground">
             {t('settings.advanced.cacheEnabledHelp', '缓存会话数据以提高性能')}
           </p>
         </div>
@@ -69,13 +201,13 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
             onChange={(e) => onUpdate('advanced', 'cacheEnabled', e.target.checked)}
             className="sr-only peer"
           />
-          <div className="w-11 h-6 bg-[#2c2d3b] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#569cd6]"></div>
+          <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
         </label>
       </div>
 
       {settings.advanced.cacheEnabled && (
         <div className="space-y-2">
-          <label className="text-sm font-medium text-white">
+          <label className="text-sm font-medium text-foreground">
             {t('settings.advanced.maxCacheSize', '最大缓存大小')}
           </label>
           <div className="flex items-center gap-3">
@@ -86,9 +218,9 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
               step="10"
               value={settings.advanced.maxCacheSize}
               onChange={(e) => onUpdate('advanced', 'maxCacheSize', parseInt(e.target.value))}
-              className="flex-1 h-2 bg-[#2c2d3b] rounded-lg appearance-none cursor-pointer accent-[#569cd6]"
+              className="flex-1 h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-info"
             />
-            <span className="text-sm text-[#6a6f85] w-20 text-right">
+            <span className="text-sm text-muted-foreground w-20 text-right">
               {settings.advanced.maxCacheSize} MB
             </span>
           </div>
@@ -97,10 +229,10 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
 
       <div className="flex items-center justify-between">
         <div>
-          <label className="text-sm font-medium text-white">
+          <label className="text-sm font-medium text-foreground">
             {t('settings.advanced.debugMode', '调试模式')}
           </label>
-          <p className="text-xs text-[#6a6f85]">
+          <p className="text-xs text-muted-foreground">
             {t('settings.advanced.debugModeHelp', '启用详细日志记录')}
           </p>
         </div>
@@ -111,16 +243,16 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
             onChange={(e) => onUpdate('advanced', 'debugMode', e.target.checked)}
             className="sr-only peer"
           />
-          <div className="w-11 h-6 bg-[#2c2d3b] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#569cd6]"></div>
+          <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
         </label>
       </div>
 
       <div className="flex items-center justify-between">
         <div>
-          <label className="text-sm font-medium text-white">
+          <label className="text-sm font-medium text-foreground">
             {t('app.demoMode', '演示模式')}
           </label>
-          <p className="text-xs text-[#6a6f85]">
+          <p className="text-xs text-muted-foreground">
             {t('app.demoModeDescription', '查看演示数据以探索所有功能')}
           </p>
         </div>
@@ -131,17 +263,17 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
             onChange={(e) => onUpdate('advanced', 'demoMode', e.target.checked)}
             className="sr-only peer"
           />
-          <div className="w-11 h-6 bg-[#2c2d3b] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#569cd6]"></div>
+          <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
         </label>
       </div>
 
-      <div className="pt-4 border-t border-[#2c2d3b] space-y-3">
+      <div className="pt-4 border-t border-border space-y-3">
         <button
           onClick={() => {
             localStorage.removeItem('onboarding-completed')
             alert(t('settings.advanced.onboardingReset', '下次打开应用时将显示引导'))
           }}
-          className="px-4 py-2 bg-[#569cd6]/10 text-[#569cd6] hover:bg-[#569cd6]/20 rounded-lg text-sm transition-colors"
+          className="px-4 py-2 bg-info/10 text-info hover:bg-info/20 rounded-lg text-sm transition-colors"
         >
           {t('settings.advanced.showOnboarding', '重新显示新手引导')}
         </button>

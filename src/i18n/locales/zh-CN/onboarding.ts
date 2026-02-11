@@ -28,5 +28,11 @@ export const onboarding = {
       description: '调整主题、字体大小、代码块样式、导出格式等。一切都可以根据你的工作流程进行配置。',
       hint: 'Cmd+, 随时打开设置',
     },
+    services: {
+      title: '服务与功能配置',
+      description: '选择启用哪些服务。WebSocket 和 HTTP API 允许外部工具连接本应用，内置终端可直接在应用内操作。',
+      terminal: '内置终端',
+      terminalHint: '在应用内直接使用终端',
+    },
   },
 } as const

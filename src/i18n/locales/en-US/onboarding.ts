@@ -28,5 +28,11 @@ export const onboarding = {
       description: 'Adjust themes, font sizes, code block styles, export formats, and more. Everything is configurable to match your workflow.',
       hint: 'Cmd+, to open settings anytime',
     },
+    services: {
+      title: 'Services & Features',
+      description: 'Choose which services to enable. WebSocket and HTTP API allow external tools to connect. The built-in terminal lets you work directly inside the app.',
+      terminal: 'Built-in Terminal',
+      terminalHint: 'Use terminal directly in the app',
+    },
   },
 } as const
