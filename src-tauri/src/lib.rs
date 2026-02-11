@@ -11,11 +11,16 @@ mod session_parser;
 mod sqlite_cache;
 pub mod stats;
 mod tantivy_search;
+pub mod terminal;
+pub mod auth;
 pub mod ws_adapter;
+pub mod http_adapter;
 mod write_buffer;
+pub mod settings_store;
 
 pub use commands::*;
-use tauri::Listener;
+use tauri::{Listener, Manager};
+use std::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -48,14 +53,26 @@ pub fn run() {
             test_models_batch,
             load_app_settings,
             save_app_settings,
+            load_server_settings,
+            save_server_settings,
             add_favorite,
             remove_favorite,
             get_all_favorites,
             is_favorite,
             toggle_favorite,
-            toggle_devtools
+            clear_cache,
+            toggle_devtools,
+            terminal_create,
+            terminal_write,
+            terminal_resize,
+            terminal_close,
+            get_default_shell,
+            get_available_shells
         ])
         .setup(|app| {
+            // Create and manage app state
+            let app_state = app_state::create_app_state(app.handle().clone());
+            app.manage(app_state.clone());
             // 启动定期刷新缓冲的任务
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
