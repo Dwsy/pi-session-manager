@@ -23,6 +23,7 @@ interface SessionViewerProps {
   onExport: () => void
   onRename: () => void
   onBack?: () => void
+  onWebResume?: () => void
   terminal?: 'iterm2' | 'terminal' | 'vscode' | 'custom'
   piPath?: string
   customCommand?: string
@@ -34,7 +35,7 @@ const SIDEBAR_DEFAULT_WIDTH = 400
 const SIDEBAR_WIDTH_KEY = 'pi-session-manager-sidebar-width'
 const MESSAGE_ITEM_GAP = 16
 
-function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2', piPath, customCommand }: SessionViewerProps) {
+function SessionViewerContent({ session, onExport, onRename, onWebResume, terminal = 'iterm2', piPath, customCommand }: SessionViewerProps) {
   const { t } = useTranslation()
   const { toggleThinking, toggleToolsExpanded } = useSessionView()
   const [entries, setEntries] = useState<SessionEntry[]>([])
@@ -623,6 +624,7 @@ function SessionViewerContent({ session, onExport, onRename, terminal = 'iterm2'
               label={t('session.resume', '恢复')}
               showLabel={true}
               className="px-3 py-1"
+              onWebResume={onWebResume}
               onError={(error) => console.error('[SessionViewer] Failed to open in terminal:', error)}
             />
           </div>
