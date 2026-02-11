@@ -25,6 +25,7 @@ import { useSessionBadges } from './hooks/useSessionBadges'
 import { useSessions } from './hooks/useSessions'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useSessionActions } from './hooks/useSessionActions'
+import { useAppearance } from './hooks/useAppearance'
 import { registerBuiltinPlugins } from './plugins'
 import type { SessionInfo, FavoriteItem } from './types'
 import type { SearchContext } from './plugins/types'
@@ -59,9 +60,13 @@ function App() {
   const { terminal, piPath, customCommand, loadSettings } = useAppSettings()
   const { handleExportSession } = useSessionActions()
   const { getBadgeType, clearBadge } = useSessionBadges(sessions)
+  useAppearance()
 
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'list' | 'project'>('project')
+  const [viewMode, setViewMode] = useState<'list' | 'project'>(() => {
+    const saved = getCachedSettings().session?.defaultViewMode
+    return saved === 'list' ? 'list' : 'project'
+  })
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -142,6 +147,22 @@ function App() {
   useEffect(() => {
     registerBuiltinPlugins()
     reloadTerminalConfig()
+
+    // Apply appearance settings from cache
+    const s = getCachedSettings()
+    const root = document.documentElement
+    if (s.appearance) {
+      const { theme, sidebarWidth, fontSize, messageSpacing, codeBlockTheme } = s.appearance
+      root.classList.remove('theme-dark', 'theme-light')
+      if (theme === 'dark') root.classList.add('theme-dark')
+      else if (theme === 'light') root.classList.add('theme-light')
+      if (sidebarWidth) root.style.setProperty('--sidebar-width', `${sidebarWidth}px`)
+      const fontMap: Record<string, string> = { small: '14px', medium: '16px', large: '18px' }
+      if (fontSize) root.style.setProperty('--font-size-base', fontMap[fontSize] || '16px')
+      const spacingMap: Record<string, string> = { compact: '8px', comfortable: '16px', spacious: '24px' }
+      if (messageSpacing) root.style.setProperty('--spacing-base', spacingMap[messageSpacing] || '16px')
+      if (codeBlockTheme) root.setAttribute('data-code-theme', codeBlockTheme)
+    }
 
     const initialize = async () => {
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -263,24 +284,24 @@ function App() {
 
   return (
     <div className="flex h-screen bg-background text-foreground">
-      <div className="w-80 border-r border-[#2c2d3b] flex flex-col">
+      <div className="w-80 border-r border-border flex flex-col">
         <div
-          className="h-8 border-b border-[#2c2d3b] flex items-center px-3 select-none"
+          className="h-8 border-b border-border flex items-center px-3 select-none"
           data-tauri-drag-region
           onMouseDown={startDragging}
         >
           <div className="flex items-center gap-0.5 ml-auto no-drag">
             <button
               onClick={() => setSelectedSession(null)}
-              className="p-1 rounded transition-colors mr-1 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b]"
+              className="p-1 rounded transition-colors mr-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
               title={t('dashboard.title')}
             >
               <LayoutDashboard className="h-3.5 w-3.5" />
             </button>
-            <div className="flex items-center bg-[#252636] rounded-lg p-0.5 mr-1">
+            <div className="flex items-center bg-surface rounded-lg p-0.5 mr-1">
               <button
                 onClick={() => { setViewMode('list'); setSelectedProject(null); setShowFavorites(false) }}
-                className={`p-1 rounded transition-colors ${viewMode === 'list' && !showFavorites ? 'text-blue-400 bg-[#2c2d3b]' : 'text-[#6a6f85] hover:text-white'}`}
+                className={`p-1 rounded transition-colors ${viewMode === 'list' && !showFavorites ? 'text-blue-400 bg-secondary' : 'text-muted-foreground hover:text-foreground'}`}
                 title={t('app.viewMode.list')}
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -289,7 +310,7 @@ function App() {
               </button>
               <button
                 onClick={() => { setViewMode('project'); setSelectedProject(null); setShowFavorites(false) }}
-                className={`p-1 rounded transition-colors ${viewMode === 'project' && !showFavorites ? 'text-blue-400 bg-[#2c2d3b]' : 'text-[#6a6f85] hover:text-white'}`}
+                className={`p-1 rounded transition-colors ${viewMode === 'project' && !showFavorites ? 'text-blue-400 bg-secondary' : 'text-muted-foreground hover:text-foreground'}`}
                 title={t('app.viewMode.project')}
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -307,7 +328,7 @@ function App() {
                   setShowFavorites(true)
                 }
               }}
-              className={`p-1 rounded transition-colors ml-0.5 ${showFavorites ? 'text-yellow-400 bg-[#2c2d3b]' : 'text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b]'}`}
+              className={`p-1 rounded transition-colors ml-0.5 ${showFavorites ? 'text-yellow-400 bg-secondary' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'}`}
               title={showFavorites ? t('favorites.back') : t('favorites.title')}
             >
               <Star className="h-3.5 w-3.5" />
@@ -316,7 +337,7 @@ function App() {
               onClick={() => {
                 window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
               }}
-              className="p-1 rounded transition-colors ml-0.5 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b] group relative"
+              className="p-1 rounded transition-colors ml-0.5 text-muted-foreground hover:text-foreground hover:bg-secondary group relative"
               title={t('app.shortcuts.searchAll', '搜索所有会话') + ' (Cmd+K)'}
             >
               <Search className="h-3.5 w-3.5" />
@@ -326,8 +347,8 @@ function App() {
               onClick={() => setShowTerminal(!showTerminal)}
               className={`p-1 rounded transition-colors ml-0.5 ${
                 showTerminal
-                  ? 'text-green-400 bg-[#2c2d3b]'
-                  : 'text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b]'
+                  ? 'text-green-400 bg-secondary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
               }`}
               title={showTerminal ? 'Close terminal (Ctrl+`)' : 'Open terminal (Ctrl+`)'}
             >
@@ -336,7 +357,7 @@ function App() {
             )}
             <button
               onClick={() => setShowSettings(true)}
-              className="p-1 rounded transition-colors ml-0.5 text-[#6a6f85] hover:text-white hover:bg-[#2c2d3b]"
+              className="p-1 rounded transition-colors ml-0.5 text-muted-foreground hover:text-foreground hover:bg-secondary"
               title={t('settings.title')}
             >
               <Settings className="h-3.5 w-3.5" />

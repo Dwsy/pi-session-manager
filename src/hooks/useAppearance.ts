@@ -1,72 +1,56 @@
-/**
- * 外观设置 Hook
- * 用于应用主题、字体大小等外观设置
- */
-
 import { useEffect } from 'react'
 import { useSettings } from './useSettings'
 import type { AppSettings } from '../components/settings/types'
 
 export type AppearanceSettings = AppSettings['appearance']
 
-/**
- * 使用外观设置 Hook
- * 自动应用外观设置到 DOM
- */
+function applyThemeClass(theme: AppearanceSettings['theme']) {
+  const root = document.documentElement
+  root.classList.remove('theme-dark', 'theme-light')
+
+  if (theme === 'dark') {
+    root.classList.add('theme-dark')
+  } else if (theme === 'light') {
+    root.classList.add('theme-light')
+  }
+  // system: no class — CSS @media handles it
+}
+
 export function useAppearance() {
   const { appearance, updateAppearanceSetting } = useSettings()
 
-  // 应用主题
   useEffect(() => {
-    const root = document.documentElement
-
-    // 移除旧的主题类
-    root.classList.remove('theme-dark', 'theme-light')
-
-    // 应用新主题
-    if (appearance.theme === 'dark') {
-      root.classList.add('theme-dark')
-    } else if (appearance.theme === 'light') {
-      root.classList.add('theme-light')
-    }
-    // 如果是 system，不添加任何类，让系统决定
-
-    // 设置 CSS 变量
-    root.style.setProperty('--sidebar-width', `${appearance.sidebarWidth}px`)
+    applyThemeClass(appearance.theme)
+    document.documentElement.style.setProperty('--sidebar-width', `${appearance.sidebarWidth}px`)
   }, [appearance.theme, appearance.sidebarWidth])
 
-  // 应用字体大小
+  // Listen for OS color scheme changes when in system mode
   useEffect(() => {
-    const root = document.documentElement
-    const fontSizeMap = {
-      small: '14px',
-      medium: '16px',
-      large: '18px',
-    }
-    root.style.setProperty('--font-size-base', fontSizeMap[appearance.fontSize])
+    if (appearance.theme !== 'system') return
+
+    const mql = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = () => applyThemeClass('system')
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [appearance.theme])
+
+  useEffect(() => {
+    const fontSizeMap = { small: '14px', medium: '16px', large: '18px' }
+    document.documentElement.style.setProperty('--font-size-base', fontSizeMap[appearance.fontSize])
   }, [appearance.fontSize])
 
-  // 应用消息间距
   useEffect(() => {
-    const root = document.documentElement
-    const spacingMap = {
-      compact: '8px',
-      comfortable: '16px',
-      spacious: '24px',
-    }
-    root.style.setProperty('--spacing-base', spacingMap[appearance.messageSpacing])
+    const spacingMap = { compact: '8px', comfortable: '16px', spacious: '24px' }
+    document.documentElement.style.setProperty('--spacing-base', spacingMap[appearance.messageSpacing])
   }, [appearance.messageSpacing])
 
-  return {
-    appearance,
-    updateAppearanceSetting,
-  }
+  useEffect(() => {
+    document.documentElement.setAttribute('data-code-theme', appearance.codeBlockTheme || 'github')
+  }, [appearance.codeBlockTheme])
+
+  return { appearance, updateAppearanceSetting }
 }
 
-/**
- * 使用主题 Hook
- * 快速访问和更新主题
- */
 export function useTheme() {
   const { appearance, updateAppearanceSetting } = useSettings()
 
@@ -81,43 +65,21 @@ export function useTheme() {
     setTheme(themes[nextIndex])
   }
 
-  return {
-    theme: appearance.theme,
-    setTheme,
-    toggleTheme,
-  }
+  return { theme: appearance.theme, setTheme, toggleTheme }
 }
 
-/**
- * 使用字体大小 Hook
- * 快速访问和更新字体大小
- */
 export function useFontSize() {
   const { appearance, updateAppearanceSetting } = useSettings()
-
-  const setFontSize = (size: AppearanceSettings['fontSize']) => {
-    updateAppearanceSetting('fontSize', size)
-  }
-
   return {
     fontSize: appearance.fontSize,
-    setFontSize,
+    setFontSize: (size: AppearanceSettings['fontSize']) => updateAppearanceSetting('fontSize', size),
   }
 }
 
-/**
- * 使用代码块主题 Hook
- * 快速访问和更新代码块主题
- */
 export function useCodeBlockTheme() {
   const { appearance, updateAppearanceSetting } = useSettings()
-
-  const setCodeBlockTheme = (theme: AppearanceSettings['codeBlockTheme']) => {
-    updateAppearanceSetting('codeBlockTheme', theme)
-  }
-
   return {
     codeBlockTheme: appearance.codeBlockTheme,
-    setCodeBlockTheme,
+    setCodeBlockTheme: (theme: AppearanceSettings['codeBlockTheme']) => updateAppearanceSetting('codeBlockTheme', theme),
   }
 }
