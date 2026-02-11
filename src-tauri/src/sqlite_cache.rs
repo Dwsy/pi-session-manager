@@ -495,6 +495,23 @@ pub fn optimize_database(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
+/// Clear all cached session data (sessions table and session_details_cache table)
+/// Note: favorites table is preserved
+pub fn clear_all_cache(conn: &Connection) -> Result<(usize, usize), String> {
+    // Delete all sessions
+    let sessions_deleted = conn.execute("DELETE FROM sessions", [])
+        .map_err(|e| format!("Failed to delete sessions: {}", e))?;
+
+    // Delete all session details cache
+    let details_deleted = conn.execute("DELETE FROM session_details_cache", [])
+        .map_err(|e| format!("Failed to delete session details cache: {}", e))?;
+
+    // Vacuum to reclaim space
+    vacuum(conn)?;
+
+    Ok((sessions_deleted, details_deleted))
+}
+
 fn parse_timestamp(s: &str) -> DateTime<Utc> {
     DateTime::parse_from_rfc3339(s)
         .map(|dt| dt.with_timezone(&Utc))

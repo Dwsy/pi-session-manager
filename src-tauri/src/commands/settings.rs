@@ -1,153 +1,72 @@
+use serde_json::Value;
 use std::fs;
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct AppSettings {
-    pub terminal: TerminalSettings,
-    pub appearance: AppearanceSettings,
-    pub language: LanguageSettings,
-    pub session: SessionSettings,
-    pub search: SearchSettings,
-    pub export: ExportSettings,
-    pub advanced: AdvancedSettings,
-}
+const APP_SETTINGS_KEY: &str = "app_settings";
+const SERVER_SETTINGS_KEY: &str = "server_settings";
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct TerminalSettings {
-    pub default_terminal: String,
-    pub custom_terminal_command: Option<String>,
-    pub pi_command_path: String,
+pub struct ServerSettings {
+    pub ws_enabled: bool,
+    pub ws_port: u16,
+    pub http_enabled: bool,
+    pub http_port: u16,
+    pub auth_enabled: bool,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct AppearanceSettings {
-    pub theme: String,
-    pub sidebar_width: u32,
-    pub font_size: String,
-    pub code_block_theme: String,
-    pub message_spacing: String,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct LanguageSettings {
-    pub locale: String,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct SessionSettings {
-    pub auto_refresh: bool,
-    pub refresh_interval: u32,
-    pub default_view_mode: String,
-    pub show_message_preview: bool,
-    pub preview_lines: u32,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct SearchSettings {
-    pub default_search_mode: String,
-    pub case_sensitive: bool,
-    pub include_tool_calls: bool,
-    pub highlight_matches: bool,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct ExportSettings {
-    pub default_format: String,
-    pub include_metadata: bool,
-    pub include_timestamps: bool,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct AdvancedSettings {
-    pub session_dir: String,
-    pub cache_enabled: bool,
-    pub debug_mode: bool,
-    pub max_cache_size: u32,
-}
-
-fn get_app_settings_path() -> Result<std::path::PathBuf, String> {
-    let config_dir = dirs::config_dir().ok_or("Failed to get config directory")?;
-    Ok(config_dir
-        .join("pi-session-manager")
-        .join("settings.json"))
-}
-
-impl Default for AppSettings {
+impl Default for ServerSettings {
     fn default() -> Self {
         Self {
-            terminal: TerminalSettings {
-                default_terminal: "iterm2".to_string(),
-                custom_terminal_command: None,
-                pi_command_path: "pi".to_string(),
-            },
-            appearance: AppearanceSettings {
-                theme: "dark".to_string(),
-                sidebar_width: 320,
-                font_size: "medium".to_string(),
-                code_block_theme: "github".to_string(),
-                message_spacing: "comfortable".to_string(),
-            },
-            language: LanguageSettings {
-                locale: "en-US".to_string(),
-            },
-            session: SessionSettings {
-                auto_refresh: true,
-                refresh_interval: 30,
-                default_view_mode: "project".to_string(),
-                show_message_preview: true,
-                preview_lines: 2,
-            },
-            search: SearchSettings {
-                default_search_mode: "content".to_string(),
-                case_sensitive: false,
-                include_tool_calls: false,
-                highlight_matches: true,
-            },
-            export: ExportSettings {
-                default_format: "html".to_string(),
-                include_metadata: true,
-                include_timestamps: true,
-            },
-            advanced: AdvancedSettings {
-                session_dir: "~/.pi/agent/sessions".to_string(),
-                cache_enabled: true,
-                debug_mode: false,
-                max_cache_size: 100,
-            },
+            ws_enabled: true,
+            ws_port: 52130,
+            http_enabled: true,
+            http_port: 52131,
+            auth_enabled: true,
         }
     }
 }
 
-pub async fn load_app_settings_internal() -> Result<AppSettings, String> {
-    let settings_path = get_app_settings_path()?;
-
-    if !settings_path.exists() {
-        return Ok(AppSettings::default());
-    }
-
-    let content =
-        fs::read_to_string(&settings_path).map_err(|e| format!("Failed to read settings: {}", e))?;
-
-    serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {}", e))
+pub fn load_server_settings_sync() -> ServerSettings {
+    crate::settings_store::get_or_default::<ServerSettings>(SERVER_SETTINGS_KEY)
+        .unwrap_or_default()
 }
 
 #[tauri::command]
-pub async fn load_app_settings() -> Result<AppSettings, String> {
+pub async fn load_server_settings() -> Result<ServerSettings, String> {
+    crate::settings_store::get_or_default::<ServerSettings>(SERVER_SETTINGS_KEY)
+}
+
+#[tauri::command]
+pub async fn save_server_settings(settings: ServerSettings) -> Result<(), String> {
+    crate::settings_store::set(SERVER_SETTINGS_KEY, &settings)
+}
+
+pub async fn load_app_settings_internal() -> Result<Value, String> {
+    if let Some(v) = crate::settings_store::get::<Value>(APP_SETTINGS_KEY)? {
+        return Ok(v);
+    }
+
+    // Migrate from legacy JSON file if exists
+    let config_dir = dirs::config_dir().ok_or("Failed to get config directory")?;
+    let legacy_path = config_dir.join("pi-session-manager").join("settings.json");
+    if legacy_path.exists() {
+        if let Ok(content) = fs::read_to_string(&legacy_path) {
+            if let Ok(v) = serde_json::from_str::<Value>(&content) {
+                crate::settings_store::set(APP_SETTINGS_KEY, &v)?;
+                let _ = fs::remove_file(&legacy_path);
+                return Ok(v);
+            }
+        }
+    }
+
+    Ok(serde_json::json!({}))
+}
+
+#[tauri::command]
+pub async fn load_app_settings() -> Result<Value, String> {
     load_app_settings_internal().await
 }
 
 #[tauri::command]
-pub async fn save_app_settings(settings: AppSettings) -> Result<(), String> {
-    let settings_path = get_app_settings_path()?;
-
-    if let Some(parent) = settings_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create settings directory: {}", e))?;
-    }
-
-    let content = serde_json::to_string_pretty(&settings)
-        .map_err(|e| format!("Failed to serialize settings: {}", e))?;
-
-    fs::write(&settings_path, content).map_err(|e| format!("Failed to write settings: {}", e))?;
-
-    Ok(())
+pub async fn save_app_settings(settings: Value) -> Result<(), String> {
+    crate::settings_store::set(APP_SETTINGS_KEY, &settings)
 }
