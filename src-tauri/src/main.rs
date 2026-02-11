@@ -1,10 +1,17 @@
+use tauri::Manager;
+
 fn main() {
     tracing_subscriber::fmt::init();
+
+    let cli_mode = std::env::args().any(|a| a == "--cli" || a == "--headless");
+
+    // Load server settings before builder (sync, no runtime needed)
+    let server_cfg = pi_session_manager::load_server_settings_sync();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
+        .setup(move |app| {
             let app_handle = app.handle().clone();
 
             // Start file watcher
@@ -16,13 +23,68 @@ fn main() {
                 }
             }
 
-            // Initialize WebSocket adapter
-            let app_state = pi_session_manager::app_state::create_app_state(app_handle);
-            tauri::async_runtime::spawn(async move {
-                if let Err(e) = pi_session_manager::ws_adapter::init_ws_adapter(app_state, 52130).await {
-                    eprintln!("Failed to init WebSocket adapter: {}", e);
+            // Initialize auth (only if enabled)
+            if server_cfg.auth_enabled {
+                match pi_session_manager::auth::init() {
+                    Ok(token) => {
+                        if cli_mode {
+                            log::info!("Auth token: {}", token);
+                        }
+                    }
+                    Err(e) => eprintln!("Failed to init auth: {}", e),
                 }
-            });
+            }
+
+            // Initialize AppState and manage it
+            let app_state = pi_session_manager::app_state::create_app_state(app_handle);
+            app.manage(app_state.clone());
+
+            // Initialize WebSocket adapter
+            if server_cfg.ws_enabled {
+                let ws_state = app_state.clone();
+                let ws_port = server_cfg.ws_port;
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = pi_session_manager::ws_adapter::init_ws_adapter(ws_state, ws_port).await {
+                        eprintln!("Failed to init WebSocket adapter: {}", e);
+                    }
+                });
+            }
+
+            // Initialize HTTP adapter
+            if server_cfg.http_enabled {
+                let http_state = app_state.clone();
+                let http_port = server_cfg.http_port;
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = pi_session_manager::http_adapter::init_http_adapter(http_state, http_port).await {
+                        eprintln!("Failed to init HTTP adapter: {}", e);
+                    }
+                });
+            }
+
+            if cli_mode {
+                let mut info = String::from("CLI mode:");
+                if server_cfg.ws_enabled {
+                    info.push_str(&format!(" WS ws://0.0.0.0:{}", server_cfg.ws_port));
+                }
+                if server_cfg.http_enabled {
+                    info.push_str(&format!(" | HTTP http://0.0.0.0:{}/api", server_cfg.http_port));
+                }
+                log::info!("{}", info);
+            } else {
+                tauri::WebviewWindowBuilder::new(
+                    app,
+                    "main",
+                    tauri::WebviewUrl::App("index.html".into()),
+                )
+                .title("Pi Session Manager")
+                .inner_size(1400.0, 900.0)
+                .min_inner_size(1000.0, 600.0)
+                .resizable(true)
+                .fullscreen(false)
+                .title_bar_style(tauri::TitleBarStyle::Overlay)
+                .hidden_title(true)
+                .build()?;
+            }
 
             Ok(())
         })
@@ -55,7 +117,18 @@ fn main() {
             pi_session_manager::remove_favorite,
             pi_session_manager::get_all_favorites,
             pi_session_manager::is_favorite,
-            pi_session_manager::toggle_favorite
+            pi_session_manager::toggle_favorite,
+            pi_session_manager::toggle_devtools,
+            pi_session_manager::load_app_settings,
+            pi_session_manager::save_app_settings,
+            pi_session_manager::load_server_settings,
+            pi_session_manager::save_server_settings,
+            pi_session_manager::terminal_create,
+            pi_session_manager::terminal_write,
+            pi_session_manager::terminal_resize,
+            pi_session_manager::terminal_close,
+            pi_session_manager::get_default_shell,
+            pi_session_manager::get_available_shells
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

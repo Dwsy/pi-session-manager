@@ -10,18 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{
-      "title": "Pi Session Manager",
-      "width": 1400,
-      "height": 900,
-      "resizable": true,
-      "fullscreen": false,
-      "minWidth": 1000,
-      "minHeight": 600,
-      "devtools": true,
-      "titleBarStyle": "Overlay",
-      "hiddenTitle": true
-    }],
+    "windows": [],
     "security": {
       "csp": null,
       "capabilities": ["default"]
