@@ -16,6 +16,7 @@ interface OpenInTerminalButtonProps {
   showLabel?: boolean
   onSuccess?: () => void
   onError?: (error: string) => void
+  onWebResume?: () => void
   children?: React.ReactNode
 }
 
@@ -31,6 +32,7 @@ export default function OpenInTerminalButton({
   showLabel = false,
   onSuccess,
   onError,
+  onWebResume,
   children,
 }: OpenInTerminalButtonProps) {
   const { t } = useTranslation()
@@ -57,6 +59,11 @@ export default function OpenInTerminalButton({
   const handleOpenInTerminal = async (e?: React.MouseEvent) => {
     e?.stopPropagation()
 
+    if (!isTauri()) {
+      onWebResume?.()
+      return
+    }
+
     if (loading) return
 
     setLoading(true)
@@ -76,8 +83,6 @@ export default function OpenInTerminalButton({
       setLoading(false)
     }
   }
-
-  if (!isTauri()) return null
 
   return (
     <button

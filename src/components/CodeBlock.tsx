@@ -17,6 +17,11 @@ export default function CodeBlock({ code, language, filename, showLineNumbers = 
 
   useEffect(() => {
     if (codeRef.current) {
+      // Skip if already highlighted
+      if (codeRef.current.dataset.highlighted === 'yes') {
+        return
+      }
+
       const lang = language || (filename ? getLanguageFromPath(filename) : undefined)
 
       if (lang) {

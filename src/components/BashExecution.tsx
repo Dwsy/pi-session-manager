@@ -33,6 +33,11 @@ export default function BashExecution({
 
   useEffect(() => {
     if (codeRef.current) {
+      // Skip if already highlighted
+      if (codeRef.current.dataset.highlighted === 'yes') {
+        return
+      }
+
       try {
         hljs.highlightElement(codeRef.current)
       } catch (e) {
