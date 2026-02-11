@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { escapeHtml } from '../utils/markdown'
 import { shortenPath, formatDate } from '../utils/format'
+import { useTheme } from '../hooks/useAppearance'
 
 interface EditExecutionProps {
   filePath: string
@@ -20,6 +21,8 @@ export default function EditExecution({
   expanded = false,
 }: EditExecutionProps) {
   const { t } = useTranslation()
+  const { theme } = useTheme()
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   const [localExpanded, setLocalExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
   const displayPath = shortenPath(filePath)
@@ -152,7 +155,7 @@ export default function EditExecution({
             newFile={newFile}
             options={{
               theme: { dark: 'pierre-dark', light: 'pierre-light' },
-              themeType: 'dark',
+              themeType: isDark ? 'dark' : 'light',
               diffStyle: 'split',
               overflow: 'wrap',
             }}
