@@ -57,7 +57,7 @@ export function useSessions(): UseSessionsReturn {
             // Session metadata changed, updating silently
             setSelectedSession(prev => {
               if (!prev) return matched
-              return Object.assign(prev, matched)
+              return { ...prev, ...matched }
             })
           }
         } else {

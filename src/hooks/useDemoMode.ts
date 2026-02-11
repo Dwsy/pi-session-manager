@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import type { SessionInfo, SearchResult, SessionEntry, SessionStats, HeatmapPoint, TimeDistributionPoint, ModelTokenStats } from '../types'
 import { format, subDays } from 'date-fns'
+import { getCachedSettings } from '../utils/settingsApi'
 
 // Token cost rates (USD per million tokens for common models)
 const TOKEN_RATES: Record<string, { input: number; output: number }> = {
@@ -333,13 +334,9 @@ export function getDemoStats(): SessionStats {
 export function useDemoMode(): UseDemoModeReturn {
   const getIsDemoMode = useCallback((): boolean => {
     try {
-      const settings = localStorage.getItem('pi-session-manager-settings')
-      if (settings) {
-        const parsed = JSON.parse(settings)
-        return parsed?.advanced?.demoMode === true
-      }
+      return getCachedSettings()?.advanced?.demoMode === true
     } catch (error) {
-      console.error('Failed to parse settings:', error)
+      console.error('Failed to get demo mode:', error)
     }
     return false
   }, [])

@@ -4,10 +4,32 @@
 
 import { useTranslation } from 'react-i18next'
 import { FolderOpen } from 'lucide-react'
+import { invoke } from '../../../transport'
 import type { AdvancedSettingsProps } from '../types'
+
+interface ClearCacheResult {
+  sessions_deleted: number
+  details_deleted: number
+}
 
 export default function AdvancedSettings({ settings, onUpdate }: AdvancedSettingsProps) {
   const { t } = useTranslation()
+
+  const handleClearCache = async () => {
+    if (!confirm(t('settings.advanced.clearCacheConfirm', '确定要清除所有缓存数据吗？这将删除所有会话缓存，但保留收藏夹。'))) {
+      return
+    }
+    try {
+      const result = await invoke<ClearCacheResult>('clear_cache')
+      alert(t('settings.advanced.cacheClearedDetail', '缓存已清除：{{sessions}} 个会话，{{details}} 个详情缓存', {
+        sessions: result.sessions_deleted,
+        details: result.details_deleted
+      }))
+    } catch (error) {
+      console.error('Failed to clear cache:', error)
+      alert(t('settings.advanced.cacheClearFailed', '清除缓存失败'))
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -124,10 +146,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
           {t('settings.advanced.showOnboarding', '重新显示新手引导')}
         </button>
         <button
-          onClick={() => {
-            localStorage.clear()
-            alert(t('settings.advanced.cacheCleared', '缓存已清除'))
-          }}
+          onClick={handleClearCache}
           className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm transition-colors"
         >
           {t('settings.advanced.clearCache', '清除缓存')}

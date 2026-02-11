@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
-import { invoke } from '../transport'
 import i18n from '../i18n'
+import { loadAppSettings } from '../utils/settingsApi'
 
 export type TerminalType = 'iterm2' | 'terminal' | 'vscode' | 'custom'
 
@@ -18,21 +18,16 @@ export function useAppSettings(): UseAppSettingsReturn {
 
   const loadSettings = useCallback(async () => {
     try {
-      const settings = await invoke('load_app_settings') as any
+      const settings = await loadAppSettings()
       if (settings?.terminal) {
-        setTerminal(settings.terminal.default_terminal || 'iterm2')
-        setPiPath(settings.terminal.pi_command_path || 'pi')
-        setCustomCommand(settings.terminal.custom_terminal_command || '')
+        setTerminal(settings.terminal.defaultTerminal || 'iterm2')
+        setPiPath(settings.terminal.piCommandPath || 'pi')
+        setCustomCommand(settings.terminal.customTerminalCommand || '')
       }
-
-      const frontendSettings = localStorage.getItem('pi-session-manager-settings')
-      if (frontendSettings) {
-        const parsed = JSON.parse(frontendSettings)
-        if (parsed?.language?.locale) {
-          i18n.changeLanguage(parsed.language.locale)
-        }
+      if (settings?.language?.locale) {
+        i18n.changeLanguage(settings.language.locale)
       }
-    } catch (error) {
+    } catch {
       // Silently fail during initialization
     }
   }, [])

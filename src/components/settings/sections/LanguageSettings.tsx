@@ -15,12 +15,8 @@ export default function LanguageSettings({ settings, onUpdate }: LanguageSetting
   ]
 
   const handleLanguageChange = (langCode: string) => {
-    // 更新 settings
     onUpdate('language', 'locale', langCode)
-    // 切换 i18n 语言
     i18n.changeLanguage(langCode)
-    // 保存到 localStorage
-    localStorage.setItem('app-language', langCode)
   }
 
   return (
