@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useMemo, useRef, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { Transport, TauriTransport, WebSocketTransport } from '../transport'
 
 interface TransportContextValue {
@@ -8,15 +9,18 @@ interface TransportContextValue {
 
 const TransportContext = createContext<TransportContextValue | null>(null)
 
-function detectEnvironment(): 'tauri' | 'web' {
-  if (typeof window !== 'undefined' && (window as { __TAURI__?: unknown }).__TAURI__) {
-    return 'tauri'
+function createTransportInstance(wsUrl: string, forceWebSocket: boolean): { transport: Transport; isWebSocket: boolean } {
+  const isTauri = typeof window !== 'undefined' && !!(window as { __TAURI__?: unknown }).__TAURI__
+  const useWs = forceWebSocket || !isTauri
+
+  return {
+    transport: useWs ? new WebSocketTransport(wsUrl) : new TauriTransport(),
+    isWebSocket: useWs,
   }
-  return 'web'
 }
 
 interface TransportProviderProps {
-  children: React.ReactNode
+  children: ReactNode
   wsUrl?: string
   forceWebSocket?: boolean
 }
@@ -26,33 +30,15 @@ export function TransportProvider({
   wsUrl = 'ws://localhost:52130',
   forceWebSocket = false,
 }: TransportProviderProps) {
-  const transportRef = useRef<Transport | null>(null)
-
-  const value = useMemo<TransportContextValue>(() => {
-    const env = detectEnvironment()
-    const useWebSocket = forceWebSocket || env === 'web'
-
-    if (!transportRef.current) {
-      if (useWebSocket) {
-        transportRef.current = new WebSocketTransport(wsUrl)
-      } else {
-        transportRef.current = new TauriTransport()
-      }
-    }
-
-    return {
-      transport: transportRef.current,
-      isWebSocket: useWebSocket,
-    }
-  }, [wsUrl, forceWebSocket])
+  const [value] = useState<TransportContextValue>(() => createTransportInstance(wsUrl, forceWebSocket))
 
   useEffect(() => {
     return () => {
-      if (transportRef.current && 'disconnect' in transportRef.current) {
-        ;(transportRef.current as WebSocketTransport).disconnect()
+      if (value.isWebSocket && 'disconnect' in value.transport) {
+        (value.transport as WebSocketTransport).disconnect()
       }
     }
-  }, [])
+  }, [value])
 
   return <TransportContext.Provider value={value}>{children}</TransportContext.Provider>
 }

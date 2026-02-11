@@ -14,11 +14,4 @@ export default defineConfig(async () => ({
       overlay: false,
     },
   },
-  logLevel: 'silent',
-  customLogger: {
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-    ready: () => {},
-  },
 }))
