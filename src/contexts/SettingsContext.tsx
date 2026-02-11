@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import type { AppSettings } from '../components/settings/types'
 import { defaultSettings } from '../components/settings/types'
+import { loadAppSettings, saveAppSettings } from '../utils/settingsApi'
 
 interface SettingsContextType {
   settings: AppSettings
@@ -29,20 +30,12 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 加载设置
   const loadSettings = async () => {
     setLoading(true)
     setError(null)
     try {
-      // TODO: 实现从后端加载设置
-      // const savedSettings = await invoke<AppSettings>('load_settings')
-      // setSettings(savedSettings)
-
-      // 临时：从 localStorage 加载
-      const saved = localStorage.getItem('pi-session-manager-settings')
-      if (saved) {
-        setSettings({ ...defaultSettings, ...JSON.parse(saved) })
-      }
+      const s = await loadAppSettings()
+      setSettings(s)
     } catch (err) {
       console.error('Failed to load settings:', err)
       setError('加载设置失败')
@@ -51,16 +44,11 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     }
   }
 
-  // 保存设置
-  const saveSettings = async () => {
+  const doSave = async () => {
     setSaving(true)
     setError(null)
     try {
-      // TODO: 实现保存到后端
-      // await invoke('save_settings', { settings })
-
-      // 临时：保存到 localStorage
-      localStorage.setItem('pi-session-manager-settings', JSON.stringify(settings))
+      await saveAppSettings(settings)
     } catch (err) {
       console.error('Failed to save settings:', err)
       setError('保存设置失败')
@@ -70,7 +58,6 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     }
   }
 
-  // 更新设置
   const updateSetting = <K extends keyof AppSettings>(
     section: K,
     key: keyof AppSettings[K],
@@ -85,17 +72,14 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     }))
   }
 
-  // 重置设置
   const resetSettings = () => {
     setSettings(defaultSettings)
   }
 
-  // 重载设置
   const reloadSettings = async () => {
     await loadSettings()
   }
 
-  // 初始化加载
   useEffect(() => {
     loadSettings()
   }, [])
@@ -107,7 +91,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     error,
     updateSetting,
     resetSettings,
-    saveSettings,
+    saveSettings: doSave,
     reloadSettings,
   }
 
