@@ -116,6 +116,9 @@
   --muted-fg-rgb: 106, 111, 133;
   --glass-rgb: 44, 45, 59;
   --text-secondary: #d4d4d8;
+  --bg-subtle: rgba(0, 0, 0, 0.12);
+  --bg-inset: rgba(0, 0, 0, 0.2);
+  --bg-inset-hover: rgba(0, 0, 0, 0.3);
 
   /* Legacy variables */
   --line-height: 18px;
@@ -217,6 +220,9 @@
   --muted-fg-rgb: 107, 114, 128;
   --glass-rgb: 255, 255, 255;
   --text-secondary: #374151;
+  --bg-subtle: rgba(0, 0, 0, 0.025);
+  --bg-inset: rgba(0, 0, 0, 0.045);
+  --bg-inset-hover: rgba(0, 0, 0, 0.065);
 
   --accent: #0d9488;
   --border: #3b82f6;
@@ -311,6 +317,9 @@
     --muted-fg-rgb: 107, 114, 128;
     --glass-rgb: 255, 255, 255;
     --text-secondary: #374151;
+    --bg-subtle: rgba(0, 0, 0, 0.025);
+    --bg-inset: rgba(0, 0, 0, 0.045);
+    --bg-inset-hover: rgba(0, 0, 0, 0.065);
 
     --accent: #0d9488;
     --border: #3b82f6;
@@ -475,7 +484,7 @@ body {
 .tool-execution {
   margin: 16px 0;
   border-radius: 8px;
-  background: rgba(var(--shadow-rgb), 0.15);
+  background: var(--bg-subtle);
   overflow: hidden;
 }
 
@@ -488,7 +497,7 @@ body {
 }
 
 .tool-execution.pending {
-  background: rgba(var(--shadow-rgb), 0.1);
+  background: var(--bg-subtle);
 }
 
 .tool-execution.success {
@@ -539,10 +548,11 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(var(--shadow-rgb), 0.25);
+  background: var(--bg-inset);
   border-radius: 6px;
   margin: 0 12px 8px 12px;
   padding-right: 8px;
+  overflow: hidden;
 }
 
 .tool-command-wrapper .tool-command {
@@ -621,7 +631,7 @@ body {
 
 .tool-arguments {
   padding: 12px;
-  background: rgba(var(--shadow-rgb), 0.2);
+  background: var(--bg-inset);
   border-bottom: 1px solid rgba(var(--accent-rgb), 0.15);
 }
 
@@ -667,7 +677,7 @@ body {
   padding: 12px;
   font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
   font-size: 11px;
-  background: rgba(var(--shadow-rgb), 0.2);
+  background: var(--bg-inset);
   overflow-x: auto;
 }
 
@@ -688,6 +698,19 @@ body {
   --pierre-diff-remove-bg: rgba(204, 102, 102, 0.15);
   --pierre-diff-remove-text: #cc6666;
   --pierre-line-number: #666666;
+}
+
+.tool-diff .pierre-light {
+  --pierre-bg-primary: #ffffff;
+  --pierre-bg-secondary: #f8f9fa;
+  --pierre-border: rgba(0, 0, 0, 0.1);
+  --pierre-text: #1a1b2e;
+  --pierre-text-muted: #6b7280;
+  --pierre-diff-add-bg: rgba(22, 163, 74, 0.1);
+  --pierre-diff-add-text: #16a34a;
+  --pierre-diff-remove-bg: rgba(220, 38, 38, 0.1);
+  --pierre-diff-remove-text: #dc2626;
+  --pierre-line-number: #9ca3af;
 }
 
 .expand-hint {
@@ -741,7 +764,7 @@ body {
 }
 
 .hover-preview-content::-webkit-scrollbar-track {
-  background: rgba(var(--shadow-rgb), 0.2);
+  background: var(--bg-inset);
 }
 
 .hover-preview-content::-webkit-scrollbar-thumb {
@@ -814,7 +837,7 @@ body {
 
 /* Code Block Styles - Simplified */
 .code-block-wrapper {
-  background: rgba(var(--shadow-rgb), 0.2);
+  background: var(--bg-inset);
   border-radius: 8px;
   margin: 16px 0;
   overflow: hidden;
@@ -906,7 +929,7 @@ body {
 
 .code-block-content::-webkit-scrollbar-track,
 .code-block::-webkit-scrollbar-track {
-  background: rgba(var(--shadow-rgb), 0.2);
+  background: var(--bg-inset);
 }
 
 .code-block-content::-webkit-scrollbar-thumb,

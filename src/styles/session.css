@@ -102,7 +102,7 @@
    padding: 6px 10px;
    font-size: 13px;
    font-family: inherit;
-   background: rgba(var(--shadow-rgb), 0.3);
+   background: var(--bg-inset-hover);
    color: var(--text-secondary);
    border: none;
    border-radius: 6px;
@@ -112,7 +112,7 @@
  .search-input:focus {
    outline: none;
    border-color: rgba(var(--accent-rgb), 0.5);
-   background: rgba(var(--shadow-rgb), 0.4);
+   background: var(--bg-inset-hover);
    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.1);
  }
 
@@ -246,7 +246,7 @@
    padding: 6px 10px;
    font-size: 11px;
    font-family: inherit;
-   background: rgba(var(--shadow-rgb), 0.2);
+   background: var(--bg-inset);
    color: var(--text-secondary);
    border: none;
    border-radius: 6px;
@@ -256,7 +256,7 @@
  .sidebar-search:focus {
    outline: none;
    border-color: rgba(var(--accent-rgb), 0.5);
-   background: rgba(var(--shadow-rgb), 0.3);
+   background: var(--bg-inset-hover);
    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.1);
  }
 
@@ -434,7 +434,7 @@
    color: rgb(var(--color-muted-foreground));
    flex-shrink: 0;
    border-top: 1px solid rgba(var(--accent-rgb), 0.1);
-   background: rgba(var(--shadow-rgb), 0.1);
+   background: var(--bg-subtle);
  }
 
  /*
@@ -531,7 +531,7 @@
 
  .tool-action-button {
    padding: 6px;
-   background: rgba(var(--shadow-rgb), 0.3);
+   background: var(--bg-inset-hover);
    color: rgb(var(--color-muted-foreground));
    border: none;
    border-radius: 6px;
@@ -563,7 +563,7 @@
 .tool-command-wrapper {
   position: relative;
   margin-top: 8px;
-  background: rgba(var(--shadow-rgb), 0.25);
+  background: var(--bg-inset);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -644,7 +644,7 @@
 .session-tree-search {
   padding: 12px 12px 8px 12px;
   border-bottom: 1px solid rgba(var(--accent-rgb), 0.1);
-  background: rgba(var(--shadow-rgb), 0.1);
+  background: var(--bg-subtle);
 }
 
 .session-tree-search-content {
@@ -672,7 +672,7 @@
   padding: 6px 10px 6px 28px;
   font-size: 12px;
   font-family: inherit;
-  background: rgba(var(--shadow-rgb), 0.2);
+  background: var(--bg-inset);
   color: var(--text-secondary);
   border: none;
   border-radius: 6px;
@@ -682,7 +682,7 @@
 .session-tree-search .search-input:focus {
   outline: none;
   border-color: rgba(var(--accent-rgb), 0.5);
-  background: rgba(var(--shadow-rgb), 0.3);
+  background: var(--bg-inset-hover);
   box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.1);
 }
 
