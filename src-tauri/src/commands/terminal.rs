@@ -45,6 +45,15 @@ pub async fn terminal_close(
 }
 
 pub fn scan_shells() -> Vec<(String, String)> {
+    #[cfg(target_os = "windows")]
+    let candidates: &[(&str, &[&str])] = &[
+        ("PowerShell", &[r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"]),
+        ("pwsh", &[r"C:\Program Files\PowerShell\7\pwsh.exe"]),
+        ("cmd", &[r"C:\Windows\System32\cmd.exe"]),
+        ("Git Bash", &[r"C:\Program Files\Git\bin\bash.exe"]),
+    ];
+
+    #[cfg(not(target_os = "windows"))]
     let candidates: &[(&str, &[&str])] = &[
         ("zsh", &["/bin/zsh", "/usr/bin/zsh", "/usr/local/bin/zsh", "/opt/homebrew/bin/zsh"]),
         ("bash", &["/bin/bash", "/usr/bin/bash", "/usr/local/bin/bash", "/opt/homebrew/bin/bash"]),
@@ -52,6 +61,7 @@ pub fn scan_shells() -> Vec<(String, String)> {
         ("fish", &["/usr/local/bin/fish", "/opt/homebrew/bin/fish", "/usr/bin/fish"]),
         ("nu", &["/usr/local/bin/nu", "/opt/homebrew/bin/nu", "/usr/bin/nu"]),
     ];
+
     let mut shells = Vec::new();
     for (label, paths) in candidates {
         for path in *paths {
@@ -67,7 +77,8 @@ pub fn scan_shells() -> Vec<(String, String)> {
 #[tauri::command]
 pub async fn get_default_shell() -> Result<String, String> {
     let shells = scan_shells();
-    Ok(shells.first().map(|(_, p)| p.clone()).unwrap_or_else(|| "/bin/sh".to_string()))
+    let fallback = if cfg!(windows) { "cmd.exe" } else { "/bin/sh" };
+    Ok(shells.first().map(|(_, p)| p.clone()).unwrap_or_else(|| fallback.to_string()))
 }
 
 #[tauri::command]

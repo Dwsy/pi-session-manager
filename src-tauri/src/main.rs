@@ -71,7 +71,7 @@ fn main() {
                 }
                 log::info!("{}", info);
             } else {
-                tauri::WebviewWindowBuilder::new(
+                let builder = tauri::WebviewWindowBuilder::new(
                     app,
                     "main",
                     tauri::WebviewUrl::App("index.html".into()),
@@ -80,10 +80,17 @@ fn main() {
                 .inner_size(1400.0, 900.0)
                 .min_inner_size(1000.0, 600.0)
                 .resizable(true)
-                .fullscreen(false)
-                .title_bar_style(tauri::TitleBarStyle::Overlay)
-                .hidden_title(true)
-                .build()?;
+                .fullscreen(false);
+
+                #[cfg(target_os = "macos")]
+                let builder = builder
+                    .title_bar_style(tauri::TitleBarStyle::Overlay)
+                    .hidden_title(true);
+
+                #[cfg(not(target_os = "macos"))]
+                let builder = builder.decorations(true);
+
+                builder.build()?;
             }
 
             Ok(())

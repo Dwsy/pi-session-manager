@@ -184,33 +184,55 @@ pub async fn open_session_in_terminal(
     let cwd_escaped = cwd.replace("\"", "\\\\\"").replace("\\", "\\\\");
     let path_escaped = path.replace("\"", "\\\\\"");
 
-    let result = match terminal.as_str() {
-        "iterm2" => {
-            let script = format!(
-                r#"tell application "iTerm"
+    let result = if cfg!(target_os = "macos") {
+        match terminal.as_str() {
+            "iterm2" => {
+                let script = format!(
+                    r#"tell application "iTerm"
     activate
     set newWindow to (create window with default profile)
     tell current session of newWindow
         write text "cd \"{}\" && {} --session \"{}\""
     end tell
 end tell"#,
-                cwd_escaped, pi_cmd, path_escaped
-            );
-            Command::new("osascript").arg("-e").arg(script).spawn()
-        }
-        "terminal" => {
-            let script = format!(
-                r#"tell application "Terminal"
+                    cwd_escaped, pi_cmd, path_escaped
+                );
+                Command::new("osascript").arg("-e").arg(script).spawn()
+            }
+            "terminal" => {
+                let script = format!(
+                    r#"tell application "Terminal"
     activate
     do script "cd \"{}\" && {} --session \"{}\""
 end tell"#,
-                cwd_escaped, pi_cmd, path_escaped
-            );
-            Command::new("osascript").arg("-e").arg(script).spawn()
+                    cwd_escaped, pi_cmd, path_escaped
+                );
+                Command::new("osascript").arg("-e").arg(script).spawn()
+            }
+            "vscode" => Command::new("code").args(["--new-window", &cwd]).spawn(),
+            _ => return Err(format!("Unsupported terminal on macOS: {}", terminal)),
         }
-        "vscode" => Command::new("code").args(["--new-window", &cwd]).spawn(),
-        _ => {
-            return Err(format!("Unsupported terminal: {}", terminal));
+    } else if cfg!(target_os = "windows") {
+        let cmd_str = format!("cd /d \"{}\" && {} --session \"{}\"", cwd, pi_cmd, path);
+        match terminal.as_str() {
+            "cmd" => Command::new("cmd").args(["/C", "start", "cmd", "/K", &cmd_str]).spawn(),
+            "powershell" => Command::new("cmd")
+                .args(["/C", "start", "powershell", "-NoExit", "-Command", &format!("cd '{}'; {} --session '{}'", cwd, pi_cmd, path)])
+                .spawn(),
+            "windows-terminal" => Command::new("wt").args(["cmd", "/K", &cmd_str]).spawn(),
+            "vscode" => Command::new("code").args(["--new-window", &cwd]).spawn(),
+            _ => return Err(format!("Unsupported terminal on Windows: {}", terminal)),
+        }
+    } else {
+        // Linux
+        let cmd_str = format!("cd '{}' && {} --session '{}'", cwd, pi_cmd, path);
+        match terminal.as_str() {
+            "gnome-terminal" => Command::new("gnome-terminal").args(["--", "bash", "-c", &cmd_str]).spawn(),
+            "konsole" => Command::new("konsole").args(["-e", "bash", "-c", &cmd_str]).spawn(),
+            "xfce4-terminal" => Command::new("xfce4-terminal").args(["-e", &format!("bash -c '{}'", cmd_str)]).spawn(),
+            "xterm" => Command::new("xterm").args(["-e", "bash", "-c", &cmd_str]).spawn(),
+            "vscode" => Command::new("code").args(["--new-window", &cwd]).spawn(),
+            _ => Command::new("x-terminal-emulator").args(["-e", "bash", "-c", &cmd_str]).spawn(),
         }
     };
 

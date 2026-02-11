@@ -528,7 +528,8 @@ pub async fn dispatch(app_state: &SharedAppState, command: &str, payload: &Value
         }
         "get_default_shell" => {
             let shells = crate::commands::terminal::scan_shells();
-            Ok(serde_json::json!(shells.first().map(|(_, p)| p.as_str()).unwrap_or("/bin/sh")))
+            let fallback = if cfg!(windows) { "cmd.exe" } else { "/bin/sh" };
+            Ok(serde_json::json!(shells.first().map(|(_, p)| p.as_str()).unwrap_or(fallback)))
         }
         "get_available_shells" => {
             Ok(serde_json::json!(crate::commands::terminal::scan_shells()))
