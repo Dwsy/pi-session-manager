@@ -1,5 +1,5 @@
-use crate::session_parser::SessionDetails;
 use crate::models::SessionInfo;
+use crate::session_parser::SessionDetails;
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -105,7 +105,8 @@ pub fn get_buffered_details(path: &str) -> Option<(SessionDetails, DateTime<Utc>
 pub fn check_and_take_flush_data() -> Option<(Vec<SessionCacheEntry>, Vec<DetailsCacheEntry>)> {
     if let Ok(mut buffer) = get_buffer().lock() {
         if buffer.should_flush() && (!buffer.sessions.is_empty() || !buffer.details.is_empty()) {
-            let sessions: Vec<SessionCacheEntry> = buffer.sessions.drain().map(|(_, v)| v).collect();
+            let sessions: Vec<SessionCacheEntry> =
+                buffer.sessions.drain().map(|(_, v)| v).collect();
             let details: Vec<DetailsCacheEntry> = buffer.details.drain().map(|(_, v)| v).collect();
             buffer.last_flush = Instant::now();
             return Some((sessions, details));
@@ -118,7 +119,8 @@ pub fn check_and_take_flush_data() -> Option<(Vec<SessionCacheEntry>, Vec<Detail
 pub fn force_flush_all() -> Option<(Vec<SessionCacheEntry>, Vec<DetailsCacheEntry>)> {
     if let Ok(mut buffer) = get_buffer().lock() {
         if !buffer.sessions.is_empty() || !buffer.details.is_empty() {
-            let sessions: Vec<SessionCacheEntry> = buffer.sessions.drain().map(|(_, v)| v).collect();
+            let sessions: Vec<SessionCacheEntry> =
+                buffer.sessions.drain().map(|(_, v)| v).collect();
             let details: Vec<DetailsCacheEntry> = buffer.details.drain().map(|(_, v)| v).collect();
             buffer.last_flush = Instant::now();
             return Some((sessions, details));

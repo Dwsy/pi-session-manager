@@ -8,10 +8,12 @@ pub async fn terminal_create(
     id: String,
     cwd: String,
     shell: String,
+    rows: u16,
+    cols: u16,
 ) -> Result<String, String> {
     let event_tx = state.event_tx.clone();
     let manager = state.terminal_manager.lock().map_err(|e| e.to_string())?;
-    manager.create_session(id, app, event_tx, cwd, shell)
+    manager.create_session(id, app, event_tx, cwd, shell, rows, cols)
 }
 
 #[tauri::command]
@@ -36,10 +38,7 @@ pub async fn terminal_resize(
 }
 
 #[tauri::command]
-pub async fn terminal_close(
-    state: State<'_, SharedAppState>,
-    id: String,
-) -> Result<(), String> {
+pub async fn terminal_close(state: State<'_, SharedAppState>, id: String) -> Result<(), String> {
     let manager = state.terminal_manager.lock().map_err(|e| e.to_string())?;
     manager.close_session(&id)
 }
@@ -47,7 +46,10 @@ pub async fn terminal_close(
 pub fn scan_shells() -> Vec<(String, String)> {
     #[cfg(target_os = "windows")]
     let candidates: &[(&str, &[&str])] = &[
-        ("PowerShell", &[r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"]),
+        (
+            "PowerShell",
+            &[r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"],
+        ),
         ("pwsh", &[r"C:\Program Files\PowerShell\7\pwsh.exe"]),
         ("cmd", &[r"C:\Windows\System32\cmd.exe"]),
         ("Git Bash", &[r"C:\Program Files\Git\bin\bash.exe"]),
@@ -55,11 +57,37 @@ pub fn scan_shells() -> Vec<(String, String)> {
 
     #[cfg(not(target_os = "windows"))]
     let candidates: &[(&str, &[&str])] = &[
-        ("zsh", &["/bin/zsh", "/usr/bin/zsh", "/usr/local/bin/zsh", "/opt/homebrew/bin/zsh"]),
-        ("bash", &["/bin/bash", "/usr/bin/bash", "/usr/local/bin/bash", "/opt/homebrew/bin/bash"]),
+        (
+            "zsh",
+            &[
+                "/bin/zsh",
+                "/usr/bin/zsh",
+                "/usr/local/bin/zsh",
+                "/opt/homebrew/bin/zsh",
+            ],
+        ),
+        (
+            "bash",
+            &[
+                "/bin/bash",
+                "/usr/bin/bash",
+                "/usr/local/bin/bash",
+                "/opt/homebrew/bin/bash",
+            ],
+        ),
         ("sh", &["/bin/sh", "/usr/bin/sh"]),
-        ("fish", &["/usr/local/bin/fish", "/opt/homebrew/bin/fish", "/usr/bin/fish"]),
-        ("nu", &["/usr/local/bin/nu", "/opt/homebrew/bin/nu", "/usr/bin/nu"]),
+        (
+            "fish",
+            &[
+                "/usr/local/bin/fish",
+                "/opt/homebrew/bin/fish",
+                "/usr/bin/fish",
+            ],
+        ),
+        (
+            "nu",
+            &["/usr/local/bin/nu", "/opt/homebrew/bin/nu", "/usr/bin/nu"],
+        ),
     ];
 
     let mut shells = Vec::new();
@@ -78,7 +106,10 @@ pub fn scan_shells() -> Vec<(String, String)> {
 pub async fn get_default_shell() -> Result<String, String> {
     let shells = scan_shells();
     let fallback = if cfg!(windows) { "cmd.exe" } else { "/bin/sh" };
-    Ok(shells.first().map(|(_, p)| p.clone()).unwrap_or_else(|| fallback.to_string()))
+    Ok(shells
+        .first()
+        .map(|(_, p)| p.clone())
+        .unwrap_or_else(|| fallback.to_string()))
 }
 
 #[tauri::command]

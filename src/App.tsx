@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search, Terminal } from 'lucide-react'
+import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search, Terminal, Columns3 } from 'lucide-react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const startDragging = () => {
@@ -19,6 +19,8 @@ import SettingsPanel from './components/settings/SettingsPanel'
 import Onboarding from './components/Onboarding'
 import { CommandPalette } from './components/command'
 import TerminalPanel from './components/TerminalPanel'
+import TagFilter from './components/TagFilter'
+import KanbanBoard from './components/kanban/KanbanBoard'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useSessionBadges } from './hooks/useSessionBadges'
@@ -26,6 +28,7 @@ import { useSessions } from './hooks/useSessions'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useSessionActions } from './hooks/useSessionActions'
 import { useAppearance } from './hooks/useAppearance'
+import { useTags } from './hooks/useTags'
 import { registerBuiltinPlugins } from './plugins'
 import type { SessionInfo, FavoriteItem } from './types'
 import type { SearchContext } from './plugins/types'
@@ -61,13 +64,15 @@ function App() {
   const { terminal, piPath, customCommand, loadSettings } = useAppSettings()
   const { handleExportSession } = useSessionActions()
   const { getBadgeType, clearBadge } = useSessionBadges(sessions)
+  const { tags, sessionTags, getTagsForSession, assignTag, removeTagFromSession, createTag, moveSession } = useTags()
   useAppearance()
 
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'list' | 'project'>(() => {
+  const [viewMode, setViewMode] = useState<'list' | 'project' | 'kanban'>(() => {
     const saved = getCachedSettings().session?.defaultViewMode
-    return saved === 'list' ? 'list' : 'project'
+    return saved === 'list' ? 'list' : saved === 'kanban' ? 'kanban' : 'project'
   })
+  const [filterTagIds, setFilterTagIds] = useState<string[]>([])
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -79,6 +84,7 @@ function App() {
     return !localStorage.getItem('onboarding-completed')
   })
   const [showTerminal, setShowTerminal] = useState(false)
+  const [terminalMaximized, setTerminalMaximized] = useState(false)
   const [terminalConfig, setTerminalConfig] = useState({ enabled: true, defaultShell: getPlatformDefaults().defaultShell, fontSize: 13 })
   const hasInitializedRef = useRef(false)
 
@@ -249,14 +255,18 @@ function App() {
       } else if (showRenameDialog) {
         setShowRenameDialog(false)
       } else if (showTerminal) {
-        setShowTerminal(false)
+        if (terminalMaximized) {
+          setTerminalMaximized(false)
+        } else {
+          setShowTerminal(false)
+        }
       } else if (selectedProject) {
         setSelectedProject(null)
       } else {
         setSelectedSession(null)
       }
     },
-  }), [showSettings, showExportDialog, showRenameDialog, showTerminal, selectedProject, setSelectedSession, handleResumeSession, handleExportAndOpen, terminalConfig.enabled])
+  }), [showSettings, showExportDialog, showRenameDialog, showTerminal, terminalMaximized, selectedProject, setSelectedSession, handleResumeSession, handleExportAndOpen, terminalConfig.enabled])
 
   useKeyboardShortcuts(shortcuts)
 
@@ -270,6 +280,14 @@ function App() {
     searchCurrentProjectOnly: false,
     t
   }), [sessions, selectedProject, selectedSession, t, setSelectedSession])
+
+  const filteredSessions = useMemo(() => {
+    if (filterTagIds.length === 0) return sessions
+    const taggedIds = new Set(
+      sessionTags.filter(st => filterTagIds.includes(st.tagId)).map(st => st.sessionId)
+    )
+    return sessions.filter(s => taggedIds.has(s.id))
+  }, [sessions, sessionTags, filterTagIds])
 
   const onRenameSession = async (newName: string) => {
     if (!selectedSession) return
@@ -317,6 +335,13 @@ function App() {
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
+              </button>
+              <button
+                onClick={() => { setViewMode('kanban'); setSelectedSession(null); setShowFavorites(false) }}
+                className={`p-1 rounded transition-colors ${viewMode === 'kanban' && !showFavorites ? 'text-blue-400 bg-secondary' : 'text-muted-foreground hover:text-foreground'}`}
+                title={t('tags.kanban.title')}
+              >
+                <Columns3 className="h-3.5 w-3.5" />
               </button>
             </div>
             <button
@@ -367,6 +392,14 @@ function App() {
         </div>
 
         <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
+          {!showFavorites && viewMode !== 'project' && (
+            <TagFilter
+              tags={tags}
+              sessionTags={sessionTags}
+              filterTagIds={filterTagIds}
+              onFilterChange={setFilterTagIds}
+            />
+          )}
           {showFavorites ? (
             <FavoritesPanel
               sessions={sessions}
@@ -417,6 +450,10 @@ function App() {
                   favorites={favorites}
                   onToggleFavorite={toggleFavorite}
                   showDirectory={false}
+                  tags={tags}
+                  getTagsForSession={getTagsForSession}
+                  onToggleTag={(sessionId, tagId, assigned) => assigned ? removeTagFromSession(sessionId, tagId) : assignTag(sessionId, tagId)}
+                  onCreateTag={createTag}
                 />
               </div>
             </div>
@@ -439,7 +476,7 @@ function App() {
             />
           ) : (
             <SessionList
-              sessions={sessions}
+              sessions={filteredSessions}
               selectedSession={selectedSession}
               onSelectSession={handleSelectSession}
               onDeleteSession={handleDeleteSession}
@@ -451,6 +488,10 @@ function App() {
               scrollParentRef={listScrollRef}
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
+              tags={tags}
+              getTagsForSession={getTagsForSession}
+              onToggleTag={(sessionId, tagId, assigned) => assigned ? removeTagFromSession(sessionId, tagId) : assignTag(sessionId, tagId)}
+              onCreateTag={createTag}
             />
           )}
         </div>
@@ -463,7 +504,7 @@ function App() {
           onMouseDown={startDragging}
         />
         <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden" style={{ display: showTerminal && terminalMaximized ? 'none' : undefined }}>
             {selectedSession ? (
               <SessionViewer
                 session={selectedSession}
@@ -474,6 +515,24 @@ function App() {
                 terminal={terminal}
                 piPath={piPath}
                 customCommand={customCommand}
+              />
+            ) : viewMode === 'kanban' ? (
+              <KanbanBoard
+                sessions={sessions}
+                tags={tags}
+                sessionTags={sessionTags}
+                selectedSession={selectedSession}
+                onSelectSession={handleSelectSession}
+                onMoveSession={moveSession}
+                getTagsForSession={getTagsForSession}
+                onToggleTag={(sessionId, tagId, assigned) => assigned ? removeTagFromSession(sessionId, tagId) : assignTag(sessionId, tagId)}
+                onDeleteSession={handleDeleteSession}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                terminal={terminal}
+                piPath={piPath}
+                customCommand={customCommand}
+                onCreateTag={createTag}
               />
             ) : (
               <Dashboard
@@ -495,9 +554,9 @@ function App() {
           {terminalConfig.enabled && (
           <TerminalPanel
             isOpen={showTerminal}
-            onClose={() => setShowTerminal(false)}
+            onClose={() => { setShowTerminal(false); setTerminalMaximized(false) }}
+            onMaximizedChange={setTerminalMaximized}
             cwd={selectedSession?.cwd || selectedProject || sessions[0]?.cwd || '/'}
-            height={280}
             defaultShell={terminalConfig.defaultShell}
             fontSize={terminalConfig.fontSize}
           />

@@ -32,7 +32,10 @@ fn cors_headers() -> [(&'static str, &'static str); 3] {
     [
         ("access-control-allow-origin", "*"),
         ("access-control-allow-methods", "POST, OPTIONS"),
-        ("access-control-allow-headers", "content-type, authorization"),
+        (
+            "access-control-allow-headers",
+            "content-type, authorization",
+        ),
     ]
 }
 
@@ -66,8 +69,16 @@ async fn handle_command(
 
     let result = dispatch(&app_state, &req.command, &req.payload).await;
     let resp = match result {
-        Ok(data) => HttpResponse { success: true, data: Some(data), error: None },
-        Err(e) => HttpResponse { success: false, data: None, error: Some(e) },
+        Ok(data) => HttpResponse {
+            success: true,
+            data: Some(data),
+            error: None,
+        },
+        Err(e) => HttpResponse {
+            success: false,
+            data: None,
+            error: Some(e),
+        },
     };
     (StatusCode::OK, cors_headers(), Json(resp))
 }
@@ -167,17 +178,17 @@ pub async fn init_http_adapter(app_state: SharedAppState, port: u16) -> Result<(
         app
     };
 
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
-        .map_err(|e| format!("Failed to bind HTTP: {}", e))?;
+        .map_err(|e| format!("Failed to bind HTTP: {e}"))?;
 
-    log::info!("HTTP server listening on http://{}", addr);
+    log::info!("HTTP server listening on http://{addr}");
 
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await
-    .map_err(|e| format!("HTTP server error: {}", e))
+    .map_err(|e| format!("HTTP server error: {e}"))
 }

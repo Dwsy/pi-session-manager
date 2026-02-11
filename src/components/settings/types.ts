@@ -45,7 +45,7 @@ export interface AppSettings {
   session: {
     autoRefresh: boolean
     refreshInterval: number
-    defaultViewMode: 'list' | 'directory' | 'project'
+    defaultViewMode: 'list' | 'directory' | 'project' | 'kanban'
     showMessagePreview: boolean
     previewLines: number
   }
@@ -131,6 +131,7 @@ export type SettingsSection =
   | 'appearance'
   | 'language'
   | 'session'
+  | 'tags'
   | 'search'
   | 'export'
   | 'pi-config'

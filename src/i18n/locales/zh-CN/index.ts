@@ -14,6 +14,7 @@ import { role } from './role'
 import { favorites } from './favorites'
 import { onboarding } from './onboarding'
 import terminal from './terminal'
+import { tags } from './tags'
 
 export const zhCN = {
   common,
@@ -32,6 +33,7 @@ export const zhCN = {
   favorites,
   onboarding,
   terminal,
+  tags,
 } as const
 
 export type Translations = typeof zhCN

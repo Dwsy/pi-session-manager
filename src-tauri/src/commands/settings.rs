@@ -26,8 +26,7 @@ impl Default for ServerSettings {
 }
 
 pub fn load_server_settings_sync() -> ServerSettings {
-    crate::settings_store::get_or_default::<ServerSettings>(SERVER_SETTINGS_KEY)
-        .unwrap_or_default()
+    crate::settings_store::get_or_default::<ServerSettings>(SERVER_SETTINGS_KEY).unwrap_or_default()
 }
 
 #[tauri::command]

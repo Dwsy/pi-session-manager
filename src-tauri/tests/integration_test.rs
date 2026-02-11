@@ -1,12 +1,12 @@
-use pi_session_manager::models::{SessionInfo};
-use pi_session_manager::search::{search_sessions, SearchMode, RoleFilter};
-use pi_session_manager::commands::{scan_sessions, search_sessions as search_sessions_cmd};
 use chrono::{DateTime, Utc};
+use pi_session_manager::commands::{scan_sessions, search_sessions as search_sessions_cmd};
+use pi_session_manager::models::SessionInfo;
+use pi_session_manager::search::{search_sessions, RoleFilter, SearchMode};
 use std::fs;
 
 /// Create a mock session file in the test directory
 fn create_mock_session(dir: &str, filename: &str, content: &str) -> String {
-    let file_path = format!("{}/{}", dir, filename);
+    let file_path = format!("{dir}/{filename}");
     fs::write(&file_path, content).expect("Failed to write mock session file");
     file_path
 }
@@ -50,8 +50,8 @@ fn test_search_integration() {
             message_count: 1,
             first_message: "How to implement search in Rust?".to_string(),
             all_messages_text: "How to implement search in Rust?".to_string(),
-        last_message: "How to implement search in Rust?".to_string(),
-        last_message_role: "user".to_string(),
+            last_message: "How to implement search in Rust?".to_string(),
+            last_message_role: "user".to_string(),
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -67,8 +67,8 @@ fn test_search_integration() {
             message_count: 1,
             first_message: "I want to learn React".to_string(),
             all_messages_text: "I want to learn React".to_string(),
-        last_message: "I want to learn React".to_string(),
-        last_message_role: "user".to_string(),
+            last_message: "I want to learn React".to_string(),
+            last_message_role: "user".to_string(),
         },
         SessionInfo {
             path: session3_path.clone(),
@@ -84,44 +84,86 @@ fn test_search_integration() {
             message_count: 1,
             first_message: "Here is how you implement search in Rust...".to_string(),
             all_messages_text: "Here is how you implement search in Rust...".to_string(),
-        last_message: "Here is how you implement search in Rust...".to_string(),
-        last_message_role: "user".to_string(),
+            last_message: "Here is how you implement search in Rust...".to_string(),
+            last_message_role: "user".to_string(),
         },
     ];
 
     // Test 1: Search for "Rust" - should find 2 sessions
-    let results = search_sessions(&sessions, "Rust", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "Rust",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
     println!("\n=== Test 1: Search for 'Rust' ===");
     println!("Found {} results", results.len());
     for result in &results {
-        println!("  - Session: {} ({})", result.session_name.as_deref().unwrap_or("Untitled"), result.session_id);
+        println!(
+            "  - Session: {} ({})",
+            result.session_name.as_deref().unwrap_or("Untitled"),
+            result.session_id
+        );
         println!("    Matches: {}", result.matches.len());
     }
     assert_eq!(results.len(), 2, "Should find 2 sessions with 'Rust'");
 
     // Test 2: Search for "React" - should find 1 session
-    let results = search_sessions(&sessions, "React", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "React",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
     println!("\n=== Test 2: Search for 'React' ===");
     println!("Found {} results", results.len());
     assert_eq!(results.len(), 1, "Should find 1 session with 'React'");
 
     // Test 3: Search by name - "Rust Search Implementation" (AND logic - all words must match)
-    let results = search_sessions(&sessions, "Rust Search Implementation", SearchMode::Name, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "Rust Search Implementation",
+        SearchMode::Name,
+        RoleFilter::All,
+        true,
+    );
     println!("\n=== Test 3: Search by name 'Rust Search Implementation' ===");
     println!("Found {} results", results.len());
-    assert_eq!(results.len(), 1, "Should find 1 session by name (AND logic)");
+    assert_eq!(
+        results.len(),
+        1,
+        "Should find 1 session by name (AND logic)"
+    );
 
     // Test 4: Search with role filter - assistant only
-    let results = search_sessions(&sessions, "implement", SearchMode::Content, RoleFilter::Assistant, true);
+    let results = search_sessions(
+        &sessions,
+        "implement",
+        SearchMode::Content,
+        RoleFilter::Assistant,
+        true,
+    );
     println!("\n=== Test 4: Search with role filter 'assistant' ===");
     println!("Found {} results", results.len());
     assert_eq!(results.len(), 1, "Should find 1 assistant message");
 
     // Test 5: Multi-word search (OR logic)
-    let results = search_sessions(&sessions, "Rust React", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "Rust React",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
     println!("\n=== Test 5: Multi-word search 'Rust React' ===");
     println!("Found {} results", results.len());
-    assert_eq!(results.len(), 3, "Should find all 3 sessions (Rust OR React)");
+    assert_eq!(
+        results.len(),
+        3,
+        "Should find all 3 sessions (Rust OR React)"
+    );
 
     // Test 6: Empty query
     let results = search_sessions(&sessions, "", SearchMode::Content, RoleFilter::All, true);
@@ -130,7 +172,13 @@ fn test_search_integration() {
     assert_eq!(results.len(), 0, "Should find 0 sessions with empty query");
 
     // Test 7: Verify search results contain session metadata
-    let results = search_sessions(&sessions, "Rust", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "Rust",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
     println!("\n=== Test 7: Verify search results metadata ===");
     for result in &results {
         println!("  Session ID: {}", result.session_id);
@@ -141,10 +189,23 @@ fn test_search_integration() {
         println!("  Matches: {}", result.matches.len());
         if !result.matches.is_empty() {
             println!("    First match role: {}", result.matches[0].role);
-            println!("    First match snippet: {}", result.matches[0].snippet.chars().take(50).collect::<String>());
+            println!(
+                "    First match snippet: {}",
+                result.matches[0]
+                    .snippet
+                    .chars()
+                    .take(50)
+                    .collect::<String>()
+            );
         }
-        assert!(!result.session_id.is_empty(), "Session ID should not be empty");
-        assert!(!result.session_path.is_empty(), "Session path should not be empty");
+        assert!(
+            !result.session_id.is_empty(),
+            "Session ID should not be empty"
+        );
+        assert!(
+            !result.session_path.is_empty(),
+            "Session path should not be empty"
+        );
         assert!(result.score > 0.0, "Score should be positive");
     }
 
@@ -179,7 +240,13 @@ fn test_search_results_mapping() {
         last_message_role: "user".to_string(),
     }];
 
-    let results = search_sessions(&sessions, "test", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "test",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
 
     println!("\n=== Test: Search Results Mapping ===");
     println!("Original session cwd: {}", sessions[0].cwd);
@@ -188,13 +255,19 @@ fn test_search_results_mapping() {
     // Simulate frontend mapping
     for result in &results {
         let original_session = sessions.iter().find(|s| s.id == result.session_id);
-        assert!(original_session.is_some(), "Should find original session by ID");
+        assert!(
+            original_session.is_some(),
+            "Should find original session by ID"
+        );
 
         let mapped = SessionInfo {
             path: result.session_path.clone(),
             id: result.session_id.clone(),
             cwd: original_session.unwrap().cwd.clone(),
-            name: result.session_name.clone().or_else(|| original_session.unwrap().name.clone()),
+            name: result
+                .session_name
+                .clone()
+                .or_else(|| original_session.unwrap().name.clone()),
             created: original_session.unwrap().created,
             modified: original_session.unwrap().modified,
             message_count: result.matches.len(),
@@ -206,8 +279,15 @@ fn test_search_results_mapping() {
 
         println!("Mapped session cwd: {}", mapped.cwd);
         println!("Mapped session name: {:?}", mapped.name);
-        assert_eq!(mapped.cwd, "/projects/my-project", "cwd should be preserved");
-        assert_eq!(mapped.name, Some("My Test Session".to_string()), "name should be preserved");
+        assert_eq!(
+            mapped.cwd, "/projects/my-project",
+            "cwd should be preserved"
+        );
+        assert_eq!(
+            mapped.name,
+            Some("My Test Session".to_string()),
+            "name should be preserved"
+        );
     }
 
     cleanup_test_dir(test_dir);

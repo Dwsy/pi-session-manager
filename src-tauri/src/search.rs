@@ -76,7 +76,11 @@ pub fn search_sessions(
         }
     }
 
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results
 }
 
@@ -99,9 +103,9 @@ fn matches_session_name(session: &SessionInfo, query_words: &[&str]) -> bool {
 
     // 检查每个查询词是否匹配名称或第一条消息
     // 避免创建合并字符串，减少内存分配
-    query_words.iter().all(|word| {
-        name.to_lowercase().contains(word) || first_msg.to_lowercase().contains(word)
-    })
+    query_words
+        .iter()
+        .all(|word| name.to_lowercase().contains(word) || first_msg.to_lowercase().contains(word))
 }
 
 /// 查找匹配项
@@ -247,8 +251,8 @@ fn parse_session_entries_from_reader<R: std::io::BufRead>(
 }
 
 fn get_filtered_session_content(path: &str, role_filter: RoleFilter) -> Result<String, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read session file: {}", e))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
     let mut full_text = String::new();
 
@@ -277,7 +281,7 @@ fn get_filtered_session_content(path: &str, role_filter: RoleFilter) -> Result<S
                             if let Some(text) = item.get("text") {
                                 if let Some(s) = text.as_str() {
                                     full_text.push_str(s);
-                                    full_text.push_str("\n");
+                                    full_text.push('\n');
                                 }
                             }
                         }
@@ -299,8 +303,8 @@ fn role_to_string(role_filter: RoleFilter) -> String {
 }
 
 fn get_full_session_content(path: &str) -> Result<String, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read session file: {}", e))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
     let mut full_text = String::new();
 
@@ -319,7 +323,7 @@ fn get_full_session_content(path: &str) -> Result<String, String> {
                         if let Some(text) = item.get("text") {
                             if let Some(s) = text.as_str() {
                                 full_text.push_str(s);
-                                full_text.push_str("\n");
+                                full_text.push('\n');
                             }
                         }
 
@@ -327,7 +331,7 @@ fn get_full_session_content(path: &str) -> Result<String, String> {
                         if let Some(thinking) = item.get("thinking") {
                             if let Some(s) = thinking.as_str() {
                                 full_text.push_str(s);
-                                full_text.push_str("\n");
+                                full_text.push('\n');
                             }
                         }
                     }
@@ -359,8 +363,8 @@ fn calculate_score(matches: &[Match], query_words: &[&str]) -> f32 {
                 let snippet_bytes = snippet_lower.as_bytes();
 
                 // 检查是否是词边界
-                let is_word_boundary_start = pos == 0
-                    || !snippet_bytes[pos - 1].is_ascii_alphanumeric();
+                let is_word_boundary_start =
+                    pos == 0 || !snippet_bytes[pos - 1].is_ascii_alphanumeric();
                 let is_word_boundary_end = pos + word_len >= snippet_bytes.len()
                     || !snippet_bytes[pos + word_len].is_ascii_alphanumeric();
 

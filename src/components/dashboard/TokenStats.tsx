@@ -32,13 +32,13 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
   return (
     <div className="glass-card rounded-xl p-5 relative overflow-hidden group">
       {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#ffcb6b]/5 via-transparent to-[#ff6b6b]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-destructive/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
-            <div className="p-1.5 rounded-lg bg-[#ffcb6b]/10">
-              <Coins className="h-4 w-4 text-[#ffcb6b]" />
+            <div className="p-1.5 rounded-lg bg-warning/10">
+              <Coins className="h-4 w-4 text-warning" />
             </div>
             {title}
           </h3>

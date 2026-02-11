@@ -1,8 +1,8 @@
 // Tantivy search engine - placeholder for future implementation
 // Full implementation would require more complex setup
 
-use crate::models::{SessionInfo, SearchResult};
-use crate::search::{SearchMode, RoleFilter};
+use crate::models::{SearchResult, SessionInfo};
+use crate::search::{RoleFilter, SearchMode};
 
 pub fn search_sessions(sessions: &[SessionInfo], query: &str) -> Vec<SearchResult> {
     // For now, delegate to the existing regex-based search

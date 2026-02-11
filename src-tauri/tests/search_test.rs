@@ -1,16 +1,16 @@
-use pi_session_manager::models::{SessionInfo};
-use pi_session_manager::search::{search_sessions, SearchMode, RoleFilter};
 use chrono::{DateTime, Utc};
+use pi_session_manager::models::SessionInfo;
+use pi_session_manager::search::{search_sessions, RoleFilter, SearchMode};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-fn create_test_session_file(dir: &PathBuf, filename: &str, content: &str) -> String {
+fn create_test_session_file(dir: &Path, filename: &str, content: &str) -> String {
     let file_path = dir.join(filename);
     fs::write(&file_path, content).expect("Failed to write test session file");
     file_path.to_string_lossy().to_string()
 }
 
-fn cleanup_test_dir(dir: &PathBuf) {
+fn cleanup_test_dir(dir: &Path) {
     if dir.exists() {
         fs::remove_dir_all(dir).expect("Failed to cleanup test directory");
     }
@@ -48,10 +48,24 @@ fn test_empty_query_returns_empty_results() {
 
     // Test whitespace-only query
     let results = search_sessions(&sessions, "   ", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 0, "Whitespace-only query should return no results");
+    assert_eq!(
+        results.len(),
+        0,
+        "Whitespace-only query should return no results"
+    );
 
-    let results = search_sessions(&sessions, "\t\n", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 0, "Tab/newline-only query should return no results");
+    let results = search_sessions(
+        &sessions,
+        "\t\n",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        0,
+        "Tab/newline-only query should return no results"
+    );
 
     cleanup_test_dir(&test_dir);
 }
@@ -83,13 +97,29 @@ fn test_single_word_search() {
     }];
 
     // Test matching word
-    let results = search_sessions(&sessions, "hello", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "hello",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
     assert_eq!(results.len(), 1, "Should find session with 'hello'");
     assert_eq!(results[0].matches.len(), 1, "Should have 1 match");
 
     // Test case insensitivity
-    let results = search_sessions(&sessions, "HELLO", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 1, "Should find session with 'HELLO' (case insensitive)");
+    let results = search_sessions(
+        &sessions,
+        "HELLO",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        1,
+        "Should find session with 'HELLO' (case insensitive)"
+    );
 
     // Test non-matching word
     let results = search_sessions(&sessions, "xyz", SearchMode::Content, RoleFilter::All, true);
@@ -125,16 +155,46 @@ fn test_multiple_word_search() {
     }];
 
     // Test OR logic: any word matches should return results
-    let results = search_sessions(&sessions, "hello world", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 1, "Should find session with 'hello' OR 'world'");
+    let results = search_sessions(
+        &sessions,
+        "hello world",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        1,
+        "Should find session with 'hello' OR 'world'"
+    );
 
     // Test with one matching and one non-matching word
-    let results = search_sessions(&sessions, "hello xyz", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 1, "Should find session with 'hello' (ignoring 'xyz')");
+    let results = search_sessions(
+        &sessions,
+        "hello xyz",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        1,
+        "Should find session with 'hello' (ignoring 'xyz')"
+    );
 
     // Test with all non-matching words
-    let results = search_sessions(&sessions, "abc xyz", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 0, "Should not find session with no matching words");
+    let results = search_sessions(
+        &sessions,
+        "abc xyz",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        0,
+        "Should not find session with no matching words"
+    );
 
     cleanup_test_dir(&test_dir);
 }
@@ -166,16 +226,42 @@ fn test_name_search_mode() {
     }];
 
     // Test searching by name
-    let results = search_sessions(&sessions, "important", SearchMode::Name, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "important",
+        SearchMode::Name,
+        RoleFilter::All,
+        true,
+    );
     assert_eq!(results.len(), 1, "Should find session by name");
 
     // Test searching by first message in name mode
-    let results = search_sessions(&sessions, "content", SearchMode::Name, RoleFilter::All, true);
-    assert_eq!(results.len(), 1, "Should find session by first message in name mode");
+    let results = search_sessions(
+        &sessions,
+        "content",
+        SearchMode::Name,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        1,
+        "Should find session by first message in name mode"
+    );
 
     // Test non-matching name
-    let results = search_sessions(&sessions, "nonexistent", SearchMode::Name, RoleFilter::All, true);
-    assert_eq!(results.len(), 0, "Should not find session with non-matching name");
+    let results = search_sessions(
+        &sessions,
+        "nonexistent",
+        SearchMode::Name,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        0,
+        "Should not find session with non-matching name"
+    );
 
     cleanup_test_dir(&test_dir);
 }
@@ -208,21 +294,48 @@ fn test_role_filter() {
     }];
 
     // Test user role filter
-    let results = search_sessions(&sessions, "keyword", SearchMode::Content, RoleFilter::User, true);
+    let results = search_sessions(
+        &sessions,
+        "keyword",
+        SearchMode::Content,
+        RoleFilter::User,
+        true,
+    );
     assert_eq!(results.len(), 1, "Should find session with user role");
     assert_eq!(results[0].matches.len(), 1, "Should have 1 user match");
-    assert_eq!(results[0].matches[0].role, "user", "Match should be from user");
+    assert_eq!(
+        results[0].matches[0].role, "user",
+        "Match should be from user"
+    );
 
     // Test assistant role filter
-    let results = search_sessions(&sessions, "keyword", SearchMode::Content, RoleFilter::Assistant, true);
+    let results = search_sessions(
+        &sessions,
+        "keyword",
+        SearchMode::Content,
+        RoleFilter::Assistant,
+        true,
+    );
     assert_eq!(results.len(), 1, "Should find session with assistant role");
     assert_eq!(results[0].matches.len(), 1, "Should have 1 assistant match");
-    assert_eq!(results[0].matches[0].role, "assistant", "Match should be from assistant");
+    assert_eq!(
+        results[0].matches[0].role, "assistant",
+        "Match should be from assistant"
+    );
 
     // Test all roles filter
-    let results = search_sessions(&sessions, "keyword", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "keyword",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
     assert_eq!(results.len(), 1, "Should find session with all roles");
-    assert!(results[0].matches.len() >= 1, "Should have at least 1 match");
+    assert!(
+        !results[0].matches.is_empty(),
+        "Should have at least 1 match"
+    );
 
     cleanup_test_dir(&test_dir);
 }
@@ -256,8 +369,8 @@ fn test_multiple_sessions() {
             message_count: 1,
             first_message: "Session about Rust programming".to_string(),
             all_messages_text: "Session about Rust programming".to_string(),
-        last_message: "Session about Rust programming".to_string(),
-        last_message_role: "user".to_string(),
+            last_message: "Session about Rust programming".to_string(),
+            last_message_role: "user".to_string(),
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -273,8 +386,8 @@ fn test_multiple_sessions() {
             message_count: 1,
             first_message: "Session about Python programming".to_string(),
             all_messages_text: "Session about Python programming".to_string(),
-        last_message: "Session about Python programming".to_string(),
-        last_message_role: "user".to_string(),
+            last_message: "Session about Python programming".to_string(),
+            last_message_role: "user".to_string(),
         },
         SessionInfo {
             path: session3_path.clone(),
@@ -290,22 +403,48 @@ fn test_multiple_sessions() {
             message_count: 1,
             first_message: "Session about JavaScript".to_string(),
             all_messages_text: "Session about JavaScript".to_string(),
-        last_message: "Session about JavaScript".to_string(),
-        last_message_role: "user".to_string(),
+            last_message: "Session about JavaScript".to_string(),
+            last_message_role: "user".to_string(),
         },
     ];
 
     // Test search that matches multiple sessions
-    let results = search_sessions(&sessions, "programming", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 2, "Should find 2 sessions with 'programming'");
+    let results = search_sessions(
+        &sessions,
+        "programming",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        2,
+        "Should find 2 sessions with 'programming'"
+    );
 
     // Test search that matches single session
-    let results = search_sessions(&sessions, "rust", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "rust",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
     assert_eq!(results.len(), 1, "Should find 1 session with 'rust'");
 
     // Test search that matches no sessions
-    let results = search_sessions(&sessions, "nonexistent", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 0, "Should find 0 sessions with 'nonexistent'");
+    let results = search_sessions(
+        &sessions,
+        "nonexistent",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        0,
+        "Should find 0 sessions with 'nonexistent'"
+    );
 
     cleanup_test_dir(&test_dir);
 }
@@ -316,7 +455,9 @@ fn test_snippet_generation() {
     fs::create_dir_all(&test_dir).expect("Failed to create test directory");
 
     let long_text = "This is a very long message that contains the keyword somewhere in the middle of the text and we want to verify that the snippet is generated correctly with proper context around the matched keyword.";
-    let session_content = format!(r#"{{"type":"message","id":"msg1","timestamp":"2025-01-01T00:00:00Z","message":{{"role":"user","content":[{{"type":"text","text":"{}"}}]}}}}"#, long_text);
+    let session_content = format!(
+        r#"{{"type":"message","id":"msg1","timestamp":"2025-01-01T00:00:00Z","message":{{"role":"user","content":[{{"type":"text","text":"{long_text}"}}]}}}}"#
+    );
     let session_path = create_test_session_file(&test_dir, "session1.jsonl", &session_content);
 
     let sessions = vec![SessionInfo {
@@ -337,11 +478,23 @@ fn test_snippet_generation() {
         last_message_role: "user".to_string(),
     }];
 
-    let results = search_sessions(&sessions, "keyword", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "keyword",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
     assert_eq!(results.len(), 1, "Should find session");
     assert_eq!(results[0].matches.len(), 1, "Should have 1 match");
-    assert!(results[0].matches[0].snippet.contains("keyword"), "Snippet should contain the keyword");
-    assert!(results[0].matches[0].snippet.len() <= 200, "Snippet should be reasonably sized");
+    assert!(
+        results[0].matches[0].snippet.contains("keyword"),
+        "Snippet should contain the keyword"
+    );
+    assert!(
+        results[0].matches[0].snippet.len() <= 200,
+        "Snippet should be reasonably sized"
+    );
 
     cleanup_test_dir(&test_dir);
 }
@@ -372,8 +525,8 @@ fn test_score_calculation() {
             message_count: 1,
             first_message: "test test test".to_string(),
             all_messages_text: "test test test".to_string(),
-        last_message: "test test test".to_string(),
-        last_message_role: "user".to_string(),
+            last_message: "test test test".to_string(),
+            last_message_role: "user".to_string(),
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -389,15 +542,24 @@ fn test_score_calculation() {
             message_count: 1,
             first_message: "test".to_string(),
             all_messages_text: "test".to_string(),
-        last_message: "test".to_string(),
-        last_message_role: "user".to_string(),
+            last_message: "test".to_string(),
+            last_message_role: "user".to_string(),
         },
     ];
 
-    let results = search_sessions(&sessions, "test", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "test",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
     assert_eq!(results.len(), 2, "Should find both sessions");
     // Session with more matches should appear first (higher score)
-    assert_eq!(results[0].session_id, "session1", "Session with more matches should be first");
+    assert_eq!(
+        results[0].session_id, "session1",
+        "Session with more matches should be first"
+    );
 
     cleanup_test_dir(&test_dir);
 }
@@ -429,12 +591,32 @@ fn test_thinking_content() {
     }];
 
     // Test with include_tools = true (should search thinking content)
-    let results = search_sessions(&sessions, "keyword", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 1, "Should find session with keyword in thinking (include_tools=true)");
+    let results = search_sessions(
+        &sessions,
+        "keyword",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        1,
+        "Should find session with keyword in thinking (include_tools=true)"
+    );
 
     // Test with include_tools = false (should not search thinking content)
-    let results = search_sessions(&sessions, "keyword", SearchMode::Content, RoleFilter::All, false);
-    assert_eq!(results.len(), 0, "Should not find session with keyword in thinking (include_tools=false)");
+    let results = search_sessions(
+        &sessions,
+        "keyword",
+        SearchMode::Content,
+        RoleFilter::All,
+        false,
+    );
+    assert_eq!(
+        results.len(),
+        0,
+        "Should not find session with keyword in thinking (include_tools=false)"
+    );
 
     cleanup_test_dir(&test_dir);
 }
@@ -443,8 +625,18 @@ fn test_thinking_content() {
 fn test_empty_sessions_list() {
     let sessions: Vec<SessionInfo> = vec![];
 
-    let results = search_sessions(&sessions, "test", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 0, "Empty sessions list should return no results");
+    let results = search_sessions(
+        &sessions,
+        "test",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        0,
+        "Empty sessions list should return no results"
+    );
 }
 
 #[test]
@@ -474,12 +666,22 @@ fn test_special_characters() {
     }];
 
     // Test searching for text without special characters
-    let results = search_sessions(&sessions, "test", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "test",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
     assert_eq!(results.len(), 1, "Should find session with 'test'");
 
     // Test searching for text with special characters
     let results = search_sessions(&sessions, "@#$", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 1, "Should find session with special characters");
+    assert_eq!(
+        results.len(),
+        1,
+        "Should find session with special characters"
+    );
 
     cleanup_test_dir(&test_dir);
 }
@@ -511,12 +713,28 @@ fn test_unicode_search() {
     }];
 
     // Test Chinese search
-    let results = search_sessions(&sessions, "中文", SearchMode::Content, RoleFilter::All, true);
+    let results = search_sessions(
+        &sessions,
+        "中文",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
     assert_eq!(results.len(), 1, "Should find session with Chinese text");
 
     // Test partial Chinese search
-    let results = search_sessions(&sessions, "测试", SearchMode::Content, RoleFilter::All, true);
-    assert_eq!(results.len(), 1, "Should find session with partial Chinese text");
+    let results = search_sessions(
+        &sessions,
+        "测试",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
+    assert_eq!(
+        results.len(),
+        1,
+        "Should find session with partial Chinese text"
+    );
 
     cleanup_test_dir(&test_dir);
 }

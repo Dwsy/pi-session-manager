@@ -15,6 +15,7 @@ import {
   Puzzle,
   Cpu,
   Keyboard,
+  Tags,
 } from 'lucide-react'
 import type { AppSettings, SettingsSection } from './types'
 import { defaultSettings } from './types'
@@ -29,6 +30,7 @@ import PiConfigSettings from './sections/PiConfigSettings'
 import ModelSettings from './sections/ModelSettings'
 import AdvancedSettings from './sections/AdvancedSettings'
 import ShortcutSettings from './sections/ShortcutSettings'
+import TagManagerSettings from './sections/TagManagerSettings'
 
 interface SettingsPanelProps {
   isOpen: boolean
@@ -117,6 +119,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     { id: 'appearance', icon: <Palette className="h-4 w-4" />, label: t('settings.sections.appearance', '外观') },
     { id: 'language', icon: <Globe className="h-4 w-4" />, label: t('settings.sections.language', '语言') },
     { id: 'session', icon: <Database className="h-4 w-4" />, label: t('settings.sections.session', '会话') },
+    { id: 'tags', icon: <Tags className="h-4 w-4" />, label: t('settings.sections.tags', '标签') },
     { id: 'search', icon: <Code className="h-4 w-4" />, label: t('settings.sections.search', '搜索') },
     { id: 'export', icon: <ChevronRight className="h-4 w-4" />, label: t('settings.sections.export', '导出') },
     { id: 'pi-config', icon: <Puzzle className="h-4 w-4" />, label: t('settings.sections.piConfig', 'Pi 配置') },
@@ -252,6 +255,7 @@ function SettingsContent({
             {activeSection === 'appearance' && <AppearanceSettings settings={settings} onUpdate={onUpdate} />}
             {activeSection === 'language' && <LanguageSettings settings={settings} onUpdate={onUpdate} />}
             {activeSection === 'session' && <SessionSettings settings={settings} onUpdate={onUpdate} />}
+            {activeSection === 'tags' && <TagManagerSettings />}
             {activeSection === 'search' && <SearchSettings settings={settings} onUpdate={onUpdate} />}
             {activeSection === 'export' && <ExportSettings settings={settings} onUpdate={onUpdate} />}
             {activeSection === 'pi-config' && <PiConfigSettings />}

@@ -83,14 +83,14 @@ export default function ActivityHeatmap({
   return (
     <div className="glass-card rounded-xl p-4 relative overflow-hidden group">
       {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#46c492]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-success/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
       <div className="relative z-10">
         {title && (
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
-              <div className="p-1.5 rounded-lg bg-[#46c492]/10">
-                <Calendar className="h-4 w-4 text-[#46c492]" />
+              <div className="p-1.5 rounded-lg bg-success/10">
+                <Calendar className="h-4 w-4 text-success" />
               </div>
               {title}
             </h3>

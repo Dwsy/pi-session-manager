@@ -23,7 +23,10 @@ impl ScannerScheduler {
     }
 
     pub async fn start(&self) {
-        info!("Starting scanner scheduler with {}s interval", self.scan_interval.as_secs());
+        info!(
+            "Starting scanner scheduler with {}s interval",
+            self.scan_interval.as_secs()
+        );
         let mut ticker = interval(self.scan_interval);
         ticker.tick().await;
 
@@ -55,7 +58,11 @@ impl ScannerScheduler {
                     if let Ok(files) = fs::read_dir(&path) {
                         for file in files.flatten() {
                             let file_path = file.path();
-                            if file_path.extension().map(|ext| ext == "jsonl").unwrap_or(false) {
+                            if file_path
+                                .extension()
+                                .map(|ext| ext == "jsonl")
+                                .unwrap_or(false)
+                            {
                                 match self.process_file(&conn, &file_path)? {
                                     FileUpdateResult::Updated => updated += 1,
                                     FileUpdateResult::Added => added += 1,
@@ -75,8 +82,7 @@ impl ScannerScheduler {
         );
 
         Ok(format!(
-            "Scanned: +{} added, ~{} updated, {} skipped",
-            added, updated, skipped
+            "Scanned: +{added} added, ~{updated} updated, {skipped} skipped"
         ))
     }
 
@@ -87,11 +93,12 @@ impl ScannerScheduler {
     ) -> Result<FileUpdateResult, String> {
         let path_str = file_path.to_string_lossy().to_string();
 
-        let metadata = fs::metadata(file_path)
-            .map_err(|e| format!("Failed to get metadata: {}", e))?;
+        let metadata =
+            fs::metadata(file_path).map_err(|e| format!("Failed to get metadata: {e}"))?;
         let file_modified = DateTime::from(
-            metadata.modified()
-                .map_err(|e| format!("Failed to get modified time: {}", e))?,
+            metadata
+                .modified()
+                .map_err(|e| format!("Failed to get modified time: {e}"))?,
         );
 
         let cached_mtime = sqlite_cache::get_cached_file_modified(conn, &path_str)?;
@@ -125,7 +132,7 @@ impl ScannerScheduler {
                 info!("Auto cleanup: removed {} missing session records", deleted);
             }
 
-            return Ok(format!("Auto cleanup: {} records removed", deleted));
+            return Ok(format!("Auto cleanup: {deleted} records removed"));
         }
 
         Ok("Auto cleanup: disabled".to_string())

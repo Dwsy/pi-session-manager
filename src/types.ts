@@ -202,3 +202,27 @@ export interface PiSettings {
   prompts: string[]
   extensions: string[]
 }
+
+export interface Tag {
+  id: string
+  name: string
+  color: string
+  icon?: string
+  sortOrder: number
+  isBuiltin: boolean
+  createdAt: string
+  autoRules?: string
+}
+
+export interface SessionTag {
+  sessionId: string
+  tagId: string
+  position: number
+  assignedAt: string
+}
+
+export interface AutoRule {
+  pattern: string
+  enabled: boolean
+  description?: string
+}

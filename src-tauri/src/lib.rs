@@ -1,26 +1,26 @@
 pub mod app_state;
+pub mod auth;
 pub mod commands;
 pub mod config;
 pub mod export;
 pub mod file_watcher;
+pub mod http_adapter;
 pub mod models;
 pub mod scanner;
 pub mod scanner_scheduler;
 pub mod search;
 mod session_parser;
+pub mod settings_store;
 mod sqlite_cache;
 pub mod stats;
 mod tantivy_search;
 pub mod terminal;
-pub mod auth;
-pub mod ws_adapter;
-pub mod http_adapter;
 mod write_buffer;
-pub mod settings_store;
+pub mod ws_adapter;
 
 pub use commands::*;
-use tauri::{Listener, Manager};
 use std::sync::Mutex;
+use tauri::{Listener, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -67,7 +67,18 @@ pub fn run() {
             terminal_resize,
             terminal_close,
             get_default_shell,
-            get_available_shells
+            get_available_shells,
+            get_all_tags,
+            create_tag,
+            update_tag,
+            delete_tag,
+            get_all_session_tags,
+            assign_tag,
+            remove_tag_from_session,
+            move_session_tag,
+            reorder_tags,
+            update_tag_auto_rules,
+            evaluate_auto_rules
         ])
         .setup(|app| {
             // Create and manage app state
@@ -84,7 +95,11 @@ pub fn run() {
                         let details_count = details.len();
                         if let Ok(conn) = sqlite_cache::init_db() {
                             for entry in sessions {
-                                let _ = sqlite_cache::upsert_session(&conn, &entry.session, entry.file_modified);
+                                let _ = sqlite_cache::upsert_session(
+                                    &conn,
+                                    &entry.session,
+                                    entry.file_modified,
+                                );
                             }
                             for entry in details {
                                 let _ = sqlite_cache::upsert_session_details_cache(
@@ -94,7 +109,9 @@ pub fn run() {
                                     &entry.details,
                                 );
                             }
-                            log::trace!("Flushed {} sessions and {} details to database", sessions_count, details_count);
+                            log::trace!(
+                                "Flushed {sessions_count} sessions and {details_count} details to database"
+                            );
                         }
                     }
                 }
@@ -106,7 +123,11 @@ pub fn run() {
                 if let Some((sessions, details)) = write_buffer::force_flush_all() {
                     if let Ok(conn) = sqlite_cache::init_db() {
                         for entry in sessions {
-                            let _ = sqlite_cache::upsert_session(&conn, &entry.session, entry.file_modified);
+                            let _ = sqlite_cache::upsert_session(
+                                &conn,
+                                &entry.session,
+                                entry.file_modified,
+                            );
                         }
                         for entry in details {
                             let _ = sqlite_cache::upsert_session_details_cache(

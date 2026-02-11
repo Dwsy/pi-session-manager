@@ -24,14 +24,14 @@ pub fn start_file_watcher(sessions_dir: PathBuf, app_handle: AppHandle) -> Resul
             }
         },
     )
-    .map_err(|e| format!("Failed to create file watcher: {}", e))?;
+    .map_err(|e| format!("Failed to create file watcher: {e}"))?;
 
     // 监听 sessions 目录
     let mut debouncer_guard = debouncer;
     debouncer_guard
         .watcher()
         .watch(&sessions_dir, RecursiveMode::Recursive)
-        .map_err(|e| format!("Failed to watch directory: {}", e))?;
+        .map_err(|e| format!("Failed to watch directory: {e}"))?;
 
     info!("File watcher started successfully (3s debounce + batch merge)");
 
@@ -72,9 +72,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                         // 检查是否有 .jsonl 文件变化
                         let has_jsonl_changes = events.iter().any(|event| {
                             event.paths.iter().any(|path| {
-                                path.extension()
-                                    .map(|ext| ext == "jsonl")
-                                    .unwrap_or(false)
+                                path.extension().map(|ext| ext == "jsonl").unwrap_or(false)
                             })
                         });
 
@@ -99,8 +97,11 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
         if pending_notification {
             let elapsed = last_notification.elapsed();
             if elapsed >= min_interval {
-                info!("Sending batched notification to frontend (after {:?})", elapsed);
-                
+                info!(
+                    "Sending batched notification to frontend (after {:?})",
+                    elapsed
+                );
+
                 if let Err(e) = app_handle.emit("sessions-changed", ()) {
                     error!("Failed to emit event: {}", e);
                 } else {

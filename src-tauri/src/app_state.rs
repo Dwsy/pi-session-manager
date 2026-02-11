@@ -1,8 +1,8 @@
+use crate::terminal::TerminalManager;
 use std::sync::Arc;
 use std::sync::Mutex;
 use tauri::AppHandle;
 use tokio::sync::broadcast;
-use crate::terminal::TerminalManager;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct WsEvent {
@@ -20,8 +20,8 @@ pub struct AppState {
 impl AppState {
     pub fn new(app_handle: AppHandle) -> Self {
         let (event_tx, _) = broadcast::channel(100);
-        Self { 
-            app_handle, 
+        Self {
+            app_handle,
             event_tx,
             terminal_manager: Mutex::new(TerminalManager::new()),
         }

@@ -50,7 +50,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
     let mut sessions: Vec<SessionInfo> = vec![];
 
     let entries = fs::read_dir(&sessions_dir)
-        .map_err(|e| format!("Failed to read sessions directory: {}", e))?;
+        .map_err(|e| format!("Failed to read sessions directory: {e}"))?;
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -58,32 +58,39 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             if let Ok(files) = fs::read_dir(&path) {
                 for file in files.flatten() {
                     let file_path = file.path();
-                    if file_path.extension().map(|ext| ext == "jsonl").unwrap_or(false) {
+                    if file_path
+                        .extension()
+                        .map(|ext| ext == "jsonl")
+                        .unwrap_or(false)
+                    {
                         let path_str = file_path.to_string_lossy().to_string();
 
                         let metadata = fs::metadata(&file_path);
                         let file_modified: DateTime<Utc> = match metadata {
-                            Ok(m) => DateTime::from(m.modified().unwrap_or(std::time::SystemTime::now())),
+                            Ok(m) => {
+                                DateTime::from(m.modified().unwrap_or(std::time::SystemTime::now()))
+                            }
                             Err(_) => continue,
                         };
 
                         if file_modified > realtime_cutoff {
                             if let Ok(info) = parse_session_info(&file_path) {
                                 sessions.push(info);
-                                write_buffer::buffer_session_write(&sessions.last().unwrap(), file_modified);
+                                write_buffer::buffer_session_write(
+                                    sessions.last().unwrap(),
+                                    file_modified,
+                                );
                             }
-                        } else {
-                            if let Some(cached_mtime) = sqlite_cache::get_cached_file_modified(&conn, &path_str)? {
-                                if file_modified > cached_mtime {
-                                    if let Ok(info) = parse_session_info(&file_path) {
-                                        write_buffer::buffer_session_write(&info, file_modified);
-                                    }
-                                }
-                            } else {
+                        } else if let Some(cached_mtime) =
+                            sqlite_cache::get_cached_file_modified(&conn, &path_str)?
+                        {
+                            if file_modified > cached_mtime {
                                 if let Ok(info) = parse_session_info(&file_path) {
                                     write_buffer::buffer_session_write(&info, file_modified);
                                 }
                             }
+                        } else if let Ok(info) = parse_session_info(&file_path) {
+                            write_buffer::buffer_session_write(&info, file_modified);
                         }
                     }
                 }
@@ -101,12 +108,19 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
 
     sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
 
-    let realtime_count = sessions.iter().filter(|s| s.modified > realtime_cutoff).count();
+    let realtime_count = sessions
+        .iter()
+        .filter(|s| s.modified > realtime_cutoff)
+        .count();
     let historical_count = sessions.len() - realtime_count;
 
     log::trace!(
         "Scan complete: {} realtime (≤{}d), {} historical (>{}d), total {}",
-        realtime_count, config.realtime_cutoff_days, historical_count, config.realtime_cutoff_days, sessions.len()
+        realtime_count,
+        config.realtime_cutoff_days,
+        historical_count,
+        config.realtime_cutoff_days,
+        sessions.len()
     );
 
     Ok(sessions)
@@ -115,18 +129,18 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
 /// 解析会话信息
 /// 优化：使用 BufReader 流式读取，减少大文件内存占用
 pub fn parse_session_info(path: &Path) -> Result<SessionInfo, String> {
-    let file = fs::File::open(path)
-        .map_err(|e| format!("Failed to open file: {}", e))?;
+    let file = fs::File::open(path).map_err(|e| format!("Failed to open file: {e}"))?;
     let reader = BufReader::new(file);
     let mut lines = reader.lines();
 
     // 读取并解析头部
-    let header_line = lines.next()
+    let header_line = lines
+        .next()
         .ok_or("Empty session file")?
-        .map_err(|e| format!("Failed to read header: {}", e))?;
+        .map_err(|e| format!("Failed to read header: {e}"))?;
 
-    let header: Value = serde_json::from_str(&header_line)
-        .map_err(|e| format!("Failed to parse header: {}", e))?;
+    let header: Value =
+        serde_json::from_str(&header_line).map_err(|e| format!("Failed to parse header: {e}"))?;
 
     if header["type"] != "session" {
         return Err("Invalid session header".to_string());
@@ -137,9 +151,12 @@ pub fn parse_session_info(path: &Path) -> Result<SessionInfo, String> {
     let timestamp_str = header["timestamp"].as_str().unwrap_or("");
     let created = parse_timestamp(timestamp_str)?;
 
-    let metadata = fs::metadata(path)
-        .map_err(|e| format!("Failed to get metadata: {}", e))?;
-    let modified = DateTime::from(metadata.modified().map_err(|e| format!("Failed to get modified time: {}", e))?);
+    let metadata = fs::metadata(path).map_err(|e| format!("Failed to get metadata: {e}"))?;
+    let modified = DateTime::from(
+        metadata
+            .modified()
+            .map_err(|e| format!("Failed to get modified time: {e}"))?,
+    );
 
     let mut message_count = 0;
     let mut first_message = String::new();
@@ -223,5 +240,5 @@ fn extract_message_text(entry: &Value) -> String {
 fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, String> {
     DateTime::parse_from_rfc3339(s)
         .map(|dt| dt.with_timezone(&Utc))
-        .map_err(|e| format!("Failed to parse timestamp: {}", e))
+        .map_err(|e| format!("Failed to parse timestamp: {e}"))
 }

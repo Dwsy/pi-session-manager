@@ -16,10 +16,11 @@ fn main() {
 
             // Start file watcher
             if let Ok(sessions_dir) = pi_session_manager::scanner::get_sessions_dir() {
-                if let Err(e) =
-                    pi_session_manager::file_watcher::start_file_watcher(sessions_dir, app_handle.clone())
-                {
-                    eprintln!("Failed to start file watcher: {}", e);
+                if let Err(e) = pi_session_manager::file_watcher::start_file_watcher(
+                    sessions_dir,
+                    app_handle.clone(),
+                ) {
+                    eprintln!("Failed to start file watcher: {e}");
                 }
             }
 
@@ -28,10 +29,10 @@ fn main() {
                 match pi_session_manager::auth::init() {
                     Ok(token) => {
                         if cli_mode {
-                            log::info!("Auth token: {}", token);
+                            log::info!("Auth token: {token}");
                         }
                     }
-                    Err(e) => eprintln!("Failed to init auth: {}", e),
+                    Err(e) => eprintln!("Failed to init auth: {e}"),
                 }
             }
 
@@ -44,8 +45,10 @@ fn main() {
                 let ws_state = app_state.clone();
                 let ws_port = server_cfg.ws_port;
                 tauri::async_runtime::spawn(async move {
-                    if let Err(e) = pi_session_manager::ws_adapter::init_ws_adapter(ws_state, ws_port).await {
-                        eprintln!("Failed to init WebSocket adapter: {}", e);
+                    if let Err(e) =
+                        pi_session_manager::ws_adapter::init_ws_adapter(ws_state, ws_port).await
+                    {
+                        eprintln!("Failed to init WebSocket adapter: {e}");
                     }
                 });
             }
@@ -55,8 +58,11 @@ fn main() {
                 let http_state = app_state.clone();
                 let http_port = server_cfg.http_port;
                 tauri::async_runtime::spawn(async move {
-                    if let Err(e) = pi_session_manager::http_adapter::init_http_adapter(http_state, http_port).await {
-                        eprintln!("Failed to init HTTP adapter: {}", e);
+                    if let Err(e) =
+                        pi_session_manager::http_adapter::init_http_adapter(http_state, http_port)
+                            .await
+                    {
+                        eprintln!("Failed to init HTTP adapter: {e}");
                     }
                 });
             }
@@ -67,9 +73,12 @@ fn main() {
                     info.push_str(&format!(" WS ws://0.0.0.0:{}", server_cfg.ws_port));
                 }
                 if server_cfg.http_enabled {
-                    info.push_str(&format!(" | HTTP http://0.0.0.0:{}/api", server_cfg.http_port));
+                    info.push_str(&format!(
+                        " | HTTP http://0.0.0.0:{}/api",
+                        server_cfg.http_port
+                    ));
                 }
-                log::info!("{}", info);
+                log::info!("{info}");
             } else {
                 let builder = tauri::WebviewWindowBuilder::new(
                     app,
@@ -135,7 +144,16 @@ fn main() {
             pi_session_manager::terminal_resize,
             pi_session_manager::terminal_close,
             pi_session_manager::get_default_shell,
-            pi_session_manager::get_available_shells
+            pi_session_manager::get_available_shells,
+            pi_session_manager::get_all_tags,
+            pi_session_manager::create_tag,
+            pi_session_manager::update_tag,
+            pi_session_manager::delete_tag,
+            pi_session_manager::get_all_session_tags,
+            pi_session_manager::assign_tag,
+            pi_session_manager::remove_tag_from_session,
+            pi_session_manager::move_session_tag,
+            pi_session_manager::reorder_tags
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

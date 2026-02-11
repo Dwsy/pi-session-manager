@@ -53,7 +53,7 @@ pub async fn scan_skills_internal() -> Result<Vec<SkillInfo>, String> {
 
                 skills.push(SkillInfo {
                     name: name.clone(),
-                    path: format!("skills/{}/SKILL.md", name),
+                    path: format!("skills/{name}/SKILL.md"),
                     description,
                     enabled: true,
                 });
@@ -78,7 +78,7 @@ pub async fn get_skill_content(skill_name: String) -> Result<String, String> {
         .join(&skill_name)
         .join("SKILL.md");
 
-    fs::read_to_string(&skill_md_path).map_err(|e| format!("Failed to read skill content: {}", e))
+    fs::read_to_string(&skill_md_path).map_err(|e| format!("Failed to read skill content: {e}"))
 }
 
 #[tauri::command]
@@ -86,9 +86,9 @@ pub async fn get_prompt_content(prompt_name: String) -> Result<String, String> {
     let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
     let prompt_md_path = home_dir
         .join(".pi/agent/prompts")
-        .join(format!("{}.md", prompt_name));
+        .join(format!("{prompt_name}.md"));
 
-    fs::read_to_string(&prompt_md_path).map_err(|e| format!("Failed to read prompt content: {}", e))
+    fs::read_to_string(&prompt_md_path).map_err(|e| format!("Failed to read prompt content: {e}"))
 }
 
 #[tauri::command]
@@ -100,13 +100,13 @@ pub async fn get_system_prompt() -> Result<String, String> {
         let default_prompt = home_dir.join(".pi/agent/prompts/default.md");
         if default_prompt.exists() {
             return fs::read_to_string(&default_prompt)
-                .map_err(|e| format!("Failed to read default prompt: {}", e));
+                .map_err(|e| format!("Failed to read default prompt: {e}"));
         }
         return Ok(String::new());
     }
 
     fs::read_to_string(&system_prompt_path)
-        .map_err(|e| format!("Failed to read system prompt: {}", e))
+        .map_err(|e| format!("Failed to read system prompt: {e}"))
 }
 
 pub async fn scan_prompts_internal() -> Result<Vec<PromptInfo>, String> {
@@ -118,7 +118,7 @@ pub async fn scan_prompts_internal() -> Result<Vec<PromptInfo>, String> {
     if let Ok(entries) = fs::read_dir(&prompts_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "md") {
+            if path.extension().is_some_and(|ext| ext == "md") {
                 let name = path
                     .file_name()
                     .and_then(|n| n.to_str())
@@ -137,7 +137,7 @@ pub async fn scan_prompts_internal() -> Result<Vec<PromptInfo>, String> {
 
                 prompts.push(PromptInfo {
                     name: name.trim_end_matches(".md").to_string(),
-                    path: format!("prompts/{}", name),
+                    path: format!("prompts/{name}"),
                     description,
                     enabled: true,
                 });
@@ -167,10 +167,10 @@ pub async fn load_pi_settings_internal() -> Result<PiSettings, String> {
     }
 
     let content =
-        fs::read_to_string(&settings_path).map_err(|e| format!("Failed to read settings: {}", e))?;
+        fs::read_to_string(&settings_path).map_err(|e| format!("Failed to read settings: {e}"))?;
 
     let json: serde_json::Value =
-        serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {}", e))?;
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {e}"))?;
 
     let skills = json
         .get("skills")
@@ -221,8 +221,8 @@ pub async fn save_pi_settings(settings: PiSettings) -> Result<(), String> {
 
     let mut json: serde_json::Value = if settings_path.exists() {
         let content = fs::read_to_string(&settings_path)
-            .map_err(|e| format!("Failed to read settings: {}", e))?;
-        serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {}", e))?
+            .map_err(|e| format!("Failed to read settings: {e}"))?;
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {e}"))?
     } else {
         serde_json::json!({})
     };
@@ -232,9 +232,9 @@ pub async fn save_pi_settings(settings: PiSettings) -> Result<(), String> {
     json["extensions"] = serde_json::json!(settings.extensions);
 
     let content = serde_json::to_string_pretty(&json)
-        .map_err(|e| format!("Failed to serialize settings: {}", e))?;
+        .map_err(|e| format!("Failed to serialize settings: {e}"))?;
 
-    fs::write(&settings_path, content).map_err(|e| format!("Failed to write settings: {}", e))?;
+    fs::write(&settings_path, content).map_err(|e| format!("Failed to write settings: {e}"))?;
 
     Ok(())
 }

@@ -11,7 +11,7 @@ pub async fn export_session(
         "html" => export_using_pi_command(session_path, output_path),
         "json" => export_as_json(session_path, output_path),
         "md" | "markdown" => export_as_markdown(session_path, output_path),
-        _ => Err(format!("Unsupported format: {}", format)),
+        _ => Err(format!("Unsupported format: {format}")),
     }
 }
 
@@ -22,11 +22,11 @@ fn export_using_pi_command(session_path: &str, output_path: &str) -> Result<(), 
         .arg(session_path)
         .arg(output_path)
         .output()
-        .map_err(|e| format!("Failed to execute pi command: {}", e))?;
+        .map_err(|e| format!("Failed to execute pi command: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Pi export command failed: {}", stderr));
+        return Err(format!("Pi export command failed: {stderr}"));
     }
 
     Ok(())
@@ -34,7 +34,7 @@ fn export_using_pi_command(session_path: &str, output_path: &str) -> Result<(), 
 
 fn export_as_json(session_path: &str, output_path: &str) -> Result<(), String> {
     let content = fs::read_to_string(session_path)
-        .map_err(|e| format!("Failed to read session file: {}", e))?;
+        .map_err(|e| format!("Failed to read session file: {e}"))?;
 
     let entries: Vec<Value> = content
         .lines()
@@ -43,17 +43,17 @@ fn export_as_json(session_path: &str, output_path: &str) -> Result<(), String> {
         .collect();
 
     let json_content = serde_json::to_string_pretty(&entries)
-        .map_err(|e| format!("Failed to serialize JSON: {}", e))?;
+        .map_err(|e| format!("Failed to serialize JSON: {e}"))?;
 
     fs::write(output_path, json_content)
-        .map_err(|e| format!("Failed to write export file: {}", e))?;
+        .map_err(|e| format!("Failed to write export file: {e}"))?;
 
     Ok(())
 }
 
 fn export_as_markdown(session_path: &str, output_path: &str) -> Result<(), String> {
     let content = fs::read_to_string(session_path)
-        .map_err(|e| format!("Failed to read session file: {}", e))?;
+        .map_err(|e| format!("Failed to read session file: {e}"))?;
 
     let mut md = String::new();
     let mut session_name = String::from("Session Export");
@@ -74,8 +74,8 @@ fn export_as_markdown(session_path: &str, output_path: &str) -> Result<(), Strin
                 if let Some(ts) = entry["timestamp"].as_str() {
                     session_date = ts.to_string();
                 }
-                md.push_str(&format!("# {}\n\n", session_name));
-                md.push_str(&format!("**Date:** {}\n\n", session_date));
+                md.push_str(&format!("# {session_name}\n\n"));
+                md.push_str(&format!("**Date:** {session_date}\n\n"));
                 md.push_str("---\n\n");
             }
 
@@ -87,10 +87,10 @@ fn export_as_markdown(session_path: &str, output_path: &str) -> Result<(), Strin
                     let role_label = match role {
                         "user" => "**User**",
                         "assistant" => "**Assistant**",
-                        _ => &format!("**{}**", role),
+                        _ => &format!("**{role}**"),
                     };
 
-                    md.push_str(&format!("{} *{}*\n\n", role_label, timestamp));
+                    md.push_str(&format!("{role_label} *{timestamp}*\n\n"));
 
                     if let Some(content_arr) = message["content"].as_array() {
                         for item in content_arr {
@@ -107,8 +107,7 @@ fn export_as_markdown(session_path: &str, output_path: &str) -> Result<(), Strin
         }
     }
 
-    fs::write(output_path, md)
-        .map_err(|e| format!("Failed to write export file: {}", e))?;
+    fs::write(output_path, md).map_err(|e| format!("Failed to write export file: {e}"))?;
 
     Ok(())
 }

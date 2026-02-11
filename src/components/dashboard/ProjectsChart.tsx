@@ -46,13 +46,13 @@ export default function ProjectsChart({ stats, sessions, title, limit = 8, onPro
 
   return (
     <div className="glass-card rounded-lg p-3 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#82aaff]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-info/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
-            <div className="p-1 rounded bg-[#82aaff]/10">
-              <Folder className="h-3 w-3 text-[#82aaff]" />
+            <div className="p-1 rounded bg-info/10">
+              <Folder className="h-3 w-3 text-info" />
             </div>
             {displayTitle}
           </h3>

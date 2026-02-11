@@ -67,7 +67,7 @@ impl Config {
 pub fn get_config_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let config_dir = home.join(".pi").join("agent");
-    fs::create_dir_all(&config_dir).map_err(|e| format!("Failed to create config dir: {}", e))?;
+    fs::create_dir_all(&config_dir).map_err(|e| format!("Failed to create config dir: {e}"))?;
     Ok(config_dir.join(CONFIG_FILE))
 }
 
@@ -80,11 +80,11 @@ pub fn load_config() -> Result<Config, String> {
         return Ok(default_config);
     }
 
-    let content = fs::read_to_string(&config_path)
-        .map_err(|e| format!("Failed to read config: {}", e))?;
+    let content =
+        fs::read_to_string(&config_path).map_err(|e| format!("Failed to read config: {e}"))?;
 
-    let config: Config = toml::from_str(&content)
-        .map_err(|e| format!("Failed to parse config: {}", e))?;
+    let config: Config =
+        toml::from_str(&content).map_err(|e| format!("Failed to parse config: {e}"))?;
 
     Ok(config)
 }
@@ -92,11 +92,10 @@ pub fn load_config() -> Result<Config, String> {
 pub fn save_config(config: &Config) -> Result<(), String> {
     let config_path = get_config_path()?;
 
-    let content = toml::to_string_pretty(config)
-        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+    let content =
+        toml::to_string_pretty(config).map_err(|e| format!("Failed to serialize config: {e}"))?;
 
-    fs::write(&config_path, content)
-        .map_err(|e| format!("Failed to write config: {}", e))?;
+    fs::write(&config_path, content).map_err(|e| format!("Failed to write config: {e}"))?;
 
     Ok(())
 }
@@ -105,8 +104,7 @@ pub fn reset_config() -> Result<Config, String> {
     let config_path = get_config_path()?;
 
     if config_path.exists() {
-        fs::remove_file(&config_path)
-            .map_err(|e| format!("Failed to remove config: {}", e))?;
+        fs::remove_file(&config_path).map_err(|e| format!("Failed to remove config: {e}"))?;
     }
 
     Ok(Config::default())

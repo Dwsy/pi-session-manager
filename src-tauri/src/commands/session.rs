@@ -18,7 +18,7 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
 
 #[tauri::command]
 pub async fn read_session_file(path: String) -> Result<String, String> {
-    fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {}", e))
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))
 }
 
 #[tauri::command]
@@ -27,7 +27,7 @@ pub async fn read_session_file_incremental(
     from_line: usize,
 ) -> Result<(usize, String), String> {
     let content =
-        fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {}", e))?;
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
     let lines: Vec<&str> = content.lines().collect();
     let total_lines = lines.len();
@@ -44,15 +44,15 @@ pub async fn read_session_file_incremental(
 
 #[tauri::command]
 pub async fn get_file_stats(path: String) -> Result<FileStats, String> {
-    let metadata = fs::metadata(&path).map_err(|e| format!("Failed to get file metadata: {}", e))?;
+    let metadata = fs::metadata(&path).map_err(|e| format!("Failed to get file metadata: {e}"))?;
 
     let modified = metadata
         .modified()
-        .map_err(|e| format!("Failed to get modified time: {}", e))?;
+        .map_err(|e| format!("Failed to get modified time: {e}"))?;
 
     let modified_at = modified
         .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| format!("Failed to convert modified time: {}", e))?
+        .map_err(|e| format!("Failed to convert modified time: {e}"))?
         .as_millis() as u64;
 
     Ok(FileStats {
@@ -65,7 +65,7 @@ pub async fn get_file_stats(path: String) -> Result<FileStats, String> {
 #[tauri::command]
 pub async fn get_session_entries(path: String) -> Result<Vec<SessionEntry>, String> {
     let content =
-        fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {}", e))?;
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
     let mut entries = Vec::new();
 
@@ -103,18 +103,22 @@ pub async fn get_session_entries(path: String) -> Result<Vec<SessionEntry>, Stri
 
 #[tauri::command]
 pub async fn delete_session(path: String) -> Result<(), String> {
-    fs::remove_file(&path).map_err(|e| format!("Failed to delete session: {}", e))
+    fs::remove_file(&path).map_err(|e| format!("Failed to delete session: {e}"))
 }
 
 #[tauri::command]
-pub async fn export_session(path: String, format: String, output_path: String) -> Result<(), String> {
+pub async fn export_session(
+    path: String,
+    format: String,
+    output_path: String,
+) -> Result<(), String> {
     export::export_session(&path, &format, &output_path).await
 }
 
 #[tauri::command]
 pub async fn rename_session(path: String, new_name: String) -> Result<(), String> {
     let content =
-        fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {}", e))?;
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
     let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
     let mut name_updated = false;
@@ -132,7 +136,7 @@ pub async fn rename_session(path: String, new_name: String) -> Result<(), String
                         serde_json::Value::String(new_name.clone()),
                     );
                     *line = serde_json::to_string(&value)
-                        .map_err(|e| format!("Failed to serialize: {}", e))?;
+                        .map_err(|e| format!("Failed to serialize: {e}"))?;
                     name_updated = true;
                     break;
                 }
@@ -147,20 +151,18 @@ pub async fn rename_session(path: String, new_name: String) -> Result<(), String
             "timestamp": chrono::Utc::now().to_rfc3339()
         });
         lines.push(
-            serde_json::to_string(&session_info).map_err(|e| format!("Failed to serialize: {}", e))?,
+            serde_json::to_string(&session_info)
+                .map_err(|e| format!("Failed to serialize: {e}"))?,
         );
     }
 
-    fs::write(&path, lines.join("\n"))
-        .map_err(|e| format!("Failed to write session file: {}", e))?;
+    fs::write(&path, lines.join("\n")).map_err(|e| format!("Failed to write session file: {e}"))?;
 
     Ok(())
 }
 
 #[tauri::command]
-pub async fn get_session_stats(
-    sessions: Vec<SessionInfo>,
-) -> Result<stats::SessionStats, String> {
+pub async fn get_session_stats(sessions: Vec<SessionInfo>) -> Result<stats::SessionStats, String> {
     Ok(stats::calculate_stats(&sessions))
 }
 
@@ -192,10 +194,9 @@ pub async fn open_session_in_terminal(
     activate
     set newWindow to (create window with default profile)
     tell current session of newWindow
-        write text "cd \"{}\" && {} --session \"{}\""
+        write text "cd \"{cwd_escaped}\" && {pi_cmd} --session \"{path_escaped}\""
     end tell
-end tell"#,
-                    cwd_escaped, pi_cmd, path_escaped
+end tell"#
                 );
                 Command::new("osascript").arg("-e").arg(script).spawn()
             }
@@ -203,40 +204,58 @@ end tell"#,
                 let script = format!(
                     r#"tell application "Terminal"
     activate
-    do script "cd \"{}\" && {} --session \"{}\""
-end tell"#,
-                    cwd_escaped, pi_cmd, path_escaped
+    do script "cd \"{cwd_escaped}\" && {pi_cmd} --session \"{path_escaped}\""
+end tell"#
                 );
                 Command::new("osascript").arg("-e").arg(script).spawn()
             }
             "vscode" => Command::new("code").args(["--new-window", &cwd]).spawn(),
-            _ => return Err(format!("Unsupported terminal on macOS: {}", terminal)),
+            _ => return Err(format!("Unsupported terminal on macOS: {terminal}")),
         }
     } else if cfg!(target_os = "windows") {
-        let cmd_str = format!("cd /d \"{}\" && {} --session \"{}\"", cwd, pi_cmd, path);
+        let cmd_str = format!("cd /d \"{cwd}\" && {pi_cmd} --session \"{path}\"");
         match terminal.as_str() {
-            "cmd" => Command::new("cmd").args(["/C", "start", "cmd", "/K", &cmd_str]).spawn(),
+            "cmd" => Command::new("cmd")
+                .args(["/C", "start", "cmd", "/K", &cmd_str])
+                .spawn(),
             "powershell" => Command::new("cmd")
-                .args(["/C", "start", "powershell", "-NoExit", "-Command", &format!("cd '{}'; {} --session '{}'", cwd, pi_cmd, path)])
+                .args([
+                    "/C",
+                    "start",
+                    "powershell",
+                    "-NoExit",
+                    "-Command",
+                    &format!("cd '{cwd}'; {pi_cmd} --session '{path}'"),
+                ])
                 .spawn(),
             "windows-terminal" => Command::new("wt").args(["cmd", "/K", &cmd_str]).spawn(),
             "vscode" => Command::new("code").args(["--new-window", &cwd]).spawn(),
-            _ => return Err(format!("Unsupported terminal on Windows: {}", terminal)),
+            _ => return Err(format!("Unsupported terminal on Windows: {terminal}")),
         }
     } else {
         // Linux
-        let cmd_str = format!("cd '{}' && {} --session '{}'", cwd, pi_cmd, path);
+        let cmd_str = format!("cd '{cwd}' && {pi_cmd} --session '{path}'");
         match terminal.as_str() {
-            "gnome-terminal" => Command::new("gnome-terminal").args(["--", "bash", "-c", &cmd_str]).spawn(),
-            "konsole" => Command::new("konsole").args(["-e", "bash", "-c", &cmd_str]).spawn(),
-            "xfce4-terminal" => Command::new("xfce4-terminal").args(["-e", &format!("bash -c '{}'", cmd_str)]).spawn(),
-            "xterm" => Command::new("xterm").args(["-e", "bash", "-c", &cmd_str]).spawn(),
+            "gnome-terminal" => Command::new("gnome-terminal")
+                .args(["--", "bash", "-c", &cmd_str])
+                .spawn(),
+            "konsole" => Command::new("konsole")
+                .args(["-e", "bash", "-c", &cmd_str])
+                .spawn(),
+            "xfce4-terminal" => Command::new("xfce4-terminal")
+                .args(["-e", &format!("bash -c '{cmd_str}'")])
+                .spawn(),
+            "xterm" => Command::new("xterm")
+                .args(["-e", "bash", "-c", &cmd_str])
+                .spawn(),
             "vscode" => Command::new("code").args(["--new-window", &cwd]).spawn(),
-            _ => Command::new("x-terminal-emulator").args(["-e", "bash", "-c", &cmd_str]).spawn(),
+            _ => Command::new("x-terminal-emulator")
+                .args(["-e", "bash", "-c", &cmd_str])
+                .spawn(),
         }
     };
 
-    result.map_err(|e| format!("Failed to open terminal: {}", e))?;
+    result.map_err(|e| format!("Failed to open terminal: {e}"))?;
     Ok(())
 }
 
@@ -247,12 +266,12 @@ pub async fn open_session_in_browser(path: String) -> Result<(), String> {
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("session");
-    let temp_html_path = temp_dir.join(format!("pi_session_{}.html", session_id));
+    let temp_html_path = temp_dir.join(format!("pi_session_{session_id}.html"));
     let temp_html_path_str = temp_html_path.to_string_lossy().to_string();
 
     export::export_session(&path, "html", &temp_html_path_str)
         .await
-        .map_err(|e| format!("Failed to export session: {}", e))?;
+        .map_err(|e| format!("Failed to export session: {e}"))?;
 
     let result = if cfg!(target_os = "macos") {
         Command::new("open").arg(&temp_html_path_str).spawn()
@@ -266,6 +285,6 @@ pub async fn open_session_in_browser(path: String) -> Result<(), String> {
         return Err("Unsupported operating system".to_string());
     };
 
-    result.map_err(|e| format!("Failed to open browser: {}", e))?;
+    result.map_err(|e| format!("Failed to open browser: {e}"))?;
     Ok(())
 }

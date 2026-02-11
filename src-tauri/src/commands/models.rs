@@ -32,11 +32,11 @@ pub async fn list_models(search: Option<String>) -> Result<Vec<ModelInfo>, Strin
     let output = Command::new("pi")
         .args(&args)
         .output()
-        .map_err(|e| format!("Failed to execute pi --list-models: {}", e))?;
+        .map_err(|e| format!("Failed to execute pi --list-models: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("pi --list-models failed: {}", stderr));
+        return Err(format!("pi --list-models failed: {stderr}"));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -96,7 +96,7 @@ pub async fn test_model(
         .args(&args)
         .stdin(Stdio::piped())
         .output()
-        .map_err(|e| format!("Failed to execute pi: {}", e))?;
+        .map_err(|e| format!("Failed to execute pi: {e}"))?;
 
     let duration = start_time.elapsed().as_secs_f64();
 

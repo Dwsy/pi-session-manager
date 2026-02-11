@@ -1,15 +1,20 @@
+import { useState } from 'react'
 import type { RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { SessionInfo, FavoriteItem } from '../types'
-import { Trash2, Search, Star, Clock } from 'lucide-react'
+import type { SessionInfo, FavoriteItem, Tag } from '../types'
+import { Trash2, Search, Star, Clock, Tags } from 'lucide-react'
 import { SessionListSkeleton } from './Skeleton'
 import OpenInBrowserButton from './OpenInBrowserButton'
 import OpenInTerminalButton from './OpenInTerminalButton'
 import { SessionBadge } from './SessionBadge'
+import TagBadge from './TagBadge'
+import TagPicker from './TagPicker'
+import SessionContextMenu from './SessionContextMenu'
 import type { TerminalType } from './settings/types'
 import { getPlatformDefaults } from './settings/types'
+import { invoke, isTauri } from '../transport'
 
 interface SessionListProps {
   sessions: SessionInfo[]
@@ -26,6 +31,10 @@ interface SessionListProps {
   favorites?: FavoriteItem[]
   onToggleFavorite?: (item: Omit<FavoriteItem, 'addedAt'>) => void
   showDirectory?: boolean
+  tags?: Tag[]
+  getTagsForSession?: (sessionId: string) => Tag[]
+  onToggleTag?: (sessionId: string, tagId: string, currentlyAssigned: boolean) => void
+  onCreateTag?: (name: string, color: string) => void
 }
 
 export default function SessionList({
@@ -42,8 +51,15 @@ export default function SessionList({
   favorites = [],
   onToggleFavorite,
   showDirectory = true,
+  tags = [],
+  getTagsForSession,
+  onToggleTag,
+  onCreateTag,
 }: SessionListProps) {
   const { t } = useTranslation()
+  const [tagPickerSessionId, setTagPickerSessionId] = useState<string | null>(null)
+  const [tagPickerAnchor, setTagPickerAnchor] = useState<DOMRect | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; sessionId: string } | null>(null)
   const rowVirtualizer = useVirtualizer({
     count: sessions.length,
     getScrollElement: () => scrollParentRef?.current ?? null,
@@ -87,6 +103,10 @@ export default function SessionList({
               data-index={virtualRow.index}
               ref={rowVirtualizer.measureElement}
               onClick={() => onSelectSession(session)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setContextMenu({ x: e.clientX, y: e.clientY, sessionId: session.id })
+              }}
               className={`relative px-3 py-2 cursor-pointer transition-all group border-b border-border/10 ${
                 isSelected 
                   ? 'bg-gradient-to-r from-blue-500/5 to-transparent border-l-2 border-l-blue-500' 
@@ -104,6 +124,13 @@ export default function SessionList({
                 <h3 className="font-medium text-[11px] text-foreground leading-tight line-clamp-1 flex-1 min-w-0">
                   {session.name || session.first_message || t('session.list.untitled')}
                 </h3>
+                {getTagsForSession && getTagsForSession(session.id).length > 0 && (
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                    {getTagsForSession(session.id).map(tag => (
+                      <TagBadge key={tag.id} tag={tag} compact />
+                    ))}
+                  </div>
+                )}
                 {getBadgeType && getBadgeType(session.id) && (
                   <div className="flex-shrink-0">
                     <SessionBadge type={getBadgeType(session.id)!} />
@@ -154,6 +181,20 @@ export default function SessionList({
                       <Star className={`h-3 w-3 ${isFavorite ? 'fill-current' : ''}`} />
                     </button>
                   )}
+                  {onToggleTag && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                        setTagPickerSessionId(prev => prev === session.id ? null : session.id)
+                        setTagPickerAnchor(rect)
+                      }}
+                      className="p-1 text-muted-foreground/60 hover:text-blue-400 rounded transition-all"
+                      title={t('tags.assign')}
+                    >
+                      <Tags className="h-3 w-3" />
+                    </button>
+                  )}
                   <OpenInTerminalButton
                     session={session}
                     terminal={terminal}
@@ -187,6 +228,56 @@ export default function SessionList({
           )
         })}
       </div>
+
+      {tagPickerSessionId && onToggleTag && (
+        <TagPicker
+          tags={tags}
+          selectedTagIds={getTagsForSession ? getTagsForSession(tagPickerSessionId).map(tg => tg.id) : []}
+          onToggle={(tagId) => {
+            const assigned = getTagsForSession ? getTagsForSession(tagPickerSessionId).some(tg => tg.id === tagId) : false
+            onToggleTag(tagPickerSessionId, tagId, assigned)
+          }}
+          onCreateTag={onCreateTag}
+          anchorRect={tagPickerAnchor}
+          onClose={() => setTagPickerSessionId(null)}
+        />
+      )}
+
+      {contextMenu && onToggleTag && (() => {
+        const ctxSession = sessions.find(s => s.id === contextMenu.sessionId)
+        if (!ctxSession) return null
+        const isFav = favorites.some(f => f.type === 'session' && f.id === ctxSession.id)
+        return (
+          <SessionContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            sessionId={contextMenu.sessionId}
+            tags={tags}
+            sessionTagIds={getTagsForSession ? getTagsForSession(contextMenu.sessionId).map(tg => tg.id) : []}
+            onToggleTag={(tagId, assigned) => onToggleTag(contextMenu.sessionId, tagId, assigned)}
+            onOpenTerminal={isTauri() ? () => {
+              invoke('open_session_in_terminal', {
+                path: ctxSession.path, cwd: ctxSession.cwd,
+                terminal: terminal === 'custom' ? customCommand : terminal,
+                pi_path: piPath || null,
+              }).catch(console.error)
+            } : undefined}
+            onOpenBrowser={isTauri() ? () => {
+              invoke('open_session_in_browser', { path: ctxSession.path }).catch(console.error)
+            } : undefined}
+            onToggleFavorite={onToggleFavorite ? () => {
+              onToggleFavorite({
+                type: 'session', id: ctxSession.id,
+                name: ctxSession.name || ctxSession.first_message || 'Untitled',
+                path: ctxSession.path,
+              })
+            } : undefined}
+            isFavorite={isFav}
+            onDelete={onDeleteSession ? () => onDeleteSession(ctxSession) : undefined}
+            onClose={() => setContextMenu(null)}
+          />
+        )
+      })()}
     </div>
   )
 }

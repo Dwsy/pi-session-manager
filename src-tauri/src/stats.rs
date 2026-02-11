@@ -2,10 +2,10 @@ use crate::models::SessionInfo;
 use crate::session_parser::parse_session_details;
 use crate::sqlite_cache;
 use crate::write_buffer;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use chrono::{Datelike, Timelike, Weekday};
+use serde::{Deserialize, Serialize};
 use serde_json;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionStats {
@@ -88,7 +88,7 @@ pub fn calculate_stats(sessions: &[SessionInfo]) -> SessionStats {
 pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionStats {
     let total_sessions = sessions.len();
 
-    log::trace!("Calculating stats for {} sessions", total_sessions);
+    log::trace!("Calculating stats for {total_sessions} sessions");
 
     let conn = sqlite_cache::init_db().ok();
 
@@ -134,13 +134,18 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             total_output += details.output_tokens as usize;
             total_cache_read += details.cache_read_tokens as usize;
             total_cache_write += details.cache_write_tokens as usize;
-            total_cost += details.input_cost + details.output_cost + details.cache_read_cost + details.cache_write_cost;
+            total_cost += details.input_cost
+                + details.output_cost
+                + details.cache_read_cost
+                + details.cache_write_cost;
 
             let date = session_modified.format("%Y-%m-%d").to_string();
-            *messages_by_date.entry(date.clone()).or_insert(0) += details.user_messages + details.assistant_messages;
+            *messages_by_date.entry(date.clone()).or_insert(0) +=
+                details.user_messages + details.assistant_messages;
 
             let hour = session_modified.hour();
-            *messages_by_hour.entry(hour.to_string()).or_insert(0) += details.user_messages + details.assistant_messages;
+            *messages_by_hour.entry(hour.to_string()).or_insert(0) +=
+                details.user_messages + details.assistant_messages;
 
             let weekday = session_modified.weekday();
             let day_name = match weekday {
@@ -152,7 +157,9 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
                 Weekday::Sat => "Saturday",
                 Weekday::Sun => "Sunday",
             };
-            *messages_by_day_of_week.entry(day_name.to_string()).or_insert(0) += details.user_messages + details.assistant_messages;
+            *messages_by_day_of_week
+                .entry(day_name.to_string())
+                .or_insert(0) += details.user_messages + details.assistant_messages;
             continue;
         }
 
@@ -179,13 +186,18 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             total_output += cached.output_tokens;
             total_cache_read += cached.cache_read_tokens;
             total_cache_write += cached.cache_write_tokens;
-            total_cost += cached.input_cost + cached.output_cost + cached.cache_read_cost + cached.cache_write_cost;
+            total_cost += cached.input_cost
+                + cached.output_cost
+                + cached.cache_read_cost
+                + cached.cache_write_cost;
 
             let date = session_modified.format("%Y-%m-%d").to_string();
-            *messages_by_date.entry(date.clone()).or_insert(0) += cached.user_messages + cached.assistant_messages;
+            *messages_by_date.entry(date.clone()).or_insert(0) +=
+                cached.user_messages + cached.assistant_messages;
 
             let hour = session_modified.hour();
-            *messages_by_hour.entry(hour.to_string()).or_insert(0) += cached.user_messages + cached.assistant_messages;
+            *messages_by_hour.entry(hour.to_string()).or_insert(0) +=
+                cached.user_messages + cached.assistant_messages;
 
             let weekday = session_modified.weekday();
             let day_name = match weekday {
@@ -197,7 +209,9 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
                 Weekday::Sat => "Saturday",
                 Weekday::Sun => "Sunday",
             };
-            *messages_by_day_of_week.entry(day_name.to_string()).or_insert(0) += cached.user_messages + cached.assistant_messages;
+            *messages_by_day_of_week
+                .entry(day_name.to_string())
+                .or_insert(0) += cached.user_messages + cached.assistant_messages;
             continue;
         }
 
@@ -220,13 +234,18 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             total_output += session_stats.output_tokens as usize;
             total_cache_read += session_stats.cache_read_tokens as usize;
             total_cache_write += session_stats.cache_write_tokens as usize;
-            total_cost += session_stats.input_cost + session_stats.output_cost + session_stats.cache_read_cost + session_stats.cache_write_cost;
+            total_cost += session_stats.input_cost
+                + session_stats.output_cost
+                + session_stats.cache_read_cost
+                + session_stats.cache_write_cost;
 
             let date = session_modified.format("%Y-%m-%d").to_string();
-            *messages_by_date.entry(date.clone()).or_insert(0) += session_stats.user_messages + session_stats.assistant_messages;
+            *messages_by_date.entry(date.clone()).or_insert(0) +=
+                session_stats.user_messages + session_stats.assistant_messages;
 
             let hour = session_modified.hour();
-            *messages_by_hour.entry(hour.to_string()).or_insert(0) += session_stats.user_messages + session_stats.assistant_messages;
+            *messages_by_hour.entry(hour.to_string()).or_insert(0) +=
+                session_stats.user_messages + session_stats.assistant_messages;
 
             let weekday = session_modified.weekday();
             let day_name = match weekday {
@@ -238,7 +257,9 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
                 Weekday::Sat => "Saturday",
                 Weekday::Sun => "Sunday",
             };
-            *messages_by_day_of_week.entry(day_name.to_string()).or_insert(0) += session_stats.user_messages + session_stats.assistant_messages;
+            *messages_by_day_of_week
+                .entry(day_name.to_string())
+                .or_insert(0) += session_stats.user_messages + session_stats.assistant_messages;
         } else {
             // Fallback if parsing fails
             *sessions_by_model.entry("unknown".to_string()).or_insert(0) += 1;
@@ -260,7 +281,9 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
                 Weekday::Sat => "Saturday",
                 Weekday::Sun => "Sunday",
             };
-            *messages_by_day_of_week.entry(day_name.to_string()).or_insert(0) += session.message_count;
+            *messages_by_day_of_week
+                .entry(day_name.to_string())
+                .or_insert(0) += session.message_count;
         }
     }
 
@@ -276,7 +299,12 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
     // Generate time distribution
     let time_distribution = generate_time_distribution(&messages_by_hour);
 
-    log::trace!("Stats: {} user messages, {} assistant messages, {} total tokens", total_user_messages, total_assistant_messages, total_input + total_output);
+    log::trace!(
+        "Stats: {} user messages, {} assistant messages, {} total tokens",
+        total_user_messages,
+        total_assistant_messages,
+        total_input + total_output
+    );
 
     SessionStats {
         total_sessions,
@@ -304,10 +332,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
 }
 
 fn extract_project_name(cwd: &str) -> String {
-    cwd.split('/')
-        .last()
-        .unwrap_or("unknown")
-        .to_string()
+    cwd.split('/').next_back().unwrap_or("unknown").to_string()
 }
 
 fn generate_heatmap_data(messages_by_date: &HashMap<String, usize>) -> Vec<HeatmapPoint> {
@@ -340,11 +365,16 @@ fn generate_heatmap_data(messages_by_date: &HashMap<String, usize>) -> Vec<Heatm
     data
 }
 
-fn generate_time_distribution(messages_by_hour: &HashMap<String, usize>) -> Vec<TimeDistributionPoint> {
+fn generate_time_distribution(
+    messages_by_hour: &HashMap<String, usize>,
+) -> Vec<TimeDistributionPoint> {
     let mut distribution = Vec::new();
 
     for hour in 0..24 {
-        let message_count = messages_by_hour.get(&hour.to_string()).copied().unwrap_or(0);
+        let message_count = messages_by_hour
+            .get(&hour.to_string())
+            .copied()
+            .unwrap_or(0);
         distribution.push(TimeDistributionPoint {
             hour,
             message_count,

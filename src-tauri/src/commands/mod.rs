@@ -5,6 +5,7 @@ mod search;
 mod session;
 mod settings;
 mod skills;
+mod tags;
 pub mod terminal;
 
 pub use cache::*;
@@ -14,6 +15,7 @@ pub use search::*;
 pub use session::*;
 pub use settings::*;
 pub use skills::*;
+pub use tags::*;
 pub use terminal::*;
 
 #[tauri::command]
