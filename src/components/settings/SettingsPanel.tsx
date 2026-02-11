@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import type { AppSettings, SettingsSection } from './types'
 import { defaultSettings } from './types'
+import { loadAppSettings, saveAppSettings } from '../../utils/settingsApi'
 import TerminalSettings from './sections/TerminalSettings'
 import AppearanceSettings from './sections/AppearanceSettings'
 import LanguageSettings from './sections/LanguageSettings'
@@ -51,11 +52,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const loadSettings = async () => {
     setLoading(true)
     try {
-      const saved = localStorage.getItem('pi-session-manager-settings')
-      if (saved) {
-        const parsedSettings = JSON.parse(saved)
-        setSettings({ ...defaultSettings, ...parsedSettings })
-      }
+      const s = await loadAppSettings()
+      setSettings(s)
     } catch (error) {
       console.error('Failed to load settings:', error)
     } finally {
@@ -66,7 +64,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const saveSettings = async () => {
     setSaving(true)
     try {
-      localStorage.setItem('pi-session-manager-settings', JSON.stringify(settings))
+      await saveAppSettings(settings)
       i18n.changeLanguage(settings.language.locale)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)

@@ -3,6 +3,9 @@ export interface AppSettings {
     defaultTerminal: 'iterm2' | 'terminal' | 'vscode' | 'custom'
     customTerminalCommand?: string
     piCommandPath: string
+    builtinTerminalEnabled: boolean
+    defaultShell: string
+    terminalFontSize: number
   }
   appearance: {
     theme: 'dark' | 'light' | 'system'
@@ -55,6 +58,9 @@ export const defaultSettings: AppSettings = {
   terminal: {
     defaultTerminal: 'iterm2',
     piCommandPath: 'pi',
+    builtinTerminalEnabled: true,
+    defaultShell: '/bin/zsh',
+    terminalFontSize: 13,
   },
   appearance: {
     theme: 'dark',
