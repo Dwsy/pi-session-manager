@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { invoke, listen } from '../transport'
 import { X, Plus, ChevronDown } from 'lucide-react'
+import { getPlatformDefaults } from './settings/types'
 
 interface ShellInfo {
   label: string
@@ -140,7 +141,7 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize }: {
 export function TerminalPanel({ isOpen, onClose, cwd, height = 280, defaultShell: propShell, fontSize = 13 }: TerminalPanelProps) {
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
-  const [defaultShell, setDefaultShell] = useState(propShell || '/bin/zsh')
+  const [defaultShell, setDefaultShell] = useState(propShell || getPlatformDefaults().defaultShell)
   const [availableShells, setAvailableShells] = useState<ShellInfo[]>([])
   const [showShellMenu, setShowShellMenu] = useState(false)
   const tabCounter = useRef(0)

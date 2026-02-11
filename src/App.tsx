@@ -31,6 +31,7 @@ import type { SessionInfo, FavoriteItem } from './types'
 import type { SearchContext } from './plugins/types'
 import { invoke, isTauri } from './transport'
 import { getCachedSettings } from './utils/settingsApi'
+import { getPlatformDefaults } from './components/settings/types'
 
 // Define sqlite_cache types for Tauri responses
 namespace sqlite_cache {
@@ -78,7 +79,7 @@ function App() {
     return !localStorage.getItem('onboarding-completed')
   })
   const [showTerminal, setShowTerminal] = useState(false)
-  const [terminalConfig, setTerminalConfig] = useState({ enabled: true, defaultShell: '/bin/zsh', fontSize: 13 })
+  const [terminalConfig, setTerminalConfig] = useState({ enabled: true, defaultShell: getPlatformDefaults().defaultShell, fontSize: 13 })
   const hasInitializedRef = useRef(false)
 
   const reloadTerminalConfig = useCallback(() => {
@@ -86,7 +87,7 @@ function App() {
       const s = getCachedSettings()
       setTerminalConfig({
         enabled: s.terminal?.builtinTerminalEnabled !== false,
-        defaultShell: s.terminal?.defaultShell || '/bin/zsh',
+        defaultShell: s.terminal?.defaultShell || getPlatformDefaults().defaultShell,
         fontSize: s.terminal?.terminalFontSize || 13,
       })
       if (s.terminal?.builtinTerminalEnabled === false) {

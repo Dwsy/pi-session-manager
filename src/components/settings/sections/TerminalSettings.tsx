@@ -2,24 +2,56 @@ import { useTranslation } from 'react-i18next'
 import { FolderOpen, Terminal, ChevronDown, ChevronUp } from 'lucide-react'
 import { useState } from 'react'
 import type { TerminalSettingsProps } from '../types'
+import { detectPlatform } from '../types'
 
-const SHELL_OPTIONS = [
-  { path: '/bin/zsh', label: 'zsh' },
-  { path: '/bin/bash', label: 'bash' },
-  { path: '/bin/sh', label: 'sh' },
-  { path: '/usr/local/bin/fish', label: 'fish' },
-]
+const platform = detectPlatform()
+
+const SHELL_OPTIONS = platform === 'windows'
+  ? [
+      { path: 'powershell.exe', label: 'PowerShell' },
+      { path: 'cmd.exe', label: 'cmd' },
+      { path: 'C:\\Program Files\\Git\\bin\\bash.exe', label: 'Git Bash' },
+      { path: 'pwsh.exe', label: 'pwsh' },
+    ]
+  : [
+      { path: '/bin/zsh', label: 'zsh' },
+      { path: '/bin/bash', label: 'bash' },
+      { path: '/bin/sh', label: 'sh' },
+      { path: '/usr/local/bin/fish', label: 'fish' },
+    ]
 
 export default function TerminalSettings({ settings, onUpdate }: TerminalSettingsProps) {
   const { t } = useTranslation()
   const [isBuiltinExpanded, setIsBuiltinExpanded] = useState(settings.terminal.builtinTerminalEnabled)
 
-  const terminals = [
-    { id: 'iterm2', name: t('settings.terminal.options.iterm2.name'), description: t('settings.terminal.options.iterm2.description') },
-    { id: 'terminal', name: t('settings.terminal.options.terminal.name'), description: t('settings.terminal.options.terminal.description') },
-    { id: 'vscode', name: t('settings.terminal.options.vscode.name'), description: t('settings.terminal.options.vscode.description') },
-    { id: 'custom', name: t('settings.terminal.options.custom.name'), description: t('settings.terminal.options.custom.description') },
-  ]
+  const platformTerminals = (() => {
+    const common = [
+      { id: 'vscode', name: t('settings.terminal.options.vscode.name'), description: t('settings.terminal.options.vscode.description') },
+      { id: 'custom', name: t('settings.terminal.options.custom.name'), description: t('settings.terminal.options.custom.description') },
+    ]
+    switch (platform) {
+      case 'windows':
+        return [
+          { id: 'powershell', name: 'PowerShell', description: t('settings.terminal.options.powershell.description', 'Windows PowerShell') },
+          { id: 'cmd', name: 'cmd', description: t('settings.terminal.options.cmd.description', 'Command Prompt') },
+          { id: 'windows-terminal', name: 'Windows Terminal', description: t('settings.terminal.options.windowsTerminal.description', 'Windows Terminal') },
+          ...common,
+        ]
+      case 'linux':
+        return [
+          { id: 'gnome-terminal', name: 'GNOME Terminal', description: t('settings.terminal.options.gnomeTerminal.description', 'GNOME Terminal') },
+          { id: 'konsole', name: 'Konsole', description: t('settings.terminal.options.konsole.description', 'KDE Konsole') },
+          { id: 'xterm', name: 'xterm', description: t('settings.terminal.options.xterm.description', 'xterm') },
+          ...common,
+        ]
+      default:
+        return [
+          { id: 'iterm2', name: t('settings.terminal.options.iterm2.name'), description: t('settings.terminal.options.iterm2.description') },
+          { id: 'terminal', name: t('settings.terminal.options.terminal.name'), description: t('settings.terminal.options.terminal.description') },
+          ...common,
+        ]
+    }
+  })()
 
   const handleToggleBuiltin = (enabled: boolean) => {
     onUpdate('terminal', 'builtinTerminalEnabled', enabled)
@@ -145,7 +177,7 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
           {t('settings.terminal.default', '默认终端')}
         </label>
         <div className="grid grid-cols-1 gap-2">
-          {terminals.map((term) => (
+          {platformTerminals.map((term) => (
             <label
               key={term.id}
               className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200 ${

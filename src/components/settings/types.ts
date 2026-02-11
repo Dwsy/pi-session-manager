@@ -1,6 +1,31 @@
+export type TerminalType =
+  | 'iterm2' | 'terminal' | 'vscode' | 'custom'
+  | 'powershell' | 'cmd' | 'windows-terminal'
+  | 'gnome-terminal' | 'konsole' | 'xterm'
+
+export type Platform = 'macos' | 'windows' | 'linux'
+
+export function detectPlatform(): Platform {
+  const ua = navigator.userAgent || navigator.platform || ''
+  if (/Win/i.test(ua)) return 'windows'
+  if (/Mac/i.test(ua)) return 'macos'
+  return 'linux'
+}
+
+export function getPlatformDefaults(): { defaultTerminal: TerminalType; defaultShell: string } {
+  switch (detectPlatform()) {
+    case 'windows':
+      return { defaultTerminal: 'powershell', defaultShell: 'powershell.exe' }
+    case 'linux':
+      return { defaultTerminal: 'gnome-terminal', defaultShell: '/bin/bash' }
+    default:
+      return { defaultTerminal: 'iterm2', defaultShell: '/bin/zsh' }
+  }
+}
+
 export interface AppSettings {
   terminal: {
-    defaultTerminal: 'iterm2' | 'terminal' | 'vscode' | 'custom'
+    defaultTerminal: TerminalType
     customTerminalCommand?: string
     piCommandPath: string
     builtinTerminalEnabled: boolean
@@ -54,12 +79,14 @@ function getDefaultLocale(): string {
   return lang.startsWith('zh') ? 'zh-CN' : 'en-US'
 }
 
+const platformDefaults = getPlatformDefaults()
+
 export const defaultSettings: AppSettings = {
   terminal: {
-    defaultTerminal: 'iterm2',
+    defaultTerminal: platformDefaults.defaultTerminal,
     piCommandPath: 'pi',
     builtinTerminalEnabled: true,
-    defaultShell: '/bin/zsh',
+    defaultShell: platformDefaults.defaultShell,
     terminalFontSize: 13,
   },
   appearance: {

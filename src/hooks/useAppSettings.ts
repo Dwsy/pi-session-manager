@@ -1,8 +1,11 @@
 import { useState, useCallback } from 'react'
 import i18n from '../i18n'
 import { loadAppSettings } from '../utils/settingsApi'
+import { type TerminalType, getPlatformDefaults } from '../components/settings/types'
 
-export type TerminalType = 'iterm2' | 'terminal' | 'vscode' | 'custom'
+export type { TerminalType }
+
+const platformDefaults = getPlatformDefaults()
 
 export interface UseAppSettingsReturn {
   terminal: TerminalType
@@ -12,7 +15,7 @@ export interface UseAppSettingsReturn {
 }
 
 export function useAppSettings(): UseAppSettingsReturn {
-  const [terminal, setTerminal] = useState<TerminalType>('iterm2')
+  const [terminal, setTerminal] = useState<TerminalType>(platformDefaults.defaultTerminal)
   const [piPath, setPiPath] = useState<string>('pi')
   const [customCommand, setCustomCommand] = useState<string>('')
 
@@ -20,7 +23,7 @@ export function useAppSettings(): UseAppSettingsReturn {
     try {
       const settings = await loadAppSettings()
       if (settings?.terminal) {
-        setTerminal(settings.terminal.defaultTerminal || 'iterm2')
+        setTerminal(settings.terminal.defaultTerminal || platformDefaults.defaultTerminal)
         setPiPath(settings.terminal.piCommandPath || 'pi')
         setCustomCommand(settings.terminal.customTerminalCommand || '')
       }

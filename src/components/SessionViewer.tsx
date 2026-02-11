@@ -15,6 +15,8 @@ import CustomMessage from './CustomMessage'
 import SessionTree, { type SessionTreeRef } from './SessionTree'
 import OpenInTerminalButton from './OpenInTerminalButton'
 import SystemPromptDialog from './SystemPromptDialog'
+import type { TerminalType } from './settings/types'
+import { getPlatformDefaults } from './settings/types'
 import { SessionViewProvider, useSessionView } from '../contexts/SessionViewContext'
 import '../styles/session.css'
 
@@ -24,7 +26,7 @@ interface SessionViewerProps {
   onRename: () => void
   onBack?: () => void
   onWebResume?: () => void
-  terminal?: 'iterm2' | 'terminal' | 'vscode' | 'custom'
+  terminal?: TerminalType
   piPath?: string
   customCommand?: string
 }
@@ -35,7 +37,7 @@ const SIDEBAR_DEFAULT_WIDTH = 400
 const SIDEBAR_WIDTH_KEY = 'pi-session-manager-sidebar-width'
 const MESSAGE_ITEM_GAP = 16
 
-function SessionViewerContent({ session, onExport, onRename, onWebResume, terminal = 'iterm2', piPath, customCommand }: SessionViewerProps) {
+function SessionViewerContent({ session, onExport, onRename, onWebResume, terminal = getPlatformDefaults().defaultTerminal, piPath, customCommand }: SessionViewerProps) {
   const { t } = useTranslation()
   const { toggleThinking, toggleToolsExpanded } = useSessionView()
   const [entries, setEntries] = useState<SessionEntry[]>([])

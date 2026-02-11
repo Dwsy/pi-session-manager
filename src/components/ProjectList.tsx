@@ -7,6 +7,8 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import SessionList from './SessionList'
+import type { TerminalType } from './settings/types'
+import { getPlatformDefaults } from './settings/types'
 
 interface ProjectListProps {
   sessions: SessionInfo[]
@@ -16,7 +18,7 @@ interface ProjectListProps {
   onSelectProject?: (project: string | null) => void
   onDeleteSession?: (session: SessionInfo) => void
   loading: boolean
-  terminal?: 'iterm2' | 'terminal' | 'vscode' | 'custom'
+  terminal?: TerminalType
   piPath?: string
   customCommand?: string
   getBadgeType?: (sessionId: string) => 'new' | 'updated' | null
@@ -42,7 +44,7 @@ export default function ProjectList({
   onSelectProject,
   onDeleteSession,
   loading,
-  terminal = 'iterm2',
+  terminal = getPlatformDefaults().defaultTerminal,
   piPath,
   customCommand,
   getBadgeType,

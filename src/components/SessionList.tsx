@@ -8,6 +8,8 @@ import { SessionListSkeleton } from './Skeleton'
 import OpenInBrowserButton from './OpenInBrowserButton'
 import OpenInTerminalButton from './OpenInTerminalButton'
 import { SessionBadge } from './SessionBadge'
+import type { TerminalType } from './settings/types'
+import { getPlatformDefaults } from './settings/types'
 
 interface SessionListProps {
   sessions: SessionInfo[]
@@ -17,7 +19,7 @@ interface SessionListProps {
   loading: boolean
   searchQuery?: string
   getBadgeType?: (sessionId: string) => 'new' | 'updated' | null
-  terminal?: 'iterm2' | 'terminal' | 'vscode' | 'custom'
+  terminal?: TerminalType
   piPath?: string
   customCommand?: string
   scrollParentRef?: RefObject<HTMLDivElement>
@@ -33,7 +35,7 @@ export default function SessionList({
   onDeleteSession,
   loading,
   getBadgeType,
-  terminal = 'iterm2',
+  terminal = getPlatformDefaults().defaultTerminal,
   piPath,
   customCommand,
   scrollParentRef,

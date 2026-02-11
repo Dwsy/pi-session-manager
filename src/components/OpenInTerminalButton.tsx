@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next'
 import { invoke, isTauri } from '../transport'
 import { Terminal, Loader2 } from 'lucide-react'
 import type { SessionInfo } from '../types'
+import type { TerminalType } from './settings/types'
+import { getPlatformDefaults } from './settings/types'
 
 interface OpenInTerminalButtonProps {
   session: SessionInfo
-  terminal?: 'iterm2' | 'terminal' | 'vscode' | 'custom'
+  terminal?: TerminalType
   piPath?: string
   customCommand?: string
   size?: 'sm' | 'md' | 'lg'
@@ -22,7 +24,7 @@ interface OpenInTerminalButtonProps {
 
 export default function OpenInTerminalButton({
   session,
-  terminal = 'iterm2',
+  terminal = getPlatformDefaults().defaultTerminal,
   piPath,
   customCommand,
   size = 'sm',

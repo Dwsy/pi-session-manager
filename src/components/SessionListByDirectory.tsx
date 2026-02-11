@@ -8,6 +8,8 @@ import { MessageSquare, Calendar, Trash2, FolderOpen, ChevronDown, ChevronRight,
 import { DirectoryListSkeleton } from './Skeleton'
 import OpenInTerminalButton from './OpenInTerminalButton'
 import { SessionBadge } from './SessionBadge'
+import type { TerminalType } from './settings/types'
+import { getPlatformDefaults } from './settings/types'
 
 interface SessionListByDirectoryProps {
   sessions: SessionInfo[]
@@ -15,7 +17,7 @@ interface SessionListByDirectoryProps {
   onSelectSession: (session: SessionInfo) => void
   onDeleteSession?: (session: SessionInfo) => void
   loading: boolean
-  terminal?: 'iterm2' | 'terminal' | 'vscode' | 'custom'
+  terminal?: TerminalType
   piPath?: string
   customCommand?: string
   getBadgeType?: (sessionId: string) => 'new' | 'updated' | null
@@ -28,7 +30,7 @@ export default function SessionListByDirectory({
   onSelectSession,
   onDeleteSession,
   loading,
-  terminal = 'iterm2',
+  terminal = getPlatformDefaults().defaultTerminal,
   piPath,
   customCommand,
   getBadgeType,
