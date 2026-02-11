@@ -14,6 +14,46 @@ scripts/                # 辅助脚本
 archive/                # 历史归档
 ```
 
+## 运行模式
+
+本应用支持 GUI 和 CLI 两种运行模式，通过启动参数切换：
+
+```bash
+./pi-session-manager              # GUI 模式（默认，打开桌面窗口）
+./pi-session-manager --cli        # CLI 模式（无窗口，仅后端服务）
+./pi-session-manager --headless   # 同 --cli
+```
+
+## 三栈通信架构
+
+应用同时暴露三种通信协议，共享同一套命令路由（`ws_adapter::dispatch`）：
+
+| 协议 | 地址 | 适用场景 |
+|------|------|----------|
+| Tauri IPC | `invoke()` | GUI 桌面端（仅 GUI 模式） |
+| WebSocket | `ws://127.0.0.1:52130` | 浏览器实时双向通信 |
+| HTTP POST | `http://127.0.0.1:52131/api` | 无状态单次调用（curl / 外部集成） |
+
+**关键文件：**
+- `ws_adapter.rs` — WS 服务 + `pub async fn dispatch()` 统一命令路由
+- `http_adapter.rs` — 单个 `POST /api` 端点，复用 `dispatch()`
+- `app_state.rs` — `SharedAppState`（`Arc<AppState>`），被 WS/HTTP/IPC 共享
+- `main.rs` — 启动参数解析、窗口条件创建、WS/HTTP adapter 并行启动
+
+**HTTP 请求/响应格式：**
+```json
+// POST http://127.0.0.1:52131/api
+// Request:
+{"command": "scan_sessions", "payload": {}}
+// Response:
+{"success": true, "data": [...]}
+```
+
+**新增命令时需同步更新：**
+1. `ws_adapter.rs` 的 `dispatch()` 函数 — 添加 match arm
+2. `main.rs` 的 `invoke_handler` — 注册 Tauri IPC 命令
+3. WS 和 HTTP 自动继承 `dispatch()` 的新命令，无需额外操作
+
 ## 构建、测试与开发命令
 
 ### 前端（TypeScript/React）
@@ -181,8 +221,12 @@ pub async fn read_session_file(path: String) -> Result<String, String> {
 ```
 
 **模块组织：**
+- `main.rs`：入口，CLI 参数解析，窗口条件创建，adapter 启动
 - `lib.rs`：模块声明，Tauri 命令注册
-- `commands.rs`：Tauri IPC 命令（瘦层）
+- `ws_adapter.rs`：WebSocket 服务 + `dispatch()` 统一命令路由
+- `http_adapter.rs`：HTTP POST 端点，复用 `dispatch()`
+- `app_state.rs`：共享状态（`SharedAppState`）
+- `commands/`：Tauri IPC 命令（瘦层）
 - 功能模块（`scanner.rs`, `search.rs` 等）：业务逻辑
 
 ## 提交规范
@@ -209,5 +253,6 @@ chore: update dependencies
 ## 技术栈参考
 
 - **前端**：React 18 + TypeScript + Vite + Tailwind CSS + i18next
-- **后端**：Tauri 2 + Rust + Tokio + SQLite + Regex
+- **后端**：Tauri 2 + Rust + Tokio + Axum + SQLite + Regex
+- **通信**：Tauri IPC + WebSocket (tokio-tungstenite) + HTTP POST (axum)
 - **构建**：Vite（前端）+ Cargo（Rust）
