@@ -1,154 +1,122 @@
 name: Release
+
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build-tauri:
-    permissions:
-      contents: write
+  build:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-latest"
+          - platform: macos-latest
+            target: aarch64-apple-darwin
             args: "--target aarch64-apple-darwin"
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            args: "--target x86_64-apple-darwin"
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            args: ""
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: ""
 
     runs-on: ${{ matrix.platform }}
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Rust setup
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.target }}
 
-      - name: Node.js setup
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
+          cache: npm
 
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Build the app
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run tauri build -- ${{ matrix.args }}
-
-      # 1. 上传 updater.json 到 Artifacts (供后续合并使用)
-      - name: Upload updater json
-        uses: actions/upload-artifact@v4
-        with:
-          name: updater-json-${{ matrix.platform }}-${{ strategy.job-index }}
-          path: target/**/release/bundle/updater/*.json
-          if-no-files-found: warn
-
-      # 2. 直接上传安装包到 GitHub Release (避免 artifact 下载超时)
-      - name: Upload Release Assets
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tag_name: ${{ github.ref_name }}
-          name: "Pi Session Manager ${{ github.ref_name }}"
-          body: "See the assets to download this version and install."
-          draft: false
+          tagName: ${{ github.ref_name }}
+          releaseName: "Pi Session Manager ${{ github.ref_name }}"
+          releaseBody: "See the assets to download and install this version."
+          releaseDraft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          files: |
-            target/**/release/bundle/dmg/*.dmg
+          args: ${{ matrix.args }}
 
-  publish-release:
-    needs: build-tauri
+  update-release-notes:
+    needs: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 只下载 updater.json 相关的小文件
-      - name: Download updater artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: updater-json-*
-          path: all-updaters
-          merge-multiple: true
-
-      - name: Merge updater JSONs
-        run: |
-          echo "Merging updater.json files..."
-          echo "{}" > merged_updater.json
-
-          # 查找所有下载下来的 json 并合并
-          find all-updaters -name "*.json" -type f | while read json_file; do
-            echo "Processing $json_file..."
-            jq -s '.[0] * .[1]' merged_updater.json "$json_file" > temp.json && mv temp.json merged_updater.json
-          done
-
-          echo "Merged JSON content:"
-          cat merged_updater.json
-
-          mv merged_updater.json updater.json
-
-      - name: Generate Changelog
+      - name: Generate changelog
         id: changelog
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-          # 获取上一个 tag
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
 
-          if [ -n "$PREV_TAG" ]; then
-            echo "changes<<EOF" >> $GITHUB_OUTPUT
-            echo "### What's Changed" >> $GITHUB_OUTPUT
-            git log --pretty=format:"- %s by @%an" "$PREV_TAG"..HEAD | grep -v "Merge pull request" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "changes<<EOF" >> $GITHUB_OUTPUT
-            echo "### What's Changed" >> $GITHUB_OUTPUT
-            echo "Initial release of Pi Session Manager v$VERSION" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          fi
+          {
+            echo "body<<EOF"
+            echo "## What's Changed"
+            echo ""
+            if [ -n "$PREV_TAG" ]; then
+              git log --pretty=format:"- %s" "$PREV_TAG"..HEAD | grep -v "^- Merge"
+              echo ""
+              echo ""
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ github.ref_name }}"
+            else
+              echo "Initial release of Pi Session Manager v$VERSION"
+            fi
+            echo ""
+            echo ""
+            echo "## Download"
+            echo ""
+            echo "| Platform | File |"
+            echo "|----------|------|"
+            echo "| macOS (Apple Silicon) | \`Pi.Session.Manager_${VERSION}_aarch64.dmg\` |"
+            echo "| macOS (Intel) | \`Pi.Session.Manager_${VERSION}_x64.dmg\` |"
+            echo "| Windows | \`.exe\` / \`.msi\` installer |"
+            echo "| Linux | \`.deb\` / \`.AppImage\` / \`.rpm\` |"
+            echo ""
+            echo "## Requirements"
+            echo ""
+            echo "- [Pi](https://github.com/badlogic/pi-mono) for terminal integration"
+            echo "- macOS 11+, Windows 10+, or Linux with WebKitGTK 4.1"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Update Release with merged updater.json and changelog
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update release body
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: "Pi Session Manager ${{ github.ref_name }}"
-          body: |
-            ${{ steps.changelog.outputs.changes }}
-
-            ## Installation
-
-            ### macOS (Apple Silicon - M1/M2/M3)
-            Download `Pi Session Manager_*_aarch64.dmg`
-
-            ## Requirements
-            - macOS 11.0 or later (Apple Silicon)
-            - [Pi](https://github.com/mariozechner/pi) must be installed for terminal integration
-
-            ## Verification
-
-            ### macOS
-            ```bash
-            # Verify the app signature
-            codesign -dv --verbose=4 /Applications/Pi\ Session\ Manager.app
-            ```
-          files: updater.json
-          draft: false
-          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          body: ${{ steps.changelog.outputs.body }}
