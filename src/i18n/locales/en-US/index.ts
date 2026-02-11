@@ -13,6 +13,7 @@ import { command } from './command'
 import { role } from './role'
 import { favorites } from './favorites'
 import { onboarding } from './onboarding'
+import terminal from './terminal'
 
 export const enUS = {
   common,
@@ -30,6 +31,7 @@ export const enUS = {
   role,
   favorites,
   onboarding,
+  terminal,
 } as const
 
 export type Translations = typeof enUS
