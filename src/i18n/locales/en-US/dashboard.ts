@@ -22,6 +22,7 @@ export const dashboard = {
     sessions: 'Sessions',
     sessionsByProject: 'Sessions by Project',
     projects: 'projects',
+    clickToView: 'Click to view {{project}}',
   },
   topModels: {
     title: 'Top Models',

@@ -165,6 +165,7 @@ export const components = {
     projectsChart: {
       title: 'Sessions by Project',
       projects: 'projects',
+      clickToView: 'Click to view {{project}}',
     },
     tokenStats: {
       title: 'Token Usage',

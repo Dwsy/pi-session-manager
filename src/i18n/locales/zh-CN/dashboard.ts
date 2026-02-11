@@ -22,6 +22,7 @@ export const dashboard = {
     sessions: '会话',
     sessionsByProject: '按项目统计会话',
     projects: '项目',
+    clickToView: '点击查看 {{project}}',
   },
   topModels: {
     title: '热门模型',
