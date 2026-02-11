@@ -13,10 +13,12 @@ import TopModelsChart from './dashboard/TopModelsChart'
 import TimeDistribution from './dashboard/TimeDistribution'
 import TokenTrendChart from './dashboard/TokenTrendChart'
 import { DashboardSkeleton } from './Skeleton'
+import { getCachedSettings } from '../utils/settingsApi'
 
 interface DashboardProps {
   sessions: SessionInfo[]
   onSessionSelect?: (session: SessionInfo) => void
+  onProjectSelect?: (projectPath: string) => void
   projectName?: string
   loading?: boolean
 }
@@ -27,7 +29,7 @@ function getProjectName(path: string): string {
   return parts[parts.length - 1] || path
 }
 
-export default function Dashboard({ sessions, onSessionSelect, projectName, loading: parentLoading = false }: DashboardProps) {
+export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, projectName, loading: parentLoading = false }: DashboardProps) {
   const { t } = useTranslation()
   const [stats, setStats] = useState<SessionStats | null>(null)
   const [showSkeleton, setShowSkeleton] = useState(true)
@@ -70,9 +72,7 @@ export default function Dashboard({ sessions, onSessionSelect, projectName, load
 
     try {
       // Check if in demo mode
-      const isDemoMode = localStorage.getItem('pi-session-manager-settings')
-        ? JSON.parse(localStorage.getItem('pi-session-manager-settings') || '{}')?.advanced?.demoMode === true
-        : false
+      const isDemoMode = getCachedSettings()?.advanced?.demoMode === true
 
       if (isDemoMode) {
         // Use demo stats in demo mode
@@ -236,7 +236,7 @@ export default function Dashboard({ sessions, onSessionSelect, projectName, load
           <TopModelsChart stats={displayStats} limit={5} />
 
           {/* Projects */}
-          <ProjectsChart stats={displayStats} limit={5} />
+          <ProjectsChart stats={displayStats} sessions={sessions} limit={5} onProjectSelect={onProjectSelect} />
 
           {/* Time Distribution */}
           <TimeDistribution stats={displayStats} type="hourly" />

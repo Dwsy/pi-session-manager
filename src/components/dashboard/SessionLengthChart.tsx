@@ -81,29 +81,31 @@ export default function SessionLengthChart({ sessions, title = 'Session Length D
       </div>
 
       {/* Chart */}
-      <ResponsiveContainer width="100%" height={180}>
-        <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#3d3d4d" vertical={false} />
-          <XAxis
-            dataKey="range"
-            tick={{ fill: '#6a6f85', fontSize: 10 }}
-            axisLine={{ stroke: '#3d3d4d' }}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fill: '#6a6f85', fontSize: 9 }}
-            axisLine={{ stroke: '#3d3d4d' }}
-            tickLine={false}
-            width={30}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Bar dataKey="count" radius={[2, 2, 0, 0]}>
-            {data.map((entry, index) => (
-              <Cell key={index} fill={entry.color} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      <div className="w-full min-w-[200px] min-h-[180px]">
+        <ResponsiveContainer width="100%" height={180} minWidth={200} minHeight={180}>
+          <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#3d3d4d" vertical={false} />
+            <XAxis
+              dataKey="range"
+              tick={{ fill: '#6a6f85', fontSize: 10 }}
+              axisLine={{ stroke: '#3d3d4d' }}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fill: '#6a6f85', fontSize: 9 }}
+              axisLine={{ stroke: '#3d3d4d' }}
+              tickLine={false}
+              width={30}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            <Bar dataKey="count" radius={[2, 2, 0, 0]}>
+              {data.map((entry, index) => (
+                <Cell key={index} fill={entry.color} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-[#1a1b26]">

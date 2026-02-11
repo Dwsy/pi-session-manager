@@ -1,10 +1,13 @@
 import { Folder } from 'lucide-react'
-import type { SessionStats } from '../../types'
+import { useTranslation } from 'react-i18next'
+import type { SessionStats, SessionInfo } from '../../types'
 
 interface ProjectsChartProps {
   stats: SessionStats
+  sessions?: SessionInfo[]
   title?: string
   limit?: number
+  onProjectSelect?: (projectPath: string) => void
 }
 
 const CHART_COLORS = [
@@ -12,10 +15,34 @@ const CHART_COLORS = [
   '#82aaff', '#89ddff', '#f78c6c', '#ffcb6b', '#c3e88d',
 ]
 
-export default function ProjectsChart({ stats, title = 'Sessions by Project', limit = 8 }: ProjectsChartProps) {
+export default function ProjectsChart({ stats, sessions, title, limit = 8, onProjectSelect }: ProjectsChartProps) {
+  const { t } = useTranslation()
+  const displayTitle = title || t('dashboard.projectsChart.sessionsByProject')
+
+  // Build a map from project name to full path using sessions data
+  const projectPathMap = new Map<string, string>()
+  sessions?.forEach(session => {
+    if (session.cwd) {
+      const projectName = session.cwd.split('/').pop() || session.cwd
+      if (!projectPathMap.has(projectName)) {
+        projectPathMap.set(projectName, session.cwd)
+      }
+    }
+  })
+
   const topProjects = Object.entries(stats.sessions_by_project)
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
+
+  const handleProjectClick = (projectName: string) => {
+    if (onProjectSelect) {
+      // Find the full path from sessions
+      const fullPath = projectPathMap.get(projectName)
+      if (fullPath) {
+        onProjectSelect(fullPath)
+      }
+    }
+  }
 
   return (
     <div className="glass-card rounded-lg p-3 relative overflow-hidden group">
@@ -27,7 +54,7 @@ export default function ProjectsChart({ stats, title = 'Sessions by Project', li
             <div className="p-1 rounded bg-[#82aaff]/10">
               <Folder className="h-3 w-3 text-[#82aaff]" />
             </div>
-            {title}
+            {displayTitle}
           </h3>
           <div className="text-[10px] text-[#6a6f85] bg-[#1a1b26]/60 px-2 py-0.5 rounded">
             {topProjects.length} projects
@@ -42,7 +69,9 @@ export default function ProjectsChart({ stats, title = 'Sessions by Project', li
             return (
               <div
                 key={project}
-                className="flex items-center justify-between p-2 bg-[#1a1b26]/60 rounded-lg border border-white/5 hover:bg-[#1a1b26]/90 hover:border-white/10 transition-all duration-300"
+                className={`flex items-center justify-between p-2 bg-[#1a1b26]/60 rounded-lg border border-white/5 hover:bg-[#1a1b26]/90 hover:border-white/10 transition-all duration-300 ${onProjectSelect ? 'cursor-pointer' : ''}`}
+                onClick={() => handleProjectClick(project)}
+                title={onProjectSelect ? t('dashboard.projectsChart.clickToView', { project }) : undefined}
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <div
@@ -52,7 +81,7 @@ export default function ProjectsChart({ stats, title = 'Sessions by Project', li
                       boxShadow: `0 0 6px ${color}50`
                     }}
                   />
-                  <span className="text-xs truncate text-white/90">{project}</span>
+                  <span className="text-xs truncate text-white/90 hover:text-white transition-colors">{project}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-16 h-1.5 bg-[#1e1f2e]/80 rounded-full overflow-hidden inner-shadow">
