@@ -1,16 +1,20 @@
+mod cache;
 mod favorites;
 mod models;
 mod search;
 mod session;
 mod settings;
 mod skills;
+pub mod terminal;
 
+pub use cache::*;
 pub use favorites::*;
 pub use models::*;
 pub use search::*;
 pub use session::*;
 pub use settings::*;
 pub use skills::*;
+pub use terminal::*;
 
 #[tauri::command]
 pub async fn toggle_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
