@@ -14,12 +14,12 @@ fn main() {
         .setup(move |app| {
             let app_handle = app.handle().clone();
 
-            // Start file watcher
-            if let Ok(sessions_dir) = pi_session_manager::scanner::get_sessions_dir() {
-                if let Err(e) = pi_session_manager::file_watcher::start_file_watcher(
-                    sessions_dir,
-                    app_handle.clone(),
-                ) {
+            // Start file watcher for all session directories
+            match pi_session_manager::file_watcher::start_watcher_for_all_dirs(app_handle.clone()) {
+                Ok(watcher_state) => {
+                    app_handle.manage(watcher_state);
+                }
+                Err(e) => {
                     eprintln!("Failed to start file watcher: {e}");
                 }
             }
@@ -139,6 +139,9 @@ fn main() {
             pi_session_manager::save_app_settings,
             pi_session_manager::load_server_settings,
             pi_session_manager::save_server_settings,
+            pi_session_manager::get_session_paths,
+            pi_session_manager::save_session_paths,
+            pi_session_manager::get_all_session_dirs,
             pi_session_manager::terminal_create,
             pi_session_manager::terminal_write,
             pi_session_manager::terminal_resize,
@@ -153,7 +156,9 @@ fn main() {
             pi_session_manager::assign_tag,
             pi_session_manager::remove_tag_from_session,
             pi_session_manager::move_session_tag,
-            pi_session_manager::reorder_tags
+            pi_session_manager::reorder_tags,
+            pi_session_manager::update_tag_auto_rules,
+            pi_session_manager::evaluate_auto_rules
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -20,6 +20,9 @@ pub struct Config {
 
     #[serde(default = "default_auto_cleanup_days")]
     pub auto_cleanup_days: Option<i64>,
+
+    #[serde(default)]
+    pub session_paths: Vec<String>,
 }
 
 fn default_realtime_cutoff_days() -> i64 {
@@ -50,6 +53,7 @@ impl Default for Config {
             enable_fts5: true,
             preload_count: 20,
             auto_cleanup_days: None,
+            session_paths: vec![],
         }
     }
 }

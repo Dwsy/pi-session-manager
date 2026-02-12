@@ -1,113 +1,200 @@
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, FileIdMap};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
-/// 启动文件监听器
-pub fn start_file_watcher(sessions_dir: PathBuf, app_handle: AppHandle) -> Result<(), String> {
-    info!("Starting file watcher for: {:?}", sessions_dir);
+/// File watcher state that can be managed by Tauri
+pub struct FileWatcherState {
+    watcher: Arc<Mutex<Option<FileWatcher>>>,
+}
 
-    // 创建事件通道
-    let (tx, rx) = channel();
+impl FileWatcherState {
+    pub fn new() -> Self {
+        Self {
+            watcher: Arc::new(Mutex::new(None)),
+        }
+    }
 
-    // 创建防抖动的监听器（3秒防抖，合并多次变化）
-    let debouncer = new_debouncer(
-        Duration::from_secs(3),
-        None,
-        move |result: DebounceEventResult| {
-            if let Err(e) = tx.send(result) {
-                error!("Failed to send file event: {:?}", e);
+    /// Start or restart the file watcher with new paths
+    pub fn restart(&self, paths: Vec<PathBuf>, app_handle: AppHandle) -> Result<(), String> {
+        let mut guard = self.watcher.lock().map_err(|e| e.to_string())?;
+
+        // Stop existing watcher if any (drop old watcher)
+        *guard = None;
+
+        // Create new watcher
+        let watcher = FileWatcher::new(paths, app_handle)?;
+        *guard = Some(watcher);
+
+        Ok(())
+    }
+}
+
+impl Default for FileWatcherState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Multi-path file watcher with debouncing
+pub struct FileWatcher {
+    _debouncer: Arc<Mutex<Debouncer<RecommendedWatcher, FileIdMap>>>,
+}
+
+impl FileWatcher {
+    pub fn new(paths: Vec<PathBuf>, app_handle: AppHandle) -> Result<Self, String> {
+        if paths.is_empty() {
+            return Err("No paths to watch".to_string());
+        }
+
+        // Filter existing paths and deduplicate
+        let unique_paths: Vec<PathBuf> = paths
+            .into_iter()
+            .filter(|p| p.exists())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        if unique_paths.is_empty() {
+            warn!("No existing session directories to watch");
+            return Err("No existing paths to watch".to_string());
+        }
+
+        info!("Starting file watcher for {} directories:", unique_paths.len());
+        for path in &unique_paths {
+            info!("  - {:?}", path);
+        }
+
+        // Create event channel
+        let (tx, rx) = channel();
+
+        // Create debounced watcher (3 second debounce)
+        let debouncer = new_debouncer(
+            Duration::from_secs(3),
+            None,
+            move |result: DebounceEventResult| {
+                if let Err(e) = tx.send(result) {
+                    error!("Failed to send file event: {:?}", e);
+                }
+            },
+        )
+        .map_err(|e| format!("Failed to create file watcher: {e}"))?;
+
+        let mut debouncer_guard = debouncer;
+
+        // Watch all paths
+        for path in &unique_paths {
+            if let Err(e) = debouncer_guard
+                .watcher()
+                .watch(path, RecursiveMode::Recursive)
+            {
+                error!("Failed to watch directory {:?}: {}", path, e);
             }
-        },
-    )
-    .map_err(|e| format!("Failed to create file watcher: {e}"))?;
+        }
 
-    // 监听 sessions 目录
-    let mut debouncer_guard = debouncer;
-    debouncer_guard
-        .watcher()
-        .watch(&sessions_dir, RecursiveMode::Recursive)
-        .map_err(|e| format!("Failed to watch directory: {e}"))?;
+        info!(
+            "File watcher started successfully (3s debounce + batch merge) for {} dirs",
+            unique_paths.len()
+        );
 
-    info!("File watcher started successfully (3s debounce + batch merge)");
+        // Keep debouncer alive
+        let debouncer_arc = Arc::new(Mutex::new(debouncer_guard));
+        let debouncer_for_thread = Arc::clone(&debouncer_arc);
+        let app_handle_for_thread = app_handle.clone();
 
-    // 使用 Arc<Mutex> 管理 debouncer 生命周期，避免内存泄漏
-    let debouncer_arc = Arc::new(Mutex::new(debouncer_guard));
+        // Start event processing thread
+        std::thread::spawn(move || {
+            let _debouncer = debouncer_for_thread;
+            process_events_with_merge(rx, app_handle_for_thread);
+        });
 
-    // 克隆 app_handle 用于线程
-    let app_handle_for_thread = app_handle.clone();
+        Ok(Self {
+            _debouncer: debouncer_arc,
+        })
+    }
+}
 
-    // 启动后台线程处理文件事件（带批量合并）
-    let debouncer_for_thread = Arc::clone(&debouncer_arc);
-    std::thread::spawn(move || {
-        // 保持 debouncer 引用存活，直到线程结束
-        let _debouncer = debouncer_for_thread;
-        process_events_with_merge(rx, app_handle_for_thread);
-    });
+/// Legacy function for single path - starts a watcher for one directory
+pub fn start_file_watcher(sessions_dir: PathBuf, app_handle: AppHandle) -> Result<(), String> {
+    FileWatcher::new(vec![sessions_dir], app_handle)?;
+    Ok(())
+}
 
-    // 将 Arc 存储到 Tauri 应用状态中以保持生命周期
-    app_handle.manage(debouncer_arc);
+/// Start watcher for all configured session directories
+pub fn start_watcher_for_all_dirs(app_handle: AppHandle) -> Result<FileWatcherState, String> {
+    let state = FileWatcherState::new();
+
+    let config = crate::config::load_config().unwrap_or_default();
+    let all_dirs = crate::scanner::get_all_session_dirs(&config);
+
+    state.restart(all_dirs, app_handle)?;
+
+    Ok(state)
+}
+
+/// Restart watcher when config changes (call this after saving session_paths)
+pub fn restart_watcher_with_config(
+    watcher_state: &FileWatcherState,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let config = crate::config::load_config().unwrap_or_default();
+    let all_dirs = crate::scanner::get_all_session_dirs(&config);
+
+    info!("Restarting file watcher with {} directories", all_dirs.len());
+    watcher_state.restart(all_dirs, app_handle)?;
 
     Ok(())
 }
 
-/// 处理文件事件，带批量合并逻辑
+/// Process file events with batch merging
 fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppHandle) {
     let mut last_notification = Instant::now();
-    let min_interval = Duration::from_secs(5); // 最小通知间隔 5 秒
+    let min_interval = Duration::from_secs(5);
     let mut pending_notification = false;
 
     loop {
-        // 尝试接收事件，带超时
         let result = rx.recv_timeout(Duration::from_secs(1));
 
         match result {
-            Ok(event_result) => {
-                match event_result {
-                    Ok(events) => {
-                        // 检查是否有 .jsonl 文件变化
-                        let has_jsonl_changes = events.iter().any(|event| {
-                            event.paths.iter().any(|path| {
-                                path.extension().map(|ext| ext == "jsonl").unwrap_or(false)
-                            })
-                        });
+            Ok(event_result) => match event_result {
+                Ok(events) => {
+                    let has_jsonl_changes = events.iter().any(|event| {
+                        event.paths.iter().any(|path| {
+                            path.extension()
+                                .map(|ext| ext == "jsonl")
+                                .unwrap_or(false)
+                        })
+                    });
 
-                        if has_jsonl_changes {
-                            info!("Detected .jsonl file changes (batching...)");
-                            pending_notification = true;
-                        }
-                    }
-                    Err(errors) => {
-                        for error in errors {
-                            error!("File watcher error: {:?}", error);
-                        }
+                    if has_jsonl_changes {
+                        info!("Detected .jsonl file changes (batching...)");
+                        pending_notification = true;
                     }
                 }
-            }
+                Err(errors) => {
+                    for error in errors {
+                        error!("File watcher error: {:?}", error);
+                    }
+                }
+            },
             Err(_) => {
-                // 超时，检查是否需要发送通知
+                // Timeout, check if we should send notification
             }
         }
 
-        // 检查是否应该发送通知
-        if pending_notification {
-            let elapsed = last_notification.elapsed();
-            if elapsed >= min_interval {
-                info!(
-                    "Sending batched notification to frontend (after {:?})",
-                    elapsed
-                );
+        if pending_notification && last_notification.elapsed() >= min_interval {
+            info!("Sending batched notification to frontend");
 
-                if let Err(e) = app_handle.emit("sessions-changed", ()) {
-                    error!("Failed to emit event: {}", e);
-                } else {
-                    last_notification = Instant::now();
-                    pending_notification = false;
-                }
+            if let Err(e) = app_handle.emit("sessions-changed", ()) {
+                error!("Failed to emit event: {}", e);
+            } else {
+                last_notification = Instant::now();
+                pending_notification = false;
             }
         }
     }

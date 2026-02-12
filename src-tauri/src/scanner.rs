@@ -13,9 +13,47 @@ use std::time::Instant;
 static SCAN_CACHE: Mutex<Option<(Instant, Vec<SessionInfo>)>> = Mutex::new(None);
 const SCAN_CACHE_TTL_SECS: u64 = 2;
 
+/// Invalidate the scan cache so the next scan re-reads all directories
+pub fn invalidate_cache() {
+    if let Ok(mut guard) = SCAN_CACHE.lock() {
+        *guard = None;
+    }
+}
+
 pub fn get_sessions_dir() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     Ok(home.join(".pi").join("agent").join("sessions"))
+}
+
+/// Returns all session directories: the default one plus any user-configured paths.
+pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
+    let mut dirs = vec![];
+
+    // Default path always included
+    if let Ok(default_dir) = get_sessions_dir() {
+        dirs.push(default_dir);
+    }
+
+    // User-configured extra paths
+    for p in &config.session_paths {
+        let expanded = expand_tilde(p);
+        let path = PathBuf::from(&expanded);
+        if path.is_absolute() && !dirs.iter().any(|d| d == &path) {
+            dirs.push(path);
+        }
+    }
+
+    dirs
+}
+
+/// Expand ~ to home directory
+fn expand_tilde(path: &str) -> String {
+    if path.starts_with("~/") || path == "~" {
+        if let Some(home) = dirs::home_dir() {
+            return path.replacen('~', &home.to_string_lossy(), 1);
+        }
+    }
+    path.to_string()
 }
 
 pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
@@ -38,59 +76,66 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
 }
 
 pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInfo>, String> {
-    let sessions_dir = get_sessions_dir()?;
+    let all_dirs = get_all_session_dirs(config);
     let realtime_cutoff = Utc::now() - Duration::days(config.realtime_cutoff_days);
-
-    if !sessions_dir.exists() {
-        return Ok(vec![]);
-    }
 
     let conn = sqlite_cache::init_db_with_config(config)?;
 
     let mut sessions: Vec<SessionInfo> = vec![];
 
-    let entries = fs::read_dir(&sessions_dir)
-        .map_err(|e| format!("Failed to read sessions directory: {e}"))?;
+    for sessions_dir in &all_dirs {
+        if !sessions_dir.exists() {
+            continue;
+        }
 
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            if let Ok(files) = fs::read_dir(&path) {
-                for file in files.flatten() {
-                    let file_path = file.path();
-                    if file_path
-                        .extension()
-                        .map(|ext| ext == "jsonl")
-                        .unwrap_or(false)
-                    {
-                        let path_str = file_path.to_string_lossy().to_string();
+        let entries = match fs::read_dir(sessions_dir) {
+            Ok(e) => e,
+            Err(e) => {
+                log::warn!("Failed to read sessions directory {:?}: {}", sessions_dir, e);
+                continue;
+            }
+        };
 
-                        let metadata = fs::metadata(&file_path);
-                        let file_modified: DateTime<Utc> = match metadata {
-                            Ok(m) => {
-                                DateTime::from(m.modified().unwrap_or(std::time::SystemTime::now()))
-                            }
-                            Err(_) => continue,
-                        };
-
-                        if file_modified > realtime_cutoff {
-                            if let Ok(info) = parse_session_info(&file_path) {
-                                sessions.push(info);
-                                write_buffer::buffer_session_write(
-                                    sessions.last().unwrap(),
-                                    file_modified,
-                                );
-                            }
-                        } else if let Some(cached_mtime) =
-                            sqlite_cache::get_cached_file_modified(&conn, &path_str)?
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Ok(files) = fs::read_dir(&path) {
+                    for file in files.flatten() {
+                        let file_path = file.path();
+                        if file_path
+                            .extension()
+                            .map(|ext| ext == "jsonl")
+                            .unwrap_or(false)
                         {
-                            if file_modified > cached_mtime {
-                                if let Ok(info) = parse_session_info(&file_path) {
-                                    write_buffer::buffer_session_write(&info, file_modified);
+                            let path_str = file_path.to_string_lossy().to_string();
+
+                            let metadata = fs::metadata(&file_path);
+                            let file_modified: DateTime<Utc> = match metadata {
+                                Ok(m) => {
+                                    DateTime::from(m.modified().unwrap_or(std::time::SystemTime::now()))
                                 }
+                                Err(_) => continue,
+                            };
+
+                            if file_modified > realtime_cutoff {
+                                if let Ok(info) = parse_session_info(&file_path) {
+                                    sessions.push(info);
+                                    write_buffer::buffer_session_write(
+                                        sessions.last().unwrap(),
+                                        file_modified,
+                                    );
+                                }
+                            } else if let Some(cached_mtime) =
+                                sqlite_cache::get_cached_file_modified(&conn, &path_str)?
+                            {
+                                if file_modified > cached_mtime {
+                                    if let Ok(info) = parse_session_info(&file_path) {
+                                        write_buffer::buffer_session_write(&info, file_modified);
+                                    }
+                                }
+                            } else if let Ok(info) = parse_session_info(&file_path) {
+                                write_buffer::buffer_session_write(&info, file_modified);
                             }
-                        } else if let Ok(info) = parse_session_info(&file_path) {
-                            write_buffer::buffer_session_write(&info, file_modified);
                         }
                     }
                 }

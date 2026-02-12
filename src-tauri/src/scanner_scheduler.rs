@@ -8,17 +8,15 @@ use tokio::time::{interval, Duration as TokioDuration};
 use tracing::{error, info};
 
 pub struct ScannerScheduler {
-    sessions_dir: PathBuf,
-    scan_interval: TokioDuration,
     config: Config,
+    scan_interval: TokioDuration,
 }
 
 impl ScannerScheduler {
-    pub fn new(sessions_dir: PathBuf, scan_interval_secs: u64, config: Config) -> Self {
+    pub fn new(_sessions_dir: PathBuf, scan_interval_secs: u64, config: Config) -> Self {
         Self {
-            sessions_dir,
-            scan_interval: TokioDuration::from_secs(scan_interval_secs),
             config,
+            scan_interval: TokioDuration::from_secs(scan_interval_secs),
         }
     }
 
@@ -51,22 +49,30 @@ impl ScannerScheduler {
         let mut added = 0;
         let mut skipped = 0;
 
-        if let Ok(entries) = fs::read_dir(&self.sessions_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    if let Ok(files) = fs::read_dir(&path) {
-                        for file in files.flatten() {
-                            let file_path = file.path();
-                            if file_path
-                                .extension()
-                                .map(|ext| ext == "jsonl")
-                                .unwrap_or(false)
-                            {
-                                match self.process_file(&conn, &file_path)? {
-                                    FileUpdateResult::Updated => updated += 1,
-                                    FileUpdateResult::Added => added += 1,
-                                    FileUpdateResult::Skipped => skipped += 1,
+        let all_dirs = scanner::get_all_session_dirs(&self.config);
+
+        for sessions_dir in &all_dirs {
+            if !sessions_dir.exists() {
+                continue;
+            }
+
+            if let Ok(entries) = fs::read_dir(sessions_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        if let Ok(files) = fs::read_dir(&path) {
+                            for file in files.flatten() {
+                                let file_path = file.path();
+                                if file_path
+                                    .extension()
+                                    .map(|ext| ext == "jsonl")
+                                    .unwrap_or(false)
+                                {
+                                    match self.process_file(&conn, &file_path)? {
+                                        FileUpdateResult::Updated => updated += 1,
+                                        FileUpdateResult::Added => added += 1,
+                                        FileUpdateResult::Skipped => skipped += 1,
+                                    }
                                 }
                             }
                         }

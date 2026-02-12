@@ -1,8 +1,11 @@
 use serde_json::Value;
 use std::fs;
+use tauri::Manager;
+use tracing::warn;
 
 const APP_SETTINGS_KEY: &str = "app_settings";
 const SERVER_SETTINGS_KEY: &str = "server_settings";
+const SESSION_PATHS_KEY: &str = "session_paths";
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct ServerSettings {
@@ -68,4 +71,42 @@ pub async fn load_app_settings() -> Result<Value, String> {
 #[tauri::command]
 pub async fn save_app_settings(settings: Value) -> Result<(), String> {
     crate::settings_store::set(APP_SETTINGS_KEY, &settings)
+}
+
+/// Get configured session paths (extra paths beyond the default)
+#[tauri::command]
+pub async fn get_session_paths() -> Result<Vec<String>, String> {
+    let config = crate::config::Config::load().unwrap_or_default();
+    Ok(config.session_paths)
+}
+
+/// Save session paths to config and sync to settings store
+#[tauri::command]
+pub async fn save_session_paths(
+    paths: Vec<String>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let mut config = crate::config::Config::load().unwrap_or_default();
+    config.session_paths = paths.clone();
+    crate::config::save_config(&config)?;
+    // Also persist in settings store for WS/HTTP access
+    crate::settings_store::set(SESSION_PATHS_KEY, &paths)?;
+    // Invalidate scan cache so next scan picks up new paths
+    crate::scanner::invalidate_cache();
+
+    // Restart file watcher with new paths
+    let watcher_state: tauri::State<'_, crate::file_watcher::FileWatcherState> = app_handle.state();
+    if let Err(e) = crate::file_watcher::restart_watcher_with_config(&watcher_state, app_handle.clone()) {
+        warn!("Failed to restart file watcher: {}", e);
+    }
+
+    Ok(())
+}
+
+/// Get all resolved session directories (default + configured)
+#[tauri::command]
+pub async fn get_all_session_dirs() -> Result<Vec<String>, String> {
+    let config = crate::config::Config::load().unwrap_or_default();
+    let dirs = crate::scanner::get_all_session_dirs(&config);
+    Ok(dirs.iter().map(|d| d.to_string_lossy().to_string()).collect())
 }
