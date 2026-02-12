@@ -50,7 +50,7 @@ interface SessionTreeProps {
   entries: SessionEntry[]
   activeLeafId?: string
   onNodeClick?: (leafId: string, targetId: string) => void
-  filter?: 'default' | 'no-tools' | 'user-only' | 'labeled-only' | 'all' | 'read-tools' | 'edit-tools'
+  filter?: 'default' | 'no-tools' | 'user-only' | 'labeled-only' | 'all' | 'read-tools' | 'edit-tools' | 'write-tools'
 }
 
 interface TreeNodeData {
@@ -370,6 +370,13 @@ ref
           }
           return false
 
+        case 'write-tools':
+          if (entry.type === 'message' && entry.message?.role === 'assistant') {
+            const content = Array.isArray(entry.message.content) ? entry.message.content : []
+            return content.some((c: any) => c.type === 'toolCall' && c.name === 'write')
+          }
+          return false
+
         default:
           return true
       }
@@ -613,9 +620,30 @@ ref
     setSearchQuery(query)
   }, [])
 
+  // Find the newest leaf reachable from a given node (follow last child at each level)
+  const findNewestLeaf = useCallback((nodeId: string): string => {
+    // Build a lookup from treeData
+    const nodeMap = new Map<string, TreeNodeData>()
+    function mapNodes(node: TreeNodeData) {
+      nodeMap.set(node.entry.id, node)
+      node.children.forEach(mapNodes)
+    }
+    treeData.forEach(mapNodes)
+
+    const node = nodeMap.get(nodeId)
+    if (!node) return nodeId
+
+    let current = node
+    while (current.children.length > 0) {
+      current = current.children[current.children.length - 1]
+    }
+    return current.entry.id
+  }, [treeData])
+
   const handleNodeClick = (flatNode: FlatNode) => {
     const entry = flatNode.node.entry
-    let targetId = entry.id
+    const leafId = findNewestLeaf(entry.id)
+    let scrollTargetId = entry.id
 
     // toolResult 不会单独渲染，需要跳转到对应的 assistant 消息
     if (entry.type === 'message' && entry.message?.role === 'toolResult') {
@@ -623,7 +651,6 @@ ref
       const toolResultContent = content.find((c: any) => c.type === 'toolResult')
 
       if (toolResultContent?.id) {
-        // 找到包含对应 toolCall 的 assistant 消息
         const assistantEntry = entries.find(e =>
           e.type === 'message' &&
           e.message?.role === 'assistant' &&
@@ -631,13 +658,13 @@ ref
           e.message.content.some((c: any) => c.type === 'toolCall' && c.id === toolResultContent.id)
         )
         if (assistantEntry) {
-          targetId = assistantEntry.id
+          scrollTargetId = assistantEntry.id
         }
       }
     }
 
     if (onNodeClick) {
-      onNodeClick(entry.id, targetId)
+      onNodeClick(leafId, scrollTargetId)
     }
   }
 
@@ -697,6 +724,12 @@ ref
           onClick={() => setCurrentFilter('edit-tools')}
         >
           Edit
+        </button>
+        <button
+          className={`filter-btn ${currentFilter === 'write-tools' ? 'active' : ''}`}
+          onClick={() => setCurrentFilter('write-tools')}
+        >
+          Write
         </button>
       </div>
 

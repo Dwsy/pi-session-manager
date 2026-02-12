@@ -46,6 +46,7 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
   const [error, setError] = useState<string | null>(null)
   const [showSidebar, setShowSidebar] = useState(false)
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null)
+  const [scrollTargetId, setScrollTargetId] = useState<string | null>(null)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY)
     return saved ? parseInt(saved, 10) : SIDEBAR_DEFAULT_WIDTH
@@ -90,6 +91,7 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
     setLineCount(0)
     setEntries([])
     setActiveEntryId(null)
+    setScrollTargetId(null)
     setHasNewMessages(false)
     prevEntriesLengthRef.current = 0
     pendingScrollToBottomRef.current = false
@@ -235,8 +237,30 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [toggleThinking, toggleToolsExpanded, setShowSidebar])
 
+  // Compute the path from root to activeEntryId (conversation branch)
+  const pathEntryIds = useMemo(() => {
+    if (!activeEntryId || entries.length === 0) return null
+
+    const byId = new Map<string, SessionEntry>()
+    for (const entry of entries) {
+      byId.set(entry.id, entry)
+    }
+
+    const ids = new Set<string>()
+    let current = byId.get(activeEntryId)
+    while (current) {
+      ids.add(current.id)
+      if (!current.parentId || current.parentId === current.id) break
+      current = byId.get(current.parentId)
+    }
+    return ids
+  }, [entries, activeEntryId])
+
   const renderableEntries = useMemo(() => {
     return entries.filter(entry => {
+      // If we have a path, only show entries on that path
+      if (pathEntryIds && !pathEntryIds.has(entry.id)) return false
+
       if (entry.type === 'message') {
         const role = entry.message?.role
         return role === 'user' || role === 'assistant'
@@ -248,7 +272,7 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
         entry.type === 'custom_message'
       )
     })
-  }, [entries])
+  }, [entries, pathEntryIds])
 
   const entryIndexById = useMemo(() => {
     const map = new Map<string, number>()
@@ -320,14 +344,14 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
   }, [])
 
   useEffect(() => {
-    if (activeEntryId && messagesContainerRef.current) {
-      const targetIndex = entryIndexById.get(activeEntryId)
+    if (scrollTargetId && messagesContainerRef.current) {
+      const targetIndex = entryIndexById.get(scrollTargetId)
       if (targetIndex === undefined) return
 
       rowVirtualizer.scrollToIndex(targetIndex, { align: 'center' })
 
       const tryHighlight = () => {
-        const element = document.getElementById(`entry-${activeEntryId}`)
+        const element = document.getElementById(`entry-${scrollTargetId}`)
         if (!element) return false
         element.classList.add('highlight')
         setTimeout(() => {
@@ -343,8 +367,11 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
           }, 50)
         }
       })
+
+      // Clear scrollTargetId after handling
+      setScrollTargetId(null)
     }
-  }, [activeEntryId, entryIndexById, rowVirtualizer])
+  }, [scrollTargetId, entryIndexById, rowVirtualizer])
 
   useEffect(() => {
     const container = messagesContainerRef.current
@@ -532,8 +559,9 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
 
   const messageEntries = useMemo(() => entries.filter(e => e.type === 'message'), [entries])
 
-  const handleTreeNodeClick = useCallback((_leafId: string, targetId: string) => {
-    setActiveEntryId(targetId)
+  const handleTreeNodeClick = useCallback((leafId: string, targetId: string) => {
+    setActiveEntryId(leafId)
+    setScrollTargetId(targetId)
   }, [])
 
   return (

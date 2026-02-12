@@ -2,6 +2,15 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Tree view: clicking a node now switches the conversation branch displayed in the content area (previously only scrolled without changing branch)
+
+### Added
+- Tree view: `findNewestLeaf` navigation — clicking any node follows the newest child chain to the leaf, rendering the full branch path
+- Tree view: added Write tool filter button alongside existing Read/Edit filters
+
 ## [0.1.0] - 2026-01-30
 
 ### Added
@@ -83,10 +92,41 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Multi-path session directories support** - Configure multiple Pi session paths in settings
+  - Backend: `Config.session_paths` with `get_all_session_dirs()` for scanning multiple directories
+  - Frontend: `sessionDirs` array in Advanced Settings with add/remove UI
+  - New Tauri commands: `get_session_paths`, `save_session_paths`, `get_all_session_dirs`
+  - File watcher monitors all configured directories with dynamic reload
+  - New `FileWatcherState` managed by Tauri for lifecycle management
+  - File watcher automatically restarts when session paths are updated
+
+- **Kanban Board UX Improvements**
+  - Project-based filtering in Kanban view - left sidebar now shows project list instead of tag filter
+  - "Untagged" column moved to first position for better visibility
+  - Added proper spacing between Kanban cards (`mb-2` gap)
+  - Custom context menu on right-click with actions:
+    - Open in Terminal
+    - Open in Browser
+    - Toggle Favorite
+    - Manage Tags (submenu)
+    - Delete Session
+  - Virtual scrolling for project filter list
+  - Project selection persists when switching between views
+
 ### Changed
 - Session tree sidebar now floats over content with `position: absolute` instead of pushing the main view
 - Main content area auto-adjusts with `padding-left` to avoid being covered by the sidebar
 - Smooth transition animation when toggling sidebar visibility (200ms)
+- Kanban view header now shows current project filter or "All Projects"
+
+### Technical
+- Added `ProjectFilterList.tsx` component for project-based filtering
+- Added `KanbanContextMenu.tsx` component for custom right-click menu
+- Updated `KanbanBoard.tsx` to support `projectFilter` prop
+- Updated `KanbanColumn.tsx` to integrate context menu
+- Updated `KanbanCard.tsx` with `onContextMenu` handler
+- i18n: Added `project.filter.*` and `tags.kanban.allProjects` translations
 
 ### Planned
 - Tantivy full-text search engine implementation
