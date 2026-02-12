@@ -5,13 +5,15 @@ import {
   MiniMap,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   type Node,
   type Edge,
   type NodeProps,
   Handle,
   Position,
 } from '@xyflow/react'
-import { User, Bot, Wrench, Settings, FileText } from 'lucide-react'
+import { User, Bot, Wrench, Settings, FileText, ZoomIn, ZoomOut, Maximize, LocateFixed } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import '../styles/flow.css'
 import type { SessionEntry } from '../types'
@@ -362,11 +364,49 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default
   }, [onNodeClick, findNewestLeaf])
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
-      <ReactFlow
+    <ReactFlowProvider>
+      <FlowInner
         nodes={nodes} edges={edges}
         onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
+        activeLeafId={activeLeafId}
+      />
+    </ReactFlowProvider>
+  )
+}
+
+interface FlowInnerProps {
+  nodes: Node[]
+  edges: Edge[]
+  onNodesChange: any
+  onEdgesChange: any
+  onNodeClick: (_: React.MouseEvent, node: Node) => void
+  activeLeafId?: string
+}
+
+function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, activeLeafId }: FlowInnerProps) {
+  const { zoomIn, zoomOut, fitView, setCenter, getZoom } = useReactFlow()
+
+  const focusActive = useCallback(() => {
+    if (!activeLeafId) { fitView({ padding: 0.2 }); return }
+    const node = nodes.find(n => n.id === activeLeafId)
+    if (node) {
+      setCenter(node.position.x + NODE_W / 2, node.position.y + NODE_H / 2, { zoom: getZoom(), duration: 300 })
+    }
+  }, [activeLeafId, nodes, fitView, setCenter, getZoom])
+
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <div className="flow-toolbar">
+        <button onClick={() => zoomIn({ duration: 200 })} title="Zoom In"><ZoomIn size={14} /></button>
+        <button onClick={() => zoomOut({ duration: 200 })} title="Zoom Out"><ZoomOut size={14} /></button>
+        <button onClick={() => fitView({ padding: 0.2, duration: 300 })} title="Fit View"><Maximize size={14} /></button>
+        <button onClick={focusActive} title="Focus Active"><LocateFixed size={14} /></button>
+      </div>
+      <ReactFlow
+        nodes={nodes} edges={edges}
+        onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         fitView fitViewOptions={{ padding: 0.2 }}
         minZoom={0.05} maxZoom={2}

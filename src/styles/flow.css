@@ -1,3 +1,36 @@
+/* Flow toolbar */
+.flow-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: flex;
+  gap: 2px;
+  background: rgb(var(--color-card));
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.flow-toolbar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.flow-toolbar button:hover {
+  background: rgb(var(--color-secondary));
+  color: rgb(var(--color-foreground));
+}
+
 /* Flow view nodes */
 .flow-node {
   border-radius: 6px;
