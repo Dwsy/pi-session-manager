@@ -690,13 +690,13 @@ ref
           className={`filter-btn ${viewMode === 'tree' ? 'active' : ''}`}
           onClick={() => setViewMode('tree')}
         >
-          🌲 Tree
+          Tree
         </button>
         <button
           className={`filter-btn ${viewMode === 'flow' ? 'active' : ''}`}
           onClick={() => setViewMode('flow')}
         >
-          🔀 Flow
+          Flow
         </button>
       </div>
 

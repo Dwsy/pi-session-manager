@@ -20,61 +20,45 @@ interface SessionFlowViewProps {
   onNodeClick?: (leafId: string, targetId: string) => void
 }
 
-// --- Layout constants ---
-const NODE_W = 180
-const NODE_H = 40
-const GAP_X = 60
-const GAP_Y = 20
+const NODE_W = 200
+const NODE_H = 36
+const GAP_X = 40
+const GAP_Y = 16
 
-// --- Compact custom node ---
+// --- Custom node ---
 const FlowNode = memo(({ data }: NodeProps) => {
-  const d = data as { label: string; role: string; isActive: boolean; isInPath: boolean }
-  let bg = 'var(--color-surface, #1e1e2e)'
-  let border = 'var(--color-border, #333)'
-  let color = 'var(--color-text-secondary, #999)'
+  const d = data as { label: string; role: string; isActive: boolean; isInPath: boolean; skipped?: number }
+  let bg = '#1e1e2e'
+  let border = '#333'
+  let color = '#999'
 
   if (d.role === 'user') {
-    bg = 'var(--color-user-bg, #1a3a5c)'
-    border = 'var(--color-user-border, #2563eb)'
-    color = 'var(--color-user-text, #93c5fd)'
+    bg = '#1a3a5c'; border = '#2563eb'; color = '#93c5fd'
   } else if (d.role === 'assistant') {
-    bg = 'var(--color-assistant-bg, #1c2333)'
-    border = 'var(--color-assistant-border, #475569)'
-    color = 'var(--color-assistant-text, #cbd5e1)'
+    bg = '#1c2333'; border = '#475569'; color = '#cbd5e1'
   } else if (d.role === 'tool') {
-    bg = 'var(--color-tool-bg, #1a2e1a)'
-    border = 'var(--color-tool-border, #22c55e)'
-    color = 'var(--color-tool-text, #86efac)'
+    bg = '#1a2e1a'; border = '#22c55e'; color = '#86efac'
+  } else if (d.role === 'meta') {
+    bg = '#2a2a1e'; border = '#a3a300'; color = '#d4d490'
   }
 
-  if (d.isActive) {
-    border = 'var(--color-accent, #f59e0b)'
-  } else if (d.isInPath) {
-    border = 'var(--color-accent-dim, #b45309)'
-  }
+  if (d.isActive) border = '#f59e0b'
+  else if (d.isInPath) border = '#b45309'
 
   return (
-    <div
-      style={{
-        width: NODE_W,
-        height: NODE_H,
-        background: bg,
-        border: `1.5px solid ${border}`,
-        borderRadius: 6,
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 8px',
-        cursor: 'pointer',
-        overflow: 'hidden',
-        fontSize: 11,
-        color,
-        lineHeight: '1.3',
-      }}
-    >
+    <div style={{
+      width: NODE_W, height: NODE_H,
+      background: bg, border: `1.5px solid ${border}`, borderRadius: 6,
+      display: 'flex', alignItems: 'center', padding: '0 8px',
+      cursor: 'pointer', overflow: 'hidden', fontSize: 11, color, lineHeight: '1.3',
+    }}>
       <Handle type="target" position={Position.Top} style={{ opacity: 0, width: 1, height: 1 }} />
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
         {d.label}
       </span>
+      {d.skipped != null && d.skipped > 0 && (
+        <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.5, flexShrink: 0 }}>+{d.skipped}</span>
+      )}
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0, width: 1, height: 1 }} />
     </div>
   )
@@ -90,41 +74,38 @@ function getRole(entry: SessionEntry): string {
   if (role === 'user') return 'user'
   if (role === 'assistant') {
     const content = Array.isArray(entry.message?.content) ? entry.message!.content : []
-    const hasToolCall = content.some((c: any) => c.type === 'toolCall')
-    return hasToolCall ? 'tool' : 'assistant'
+    return content.some((c: any) => c.type === 'toolCall') ? 'tool' : 'assistant'
   }
   if (role === 'toolResult') return 'tool'
   return 'meta'
 }
 
 function getLabel(entry: SessionEntry): string {
-  if (entry.type === 'model_change') return '🔄 model change'
-  if (entry.type === 'compaction') return '📦 compaction'
-  if (entry.type === 'branch_summary') return '📝 branch summary'
-  if (entry.type === 'custom_message') return '💬 custom'
+  if (entry.type === 'model_change') return 'model change'
+  if (entry.type === 'compaction') return 'compaction'
+  if (entry.type === 'branch_summary') return 'branch summary'
+  if (entry.type === 'custom_message') return 'custom'
   if (entry.type !== 'message' || !entry.message) return entry.type
-
   const msg = entry.message
   if (msg.role === 'user') {
     const content = Array.isArray(msg.content) ? msg.content : []
     const text = content.filter((c: any) => c.type === 'text' && c.text).map((c: any) => c.text).join(' ')
-    return text.slice(0, 40) || 'User'
+    return text.slice(0, 50) || 'User'
   }
   if (msg.role === 'assistant') {
     const content = Array.isArray(msg.content) ? msg.content : []
     const toolCalls = content.filter((c: any) => c.type === 'toolCall')
     if (toolCalls.length > 0) {
       const name = toolCalls[0].name || 'tool'
-      return `🔧 ${name}${toolCalls.length > 1 ? ` +${toolCalls.length - 1}` : ''}`
+      return `${name}${toolCalls.length > 1 ? ` +${toolCalls.length - 1}` : ''}`
     }
     const text = content.filter((c: any) => c.type === 'text' && c.text).map((c: any) => c.text).join(' ')
-    return text.slice(0, 40) || 'Assistant'
+    return text.slice(0, 50) || 'Assistant'
   }
-  if (msg.role === 'toolResult') return '↩ result'
   return msg.role || 'unknown'
 }
 
-// --- Tree layout (top-down, handles branching) ---
+// --- Tree building ---
 interface TreeNode {
   entry: SessionEntry
   children: TreeNode[]
@@ -148,7 +129,6 @@ function buildTree(entries: SessionEntry[]): TreeNode[] {
       roots.push({ entry: e, children: childrenMap.get(e.id) || [] })
     }
   }
-  // Sort children by timestamp
   const sort = (n: TreeNode) => {
     n.children.sort((a, b) => new Date(a.entry.timestamp || 0).getTime() - new Date(b.entry.timestamp || 0).getTime())
     n.children.forEach(sort)
@@ -157,79 +137,112 @@ function buildTree(entries: SessionEntry[]): TreeNode[] {
   return roots
 }
 
-interface LayoutResult {
-  nodes: Node[]
-  edges: Edge[]
+// --- Key: collapse linear chains, keep only significant nodes ---
+// Significant = user message, branch point (>1 child), leaf (0 children), meta event
+interface CompactNode {
+  entry: SessionEntry
+  children: CompactNode[]
+  skipped: number // how many nodes were collapsed into this edge
 }
 
-function layoutTree(roots: TreeNode[], activePathIds: Set<string>, activeLeafId?: string): LayoutResult {
+function isSignificant(node: TreeNode): boolean {
+  const role = getRole(node.entry)
+  if (role === 'user') return true
+  if (role === 'meta') return true
+  if (node.children.length !== 1) return true // branch point or leaf
+  // toolResult is never significant on its own
+  if (node.entry.type === 'message' && node.entry.message?.role === 'toolResult') return false
+  return false
+}
+
+function compactTree(roots: TreeNode[]): CompactNode[] {
+  function compact(node: TreeNode): CompactNode {
+    // Walk down single-child chains to find next significant node
+    let current = node
+    let skipped = 0
+
+    // If this node itself is significant, keep it and recurse children
+    if (isSignificant(current)) {
+      return {
+        entry: current.entry,
+        children: current.children.map(c => compact(c)),
+        skipped: 0,
+      }
+    }
+
+    // Not significant + single child: skip forward
+    while (!isSignificant(current) && current.children.length === 1) {
+      skipped++
+      current = current.children[0]
+    }
+
+    // current is now significant (or has 0 or >1 children)
+    return {
+      entry: current.entry,
+      children: current.children.map(c => compact(c)),
+      skipped,
+    }
+  }
+
+  return roots.map(r => compact(r))
+}
+
+// --- Layout ---
+interface LayoutResult { nodes: Node[]; edges: Edge[] }
+
+function layoutTree(roots: CompactNode[], activePathIds: Set<string>, activeLeafId?: string): LayoutResult {
   const nodes: Node[] = []
   const edges: Edge[] = []
   let nextX = 0
 
-  // Returns the x-range [minX, maxX] used by this subtree
-  function place(node: TreeNode, depth: number): [number, number] {
+  function place(node: CompactNode, depth: number): [number, number] {
     const role = getRole(node.entry)
     const label = getLabel(node.entry)
     const isActive = node.entry.id === activeLeafId
     const isInPath = activePathIds.has(node.entry.id)
 
     if (node.children.length === 0) {
-      // Leaf: place at nextX
       const x = nextX
       nextX += NODE_W + GAP_X
-      const y = depth * (NODE_H + GAP_Y)
       nodes.push({
-        id: node.entry.id,
-        type: 'flow',
-        position: { x, y },
-        data: { label, role, isActive, isInPath },
+        id: node.entry.id, type: 'flow',
+        position: { x, y: depth * (NODE_H + GAP_Y) },
+        data: { label, role, isActive, isInPath, skipped: node.skipped },
       })
       return [x, x]
     }
 
-    // Place children first
     const childRanges: [number, number][] = []
     for (const child of node.children) {
       childRanges.push(place(child, depth + 1))
-      // Add edge
+      const inPath = activePathIds.has(child.entry.id)
       edges.push({
         id: `${node.entry.id}-${child.entry.id}`,
-        source: node.entry.id,
-        target: child.entry.id,
-        style: {
-          stroke: activePathIds.has(child.entry.id) ? 'var(--color-accent-dim, #b45309)' : 'var(--color-border, #333)',
-          strokeWidth: activePathIds.has(child.entry.id) ? 2 : 1,
-        },
+        source: node.entry.id, target: child.entry.id,
+        style: { stroke: inPath ? '#b45309' : '#333', strokeWidth: inPath ? 2 : 1 },
+        label: child.skipped > 0 ? `${child.skipped} skipped` : undefined,
+        labelStyle: { fill: '#666', fontSize: 9 },
+        labelBgStyle: { fill: '#111', fillOpacity: 0.8 },
+        labelBgPadding: [4, 2] as [number, number],
       })
     }
 
-    // Center parent above children
     const minX = childRanges[0][0]
     const maxX = childRanges[childRanges.length - 1][1]
-    const x = (minX + maxX) / 2
-    const y = depth * (NODE_H + GAP_Y)
-
     nodes.push({
-      id: node.entry.id,
-      type: 'flow',
-      position: { x, y },
-      data: { label, role, isActive, isInPath },
+      id: node.entry.id, type: 'flow',
+      position: { x: (minX + maxX) / 2, y: depth * (NODE_H + GAP_Y) },
+      data: { label, role, isActive, isInPath, skipped: node.skipped },
     })
-
     return [minX, maxX]
   }
 
-  for (const root of roots) {
-    place(root, 0)
-  }
-
+  for (const root of roots) place(root, 0)
   return { nodes, edges }
 }
 
 // --- Main component ---
 function SessionFlowView({ entries, activeLeafId, onNodeClick }: SessionFlowViewProps) {
-  // Build active path
   const activePathIds = useMemo(() => {
     if (!activeLeafId) return new Set<string>()
     const byId = new Map<string, SessionEntry>()
@@ -244,49 +257,32 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick }: SessionFlowView
     return ids
   }, [entries, activeLeafId])
 
-  // Filter: skip toolResult entries to keep the graph compact
-  const filteredEntries = useMemo(() =>
-    entries.filter(e => {
-      if (e.type === 'message' && e.message?.role === 'toolResult') return false
-      return true
-    }),
-    [entries]
-  )
-
-  // Build layout
   const { layoutNodes, layoutEdges } = useMemo(() => {
-    const roots = buildTree(filteredEntries)
-    const { nodes, edges } = layoutTree(roots, activePathIds, activeLeafId)
+    const rawTree = buildTree(entries)
+    const compact = compactTree(rawTree)
+    const { nodes, edges } = layoutTree(compact, activePathIds, activeLeafId)
     return { layoutNodes: nodes, layoutEdges: edges }
-  }, [filteredEntries, activePathIds, activeLeafId])
+  }, [entries, activePathIds, activeLeafId])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutEdges)
 
-  // Sync when layout changes (e.g. new entries, active leaf change)
   useEffect(() => {
     setNodes(layoutNodes)
     setEdges(layoutEdges)
   }, [layoutNodes, layoutEdges, setNodes, setEdges])
 
-  // Find newest leaf from a node
   const findNewestLeaf = useCallback((nodeId: string): string => {
     const byId = new Map<string, SessionEntry>()
     const childrenMap = new Map<string, SessionEntry[]>()
+    for (const e of entries) { byId.set(e.id, e); childrenMap.set(e.id, []) }
     for (const e of entries) {
-      byId.set(e.id, e)
-      childrenMap.set(e.id, [])
-    }
-    for (const e of entries) {
-      if (e.parentId && byId.has(e.parentId)) {
-        childrenMap.get(e.parentId)!.push(e)
-      }
+      if (e.parentId && byId.has(e.parentId)) childrenMap.get(e.parentId)!.push(e)
     }
     let current = nodeId
     while (true) {
       const children = childrenMap.get(current) || []
       if (children.length === 0) break
-      // Pick last child (newest by insertion order)
       current = children[children.length - 1].id
     }
     return current
@@ -301,33 +297,27 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick }: SessionFlowView
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        nodes={nodes} edges={edges}
+        onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
         nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.05}
-        maxZoom={2}
+        fitView fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.05} maxZoom={2}
         proOptions={{ hideAttribution: true }}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
+        nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}
       >
-        <Background gap={20} size={1} color="var(--color-border, #222)" />
+        <Background gap={20} size={1} color="#222" />
         <MiniMap
           nodeColor={(n) => {
-            const d = n.data as { role: string; isActive: boolean; isInPath: boolean }
+            const d = n.data as { role: string; isActive: boolean }
             if (d.isActive) return '#f59e0b'
             if (d.role === 'user') return '#2563eb'
             if (d.role === 'assistant') return '#475569'
             if (d.role === 'tool') return '#22c55e'
-            return '#333'
+            return '#555'
           }}
           maskColor="rgba(0,0,0,0.7)"
-          style={{ background: 'var(--color-surface, #111)' }}
+          style={{ background: '#111' }}
         />
       </ReactFlow>
     </div>
