@@ -26,17 +26,21 @@
 
 ## Features
 
-- **Session Browser** — Tree / list / project views, favorites, rename, batch export
-- **Full-Text Search** — SQLite FTS5 + Tantivy powered, role / tool filters, snippet highlighting
-- **Session Tree** — Hierarchical conversation view with collapsible tool calls and thinking blocks
+- **Session Browser** — List / project / kanban views, favorites, rename, batch export
+- **Kanban Board** — Drag-and-drop sessions across tag columns, context menu, project filtering
+- **Hierarchical Tags** — Parent-child tag tree with auto-rules and reordering
+- **Full-Text Search** — SQLite FTS5 + Tantivy, role / tool filters, snippet highlighting, plugin system
+- **Session Viewer** — Tree view with collapsible tool calls / thinking blocks, flow visualization (React Flow)
 - **Built-in Terminal** — Integrated xterm.js terminal with PTY backend (`Cmd/Ctrl+J`)
 - **Export** — HTML / Markdown / JSON, one-click open in browser
 - **Dashboard** — Activity heatmap, project mix, model usage, token costs, achievements
 - **Skills & Prompts** — Scan and manage `~/.pi/agent/skills` and prompts, system prompt editor
 - **Model Tester** — Batch connectivity test for configured models
+- **Multi-Path Scanning** — Configure multiple session directories
+- **Web Access** — Embedded frontend served via HTTP, accessible from any browser
 - **Theme** — Dark / Light / System, fully themeable via CSS custom properties
 - **i18n** — English and 简体中文
-- **Multi-Protocol API** — Tauri IPC + WebSocket (`ws://:52130`) + HTTP POST (`http://:52131/api`)
+- **Multi-Protocol API** — Tauri IPC + WebSocket (`ws://:52130`) + HTTP (`http://:52131`)
 - **CLI Mode** — Headless backend service via `--cli` / `--headless`
 - **Cross-Platform** — macOS (ARM/Intel), Windows, Linux
 
@@ -46,18 +50,21 @@
 Frontend (React 18 / TypeScript / Vite)
 ┌───────────────────────────────────────────────────┐
 │  Components · Hooks · Plugins · i18n · xterm.js   │
+│  React Flow · Recharts · dnd-kit · cmdk           │
 ├──────────┬──────────────┬─────────────────────────┤
-│ Tauri IPC│  WebSocket   │     HTTP POST           │
-│ invoke() │ ws://:52130  │ http://:52131/api       │
+│ Tauri IPC│  WebSocket   │     HTTP + Embedded UI  │
+│ invoke() │ ws://:52130  │ http://:52131           │
 ├──────────┴──────────────┴─────────────────────────┤
 │             Rust Backend (Tauri 2)                 │
 │  Scanner · SQLite Cache · FTS5 · Tantivy          │
 │  File Watcher · PTY Terminal · Auth · Export       │
-│  Config · Stats · WebSocket/HTTP Adapters          │
+│  Config · Stats · Tags · WebSocket/HTTP Adapters  │
 └───────────────────────────────────────────────────┘
 ```
 
 All three protocols share a single command router — `ws_adapter::dispatch()`. Adding a new command only requires one `match` arm in Rust; WS and HTTP inherit it automatically.
+
+The HTTP server embeds the frontend via `rust-embed`, so the packaged binary serves the full UI at `http://localhost:52131` — no external `dist/` directory needed. The frontend auto-detects the runtime environment and switches between Tauri IPC (desktop) and WebSocket (browser).
 
 ## Download
 
@@ -145,6 +152,10 @@ Run as a backend service exposing WS + HTTP APIs:
 ./pi-session-manager --cli
 ```
 
+### Web Access
+
+Open `http://localhost:52131` in any browser while the app is running (GUI or CLI mode). The frontend is embedded in the binary and auto-connects via WebSocket.
+
 ### API Examples
 
 ```bash
@@ -184,11 +195,15 @@ wscat -c ws://127.0.0.1:52130
 
 ```
 src/                        # Frontend (React + TypeScript)
-  components/               #   UI components
-  hooks/                    #   React hooks
-  plugins/                  #   Search plugin system
-  contexts/                 #   React contexts
-  i18n/                     #   Internationalization
+  components/               #   UI components (60+)
+    kanban/                  #   Kanban board (drag-drop, context menu)
+    dashboard/              #   Analytics charts (11 components)
+    settings/sections/      #   Settings panels (10+ sections)
+    command/                #   Command palette
+  hooks/                    #   React hooks (19)
+  plugins/                  #   Search plugin system (session, message, project)
+  contexts/                 #   React contexts (Transport, Settings, SessionView)
+  i18n/                     #   Internationalization (en-US, zh-CN)
   utils/                    #   Utilities
 
 src-tauri/                  # Backend (Rust + Tauri 2)
@@ -196,13 +211,13 @@ src-tauri/                  # Backend (Rust + Tauri 2)
     main.rs                 #   Entry: CLI args, window, adapter startup
     lib.rs                  #   Module declarations, command registration
     ws_adapter.rs           #   WebSocket server + dispatch() router
-    http_adapter.rs         #   HTTP POST endpoint, reuses dispatch()
+    http_adapter.rs         #   HTTP server, embedded frontend (rust-embed)
     app_state.rs            #   SharedAppState (Arc)
-    scanner.rs              #   Session file scanner
+    scanner.rs              #   Session file scanner (multi-path)
     terminal.rs             #   PTY session manager (portable-pty)
     sqlite_cache.rs         #   Dual-layer cache (FS + SQLite)
     tantivy_search.rs       #   Full-text search index
-    commands/               #   Tauri IPC command handlers
+    commands/               #   Tauri IPC command handlers (12 modules)
   tests/                    #   Integration tests
 ```
 
@@ -210,17 +225,17 @@ src-tauri/                  # Backend (Rust + Tauri 2)
 
 | Layer | Technologies |
 |-------|-------------|
-| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, i18next, xterm.js, cmdk, Recharts |
-| **Backend** | Tauri 2, Rust, Tokio, Axum, SQLite (rusqlite), Tantivy, portable-pty |
-| **Communication** | Tauri IPC, WebSocket (tokio-tungstenite), HTTP POST (Axum) |
+| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, i18next, xterm.js, cmdk, Recharts, React Flow, dnd-kit |
+| **Backend** | Tauri 2, Rust, Tokio, Axum, SQLite (rusqlite), Tantivy, portable-pty, rust-embed |
+| **Communication** | Tauri IPC, WebSocket (tokio-tungstenite), HTTP (Axum) |
 
 ## Configuration
 
 | Path | Description |
 |------|-------------|
-| `~/.pi/agent/sessions/` | Pi session JSONL files |
-| `~/.pi/agent/sessions/sessions.db` | SQLite cache + app settings (KV store) |
-| `~/.pi/agent/session-manager-config.toml` | Scanner configuration (cutoff days, FTS5, etc.) |
+| `~/.pi/agent/sessions/` | Default Pi session directory |
+| `~/.pi/agent/session-manager.db` | SQLite cache, settings, tags (KV store) |
+| `~/.pi/agent/session-manager-config.toml` | Scanner config (cutoff days, FTS5, paths, etc.) |
 | `~/.pi/agent/skills/` | Pi skills directory |
 | `~/.pi/agent/prompts/` | Pi prompts directory |
 | `~/.pi/agent/settings.json` | Pi agent settings |
