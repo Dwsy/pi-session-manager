@@ -11,4 +11,8 @@ export const project = {
     projects: '项目',
   },
   sessionCount: '{{count}} 个会话',
+  filter: {
+    title: '项目筛选',
+    allProjects: '全部项目',
+  },
 } as const

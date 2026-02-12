@@ -33,6 +33,7 @@ interface KanbanBoardProps {
   piPath?: string
   customCommand?: string
   onCreateTag?: (name: string, color: string) => void
+  projectFilter?: string | null // null = all projects
 }
 
 interface ColumnData {
@@ -50,9 +51,19 @@ export default function KanbanBoard({
   onMoveSession,
   getTagsForSession,
   onToggleTag,
+  onDeleteSession,
+  favorites,
+  onToggleFavorite,
+  projectFilter,
 }: KanbanBoardProps) {
   const { t } = useTranslation()
   const [activeId, setActiveId] = useState<string | null>(null)
+
+  // Filter sessions by project
+  const filteredSessions = useMemo(() => {
+    if (!projectFilter) return sessions
+    return sessions.filter(s => s.cwd === projectFilter)
+  }, [sessions, projectFilter])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -66,18 +77,19 @@ export default function KanbanBoard({
     [tags]
   )
 
-  // Build session map for quick lookup
+  // Build session map for quick lookup (using filtered sessions)
   const sessionMap = useMemo(
-    () => new Map(sessions.map(s => [s.id, s])),
-    [sessions]
+    () => new Map(filteredSessions.map(s => [s.id, s])),
+    [filteredSessions]
   )
 
-  // Build columns data
+  // Build columns data (using filtered sessions)
+  // Order: Untagged first, then tagged columns
   const columns = useMemo<ColumnData[]>(() => {
     const taggedSessionIds = new Set<string>()
     const cols: ColumnData[] = []
 
-    // Create columns for each tag
+    // First, collect all tagged sessions
     for (const tag of sortedTags) {
       const tagSessions = sessionTags
         .filter(st => st.tagId === tag.id)
@@ -86,15 +98,25 @@ export default function KanbanBoard({
         .filter((s): s is SessionInfo => s !== undefined)
 
       tagSessions.forEach(s => taggedSessionIds.add(s.id))
+    }
+
+    // Untagged column FIRST (before tagged columns)
+    const untaggedSessions = filteredSessions.filter(s => !taggedSessionIds.has(s.id))
+    cols.push({ id: '__untagged__', tag: null, sessions: untaggedSessions })
+
+    // Then add tagged columns
+    for (const tag of sortedTags) {
+      const tagSessions = sessionTags
+        .filter(st => st.tagId === tag.id)
+        .sort((a, b) => a.position - b.position)
+        .map(st => sessionMap.get(st.sessionId))
+        .filter((s): s is SessionInfo => s !== undefined)
+
       cols.push({ id: tag.id, tag, sessions: tagSessions })
     }
 
-    // Untagged column
-    const untaggedSessions = sessions.filter(s => !taggedSessionIds.has(s.id))
-    cols.push({ id: '__untagged__', tag: null, sessions: untaggedSessions })
-
     return cols
-  }, [sortedTags, sessions, sessionTags, sessionMap])
+  }, [sortedTags, filteredSessions, sessionTags, sessionMap])
 
   // Get active session for drag overlay
   const activeSession = activeId ? sessionMap.get(activeId) : null
@@ -176,8 +198,17 @@ export default function KanbanBoard({
         <h2 className="text-sm font-medium text-foreground">
           {t('tags.kanban.title')}
         </h2>
-        <span className="text-[10px] text-muted-foreground">
-          {t('tags.kanban.dragHint')}
+        {projectFilter ? (
+          <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 text-[11px]">
+            {projectFilter.split('/').pop()}
+          </span>
+        ) : (
+          <span className="text-[10px] text-muted-foreground">
+            {t('tags.kanban.allProjects', '全部项目')}
+          </span>
+        )}
+        <span className="text-[10px] text-muted-foreground ml-auto">
+          {filteredSessions.length} {t('project.list.sessions')}
         </span>
       </div>
 
@@ -189,8 +220,8 @@ export default function KanbanBoard({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
-          <div className="flex gap-3 h-full">
+        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-4">
+          <div className="flex gap-3 h-full min-h-0">
             {columns.map(col => (
               <KanbanColumn
                 key={col.id}
@@ -200,6 +231,11 @@ export default function KanbanBoard({
                 selectedSession={selectedSession}
                 onSelectSession={onSelectSession}
                 getTagsForSession={getTagsForSession}
+                allTags={tags}
+                favorites={favorites || []}
+                onToggleFavorite={onToggleFavorite || (() => {})}
+                onToggleTag={onToggleTag}
+                onDeleteSession={onDeleteSession}
               />
             ))}
           </div>

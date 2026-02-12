@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search, Terminal, Columns3 } from 'lucide-react'
+import ProjectFilterList from './components/ProjectFilterList'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const startDragging = () => {
@@ -19,7 +20,7 @@ import SettingsPanel from './components/settings/SettingsPanel'
 import Onboarding from './components/Onboarding'
 import { CommandPalette } from './components/command'
 import TerminalPanel from './components/TerminalPanel'
-import TagFilter from './components/TagFilter'
+import LabelFilter from './components/LabelFilter'
 import KanbanBoard from './components/kanban/KanbanBoard'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useFileWatcher } from './hooks/useFileWatcher'
@@ -64,7 +65,7 @@ function App() {
   const { terminal, piPath, customCommand, loadSettings } = useAppSettings()
   const { handleExportSession } = useSessionActions()
   const { getBadgeType, clearBadge } = useSessionBadges(sessions)
-  const { tags, sessionTags, getTagsForSession, assignTag, removeTagFromSession, createTag, moveSession } = useTags()
+  const { tags, sessionTags, getTagsForSession, assignTag, removeTagFromSession, createTag, moveSession, getDescendantIds } = useTags()
   useAppearance()
 
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
@@ -283,11 +284,18 @@ function App() {
 
   const filteredSessions = useMemo(() => {
     if (filterTagIds.length === 0) return sessions
+    // Include descendants for hierarchical filtering
+    const allFilterIds = new Set(filterTagIds)
+    for (const id of filterTagIds) {
+      for (const descId of getDescendantIds(id)) {
+        allFilterIds.add(descId)
+      }
+    }
     const taggedIds = new Set(
-      sessionTags.filter(st => filterTagIds.includes(st.tagId)).map(st => st.sessionId)
+      sessionTags.filter(st => allFilterIds.has(st.tagId)).map(st => st.sessionId)
     )
     return sessions.filter(s => taggedIds.has(s.id))
-  }, [sessions, sessionTags, filterTagIds])
+  }, [sessions, sessionTags, filterTagIds, getDescendantIds])
 
   const onRenameSession = async (newName: string) => {
     if (!selectedSession) return
@@ -391,14 +399,33 @@ function App() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
-          {!showFavorites && viewMode !== 'project' && (
-            <TagFilter
+        {/* Filter bar — between toolbar and scrollable content */}
+        {!showFavorites && (viewMode === 'list' || viewMode === 'kanban') && tags.length > 0 && (
+          <div className="flex items-center justify-end gap-1 px-3 py-1.5 border-b border-border/50">
+            <LabelFilter
               tags={tags}
               sessionTags={sessionTags}
               filterTagIds={filterTagIds}
               onFilterChange={setFilterTagIds}
+              onCreateTag={(name, color, parentId) => createTag(name, color, undefined, parentId)}
+              getDescendantIds={getDescendantIds}
             />
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
+          {!showFavorites && viewMode === 'kanban' && (
+            <>
+              <ProjectFilterList
+                sessions={sessions}
+                selectedProject={selectedProject}
+                onSelectProject={(project) => {
+                  setSelectedProject(project)
+                  setSelectedSession(null)
+                }}
+                scrollParentRef={listScrollRef}
+              />
+            </>
           )}
           {showFavorites ? (
             <FavoritesPanel
@@ -533,6 +560,7 @@ function App() {
                 piPath={piPath}
                 customCommand={customCommand}
                 onCreateTag={createTag}
+                projectFilter={selectedProject}
               />
             ) : (
               <Dashboard

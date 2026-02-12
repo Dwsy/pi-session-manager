@@ -107,10 +107,10 @@ export default function SessionList({
                 e.preventDefault()
                 setContextMenu({ x: e.clientX, y: e.clientY, sessionId: session.id })
               }}
-              className={`relative px-3 py-2 cursor-pointer transition-all group border-b border-border/10 ${
+              className={`relative px-3 py-2 cursor-pointer transition-all group border-b border-border/10 border-l-2 ${
                 isSelected 
-                  ? 'bg-gradient-to-r from-blue-500/5 to-transparent border-l-2 border-l-blue-500' 
-                  : 'hover:bg-background'
+                  ? 'bg-gradient-to-r from-blue-500/5 to-transparent border-l-blue-500' 
+                  : 'border-l-transparent hover:bg-background'
               }`}
               style={{
                 position: 'absolute',

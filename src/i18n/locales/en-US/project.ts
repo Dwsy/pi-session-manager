@@ -11,4 +11,8 @@ export const project = {
     projects: 'projects',
   },
   sessionCount: '{{count}} sessions',
+  filter: {
+    title: 'Project Filter',
+    allProjects: 'All Projects',
+  },
 } as const
