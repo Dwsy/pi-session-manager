@@ -2,15 +2,18 @@ use crate::app_state::SharedAppState;
 use crate::auth;
 use crate::ws_adapter::dispatch;
 use axum::extract::{ConnectInfo, State};
-use axum::http::{HeaderMap, StatusCode};
-use axum::response::{Html, IntoResponse, Response};
+use axum::http::{header, HeaderMap, StatusCode, Uri};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use rust_embed::Embed;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::SocketAddr;
-use std::path::PathBuf;
-use tower_http::services::ServeDir;
+
+#[derive(Embed)]
+#[folder = "../dist"]
+struct FrontendAssets;
 
 #[derive(Deserialize)]
 struct HttpRequest {
@@ -31,7 +34,7 @@ struct HttpResponse {
 fn cors_headers() -> [(&'static str, &'static str); 3] {
     [
         ("access-control-allow-origin", "*"),
-        ("access-control-allow-methods", "POST, OPTIONS"),
+        ("access-control-allow-methods", "GET, POST, OPTIONS"),
         (
             "access-control-allow-headers",
             "content-type, authorization",
@@ -45,7 +48,6 @@ async fn handle_command(
     headers: HeaderMap,
     Json(req): Json<HttpRequest>,
 ) -> impl IntoResponse {
-    // Non-local requests require Bearer token (if auth enabled)
     if auth::is_auth_required(&addr.ip()) {
         let valid = headers
             .get("authorization")
@@ -87,96 +89,47 @@ async fn handle_preflight() -> impl IntoResponse {
     (StatusCode::NO_CONTENT, cors_headers())
 }
 
-async fn serve_index() -> impl IntoResponse {
-    let html = r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pi Session Manager</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: #eaeaea;
-        }
-        .container {
-            text-align: center;
-            padding: 2rem;
-        }
-        h1 { font-size: 2.5rem; margin-bottom: 1rem; color: #00d4aa; }
-        .status {
-            background: rgba(0, 212, 170, 0.1);
-            border: 1px solid rgba(0, 212, 170, 0.3);
-            padding: 1rem 2rem;
-            border-radius: 8px;
-            margin: 1rem 0;
-        }
-        .endpoints {
-            margin-top: 2rem;
-            text-align: left;
-            background: rgba(0,0,0,0.3);
-            padding: 1.5rem;
-            border-radius: 12px;
-        }
-        .endpoints h3 { margin-bottom: 1rem; color: #00d4aa; }
-        .endpoints ul { list-style: none; }
-        .endpoints li { margin: 0.5rem 0; font-family: monospace; }
-        .endpoints code {
-            background: rgba(255,255,255,0.1);
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 Pi Session Manager</h1>
-        <div class="status">✅ Server is running</div>
-        <div class="endpoints">
-            <h3>Available Endpoints</h3>
-            <ul>
-                <li>📡 <code>WS ws://0.0.0.0:52130</code></li>
-                <li>🔌 <code>HTTP POST /api</code></li>
-            </ul>
-        </div>
-    </div>
-</body>
-</html>"#;
-    Html(html)
+fn serve_embedded(path: &str) -> Response {
+    let mime = mime_guess::from_path(path).first_or_octet_stream();
+    match FrontendAssets::get(path) {
+        Some(file) => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, mime.as_ref())],
+            file.data.to_vec(),
+        )
+            .into_response(),
+        None => match FrontendAssets::get("index.html") {
+            Some(file) => (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "text/html")],
+                file.data.to_vec(),
+            )
+                .into_response(),
+            None => (StatusCode::NOT_FOUND, "Not Found").into_response(),
+        },
+    }
+}
+
+async fn serve_static(uri: Uri) -> Response {
+    let path = uri.path().trim_start_matches('/');
+    if path.is_empty() {
+        return serve_embedded("index.html");
+    }
+    serve_embedded(path)
 }
 
 pub async fn init_http_adapter(app_state: SharedAppState, port: u16) -> Result<(), String> {
-    // Try to find dist directory - first check relative to binary, then current dir
-    let dist_path = if std::path::Path::new("../dist").exists() {
-        PathBuf::from("../dist")
-    } else if std::path::Path::new("./dist").exists() {
-        PathBuf::from("./dist")
+    let has_frontend = FrontendAssets::get("index.html").is_some();
+    if has_frontend {
+        log::info!("Frontend assets embedded in binary");
     } else {
-        PathBuf::new() // Empty path - static file service won't work
-    };
-
-    let has_static_files = dist_path.exists() && dist_path.is_dir();
+        log::warn!("No embedded frontend assets, API-only mode");
+    }
 
     let app = Router::new()
-        .route("/", get(serve_index))
         .route("/api", post(handle_command).options(handle_preflight))
+        .fallback(get(serve_static))
         .with_state(app_state);
-
-    // Add static file service if dist exists
-    let app = if has_static_files {
-        log::info!("Serving static files from: {}", dist_path.display());
-        app.fallback_service(ServeDir::new(dist_path).append_index_html_on_directories(true))
-    } else {
-        log::warn!("No dist directory found, API-only mode");
-        app
-    };
 
     let addr = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(&addr)
