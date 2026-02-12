@@ -105,7 +105,10 @@ export const settings = {
   },
   advanced: {
     sessionDir: '会话目录',
-    sessionDirHelp: 'Pi 会话文件的存储位置',
+    sessionDirHelp: 'Pi 会话文件的存储位置，默认路径始终包含在内',
+    addSessionDir: '添加路径',
+    removeSessionDir: '移除',
+    defaultSessionDir: '默认（不可移除）',
     cacheEnabled: '启用缓存',
     cacheEnabledHelp: '缓存会话数据以提高性能',
     maxCacheSize: '最大缓存大小',

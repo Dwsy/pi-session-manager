@@ -104,8 +104,11 @@ export const settings = {
     includeTimestampsHelp: 'Include message timestamps when exporting',
   },
   advanced: {
-    sessionDir: 'Session Directory',
-    sessionDirHelp: 'Location where Pi session files are stored',
+    sessionDir: 'Session Directories',
+    sessionDirHelp: 'Locations where Pi session files are stored. The default path is always included.',
+    addSessionDir: 'Add Path',
+    removeSessionDir: 'Remove',
+    defaultSessionDir: 'Default (cannot remove)',
     cacheEnabled: 'Enable Cache',
     cacheEnabledHelp: 'Cache session data for better performance',
     maxCacheSize: 'Max Cache Size',

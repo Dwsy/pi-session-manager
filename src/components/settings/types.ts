@@ -61,7 +61,7 @@ export interface AppSettings {
     includeTimestamps: boolean
   }
   advanced: {
-    sessionDir: string
+    sessionDirs: string[]
     cacheEnabled: boolean
     debugMode: boolean
     demoMode: boolean
@@ -118,7 +118,7 @@ export const defaultSettings: AppSettings = {
     includeTimestamps: true,
   },
   advanced: {
-    sessionDir: '~/.pi/agent/sessions',
+    sessionDirs: ['~/.pi/agent/sessions'],
     cacheEnabled: true,
     debugMode: false,
     demoMode: false,

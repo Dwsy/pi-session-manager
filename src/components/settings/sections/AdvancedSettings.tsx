@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Plus, X } from 'lucide-react'
 import { invoke } from '../../../transport'
 import type { AdvancedSettingsProps } from '../types'
 
@@ -165,24 +165,73 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <label className="text-sm font-medium text-foreground">
           {t('settings.advanced.sessionDir', '会话目录')}
         </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={settings.advanced.sessionDir}
-            onChange={(e) => onUpdate('advanced', 'sessionDir', e.target.value)}
-            className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
-          />
-          <button className="px-3 py-2 bg-surface border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">
-            <FolderOpen className="h-4 w-4" />
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {t('settings.advanced.sessionDirHelp', 'Pi 会话文件的存储位置')}
+        <p className="text-xs text-muted-foreground mb-2">
+          {t('settings.advanced.sessionDirHelp', 'Pi 会话文件的存储位置，默认路径始终包含在内')}
         </p>
+
+        <div className="space-y-2">
+          {/* Default path (always present, not removable) */}
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              value="~/.pi/agent/sessions"
+              disabled
+              className="flex-1 px-3 py-2 bg-surface/50 border border-border rounded-lg text-sm text-muted-foreground cursor-not-allowed"
+            />
+            <span className="text-xs text-muted-foreground whitespace-nowrap px-2">
+              {t('settings.advanced.defaultSessionDir', '默认')}
+            </span>
+          </div>
+
+          {/* Extra configured paths */}
+          {(settings.advanced.sessionDirs || [])
+            .filter((d: string) => d !== '~/.pi/agent/sessions')
+            .map((dir: string, index: number) => (
+              <div key={index} className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={dir}
+                  onChange={(e) => {
+                    const extraDirs = (settings.advanced.sessionDirs || []).filter(
+                      (d: string) => d !== '~/.pi/agent/sessions'
+                    )
+                    extraDirs[index] = e.target.value
+                    onUpdate('advanced', 'sessionDirs', ['~/.pi/agent/sessions', ...extraDirs])
+                  }}
+                  className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
+                  placeholder="/path/to/sessions"
+                />
+                <button
+                  onClick={() => {
+                    const extraDirs = (settings.advanced.sessionDirs || []).filter(
+                      (d: string) => d !== '~/.pi/agent/sessions'
+                    )
+                    extraDirs.splice(index, 1)
+                    onUpdate('advanced', 'sessionDirs', ['~/.pi/agent/sessions', ...extraDirs])
+                  }}
+                  className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                  title={t('settings.advanced.removeSessionDir', '移除')}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+        </div>
+
+        <button
+          onClick={() => {
+            const current = settings.advanced.sessionDirs || ['~/.pi/agent/sessions']
+            onUpdate('advanced', 'sessionDirs', [...current, ''])
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-info hover:bg-info/10 rounded-lg transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {t('settings.advanced.addSessionDir', '添加路径')}
+        </button>
       </div>
 
       <div className="flex items-center justify-between">

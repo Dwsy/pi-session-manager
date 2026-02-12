@@ -208,7 +208,7 @@ export function getSettingDisplayName(section: string, key: string): string {
       includeTimestamps: '包含时间戳',
     },
     advanced: {
-      sessionDir: '会话目录',
+      sessionDirs: '会话目录',
       cacheEnabled: '启用缓存',
       debugMode: '调试模式',
       maxCacheSize: '最大缓存大小',

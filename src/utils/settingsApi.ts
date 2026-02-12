@@ -7,6 +7,17 @@ const CACHE_KEY = 'pi-session-manager-settings'
 let memoryCache: AppSettings | null = null
 
 function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
+  const advanced = { ...defaultSettings.advanced, ...raw.advanced }
+
+  // Migrate legacy sessionDir (string) → sessionDirs (string[])
+  const rawAdv = raw.advanced as Record<string, unknown> | undefined
+  if (rawAdv && typeof rawAdv.sessionDir === 'string' && !rawAdv.sessionDirs) {
+    const legacyDir = rawAdv.sessionDir as string
+    advanced.sessionDirs = legacyDir === '~/.pi/agent/sessions'
+      ? ['~/.pi/agent/sessions']
+      : ['~/.pi/agent/sessions', legacyDir]
+  }
+
   return {
     terminal: { ...defaultSettings.terminal, ...raw.terminal },
     appearance: { ...defaultSettings.appearance, ...raw.appearance },
@@ -14,7 +25,7 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
     session: { ...defaultSettings.session, ...raw.session },
     search: { ...defaultSettings.search, ...raw.search },
     export: { ...defaultSettings.export, ...raw.export },
-    advanced: { ...defaultSettings.advanced, ...raw.advanced },
+    advanced,
   }
 }
 
@@ -43,6 +54,16 @@ export async function loadAppSettings(): Promise<AppSettings> {
 export async function saveAppSettings(settings: AppSettings): Promise<void> {
   await invoke('save_app_settings', { settings })
   writeCache(settings)
+
+  // Sync session paths to backend config (TOML) so scanner picks them up
+  const extraPaths = (settings.advanced.sessionDirs || []).filter(
+    (d: string) => d !== '~/.pi/agent/sessions' && d.trim() !== ''
+  )
+  try {
+    await invoke('save_session_paths', { paths: extraPaths })
+  } catch (e) {
+    console.warn('Failed to sync session paths:', e)
+  }
 }
 
 export function getCachedSettings(): AppSettings {
