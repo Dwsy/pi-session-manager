@@ -27,7 +27,7 @@ const GAP_Y = 16
 
 // --- Custom node ---
 const FlowNode = memo(({ data }: NodeProps) => {
-  const d = data as { label: string; role: string; isActive: boolean; isInPath: boolean; skipped?: number }
+  const d = data as { label: string; role: string; isActive: boolean; isInPath: boolean; skipped?: number; skippedSummary?: string }
   let bg = '#1e1e2e'
   let border = '#333'
   let color = '#999'
@@ -142,7 +142,8 @@ function buildTree(entries: SessionEntry[]): TreeNode[] {
 interface CompactNode {
   entry: SessionEntry
   children: CompactNode[]
-  skipped: number // how many nodes were collapsed into this edge
+  skipped: number
+  skippedSummary: string // e.g. "bash, read, edit"
 }
 
 function isSignificant(node: TreeNode): boolean {
@@ -155,32 +156,55 @@ function isSignificant(node: TreeNode): boolean {
   return false
 }
 
+function getSkipLabel(entry: SessionEntry): string {
+  if (entry.type !== 'message') return entry.type
+  const msg = entry.message
+  if (!msg) return 'unknown'
+  if (msg.role === 'toolResult') return 'result'
+  if (msg.role === 'assistant') {
+    const content = Array.isArray(msg.content) ? msg.content : []
+    const toolCalls = content.filter((c: any) => c.type === 'toolCall')
+    if (toolCalls.length > 0) return toolCalls[0].name || 'tool'
+    return 'assistant'
+  }
+  return msg.role || 'unknown'
+}
+
 function compactTree(roots: TreeNode[]): CompactNode[] {
   function compact(node: TreeNode): CompactNode {
-    // Walk down single-child chains to find next significant node
     let current = node
     let skipped = 0
+    const skippedLabels: string[] = []
 
-    // If this node itself is significant, keep it and recurse children
     if (isSignificant(current)) {
       return {
         entry: current.entry,
         children: current.children.map(c => compact(c)),
         skipped: 0,
+        skippedSummary: '',
       }
     }
 
-    // Not significant + single child: skip forward
     while (!isSignificant(current) && current.children.length === 1) {
+      skippedLabels.push(getSkipLabel(current.entry))
       skipped++
       current = current.children[0]
     }
 
-    // current is now significant (or has 0 or >1 children)
+    // Deduplicate consecutive labels: [bash, result, bash, result] -> "bash x2"
+    const counts = new Map<string, number>()
+    for (const l of skippedLabels) {
+      if (l !== 'result') counts.set(l, (counts.get(l) || 0) + 1)
+    }
+    const summary = Array.from(counts.entries())
+      .map(([name, cnt]) => cnt > 1 ? `${name} x${cnt}` : name)
+      .join(', ')
+
     return {
       entry: current.entry,
       children: current.children.map(c => compact(c)),
       skipped,
+      skippedSummary: summary,
     }
   }
 
@@ -220,9 +244,9 @@ function layoutTree(roots: CompactNode[], activePathIds: Set<string>, activeLeaf
         id: `${node.entry.id}-${child.entry.id}`,
         source: node.entry.id, target: child.entry.id,
         style: { stroke: inPath ? '#b45309' : '#333', strokeWidth: inPath ? 2 : 1 },
-        label: child.skipped > 0 ? `${child.skipped} skipped` : undefined,
-        labelStyle: { fill: '#666', fontSize: 9 },
-        labelBgStyle: { fill: '#111', fillOpacity: 0.8 },
+        label: child.skippedSummary || undefined,
+        labelStyle: { fill: '#888', fontSize: 9 },
+        labelBgStyle: { fill: '#1a1a2e', fillOpacity: 0.9 },
         labelBgPadding: [4, 2] as [number, number],
       })
     }

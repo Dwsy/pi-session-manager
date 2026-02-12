@@ -70,6 +70,7 @@ interface FlatNode {
   isVirtualRootChild: boolean
   multipleRoots: boolean
   hasChildren: boolean
+  isBranchPoint: boolean
 }
 
 const SessionTree = forwardRef<SessionTreeRef, SessionTreeProps>(function SessionTree({
@@ -199,8 +200,9 @@ ref
     while (stack.length > 0) {
       const [node, indent, justBranched, showConnector, isLast, gutters, isVirtualRootChild] = stack.pop()!
       const hasChildren = node.children.length > 0
+      const isBranchPoint = node.children.length > 1
 
-      result.push({ node, indent, showConnector, isLast, gutters, isVirtualRootChild, multipleRoots, hasChildren })
+      result.push({ node, indent, showConnector, isLast, gutters, isVirtualRootChild, multipleRoots, hasChildren, isBranchPoint })
 
       // 如果当前节点被折叠，跳过子节点
       if (collapsedNodes.has(node.entry.id)) {
@@ -794,7 +796,7 @@ ref
               onClick={() => handleNodeClick(flatNode)}
             >
               <span className="tree-prefix">{prefix}</span>
-              {flatNode.hasChildren ? (
+              {flatNode.isBranchPoint ? (
                 <span
                   className="tree-toggle"
                   onClick={(e) => toggleCollapse(entry.id, e)}
@@ -805,7 +807,7 @@ ref
                 <span className="tree-marker">{marker}</span>
               )}
               <span className={`tree-content ${roleClass}`}>{displayText}</span>
-              {isCollapsed && flatNode.hasChildren && (
+              {isCollapsed && flatNode.isBranchPoint && (
                 <span className="tree-collapsed-hint">...</span>
               )}
               {snippet && (
