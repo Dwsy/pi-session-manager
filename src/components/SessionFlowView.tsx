@@ -11,6 +11,7 @@ import {
   Handle,
   Position,
 } from '@xyflow/react'
+import { User, Bot, Wrench, Settings, FileText } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import '../styles/flow.css'
 import type { SessionEntry } from '../types'
@@ -32,12 +33,18 @@ const FlowNode = memo(({ data }: NodeProps) => {
 
   const roleClass = `flow-node flow-node-${d.role}${d.isActive ? ' flow-node-active' : ''}${d.isInPath ? ' flow-node-in-path' : ''}`
 
+  const iconMap: Record<string, React.ReactNode> = {
+    user: <User size={12} />,
+    assistant: <Bot size={12} />,
+    tool: <Wrench size={12} />,
+    meta: <Settings size={12} />,
+  }
+
   return (
     <div className={roleClass} style={{ width: NODE_W, height: NODE_H }}>
       <Handle type="target" position={Position.Top} style={{ opacity: 0, width: 1, height: 1 }} />
-      <span className="flow-node-label">
-        {d.label}
-      </span>
+      <span className="flow-node-icon">{iconMap[d.role] || <FileText size={12} />}</span>
+      <span className="flow-node-label">{d.label}</span>
       {d.skipped != null && d.skipped > 0 && (
         <span className="flow-node-skip">+{d.skipped}</span>
       )}

@@ -46,6 +46,14 @@
   border-color: rgb(var(--color-warning) / 0.5) !important;
 }
 
+.flow-node-icon {
+  flex-shrink: 0;
+  margin-right: 5px;
+  display: flex;
+  align-items: center;
+  opacity: 0.8;
+}
+
 .flow-node-label {
   overflow: hidden;
   text-overflow: ellipsis;
