@@ -4,12 +4,52 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
-### Fixed
-- Tree view: clicking a node now switches the conversation branch displayed in the content area (previously only scrolled without changing branch)
-
 ### Added
-- Tree view: `findNewestLeaf` navigation — clicking any node follows the newest child chain to the leaf, rendering the full branch path
-- Tree view: added Write tool filter button alongside existing Read/Edit filters
+
+- **Flow view** — new graph visualization mode for conversation trees
+  - React Flow (`@xyflow/react`) based node graph with compact tree algorithm
+  - Collapses linear tool call chains, shows skipped tool names on edges (e.g. `bash x2, read, edit`)
+  - Role-based node icons: User / Bot / Wrench / Settings
+  - Toolbar: zoom in/out, fit view, focus active node
+  - MiniMap with role-based coloring
+  - Click node to navigate to corresponding conversation branch
+  - Shares filter bar with tree view (Default / No Tools / User / All / Read / Edit / Write)
+  - Theme-aware via CSS variables, follows light/dark mode
+
+- **Multi-path session directories** — scan sessions from multiple locations
+  - Backend: `Config.session_paths` + `get_all_session_dirs()` multi-directory scanning
+  - Frontend: `sessionDirs` array in Advanced Settings with add/remove UI
+  - New commands: `get_session_paths`, `save_session_paths`, `get_all_session_dirs`
+  - File watcher monitors all configured directories with dynamic reload
+  - Legacy `sessionDir` (string) auto-migrated to `sessionDirs` (string[])
+
+- **Hierarchical labels** — parent-child tag relationships
+  - Backend: `parent_id` column on tags table, wired through create/update
+  - Frontend: `getDescendantIds`, `getRootTags`, `getChildTags` in useTags hook
+  - TagPicker renders tree structure with expand/collapse
+  - TagManagerSettings groups statuses vs custom labels
+  - New LabelFilter component with search, grouped sections, descendant filtering
+  - Renamed "tag" → "label" across en-US/zh-CN i18n
+
+- **Kanban UX improvements**
+  - Project-based filtering via new ProjectFilterList sidebar
+  - Untagged column moved to first position
+  - Context menu on right-click: terminal, browser, favorite, labels, delete
+  - Project selection persists across view switches
+
+- **Tree view improvements**
+  - `findNewestLeaf` navigation — clicking any node follows newest child chain
+  - Write tool filter button alongside Read/Edit
+  - Collapse toggle only on branch points (nodes with >1 children)
+
+### Changed
+- HTTP adapter uses `rust-embed` to serve frontend assets from binary instead of runtime `ServeDir`
+- Session tree sidebar floats over content with smooth transition animation
+
+### Fixed
+- Tree view: clicking a node now switches the conversation branch (previously only scrolled)
+- Flow view: fixed broken parent chain when filtering toolResult entries — build tree from all entries, let compactTree handle skipping
+- Flow view: filter out session/thinking_level_change/label metadata nodes
 
 ## [0.1.0] - 2026-01-30
 
@@ -89,52 +129,3 @@ All notable changes to Pi Session Manager will be documented in this file.
 - Improved SessionViewer to generate HTML server-side for better performance
 - Enhanced search to support tool call filtering
 - Updated UI styling with consistent dark theme colors
-
-## [Unreleased]
-
-### Added
-- **Multi-path session directories support** - Configure multiple Pi session paths in settings
-  - Backend: `Config.session_paths` with `get_all_session_dirs()` for scanning multiple directories
-  - Frontend: `sessionDirs` array in Advanced Settings with add/remove UI
-  - New Tauri commands: `get_session_paths`, `save_session_paths`, `get_all_session_dirs`
-  - File watcher monitors all configured directories with dynamic reload
-  - New `FileWatcherState` managed by Tauri for lifecycle management
-  - File watcher automatically restarts when session paths are updated
-
-- **Kanban Board UX Improvements**
-  - Project-based filtering in Kanban view - left sidebar now shows project list instead of tag filter
-  - "Untagged" column moved to first position for better visibility
-  - Added proper spacing between Kanban cards (`mb-2` gap)
-  - Custom context menu on right-click with actions:
-    - Open in Terminal
-    - Open in Browser
-    - Toggle Favorite
-    - Manage Tags (submenu)
-    - Delete Session
-  - Virtual scrolling for project filter list
-  - Project selection persists when switching between views
-
-### Changed
-- Session tree sidebar now floats over content with `position: absolute` instead of pushing the main view
-- Main content area auto-adjusts with `padding-left` to avoid being covered by the sidebar
-- Smooth transition animation when toggling sidebar visibility (200ms)
-- Kanban view header now shows current project filter or "All Projects"
-
-### Technical
-- Added `ProjectFilterList.tsx` component for project-based filtering
-- Added `KanbanContextMenu.tsx` component for custom right-click menu
-- Updated `KanbanBoard.tsx` to support `projectFilter` prop
-- Updated `KanbanColumn.tsx` to integrate context menu
-- Updated `KanbanCard.tsx` with `onContextMenu` handler
-- i18n: Added `project.filter.*` and `tags.kanban.allProjects` translations
-
-### Planned
-- Tantivy full-text search engine implementation
-- Session merge functionality
-- Advanced filters (date range, project, model)
-- File system watcher for live updates
-- Drag-and-drop file handling
-- Copy message to clipboard
-- Print session export
-- Visual timeline charts in statistics panel
-- Model usage statistics
