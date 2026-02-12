@@ -702,18 +702,6 @@ ref
         </button>
       </div>
 
-      {viewMode === 'flow' ? (
-        <div className="flex-1 min-h-0">
-          <Suspense fallback={<div style={{ padding: 12, color: 'var(--color-text-secondary)' }}>Loading...</div>}>
-            <SessionFlowView
-              entries={entries}
-              activeLeafId={activeLeafId}
-              onNodeClick={onNodeClick}
-            />
-          </Suspense>
-        </div>
-      ) : (
-      <>
       {/* Filters */}
       <div className="sidebar-filters">
         <button
@@ -765,6 +753,20 @@ ref
           Write
         </button>
       </div>
+
+      {viewMode === 'flow' ? (
+        <div className="flex-1 min-h-0">
+          <Suspense fallback={<div style={{ padding: 12, color: 'var(--color-text-secondary)' }}>Loading...</div>}>
+            <SessionFlowView
+              entries={entries}
+              activeLeafId={activeLeafId}
+              onNodeClick={onNodeClick}
+              filter={currentFilter}
+            />
+          </Suspense>
+        </div>
+      ) : (
+      <>
 
       {/* Tree */}
       <div className="tree-container">

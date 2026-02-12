@@ -16,10 +16,13 @@ import '@xyflow/react/dist/style.css'
 import '../styles/flow.css'
 import type { SessionEntry } from '../types'
 
+type FilterMode = 'default' | 'no-tools' | 'user-only' | 'labeled-only' | 'all' | 'read-tools' | 'edit-tools' | 'write-tools'
+
 interface SessionFlowViewProps {
   entries: SessionEntry[]
   activeLeafId?: string
   onNodeClick?: (leafId: string, targetId: string) => void
+  filter?: FilterMode
 }
 
 const NODE_W = 200
@@ -135,14 +138,61 @@ interface CompactNode {
   skippedSummary: string // e.g. "bash, read, edit"
 }
 
-function isSignificant(node: TreeNode): boolean {
-  const role = getRole(node.entry)
-  if (role === 'user') return true
-  if (role === 'meta') return true
-  if (node.children.length !== 1) return true // branch point or leaf
-  // toolResult is never significant on its own
-  if (node.entry.type === 'message' && node.entry.message?.role === 'toolResult') return false
-  return false
+// Skip these types entirely - they're metadata, not conversation
+const SKIP_TYPES = new Set(['session', 'thinking_level_change', 'label'])
+
+function isSignificant(node: TreeNode, filter: FilterMode): boolean {
+  const entry = node.entry
+  if (SKIP_TYPES.has(entry.type)) return false
+
+  // toolResult is never significant
+  if (entry.type === 'message' && entry.message?.role === 'toolResult') return false
+
+  // Branch points and leaves are always significant (structural)
+  if (node.children.length !== 1) {
+    // But still apply filter to leaves
+    if (node.children.length === 0) return matchesFilter(entry, filter)
+    return true
+  }
+
+  return matchesFilter(entry, filter)
+}
+
+function matchesFilter(entry: SessionEntry, filter: FilterMode): boolean {
+  switch (filter) {
+    case 'default':
+      // user messages + meta events
+      if (entry.type !== 'message') return true
+      return entry.message?.role === 'user'
+
+    case 'no-tools':
+      if (entry.type !== 'message') return true
+      return entry.message?.role === 'user' || entry.message?.role === 'assistant'
+
+    case 'user-only':
+      return entry.type === 'message' && entry.message?.role === 'user'
+
+    case 'all':
+      return true
+
+    case 'read-tools':
+    case 'edit-tools':
+    case 'write-tools': {
+      if (entry.type === 'message' && entry.message?.role === 'user') return true
+      const toolName = filter.replace('-tools', '')
+      if (entry.type === 'message' && entry.message?.role === 'assistant') {
+        const content = Array.isArray(entry.message.content) ? entry.message.content : []
+        return content.some((c: any) => c.type === 'toolCall' && c.name === toolName)
+      }
+      return false
+    }
+
+    case 'labeled-only':
+      return entry.type === 'message' && entry.message?.role === 'user'
+
+    default:
+      return true
+  }
 }
 
 function getSkipLabel(entry: SessionEntry): string {
@@ -159,28 +209,32 @@ function getSkipLabel(entry: SessionEntry): string {
   return msg.role || 'unknown'
 }
 
-function compactTree(roots: TreeNode[]): CompactNode[] {
-  function compact(node: TreeNode): CompactNode {
+function compactTree(roots: TreeNode[], filter: FilterMode): CompactNode[] {
+  function compact(node: TreeNode): CompactNode | null {
     let current = node
     let skipped = 0
     const skippedLabels: string[] = []
 
-    if (isSignificant(current)) {
+    if (isSignificant(current, filter)) {
+      const children = current.children.map(c => compact(c)).filter((c): c is CompactNode => c !== null)
       return {
         entry: current.entry,
-        children: current.children.map(c => compact(c)),
+        children,
         skipped: 0,
         skippedSummary: '',
       }
     }
 
-    while (!isSignificant(current) && current.children.length === 1) {
+    while (!isSignificant(current, filter) && current.children.length === 1) {
       skippedLabels.push(getSkipLabel(current.entry))
       skipped++
       current = current.children[0]
     }
 
-    // Deduplicate consecutive labels: [bash, result, bash, result] -> "bash x2"
+    if (!isSignificant(current, filter) && current.children.length === 0) {
+      return null
+    }
+
     const counts = new Map<string, number>()
     for (const l of skippedLabels) {
       if (l !== 'result') counts.set(l, (counts.get(l) || 0) + 1)
@@ -189,15 +243,16 @@ function compactTree(roots: TreeNode[]): CompactNode[] {
       .map(([name, cnt]) => cnt > 1 ? `${name} x${cnt}` : name)
       .join(', ')
 
+    const children = current.children.map(c => compact(c)).filter((c): c is CompactNode => c !== null)
     return {
       entry: current.entry,
-      children: current.children.map(c => compact(c)),
+      children,
       skipped,
       skippedSummary: summary,
     }
   }
 
-  return roots.map(r => compact(r))
+  return roots.map(r => compact(r)).filter((c): c is CompactNode => c !== null)
 }
 
 // --- Layout ---
@@ -254,7 +309,7 @@ function layoutTree(roots: CompactNode[], activePathIds: Set<string>, activeLeaf
 }
 
 // --- Main component ---
-function SessionFlowView({ entries, activeLeafId, onNodeClick }: SessionFlowViewProps) {
+function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default' }: SessionFlowViewProps) {
   const activePathIds = useMemo(() => {
     if (!activeLeafId) return new Set<string>()
     const byId = new Map<string, SessionEntry>()
@@ -271,10 +326,10 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick }: SessionFlowView
 
   const { layoutNodes, layoutEdges } = useMemo(() => {
     const rawTree = buildTree(entries)
-    const compact = compactTree(rawTree)
+    const compact = compactTree(rawTree, filter)
     const { nodes, edges } = layoutTree(compact, activePathIds, activeLeafId)
     return { layoutNodes: nodes, layoutEdges: edges }
-  }, [entries, activePathIds, activeLeafId])
+  }, [entries, activePathIds, activeLeafId, filter])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutEdges)
