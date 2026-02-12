@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Clock, MessageSquare, GripVertical } from 'lucide-react'
@@ -13,7 +14,7 @@ interface KanbanCardProps {
   onSelect: () => void
 }
 
-export default function KanbanCard({
+function KanbanCardInner({
   session,
   tags,
   isSelected,
@@ -27,7 +28,7 @@ export default function KanbanCard({
     setNodeRef,
     transform,
     transition,
-  } = useSortable({ id: session.id })
+  } = useSortable({ id: session.id, disabled: isOverlay })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -50,7 +51,7 @@ export default function KanbanCard({
     isOverlay ? 'shadow-xl rotate-2 scale-105' : '',
   ].filter(Boolean).join(' ')
 
-  const content = (
+  return (
     <div
       ref={isOverlay ? undefined : setNodeRef}
       style={isOverlay ? undefined : style}
@@ -107,6 +108,19 @@ export default function KanbanCard({
       </div>
     </div>
   )
-
-  return content
 }
+
+// Memo with custom comparison - only re-render when necessary
+const KanbanCard = memo(KanbanCardInner, (prev, next) => {
+  return (
+    prev.session.id === next.session.id &&
+    prev.session.modified === next.session.modified &&
+    prev.session.name === next.session.name &&
+    prev.isSelected === next.isSelected &&
+    prev.isDragging === next.isDragging &&
+    prev.isOverlay === next.isOverlay &&
+    prev.tags.length === next.tags.length
+  )
+})
+
+export default KanbanCard
