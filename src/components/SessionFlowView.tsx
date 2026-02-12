@@ -12,6 +12,7 @@ import {
   Position,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import '../styles/flow.css'
 import type { SessionEntry } from '../types'
 
 interface SessionFlowViewProps {
@@ -28,36 +29,17 @@ const GAP_Y = 16
 // --- Custom node ---
 const FlowNode = memo(({ data }: NodeProps) => {
   const d = data as { label: string; role: string; isActive: boolean; isInPath: boolean; skipped?: number; skippedSummary?: string }
-  let bg = '#1e1e2e'
-  let border = '#333'
-  let color = '#999'
 
-  if (d.role === 'user') {
-    bg = '#1a3a5c'; border = '#2563eb'; color = '#93c5fd'
-  } else if (d.role === 'assistant') {
-    bg = '#1c2333'; border = '#475569'; color = '#cbd5e1'
-  } else if (d.role === 'tool') {
-    bg = '#1a2e1a'; border = '#22c55e'; color = '#86efac'
-  } else if (d.role === 'meta') {
-    bg = '#2a2a1e'; border = '#a3a300'; color = '#d4d490'
-  }
-
-  if (d.isActive) border = '#f59e0b'
-  else if (d.isInPath) border = '#b45309'
+  const roleClass = `flow-node flow-node-${d.role}${d.isActive ? ' flow-node-active' : ''}${d.isInPath ? ' flow-node-in-path' : ''}`
 
   return (
-    <div style={{
-      width: NODE_W, height: NODE_H,
-      background: bg, border: `1.5px solid ${border}`, borderRadius: 6,
-      display: 'flex', alignItems: 'center', padding: '0 8px',
-      cursor: 'pointer', overflow: 'hidden', fontSize: 11, color, lineHeight: '1.3',
-    }}>
+    <div className={roleClass} style={{ width: NODE_W, height: NODE_H }}>
       <Handle type="target" position={Position.Top} style={{ opacity: 0, width: 1, height: 1 }} />
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+      <span className="flow-node-label">
         {d.label}
       </span>
       {d.skipped != null && d.skipped > 0 && (
-        <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.5, flexShrink: 0 }}>+{d.skipped}</span>
+        <span className="flow-node-skip">+{d.skipped}</span>
       )}
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0, width: 1, height: 1 }} />
     </div>
@@ -243,10 +225,9 @@ function layoutTree(roots: CompactNode[], activePathIds: Set<string>, activeLeaf
       edges.push({
         id: `${node.entry.id}-${child.entry.id}`,
         source: node.entry.id, target: child.entry.id,
-        style: { stroke: inPath ? '#b45309' : '#333', strokeWidth: inPath ? 2 : 1 },
+        className: inPath ? 'flow-edge-active' : 'flow-edge',
         label: child.skippedSummary || undefined,
-        labelStyle: { fill: '#888', fontSize: 9 },
-        labelBgStyle: { fill: '#1a1a2e', fillOpacity: 0.9 },
+        labelStyle: { fontSize: 9 },
         labelBgPadding: [4, 2] as [number, number],
       })
     }
@@ -330,18 +311,15 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick }: SessionFlowView
         proOptions={{ hideAttribution: true }}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}
       >
-        <Background gap={20} size={1} color="#222" />
+        <Background gap={20} size={1} />
         <MiniMap
           nodeColor={(n) => {
             const d = n.data as { role: string; isActive: boolean }
-            if (d.isActive) return '#f59e0b'
-            if (d.role === 'user') return '#2563eb'
-            if (d.role === 'assistant') return '#475569'
-            if (d.role === 'tool') return '#22c55e'
-            return '#555'
+            if (d.isActive) return 'rgb(var(--color-warning))'
+            if (d.role === 'user') return 'rgb(var(--color-info))'
+            if (d.role === 'tool') return 'rgb(var(--color-success))'
+            return 'rgb(var(--color-muted-foreground))'
           }}
-          maskColor="rgba(0,0,0,0.7)"
-          style={{ background: '#111' }}
         />
       </ReactFlow>
     </div>
