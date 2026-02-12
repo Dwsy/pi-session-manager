@@ -1,7 +1,9 @@
-import { useState, useMemo, useCallback, useEffect, forwardRef, useRef, useImperativeHandle, type ReactNode } from 'react'
+import { useState, useMemo, useCallback, useEffect, forwardRef, useRef, useImperativeHandle, lazy, Suspense, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SessionEntry } from '../types'
 import SessionTreeSearch, { type SessionTreeSearchRef } from './SessionTreeSearch'
+
+const SessionFlowView = lazy(() => import('./SessionFlowView'))
 
 // 高亮搜索关键词
 function highlightText(text: string, tokens: string[]): ReactNode {
@@ -85,6 +87,7 @@ ref
   const [currentResultIndex, setCurrentResultIndex] = useState(0)
   const [searchResults, setSearchResults] = useState<string[]>([])
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set())
+  const [viewMode, setViewMode] = useState<'tree' | 'flow'>('tree')
 
   useImperativeHandle(ref, () => ({
     focusSearch: () => {
@@ -681,6 +684,34 @@ ref
         totalResults={searchResults.length}
       />
 
+      {/* View mode toggle */}
+      <div className="sidebar-filters" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+        <button
+          className={`filter-btn ${viewMode === 'tree' ? 'active' : ''}`}
+          onClick={() => setViewMode('tree')}
+        >
+          🌲 Tree
+        </button>
+        <button
+          className={`filter-btn ${viewMode === 'flow' ? 'active' : ''}`}
+          onClick={() => setViewMode('flow')}
+        >
+          🔀 Flow
+        </button>
+      </div>
+
+      {viewMode === 'flow' ? (
+        <div className="flex-1 min-h-0">
+          <Suspense fallback={<div style={{ padding: 12, color: 'var(--color-text-secondary)' }}>Loading...</div>}>
+            <SessionFlowView
+              entries={entries}
+              activeLeafId={activeLeafId}
+              onNodeClick={onNodeClick}
+            />
+          </Suspense>
+        </div>
+      ) : (
+      <>
       {/* Filters */}
       <div className="sidebar-filters">
         <button
@@ -789,6 +820,8 @@ ref
       <div className="tree-status">
         {filteredNodes.length} / {flatNodes.length} {t('session.tree.nodes')}
       </div>
+      </>
+      )}
     </div>
   )
 })
