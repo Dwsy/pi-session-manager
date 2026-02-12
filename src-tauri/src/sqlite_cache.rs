@@ -130,6 +130,10 @@ pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
     conn.execute("ALTER TABLE tags ADD COLUMN auto_rules TEXT", [])
         .ok();
 
+    // Migration: add parent_id column to tags for hierarchical labels
+    conn.execute("ALTER TABLE tags ADD COLUMN parent_id TEXT", [])
+        .ok();
+
     // Insert builtin tags
     let now = Utc::now().to_rfc3339();
     let builtins = [
@@ -698,6 +702,7 @@ pub struct DbTag {
     pub is_builtin: bool,
     pub created_at: String,
     pub auto_rules: Option<String>,
+    pub parent_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -710,7 +715,7 @@ pub struct DbSessionTag {
 
 pub fn get_all_tags(conn: &Connection) -> Result<Vec<DbTag>, String> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, color, icon, sort_order, is_builtin, created_at, auto_rules FROM tags ORDER BY sort_order"
+        "SELECT id, name, color, icon, sort_order, is_builtin, created_at, auto_rules, parent_id FROM tags ORDER BY sort_order"
     ).map_err(|e| format!("Failed to prepare tags statement: {e}"))?;
 
     let tags = stmt
@@ -724,6 +729,7 @@ pub fn get_all_tags(conn: &Connection) -> Result<Vec<DbTag>, String> {
                 is_builtin: row.get(5)?,
                 created_at: row.get(6)?,
                 auto_rules: row.get(7)?,
+                parent_id: row.get(8)?,
             })
         })
         .map_err(|e| format!("Failed to query tags: {e}"))?
@@ -739,6 +745,7 @@ pub fn create_tag(
     name: &str,
     color: &str,
     icon: Option<&str>,
+    parent_id: Option<&str>,
 ) -> Result<(), String> {
     let max_order: i64 = conn
         .query_row("SELECT COALESCE(MAX(sort_order), -1) FROM tags", [], |r| {
@@ -746,8 +753,8 @@ pub fn create_tag(
         })
         .unwrap_or(-1);
     conn.execute(
-        "INSERT INTO tags (id, name, color, icon, sort_order, is_builtin, created_at) VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)",
-        params![id, name, color, icon, max_order + 1, Utc::now().to_rfc3339()],
+        "INSERT INTO tags (id, name, color, icon, sort_order, is_builtin, created_at, parent_id) VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7)",
+        params![id, name, color, icon, max_order + 1, Utc::now().to_rfc3339(), parent_id],
     ).map_err(|e| format!("Failed to create tag: {e}"))?;
     Ok(())
 }
@@ -759,6 +766,7 @@ pub fn update_tag(
     color: Option<&str>,
     icon: Option<&str>,
     sort_order: Option<i64>,
+    parent_id: Option<Option<&str>>,
 ) -> Result<(), String> {
     let mut sets = Vec::new();
     let mut values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -777,6 +785,10 @@ pub fn update_tag(
     if let Some(v) = sort_order {
         sets.push("sort_order = ?");
         values.push(Box::new(v));
+    }
+    if let Some(v) = parent_id {
+        sets.push("parent_id = ?");
+        values.push(Box::new(v.map(|s| s.to_string())));
     }
     if sets.is_empty() {
         return Ok(());

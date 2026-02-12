@@ -465,6 +465,26 @@ pub async fn dispatch(
             crate::save_server_settings(settings).await?;
             Ok(Value::Null)
         }
+        "get_session_paths" => {
+            let result = crate::get_session_paths().await?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+        "save_session_paths" => {
+            let paths: Vec<String> = serde_json::from_value(
+                payload
+                    .get("paths")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
+            )
+            .map_err(|e| format!("Invalid paths: {e}"))?;
+            let app_handle = app_state.app_handle.clone();
+            crate::save_session_paths(paths, app_handle).await?;
+            Ok(Value::Null)
+        }
+        "get_all_session_dirs" => {
+            let result = crate::get_all_session_dirs().await?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
 
         // Models
         "list_models" => {
@@ -557,7 +577,8 @@ pub async fn dispatch(
             let name = extract_string(payload, "name")?;
             let color = extract_string(payload, "color")?;
             let icon = extract_optional_string(payload, "icon");
-            let result = crate::create_tag(name, color, icon).await?;
+            let parent_id = extract_optional_string(payload, "parentId");
+            let result = crate::create_tag(name, color, icon, parent_id).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "update_tag" => {
@@ -566,7 +587,12 @@ pub async fn dispatch(
             let color = extract_optional_string(payload, "color");
             let icon = extract_optional_string(payload, "icon");
             let sort_order = payload.get("sortOrder").and_then(|v| v.as_i64());
-            crate::update_tag(id, name, color, icon, sort_order).await?;
+            let parent_id = if payload.get("parentId").is_some() {
+                Some(extract_optional_string(payload, "parentId"))
+            } else {
+                None
+            };
+            crate::update_tag(id, name, color, icon, sort_order, parent_id).await?;
             Ok(Value::Null)
         }
         "delete_tag" => {

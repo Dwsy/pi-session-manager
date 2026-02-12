@@ -11,6 +11,7 @@ pub struct TagItem {
     pub is_builtin: bool,
     pub created_at: String,
     pub auto_rules: Option<String>,
+    pub parent_id: Option<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -33,6 +34,7 @@ impl From<sqlite_cache::DbTag> for TagItem {
             is_builtin: t.is_builtin,
             created_at: t.created_at,
             auto_rules: t.auto_rules,
+            parent_id: t.parent_id,
         }
     }
 }
@@ -67,10 +69,11 @@ pub async fn create_tag(
     name: String,
     color: String,
     icon: Option<String>,
+    parent_id: Option<String>,
 ) -> Result<TagItem, String> {
     let conn = get_conn()?;
     let id = format!("tag-{}", chrono::Utc::now().timestamp_millis());
-    sqlite_cache::create_tag(&conn, &id, &name, &color, icon.as_deref())?;
+    sqlite_cache::create_tag(&conn, &id, &name, &color, icon.as_deref(), parent_id.as_deref())?;
     sqlite_cache::get_all_tags(&conn)?
         .into_iter()
         .find(|t| t.id == id)
@@ -85,6 +88,7 @@ pub async fn update_tag(
     color: Option<String>,
     icon: Option<String>,
     sort_order: Option<i64>,
+    parent_id: Option<Option<String>>,
 ) -> Result<(), String> {
     let conn = get_conn()?;
     sqlite_cache::update_tag(
@@ -94,6 +98,7 @@ pub async fn update_tag(
         color.as_deref(),
         icon.as_deref(),
         sort_order,
+        parent_id.as_ref().map(|p| p.as_deref()),
     )
 }
 
