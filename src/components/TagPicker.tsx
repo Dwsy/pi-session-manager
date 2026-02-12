@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, Plus, Check } from 'lucide-react'
+import { Search, Plus, Check, ChevronRight, ChevronDown } from 'lucide-react'
 import type { Tag } from '../types'
 import { getColorClass, getColorStyle } from './TagBadge'
 
@@ -8,7 +8,7 @@ interface TagPickerProps {
   tags: Tag[]
   selectedTagIds: string[]
   onToggle: (tagId: string) => void
-  onCreateTag?: (name: string, color: string) => void
+  onCreateTag?: (name: string, color: string, parentId?: string) => void
   anchorRect?: DOMRect | null
   onClose: () => void
 }
@@ -16,11 +16,20 @@ interface TagPickerProps {
 export default function TagPicker({ tags, selectedTagIds, onToggle, onCreateTag, anchorRect, onClose }: TagPickerProps) {
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
+    const parentIds = new Set(tags.filter(t => t.parentId).map(t => t.parentId!))
+    return parentIds
+  })
   const ref = useRef<HTMLDivElement>(null)
 
   const filtered = useMemo(
     () => tags.filter(tag => tag.name.toLowerCase().includes(search.toLowerCase())),
     [tags, search],
+  )
+
+  const rootTags = useMemo(
+    () => filtered.filter(t => !t.parentId || !filtered.some(f => f.id === t.parentId)).sort((a, b) => a.sortOrder - b.sortOrder),
+    [filtered],
   )
 
   useEffect(() => {
@@ -34,6 +43,53 @@ export default function TagPicker({ tags, selectedTagIds, onToggle, onCreateTag,
   const style: React.CSSProperties = anchorRect
     ? { position: 'fixed', top: anchorRect.bottom + 4, left: anchorRect.left, zIndex: 9999 }
     : { zIndex: 9999 }
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const renderTag = (tag: Tag, depth: number) => {
+    const selected = selectedTagIds.includes(tag.id)
+    const isHex = tag.color.startsWith('#')
+    const children = filtered.filter(t => t.parentId === tag.id).sort((a, b) => a.sortOrder - b.sortOrder)
+    const hasChildren = children.length > 0
+    const expanded = expandedIds.has(tag.id)
+
+    return (
+      <div key={tag.id}>
+        <button
+          onClick={() => onToggle(tag.id)}
+          className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded text-left hover:bg-secondary transition-colors"
+          style={{ paddingLeft: `${8 + depth * 14}px` }}
+        >
+          {hasChildren ? (
+            <span
+              className="flex-shrink-0 p-0.5 -ml-1"
+              onClick={(e) => { e.stopPropagation(); toggleExpand(tag.id) }}
+            >
+              {expanded
+                ? <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+                : <ChevronRight className="h-2.5 w-2.5 text-muted-foreground" />}
+            </span>
+          ) : (
+            <span className="w-3.5 flex-shrink-0" />
+          )}
+          <span
+            className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${isHex ? '' : getColorClass(tag.color)}`}
+            style={getColorStyle(tag.color)}
+          />
+          <span className="flex-1 text-xs text-foreground truncate">{tag.name}</span>
+          {selected && <Check className="h-3 w-3 text-info" />}
+        </button>
+        {hasChildren && expanded && children.map(child => renderTag(child, depth + 1))}
+      </div>
+    )
+  }
 
   return (
     <div ref={ref} style={style} className="w-52 bg-surface border border-border rounded-lg shadow-xl overflow-hidden">
@@ -50,24 +106,7 @@ export default function TagPicker({ tags, selectedTagIds, onToggle, onCreateTag,
         </div>
       </div>
       <div className="max-h-48 overflow-y-auto p-1">
-        {filtered.map(tag => {
-          const selected = selectedTagIds.includes(tag.id)
-          const isHex = tag.color.startsWith('#')
-          return (
-            <button
-              key={tag.id}
-              onClick={() => onToggle(tag.id)}
-              className="flex items-center gap-2 w-full px-2 py-1.5 rounded text-left hover:bg-secondary transition-colors"
-            >
-              <span
-                className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${isHex ? '' : getColorClass(tag.color)}`}
-                style={getColorStyle(tag.color)}
-              />
-              <span className="flex-1 text-xs text-foreground truncate">{tag.name}</span>
-              {selected && <Check className="h-3 w-3 text-info" />}
-            </button>
-          )
-        })}
+        {rootTags.map(tag => renderTag(tag, 0))}
         {filtered.length === 0 && search && onCreateTag && (
           <button
             onClick={() => { onCreateTag(search, 'info'); setSearch('') }}

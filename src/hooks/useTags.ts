@@ -24,8 +24,8 @@ export function useTags() {
 
   useEffect(() => { loadTags() }, [loadTags])
 
-  const createTag = useCallback(async (name: string, color: string, icon?: string) => {
-    const tag = await invoke<Tag>('create_tag', { name, color, icon })
+  const createTag = useCallback(async (name: string, color: string, icon?: string, parentId?: string) => {
+    const tag = await invoke<Tag>('create_tag', { name, color, icon, parentId })
     setTags(prev => [...prev, tag])
     return tag
   }, [])
@@ -104,11 +104,30 @@ export function useTags() {
     return matched
   }, [loadTags])
 
+  const getDescendantIds = useCallback((tagId: string): string[] => {
+    const result: string[] = []
+    const children = tags.filter(t => t.parentId === tagId)
+    for (const child of children) {
+      result.push(child.id)
+      result.push(...getDescendantIds(child.id))
+    }
+    return result
+  }, [tags])
+
+  const getRootTags = useCallback((): Tag[] => {
+    return tags.filter(t => !t.parentId).sort((a, b) => a.sortOrder - b.sortOrder)
+  }, [tags])
+
+  const getChildTags = useCallback((parentId: string): Tag[] => {
+    return tags.filter(t => t.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder)
+  }, [tags])
+
   return {
     tags, sessionTags, loading,
     loadTags, createTag, updateTag, deleteTag,
     assignTag, removeTagFromSession, moveSession, reorderTags,
     getTagsForSession, getSessionsForTag,
     updateTagAutoRules, evaluateAutoRules,
+    getDescendantIds, getRootTags, getChildTags,
   }
 }

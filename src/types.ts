@@ -212,6 +212,7 @@ export interface Tag {
   isBuiltin: boolean
   createdAt: string
   autoRules?: string
+  parentId?: string | null
 }
 
 export interface SessionTag {

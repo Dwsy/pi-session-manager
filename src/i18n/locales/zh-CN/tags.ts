@@ -12,6 +12,9 @@ export const tags = {
   add: '添加',
   existing: '标签列表',
   confirmDelete: '删除此标签？相关会话将取消标记。',
+  statusesHint: '看板使用的内置状态。',
+  labelsHint: '自定义标签，用于分类会话。',
+  builtin: '内置',
   builtinTodo: '待处理',
   builtinWip: '进行中',
   builtinDone: '已完成',
@@ -22,6 +25,7 @@ export const tags = {
     untagged: '未标记',
     dragHint: '拖拽移动到其他列',
     emptyColumn: '暂无会话',
+    allProjects: '全部项目',
   },
   contextMenu: {
     labels: '标签',
@@ -33,7 +37,11 @@ export const tags = {
   filter: {
     title: '标签',
     all: '全部',
-    clearFilter: '清除筛选',
+    clearFilter: '清除',
+    searchPlaceholder: '搜索状态和标签...',
+    filterChats: '筛选会话',
+    statuses: '状态',
+    labels: '标签',
   },
   autoRules: {
     title: '自动规则',
