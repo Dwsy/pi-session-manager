@@ -41,6 +41,7 @@ export class WebSocketTransport implements Transport {
   private pingTimer: ReturnType<typeof setInterval> | null = null
   private readonly url: string
   private disposed = false
+  private connectWaiters: { resolve: () => void; reject: (e: Error) => void }[] = []
 
   constructor(url = 'ws://localhost:52130') {
     this.url = url
@@ -62,6 +63,8 @@ export class WebSocketTransport implements Transport {
         this.state = WsState.Connected
         this.retryCount = 0
         this.startPing()
+        for (const w of this.connectWaiters) w.resolve()
+        this.connectWaiters = []
         console.log('[WS] connected')
       }
 
@@ -94,6 +97,8 @@ export class WebSocketTransport implements Transport {
     this.state = WsState.Disconnected
     this.stopPing()
     this.rejectAllPending('WebSocket disconnected')
+    for (const w of this.connectWaiters) w.reject(new Error('WebSocket disconnected'))
+    this.connectWaiters = []
     if (!this.disposed) {
       this.scheduleReconnect()
     }
@@ -169,9 +174,25 @@ export class WebSocketTransport implements Transport {
     }
   }
 
+  private waitForConnection(timeoutMs = 10000): Promise<void> {
+    if (this.state === WsState.Connected) return Promise.resolve()
+    if (this.disposed) return Promise.reject(new Error('Transport disposed'))
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const idx = this.connectWaiters.findIndex(w => w.resolve === resolve)
+        if (idx >= 0) this.connectWaiters.splice(idx, 1)
+        reject(new Error('WebSocket connection timeout'))
+      }, timeoutMs)
+      this.connectWaiters.push({
+        resolve: () => { clearTimeout(timer); resolve() },
+        reject: (e) => { clearTimeout(timer); reject(e) },
+      })
+    })
+  }
+
   async invoke<T>(command: string, payload?: unknown): Promise<T> {
-    if (this.state !== WsState.Connected || !this.ws) {
-      throw new Error('WebSocket not connected')
+    if (this.state !== WsState.Connected) {
+      await this.waitForConnection()
     }
 
     const id = `ws-${++this.messageId}`
@@ -215,8 +236,92 @@ export class WebSocketTransport implements Transport {
     }
     this.stopPing()
     this.rejectAllPending('Transport disposed')
+    for (const w of this.connectWaiters) w.reject(new Error('Transport disposed'))
+    this.connectWaiters = []
     this.cleanupSocket()
   }
+}
+
+export class HttpTransport implements Transport {
+  private readonly baseUrl: string
+  private eventListeners = new Map<string, Set<(payload: unknown) => void>>()
+  private eventSource: EventSource | null = null
+  private sseConnected = false
+
+  constructor(baseUrl = `http://${location.hostname}:52131`) {
+    this.baseUrl = baseUrl
+    this.connectSSE()
+  }
+
+  private connectSSE(): void {
+    if (this.eventSource) return
+
+    const es = new EventSource(`${this.baseUrl}/api/events`)
+    this.eventSource = es
+
+    es.onopen = () => {
+      this.sseConnected = true
+      console.log('[SSE] connected')
+    }
+
+    es.addEventListener('sessions-changed', (e: MessageEvent) => {
+      try {
+        const payload = JSON.parse(e.data)
+        this.eventListeners.get('sessions-changed')?.forEach(cb => cb(payload))
+      } catch (err) {
+        console.error('[SSE] parse error:', err)
+      }
+    })
+
+    es.onerror = () => {
+      this.sseConnected = false
+      // EventSource auto-reconnects, just log
+      console.warn('[SSE] connection error, will auto-reconnect')
+    }
+  }
+
+  async invoke<T>(command: string, payload?: unknown): Promise<T> {
+    const resp = await fetch(`${this.baseUrl}/api`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command, payload: payload ?? {} }),
+    })
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const data = await resp.json() as { success: boolean; data?: T; error?: string }
+    if (!data.success) throw new Error(data.error || 'Command failed')
+    return data.data as T
+  }
+
+  async onEvent<T>(event: string, callback: (payload: T) => void): Promise<() => void> {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, new Set())
+    }
+    const wrapped = (p: unknown) => callback(p as T)
+    this.eventListeners.get(event)!.add(wrapped)
+
+    return () => {
+      this.eventListeners.get(event)?.delete(wrapped)
+    }
+  }
+
+  isConnected(): boolean {
+    return this.sseConnected
+  }
+
+  disconnect(): void {
+    if (this.eventSource) {
+      this.eventSource.close()
+      this.eventSource = null
+    }
+    this.sseConnected = false
+    this.eventListeners.clear()
+  }
+}
+
+function detectMobileWeb(): boolean {
+  if (typeof window === 'undefined') return false
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024)
 }
 
 export function createTransport(): Transport {
@@ -225,13 +330,18 @@ export function createTransport(): Transport {
     return new TauriTransport()
   }
 
+  if (detectMobileWeb()) {
+    console.log('Using HTTP transport (mobile)')
+    return new HttpTransport()
+  }
+
   console.log('Using WebSocket transport')
   return new WebSocketTransport()
 }
 
 let _transport: Transport | null = null
 
-function getTransport(): Transport {
+export function getTransport(): Transport {
   if (!_transport) {
     _transport = createTransport()
   }

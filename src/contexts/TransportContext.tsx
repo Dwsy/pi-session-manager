@@ -1,60 +1,43 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useMemo } from 'react'
 import type { ReactNode } from 'react'
-import { Transport, TauriTransport, WebSocketTransport } from '../transport'
+import type { Transport } from '../transport'
+import { getTransport, HttpTransport } from '../transport'
+
+type TransportType = 'ws' | 'http' | 'tauri'
 
 interface TransportContextValue {
   transport: Transport
-  isWebSocket: boolean
+  type: TransportType
 }
 
 const TransportContext = createContext<TransportContextValue | null>(null)
 
-function createTransportInstance(wsUrl: string, forceWebSocket: boolean): { transport: Transport; isWebSocket: boolean } {
-  const isTauri = typeof window !== 'undefined' && !!(window as { __TAURI__?: unknown }).__TAURI__
-  const useWs = forceWebSocket || !isTauri
-
-  return {
-    transport: useWs ? new WebSocketTransport(wsUrl) : new TauriTransport(),
-    isWebSocket: useWs,
-  }
+function resolveType(t: Transport): TransportType {
+  if (typeof window !== 'undefined' && (window as { __TAURI__?: unknown }).__TAURI__) return 'tauri'
+  return t instanceof HttpTransport ? 'http' : 'ws'
 }
 
 interface TransportProviderProps {
   children: ReactNode
-  wsUrl?: string
-  forceWebSocket?: boolean
 }
 
-export function TransportProvider({
-  children,
-  wsUrl = 'ws://localhost:52130',
-  forceWebSocket = false,
-}: TransportProviderProps) {
-  const [value] = useState<TransportContextValue>(() => createTransportInstance(wsUrl, forceWebSocket))
-
-  useEffect(() => {
-    return () => {
-      if (value.isWebSocket && 'disconnect' in value.transport) {
-        (value.transport as WebSocketTransport).disconnect()
-      }
-    }
-  }, [value])
+export function TransportProvider({ children }: TransportProviderProps) {
+  const value = useMemo<TransportContextValue>(() => {
+    const transport = getTransport()
+    return { transport, type: resolveType(transport) }
+  }, [])
 
   return <TransportContext.Provider value={value}>{children}</TransportContext.Provider>
 }
 
 export function useTransport(): Transport {
-  const context = useContext(TransportContext)
-  if (!context) {
-    throw new Error('useTransport must be used within a TransportProvider')
-  }
-  return context.transport
+  const ctx = useContext(TransportContext)
+  if (!ctx) throw new Error('useTransport must be used within TransportProvider')
+  return ctx.transport
 }
 
 export function useTransportInfo(): TransportContextValue {
-  const context = useContext(TransportContext)
-  if (!context) {
-    throw new Error('useTransportInfo must be used within a TransportProvider')
-  }
-  return context
+  const ctx = useContext(TransportContext)
+  if (!ctx) throw new Error('useTransportInfo must be used within TransportProvider')
+  return ctx
 }
