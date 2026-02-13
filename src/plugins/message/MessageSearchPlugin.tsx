@@ -40,7 +40,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       
       // 转换为插件结果格式
       const pluginResults = filteredSessions.map(session => {
-        const score = this.fuzzyMatch(query, session.all_messages_text)
+        const score = this.fuzzyMatch(query, session.first_message)
         
         return {
           id: `session-${session.id}`,

@@ -1,46 +1,68 @@
 import { useEffect, useRef } from 'react'
 import { listen } from '../transport'
+import type { SessionsDiff } from '../types'
 
 interface UseFileWatcherOptions {
   enabled?: boolean
-  onSessionsChanged: () => void
-  debounceMs?: number // 防抖时间（毫秒）
+  onDiff: (diff: SessionsDiff) => void
+  debounceMs?: number
 }
 
 /**
  * 文件监听 Hook
- * 监听后端的文件变化事件，触发会话列表刷新
- * 带防抖机制，避免频繁刷新
+ * 后端 file_watcher 增量 rescan 后推送 diff，前端直接 merge，不再调 scan_sessions
  */
 export function useFileWatcher({
   enabled = true,
-  onSessionsChanged,
-  debounceMs = 2000, // 默认 2 秒防抖
+  onDiff,
+  debounceMs = 2000,
 }: UseFileWatcherOptions) {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const onSessionsChangedRef = useRef(onSessionsChanged)
-
-  // 保持回调引用最新
-  useEffect(() => {
-    onSessionsChangedRef.current = onSessionsChanged
-  }, [onSessionsChanged])
+  const onDiffRef = useRef(onDiff)
+  const pendingDiffRef = useRef<SessionsDiff>({ updated: [], removed: [] })
 
   useEffect(() => {
-    if (!enabled) {
-      return
-    }
+    onDiffRef.current = onDiff
+  }, [onDiff])
+
+  useEffect(() => {
+    if (!enabled) return
 
     let unlisten: (() => void) | null = null
 
     const setupListener = async () => {
       try {
-        unlisten = await listen('sessions-changed', (_event) => {
+        unlisten = await listen<SessionsDiff>('sessions-changed', (event) => {
+          const diff = event.payload
+          if (!diff) return
+
+          // Accumulate diffs within debounce window
+          const pending = pendingDiffRef.current
+          if (diff.updated?.length) {
+            for (const u of diff.updated) {
+              const idx = pending.updated.findIndex(s => s.path === u.path)
+              if (idx >= 0) pending.updated[idx] = u
+              else pending.updated.push(u)
+            }
+          }
+          if (diff.removed?.length) {
+            for (const r of diff.removed) {
+              if (!pending.removed.includes(r)) pending.removed.push(r)
+              // Also remove from pending.updated if it was queued
+              pending.updated = pending.updated.filter(s => s.path !== r)
+            }
+          }
+
           if (debounceTimerRef.current) {
             clearTimeout(debounceTimerRef.current)
           }
 
           debounceTimerRef.current = setTimeout(() => {
-            onSessionsChangedRef.current()
+            const merged = { ...pendingDiffRef.current }
+            pendingDiffRef.current = { updated: [], removed: [] }
+            if (merged.updated.length || merged.removed.length) {
+              onDiffRef.current(merged)
+            }
             debounceTimerRef.current = null
           }, debounceMs)
         })
@@ -56,10 +78,8 @@ export function useFileWatcher({
         clearTimeout(debounceTimerRef.current)
         debounceTimerRef.current = null
       }
-
-      if (unlisten) {
-        unlisten()
-      }
+      pendingDiffRef.current = { updated: [], removed: [] }
+      if (unlisten) unlisten()
     }
   }, [enabled, debounceMs])
 }

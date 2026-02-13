@@ -8,10 +8,15 @@ export interface SessionInfo {
   modified: string
   message_count: number
   first_message: string
-  all_messages_text: string
+  all_messages_text?: string
   last_message: string
   last_message_role: string
   isFavorite?: boolean
+}
+
+export interface SessionsDiff {
+  updated: SessionInfo[]
+  removed: string[]
 }
 
 export interface FavoriteItem {

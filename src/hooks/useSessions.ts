@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { invoke } from '../transport'
 import { useTranslation } from 'react-i18next'
-import type { SessionInfo } from '../types'
+import type { SessionInfo, SessionsDiff } from '../types'
 import { useDemoMode } from './useDemoMode'
 
 export interface UseSessionsReturn {
@@ -10,6 +10,7 @@ export interface UseSessionsReturn {
   selectedSession: SessionInfo | null
   setSelectedSession: (session: SessionInfo | null) => void
   loadSessions: () => Promise<void>
+  patchSessions: (diff: SessionsDiff) => void
   handleDeleteSession: (session: SessionInfo) => Promise<void>
   handleRenameSession: (session: SessionInfo, newName: string) => Promise<void>
 }
@@ -83,6 +84,39 @@ export function useSessions(): UseSessionsReturn {
     }
   }, [t, isDemoMode, getDemoSessions])
 
+  const patchSessions = useCallback((diff: SessionsDiff) => {
+    setSessions(prev => {
+      const removedSet = new Set(diff.removed)
+      let next = prev.filter(s => !removedSet.has(s.path))
+
+      for (const u of diff.updated) {
+        const idx = next.findIndex(s => s.path === u.path)
+        if (idx >= 0) {
+          next[idx] = u
+        } else {
+          next.push(u)
+        }
+      }
+
+      next.sort((a, b) => b.modified.localeCompare(a.modified))
+      return next
+    })
+
+    // Update selected session if it was in the diff
+    const currentSelection = selectedSessionRef.current
+    if (currentSelection) {
+      const removedSet = new Set(diff.removed)
+      if (removedSet.has(currentSelection.path)) {
+        setSelectedSession(null)
+      } else {
+        const updated = diff.updated.find(s => s.path === currentSelection.path)
+        if (updated) {
+          setSelectedSession(prev => prev ? { ...prev, ...updated } : null)
+        }
+      }
+    }
+  }, [])
+
   const handleDeleteSession = useCallback(async (session: SessionInfo) => {
     if (!confirm(t('app.confirm.deleteSession', { name: session.name || t('common.untitled') }))) {
       return
@@ -137,6 +171,7 @@ export function useSessions(): UseSessionsReturn {
     selectedSession,
     setSelectedSession,
     loadSessions,
+    patchSessions,
     handleDeleteSession,
     handleRenameSession,
   }
