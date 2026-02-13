@@ -14,10 +14,58 @@ All notable changes to Pi Session Manager will be documented in this file.
   - Kanban board uses top-tab single-column layout instead of horizontal scroll
   - Dashboard stat grid: 5th card spans full width to avoid orphan half-row
   - StatCard label text bumped to 11px on mobile for readability
-  - Settings panel: sidebar → horizontal scrollable tab bar
+  - Settings panel: animated list → detail page navigation on mobile
   - Dialogs (export, rename) expand to 95vw on mobile
+  - Long-press context menu on session list (touch devices)
   - CSS: 36px min touch targets, safe-area-bottom padding, kanban snap scroll
-  - Terminal panel hidden on mobile (touch terminal not practical)
+
+- **Connection status banner** — real-time transport health indicator
+  - Red banner when WS/HTTP transport disconnects ("无法连接到服务")
+  - Amber "正在重新连接…" during reconnection attempts
+  - Green "已重新连接" flash (2s) on recovery, then auto-hide
+  - Skips initial connecting state to avoid flash on first load
+  - Works on both mobile and desktop layouts
+
+- **Incremental session scanning** — backend cache + diff-based updates
+  - Scanner: persistent cache (no TTL), `CACHE_VERSION` atomic counter, `get_session_digest()`
+  - `rescan_changed_files()`: re-parse only changed .jsonl files, merge into cache
+  - File watcher: accumulate changed paths, batch rescan, emit `SessionsDiff` payload
+  - Frontend: `patchSessions()` merges diffs into session list without full reload
+  - `useFileWatcher` receives diffs and accumulates within debounce window
+  - SessionViewer: event-driven incremental update replaces 1s polling interval
+  - `all_messages_text` no longer serialized from backend (skip_serializing)
+
+- **HTTP transport + SSE** — mobile-friendly alternative to WebSocket
+  - `HttpTransport`: POST `/api` for commands, SSE `/api/events` for real-time diffs
+  - Auto-detect mobile web → use HTTP transport instead of WebSocket
+  - Backend: SSE endpoint via axum + async-stream
+
+- **Auth token management** — API key CRUD for remote access
+  - `list_tokens` / `create_token` / `revoke_token` / `update_last_used` in auth.rs
+  - Tauri IPC commands + WS/HTTP dispatch for list/create/revoke
+  - Advanced Settings UI: key list, create with name, copy notice, revoke with confirm
+
+- **Configurable bind address** — control network exposure
+  - `bind_addr` field in ServerSettings (default `127.0.0.1`)
+  - WS/HTTP adapters bind to configured address
+  - Onboarding: bind address selector with local/remote hints and mobile access instructions
+  - Remote warning badge when `0.0.0.0` selected
+
+- **Session content cache** — faster back-navigation in SessionViewer
+  - LRU cache (5 entries) keyed by path + modified timestamp
+  - Cache hit skips file read entirely, StrictMode double-mount also hits cache
+
+- **Terminal resume command** — resume sessions from web terminal
+  - `buildResumeCommand()` generates `cd + pi --session` command
+  - `TerminalPanel` accepts `pendingCommand` prop, writes to shell after 500ms
+
+### Changed
+
+- WebSocket `invoke()` waits for connection (connectWaiters queue + 10s timeout) instead of throwing immediately
+- WebSocketTransport uses `location.hostname` instead of hardcoded `localhost`
+- TransportContext simplified to singleton via `getTransport()`, removed `wsUrl`/`forceWebSocket` props
+- Onboarding dialog responsive (95vw on mobile), shows bind_addr config in Services step
+- Session load error: silent console.error instead of blocking `alert()`
 
 - **Flow view** — new graph visualization mode for conversation trees
   - React Flow (`@xyflow/react`) based node graph with compact tree algorithm
