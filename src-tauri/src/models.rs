@@ -11,9 +11,17 @@ pub struct SessionInfo {
     pub modified: DateTime<Utc>,
     pub message_count: usize,
     pub first_message: String,
+    #[serde(skip_serializing)]
     pub all_messages_text: String,
     pub last_message: String,
     pub last_message_role: String,
+}
+
+/// Incremental diff emitted by file_watcher after rescan
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionsDiff {
+    pub updated: Vec<SessionInfo>,
+    pub removed: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

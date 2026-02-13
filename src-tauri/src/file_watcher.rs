@@ -1,5 +1,6 @@
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, FileIdMap};
+use serde_json::Value;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver};
@@ -151,11 +152,17 @@ pub fn restart_watcher_with_config(
     Ok(())
 }
 
-/// Process file events with batch merging
+/// Process file events with batch merging — updates backend cache incrementally, then notifies frontend
 fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppHandle) {
     let mut last_notification = Instant::now();
     let min_interval = Duration::from_secs(5);
-    let mut pending_notification = false;
+    let mut pending_paths: HashSet<PathBuf> = HashSet::new();
+
+    // Create a tokio runtime for async calls
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to create tokio runtime for file watcher");
 
     loop {
         let result = rx.recv_timeout(Duration::from_secs(1));
@@ -163,17 +170,23 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
         match result {
             Ok(event_result) => match event_result {
                 Ok(events) => {
-                    let has_jsonl_changes = events.iter().any(|event| {
-                        event.paths.iter().any(|path| {
-                            path.extension()
+                    for event in &events {
+                        for path in &event.paths {
+                            if path
+                                .extension()
                                 .map(|ext| ext == "jsonl")
                                 .unwrap_or(false)
-                        })
-                    });
+                            {
+                                pending_paths.insert(path.clone());
+                            }
+                        }
+                    }
 
-                    if has_jsonl_changes {
-                        info!("Detected .jsonl file changes (batching...)");
-                        pending_notification = true;
+                    if !pending_paths.is_empty() {
+                        info!(
+                            "Detected .jsonl file changes: {} files (batching...)",
+                            pending_paths.len()
+                        );
                     }
                 }
                 Err(errors) => {
@@ -187,14 +200,35 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
             }
         }
 
-        if pending_notification && last_notification.elapsed() >= min_interval {
-            info!("Sending batched notification to frontend");
+        if !pending_paths.is_empty() && last_notification.elapsed() >= min_interval {
+            let changed: Vec<String> = pending_paths
+                .drain()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect();
 
-            if let Err(e) = app_handle.emit("sessions-changed", ()) {
-                error!("Failed to emit event: {}", e);
-            } else {
-                last_notification = Instant::now();
-                pending_notification = false;
+            info!(
+                "Incremental rescan: {} changed files",
+                changed.len()
+            );
+
+            // Update backend cache, get diff
+            match rt.block_on(crate::scanner::rescan_changed_files(changed)) {
+                Ok(diff) => {
+                    if diff.updated.is_empty() && diff.removed.is_empty() {
+                        // Nothing actually changed, skip notification
+                        continue;
+                    }
+                    // Emit diff so frontend can merge locally without calling scan_sessions
+                    let payload = serde_json::to_value(&diff).unwrap_or(Value::Null);
+                    if let Err(e) = app_handle.emit("sessions-changed", payload) {
+                        error!("Failed to emit event: {}", e);
+                    } else {
+                        last_notification = Instant::now();
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to rescan changed files: {}", e);
+                }
             }
         }
     }

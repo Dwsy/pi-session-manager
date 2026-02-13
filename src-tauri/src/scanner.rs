@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::models::SessionInfo;
+use crate::models::{SessionInfo, SessionsDiff};
 use crate::sqlite_cache;
 use crate::write_buffer;
 use chrono::{DateTime, Duration, Utc};
@@ -7,17 +7,29 @@ use serde_json::Value;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::Instant;
 
-static SCAN_CACHE: Mutex<Option<(Instant, Vec<SessionInfo>)>> = Mutex::new(None);
-const SCAN_CACHE_TTL_SECS: u64 = 2;
+static SCAN_CACHE: Mutex<Option<Vec<SessionInfo>>> = Mutex::new(None);
+static CACHE_VERSION: AtomicU64 = AtomicU64::new(0);
 
 /// Invalidate the scan cache so the next scan re-reads all directories
 pub fn invalidate_cache() {
     if let Ok(mut guard) = SCAN_CACHE.lock() {
         *guard = None;
+        CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
     }
+}
+
+/// Lightweight digest for HTTP polling — just version + count, no session data
+pub fn get_session_digest() -> (u64, usize) {
+    let version = CACHE_VERSION.load(Ordering::Relaxed);
+    let count = SCAN_CACHE
+        .lock()
+        .ok()
+        .and_then(|g| g.as_ref().map(|v| v.len()))
+        .unwrap_or(0);
+    (version, count)
 }
 
 pub fn get_sessions_dir() -> Result<PathBuf, String> {
@@ -57,19 +69,20 @@ fn expand_tilde(path: &str) -> String {
 }
 
 pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
+    // Return cached list if available — file_watcher keeps it fresh
     if let Ok(guard) = SCAN_CACHE.lock() {
-        if let Some((ts, ref cached)) = *guard {
-            if ts.elapsed().as_secs() < SCAN_CACHE_TTL_SECS {
-                return Ok(cached.clone());
-            }
+        if let Some(ref cached) = *guard {
+            return Ok(cached.clone());
         }
     }
 
+    // First call: full scan to populate cache
     let config = Config::load().unwrap_or_default();
     let result = scan_sessions_with_config(&config).await?;
 
     if let Ok(mut guard) = SCAN_CACHE.lock() {
-        *guard = Some((Instant::now(), result.clone()));
+        *guard = Some(result.clone());
+        CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
     }
 
     Ok(result)
@@ -286,4 +299,74 @@ fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, String> {
     DateTime::parse_from_rfc3339(s)
         .map(|dt| dt.with_timezone(&Utc))
         .map_err(|e| format!("Failed to parse timestamp: {e}"))
+}
+
+/// Incremental update: re-parse changed files, update cache, return diff for frontend merge.
+pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<SessionsDiff, String> {
+    let mut sessions = if let Ok(guard) = SCAN_CACHE.lock() {
+        guard.clone().unwrap_or_default()
+    } else {
+        vec![]
+    };
+
+    if sessions.is_empty() {
+        sessions = scan_sessions().await?;
+    }
+
+    let mut diff = SessionsDiff {
+        updated: vec![],
+        removed: vec![],
+    };
+
+    for path_str in &changed_paths {
+        let path = PathBuf::from(path_str);
+
+        if !path.exists() {
+            let before = sessions.len();
+            sessions.retain(|s| s.path != *path_str);
+            if sessions.len() != before {
+                diff.removed.push(path_str.clone());
+                log::info!("Session removed (file deleted): {}", path_str);
+            }
+            continue;
+        }
+
+        match parse_session_info(&path) {
+            Ok(info) => {
+                if let Ok(m) = fs::metadata(&path) {
+                    if let Ok(mt) = m.modified() {
+                        let file_modified: DateTime<Utc> = DateTime::from(mt);
+                        write_buffer::buffer_session_write(&info, file_modified);
+                    }
+                }
+
+                diff.updated.push(info.clone());
+
+                if let Some(existing) = sessions.iter_mut().find(|s| s.path == info.path) {
+                    *existing = info;
+                } else {
+                    sessions.push(info);
+                }
+            }
+            Err(e) => {
+                log::warn!("Failed to re-parse {}: {}", path_str, e);
+            }
+        }
+    }
+
+    if !diff.updated.is_empty() || !diff.removed.is_empty() {
+        sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+        if let Ok(mut guard) = SCAN_CACHE.lock() {
+            *guard = Some(sessions);
+            CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    log::info!(
+        "Incremental rescan: {} updated, {} removed",
+        diff.updated.len(),
+        diff.removed.len()
+    );
+
+    Ok(diff)
 }
