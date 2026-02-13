@@ -33,6 +33,9 @@ export const onboarding = {
       description: '选择启用哪些服务。WebSocket 和 HTTP API 允许外部工具连接本应用，内置终端可直接在应用内操作。',
       terminal: '内置终端',
       terminalHint: '在应用内直接使用终端',
+      bindLocal: '仅本机访问',
+      bindRemote: '允许局域网设备（手机/平板）连接',
+      mobileHint: '移动端通过浏览器访问 http://<电脑IP>:52131 即可使用，自动切换 HTTP 模式',
     },
   },
 } as const

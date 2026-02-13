@@ -33,6 +33,9 @@ export const onboarding = {
       description: 'Choose which services to enable. WebSocket and HTTP API allow external tools to connect. The built-in terminal lets you work directly inside the app.',
       terminal: 'Built-in Terminal',
       terminalHint: 'Use terminal directly in the app',
+      bindLocal: 'Local access only',
+      bindRemote: 'Allow LAN devices (phone/tablet) to connect',
+      mobileHint: 'Access from mobile via http://<your-PC-IP>:52131 in a browser — HTTP mode is auto-selected',
     },
   },
 } as const

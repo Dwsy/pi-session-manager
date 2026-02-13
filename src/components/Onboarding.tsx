@@ -12,6 +12,7 @@ import {
   Server,
 } from 'lucide-react'
 import { invoke } from '../transport'
+import { useIsMobile } from '../hooks/useIsMobile'
 
 interface OnboardingProps {
   onComplete: () => void
@@ -31,15 +32,18 @@ interface ServerSettings {
   http_enabled: boolean
   http_port: number
   auth_enabled: boolean
+  bind_addr: string
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
   const { t } = useTranslation()
+  const isMobile = useIsMobile()
   const [currentStep, setCurrentStep] = useState(0)
   const [serverSettings, setServerSettings] = useState<ServerSettings>({
     ws_enabled: true, ws_port: 52130,
     http_enabled: true, http_port: 52131,
     auth_enabled: true,
+    bind_addr: '127.0.0.1',
   })
   const [terminalEnabled, setTerminalEnabled] = useState(true)
 
@@ -134,7 +138,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md">
-      <div className="relative w-[520px] bg-surface-dark rounded-2xl border border-border shadow-2xl overflow-hidden">
+      <div className={`relative ${isMobile ? 'w-[95vw]' : 'w-[520px]'} bg-surface-dark rounded-2xl border border-border shadow-2xl overflow-hidden`}>
         <button
           onClick={handleSkip}
           className="absolute top-4 right-4 p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors z-10"
@@ -170,15 +174,33 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           {/* Services interactive step */}
           {step.interactive && (
             <div className="mt-4 space-y-3 text-left max-w-xs mx-auto">
+              <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground">{t('settings.advanced.bindAddr', '绑定地址')}</span>
+                  <select
+                    value={serverSettings.bind_addr}
+                    onChange={(e) => setServerSettings((s) => ({ ...s, bind_addr: e.target.value }))}
+                    className="px-2 py-1 bg-background border border-border rounded text-xs text-foreground"
+                  >
+                    <option value="127.0.0.1">127.0.0.1</option>
+                    <option value="0.0.0.0">0.0.0.0</option>
+                  </select>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {serverSettings.bind_addr === '0.0.0.0'
+                    ? t('onboarding.steps.services.bindRemote', '允许局域网设备（手机/平板）连接')
+                    : t('onboarding.steps.services.bindLocal', '仅本机访问')}
+                </p>
+              </div>
               <ToggleRow
                 label="WebSocket"
-                hint={`ws://0.0.0.0:${serverSettings.ws_port}`}
+                hint={`ws://${serverSettings.bind_addr}:${serverSettings.ws_port}`}
                 checked={serverSettings.ws_enabled}
                 onChange={(v) => setServerSettings((s) => ({ ...s, ws_enabled: v }))}
               />
               <ToggleRow
                 label="HTTP API"
-                hint={`http://0.0.0.0:${serverSettings.http_port}/api`}
+                hint={`http://${serverSettings.bind_addr}:${serverSettings.http_port}/api`}
                 checked={serverSettings.http_enabled}
                 onChange={(v) => setServerSettings((s) => ({ ...s, http_enabled: v }))}
               />
@@ -188,6 +210,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 checked={terminalEnabled}
                 onChange={setTerminalEnabled}
               />
+              {serverSettings.bind_addr === '0.0.0.0' && (
+                <p className="text-[11px] text-amber-400/80 px-1">
+                  {t('onboarding.steps.services.mobileHint', '移动端通过浏览器访问 http://<电脑IP>:52131 即可使用，自动切换 HTTP 模式')}
+                </p>
+              )}
             </div>
           )}
         </div>

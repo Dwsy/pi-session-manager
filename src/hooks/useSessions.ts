@@ -78,7 +78,7 @@ export function useSessions(): UseSessionsReturn {
       }
     } catch (error) {
       console.error('[useSessions] Failed to load sessions:', error)
-      alert(`${t('app.errors.loadSessions')}: ${error}`)
+      // Don't alert on mobile — connection errors are common on first load
     } finally {
       setLoading(false)
     }
@@ -87,16 +87,29 @@ export function useSessions(): UseSessionsReturn {
   const patchSessions = useCallback((diff: SessionsDiff) => {
     setSessions(prev => {
       const removedSet = new Set(diff.removed)
-      let next = prev.filter(s => !removedSet.has(s.path))
+      let changed = diff.removed.length > 0 && prev.some(s => removedSet.has(s.path))
+
+      let next = changed ? prev.filter(s => !removedSet.has(s.path)) : [...prev]
 
       for (const u of diff.updated) {
         const idx = next.findIndex(s => s.path === u.path)
         if (idx >= 0) {
-          next[idx] = u
+          // Only replace if something actually changed
+          const existing = next[idx]
+          if (existing.modified !== u.modified
+            || existing.message_count !== u.message_count
+            || existing.name !== u.name
+            || existing.last_message !== u.last_message) {
+            next[idx] = u
+            changed = true
+          }
         } else {
           next.push(u)
+          changed = true
         }
       }
+
+      if (!changed) return prev
 
       next.sort((a, b) => b.modified.localeCompare(a.modified))
       return next

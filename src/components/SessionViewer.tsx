@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-import { invoke } from '../transport'
+import { invoke, listen } from '../transport'
 import { useTranslation } from 'react-i18next'
 import { ArrowUp, ArrowDown, Loader2, Bot, Search } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { SessionInfo, SessionEntry } from '../types'
-import { parseSessionEntries, computeStats, isTauriReady } from '../utils/session'
+import type { SessionInfo, SessionEntry, SessionsDiff } from '../types'
+import { parseSessionEntries, computeStats } from '../utils/session'
 import SessionHeader from './SessionHeader'
 import UserMessage from './UserMessage'
 import AssistantMessage from './AssistantMessage'
@@ -90,8 +90,6 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
   const treeRef = useRef<SessionTreeRef>(null)
 
   const measuredHeightsRef = useRef<Map<number, number>>(new Map())
-  const isScrollingRef = useRef(false)
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const pendingScrollToBottomRef = useRef(false)
   const prevEntriesLengthRef = useRef(0)
@@ -190,45 +188,29 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
     }
   }, [session.path, session.modified, t])
 
+  // Incremental update: listen for diff events, load new lines if this session was updated
   useEffect(() => {
     if (!session.path || loading) return
 
-    const container = messagesContainerRef.current
-    if (!container) return
+    let unlisten: (() => void) | null = null
 
-    let checkInterval: NodeJS.Timeout
-
-    const handleScroll = () => {
-      isScrollingRef.current = true
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current)
-      }
-      scrollTimeoutRef.current = setTimeout(() => {
-        isScrollingRef.current = false
-      }, 150)
+    const setup = async () => {
+      unlisten = await listen<SessionsDiff>('sessions-changed', (event) => {
+        const diff = event.payload
+        if (!diff?.updated?.length) return
+        const hit = diff.updated.some(s => s.path === session.path)
+        if (hit) {
+          loadIncremental()
+        }
+      })
     }
 
-    const checkFileChanges = async () => {
-      if (isScrollingRef.current) return
-      if (!isTauriReady()) return
-      try {
-        await loadIncremental()
-      } catch (err) {
-        console.error('Failed to check file changes:', err)
-      }
-    }
-
-    container.addEventListener('scroll', handleScroll, { passive: true })
-    checkInterval = setInterval(checkFileChanges, 1000)
+    setup()
 
     return () => {
-      clearInterval(checkInterval)
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current)
-      }
-      container.removeEventListener('scroll', handleScroll)
+      if (unlisten) unlisten()
     }
-  }, [session.path, lineCount, loading])
+  }, [session.path, loading])
 
   
 
@@ -469,11 +451,14 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
   }, [isResizing])
 
   // 增量加载新内容
-  const loadIncremental = async () => {
+  const lineCountRef = useRef(lineCount)
+  lineCountRef.current = lineCount
+
+  const loadIncremental = useCallback(async () => {
     try {
       const result = await invoke<[number, string]>('read_session_file_incremental', {
         path: session.path,
-        fromLine: lineCount
+        fromLine: lineCountRef.current
       })
 
       const [newLineCount, newContent] = result
@@ -511,7 +496,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
     } catch (err) {
       console.error('Failed to load incremental session:', err)
     }
-  }
+  }, [session.path, session.modified])
 
   const stats = useMemo(() => computeStats(entries), [entries])
   const headerEntry = useMemo(() => entries.find(e => e.type === 'session'), [entries])

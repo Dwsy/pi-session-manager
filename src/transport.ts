@@ -43,7 +43,7 @@ export class WebSocketTransport implements Transport {
   private disposed = false
   private connectWaiters: { resolve: () => void; reject: (e: Error) => void }[] = []
 
-  constructor(url = 'ws://localhost:52130') {
+  constructor(url = `ws://${typeof location !== 'undefined' ? location.hostname : 'localhost'}:52130`) {
     this.url = url
     this.connect()
   }
