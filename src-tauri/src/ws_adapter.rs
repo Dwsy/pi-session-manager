@@ -53,16 +53,17 @@ fn extract_usize(payload: &Value, key: &str) -> Result<usize, String> {
 
 pub struct WsAdapter {
     app_state: SharedAppState,
+    bind_addr: String,
     port: u16,
 }
 
 impl WsAdapter {
-    pub fn new(app_state: SharedAppState, port: u16) -> Self {
-        Self { app_state, port }
+    pub fn new(app_state: SharedAppState, bind_addr: &str, port: u16) -> Self {
+        Self { app_state, bind_addr: bind_addr.to_string(), port }
     }
 
     pub async fn start(self: Arc<Self>) -> Result<(), String> {
-        let addr: SocketAddr = format!("0.0.0.0:{}", self.port)
+        let addr: SocketAddr = format!("{}:{}", self.bind_addr, self.port)
             .parse()
             .map_err(|e| format!("Invalid address: {e}"))?;
 
@@ -235,11 +236,13 @@ impl WsAdapter {
         let app_handle = self.app_state.app_handle.clone();
         let event_tx = self.app_state.event_tx.clone();
 
-        app_handle.listen("sessions-changed", move |_event| {
+        app_handle.listen("sessions-changed", move |event| {
+            let payload = serde_json::from_str::<Value>(event.payload())
+                .unwrap_or(Value::Null);
             let ws_event = WsEvent {
                 event_type: "event".to_string(),
                 event: "sessions-changed".to_string(),
-                payload: Value::Null,
+                payload,
             };
             let _ = event_tx.send(ws_event);
         });
@@ -255,6 +258,10 @@ pub async fn dispatch(
         "scan_sessions" => {
             let result = crate::scanner::scan_sessions().await?;
             Ok(serde_json::to_value(result).unwrap())
+        }
+        "session_digest" => {
+            let (version, count) = crate::scanner::get_session_digest();
+            Ok(serde_json::json!({ "version": version, "count": count }))
         }
         "read_session_file" => {
             let path = extract_string(payload, "path")?;
@@ -651,6 +658,22 @@ pub async fn dispatch(
             Ok(serde_json::to_value(result).unwrap())
         }
 
+        // Auth / API keys
+        "list_api_keys" => {
+            let result = crate::list_api_keys().await?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+        "create_api_key" => {
+            let name = extract_string(payload, "name")?;
+            let result = crate::create_api_key(name).await?;
+            Ok(serde_json::json!(result))
+        }
+        "revoke_api_key" => {
+            let key_preview = extract_string(payload, "keyPreview")?;
+            crate::revoke_api_key(key_preview).await?;
+            Ok(Value::Null)
+        }
+
         // Desktop-only commands
         "open_session_in_browser" => Err("open_session_in_browser is desktop-only".to_string()),
         "open_session_in_terminal" => Err("open_session_in_terminal is desktop-only".to_string()),
@@ -662,9 +685,10 @@ pub async fn dispatch(
 
 pub async fn init_ws_adapter(
     app_state: SharedAppState,
+    bind_addr: &str,
     port: u16,
 ) -> Result<Arc<WsAdapter>, String> {
-    let adapter = Arc::new(WsAdapter::new(app_state, port));
+    let adapter = Arc::new(WsAdapter::new(app_state, bind_addr, port));
     let adapter_clone = adapter.clone();
 
     tokio::spawn(async move {

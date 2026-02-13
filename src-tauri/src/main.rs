@@ -44,9 +44,10 @@ fn main() {
             if server_cfg.ws_enabled {
                 let ws_state = app_state.clone();
                 let ws_port = server_cfg.ws_port;
+                let ws_bind = server_cfg.bind_addr.clone();
                 tauri::async_runtime::spawn(async move {
                     if let Err(e) =
-                        pi_session_manager::ws_adapter::init_ws_adapter(ws_state, ws_port).await
+                        pi_session_manager::ws_adapter::init_ws_adapter(ws_state, &ws_bind, ws_port).await
                     {
                         eprintln!("Failed to init WebSocket adapter: {e}");
                     }
@@ -57,9 +58,10 @@ fn main() {
             if server_cfg.http_enabled {
                 let http_state = app_state.clone();
                 let http_port = server_cfg.http_port;
+                let http_bind = server_cfg.bind_addr.clone();
                 tauri::async_runtime::spawn(async move {
                     if let Err(e) =
-                        pi_session_manager::http_adapter::init_http_adapter(http_state, http_port)
+                        pi_session_manager::http_adapter::init_http_adapter(http_state, &http_bind, http_port)
                             .await
                     {
                         eprintln!("Failed to init HTTP adapter: {e}");
@@ -70,12 +72,12 @@ fn main() {
             if cli_mode {
                 let mut info = String::from("CLI mode:");
                 if server_cfg.ws_enabled {
-                    info.push_str(&format!(" WS ws://0.0.0.0:{}", server_cfg.ws_port));
+                    info.push_str(&format!(" WS ws://{}:{}", server_cfg.bind_addr, server_cfg.ws_port));
                 }
                 if server_cfg.http_enabled {
                     info.push_str(&format!(
-                        " | HTTP http://0.0.0.0:{}/api",
-                        server_cfg.http_port
+                        " | HTTP http://{}:{}/api",
+                        server_cfg.bind_addr, server_cfg.http_port
                     ));
                 }
                 log::info!("{info}");
@@ -158,7 +160,10 @@ fn main() {
             pi_session_manager::move_session_tag,
             pi_session_manager::reorder_tags,
             pi_session_manager::update_tag_auto_rules,
-            pi_session_manager::evaluate_auto_rules
+            pi_session_manager::evaluate_auto_rules,
+            pi_session_manager::list_api_keys,
+            pi_session_manager::create_api_key,
+            pi_session_manager::revoke_api_key
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

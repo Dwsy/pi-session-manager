@@ -81,7 +81,10 @@ pub fn run() {
             move_session_tag,
             reorder_tags,
             update_tag_auto_rules,
-            evaluate_auto_rules
+            evaluate_auto_rules,
+            list_api_keys,
+            create_api_key,
+            revoke_api_key
         ])
         .setup(|app| {
             // Create and manage app state

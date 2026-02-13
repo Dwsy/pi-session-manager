@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use rusqlite::{params, Connection};
+use serde::Serialize;
 use std::collections::HashSet;
 use std::net::IpAddr;
 use std::path::PathBuf;
@@ -8,6 +9,14 @@ use std::sync::Mutex;
 lazy_static! {
     static ref TOKENS: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
     static ref ENABLED: Mutex<bool> = Mutex::new(false);
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TokenInfo {
+    pub name: String,
+    pub key_preview: String,
+    pub created_at: String,
+    pub last_used: Option<String>,
 }
 
 fn db_path() -> Result<PathBuf, String> {
@@ -21,6 +30,11 @@ fn open_db() -> Result<Connection, String> {
     Connection::open(db_path()?).map_err(|e| format!("Failed to open DB: {e}"))
 }
 
+fn ensure_columns(conn: &Connection) {
+    // Add last_used column if missing
+    let _ = conn.execute("ALTER TABLE auth_tokens ADD COLUMN last_used TEXT", []);
+}
+
 pub fn init() -> Result<String, String> {
     let conn = open_db()?;
 
@@ -28,11 +42,14 @@ pub fn init() -> Result<String, String> {
         "CREATE TABLE IF NOT EXISTS auth_tokens (
             token TEXT PRIMARY KEY,
             name TEXT,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            last_used TEXT
         )",
         [],
     )
     .map_err(|e| format!("Failed to create auth_tokens table: {e}"))?;
+
+    ensure_columns(&conn);
 
     let existing: Option<String> = conn
         .query_row("SELECT token FROM auth_tokens LIMIT 1", [], |row| {
@@ -43,7 +60,7 @@ pub fn init() -> Result<String, String> {
     let token = match existing {
         Some(t) => t,
         None => {
-            let t = generate_token();
+            let t = "pi-session-manager".to_string();
             conn.execute(
                 "INSERT INTO auth_tokens (token, name, created_at) VALUES (?1, ?2, ?3)",
                 params![t, "default", chrono::Utc::now().to_rfc3339()],
@@ -53,7 +70,13 @@ pub fn init() -> Result<String, String> {
         }
     };
 
-    // Load all tokens into memory
+    reload_tokens(&conn)?;
+    *ENABLED.lock().unwrap() = true;
+
+    Ok(token)
+}
+
+fn reload_tokens(conn: &Connection) -> Result<(), String> {
     let mut stmt = conn
         .prepare("SELECT token FROM auth_tokens")
         .map_err(|e| format!("Failed to query tokens: {e}"))?;
@@ -63,13 +86,75 @@ pub fn init() -> Result<String, String> {
         .filter_map(|r| r.ok())
         .collect();
     *TOKENS.lock().unwrap() = tokens;
-    *ENABLED.lock().unwrap() = true;
+    Ok(())
+}
 
+pub fn list_tokens() -> Result<Vec<TokenInfo>, String> {
+    let conn = open_db()?;
+    let mut stmt = conn
+        .prepare("SELECT token, name, created_at, last_used FROM auth_tokens ORDER BY created_at DESC")
+        .map_err(|e| format!("{e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let token: String = row.get(0)?;
+            let preview = if token.len() >= 8 {
+                format!("{}…", &token[..8])
+            } else {
+                token.clone()
+            };
+            Ok(TokenInfo {
+                name: row.get(1)?,
+                key_preview: preview,
+                created_at: row.get(2)?,
+                last_used: row.get(3)?,
+            })
+        })
+        .map_err(|e| format!("{e}"))?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("{e}"))
+}
+
+pub fn create_token(name: &str) -> Result<String, String> {
+    let conn = open_db()?;
+    let token = generate_token();
+    conn.execute(
+        "INSERT INTO auth_tokens (token, name, created_at) VALUES (?1, ?2, ?3)",
+        params![token, name, chrono::Utc::now().to_rfc3339()],
+    )
+    .map_err(|e| format!("Failed to create token: {e}"))?;
+    reload_tokens(&conn)?;
     Ok(token)
 }
 
+pub fn revoke_token(key_preview: &str) -> Result<(), String> {
+    let conn = open_db()?;
+    let prefix = key_preview.trim_end_matches('…');
+    let pattern = format!("{prefix}%");
+    let deleted = conn
+        .execute("DELETE FROM auth_tokens WHERE token LIKE ?1", params![pattern])
+        .map_err(|e| format!("Failed to revoke: {e}"))?;
+    if deleted == 0 {
+        return Err("Token not found".to_string());
+    }
+    reload_tokens(&conn)?;
+    Ok(())
+}
+
+pub fn update_last_used(token: &str) {
+    if let Ok(conn) = open_db() {
+        let _ = conn.execute(
+            "UPDATE auth_tokens SET last_used = ?1 WHERE token = ?2",
+            params![chrono::Utc::now().to_rfc3339(), token],
+        );
+    }
+}
+
 pub fn validate(token: &str) -> bool {
-    TOKENS.lock().unwrap().contains(token)
+    let valid = TOKENS.lock().unwrap().contains(token);
+    if valid {
+        update_last_used(token);
+    }
+    valid
 }
 
 pub fn is_auth_required(ip: &IpAddr) -> bool {

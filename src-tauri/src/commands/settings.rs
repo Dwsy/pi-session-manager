@@ -14,6 +14,12 @@ pub struct ServerSettings {
     pub http_enabled: bool,
     pub http_port: u16,
     pub auth_enabled: bool,
+    #[serde(default = "default_bind_addr")]
+    pub bind_addr: String,
+}
+
+fn default_bind_addr() -> String {
+    "127.0.0.1".to_string()
 }
 
 impl Default for ServerSettings {
@@ -24,6 +30,7 @@ impl Default for ServerSettings {
             http_enabled: true,
             http_port: 52131,
             auth_enabled: true,
+            bind_addr: default_bind_addr(),
         }
     }
 }

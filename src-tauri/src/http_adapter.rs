@@ -3,12 +3,15 @@ use crate::auth;
 use crate::ws_adapter::dispatch;
 use axum::extract::{ConnectInfo, State};
 use axum::http::{header, HeaderMap, StatusCode, Uri};
+use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use futures_util::stream::Stream;
 use rust_embed::Embed;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::convert::Infallible;
 use std::net::SocketAddr;
 
 #[derive(Embed)]
@@ -118,7 +121,43 @@ async fn serve_static(uri: Uri) -> Response {
     serve_embedded(path)
 }
 
-pub async fn init_http_adapter(app_state: SharedAppState, port: u16) -> Result<(), String> {
+async fn handle_sse(
+    State(app_state): State<SharedAppState>,
+) -> impl IntoResponse {
+    let mut rx = app_state.subscribe_events();
+
+    let stream = async_stream::stream! {
+        loop {
+            match rx.recv().await {
+                Ok(ws_event) => {
+                    if ws_event.event == "sessions-changed" {
+                        let data = serde_json::to_string(&ws_event.payload)
+                            .unwrap_or_default();
+                        yield Ok::<_, Infallible>(SseEvent::default()
+                            .event("sessions-changed")
+                            .data(data));
+                    }
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    log::warn!("SSE client lagged, skipped {n} events");
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    break;
+                }
+            }
+        }
+    };
+
+    (
+        [
+            ("access-control-allow-origin", "*"),
+            ("cache-control", "no-cache"),
+        ],
+        Sse::new(stream).keep_alive(KeepAlive::default()),
+    )
+}
+
+pub async fn init_http_adapter(app_state: SharedAppState, bind_addr: &str, port: u16) -> Result<(), String> {
     let has_frontend = FrontendAssets::get("index.html").is_some();
     if has_frontend {
         log::info!("Frontend assets embedded in binary");
@@ -128,10 +167,11 @@ pub async fn init_http_adapter(app_state: SharedAppState, port: u16) -> Result<(
 
     let app = Router::new()
         .route("/api", post(handle_command).options(handle_preflight))
+        .route("/api/events", get(handle_sse))
         .fallback(get(serve_static))
         .with_state(app_state);
 
-    let addr = format!("0.0.0.0:{port}");
+    let addr = format!("{bind_addr}:{port}");
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .map_err(|e| format!("Failed to bind HTTP: {e}"))?;

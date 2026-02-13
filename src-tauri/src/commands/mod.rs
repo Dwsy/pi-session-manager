@@ -1,3 +1,4 @@
+mod auth_cmds;
 mod cache;
 mod favorites;
 mod models;
@@ -8,6 +9,7 @@ mod skills;
 mod tags;
 pub mod terminal;
 
+pub use auth_cmds::*;
 pub use cache::*;
 pub use favorites::*;
 pub use models::*;
