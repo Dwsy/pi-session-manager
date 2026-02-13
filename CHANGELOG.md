@@ -6,6 +6,19 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Added
 
+- **Mobile adaptation** — full responsive support for < 768px screens
+  - `useIsMobile` hook (matchMedia-based, 768px breakpoint)
+  - Full-screen page switching with bottom navigation bar (5 tabs: list, projects, kanban, dashboard, settings)
+  - Session detail takes over full screen with back arrow navigation
+  - Diff view switches to unified (single-column) mode on mobile
+  - Kanban board uses top-tab single-column layout instead of horizontal scroll
+  - Dashboard stat grid: 5th card spans full width to avoid orphan half-row
+  - StatCard label text bumped to 11px on mobile for readability
+  - Settings panel: sidebar → horizontal scrollable tab bar
+  - Dialogs (export, rename) expand to 95vw on mobile
+  - CSS: 36px min touch targets, safe-area-bottom padding, kanban snap scroll
+  - Terminal panel hidden on mobile (touch terminal not practical)
+
 - **Flow view** — new graph visualization mode for conversation trees
   - React Flow (`@xyflow/react`) based node graph with compact tree algorithm
   - Collapses linear tool call chains, shows skipped tool names on edges (e.g. `bash x2, read, edit`)
