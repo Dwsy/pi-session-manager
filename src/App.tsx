@@ -29,6 +29,7 @@ import { useSessions } from './hooks/useSessions'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useSessionActions } from './hooks/useSessionActions'
 import { useAppearance } from './hooks/useAppearance'
+import { useIsMobile } from './hooks/useIsMobile'
 import { useTags } from './hooks/useTags'
 import { registerBuiltinPlugins } from './plugins'
 import type { SessionInfo, FavoriteItem } from './types'
@@ -50,6 +51,8 @@ namespace sqlite_cache {
 
 function App() {
   const { t } = useTranslation()
+  const isMobile = useIsMobile()
+  const [mobileTab, setMobileTab] = useState<'list' | 'projects' | 'kanban' | 'dashboard' | 'settings'>('list')
   const listScrollRef = useRef<HTMLDivElement>(null)
 
   const {
@@ -58,6 +61,7 @@ function App() {
     selectedSession,
     setSelectedSession,
     loadSessions,
+    patchSessions,
     handleDeleteSession,
     handleRenameSession,
   } = useSessions()
@@ -86,6 +90,7 @@ function App() {
   })
   const [showTerminal, setShowTerminal] = useState(false)
   const [terminalMaximized, setTerminalMaximized] = useState(false)
+  const [terminalPendingCommand, setTerminalPendingCommand] = useState<string | null>(null)
   const [terminalConfig, setTerminalConfig] = useState({ enabled: true, defaultShell: getPlatformDefaults().defaultShell, fontSize: 13 })
   const hasInitializedRef = useRef(false)
 
@@ -210,14 +215,18 @@ function App() {
   useFileWatcher({
     enabled: true,
     debounceMs: 2000,
-    onSessionsChanged: () => {
-      loadSessions()
-    },
+    onDiff: patchSessions,
   })
+
+  const buildResumeCommand = useCallback((session: SessionInfo) => {
+    const pi = piPath || 'pi'
+    return `cd "${session.cwd}" && ${pi} --session "${session.path}"`
+  }, [piPath])
 
   const handleResumeSession = useCallback(async () => {
     if (!selectedSession) return
     if (!isTauri()) {
+      setTerminalPendingCommand(buildResumeCommand(selectedSession))
       setShowTerminal(true)
       return
     }
@@ -231,7 +240,7 @@ function App() {
     } catch (err) {
       console.error('Failed to resume session:', err)
     }
-  }, [selectedSession, terminal, customCommand, piPath])
+  }, [selectedSession, terminal, customCommand, piPath, buildResumeCommand])
 
   const handleExportAndOpen = useCallback(async () => {
     if (!selectedSession || !isTauri()) return
@@ -309,6 +318,284 @@ function App() {
     setShowExportDialog(false)
   }
 
+  // ─── Shared content renderers ───
+
+  const renderMobileFilterBar = () => (
+    <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50">
+      <button
+        onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+        className="flex-1 flex items-center gap-2 px-2.5 py-1.5 text-xs text-muted-foreground bg-secondary/50 hover:bg-secondary rounded-lg transition-colors min-w-0"
+      >
+        <Search className="h-3.5 w-3.5 flex-shrink-0" />
+        <span className="truncate">{t('app.shortcuts.searchAll', '搜索会话')}</span>
+      </button>
+      {tags.length > 0 && (
+        <LabelFilter
+          tags={tags}
+          sessionTags={sessionTags}
+          filterTagIds={filterTagIds}
+          onFilterChange={setFilterTagIds}
+          onCreateTag={(name, color, parentId) => createTag(name, color, undefined, parentId)}
+          getDescendantIds={getDescendantIds}
+        />
+      )}
+    </div>
+  )
+
+  const renderSessionList = () => (
+    <>
+      {isMobile && renderMobileFilterBar()}
+      {!isMobile && tags.length > 0 && (
+        <div className="flex items-center justify-end gap-1 px-3 py-1.5 border-b border-border/50">
+          <LabelFilter
+            tags={tags}
+            sessionTags={sessionTags}
+            filterTagIds={filterTagIds}
+            onFilterChange={setFilterTagIds}
+            onCreateTag={(name, color, parentId) => createTag(name, color, undefined, parentId)}
+            getDescendantIds={getDescendantIds}
+          />
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
+        <SessionList
+          sessions={filteredSessions}
+          selectedSession={selectedSession}
+          onSelectSession={handleSelectSession}
+          onDeleteSession={handleDeleteSession}
+          loading={loading}
+          getBadgeType={getBadgeType}
+          terminal={terminal}
+          piPath={piPath}
+          customCommand={customCommand}
+          scrollParentRef={listScrollRef}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+          tags={tags}
+          getTagsForSession={getTagsForSession}
+          onToggleTag={(sessionId, tagId, assigned) => assigned ? removeTagFromSession(sessionId, tagId) : assignTag(sessionId, tagId)}
+          onCreateTag={createTag}
+        />
+      </div>
+    </>
+  )
+
+  const renderProjectList = () => (
+    <>
+      {isMobile && renderMobileFilterBar()}
+      <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
+      {selectedProject ? (
+        <div className="flex flex-col h-full">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30 flex-shrink-0 sticky top-0 z-10">
+            <button
+              onClick={() => setSelectedProject(null)}
+              className="p-1 hover:bg-accent rounded transition-colors flex-shrink-0"
+            >
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <FolderOpen className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
+              <span className="text-sm font-medium truncate">
+                {sessions.find(s => s.cwd === selectedProject)?.cwd.split('/').pop() || selectedProject.split('/').pop()}
+              </span>
+              <span className="text-[11px] text-muted-foreground flex-shrink-0">
+                ({sessions.filter(s => s.cwd === selectedProject).length})
+              </span>
+            </div>
+          </div>
+          <SessionList
+            sessions={sessions.filter(s => s.cwd === selectedProject)}
+            selectedSession={selectedSession}
+            onSelectSession={handleSelectSession}
+            onDeleteSession={handleDeleteSession}
+            loading={loading}
+            getBadgeType={getBadgeType}
+            terminal={terminal}
+            piPath={piPath}
+            customCommand={customCommand}
+            scrollParentRef={listScrollRef}
+            favorites={favorites}
+            onToggleFavorite={toggleFavorite}
+            showDirectory={false}
+            tags={tags}
+            getTagsForSession={getTagsForSession}
+            onToggleTag={(sessionId, tagId, assigned) => assigned ? removeTagFromSession(sessionId, tagId) : assignTag(sessionId, tagId)}
+            onCreateTag={createTag}
+          />
+        </div>
+      ) : (
+        <ProjectList
+          sessions={sessions}
+          selectedSession={selectedSession}
+          selectedProject={selectedProject}
+          onSelectSession={handleSelectSession}
+          onSelectProject={setSelectedProject}
+          onDeleteSession={handleDeleteSession}
+          loading={loading}
+          terminal={terminal}
+          piPath={piPath}
+          customCommand={customCommand}
+          getBadgeType={getBadgeType}
+          scrollParentRef={listScrollRef}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+        />
+      )}
+    </div>
+    </>
+  )
+
+  const renderKanban = () => (
+    <KanbanBoard
+      sessions={sessions}
+      tags={tags}
+      sessionTags={sessionTags}
+      selectedSession={selectedSession}
+      onSelectSession={handleSelectSession}
+      onMoveSession={moveSession}
+      getTagsForSession={getTagsForSession}
+      onToggleTag={(sessionId, tagId, assigned) => assigned ? removeTagFromSession(sessionId, tagId) : assignTag(sessionId, tagId)}
+      onDeleteSession={handleDeleteSession}
+      favorites={favorites}
+      onToggleFavorite={toggleFavorite}
+      terminal={terminal}
+      piPath={piPath}
+      customCommand={customCommand}
+      onCreateTag={createTag}
+      projectFilter={selectedProject}
+    />
+  )
+
+  const renderDashboard = () => (
+    <Dashboard
+      sessions={selectedProject ? sessions.filter(s => s.cwd === selectedProject) : sessions}
+      onSessionSelect={setSelectedSession}
+      onProjectSelect={(path) => {
+        setSelectedProject(path)
+        if (isMobile) setMobileTab('projects')
+        else { setViewMode('project'); setShowFavorites(false) }
+      }}
+      projectName={selectedProject || undefined}
+      loading={loading}
+    />
+  )
+
+  const renderSessionViewer = () => (
+    <SessionViewer
+      session={selectedSession!}
+      onExport={() => setShowExportDialog(true)}
+      onRename={() => setShowRenameDialog(true)}
+      onBack={() => setSelectedSession(null)}
+      onWebResume={() => {
+        if (selectedSession) {
+          setTerminalPendingCommand(buildResumeCommand(selectedSession))
+        }
+        setShowTerminal(true)
+      }}
+      terminal={terminal}
+      piPath={piPath}
+      customCommand={customCommand}
+    />
+  )
+
+  // ─── Shared overlays ───
+
+  const renderOverlays = () => (
+    <>
+      {showExportDialog && selectedSession && (
+        <ExportDialog
+          session={selectedSession}
+          onExport={onExportSession}
+          onClose={() => setShowExportDialog(false)}
+        />
+      )}
+      {showRenameDialog && selectedSession && (
+        <RenameDialog
+          session={selectedSession}
+          onRename={onRenameSession}
+          onClose={() => setShowRenameDialog(false)}
+        />
+      )}
+      <SettingsPanel
+        isOpen={showSettings}
+        onClose={() => { setShowSettings(false); reloadTerminalConfig() }}
+      />
+      <CommandPalette context={commandContext} />
+      {showOnboarding && (
+        <Onboarding
+          onComplete={() => {
+            localStorage.setItem('onboarding-completed', 'true')
+            setShowOnboarding(false)
+          }}
+        />
+      )}
+    </>
+  )
+
+  // ═══════════════════════════════════
+  // Mobile layout: full-screen pages + bottom nav
+  // ═══════════════════════════════════
+  if (isMobile) {
+    // Session detail takes over the entire screen
+    if (selectedSession) {
+      return (
+        <div className="flex flex-col h-screen bg-background text-foreground">
+          <div className="flex-1 overflow-hidden">
+            {renderSessionViewer()}
+          </div>
+          {renderOverlays()}
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex flex-col h-screen bg-background text-foreground">
+        {/* Main content area */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {mobileTab === 'list' && renderSessionList()}
+          {mobileTab === 'projects' && renderProjectList()}
+          {mobileTab === 'kanban' && renderKanban()}
+          {mobileTab === 'dashboard' && renderDashboard()}
+          {mobileTab === 'settings' && (
+            <SettingsPanel
+              isOpen={true}
+              onClose={() => { setMobileTab('list'); reloadTerminalConfig() }}
+            />
+          )}
+        </div>
+
+        {/* Bottom navigation bar */}
+        <nav className="flex-shrink-0 border-t border-border bg-background/95 backdrop-blur-sm flex items-center justify-around px-1 safe-area-bottom">
+          {([
+            { id: 'list' as const, icon: <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>, label: t('app.viewMode.list', '列表') },
+            { id: 'projects' as const, icon: <FolderOpen className="h-5 w-5" />, label: t('app.viewMode.project', '项目') },
+            { id: 'kanban' as const, icon: <Columns3 className="h-5 w-5" />, label: t('tags.kanban.title', '看板') },
+            { id: 'dashboard' as const, icon: <LayoutDashboard className="h-5 w-5" />, label: t('dashboard.title', '概览') },
+            { id: 'settings' as const, icon: <Settings className="h-5 w-5" />, label: t('settings.title', '设置') },
+          ]).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setMobileTab(tab.id)}
+              className={`flex flex-col items-center gap-0.5 py-2 px-3 rounded-lg transition-colors ${
+                mobileTab === tab.id
+                  ? 'text-primary'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              {tab.icon}
+              <span className="text-[10px] leading-tight">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        {renderOverlays()}
+      </div>
+    )
+  }
+
+  // ═══════════════════════════════════
+  // Desktop layout: sidebar + content (unchanged)
+  // ═══════════════════════════════════
   return (
     <div className="flex h-screen bg-background text-foreground">
       <div className="w-80 border-r border-border flex flex-col">
@@ -355,10 +642,8 @@ function App() {
             <button
               onClick={() => {
                 if (showFavorites) {
-                  // 如果已经在收藏视图，返回到会话列表
                   setShowFavorites(false)
                 } else {
-                  // 打开收藏视图
                   setShowFavorites(true)
                 }
               }}
@@ -399,7 +684,7 @@ function App() {
           </div>
         </div>
 
-        {/* Filter bar — between toolbar and scrollable content */}
+        {/* Filter bar */}
         {!showFavorites && (viewMode === 'list' || viewMode === 'kanban') && tags.length > 0 && (
           <div className="flex items-center justify-end gap-1 px-3 py-1.5 border-b border-border/50">
             <LabelFilter
@@ -415,17 +700,15 @@ function App() {
 
         <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
           {!showFavorites && viewMode === 'kanban' && (
-            <>
-              <ProjectFilterList
-                sessions={sessions}
-                selectedProject={selectedProject}
-                onSelectProject={(project) => {
-                  setSelectedProject(project)
-                  setSelectedSession(null)
-                }}
-                scrollParentRef={listScrollRef}
-              />
-            </>
+            <ProjectFilterList
+              sessions={sessions}
+              selectedProject={selectedProject}
+              onSelectProject={(project) => {
+                setSelectedProject(project)
+                setSelectedSession(null)
+              }}
+              scrollParentRef={listScrollRef}
+            />
           )}
           {showFavorites ? (
             <FavoritesPanel
@@ -532,52 +815,7 @@ function App() {
         />
         <div className="flex-1 overflow-hidden flex flex-col">
           <div className="flex-1 overflow-hidden" style={{ display: showTerminal && terminalMaximized ? 'none' : undefined }}>
-            {selectedSession ? (
-              <SessionViewer
-                session={selectedSession}
-                onExport={() => setShowExportDialog(true)}
-                onRename={() => setShowRenameDialog(true)}
-                onBack={() => setSelectedSession(null)}
-                onWebResume={() => setShowTerminal(true)}
-                terminal={terminal}
-                piPath={piPath}
-                customCommand={customCommand}
-              />
-            ) : viewMode === 'kanban' ? (
-              <KanbanBoard
-                sessions={sessions}
-                tags={tags}
-                sessionTags={sessionTags}
-                selectedSession={selectedSession}
-                onSelectSession={handleSelectSession}
-                onMoveSession={moveSession}
-                getTagsForSession={getTagsForSession}
-                onToggleTag={(sessionId, tagId, assigned) => assigned ? removeTagFromSession(sessionId, tagId) : assignTag(sessionId, tagId)}
-                onDeleteSession={handleDeleteSession}
-                favorites={favorites}
-                onToggleFavorite={toggleFavorite}
-                terminal={terminal}
-                piPath={piPath}
-                customCommand={customCommand}
-                onCreateTag={createTag}
-                projectFilter={selectedProject}
-              />
-            ) : (
-              <Dashboard
-                sessions={selectedProject
-                  ? sessions.filter(s => s.cwd === selectedProject)
-                  : sessions
-                }
-                onSessionSelect={setSelectedSession}
-                onProjectSelect={(path) => {
-                  setSelectedProject(path)
-                  setViewMode('project')
-                  setShowFavorites(false)
-                }}
-                projectName={selectedProject || undefined}
-                loading={loading}
-              />
-            )}
+            {selectedSession ? renderSessionViewer() : viewMode === 'kanban' ? renderKanban() : renderDashboard()}
           </div>
           {terminalConfig.enabled && (
           <TerminalPanel
@@ -587,42 +825,14 @@ function App() {
             cwd={selectedSession?.cwd || selectedProject || sessions[0]?.cwd || '/'}
             defaultShell={terminalConfig.defaultShell}
             fontSize={terminalConfig.fontSize}
+            pendingCommand={terminalPendingCommand}
+            onCommandConsumed={() => setTerminalPendingCommand(null)}
           />
           )}
         </div>
       </div>
 
-      {showExportDialog && selectedSession && (
-        <ExportDialog
-          session={selectedSession}
-          onExport={onExportSession}
-          onClose={() => setShowExportDialog(false)}
-        />
-      )}
-
-      {showRenameDialog && selectedSession && (
-        <RenameDialog
-          session={selectedSession}
-          onRename={onRenameSession}
-          onClose={() => setShowRenameDialog(false)}
-        />
-      )}
-
-      <SettingsPanel
-        isOpen={showSettings}
-        onClose={() => { setShowSettings(false); reloadTerminalConfig() }}
-      />
-
-      <CommandPalette context={commandContext} />
-
-      {showOnboarding && (
-        <Onboarding
-          onComplete={() => {
-            localStorage.setItem('onboarding-completed', 'true')
-            setShowOnboarding(false)
-          }}
-        />
-      )}
+      {renderOverlays()}
     </div>
   )
 }

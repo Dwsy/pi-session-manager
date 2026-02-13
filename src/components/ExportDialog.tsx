@@ -2,6 +2,7 @@ import type { SessionInfo } from '../types'
 import { FileText, FileCode, Database } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getCachedSettings } from '../utils/settingsApi'
+import { useIsMobile } from '../hooks/useIsMobile'
 
 interface ExportDialogProps {
   session: SessionInfo
@@ -11,6 +12,7 @@ interface ExportDialogProps {
 
 export default function ExportDialog({ session, onExport, onClose }: ExportDialogProps) {
   const { t } = useTranslation('export')
+  const isMobile = useIsMobile()
   const defaultFormat = getCachedSettings().export?.defaultFormat || 'html'
 
   const handleExport = (format: 'html' | 'md' | 'json') => {
@@ -23,7 +25,7 @@ export default function ExportDialog({ session, onExport, onClose }: ExportDialo
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-background border border-border rounded-lg p-6 w-96 shadow-2xl">
+      <div className={`bg-background border border-border rounded-lg p-6 shadow-2xl ${isMobile ? 'w-[95vw]' : 'w-96'}`}>
         <h3 className="text-lg font-semibold mb-2">
           {t('title')}
         </h3>

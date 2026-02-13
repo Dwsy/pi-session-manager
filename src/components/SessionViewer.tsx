@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { invoke } from '../transport'
 import { useTranslation } from 'react-i18next'
-import { ArrowUp, ArrowDown, Loader2, Bot } from 'lucide-react'
+import { ArrowUp, ArrowDown, Loader2, Bot, Search } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo, SessionEntry } from '../types'
 import { parseSessionEntries, computeStats, isTauriReady } from '../utils/session'
@@ -18,7 +18,25 @@ import SystemPromptDialog from './SystemPromptDialog'
 import type { TerminalType } from './settings/types'
 import { getPlatformDefaults } from './settings/types'
 import { SessionViewProvider, useSessionView } from '../contexts/SessionViewContext'
+import { useIsMobile } from '../hooks/useIsMobile'
 import '../styles/session.css'
+
+// Session content cache — avoids re-reading file when switching back
+const SESSION_CONTENT_CACHE = new Map<string, {
+  modified: string
+  entries: SessionEntry[]
+  lineCount: number
+}>()
+const MAX_CACHE_SIZE = 5
+
+function cacheSessionContent(path: string, modified: string, entries: SessionEntry[], lineCount: number) {
+  if (SESSION_CONTENT_CACHE.size >= MAX_CACHE_SIZE) {
+    // Evict oldest
+    const firstKey = SESSION_CONTENT_CACHE.keys().next().value
+    if (firstKey) SESSION_CONTENT_CACHE.delete(firstKey)
+  }
+  SESSION_CONTENT_CACHE.set(path, { modified, entries, lineCount })
+}
 
 interface SessionViewerProps {
   session: SessionInfo
@@ -37,9 +55,10 @@ const SIDEBAR_DEFAULT_WIDTH = 400
 const SIDEBAR_WIDTH_KEY = 'pi-session-manager-sidebar-width'
 const MESSAGE_ITEM_GAP = 16
 
-function SessionViewerContent({ session, onExport, onRename, onWebResume, terminal = getPlatformDefaults().defaultTerminal, piPath, customCommand }: SessionViewerProps) {
+function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume, terminal = getPlatformDefaults().defaultTerminal, piPath, customCommand }: SessionViewerProps) {
   const { t } = useTranslation()
   const { toggleThinking, toggleToolsExpanded } = useSessionView()
+  const isMobile = useIsMobile()
   const [entries, setEntries] = useState<SessionEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [showLoading, setShowLoading] = useState(false)
@@ -78,7 +97,6 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
   const prevEntriesLengthRef = useRef(0)
 
   useEffect(() => {
-    console.log('[SessionViewer] useEffect triggered, session.path:', session.path)
     let cancelled = false
 
     // 清除之前的 loading timer
@@ -104,6 +122,18 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
         setError(null)
         measuredHeightsRef.current.clear()
 
+        // Check cache first — skip file read if session hasn't changed
+        const cached = SESSION_CONTENT_CACHE.get(session.path)
+        if (cached && cached.modified === session.modified) {
+          console.log('[SessionViewer] Using cached content, entries:', cached.entries.length)
+          setEntries(cached.entries)
+          setLineCount(cached.lineCount)
+          const lastMessage = cached.entries.filter(e => e.type === 'message').pop()
+          if (lastMessage) setActiveEntryId(lastMessage.id)
+          pendingScrollToBottomRef.current = true
+          return
+        }
+
         loadingTimerRef.current = setTimeout(() => {
           if (!cancelled) {
             console.log('[SessionViewer] Setting showLoading to true after 300ms')
@@ -111,21 +141,17 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
           }
         }, 300)
 
-        console.log('[SessionViewer] Invoking read_session_file...')
         const jsonlContent = await invoke<string>('read_session_file', { path: session.path })
 
-        if (cancelled) {
-          console.log('[SessionViewer] Load cancelled, ignoring result')
-          return
-        }
-
-        console.log('[SessionViewer] read_session_file returned, content length:', jsonlContent?.length)
-
         const lines = jsonlContent.split('\n').filter(line => line.trim()).length
-        setLineCount(lines)
-
         const parsedEntries = parseSessionEntries(jsonlContent)
-        console.log('[SessionViewer] Parsed entries count:', parsedEntries.length)
+
+        // Always cache, even if cancelled — so StrictMode's second mount hits cache
+        cacheSessionContent(session.path, session.modified, parsedEntries, lines)
+
+        if (cancelled) return
+
+        setLineCount(lines)
         setEntries(parsedEntries)
 
         const lastMessage = parsedEntries.filter(e => e.type === 'message').pop()
@@ -156,14 +182,13 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
     doLoad()
 
     return () => {
-      console.log('[SessionViewer] useEffect cleanup, cancelling load')
       cancelled = true
       if (loadingTimerRef.current) {
         clearTimeout(loadingTimerRef.current)
         loadingTimerRef.current = null
       }
     }
-  }, [session.path, t])
+  }, [session.path, session.modified, t])
 
   useEffect(() => {
     if (!session.path || loading) return
@@ -459,7 +484,12 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
 
         if (newEntries.length > 0) {
           // 追加到现有列表
-          setEntries(prev => [...prev, ...newEntries])
+          setEntries(prev => {
+            const merged = [...prev, ...newEntries]
+            // Update cache with merged entries
+            cacheSessionContent(session.path, session.modified, merged, newLineCount)
+            return merged
+          })
 
           // 更新行数
           setLineCount(newLineCount)
@@ -571,8 +601,19 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
           <aside 
             ref={sidebarRef}
             className="session-sidebar absolute left-0 top-0 bottom-0 z-20 shadow-xl" 
-            style={{ width: `${sidebarWidth}px` }}
+            style={{ width: isMobile ? '100vw' : `${sidebarWidth}px` }}
           >
+            {isMobile && (
+              <button
+                onClick={() => setShowSidebar(false)}
+                className="absolute top-2 right-2 z-30 p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
+                title={t('session.hideSidebar')}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
             <SessionTree
               ref={treeRef}
               entries={entries}
@@ -581,82 +622,137 @@ function SessionViewerContent({ session, onExport, onRename, onWebResume, termin
             />
           </aside>
           
-          {/* 拖拽手柄 - 跟随侧边栏 */}
-          <div
-            ref={resizeHandleRef}
-            className={`sidebar-resize-handle absolute z-30 ${isResizing ? 'resizing' : ''}`}
-            style={{ left: `${sidebarWidth}px` }}
-            onMouseDown={handleMouseDown}
-          >
-            <div className="sidebar-resize-handle-inner" />
-          </div>
+          {/* 拖拽手柄 - 跟随侧边栏, 移动端禁用 */}
+          {!isMobile && (
+            <div
+              ref={resizeHandleRef}
+              className={`sidebar-resize-handle absolute z-30 ${isResizing ? 'resizing' : ''}`}
+              style={{ left: `${sidebarWidth}px` }}
+              onMouseDown={handleMouseDown}
+            >
+              <div className="sidebar-resize-handle-inner" />
+            </div>
+          )}
         </>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 transition-all duration-200" style={{ paddingLeft: showSidebar ? `${sidebarWidth}px` : 0 }}>
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-          <div className="flex items-baseline gap-2 min-w-0">
-            <button
-              onClick={() => setShowSidebar(!showSidebar)}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors flex-shrink-0 self-center"
-              title={showSidebar ? t('session.hideSidebar') : t('session.showSidebar')}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 transition-all duration-200" style={{ paddingLeft: showSidebar && !isMobile ? `${sidebarWidth}px` : 0 }}>
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {isMobile && onBack && (
+              <button
+                onClick={onBack}
+                className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors flex-shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+            {!isMobile && (
+              <button
+                onClick={() => setShowSidebar(!showSidebar)}
+                className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors flex-shrink-0"
+                title={showSidebar ? t('session.hideSidebar') : t('session.showSidebar')}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            )}
             <span className="text-sm font-medium truncate">{session.name || t('session.title')}</span>
-            <span className="text-xs text-muted-foreground flex-shrink-0">
+            <span className="text-[11px] text-muted-foreground flex-shrink-0">
               {messageEntries.length} {t('session.messages')}
             </span>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {isMobile && (
+              <button
+                onClick={() => {
+                  setShowSidebar(!showSidebar)
+                  if (!showSidebar) {
+                    setTimeout(() => treeRef.current?.focusSearch(), 100)
+                  }
+                }}
+                className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+                title={t('session.showSidebar')}
+              >
+                <Search className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               onClick={() => setShowSystemPromptDialog(true)}
-              className="px-2 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors cursor-pointer"
+              className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
               title={t('session.systemPromptAndTools', '系统提示词和工具')}
             >
               <Bot className="h-3.5 w-3.5" />
             </button>
-            <button
-              onClick={scrollToTop}
-              className="px-2 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors cursor-pointer"
-              title={t('session.scrollToTop', '滚动到顶部')}
-            >
-              <ArrowUp className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => scrollToBottom()}
-              className="px-2 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors cursor-pointer"
-              title={t('session.scrollToBottom', '滚动到底部')}
-            >
-              <ArrowDown className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={onRename}
-              className="px-3 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors cursor-pointer"
-            >
-              {t('common.rename')}
-            </button>
-            <button
-              onClick={onExport}
-              className="px-3 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors cursor-pointer"
-            >
-              {t('common.export')}
-            </button>
-            <OpenInTerminalButton
-              session={session}
-              terminal={terminal}
-              piPath={piPath}
-              customCommand={customCommand}
-              size="sm"
-              variant="ghost"
-              label={t('session.resume', '恢复')}
-              showLabel={true}
-              className="px-3 py-1"
-              onWebResume={onWebResume}
-              onError={(error) => console.error('[SessionViewer] Failed to open in terminal:', error)}
-            />
+            {isMobile && (
+              <>
+                <button
+                  onClick={() => scrollToBottom()}
+                  className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+                  title={t('session.scrollToBottom', '滚动到底部')}
+                >
+                  <ArrowDown className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={onRename}
+                  className="px-2 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+                >
+                  {t('common.rename')}
+                </button>
+                <button
+                  onClick={onExport}
+                  className="px-2 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+                >
+                  {t('common.export')}
+                </button>
+              </>
+            )}
+            {!isMobile && (
+              <>
+                <button
+                  onClick={scrollToTop}
+                  className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+                  title={t('session.scrollToTop', '滚动到顶部')}
+                >
+                  <ArrowUp className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => scrollToBottom()}
+                  className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+                  title={t('session.scrollToBottom', '滚动到底部')}
+                >
+                  <ArrowDown className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={onRename}
+                  className="px-2.5 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+                >
+                  {t('common.rename')}
+                </button>
+                <button
+                  onClick={onExport}
+                  className="px-2.5 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+                >
+                  {t('common.export')}
+                </button>
+                <OpenInTerminalButton
+                  session={session}
+                  terminal={terminal}
+                  piPath={piPath}
+                  customCommand={customCommand}
+                  size="sm"
+                  variant="ghost"
+                  label={t('session.resume', '恢复')}
+                  showLabel={true}
+                  className="px-3 py-1"
+                  onWebResume={onWebResume}
+                  onError={(error) => console.error('[SessionViewer] Failed to open in terminal:', error)}
+                />
+              </>
+            )}
           </div>
         </div>
 

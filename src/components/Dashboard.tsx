@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { invoke } from '../transport'
 import { useTranslation } from 'react-i18next'
 import { BarChart3, Clock, RefreshCw, Activity, Zap, DollarSign } from 'lucide-react'
+
 import type { SessionInfo, SessionStats, SessionStatsInput } from '../types'
 import { getDemoStats } from '../hooks/useDemoMode'
 import StatCard from './dashboard/StatCard'
@@ -143,11 +144,11 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4">
+    <div className="h-full overflow-y-auto p-3 md:p-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gradient mb-0.5">
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg md:text-2xl font-bold text-gradient mb-0.5 truncate">
             {projectName ? (
               <>
                 {t('dashboard.title')} - <span className="text-info">{getProjectName(projectName)}</span>
@@ -156,21 +157,21 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
               t('dashboard.title')
             )}
           </h1>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground truncate">
             {projectName ? t('dashboard.projectSubtitle') : t('dashboard.subtitle')}
           </p>
         </div>
         <button
           onClick={loadStats}
-          className="flex items-center gap-2 px-3 py-2 glass-card rounded-lg text-xs transition-all duration-300 hover:scale-105 active:scale-95 group"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 md:gap-2 md:px-3 md:py-2 glass-card rounded-lg text-xs transition-all duration-300 hover:scale-105 active:scale-95 group flex-shrink-0"
         >
           <RefreshCw className="h-3.5 w-3.5 transition-transform duration-500 group-hover:rotate-180" />
-          {t('common.refresh')}
+          <span className="hidden md:inline">{t('common.refresh')}</span>
         </button>
       </div>
 
       {/* Stats Grid - Compact - 5 cards */}
-      <div className="grid grid-cols-5 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-3 mb-4">
         <StatCard
           icon={BarChart3}
           label={t('components.displayStats.cards.sessions')}
@@ -200,28 +201,30 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
           }
           color="#c792ea"
         />
-        <StatCard
-          icon={DollarSign}
-          label={t('components.displayStats.cards.totalCost')}
-          value={displayStats.token_details.total_cost < 0.01 
-            ? `$${displayStats.token_details.total_cost.toFixed(4)}` 
-            : displayStats.token_details.total_cost < 1
-              ? `$${displayStats.token_details.total_cost.toFixed(3)}`
-              : `$${displayStats.token_details.total_cost.toFixed(2)}`
-          }
-          color="#ff6b6b"
-        />
+        <div className="col-span-2 md:col-span-1">
+          <StatCard
+            icon={DollarSign}
+            label={t('components.displayStats.cards.totalCost')}
+            value={displayStats.token_details.total_cost < 0.01 
+              ? `$${displayStats.token_details.total_cost.toFixed(4)}` 
+              : displayStats.token_details.total_cost < 1
+                ? `$${displayStats.token_details.total_cost.toFixed(3)}`
+                : `$${displayStats.token_details.total_cost.toFixed(2)}`
+            }
+            color="#ff6b6b"
+          />
+        </div>
       </div>
 
       {/* Main Grid - Dense Layout */}
-      <div className="grid grid-cols-12 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
         {/* Left Column - 8 cols */}
-        <div className="col-span-8 space-y-3">
+        <div className="md:col-span-8 space-y-3">
           {/* Token Trend Chart - Full Width */}
           <TokenTrendChart stats={displayStats} days={30} />
 
           {/* Message Distribution + Heatmap */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <MessageDistribution stats={displayStats} />
             <ActivityHeatmap data={displayStats.heatmap_data} size="mini" showLabels={false} />
           </div>
@@ -231,7 +234,7 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
         </div>
 
         {/* Right Column - 4 cols */}
-        <div className="col-span-4 space-y-3">
+        <div className="md:col-span-4 space-y-3">
           {/* Top Models */}
           <TopModelsChart stats={displayStats} limit={5} />
 

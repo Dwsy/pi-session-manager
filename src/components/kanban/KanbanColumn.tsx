@@ -23,6 +23,7 @@ interface KanbanColumnProps {
   terminal?: string
   piPath?: string
   customCommand?: string
+  isMobile?: boolean
 }
 
 // Threshold for enabling virtualization
@@ -41,6 +42,7 @@ export default function KanbanColumn({
   onToggleFavorite,
   onToggleTag,
   onDeleteSession,
+  isMobile,
 }: KanbanColumnProps) {
   const { t } = useTranslation()
   const { setNodeRef, isOver } = useDroppable({ id })
@@ -137,8 +139,9 @@ export default function KanbanColumn({
   }
 
   return (
-    <div className="flex flex-col w-64 min-w-[256px] flex-shrink-0 h-full overflow-hidden">
-      {/* Column Header */}
+    <div className={`flex flex-col flex-shrink-0 h-full overflow-hidden ${isMobile ? 'w-full' : 'w-64 min-w-[256px]'}`}>
+      {/* Column Header - hidden on mobile (tabs handle this) */}
+      {!isMobile && (
       <div className="flex items-center gap-2 px-3 py-2.5 mb-1">
         {tag ? (
           <span
@@ -155,6 +158,7 @@ export default function KanbanColumn({
           {sessions.length}
         </span>
       </div>
+      )}
 
       {/* Column Content */}
       <div

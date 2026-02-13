@@ -2,9 +2,9 @@
  * 高级设置组件
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Plus, X } from 'lucide-react'
+import { AlertTriangle, Plus, X, Copy, Trash2, Key, Shield } from 'lucide-react'
 import { invoke } from '../../../transport'
 import type { AdvancedSettingsProps } from '../types'
 
@@ -19,16 +19,39 @@ interface ServerSettings {
   http_enabled: boolean
   http_port: number
   auth_enabled: boolean
+  bind_addr: string
+}
+
+interface TokenInfo {
+  name: string
+  key_preview: string
+  created_at: string
+  last_used: string | null
 }
 
 export default function AdvancedSettings({ settings, onUpdate }: AdvancedSettingsProps) {
   const { t } = useTranslation()
   const [serverSettings, setServerSettings] = useState<ServerSettings | null>(null)
   const [serverDirty, setServerDirty] = useState(false)
+  const [apiKeys, setApiKeys] = useState<TokenInfo[]>([])
+  const [newKeyName, setNewKeyName] = useState('')
+  const [newKeyValue, setNewKeyValue] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     invoke<ServerSettings>('load_server_settings').then(setServerSettings).catch(console.error)
   }, [])
+
+  const loadApiKeys = useCallback(async () => {
+    try {
+      const keys = await invoke<TokenInfo[]>('list_api_keys')
+      setApiKeys(keys)
+    } catch (e) {
+      console.error('Failed to load API keys:', e)
+    }
+  }, [])
+
+  useEffect(() => { loadApiKeys() }, [loadApiKeys])
 
   const updateServer = <K extends keyof ServerSettings>(key: K, value: ServerSettings[K]) => {
     setServerSettings((prev) => prev ? { ...prev, [key]: value } : prev)
@@ -43,6 +66,35 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
     } catch (error) {
       console.error('Failed to save server settings:', error)
     }
+  }
+
+  const handleCreateKey = async () => {
+    const name = newKeyName.trim() || 'unnamed'
+    setCreating(true)
+    try {
+      const key = await invoke<string>('create_api_key', { name })
+      setNewKeyValue(key)
+      setNewKeyName('')
+      await loadApiKeys()
+    } catch (e) {
+      console.error('Failed to create API key:', e)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleRevokeKey = async (keyPreview: string) => {
+    if (!confirm(t('settings.advanced.revokeKeyConfirm', '确定要吊销此密钥？此操作不可撤销。'))) return
+    try {
+      await invoke('revoke_api_key', { keyPreview })
+      await loadApiKeys()
+    } catch (e) {
+      console.error('Failed to revoke key:', e)
+    }
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).catch(console.error)
   }
 
   const handleClearCache = async () => {
@@ -61,6 +113,8 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
     }
   }
 
+  const isRemoteBind = serverSettings?.bind_addr === '0.0.0.0'
+
   return (
     <div className="space-y-6">
       {/* Server Settings */}
@@ -70,10 +124,36 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
             {t('settings.advanced.serverSection', '服务设置')}
           </h4>
 
+          {/* Bind Address */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-foreground">
+              {t('settings.advanced.bindAddr', '绑定地址')}
+            </label>
+            <p className="text-xs text-muted-foreground">
+              {t('settings.advanced.bindAddrHelp', '127.0.0.1 仅本地访问，0.0.0.0 允许远程连接')}
+            </p>
+            <div className="flex items-center gap-2">
+              <select
+                value={serverSettings.bind_addr}
+                onChange={(e) => updateServer('bind_addr', e.target.value)}
+                className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
+              >
+                <option value="127.0.0.1">127.0.0.1 (仅本地)</option>
+                <option value="0.0.0.0">0.0.0.0 (所有接口)</option>
+              </select>
+              {isRemoteBind && (
+                <span className="flex items-center gap-1 text-xs text-amber-400">
+                  <Shield className="h-3 w-3" />
+                  {t('settings.advanced.remoteWarning', '远程访问已开启，请确保认证已启用')}
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <div>
               <label className="text-sm font-medium text-foreground">WebSocket</label>
-              <p className="text-xs text-muted-foreground">ws://0.0.0.0:{serverSettings.ws_port}</p>
+              <p className="text-xs text-muted-foreground">ws://{serverSettings.bind_addr}:{serverSettings.ws_port}</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -103,7 +183,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
           <div className="flex items-center justify-between">
             <div>
               <label className="text-sm font-medium text-foreground">HTTP API</label>
-              <p className="text-xs text-muted-foreground">http://0.0.0.0:{serverSettings.http_port}/api</p>
+              <p className="text-xs text-muted-foreground">http://{serverSettings.bind_addr}:{serverSettings.http_port}/api</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -165,6 +245,89 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
         </div>
       )}
 
+      {/* API Keys */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+          <Key className="h-3.5 w-3.5" />
+          {t('settings.advanced.apiKeys', 'API 密钥')}
+        </h4>
+        <p className="text-xs text-muted-foreground">
+          {t('settings.advanced.apiKeysHelp', '用于远程连接认证，通过 Authorization: Bearer <key> 使用')}
+        </p>
+
+        {/* Key list */}
+        {apiKeys.length > 0 && (
+          <div className="space-y-2">
+            {apiKeys.map((k) => (
+              <div key={k.key_preview} className="flex items-center justify-between px-3 py-2 bg-surface border border-border rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-foreground">{k.name}</span>
+                    <code className="text-xs text-muted-foreground font-mono">{k.key_preview}</code>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {t('settings.advanced.keyCreated', '创建')}: {new Date(k.created_at).toLocaleDateString()}
+                    {k.last_used && (
+                      <> · {t('settings.advanced.keyLastUsed', '最后使用')}: {new Date(k.last_used).toLocaleDateString()}</>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleRevokeKey(k.key_preview)}
+                  className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                  title={t('settings.advanced.revokeKey', '吊销')}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* New key created - show once */}
+        {newKeyValue && (
+          <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg space-y-2">
+            <p className="text-xs text-green-400">
+              {t('settings.advanced.newKeyCreated', '密钥已创建，请立即复制保存，此后不再显示完整密钥。')}
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs font-mono text-foreground bg-surface px-2 py-1 rounded break-all select-all">
+                {newKeyValue}
+              </code>
+              <button
+                onClick={() => { copyToClipboard(newKeyValue); setNewKeyValue(null) }}
+                className="p-1.5 text-info hover:bg-info/10 rounded-lg transition-colors"
+                title={t('settings.advanced.copyKey', '复制')}
+              >
+                <Copy className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Create new key */}
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={newKeyName}
+            onChange={(e) => setNewKeyName(e.target.value)}
+            placeholder={t('settings.advanced.keyNamePlaceholder', '密钥名称（可选）')}
+            className="flex-1 px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
+            onKeyDown={(e) => e.key === 'Enter' && handleCreateKey()}
+          />
+          <button
+            onClick={handleCreateKey}
+            disabled={creating}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-info hover:bg-info/80 text-white rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t('settings.advanced.createKey', '创建密钥')}
+          </button>
+        </div>
+
+        <div className="border-b border-border" />
+      </div>
+
       <div className="space-y-3">
         <label className="text-sm font-medium text-foreground">
           {t('settings.advanced.sessionDir', '会话目录')}
@@ -174,7 +337,6 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
         </p>
 
         <div className="space-y-2">
-          {/* Default path (always present, not removable) */}
           <div className="flex gap-2 items-center">
             <input
               type="text"
@@ -187,7 +349,6 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
             </span>
           </div>
 
-          {/* Extra configured paths */}
           {(settings.advanced.sessionDirs || [])
             .filter((d: string) => d !== '~/.pi/agent/sessions')
             .map((dir: string, index: number) => (

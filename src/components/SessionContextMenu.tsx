@@ -28,16 +28,18 @@ export default function SessionContextMenu({
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent | TouchEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose()
     }
     const keyHandler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
     document.addEventListener('keydown', keyHandler)
     return () => {
       document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
       document.removeEventListener('keydown', keyHandler)
     }
   }, [onClose])

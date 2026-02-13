@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo } from '../types'
+import { useIsMobile } from '../hooks/useIsMobile'
 
 interface RenameDialogProps {
   session: SessionInfo
@@ -10,6 +11,7 @@ interface RenameDialogProps {
 
 export default function RenameDialog({ session, onRename, onClose }: RenameDialogProps) {
   const { t } = useTranslation()
+  const isMobile = useIsMobile()
   const [newName, setNewName] = useState(session.name || '')
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -21,7 +23,7 @@ export default function RenameDialog({ session, onRename, onClose }: RenameDialo
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background border border-border rounded-lg p-6 w-96">
+      <div className={`bg-background border border-border rounded-lg p-6 ${isMobile ? 'w-[95vw]' : 'w-96'}`}>
         <h3 className="text-lg font-semibold mb-4">{t('rename.title')}</h3>
 
         <form onSubmit={handleSubmit}>

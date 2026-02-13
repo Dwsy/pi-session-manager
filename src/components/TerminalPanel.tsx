@@ -64,6 +64,8 @@ interface TerminalPanelProps {
   cwd: string
   defaultShell?: string
   fontSize?: number
+  pendingCommand?: string | null
+  onCommandConsumed?: () => void
 }
 
 function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme }: {
@@ -166,7 +168,7 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
 const MIN_HEIGHT = 120
 const DEFAULT_HEIGHT = 280
 
-export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, defaultShell: propShell, fontSize = 13 }: TerminalPanelProps) {
+export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, defaultShell: propShell, fontSize = 13, pendingCommand, onCommandConsumed }: TerminalPanelProps) {
   const resolvedTheme = useResolvedTheme()
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
@@ -210,6 +212,17 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
   useEffect(() => {
     if (isOpen && tabs.length === 0) addTab()
   }, [isOpen, tabs.length, addTab])
+
+  // Write pending command to active terminal after it's ready
+  useEffect(() => {
+    if (!pendingCommand || !activeTabId) return
+    // Delay to ensure terminal_create has completed and shell is ready
+    const timer = setTimeout(() => {
+      invoke('terminal_write', { id: activeTabId, data: pendingCommand + '\n' }).catch(() => {})
+      onCommandConsumed?.()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [pendingCommand, activeTabId, onCommandConsumed])
 
   const closeTab = useCallback((tabId: string) => {
     setTabs(prev => {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import type { RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -15,6 +15,7 @@ import SessionContextMenu from './SessionContextMenu'
 import type { TerminalType } from './settings/types'
 import { getPlatformDefaults } from './settings/types'
 import { invoke, isTauri } from '../transport'
+import { useIsMobile } from '../hooks/useIsMobile'
 
 interface SessionListProps {
   sessions: SessionInfo[]
@@ -57,9 +58,37 @@ export default function SessionList({
   onCreateTag,
 }: SessionListProps) {
   const { t } = useTranslation()
+  const isMobile = useIsMobile()
   const [tagPickerSessionId, setTagPickerSessionId] = useState<string | null>(null)
   const [tagPickerAnchor, setTagPickerAnchor] = useState<DOMRect | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; sessionId: string } | null>(null)
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const longPressTriggeredRef = useRef(false)
+
+  const handleTouchStart = useCallback((e: React.TouchEvent, sessionId: string) => {
+    longPressTriggeredRef.current = false
+    const touch = e.touches[0]
+    const x = touch.clientX
+    const y = touch.clientY
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true
+      setContextMenu({ x, y, sessionId })
+    }, 500)
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }, [])
+
+  const handleTouchMove = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }, [])
   const rowVirtualizer = useVirtualizer({
     count: sessions.length,
     getScrollElement: () => scrollParentRef?.current ?? null,
@@ -102,11 +131,17 @@ export default function SessionList({
               key={session.id}
               data-index={virtualRow.index}
               ref={rowVirtualizer.measureElement}
-              onClick={() => onSelectSession(session)}
+              onClick={() => {
+                if (longPressTriggeredRef.current) return
+                onSelectSession(session)
+              }}
               onContextMenu={(e) => {
                 e.preventDefault()
                 setContextMenu({ x: e.clientX, y: e.clientY, sessionId: session.id })
               }}
+              onTouchStart={(e) => handleTouchStart(e, session.id)}
+              onTouchEnd={handleTouchEnd}
+              onTouchMove={handleTouchMove}
               className={`relative px-3 py-2 cursor-pointer transition-all group border-b border-border/10 border-l-2 ${
                 isSelected 
                   ? 'bg-gradient-to-r from-blue-500/5 to-transparent border-l-blue-500' 
@@ -161,7 +196,7 @@ export default function SessionList({
                 )}
                 {!showDirectory && <span className="flex-1" />}
 
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <div className={`flex items-center gap-0.5 flex-shrink-0 ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                   {onToggleFavorite && (
                     <button
                       onClick={(e) => {

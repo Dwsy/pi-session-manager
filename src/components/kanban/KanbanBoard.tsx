@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import {
   DndContext,
   DragOverlay,
@@ -57,7 +58,9 @@ export default function KanbanBoard({
   projectFilter,
 }: KanbanBoardProps) {
   const { t } = useTranslation()
+  const isMobile = useIsMobile()
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [mobileColIndex, setMobileColIndex] = useState(0)
 
   // Filter sessions by project
   const filteredSessions = useMemo(() => {
@@ -67,7 +70,7 @@ export default function KanbanBoard({
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
+      activationConstraint: { distance: isMobile ? 10 : 5 },
     })
   )
 
@@ -220,26 +223,70 @@ export default function KanbanBoard({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-4">
-          <div className="flex gap-3 h-full min-h-0">
-            {columns.map(col => (
-              <KanbanColumn
-                key={col.id}
-                id={col.id}
-                tag={col.tag}
-                sessions={col.sessions}
-                selectedSession={selectedSession}
-                onSelectSession={onSelectSession}
-                getTagsForSession={getTagsForSession}
-                allTags={tags}
-                favorites={favorites || []}
-                onToggleFavorite={onToggleFavorite || (() => {})}
-                onToggleTag={onToggleTag}
-                onDeleteSession={onDeleteSession}
-              />
-            ))}
+        {isMobile ? (
+          /* Mobile: single column with swipe nav */
+          <div className="flex-1 min-h-0 flex flex-col">
+            {/* Column tabs */}
+            <div className="flex items-center gap-1 px-3 py-1.5 border-b border-border/30 overflow-x-auto flex-shrink-0">
+              {columns.map((col, i) => (
+                <button
+                  key={col.id}
+                  onClick={() => setMobileColIndex(i)}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] whitespace-nowrap transition-colors ${
+                    mobileColIndex === i
+                      ? 'bg-secondary text-foreground font-medium'
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  {col.tag?.name || t('tags.kanban.untagged')}
+                  <span className="text-[9px] opacity-60">{col.sessions.length}</span>
+                </button>
+              ))}
+            </div>
+            {/* Active column */}
+            <div className="flex-1 min-h-0 p-3">
+              {columns[mobileColIndex] && (
+                <KanbanColumn
+                  id={columns[mobileColIndex].id}
+                  tag={columns[mobileColIndex].tag}
+                  sessions={columns[mobileColIndex].sessions}
+                  selectedSession={selectedSession}
+                  onSelectSession={onSelectSession}
+                  getTagsForSession={getTagsForSession}
+                  allTags={tags}
+                  favorites={favorites || []}
+                  onToggleFavorite={onToggleFavorite || (() => {})}
+                  onToggleTag={onToggleTag}
+                  onDeleteSession={onDeleteSession}
+                  isMobile
+                />
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          /* Desktop: horizontal scroll */
+          <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-4">
+            <div className="kanban-board flex gap-3 h-full min-h-0">
+              {columns.map(col => (
+                <div key={col.id} className="kanban-column">
+                  <KanbanColumn
+                    id={col.id}
+                    tag={col.tag}
+                    sessions={col.sessions}
+                    selectedSession={selectedSession}
+                    onSelectSession={onSelectSession}
+                    getTagsForSession={getTagsForSession}
+                    allTags={tags}
+                    favorites={favorites || []}
+                    onToggleFavorite={onToggleFavorite || (() => {})}
+                    onToggleTag={onToggleTag}
+                    onDeleteSession={onDeleteSession}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Drag Overlay */}
         <DragOverlay dropAnimation={null}>

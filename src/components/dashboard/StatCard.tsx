@@ -58,7 +58,7 @@ export default function StatCard({ icon: Icon, label, value, color, change, tren
           )}
         </div>
         <div className="text-xl font-bold mb-0.5 text-gradient">{value}</div>
-        <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
+        <div className="text-[11px] md:text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
       </div>
 
       {/* Bottom glow line */}
