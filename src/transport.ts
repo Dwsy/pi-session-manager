@@ -1,10 +1,14 @@
 import { listen as tauriListen } from '@tauri-apps/api/event'
 import { invoke as tauriInvoke } from '@tauri-apps/api/core'
 
+export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected'
+export type StatusListener = (status: ConnectionStatus) => void
+
 export interface Transport {
   invoke<T>(command: string, payload?: unknown): Promise<T>
   onEvent<T>(event: string, callback: (payload: T) => void): Promise<() => void>
   isConnected(): boolean
+  onStatusChange?(listener: StatusListener): () => void
 }
 
 export class TauriTransport implements Transport {
@@ -42,15 +46,29 @@ export class WebSocketTransport implements Transport {
   private readonly url: string
   private disposed = false
   private connectWaiters: { resolve: () => void; reject: (e: Error) => void }[] = []
+  private statusListeners = new Set<StatusListener>()
 
   constructor(url = `ws://${typeof location !== 'undefined' ? location.hostname : 'localhost'}:52130`) {
     this.url = url
+    this.emitStatus('connecting')
     this.connect()
+  }
+
+  private emitStatus(status: ConnectionStatus): void {
+    for (const fn of this.statusListeners) fn(status)
+  }
+
+  onStatusChange(listener: StatusListener): () => void {
+    this.statusListeners.add(listener)
+    // Immediately notify current state
+    listener(this.state === WsState.Connected ? 'connected' : this.state === WsState.Connecting ? 'connecting' : 'disconnected')
+    return () => { this.statusListeners.delete(listener) }
   }
 
   private connect(): void {
     if (this.disposed || this.state === WsState.Connecting) return
     this.state = WsState.Connecting
+    this.emitStatus('connecting')
 
     this.cleanupSocket()
 
@@ -65,6 +83,7 @@ export class WebSocketTransport implements Transport {
         this.startPing()
         for (const w of this.connectWaiters) w.resolve()
         this.connectWaiters = []
+        this.emitStatus('connected')
         console.log('[WS] connected')
       }
 
@@ -99,6 +118,7 @@ export class WebSocketTransport implements Transport {
     this.rejectAllPending('WebSocket disconnected')
     for (const w of this.connectWaiters) w.reject(new Error('WebSocket disconnected'))
     this.connectWaiters = []
+    this.emitStatus('disconnected')
     if (!this.disposed) {
       this.scheduleReconnect()
     }
@@ -247,10 +267,22 @@ export class HttpTransport implements Transport {
   private eventListeners = new Map<string, Set<(payload: unknown) => void>>()
   private eventSource: EventSource | null = null
   private sseConnected = false
+  private statusListeners = new Set<StatusListener>()
+  private httpOk = false
 
   constructor(baseUrl = `http://${location.hostname}:52131`) {
     this.baseUrl = baseUrl
     this.connectSSE()
+  }
+
+  private emitStatus(status: ConnectionStatus): void {
+    for (const fn of this.statusListeners) fn(status)
+  }
+
+  onStatusChange(listener: StatusListener): () => void {
+    this.statusListeners.add(listener)
+    listener(this.httpOk || this.sseConnected ? 'connected' : 'connecting')
+    return () => { this.statusListeners.delete(listener) }
   }
 
   private connectSSE(): void {
@@ -261,6 +293,7 @@ export class HttpTransport implements Transport {
 
     es.onopen = () => {
       this.sseConnected = true
+      this.emitStatus('connected')
       console.log('[SSE] connected')
     }
 
@@ -275,21 +308,31 @@ export class HttpTransport implements Transport {
 
     es.onerror = () => {
       this.sseConnected = false
-      // EventSource auto-reconnects, just log
+      if (!this.httpOk) this.emitStatus('disconnected')
       console.warn('[SSE] connection error, will auto-reconnect')
     }
   }
 
   async invoke<T>(command: string, payload?: unknown): Promise<T> {
-    const resp = await fetch(`${this.baseUrl}/api`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command, payload: payload ?? {} }),
-    })
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-    const data = await resp.json() as { success: boolean; data?: T; error?: string }
-    if (!data.success) throw new Error(data.error || 'Command failed')
-    return data.data as T
+    try {
+      const resp = await fetch(`${this.baseUrl}/api`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command, payload: payload ?? {} }),
+      })
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const data = await resp.json() as { success: boolean; data?: T; error?: string }
+      if (!data.success) throw new Error(data.error || 'Command failed')
+      if (!this.httpOk) {
+        this.httpOk = true
+        this.emitStatus('connected')
+      }
+      return data.data as T
+    } catch (e) {
+      this.httpOk = false
+      if (!this.sseConnected) this.emitStatus('disconnected')
+      throw e
+    }
   }
 
   async onEvent<T>(event: string, callback: (payload: T) => void): Promise<() => void> {

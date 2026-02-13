@@ -34,6 +34,11 @@ export const enUS = {
   onboarding,
   terminal,
   tags,
+  connection: {
+    disconnected: 'Cannot connect to server — is the app running?',
+    connecting: 'Reconnecting…',
+    reconnected: 'Reconnected',
+  },
 } as const
 
 export type Translations = typeof enUS

@@ -30,6 +30,7 @@ import { useAppSettings } from './hooks/useAppSettings'
 import { useSessionActions } from './hooks/useSessionActions'
 import { useAppearance } from './hooks/useAppearance'
 import { useIsMobile } from './hooks/useIsMobile'
+import ConnectionBanner from './components/ConnectionBanner'
 import { useTags } from './hooks/useTags'
 import { registerBuiltinPlugins } from './plugins'
 import type { SessionInfo, FavoriteItem } from './types'
@@ -540,6 +541,7 @@ function App() {
     if (selectedSession) {
       return (
         <div className="flex flex-col h-screen bg-background text-foreground">
+          <ConnectionBanner />
           <div className="flex-1 overflow-hidden">
             {renderSessionViewer()}
           </div>
@@ -550,6 +552,7 @@ function App() {
 
     return (
       <div className="flex flex-col h-screen bg-background text-foreground">
+        <ConnectionBanner />
         {/* Main content area */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {mobileTab === 'list' && renderSessionList()}
@@ -597,7 +600,9 @@ function App() {
   // Desktop layout: sidebar + content (unchanged)
   // ═══════════════════════════════════
   return (
-    <div className="flex h-screen bg-background text-foreground">
+    <div className="flex flex-col h-screen bg-background text-foreground">
+      <ConnectionBanner />
+      <div className="flex flex-1 min-h-0">
       <div className="w-80 border-r border-border flex flex-col">
         <div
           className="h-8 border-b border-border flex items-center px-3 select-none"
@@ -833,6 +838,7 @@ function App() {
       </div>
 
       {renderOverlays()}
+      </div>
     </div>
   )
 }
