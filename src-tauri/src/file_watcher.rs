@@ -177,12 +177,13 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                                 .map(|ext| ext == "jsonl")
                                 .unwrap_or(false)
                             {
-                                // Skip subagent artifact files — they are child sessions,
-                                // not top-level sessions, and should not pollute the main list.
-                                let dominated_by_subagent = path.components().any(|c| {
-                                    c.as_os_str() == "subagent-artifacts"
+                                // Skip non-pi-session files: subagent artifacts and
+                                // gateway transcripts use different JSONL formats.
+                                let dominated_by_excluded = path.components().any(|c| {
+                                    let s = c.as_os_str();
+                                    s == "subagent-artifacts" || s == "transcripts"
                                 });
-                                if !dominated_by_subagent {
+                                if !dominated_by_excluded {
                                     pending_paths.insert(path.clone());
                                 }
                             }

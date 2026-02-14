@@ -112,6 +112,12 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
+                // Skip non-pi-session directories (gateway transcripts, subagent artifacts, etc.)
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name == "transcripts" || name == "subagent-artifacts" {
+                        continue;
+                    }
+                }
                 if let Ok(files) = fs::read_dir(&path) {
                     for file in files.flatten() {
                         let file_path = file.path();
