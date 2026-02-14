@@ -280,7 +280,8 @@ impl WsAdapter {
         match crate::compression::gzip_compress_to_base64(json_str.as_bytes()) {
             Ok(compressed_b64) => {
                 let mut compressed_response = serde_json::Map::new();
-                compressed_response.insert("id".to_string(), serde_json::Value::String(response.id));
+                compressed_response
+                    .insert("id".to_string(), serde_json::Value::String(response.id));
                 compressed_response.insert(
                     "command".to_string(),
                     serde_json::Value::String(response.command),
@@ -293,10 +294,7 @@ impl WsAdapter {
                     "data".to_string(),
                     serde_json::Value::String(compressed_b64),
                 );
-                compressed_response.insert(
-                    "compressed".to_string(),
-                    serde_json::Value::Bool(true),
-                );
+                compressed_response.insert("compressed".to_string(), serde_json::Value::Bool(true));
                 if let Some(error) = response.error {
                     compressed_response
                         .insert("error".to_string(), serde_json::Value::String(error));
