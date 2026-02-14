@@ -1,0 +1,17 @@
+export const time = {
+  justNow: 'Ahora mismo',
+  minutesAgo: 'hace {{count}} minutos',
+  minutesAgo_one: 'hace 1 minuto',
+  hoursAgo: 'hace {{count}} horas',
+  hoursAgo_one: 'hace 1 hora',
+  daysAgo: 'hace {{count}} días',
+  daysAgo_one: 'hace 1 día',
+  weeksAgo: 'hace {{count}} semanas',
+  weeksAgo_one: 'hace 1 semana',
+  monthsAgo: 'hace {{count}} meses',
+  monthsAgo_one: 'hace 1 mes',
+  yearsAgo: 'hace {{count}} años',
+  yearsAgo_one: 'hace 1 año',
+  today: 'Hoy',
+  yesterday: 'Ayer',
+} as const
