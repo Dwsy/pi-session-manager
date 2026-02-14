@@ -114,8 +114,10 @@ function readRemoteConfig(): RemoteConfig {
 async function gzipCompress(data: Uint8Array): Promise<Uint8Array> {
   const cs = new CompressionStream('gzip')
   const writer = cs.writable.getWriter()
-  writer.write(data)
-  writer.close()
+  const source = new Uint8Array(data.byteLength)
+  source.set(data)
+  await writer.write(source)
+  await writer.close()
   const chunks: Uint8Array[] = []
   const reader = cs.readable.getReader()
   while (true) {
@@ -136,8 +138,10 @@ async function gzipCompress(data: Uint8Array): Promise<Uint8Array> {
 async function gzipDecompress(data: Uint8Array): Promise<Uint8Array> {
   const ds = new DecompressionStream('gzip')
   const writer = ds.writable.getWriter()
-  writer.write(data)
-  writer.close()
+  const source = new Uint8Array(data.byteLength)
+  source.set(data)
+  await writer.write(source)
+  await writer.close()
   const chunks: Uint8Array[] = []
   const reader = ds.readable.getReader()
   while (true) {
