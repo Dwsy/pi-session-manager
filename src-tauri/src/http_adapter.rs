@@ -80,6 +80,14 @@ fn is_authorized(ip: &std::net::IpAddr, headers: &HeaderMap, uri: &Uri) -> bool 
 
 // ─── HTTP POST /api ──────────────────────────────────────────
 
+fn accepts_gzip(headers: &HeaderMap) -> bool {
+    headers
+        .get("accept-encoding")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.to_lowercase().contains("gzip"))
+        .unwrap_or(false)
+}
+
 async fn handle_command(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(app_state): State<SharedAppState>,
@@ -96,8 +104,11 @@ async fn handle_command(
                 data: None,
                 error: Some("Unauthorized".to_string()),
             }),
-        );
+        )
+            .into_response();
     }
+
+    let gzip_supported = accepts_gzip(&headers);
 
     let result = dispatch(&app_state, &req.command, &req.payload).await;
     let resp = match result {
@@ -112,7 +123,23 @@ async fn handle_command(
             error: Some(e),
         },
     };
-    (StatusCode::OK, cors_headers(), Json(resp))
+
+    if gzip_supported {
+        if let Ok(json_bytes) = serde_json::to_vec(&resp) {
+            match crate::compression::gzip_compress(&json_bytes) {
+                Ok(compressed) => {
+                    let mut headers = cors_headers().to_vec();
+                    headers.push(("content-encoding", "gzip"));
+                    return (StatusCode::OK, headers, compressed).into_response();
+                }
+                Err(e) => {
+                    log::warn!("Gzip compression failed: {e}");
+                }
+            }
+        }
+    }
+
+    (StatusCode::OK, cors_headers(), Json(resp)).into_response()
 }
 
 async fn handle_preflight() -> impl IntoResponse {

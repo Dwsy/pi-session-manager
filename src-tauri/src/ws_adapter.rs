@@ -15,6 +15,12 @@ struct WsRequest {
     command: String,
     #[serde(default)]
     payload: Value,
+    /// 请求数据是否使用 Gzip 压缩（Base64 编码）
+    #[serde(default)]
+    compressed: bool,
+    /// 期望响应是否使用 Gzip 压缩
+    #[serde(default)]
+    accept_gzip: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -26,6 +32,9 @@ struct WsResponse {
     data: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+    /// 响应数据是否使用 Gzip 压缩（Base64 编码）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    compressed: Option<bool>,
 }
 
 use crate::dispatch::{extract_string, extract_usize};
@@ -128,10 +137,29 @@ impl WsAdapter {
                             }
 
                             match serde_json::from_str::<WsRequest>(&text) {
-                                Ok(request) => {
-                                    let response = self.handle_request(request).await;
-                                    let response_text = serde_json::to_string(&response)?;
-                                    if ws_sender.send(Message::Text(response_text)).await.is_err() {
+                                Ok(mut request) => {
+                                    // 处理压缩的请求 payload
+                                    if request.compressed {
+                                        if let Some(payload_str) = request.payload.as_str() {
+                                            match crate::compression::gzip_decompress_from_base64(payload_str) {
+                                                Ok(decompressed) => {
+                                                    if let Ok(decompressed_json) = serde_json::from_slice(&decompressed) {
+                                                        request.payload = decompressed_json;
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    log::warn!("Failed to decompress request: {e}");
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    let result = dispatch(&self.app_state, &request.command, &request.payload).await;
+                                    let accept_gzip = request.accept_gzip;
+                                    let response = self.build_response(&request, result);
+
+                                    let msg = self.compress_response_if_needed(response, accept_gzip)?;
+                                    if ws_sender.send(msg).await.is_err() {
                                         break;
                                     }
                                 }
@@ -142,6 +170,7 @@ impl WsAdapter {
                                         success: false,
                                         data: None,
                                         error: Some(format!("Invalid request format: {e}")),
+                                        compressed: None,
                                     };
                                     let error_text = serde_json::to_string(&error_response)?;
                                     if ws_sender.send(Message::Text(error_text)).await.is_err() {
@@ -204,6 +233,7 @@ impl WsAdapter {
                 success: true,
                 data: Some(data),
                 error: None,
+                compressed: None,
             },
             Err(error) => WsResponse {
                 id: request.id,
@@ -211,7 +241,72 @@ impl WsAdapter {
                 success: false,
                 data: None,
                 error: Some(error),
+                compressed: None,
             },
+        }
+    }
+
+    fn build_response(&self, request: &WsRequest, result: Result<Value, String>) -> WsResponse {
+        match result {
+            Ok(data) => WsResponse {
+                id: request.id.clone(),
+                command: request.command.clone(),
+                success: true,
+                data: Some(data),
+                error: None,
+                compressed: None,
+            },
+            Err(error) => WsResponse {
+                id: request.id.clone(),
+                command: request.command.clone(),
+                success: false,
+                data: None,
+                error: Some(error),
+                compressed: None,
+            },
+        }
+    }
+
+    fn compress_response_if_needed(
+        &self,
+        response: WsResponse,
+        accept_gzip: bool,
+    ) -> Result<Message, Box<dyn std::error::Error + Send + Sync>> {
+        if !accept_gzip {
+            return Ok(Message::Text(serde_json::to_string(&response)?));
+        }
+
+        let json_str = serde_json::to_string(&response)?;
+        match crate::compression::gzip_compress_to_base64(json_str.as_bytes()) {
+            Ok(compressed_b64) => {
+                let mut compressed_response = serde_json::Map::new();
+                compressed_response.insert("id".to_string(), serde_json::Value::String(response.id));
+                compressed_response.insert(
+                    "command".to_string(),
+                    serde_json::Value::String(response.command),
+                );
+                compressed_response.insert(
+                    "success".to_string(),
+                    serde_json::Value::Bool(response.success),
+                );
+                compressed_response.insert(
+                    "data".to_string(),
+                    serde_json::Value::String(compressed_b64),
+                );
+                compressed_response.insert(
+                    "compressed".to_string(),
+                    serde_json::Value::Bool(true),
+                );
+                if let Some(error) = response.error {
+                    compressed_response
+                        .insert("error".to_string(), serde_json::Value::String(error));
+                }
+                Ok(Message::Text(serde_json::to_string(&compressed_response)?))
+            }
+            Err(e) => {
+                log::warn!("Failed to compress response: {e}");
+                Ok(Message::Text(json_str))
+            }
         }
     }
 

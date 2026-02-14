@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod commands;
+pub mod compression;
 pub mod config;
 pub mod dispatch;
 pub mod export;

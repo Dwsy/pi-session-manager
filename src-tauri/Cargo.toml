@@ -49,6 +49,8 @@ rust-embed = "8"
 mime_guess = "2"
 portable-pty = "0.9"
 async-stream = "0.3.6"
+flate2 = "1.0"
+base64 = "0.22"
 
 [lints.rust]
 dead_code = "allow"

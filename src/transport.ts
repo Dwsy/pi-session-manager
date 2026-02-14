@@ -5,7 +5,7 @@ export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected'
 export type StatusListener = (status: ConnectionStatus) => void
 
 export interface Transport {
-  invoke<T>(command: string, payload?: unknown): Promise<T>
+  invoke<T>(command: string, payload?: unknown, useCompression?: boolean): Promise<T>
   onEvent<T>(event: string, callback: (payload: T) => void): Promise<() => void>
   isConnected(): boolean
   onStatusChange?(listener: StatusListener): () => void
@@ -14,7 +14,7 @@ export interface Transport {
 export class TauriTransport implements Transport {
   private connected = true
 
-  async invoke<T>(command: string, payload?: unknown): Promise<T> {
+  async invoke<T>(command: string, payload?: unknown, _useCompression?: boolean): Promise<T> {
     return tauriInvoke<T>(command, payload as Record<string, unknown>)
   }
 
@@ -110,6 +110,90 @@ function readRemoteConfig(): RemoteConfig {
   }
 }
 
+// Gzip 压缩相关工具函数
+async function gzipCompress(data: Uint8Array): Promise<Uint8Array> {
+  const cs = new CompressionStream('gzip')
+  const writer = cs.writable.getWriter()
+  writer.write(data)
+  writer.close()
+  const chunks: Uint8Array[] = []
+  const reader = cs.readable.getReader()
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+  }
+  const totalLength = chunks.reduce((acc, c) => acc + c.length, 0)
+  const result = new Uint8Array(totalLength)
+  let offset = 0
+  for (const chunk of chunks) {
+    result.set(chunk, offset)
+    offset += chunk.length
+  }
+  return result
+}
+
+async function gzipDecompress(data: Uint8Array): Promise<Uint8Array> {
+  const ds = new DecompressionStream('gzip')
+  const writer = ds.writable.getWriter()
+  writer.write(data)
+  writer.close()
+  const chunks: Uint8Array[] = []
+  const reader = ds.readable.getReader()
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+  }
+  const totalLength = chunks.reduce((acc, c) => acc + c.length, 0)
+  const result = new Uint8Array(totalLength)
+  let offset = 0
+  for (const chunk of chunks) {
+    result.set(chunk, offset)
+    offset += chunk.length
+  }
+  return result
+}
+
+function base64Encode(data: Uint8Array): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  let result = ''
+  let i = 0
+  while (i < data.length) {
+    const a = data[i++]
+    const b = i < data.length ? data[i++] : 0
+    const c = i < data.length ? data[i++] : 0
+    const bitmap = (a << 16) | (b << 8) | c
+    result += chars.charAt((bitmap >> 18) & 63)
+    result += chars.charAt((bitmap >> 12) & 63)
+    result += i - 2 < data.length ? chars.charAt((bitmap >> 6) & 63) : '='
+    result += i - 1 < data.length ? chars.charAt(bitmap & 63) : '='
+  }
+  return result
+}
+
+function base64Decode(str: string): Uint8Array {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  const lookup: Record<string, number> = {}
+  for (let i = 0; i < chars.length; i++) {
+    lookup[chars[i]] = i
+  }
+  const len = str.length
+  const padding = str.endsWith('==') ? 2 : str.endsWith('=') ? 1 : 0
+  const bytes = new Uint8Array((len * 3 / 4) - padding)
+  let j = 0
+  for (let i = 0; i < len; i += 4) {
+    const a = lookup[str[i]]
+    const b = lookup[str[i + 1]]
+    const c = lookup[str[i + 2]] || 0
+    const d = lookup[str[i + 3]] || 0
+    bytes[j++] = (a << 2) | (b >> 4)
+    if (j < bytes.length) bytes[j++] = ((b & 15) << 4) | (c >> 2)
+    if (j < bytes.length) bytes[j++] = ((c & 3) << 6) | d
+  }
+  return bytes
+}
+
 export class WebSocketTransport implements Transport {
   private ws: WebSocket | null = null
   private state = WsState.Disconnected
@@ -124,10 +208,12 @@ export class WebSocketTransport implements Transport {
   private disposed = false
   private connectWaiters: { resolve: () => void; reject: (e: Error) => void }[] = []
   private statusListeners = new Set<StatusListener>()
+  private enableCompression: boolean
 
-  constructor(url = readRemoteConfig().wsUrl, token = readRemoteConfig().token) {
+  constructor(url = readRemoteConfig().wsUrl, token = readRemoteConfig().token, enableCompression = false) {
     this.url = url
     this.token = token
+    this.enableCompression = enableCompression
     this.emitStatus('connecting')
     this.connect()
   }
@@ -168,12 +254,12 @@ export class WebSocketTransport implements Transport {
         console.log('[WS] connected')
       }
 
-      ws.onmessage = (event) => {
+      ws.onmessage = async (event) => {
         if (ws !== this.ws) return
         try {
           const data = JSON.parse(event.data)
           if (data.pong) return
-          this.handleMessage(data)
+          await this.handleMessage(data)
         } catch (e) {
           console.error('[WS] parse error:', e)
         }
@@ -253,14 +339,26 @@ export class WebSocketTransport implements Transport {
     this.pendingRequests.clear()
   }
 
-  private handleMessage(data: { id?: string; event?: string; event_type?: string; payload?: unknown; success?: boolean; data?: unknown; error?: string }): void {
+  private async handleMessage(data: { id?: string; event?: string; event_type?: string; payload?: unknown; success?: boolean; data?: unknown; error?: string; compressed?: boolean }): Promise<void> {
     if (data.id && this.pendingRequests.has(data.id)) {
       const request = this.pendingRequests.get(data.id)!
       clearTimeout(request.timer)
       this.pendingRequests.delete(data.id)
 
+      let responseData = data.data
+      // 处理压缩的响应数据
+      if (data.compressed && typeof data.data === 'string') {
+        try {
+          const compressed = base64Decode(data.data)
+          const decompressed = await gzipDecompress(compressed)
+          responseData = JSON.parse(new TextDecoder().decode(decompressed))
+        } catch (e) {
+          console.error('[WS] Failed to decompress response:', e)
+        }
+      }
+
       if (data.success) {
-        request.resolve(data.data)
+        request.resolve(responseData)
       } else {
         request.reject(new Error(data.error || 'Command failed'))
       }
@@ -291,7 +389,7 @@ export class WebSocketTransport implements Transport {
     })
   }
 
-  async invoke<T>(command: string, payload?: unknown): Promise<T> {
+  async invoke<T>(command: string, payload?: unknown, useCompression = false): Promise<T> {
     if (this.state !== WsState.Connected) {
       await this.waitForConnection()
     }
@@ -306,9 +404,31 @@ export class WebSocketTransport implements Transport {
 
       this.pendingRequests.set(id, { resolve: resolve as (value: unknown) => void, reject, timer })
 
-      this.ws!.send(
-        JSON.stringify({ id, command, payload: payload ?? {} })
-      )
+      const sendRequest = async () => {
+        const acceptGzip = this.enableCompression
+
+        if (useCompression && payload) {
+          try {
+            const payloadStr = JSON.stringify(payload)
+            const compressed = await gzipCompress(new TextEncoder().encode(payloadStr))
+            const compressedB64 = base64Encode(compressed)
+            this.ws!.send(
+              JSON.stringify({ id, command, payload: compressedB64, compressed: true, accept_gzip: acceptGzip })
+            )
+          } catch (e) {
+            console.warn('[WS] Compression failed, sending uncompressed:', e)
+            this.ws!.send(
+              JSON.stringify({ id, command, payload: payload ?? {}, accept_gzip: acceptGzip })
+            )
+          }
+        } else {
+          this.ws!.send(
+            JSON.stringify({ id, command, payload: payload ?? {}, accept_gzip: acceptGzip })
+          )
+        }
+      }
+
+      sendRequest()
     })
   }
 
@@ -463,9 +583,13 @@ export class HttpTransport implements Transport {
     this.wsConnected = false
   }
 
-  async invoke<T>(command: string, payload?: unknown): Promise<T> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  async invoke<T>(command: string, payload?: unknown, acceptGzip = true): Promise<T> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
     if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`
+    if (acceptGzip) headers['Accept-Encoding'] = 'gzip'
+
     try {
       const resp = await fetch(`${this.baseUrl}/api`, {
         method: 'POST',
@@ -473,6 +597,8 @@ export class HttpTransport implements Transport {
         body: JSON.stringify({ command, payload: payload ?? {} }),
       })
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+
+      // 浏览器会自动处理 gzip 解码
       const data = await resp.json() as { success: boolean; data?: T; error?: string }
       if (!data.success) throw new Error(data.error || 'Command failed')
       if (!this.httpOk) {
@@ -520,7 +646,7 @@ function detectMobileWeb(): boolean {
     || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024)
 }
 
-export function createTransport(): Transport {
+export function createTransport(enableCompression = false): Transport {
   if (typeof window !== 'undefined' && (window as { __TAURI__?: unknown }).__TAURI__) {
     console.log('Using Tauri IPC transport')
     return new TauriTransport()
@@ -535,8 +661,8 @@ export function createTransport(): Transport {
     return new HttpTransport(cfg.httpBaseUrl, cfg.wsUrl, cfg.token ?? null)
   }
 
-  console.log('Using WebSocket transport', cfg.wsUrl)
-  return new WebSocketTransport(cfg.wsUrl, cfg.token)
+  console.log('Using WebSocket transport', cfg.wsUrl, enableCompression ? 'with compression' : '')
+  return new WebSocketTransport(cfg.wsUrl, cfg.token, enableCompression)
 }
 
 let _transport: Transport | null = null

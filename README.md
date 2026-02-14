@@ -5,13 +5,15 @@
 <h1 align="center">Pi Session Manager</h1>
 
 <p align="center">
-  Cross-platform desktop app for browsing, searching, and managing
+  Cross-platform desktop, mobile, and web app for browsing, searching, and managing
   <a href="https://github.com/badlogic/pi-mono">Pi</a> AI coding sessions.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/Tauri-2.x-orange?style=flat-square" alt="Tauri 2">
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square" alt="React 18">
+  <img src="https://img.shields.io/badge/Rust-stable-orange?style=flat-square" alt="Rust">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License">
 </p>
 
@@ -26,7 +28,8 @@
 
 ## Features
 
-- **Session Browser** — List / project / kanban views, favorites, rename, batch export
+- **Multi-Platform Support** — Native desktop (macOS/Windows/Linux), responsive mobile web, and headless server mode
+- **Session Browser** — List / project / directory / kanban views, favorites, rename, batch export
 - **Kanban Board** — Drag-and-drop sessions across tag columns, context menu, project filtering
 - **Hierarchical Tags** — Parent-child tag tree with auto-rules and reordering
 - **Full-Text Search** — SQLite FTS5 + Tantivy, role / tool filters, snippet highlighting, plugin system
@@ -37,34 +40,56 @@
 - **Skills & Prompts** — Scan and manage `~/.pi/agent/skills` and prompts, system prompt editor
 - **Model Tester** — Batch connectivity test for configured models
 - **Multi-Path Scanning** — Configure multiple session directories
-- **Web Access** — Embedded frontend served via HTTP, accessible from any browser
+- **Web Access** — Embedded frontend served via HTTP, accessible from any browser or mobile device
 - **Theme** — Dark / Light / System, fully themeable via CSS custom properties
 - **i18n** — English and 简体中文
 - **Multi-Protocol API** — Tauri IPC + WebSocket (`ws://:52130`) + HTTP (`http://:52131`)
 - **CLI Mode** — Headless backend service via `--cli` / `--headless`
-- **Cross-Platform** — macOS (ARM/Intel), Windows, Linux
+- **Mobile Optimized** — Touch-friendly UI with bottom navigation on phones
+
+---
 
 ## Architecture
 
 ```
-Frontend (React 18 / TypeScript / Vite)
-┌───────────────────────────────────────────────────┐
-│  Components · Hooks · Plugins · i18n · xterm.js   │
-│  React Flow · Recharts · dnd-kit · cmdk           │
-├──────────┬──────────────┬─────────────────────────┤
-│ Tauri IPC│  WebSocket   │     HTTP + Embedded UI  │
-│ invoke() │ ws://:52130  │ http://:52131           │
-├──────────┴──────────────┴─────────────────────────┤
-│             Rust Backend (Tauri 2)                 │
-│  Scanner · SQLite Cache · FTS5 · Tantivy          │
-│  File Watcher · PTY Terminal · Auth · Export       │
-│  Config · Stats · Tags · WebSocket/HTTP Adapters  │
-└───────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Clients                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
+│  │   Desktop    │  │    Mobile    │  │      Web Browser         │  │
+│  │  (Tauri App) │  │  (PWA/Web)   │  │  (Chrome/Safari/Firefox) │  │
+│  └──────┬───────┘  └──────┬───────┘  └────────────┬─────────────┘  │
+└─────────┼─────────────────┼───────────────────────┼────────────────┘
+          │                 │                       │
+          └─────────────────┼───────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────────────┐
+│                    Frontend (React 18 / TypeScript / Vite)          │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  99+ Components · 19 Hooks · Plugin System · i18n · xterm.js │   │
+│  │  React Flow · Recharts · dnd-kit · cmdk · Virtual Scroll    │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+├───────────────────────────┬───────────────────┬─────────────────────┤
+│       Tauri IPC           │    WebSocket      │  HTTP + Embedded UI │
+│       (Desktop)           │   ws://:52130     │  http://:52131      │
+└───────────────────────────┴───────────────────┴─────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────────────┐
+│                    Rust Backend (Tauri 2)                           │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  Scanner · SQLite Cache · FTS5 · Tantivy · File Watcher     │   │
+│  │  PTY Terminal · Auth · Export · Config · Stats · Tags       │   │
+│  │  WebSocket/HTTP Adapters · Incremental Updates              │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-All three protocols share a single command router — `ws_adapter::dispatch()`. Adding a new command only requires one `match` arm in Rust; WS and HTTP inherit it automatically.
+All three protocols share a single command router — `dispatch()`. Adding a new command only requires one `match` arm in Rust; WS and HTTP inherit it automatically.
 
-The HTTP server embeds the frontend via `rust-embed`, so the packaged binary serves the full UI at `http://localhost:52131` — no external `dist/` directory needed. The frontend auto-detects the runtime environment and switches between Tauri IPC (desktop) and WebSocket (browser).
+The HTTP server embeds the frontend via `rust-embed`, so the packaged binary serves the full UI at `http://localhost:52131` — no external `dist/` directory needed. The frontend auto-detects the runtime environment and switches between:
+- **Tauri IPC** — When running as desktop app (window.__TAURI__ available)
+- **WebSocket/HTTP** — When running in browser or mobile
+
+---
 
 ## Download
 
@@ -82,6 +107,8 @@ Grab the latest build from [**Releases**](../../releases):
 ### Prerequisites
 
 [Pi](https://github.com/badlogic/pi-mono) must be installed for session resume and terminal integration.
+
+---
 
 ## Build from Source
 
@@ -136,25 +163,37 @@ npm run tauri:build      # Production build
 
 Build artifacts land in `src-tauri/target/release/bundle/`.
 
+---
+
 ## Usage
 
-### GUI (Default)
+### Desktop (GUI Mode)
+
+Default mode with full native integration:
 
 ```bash
 ./pi-session-manager
 ```
 
-### CLI / Headless
+### Server (CLI / Headless Mode)
 
-Run as a backend service exposing WS + HTTP APIs:
+Run as a backend service exposing WebSocket + HTTP APIs, accessible from any device on the network:
 
 ```bash
 ./pi-session-manager --cli
+# or
+./pi-session-manager --headless
 ```
 
-### Web Access
+Then open `http://localhost:52131` in any browser, or connect mobile apps.
 
-Open `http://localhost:52131` in any browser while the app is running (GUI or CLI mode). The frontend is embedded in the binary and auto-connects via WebSocket.
+### Web / Mobile Access
+
+Open `http://localhost:52131` in any browser while the app is running (GUI or CLI mode). The frontend:
+- Auto-detects mobile devices and shows touch-optimized UI
+- Uses bottom navigation bar on phones
+- Supports responsive layouts for tablets
+- Works as PWA (add to home screen)
 
 ### API Examples
 
@@ -168,6 +207,8 @@ curl -s -X POST http://127.0.0.1:52131/api \
 wscat -c ws://127.0.0.1:52130
 > {"command":"scan_sessions","payload":{}}
 ```
+
+---
 
 ## Keyboard Shortcuts
 
@@ -191,54 +232,90 @@ wscat -c ws://127.0.0.1:52130
 | `Cmd/Ctrl + T` | Toggle thinking blocks |
 | `Cmd/Ctrl + O` | Toggle tool call expansion |
 
+---
+
 ## Project Structure
 
 ```
 src/                        # Frontend (React + TypeScript)
-  components/               #   UI components (60+)
-    kanban/                  #   Kanban board (drag-drop, context menu)
+  components/               #   UI components (99+ files)
+    kanban/                 #   Kanban board (drag-drop, context menu)
     dashboard/              #   Analytics charts (11 components)
     settings/sections/      #   Settings panels (10+ sections)
-    command/                #   Command palette
+    command/                #   Command palette (cmdk-based)
   hooks/                    #   React hooks (19)
   plugins/                  #   Search plugin system (session, message, project)
   contexts/                 #   React contexts (Transport, Settings, SessionView)
   i18n/                     #   Internationalization (en-US, zh-CN)
+  transport.ts              #   Multi-protocol transport layer
   utils/                    #   Utilities
 
 src-tauri/                  # Backend (Rust + Tauri 2)
   src/
     main.rs                 #   Entry: CLI args, window, adapter startup
+    main-cli.rs             #   CLI-only entry point
     lib.rs                  #   Module declarations, command registration
     ws_adapter.rs           #   WebSocket server + dispatch() router
     http_adapter.rs         #   HTTP server, embedded frontend (rust-embed)
     app_state.rs            #   SharedAppState (Arc)
-    scanner.rs              #   Session file scanner (multi-path)
+    scanner.rs              #   Session file scanner (multi-path, incremental)
+    scanner_scheduler.rs    #   Background scan scheduling
     terminal.rs             #   PTY session manager (portable-pty)
     sqlite_cache.rs         #   Dual-layer cache (FS + SQLite)
     tantivy_search.rs       #   Full-text search index
-    commands/               #   Tauri IPC command handlers (12 modules)
+    file_watcher.rs         #   FS watcher for incremental updates
+    write_buffer.rs         #   Async write batching
+    commands/               #   Tauri IPC command handlers (12 modules, ~2160 LOC)
+      session.rs            #   Session operations
+      tags.rs               #   Tag management
+      skills.rs             #   Skills & prompts scanning
+      settings.rs           #   Settings persistence
+      terminal.rs           #   Terminal commands
+      search.rs             #   Search commands
+      cache.rs              #   Cache management
+      favorites.rs          #   Favorites system
+      models.rs             #   Model testing
+      auth_cmds.rs          #   Authentication
   tests/                    #   Integration tests
 ```
+
+---
 
 ## Tech Stack
 
 | Layer | Technologies |
 |-------|-------------|
-| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, i18next, xterm.js, cmdk, Recharts, React Flow, dnd-kit |
-| **Backend** | Tauri 2, Rust, Tokio, Axum, SQLite (rusqlite), Tantivy, portable-pty, rust-embed |
+| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, i18next, xterm.js, cmdk, Recharts, React Flow, dnd-kit, @tanstack/react-virtual |
+| **Backend** | Tauri 2, Rust, Tokio, Axum, SQLite (rusqlite), Tantivy, portable-pty, rust-embed, notify |
 | **Communication** | Tauri IPC, WebSocket (tokio-tungstenite), HTTP (Axum) |
+| **Build** | Cargo, PNPM, GitHub Actions |
+
+---
 
 ## Configuration
 
 | Path | Description |
 |------|-------------|
 | `~/.pi/agent/sessions/` | Default Pi session directory |
-| `~/.pi/agent/session-manager.db` | SQLite cache, settings, tags (KV store) |
+| `~/.pi/agent/session-manager.db` | SQLite cache, settings, tags, favorites |
 | `~/.pi/agent/session-manager-config.toml` | Scanner config (cutoff days, FTS5, paths, etc.) |
 | `~/.pi/agent/skills/` | Pi skills directory |
 | `~/.pi/agent/prompts/` | Pi prompts directory |
 | `~/.pi/agent/settings.json` | Pi agent settings |
+
+### Config File Example
+
+```toml
+# ~/.pi/agent/session-manager-config.toml
+realtime_cutoff_days = 2      # Days to keep in memory
+scan_interval_seconds = 30    # Background scan interval
+enable_fts5 = true            # Enable full-text search
+preload_count = 20            # Preload recent sessions
+auto_cleanup_days = 90        # Auto cleanup old sessions (optional)
+session_paths = []            # Additional session directories
+```
+
+---
 
 ## Contributing
 
@@ -246,6 +323,8 @@ src-tauri/                  # Backend (Rust + Tauri 2)
 2. `cd src-tauri && cargo fmt && cargo clippy`
 3. Run tests: `cd src-tauri && cargo test`
 4. Submit PR with [Conventional Commits](https://www.conventionalcommits.org/)
+
+---
 
 ## License
 
