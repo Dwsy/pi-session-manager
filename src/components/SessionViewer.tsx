@@ -14,6 +14,7 @@ import BranchSummary from './BranchSummary'
 import CustomMessage from './CustomMessage'
 import SessionTree, { type SessionTreeRef } from './SessionTree'
 import OpenInTerminalButton from './OpenInTerminalButton'
+import KbdTooltip from './KbdTooltip'
 import SystemPromptDialog from './SystemPromptDialog'
 import type { TerminalType } from './settings/types'
 import { getPlatformDefaults } from './settings/types'
@@ -663,6 +664,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
                 <Search className="h-3.5 w-3.5" />
               </button>
             )}
+            <KbdTooltip shortcut="Cmd+T">
             <button
               onClick={toggleThinking}
               className={`p-1.5 text-xs rounded transition-colors ${showThinking ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
@@ -670,6 +672,8 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
             >
               {showThinking ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
             </button>
+            </KbdTooltip>
+            <KbdTooltip shortcut="Cmd+O">
             <button
               onClick={toggleToolsExpanded}
               className={`p-1.5 text-xs rounded transition-colors ${toolsExpanded ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
@@ -677,6 +681,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
             >
               <ChevronsUpDown className="h-3.5 w-3.5" />
             </button>
+            </KbdTooltip>
             <button
               onClick={() => setShowSystemPromptDialog(true)}
               className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
@@ -729,12 +734,15 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
                 >
                   {t('common.rename')}
                 </button>
+                <KbdTooltip shortcut="Cmd+E">
                 <button
                   onClick={onExport}
                   className="px-2.5 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
                 >
                   {t('common.export')}
                 </button>
+                </KbdTooltip>
+                <KbdTooltip shortcut="Cmd+R">
                 <OpenInTerminalButton
                   session={session}
                   terminal={terminal}
@@ -748,6 +756,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
                   onWebResume={onWebResume}
                   onError={(error) => console.error('[SessionViewer] Failed to open in terminal:', error)}
                 />
+                </KbdTooltip>
               </>
             )}
           </div>

@@ -6,6 +6,23 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Added
 
+- **Subagent session viewer** — view full subagent conversations inline
+  - Clickable subagent tool call cards showing agent name, model, duration, tokens, task preview
+  - Modal with scale+fade animation renders the complete subagent JSONL session (reuses UserMessage, AssistantMessage, ToolCallList, etc.)
+  - Supports single, parallel, chain, and management (list/get) action modes
+  - Nested subagent support — subagent within subagent opens stacked modals with incremental z-index
+  - Thinking/Tools toggle buttons (⌘T / ⌘O) in both main SessionViewer toolbar and SubagentModal toolbar
+  - Capture-phase keyboard interception prevents shortcuts from leaking between modal and parent view
+  - JSONL cache (10 entries) with fallback path resolution (artifactPaths → sessionFile)
+  - `exitCode === 0` is now the sole success indicator — ignores benign "terminated" error from pi-subagents
+  - File watcher filters out `subagent-artifacts/` paths to prevent ghost sessions in main list
+  - Portal-rendered modal avoids parent overflow clipping; mobile responsive
+
+- **Tauri drag region fix** — toolbar buttons now clickable on macOS overlay title bar
+  - SessionViewer and KanbanBoard toolbars carry their own `data-tauri-drag-region` at `z-20`
+  - Background overlay lowered to `z-10` for Dashboard fallback
+  - Empty toolbar space remains draggable; buttons use `no-drag` via existing CSS rule
+
 - **Pi Config TUI settings panel** — unified resource management and settings editor aligned with pi source
   - Resources tab: scan and manage extensions/skills/prompts/themes with user+project scope grouping
   - `scan_all_resources` backend: scans `~/.pi/agent/` and `.pi/` for all resource types with metadata
