@@ -1,6 +1,7 @@
 use crate::app_state::SharedAppState;
 use crate::auth;
 use crate::ws_adapter::dispatch;
+use axum::body::Body;
 use axum::extract::ws::{Message as AxumWsMsg, WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::{header, HeaderMap, StatusCode, Uri};
@@ -108,7 +109,17 @@ async fn handle_command(
             .into_response();
     }
 
-    let gzip_supported = accepts_gzip(&headers);
+    let gzip_requested = accepts_gzip(&headers);
+    // 服务端强制压缩开关：设置环境变量 PSM_FORCE_GZIP=1 可强制启用压缩
+    let force_gzip = std::env::var("PSM_FORCE_GZIP").unwrap_or_default() == "1";
+    let gzip_enabled = gzip_requested || force_gzip;
+
+    log::debug!(
+        "HTTP request: gzip_requested={}, force_gzip={}, accept_encoding={:?}",
+        gzip_requested,
+        force_gzip,
+        headers.get("accept-encoding")
+    );
 
     let result = dispatch(&app_state, &req.command, &req.payload).await;
     let resp = match result {
@@ -124,13 +135,31 @@ async fn handle_command(
         },
     };
 
-    if gzip_supported {
+    // 检查请求中是否有压缩开关参数（优先于 Accept-Encoding）
+    let compression_disabled = query_param(&uri, "no_gzip").is_some()
+        || query_param(&uri, "disable_compression").is_some();
+
+    if gzip_enabled && !compression_disabled {
         if let Ok(json_bytes) = serde_json::to_vec(&resp) {
             match crate::compression::gzip_compress(&json_bytes) {
                 Ok(compressed) => {
-                    let mut headers = cors_headers().to_vec();
-                    headers.push(("content-encoding", "gzip"));
-                    return (StatusCode::OK, headers, compressed).into_response();
+                    log::debug!(
+                        "Gzip compressed: {} bytes -> {} bytes",
+                        json_bytes.len(),
+                        compressed.len()
+                    );
+                    return Response::builder()
+                        .status(StatusCode::OK)
+                        .header("access-control-allow-origin", "*")
+                        .header("access-control-allow-methods", "GET, POST, OPTIONS")
+                        .header(
+                            "access-control-allow-headers",
+                            "content-type, authorization",
+                        )
+                        .header("content-encoding", "gzip")
+                        .body(Body::from(compressed))
+                        .unwrap()
+                        .into_response();
                 }
                 Err(e) => {
                     log::warn!("Gzip compression failed: {e}");
