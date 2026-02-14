@@ -594,6 +594,25 @@ ref
 
 
 
+  // toolResult 不会单独渲染，需要跳转到对应的 assistant 消息（包含该 toolCall）
+  const resolveScrollTarget = useCallback((entryId: string): string => {
+    const entry = entries.find(e => e.id === entryId)
+    if (!entry || entry.type !== 'message' || entry.message?.role !== 'toolResult') {
+      return entryId
+    }
+    const content = Array.isArray(entry.message.content) ? entry.message.content : []
+    const toolResultContent = content.find((c: any) => c.type === 'toolResult')
+    if (!toolResultContent?.id) return entryId
+
+    const assistantEntry = entries.find(e =>
+      e.type === 'message' &&
+      e.message?.role === 'assistant' &&
+      Array.isArray(e.message.content) &&
+      e.message.content.some((c: any) => c.type === 'toolCall' && c.id === toolResultContent.id)
+    )
+    return assistantEntry ? assistantEntry.id : entryId
+  }, [entries])
+
   // 搜索导航
   const handleSearchNext = useCallback(() => {
     if (searchResults.length === 0) return
@@ -601,9 +620,9 @@ ref
     setCurrentResultIndex(newIndex)
     const entryId = searchResults[newIndex]
     if (onNodeClick) {
-      onNodeClick(entryId, entryId)
+      onNodeClick(entryId, resolveScrollTarget(entryId))
     }
-  }, [searchResults, currentResultIndex, onNodeClick])
+  }, [searchResults, currentResultIndex, onNodeClick, resolveScrollTarget])
 
   const handleSearchPrevious = useCallback(() => {
     if (searchResults.length === 0) return
@@ -611,9 +630,9 @@ ref
     setCurrentResultIndex(newIndex)
     const entryId = searchResults[newIndex]
     if (onNodeClick) {
-      onNodeClick(entryId, entryId)
+      onNodeClick(entryId, resolveScrollTarget(entryId))
     }
-  }, [searchResults, currentResultIndex, onNodeClick])
+  }, [searchResults, currentResultIndex, onNodeClick, resolveScrollTarget])
 
   const handleSearchClose = useCallback(() => {
     setSearchQuery('')
@@ -648,25 +667,7 @@ ref
   const handleNodeClick = (flatNode: FlatNode) => {
     const entry = flatNode.node.entry
     const leafId = findNewestLeaf(entry.id)
-    let scrollTargetId = entry.id
-
-    // toolResult 不会单独渲染，需要跳转到对应的 assistant 消息
-    if (entry.type === 'message' && entry.message?.role === 'toolResult') {
-      const content = Array.isArray(entry.message.content) ? entry.message.content : []
-      const toolResultContent = content.find((c: any) => c.type === 'toolResult')
-
-      if (toolResultContent?.id) {
-        const assistantEntry = entries.find(e =>
-          e.type === 'message' &&
-          e.message?.role === 'assistant' &&
-          Array.isArray(e.message.content) &&
-          e.message.content.some((c: any) => c.type === 'toolCall' && c.id === toolResultContent.id)
-        )
-        if (assistantEntry) {
-          scrollTargetId = assistantEntry.id
-        }
-      }
-    }
+    const scrollTargetId = resolveScrollTarget(entry.id)
 
     if (onNodeClick) {
       onNodeClick(leafId, scrollTargetId)
