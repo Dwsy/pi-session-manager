@@ -7,6 +7,7 @@ export const common = {
   export: '导出',
   search: '搜索',
   searchPlaceholder: '搜索会话...',
+  searchProjectsPlaceholder: '搜索项目...',
   searching: '搜索中...',
   results: '个结果',
   result: '个结果',

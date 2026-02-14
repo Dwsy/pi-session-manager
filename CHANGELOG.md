@@ -4,6 +4,29 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Unified SearchFilterBar component** — reusable search + tag filter bar shared across all views
+  - New `SearchFilterBar` component combining inline search input with `LabelFilter` dropdown
+  - Desktop sidebar: search + tag filter always visible for list, project, and kanban views
+  - Kanban board header: integrated search box next to project badge and session count
+  - Mobile: filter bar with search + tags on list, project, and kanban tabs
+  - Context-aware placeholder: "搜索会话..." for list/kanban, "搜索项目..." for project view
+  - Search filters by session name, first/last message, and project directory
+  - Added i18n keys: `common.searchProjectsPlaceholder` (en-US / zh-CN)
+
+### Fixed
+
+- **i18n hardcoded strings cleanup** — fixed ~50 hardcoded Chinese/English strings across 19 component files
+  - Settings sections: `TerminalSettings` (收起/展开), `AppearanceSettings` (紧凑/舒适/宽松), `SessionSettings` (列表/目录/项目), `AdvancedSettings` (option labels), `ModelSettings` (快/中/慢, test prompt)
+  - Dashboard: `StatsPanel` (stat labels & time titles), `WeeklyComparison` (vs last week), `ActivityHeatmap` (Less/More), `TokenTrendChart` (no data text)
+  - Viewer: `TreeNode` (Session Start, Model, tool calls), `SessionTree` (Loading), `SessionFlowView` (toolbar titles)
+  - Subagent: `SubagentModal` (Thinking/Tools/Close/Show/Hide), `SubagentToolCall` (click to view)
+  - Terminal: `TerminalPanel` (New terminal/Select shell/Hide panel)
+  - Other: `SessionListByDirectory` (tooltip labels), `TagManagerSettings` (Add child), `PiConfigSettings` (View), `Onboarding` (WebSocket/HTTP API)
+  - Added missing `settings.sections.tags` key to both en-US and zh-CN locale files
+  - Added new i18n keys: `session.tree.*`, `session.tooltip.*`, `settings.terminal.collapse/expandSettings`, `settings.advanced.bindAddrLocal/bindAddrAll`, `settings.models.speed.*`, `settings.models.testPrompt`, `dashboard.weeklyComparison.vsLastWeek`, `components.subagent.*`, `components.sessionFlow.*`, `components.terminalPanel.*`, `components.tokenTrend.*`, `components.tagManager.*`, `components.piConfig.*`, `onboarding.steps.services.websocket/httpApi`
+
 ### Fixed
 
 - **GUI dev mode now correctly uses Vite dev server** — fixed `tauri://localhost` white screen issue

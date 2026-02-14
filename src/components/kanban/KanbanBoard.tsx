@@ -17,6 +17,7 @@ import type { SessionInfo, Tag, SessionTag, FavoriteItem } from '../../types'
 import type { TerminalType } from '../settings/types'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
+import SearchFilterBar from '../SearchFilterBar'
 
 interface KanbanBoardProps {
   sessions: SessionInfo[]
@@ -35,6 +36,9 @@ interface KanbanBoardProps {
   customCommand?: string
   onCreateTag?: (name: string, color: string) => void
   projectFilter?: string | null // null = all projects
+  filterTagIds?: string[]
+  onFilterChange?: (tagIds: string[]) => void
+  getDescendantIds?: (tagId: string) => string[]
 }
 
 interface ColumnData {
@@ -56,17 +60,33 @@ export default function KanbanBoard({
   favorites,
   onToggleFavorite,
   projectFilter,
+  filterTagIds = [],
+  onFilterChange,
+  getDescendantIds = () => [],
 }: KanbanBoardProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
   const [activeId, setActiveId] = useState<string | null>(null)
   const [mobileColIndex, setMobileColIndex] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
 
-  // Filter sessions by project
+  // Filter sessions by project + search query
   const filteredSessions = useMemo(() => {
-    if (!projectFilter) return sessions
-    return sessions.filter(s => s.cwd === projectFilter)
-  }, [sessions, projectFilter])
+    let result = sessions
+    if (projectFilter) {
+      result = result.filter(s => s.cwd === projectFilter)
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(s =>
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.first_message && s.first_message.toLowerCase().includes(q)) ||
+        (s.last_message && s.last_message.toLowerCase().includes(q)) ||
+        (s.cwd && s.cwd.toLowerCase().includes(q))
+      )
+    }
+    return result
+  }, [sessions, projectFilter, searchQuery])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -197,20 +217,32 @@ export default function KanbanBoard({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/40 flex-shrink-0">
-        <h2 className="text-sm font-medium text-foreground">
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/40 flex-shrink-0 relative z-20" data-tauri-drag-region>
+        <h2 className="text-sm font-medium text-foreground shrink-0">
           {t('tags.kanban.title')}
         </h2>
         {projectFilter ? (
-          <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 text-[11px]">
+          <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 text-[11px] shrink-0">
             {projectFilter.split('/').pop()}
           </span>
         ) : (
-          <span className="text-[10px] text-muted-foreground">
+          <span className="text-[10px] text-muted-foreground shrink-0">
             {t('tags.kanban.allProjects', '全部项目')}
           </span>
         )}
-        <span className="text-[10px] text-muted-foreground ml-auto">
+        <div className="flex-1 min-w-0 max-w-[360px]">
+          <SearchFilterBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            tags={tags}
+            sessionTags={sessionTags}
+            filterTagIds={filterTagIds}
+            onFilterChange={onFilterChange || (() => {})}
+            getDescendantIds={getDescendantIds}
+            compact
+          />
+        </div>
+        <span className="text-[10px] text-muted-foreground shrink-0">
           {filteredSessions.length} {t('project.list.sessions')}
         </span>
       </div>

@@ -7,6 +7,7 @@ export const common = {
   export: 'Export',
   search: 'Search',
   searchPlaceholder: 'Search sessions...',
+  searchProjectsPlaceholder: 'Search projects...',
   searching: 'Searching...',
   results: 'results',
   result: 'result',

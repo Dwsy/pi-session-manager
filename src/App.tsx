@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search, Terminal, Columns3 } from 'lucide-react'
+import KbdTooltip from './components/KbdTooltip'
 import ProjectFilterList from './components/ProjectFilterList'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
@@ -20,7 +21,7 @@ import SettingsPanel from './components/settings/SettingsPanel'
 import Onboarding from './components/Onboarding'
 import { CommandPalette } from './components/command'
 import TerminalPanel from './components/TerminalPanel'
-import LabelFilter from './components/LabelFilter'
+import SearchFilterBar from './components/SearchFilterBar'
 import KanbanBoard from './components/kanban/KanbanBoard'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useFileWatcher } from './hooks/useFileWatcher'
@@ -79,6 +80,7 @@ function App() {
     return saved === 'list' ? 'list' : saved === 'kanban' ? 'kanban' : 'project'
   })
   const [filterTagIds, setFilterTagIds] = useState<string[]>([])
+  const [sidebarSearchQuery, setSidebarSearchQuery] = useState('')
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -281,6 +283,20 @@ function App() {
 
   useKeyboardShortcuts(shortcuts)
 
+  // Restore browser-like refresh shortcuts (Cmd+Shift+R, F5, Ctrl+Shift+R)
+  useEffect(() => {
+    const handleRefresh = (e: KeyboardEvent) => {
+      const isCmdShiftR = (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'r'
+      const isF5 = e.key === 'F5'
+      if (isCmdShiftR || isF5) {
+        e.preventDefault()
+        window.location.reload()
+      }
+    }
+    window.addEventListener('keydown', handleRefresh)
+    return () => window.removeEventListener('keydown', handleRefresh)
+  }, [])
+
   const commandContext = useMemo<SearchContext>(() => ({
     sessions,
     selectedProject,
@@ -293,19 +309,35 @@ function App() {
   }), [sessions, selectedProject, selectedSession, t, setSelectedSession])
 
   const filteredSessions = useMemo(() => {
-    if (filterTagIds.length === 0) return sessions
-    // Include descendants for hierarchical filtering
-    const allFilterIds = new Set(filterTagIds)
-    for (const id of filterTagIds) {
-      for (const descId of getDescendantIds(id)) {
-        allFilterIds.add(descId)
+    let result = sessions
+
+    // Tag filter
+    if (filterTagIds.length > 0) {
+      const allFilterIds = new Set(filterTagIds)
+      for (const id of filterTagIds) {
+        for (const descId of getDescendantIds(id)) {
+          allFilterIds.add(descId)
+        }
       }
+      const taggedIds = new Set(
+        sessionTags.filter(st => allFilterIds.has(st.tagId)).map(st => st.sessionId)
+      )
+      result = result.filter(s => taggedIds.has(s.id))
     }
-    const taggedIds = new Set(
-      sessionTags.filter(st => allFilterIds.has(st.tagId)).map(st => st.sessionId)
-    )
-    return sessions.filter(s => taggedIds.has(s.id))
-  }, [sessions, sessionTags, filterTagIds, getDescendantIds])
+
+    // Search filter
+    if (sidebarSearchQuery.trim()) {
+      const q = sidebarSearchQuery.toLowerCase()
+      result = result.filter(s =>
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.first_message && s.first_message.toLowerCase().includes(q)) ||
+        (s.last_message && s.last_message.toLowerCase().includes(q)) ||
+        (s.cwd && s.cwd.toLowerCase().includes(q))
+      )
+    }
+
+    return result
+  }, [sessions, sessionTags, filterTagIds, getDescendantIds, sidebarSearchQuery])
 
   const onRenameSession = async (newName: string) => {
     if (!selectedSession) return
@@ -321,43 +353,26 @@ function App() {
 
   // ─── Shared content renderers ───
 
-  const renderMobileFilterBar = () => (
-    <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50">
-      <button
-        onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
-        className="flex-1 flex items-center gap-2 px-2.5 py-1.5 text-xs text-muted-foreground bg-secondary/50 hover:bg-secondary rounded-lg transition-colors min-w-0"
-      >
-        <Search className="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="truncate">{t('app.shortcuts.searchAll', '搜索会话')}</span>
-      </button>
-      {tags.length > 0 && (
-        <LabelFilter
-          tags={tags}
-          sessionTags={sessionTags}
-          filterTagIds={filterTagIds}
-          onFilterChange={setFilterTagIds}
-          onCreateTag={(name, color, parentId) => createTag(name, color, undefined, parentId)}
-          getDescendantIds={getDescendantIds}
-        />
-      )}
+  const renderMobileFilterBar = (placeholder?: string) => (
+    <div className="px-3 py-1.5 border-b border-border/50">
+      <SearchFilterBar
+        searchQuery={sidebarSearchQuery}
+        onSearchChange={setSidebarSearchQuery}
+        tags={tags}
+        sessionTags={sessionTags}
+        filterTagIds={filterTagIds}
+        onFilterChange={setFilterTagIds}
+        onCreateTag={(name, color, parentId) => createTag(name, color, undefined, parentId)}
+        getDescendantIds={getDescendantIds}
+        placeholder={placeholder}
+        compact
+      />
     </div>
   )
 
   const renderSessionList = () => (
     <>
       {isMobile && renderMobileFilterBar()}
-      {!isMobile && tags.length > 0 && (
-        <div className="flex items-center justify-end gap-1 px-3 py-1.5 border-b border-border/50">
-          <LabelFilter
-            tags={tags}
-            sessionTags={sessionTags}
-            filterTagIds={filterTagIds}
-            onFilterChange={setFilterTagIds}
-            onCreateTag={(name, color, parentId) => createTag(name, color, undefined, parentId)}
-            getDescendantIds={getDescendantIds}
-          />
-        </div>
-      )}
       <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
         <SessionList
           sessions={filteredSessions}
@@ -383,7 +398,7 @@ function App() {
 
   const renderProjectList = () => (
     <>
-      {isMobile && renderMobileFilterBar()}
+      {isMobile && renderMobileFilterBar(selectedProject ? undefined : t('common.searchProjectsPlaceholder'))}
       <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
       {selectedProject ? (
         <div className="flex flex-col h-full">
@@ -405,7 +420,7 @@ function App() {
             </div>
           </div>
           <SessionList
-            sessions={sessions.filter(s => s.cwd === selectedProject)}
+            sessions={filteredSessions.filter(s => s.cwd === selectedProject)}
             selectedSession={selectedSession}
             onSelectSession={handleSelectSession}
             onDeleteSession={handleDeleteSession}
@@ -426,7 +441,7 @@ function App() {
         </div>
       ) : (
         <ProjectList
-          sessions={sessions}
+          sessions={filteredSessions}
           selectedSession={selectedSession}
           selectedProject={selectedProject}
           onSelectSession={handleSelectSession}
@@ -448,7 +463,7 @@ function App() {
 
   const renderKanban = () => (
     <KanbanBoard
-      sessions={sessions}
+      sessions={filteredSessions}
       tags={tags}
       sessionTags={sessionTags}
       selectedSession={selectedSession}
@@ -464,6 +479,9 @@ function App() {
       customCommand={customCommand}
       onCreateTag={createTag}
       projectFilter={selectedProject}
+      filterTagIds={filterTagIds}
+      onFilterChange={setFilterTagIds}
+      getDescendantIds={getDescendantIds}
     />
   )
 
@@ -689,16 +707,20 @@ function App() {
           </div>
         </div>
 
-        {/* Filter bar */}
-        {!showFavorites && (viewMode === 'list' || viewMode === 'kanban') && tags.length > 0 && (
-          <div className="flex items-center justify-end gap-1 px-3 py-1.5 border-b border-border/50">
-            <LabelFilter
+        {/* Search + Filter bar */}
+        {!showFavorites && (
+          <div className="px-3 py-1.5 border-b border-border/50">
+            <SearchFilterBar
+              searchQuery={sidebarSearchQuery}
+              onSearchChange={setSidebarSearchQuery}
               tags={tags}
               sessionTags={sessionTags}
               filterTagIds={filterTagIds}
               onFilterChange={setFilterTagIds}
               onCreateTag={(name, color, parentId) => createTag(name, color, undefined, parentId)}
               getDescendantIds={getDescendantIds}
+              placeholder={viewMode === 'project' && !selectedProject ? t('common.searchProjectsPlaceholder') : undefined}
+              compact
             />
           </div>
         )}
@@ -730,7 +752,7 @@ function App() {
               getBadgeType={getBadgeType}
               loading={loadingFavorites}
             />
-          ) : viewMode === 'project' && selectedProject ? (
+          ) : viewMode === 'kanban' ? null : viewMode === 'project' && selectedProject ? (
             <div className="flex flex-col">
               <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30 flex-shrink-0 sticky top-0 z-10">
                 <button
@@ -752,7 +774,7 @@ function App() {
               </div>
               <div>
                 <SessionList
-                  sessions={sessions.filter(s => s.cwd === selectedProject)}
+                  sessions={filteredSessions.filter(s => s.cwd === selectedProject)}
                   selectedSession={selectedSession}
                   onSelectSession={handleSelectSession}
                   onDeleteSession={handleDeleteSession}
@@ -774,7 +796,7 @@ function App() {
             </div>
           ) : viewMode === 'project' ? (
             <ProjectList
-              sessions={sessions}
+              sessions={filteredSessions}
               selectedSession={selectedSession}
               selectedProject={selectedProject}
               onSelectSession={handleSelectSession}
@@ -812,11 +834,10 @@ function App() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 overflow-hidden flex flex-col relative">
         <div
-          className="h-8 flex-shrink-0 select-none"
+          className="absolute top-0 left-0 right-0 h-8 z-10"
           data-tauri-drag-region
-          onMouseDown={startDragging}
         />
         <div className="flex-1 overflow-hidden flex flex-col">
           <div className="flex-1 overflow-hidden" style={{ display: showTerminal && terminalMaximized ? 'none' : undefined }}>
