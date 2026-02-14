@@ -4,8 +4,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Plus, X, Copy, Trash2, Key, Shield } from 'lucide-react'
+import { AlertTriangle, Plus, X, Copy, Trash2, Key, Shield, Server, FolderOpen, Settings2 } from 'lucide-react'
 import { invoke } from '../../../transport'
+import Toggle from '../../ui/Toggle'
+import SettingsCard from '../SettingsCard'
 import type { AdvancedSettingsProps } from '../types'
 
 interface ClearCacheResult {
@@ -115,240 +117,228 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
 
   const isRemoteBind = serverSettings?.bind_addr === '0.0.0.0'
 
+  const inputBase =
+    'px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-info/40 focus:border-info transition-all'
+  const selectBase =
+    'px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-info/40 focus:border-info transition-all'
+
   return (
     <div className="space-y-6">
       {/* Server Settings */}
       {serverSettings && (
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-            {t('settings.advanced.serverSection', '服务设置')}
-          </h4>
-
-          {/* Bind Address */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-foreground">
-              {t('settings.advanced.bindAddr', '绑定地址')}
-            </label>
-            <p className="text-xs text-muted-foreground">
-              {t('settings.advanced.bindAddrHelp', '127.0.0.1 仅本地访问，0.0.0.0 允许远程连接')}
-            </p>
-            <div className="flex items-center gap-2">
-              <select
-                value={serverSettings.bind_addr}
-                onChange={(e) => updateServer('bind_addr', e.target.value)}
-                className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
-              >
-                <option value="127.0.0.1">{t('settings.advanced.bindAddrLocal')}</option>
-                <option value="0.0.0.0">{t('settings.advanced.bindAddrAll')}</option>
-              </select>
-              {isRemoteBind && (
-                <span className="flex items-center gap-1 text-xs text-amber-400">
-                  <Shield className="h-3 w-3" />
-                  {t('settings.advanced.remoteWarning', '远程访问已开启，请确保认证已启用')}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
+        <SettingsCard
+          title={t('settings.advanced.serverSection', '服务设置')}
+          description={t('settings.advanced.serverSectionDesc', 'WebSocket、HTTP API 及认证配置')}
+          icon={<Server className="h-4 w-4" />}
+        >
+          <div className="space-y-5">
+            {/* Bind Address */}
             <div>
-              <label className="text-sm font-medium text-foreground">WebSocket</label>
-              <p className="text-xs text-muted-foreground">ws://{serverSettings.bind_addr}:{serverSettings.ws_port}</p>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                {t('settings.advanced.bindAddr', '绑定地址')}
+              </label>
+              <p className="text-xs text-muted-foreground mb-2">
+                {t('settings.advanced.bindAddrHelp', '127.0.0.1 仅本地访问，0.0.0.0 允许远程连接')}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={serverSettings.bind_addr}
+                  onChange={(e) => updateServer('bind_addr', e.target.value)}
+                  className={selectBase}
+                >
+                  <option value="127.0.0.1">{t('settings.advanced.bindAddrLocal')}</option>
+                  <option value="0.0.0.0">{t('settings.advanced.bindAddrAll')}</option>
+                </select>
+                {isRemoteBind && (
+                  <span className="flex items-center gap-1.5 text-xs text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg">
+                    <Shield className="h-3.5 w-3.5 flex-shrink-0" />
+                    {t('settings.advanced.remoteWarning', '远程访问已开启，请确保认证已启用')}
+                  </span>
+                )}
+              </div>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
+
+            {/* WebSocket */}
+            <div className="flex items-start justify-between gap-4 pt-4 border-t border-border/60">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">WebSocket</p>
+                <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                  ws://{serverSettings.bind_addr}:{serverSettings.ws_port}
+                </p>
+              </div>
+              <Toggle
                 checked={serverSettings.ws_enabled}
-                onChange={(e) => updateServer('ws_enabled', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
-            </label>
-          </div>
-
-          {serverSettings.ws_enabled && (
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">{t('settings.advanced.wsPort', 'WebSocket 端口')}</label>
-              <input
-                type="number"
-                min="1024"
-                max="65535"
-                value={serverSettings.ws_port}
-                onChange={(e) => updateServer('ws_port', parseInt(e.target.value) || 52130)}
-                className="w-32 px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
+                onChange={(v) => updateServer('ws_enabled', v)}
               />
             </div>
-          )}
+            {serverSettings.ws_enabled && (
+              <div className="pl-0">
+                <label className="block text-xs text-muted-foreground mb-1">{t('settings.advanced.wsPort', 'WebSocket 端口')}</label>
+                <input
+                  type="number"
+                  min="1024"
+                  max="65535"
+                  value={serverSettings.ws_port}
+                  onChange={(e) => updateServer('ws_port', parseInt(e.target.value) || 52130)}
+                  className={`${inputBase} w-28`}
+                />
+              </div>
+            )}
 
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="text-sm font-medium text-foreground">HTTP API</label>
-              <p className="text-xs text-muted-foreground">http://{serverSettings.bind_addr}:{serverSettings.http_port}/api</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
+            {/* HTTP API */}
+            <div className="flex items-start justify-between gap-4 py-2 border-t border-border/60">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">HTTP API</p>
+                <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                  http://{serverSettings.bind_addr}:{serverSettings.http_port}/api
+                </p>
+              </div>
+              <Toggle
                 checked={serverSettings.http_enabled}
-                onChange={(e) => updateServer('http_enabled', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
-            </label>
-          </div>
-
-          {serverSettings.http_enabled && (
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">{t('settings.advanced.httpPort', 'HTTP 端口')}</label>
-              <input
-                type="number"
-                min="1024"
-                max="65535"
-                value={serverSettings.http_port}
-                onChange={(e) => updateServer('http_port', parseInt(e.target.value) || 52131)}
-                className="w-32 px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
+                onChange={(v) => updateServer('http_enabled', v)}
               />
             </div>
-          )}
+            {serverSettings.http_enabled && (
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">{t('settings.advanced.httpPort', 'HTTP 端口')}</label>
+                <input
+                  type="number"
+                  min="1024"
+                  max="65535"
+                  value={serverSettings.http_port}
+                  onChange={(e) => updateServer('http_port', parseInt(e.target.value) || 52131)}
+                  className={`${inputBase} w-28`}
+                />
+              </div>
+            )}
 
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="text-sm font-medium text-foreground">{t('settings.advanced.auth', '认证')}</label>
-              <p className="text-xs text-muted-foreground">{t('settings.advanced.authHelp', '非本地连接需要 Token 认证')}</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
+            {/* Auth */}
+            <div className="flex items-start justify-between gap-4 py-2 border-t border-border/60">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{t('settings.advanced.auth', '认证')}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('settings.advanced.authHelp', '非本地连接需要 Token 认证')}</p>
+              </div>
+              <Toggle
                 checked={serverSettings.auth_enabled}
-                onChange={(e) => updateServer('auth_enabled', e.target.checked)}
-                className="sr-only peer"
+                onChange={(v) => updateServer('auth_enabled', v)}
               />
-              <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
-            </label>
-          </div>
-
-          {serverDirty && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={saveServerSettings}
-                className="px-4 py-1.5 bg-info hover:bg-info/80 text-white text-sm rounded-lg transition-colors"
-              >
-                {t('settings.advanced.saveServer', '保存服务设置')}
-              </button>
-              <span className="flex items-center gap-1 text-xs text-amber-400">
-                <AlertTriangle className="h-3 w-3" />
-                {t('settings.advanced.restartRequired', '需重启应用生效')}
-              </span>
             </div>
-          )}
 
-          <div className="border-b border-border" />
-        </div>
+            {serverDirty && (
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                  onClick={saveServerSettings}
+                  className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                >
+                  {t('settings.advanced.saveServer', '保存服务设置')}
+                </button>
+                <span className="flex items-center gap-1.5 text-xs text-amber-400">
+                  <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                  {t('settings.advanced.restartRequired', '需重启应用生效')}
+                </span>
+              </div>
+            )}
+          </div>
+        </SettingsCard>
       )}
 
       {/* API Keys */}
-      <div className="space-y-4">
-        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-          <Key className="h-3.5 w-3.5" />
-          {t('settings.advanced.apiKeys', 'API 密钥')}
-        </h4>
-        <p className="text-xs text-muted-foreground">
-          {t('settings.advanced.apiKeysHelp', '用于远程连接认证，通过 Authorization: Bearer <key> 使用')}
-        </p>
-
-        {/* Key list */}
-        {apiKeys.length > 0 && (
-          <div className="space-y-2">
-            {apiKeys.map((k) => (
-              <div key={k.key_preview} className="flex items-center justify-between px-3 py-2 bg-surface border border-border rounded-lg">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-foreground">{k.name}</span>
-                    <code className="text-xs text-muted-foreground font-mono">{k.key_preview}</code>
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {t('settings.advanced.keyCreated', '创建')}: {new Date(k.created_at).toLocaleDateString()}
-                    {k.last_used && (
-                      <> · {t('settings.advanced.keyLastUsed', '最后使用')}: {new Date(k.last_used).toLocaleDateString()}</>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleRevokeKey(k.key_preview)}
-                  className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
-                  title={t('settings.advanced.revokeKey', '吊销')}
+      <SettingsCard
+        title={t('settings.advanced.apiKeys', 'API 密钥')}
+        description={t('settings.advanced.apiKeysHelp', '用于远程连接认证，通过 Authorization: Bearer <key> 使用')}
+        icon={<Key className="h-4 w-4" />}
+      >
+        <div className="space-y-4">
+          {apiKeys.length > 0 && (
+            <div className="space-y-2">
+              {apiKeys.map((k) => (
+                <div
+                  key={k.key_preview}
+                  className="flex items-center justify-between gap-3 px-3 py-2.5 bg-background/50 border border-border rounded-lg hover:border-border-hover/50 transition-colors"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-foreground">{k.name}</span>
+                      <code className="text-xs text-muted-foreground font-mono truncate">{k.key_preview}</code>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {t('settings.advanced.keyCreated', '创建')}: {new Date(k.created_at).toLocaleDateString()}
+                      {k.last_used && (
+                        <> · {t('settings.advanced.keyLastUsed', '最后使用')}: {new Date(k.last_used).toLocaleDateString()}</>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRevokeKey(k.key_preview)}
+                    className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex-shrink-0"
+                    title={t('settings.advanced.revokeKey', '吊销')}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {newKeyValue && (
+            <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg space-y-3">
+              <p className="text-sm text-green-400">
+                {t('settings.advanced.newKeyCreated', '密钥已创建，请立即复制保存，此后不再显示完整密钥。')}
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs font-mono text-foreground bg-surface px-3 py-2 rounded-lg break-all select-all border border-border">
+                  {newKeyValue}
+                </code>
+                <button
+                  onClick={() => { copyToClipboard(newKeyValue); setNewKeyValue(null) }}
+                  className="p-2 text-info hover:bg-info/10 rounded-lg transition-colors flex-shrink-0"
+                  title={t('settings.advanced.copyKey', '复制')}
+                >
+                  <Copy className="h-4 w-4" />
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* New key created - show once */}
-        {newKeyValue && (
-          <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg space-y-2">
-            <p className="text-xs text-green-400">
-              {t('settings.advanced.newKeyCreated', '密钥已创建，请立即复制保存，此后不再显示完整密钥。')}
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs font-mono text-foreground bg-surface px-2 py-1 rounded break-all select-all">
-                {newKeyValue}
-              </code>
-              <button
-                onClick={() => { copyToClipboard(newKeyValue); setNewKeyValue(null) }}
-                className="p-1.5 text-info hover:bg-info/10 rounded-lg transition-colors"
-                title={t('settings.advanced.copyKey', '复制')}
-              >
-                <Copy className="h-4 w-4" />
-              </button>
             </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="text"
+              value={newKeyName}
+              onChange={(e) => setNewKeyName(e.target.value)}
+              placeholder={t('settings.advanced.keyNamePlaceholder', '密钥名称（可选）')}
+              className={`flex-1 min-w-[120px] ${inputBase}`}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateKey()}
+            />
+            <button
+              onClick={handleCreateKey}
+              disabled={creating}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-info hover:bg-info/90 text-white rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              {t('settings.advanced.createKey', '创建密钥')}
+            </button>
           </div>
-        )}
-
-        {/* Create new key */}
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={newKeyName}
-            onChange={(e) => setNewKeyName(e.target.value)}
-            placeholder={t('settings.advanced.keyNamePlaceholder', '密钥名称（可选）')}
-            className="flex-1 px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
-            onKeyDown={(e) => e.key === 'Enter' && handleCreateKey()}
-          />
-          <button
-            onClick={handleCreateKey}
-            disabled={creating}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-info hover:bg-info/80 text-white rounded-lg transition-colors disabled:opacity-50"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {t('settings.advanced.createKey', '创建密钥')}
-          </button>
         </div>
+      </SettingsCard>
 
-        <div className="border-b border-border" />
-      </div>
-
-      <div className="space-y-3">
-        <label className="text-sm font-medium text-foreground">
-          {t('settings.advanced.sessionDir', '会话目录')}
-        </label>
-        <p className="text-xs text-muted-foreground mb-2">
-          {t('settings.advanced.sessionDirHelp', 'Pi 会话文件的存储位置，默认路径始终包含在内')}
-        </p>
-
-        <div className="space-y-2">
+      {/* Session Dirs */}
+      <SettingsCard
+        title={t('settings.advanced.sessionDir', '会话目录')}
+        description={t('settings.advanced.sessionDirHelp', 'Pi 会话文件的存储位置，默认路径始终包含在内')}
+        icon={<FolderOpen className="h-4 w-4" />}
+      >
+        <div className="space-y-3">
           <div className="flex gap-2 items-center">
             <input
               type="text"
               value="~/.pi/agent/sessions"
               disabled
-              className="flex-1 px-3 py-2 bg-surface/50 border border-border rounded-lg text-sm text-muted-foreground cursor-not-allowed"
+              className={`flex-1 ${inputBase} opacity-80 cursor-not-allowed`}
             />
-            <span className="text-xs text-muted-foreground whitespace-nowrap px-2">
+            <span className="text-xs text-muted-foreground whitespace-nowrap px-2 py-1 bg-secondary/50 rounded">
               {t('settings.advanced.defaultSessionDir', '默认')}
             </span>
           </div>
-
           {(settings.advanced.sessionDirs || [])
             .filter((d: string) => d !== '~/.pi/agent/sessions')
             .map((dir: string, index: number) => (
@@ -363,7 +353,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
                     extraDirs[index] = e.target.value
                     onUpdate('advanced', 'sessionDirs', ['~/.pi/agent/sessions', ...extraDirs])
                   }}
-                  className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
+                  className={`flex-1 ${inputBase}`}
                   placeholder="/path/to/sessions"
                 />
                 <button
@@ -374,126 +364,98 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
                     extraDirs.splice(index, 1)
                     onUpdate('advanced', 'sessionDirs', ['~/.pi/agent/sessions', ...extraDirs])
                   }}
-                  className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                  className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                   title={t('settings.advanced.removeSessionDir', '移除')}
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
             ))}
+          <button
+            onClick={() => {
+              const current = settings.advanced.sessionDirs || ['~/.pi/agent/sessions']
+              onUpdate('advanced', 'sessionDirs', [...current, ''])
+            }}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-info hover:bg-info/10 rounded-lg transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            {t('settings.advanced.addSessionDir', '添加路径')}
+          </button>
         </div>
+      </SettingsCard>
 
-        <button
-          onClick={() => {
-            const current = settings.advanced.sessionDirs || ['~/.pi/agent/sessions']
-            onUpdate('advanced', 'sessionDirs', [...current, ''])
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-info hover:bg-info/10 rounded-lg transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          {t('settings.advanced.addSessionDir', '添加路径')}
-        </button>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div>
-          <label className="text-sm font-medium text-foreground">
-            {t('settings.advanced.cacheEnabled', '启用缓存')}
-          </label>
-          <p className="text-xs text-muted-foreground">
-            {t('settings.advanced.cacheEnabledHelp', '缓存会话数据以提高性能')}
-          </p>
-        </div>
-        <label className="relative inline-flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            checked={settings.advanced.cacheEnabled}
-            onChange={(e) => onUpdate('advanced', 'cacheEnabled', e.target.checked)}
-            className="sr-only peer"
-          />
-          <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
-        </label>
-      </div>
-
-      {settings.advanced.cacheEnabled && (
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
-            {t('settings.advanced.maxCacheSize', '最大缓存大小')}
-          </label>
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min="10"
-              max="1000"
-              step="10"
-              value={settings.advanced.maxCacheSize}
-              onChange={(e) => onUpdate('advanced', 'maxCacheSize', parseInt(e.target.value))}
-              className="flex-1 h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-info"
+      {/* General options card */}
+      <SettingsCard
+        title={t('settings.advanced.generalTitle', '常规选项')}
+        icon={<Settings2 className="h-4 w-4" />}
+      >
+        <div className="space-y-4">
+          <div className="flex items-start justify-between gap-4 py-2">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">{t('settings.advanced.cacheEnabled', '启用缓存')}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('settings.advanced.cacheEnabledHelp', '缓存会话数据以提高性能')}</p>
+            </div>
+            <Toggle
+              checked={settings.advanced.cacheEnabled}
+              onChange={(v) => onUpdate('advanced', 'cacheEnabled', v)}
             />
-            <span className="text-sm text-muted-foreground w-20 text-right">
-              {settings.advanced.maxCacheSize} MB
-            </span>
+          </div>
+          {settings.advanced.cacheEnabled && (
+            <div className="pl-0 pt-2 border-t border-border/60">
+              <label className="block text-sm font-medium text-foreground mb-2">{t('settings.advanced.maxCacheSize', '最大缓存大小')}</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="10"
+                  max="1000"
+                  step="10"
+                  value={settings.advanced.maxCacheSize}
+                  onChange={(e) => onUpdate('advanced', 'maxCacheSize', parseInt(e.target.value))}
+                  className="flex-1 h-2 bg-secondary rounded-full appearance-none cursor-pointer accent-info"
+                />
+                <span className="text-sm font-mono text-muted-foreground w-16 text-right">{settings.advanced.maxCacheSize} MB</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-start justify-between gap-4 py-2 border-t border-border/60">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">{t('settings.advanced.debugMode', '调试模式')}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('settings.advanced.debugModeHelp', '启用详细日志记录')}</p>
+            </div>
+            <Toggle checked={settings.advanced.debugMode} onChange={(v) => onUpdate('advanced', 'debugMode', v)} />
+          </div>
+
+          <div className="flex items-start justify-between gap-4 py-2 border-t border-border/60">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">{t('app.demoMode', '演示模式')}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('app.demoModeDescription', '查看演示数据以探索所有功能')}</p>
+            </div>
+            <Toggle checked={settings.advanced.demoMode} onChange={(v) => onUpdate('advanced', 'demoMode', v)} />
           </div>
         </div>
-      )}
+      </SettingsCard>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <label className="text-sm font-medium text-foreground">
-            {t('settings.advanced.debugMode', '调试模式')}
-          </label>
-          <p className="text-xs text-muted-foreground">
-            {t('settings.advanced.debugModeHelp', '启用详细日志记录')}
-          </p>
+      {/* Actions */}
+      <SettingsCard>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => {
+              localStorage.removeItem('onboarding-completed')
+              alert(t('settings.advanced.onboardingReset', '下次打开应用时将显示引导'))
+            }}
+            className="px-4 py-2 bg-info/10 text-info hover:bg-info/20 rounded-lg text-sm font-medium transition-colors"
+          >
+            {t('settings.advanced.showOnboarding', '重新显示新手引导')}
+          </button>
+          <button
+            onClick={handleClearCache}
+            className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors"
+          >
+            {t('settings.advanced.clearCache', '清除缓存')}
+          </button>
         </div>
-        <label className="relative inline-flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            checked={settings.advanced.debugMode}
-            onChange={(e) => onUpdate('advanced', 'debugMode', e.target.checked)}
-            className="sr-only peer"
-          />
-          <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
-        </label>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div>
-          <label className="text-sm font-medium text-foreground">
-            {t('app.demoMode', '演示模式')}
-          </label>
-          <p className="text-xs text-muted-foreground">
-            {t('app.demoModeDescription', '查看演示数据以探索所有功能')}
-          </p>
-        </div>
-        <label className="relative inline-flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            checked={settings.advanced.demoMode}
-            onChange={(e) => onUpdate('advanced', 'demoMode', e.target.checked)}
-            className="sr-only peer"
-          />
-          <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
-        </label>
-      </div>
-
-      <div className="pt-4 border-t border-border space-y-3">
-        <button
-          onClick={() => {
-            localStorage.removeItem('onboarding-completed')
-            alert(t('settings.advanced.onboardingReset', '下次打开应用时将显示引导'))
-          }}
-          className="px-4 py-2 bg-info/10 text-info hover:bg-info/20 rounded-lg text-sm transition-colors"
-        >
-          {t('settings.advanced.showOnboarding', '重新显示新手引导')}
-        </button>
-        <button
-          onClick={handleClearCache}
-          className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm transition-colors"
-        >
-          {t('settings.advanced.clearCache', '清除缓存')}
-        </button>
-      </div>
+      </SettingsCard>
     </div>
   )
 }
