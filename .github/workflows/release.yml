@@ -9,24 +9,40 @@ on:
 permissions:
   contents: write
 
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
         include:
+          # macOS ARM64
           - platform: macos-latest
             target: aarch64-apple-darwin
-            args: "--target aarch64-apple-darwin"
+            tauri_args: "--target aarch64-apple-darwin"
+            cli_artifact: pi-session-cli-macos-arm64
+            cli_binary: pi-session-cli
+          # macOS x64
           - platform: macos-latest
             target: x86_64-apple-darwin
-            args: "--target x86_64-apple-darwin"
+            tauri_args: "--target x86_64-apple-darwin"
+            cli_artifact: pi-session-cli-macos-x64
+            cli_binary: pi-session-cli
+          # Linux x64
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            args: ""
+            tauri_args: ""
+            cli_artifact: pi-session-cli-linux-x64
+            cli_binary: pi-session-cli
+          # Windows x64
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
-            args: ""
+            tauri_args: ""
+            cli_artifact: pi-session-cli-windows-x64.exe
+            cli_binary: pi-session-cli.exe
 
     runs-on: ${{ matrix.platform }}
 
@@ -45,16 +61,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+          key: ${{ matrix.target }}
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Install frontend dependencies
-        run: npm ci
+      # ── Frontend (shared by both Desktop and CLI) ──────────
+      - name: Build frontend
+        run: |
+          npm ci
+          npm run build
 
-      - name: Build Tauri app
+      # ── Desktop (Tauri) ───────────────────────────────────
+      - name: Build Tauri desktop app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -63,60 +89,150 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Pi Session Manager ${{ github.ref_name }}"
-          releaseBody: "See the assets to download and install this version."
-          releaseDraft: false
+          releaseBody: ""
+          releaseDraft: true
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          args: ${{ matrix.args }}
+          args: ${{ matrix.tauri_args }}
 
-  update-release-notes:
+      # ── CLI binary ────────────────────────────────────────
+      - name: Build CLI binary
+        run: cargo build --release --target ${{ matrix.target }} -p pi-session-cli
+
+      - name: Package CLI (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p cli-dist
+          cp target/${{ matrix.target }}/release/${{ matrix.cli_binary }} cli-dist/${{ matrix.cli_artifact }}
+          chmod +x cli-dist/${{ matrix.cli_artifact }}
+          cd cli-dist
+          tar -czf ${{ matrix.cli_artifact }}.tar.gz ${{ matrix.cli_artifact }}
+          shasum -a 256 ${{ matrix.cli_artifact }}.tar.gz > ${{ matrix.cli_artifact }}.tar.gz.sha256
+
+      - name: Package CLI (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path cli-dist
+          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.cli_binary }}" "cli-dist/${{ matrix.cli_artifact }}"
+          Compress-Archive -Path "cli-dist/${{ matrix.cli_artifact }}" -DestinationPath "cli-dist/${{ matrix.cli_artifact }}.zip"
+          $hash = (Get-FileHash "cli-dist/${{ matrix.cli_artifact }}.zip" -Algorithm SHA256).Hash
+          "$hash  ${{ matrix.cli_artifact }}.zip" | Out-File -FilePath "cli-dist/${{ matrix.cli_artifact }}.zip.sha256" -Encoding ASCII
+
+      - name: Upload CLI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.cli_artifact }}
+          path: cli-dist/*.*
+          retention-days: 7
+
+  # ── Finalize Release ─────────────────────────────────────
+  finalize-release:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Generate changelog
-        id: changelog
+      - name: Download CLI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          path: cli-artifacts
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -lhR cli-artifacts/
+
+      - name: Generate release notes
+        id: notes
         run: |
           VERSION=${GITHUB_REF_NAME#v}
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
 
           {
             echo "body<<EOF"
-            echo "## What's Changed"
+            echo "## Pi Session Manager $VERSION"
+            echo ""
+            echo "### What's Changed"
             echo ""
             if [ -n "$PREV_TAG" ]; then
-              git log --pretty=format:"- %s" "$PREV_TAG"..HEAD | grep -v "^- Merge"
+              git log --pretty=format:"- %s" "$PREV_TAG"..HEAD | grep -v "^- Merge" || echo "- See commit history"
               echo ""
               echo ""
               echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ github.ref_name }}"
             else
-              echo "Initial release of Pi Session Manager v$VERSION"
+              echo "- Initial release"
             fi
             echo ""
             echo ""
-            echo "## Download"
+            echo "---"
+            echo ""
+            echo "### 🖥️ Desktop App (GUI)"
+            echo ""
+            echo "Full-featured desktop application with Tauri."
             echo ""
             echo "| Platform | File |"
             echo "|----------|------|"
             echo "| macOS (Apple Silicon) | \`Pi.Session.Manager_${VERSION}_aarch64.dmg\` |"
             echo "| macOS (Intel) | \`Pi.Session.Manager_${VERSION}_x64.dmg\` |"
             echo "| Windows | \`.exe\` / \`.msi\` installer |"
-            echo "| Linux | \`.deb\` / \`.AppImage\` / \`.rpm\` |"
+            echo "| Linux | \`.deb\` / \`.AppImage\` |"
             echo ""
-            echo "## Requirements"
+            echo "### ⚡ CLI Server (Headless)"
             echo ""
-            echo "- [Pi](https://github.com/badlogic/pi-mono) for terminal integration"
-            echo "- macOS 11+, Windows 10+, or Linux with WebKitGTK 4.1"
+            echo "Lightweight server with embedded web UI — no GUI dependencies needed."
+            echo "Ideal for remote servers, Docker, or headless environments."
+            echo ""
+            echo "| Platform | File |"
+            echo "|----------|------|"
+            echo "| macOS (Apple Silicon) | \`pi-session-cli-macos-arm64.tar.gz\` |"
+            echo "| macOS (Intel) | \`pi-session-cli-macos-x64.tar.gz\` |"
+            echo "| Linux (x64) | \`pi-session-cli-linux-x64.tar.gz\` |"
+            echo "| Windows (x64) | \`pi-session-cli-windows-x64.exe.zip\` |"
+            echo ""
+            echo "#### CLI Quick Start"
+            echo ""
+            echo "\`\`\`bash"
+            echo "# Extract and run"
+            echo "tar -xzf pi-session-cli-*.tar.gz"
+            echo "chmod +x pi-session-cli-*"
+            echo "./pi-session-cli-*"
+            echo ""
+            echo "# Open http://localhost:52131 in your browser"
+            echo "\`\`\`"
+            echo ""
+            echo "#### CLI Configuration"
+            echo ""
+            echo "Create \`~/.config/pi-session-manager.json\` (Linux) or \`~/Library/Application Support/pi-session-manager.json\` (macOS):"
+            echo ""
+            echo "\`\`\`json"
+            echo "{"
+            echo "  \"http_port\": 52131,"
+            echo "  \"bind_addr\": \"0.0.0.0\","
+            echo "  \"auth_enabled\": true"
+            echo "}"
+            echo "\`\`\`"
+            echo ""
+            echo "### Requirements"
+            echo ""
+            echo "- **Desktop**: macOS 11+, Windows 10+, or Linux with WebKitGTK 4.1"
+            echo "- **CLI**: No special requirements (statically links SQLite)"
+            echo "- [Pi](https://github.com/nickviper/pi-mono) for terminal integration"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Update release body
+      - name: Update release with CLI assets and notes
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: "Pi Session Manager ${{ github.ref_name }}"
-          body: ${{ steps.changelog.outputs.body }}
+          body: ${{ steps.notes.outputs.body }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          files: cli-artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

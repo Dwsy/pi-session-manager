@@ -44,7 +44,7 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: ". -> target"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -61,14 +61,19 @@ jobs:
       - name: Frontend build
         run: npm run build
 
-      - name: Rust format check
-        working-directory: src-tauri
-        run: cargo fmt --check
+      - name: Rust format check (workspace)
+        run: cargo fmt --all --check
 
-      - name: Rust clippy
+      - name: Rust clippy (desktop)
         working-directory: src-tauri
         run: cargo clippy -- -D warnings
 
-      - name: Rust tests
+      - name: Rust clippy (CLI)
+        run: cargo clippy -p pi-session-cli -- -D warnings
+
+      - name: Rust tests (desktop)
         working-directory: src-tauri
         run: cargo test
+
+      - name: Rust build CLI
+        run: cargo build -p pi-session-cli
