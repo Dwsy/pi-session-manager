@@ -133,7 +133,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className={`${isMobile ? 'w-full h-full' : 'w-[1200px] h-[700px]'} bg-surface-dark rounded-xl border border-border shadow-2xl flex ${isMobile ? 'flex-col' : ''} overflow-hidden`}>
+      <div className={`${isMobile ? 'w-full h-full rounded-none' : 'w-[1200px] h-[700px] rounded-xl'} bg-surface-dark border border-border shadow-2xl flex ${isMobile ? 'flex-col' : ''} overflow-hidden`}>
         {isMobile ? (
           <MobileSettings
             menuItems={menuItems}
@@ -244,9 +244,8 @@ function MobileSettings({
   const shouldRenderDetail = showDetail || animating
   const shouldRenderList = !showDetail || animating
 
-  // List: visible at translateX(0) when !showDetail, slides to -30% when showDetail
-  // Detail: visible at translateX(0) when showDetail, starts at 100% and slides in
-  const listTransform = showDetail ? 'translateX(-30%)' : 'translateX(0)'
+  // 移动端全屏滑动：列表左滑出，详情从右滑入（更清晰的页面切换）
+  const listTransform = showDetail ? 'translateX(-100%)' : 'translateX(0)'
   const detailTransform = showDetail ? 'translateX(0)' : 'translateX(100%)'
   const transitionStyle = { transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease' }
 
@@ -258,16 +257,16 @@ function MobileSettings({
           className="absolute inset-0 flex flex-col bg-surface-dark"
           style={{
             transform: listTransform,
-            opacity: showDetail ? 0.5 : 1,
+            opacity: showDetail ? 0 : 1,
             ...transitionStyle,
           }}
           onTransitionEnd={!showDetail ? handleTransitionEnd : undefined}
         >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background flex-shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background flex-shrink-0 safe-area-top">
             <h2 className="text-lg font-semibold text-foreground">{t('settings.title', '设置')}</h2>
             <button
               onClick={onClose}
-              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -279,7 +278,7 @@ function MobileSettings({
                 <button
                   key={item.id}
                   onClick={() => handleSectionClick(item.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-foreground hover:bg-surface active:bg-secondary transition-colors"
+                  className="w-full flex items-center gap-3 px-4 min-h-[44px] text-left text-sm text-foreground hover:bg-surface active:bg-secondary transition-colors"
                 >
                   <span className="text-muted-foreground">{item.icon}</span>
                   <span className="flex-1 text-left">{item.label}</span>
@@ -291,7 +290,7 @@ function MobileSettings({
             <div className="px-4 py-4 border-t border-border">
               <button
                 onClick={onReset}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border transition-colors"
+                className="w-full flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border transition-colors"
               >
                 <RefreshCw className="h-4 w-4" />
                 {t('settings.reset', '重置设置')}
@@ -311,10 +310,10 @@ function MobileSettings({
           }}
           onTransitionEnd={showDetail ? handleTransitionEnd : undefined}
         >
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-background flex-shrink-0">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-background flex-shrink-0 safe-area-top">
             <button
               onClick={handleBack}
-              className="p-1.5 -ml-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+              className="p-2 -ml-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -323,13 +322,13 @@ function MobileSettings({
             </h3>
             <button
               onClick={onClose}
-              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="flex-1 overflow-y-auto px-4 py-4 overscroll-contain">
             {loading ? (
               <div className="flex items-center justify-center h-40">
                 <Loader2 className="h-8 w-8 animate-spin text-info" />
@@ -339,17 +338,17 @@ function MobileSettings({
             )}
           </div>
 
-          <div className="flex items-center gap-3 px-4 py-3 border-t border-border bg-background flex-shrink-0">
+          <div className="flex items-center gap-3 px-4 py-3 border-t border-border bg-background flex-shrink-0 safe-area-bottom">
             <button
               onClick={handleBack}
-              className="flex-1 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors"
+              className="flex-1 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors flex items-center justify-center"
             >
               {t('common.cancel', '取消')}
             </button>
             <button
               onClick={onSave}
               disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-info hover:bg-info/80 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-2 min-h-[44px] px-4 bg-info hover:bg-info/80 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
               {saved ? t('settings.saved', '已保存') : t('common.save', '保存')}
@@ -372,38 +371,38 @@ function SettingsSidebar({ menuItems, activeSection, onSectionChange, onReset }:
   const { t } = useTranslation()
 
   return (
-    <div className="w-64 bg-background border-r border-border flex flex-col overflow-y-auto">
-      <div className="p-4 border-b border-border flex-shrink-0">
-        <h2 className="text-lg font-semibold text-foreground">{t('settings.title', '设置')}</h2>
-        <p className="text-xs text-muted-foreground mt-1">{t('settings.subtitle', '自定义您的体验')}</p>
+    <div className="w-64 bg-background/95 border-r border-border flex flex-col overflow-y-auto">
+      <div className="p-5 border-b border-border/80 flex-shrink-0">
+        <h2 className="text-lg font-semibold text-foreground tracking-tight">{t('settings.title', '设置')}</h2>
+        <p className="text-xs text-muted-foreground mt-1.5">{t('settings.subtitle', '自定义您的体验')}</p>
       </div>
 
-      <nav className="flex-1 p-2 space-y-1">
+      <nav className="flex-1 p-2 space-y-0.5">
         {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onSectionChange(item.id)}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
               activeSection === item.id
-                ? 'bg-secondary text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-surface'
+                ? 'bg-info/15 text-foreground ring-1 ring-info/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-surface/80'
             }`}
           >
-            {item.icon}
-            <span>{item.label}</span>
+            <span className={activeSection === item.id ? 'text-info' : ''}>{item.icon}</span>
+            <span className="flex-1 text-left">{item.label}</span>
             <ChevronRight
-              className={`h-4 w-4 ml-auto transition-transform ${
-                activeSection === item.id ? 'rotate-90' : ''
+              className={`h-4 w-4 transition-transform text-muted-foreground/50 ${
+                activeSection === item.id ? 'rotate-90 text-info/70' : ''
               }`}
             />
           </button>
         ))}
       </nav>
 
-      <div className="p-4 border-t border-border flex-shrink-0">
+      <div className="p-3 border-t border-border/80 flex-shrink-0">
         <button
           onClick={onReset}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg transition-colors"
         >
           <RefreshCw className="h-4 w-4" />
           {t('settings.reset', '重置设置')}
@@ -439,20 +438,20 @@ function SettingsContent({
   const { t } = useTranslation()
 
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <h3 className="text-base font-medium text-foreground">
+    <div className="flex-1 flex flex-col bg-surface-dark/30">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-background/50">
+        <h3 className="text-base font-semibold text-foreground tracking-tight">
           {menuItems.find((i) => i.id === activeSection)?.label}
         </h3>
         <button
           onClick={onClose}
-          className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
+          className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg transition-colors"
         >
           <X className="h-5 w-5" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 min-h-0">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-info" />
@@ -474,17 +473,17 @@ function SettingsContent({
         )}
       </div>
 
-      <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-background">
+      <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border/80 bg-background/80">
         <button
           onClick={onClose}
-          className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg transition-colors"
         >
           {t('common.cancel', '取消')}
         </button>
         <button
           onClick={onSave}
           disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-info hover:bg-info/80 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-5 py-2.5 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
           {saved ? t('settings.saved', '已保存') : t('common.save', '保存设置')}
