@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { useIsMobile } from '../hooks/useIsMobile'
 
+const isMac = navigator.platform.toUpperCase().includes('MAC')
+  || navigator.userAgent.includes('Macintosh')
+
 interface KbdTooltipProps {
   shortcut: string
   label?: string
@@ -11,7 +14,7 @@ interface KbdTooltipProps {
 
 /**
  * Wraps a button/element and shows a keyboard shortcut tooltip on hover.
- * Hidden on mobile devices.
+ * Hidden on mobile devices. Adapts modifier symbols per platform.
  */
 export default function KbdTooltip({
   shortcut,
@@ -37,14 +40,16 @@ export default function KbdTooltip({
     setVisible(false)
   }
 
-  // Parse shortcut keys for rendering
-  const keys = shortcut.split('+').map(k => {
-    const map: Record<string, string> = {
-      Cmd: '⌘', Ctrl: '⌃', Alt: '⌥', Shift: '⇧',
-      '⌘': '⌘', '⌃': '⌃', '⌥': '⌥', '⇧': '⇧',
-    }
-    return map[k] || k
-  })
+  // Platform-aware modifier mapping
+  const macMap: Record<string, string> = {
+    Cmd: '⌘', Ctrl: '⌃', Alt: '⌥', Shift: '⇧',
+  }
+  const otherMap: Record<string, string> = {
+    Cmd: 'Ctrl', Ctrl: 'Ctrl', Alt: 'Alt', Shift: 'Shift',
+  }
+  const modMap = isMac ? macMap : otherMap
+
+  const keys = shortcut.split('+').map(k => modMap[k] ?? k)
 
   const posClass = position === 'top'
     ? 'bottom-full mb-1.5'
