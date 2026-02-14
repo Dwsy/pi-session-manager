@@ -43,10 +43,6 @@ struct ServerConfig {
     bind_addr: String,
     #[serde(default)]
     auth_enabled: bool,
-    #[serde(default)]
-    ws_enabled: bool,
-    #[serde(default)]
-    ws_port: u16,
 }
 
 fn default_true() -> bool {
@@ -66,8 +62,6 @@ impl Default for ServerConfig {
             http_port: 52131,
             bind_addr: "0.0.0.0".to_string(),
             auth_enabled: false,
-            ws_enabled: false,
-            ws_port: 0,
         }
     }
 }
@@ -144,6 +138,11 @@ async fn main() {
         }
     } else {
         info!("🔓 Auth disabled (set auth_enabled=true in config)");
+    }
+
+    if !config.http_enabled {
+        error!("HTTP server is disabled in config (http_enabled=false), nothing to start");
+        return;
     }
 
     let addr = format!("{}:{}", config.bind_addr, config.http_port);
