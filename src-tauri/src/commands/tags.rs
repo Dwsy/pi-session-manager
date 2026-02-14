@@ -73,7 +73,14 @@ pub async fn create_tag(
 ) -> Result<TagItem, String> {
     let conn = get_conn()?;
     let id = format!("tag-{}", chrono::Utc::now().timestamp_millis());
-    sqlite_cache::create_tag(&conn, &id, &name, &color, icon.as_deref(), parent_id.as_deref())?;
+    sqlite_cache::create_tag(
+        &conn,
+        &id,
+        &name,
+        &color,
+        icon.as_deref(),
+        parent_id.as_deref(),
+    )?;
     sqlite_cache::get_all_tags(&conn)?
         .into_iter()
         .find(|t| t.id == id)

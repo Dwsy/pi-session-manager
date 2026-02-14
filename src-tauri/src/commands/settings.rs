@@ -1,8 +1,8 @@
 use serde_json::Value;
 use std::fs;
-use tracing::warn;
 #[cfg(feature = "gui")]
 use tauri::Manager;
+use tracing::warn;
 
 const APP_SETTINGS_KEY: &str = "app_settings";
 const SERVER_SETTINGS_KEY: &str = "server_settings";
@@ -109,7 +109,9 @@ pub async fn save_session_paths(
 
     // Restart file watcher with new paths
     let watcher_state: tauri::State<'_, crate::file_watcher::FileWatcherState> = app_handle.state();
-    if let Err(e) = crate::file_watcher::restart_watcher_with_config(&watcher_state, app_handle.clone()) {
+    if let Err(e) =
+        crate::file_watcher::restart_watcher_with_config(&watcher_state, app_handle.clone())
+    {
         warn!("Failed to restart file watcher: {}", e);
     }
 
@@ -121,5 +123,8 @@ pub async fn save_session_paths(
 pub async fn get_all_session_dirs() -> Result<Vec<String>, String> {
     let config = crate::config::Config::load().unwrap_or_default();
     let dirs = crate::scanner::get_all_session_dirs(&config);
-    Ok(dirs.iter().map(|d| d.to_string_lossy().to_string()).collect())
+    Ok(dirs
+        .iter()
+        .map(|d| d.to_string_lossy().to_string())
+        .collect())
 }

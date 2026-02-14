@@ -1,16 +1,20 @@
-use std::sync::Arc;
-use tokio::sync::broadcast;
-use tracing::{info, error};
 use axum::{
-    Router, routing::{get, post}, Json,
-    extract::{ws::{Message as AxumWsMsg, WebSocket, WebSocketUpgrade}, ConnectInfo, State},
+    extract::{
+        ws::{Message as AxumWsMsg, WebSocket, WebSocketUpgrade},
+        ConnectInfo, State,
+    },
+    http::{header, HeaderMap, StatusCode, Uri},
     response::{IntoResponse, Response},
-    http::{HeaderMap, StatusCode, header, Uri},
+    routing::{get, post},
+    Json, Router,
 };
+use futures_util::{SinkExt, StreamExt};
 use rust_embed::Embed;
 use serde_json::Value;
-use futures_util::{SinkExt, StreamExt};
 use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::broadcast;
+use tracing::{error, info};
 
 #[derive(Embed)]
 #[folder = "../dist/"]
@@ -45,9 +49,15 @@ struct ServerConfig {
     ws_port: u16,
 }
 
-fn default_true() -> bool { true }
-fn default_http_port() -> u16 { 52131 }
-fn default_bind() -> String { "0.0.0.0".to_string() }
+fn default_true() -> bool {
+    true
+}
+fn default_http_port() -> u16 {
+    52131
+}
+fn default_bind() -> String {
+    "0.0.0.0".to_string()
+}
 
 impl Default for ServerConfig {
     fn default() -> Self {
@@ -94,7 +104,9 @@ fn is_authorized(ip: &std::net::IpAddr, headers: &HeaderMap, uri: &Uri) -> bool 
         .and_then(|v| v.strip_prefix("Bearer "))
         .map(pi_session_manager::auth::validate)
         .unwrap_or(false);
-    if header_ok { return true; }
+    if header_ok {
+        return true;
+    }
     query_param(uri, "token")
         .as_deref()
         .map(pi_session_manager::auth::validate)
@@ -154,7 +166,11 @@ async fn main() {
 // ─── Handlers ───────────────────────────────────────────────
 
 #[derive(serde::Deserialize)]
-struct ApiReq { command: String, #[serde(default)] payload: Value }
+struct ApiReq {
+    command: String,
+    #[serde(default)]
+    payload: Value,
+}
 
 async fn api_handler(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -222,11 +238,21 @@ async fn static_handler(uri: Uri) -> Response {
     if !path.is_empty() {
         if let Some(file) = FrontendAssets::get(path) {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
-            return (StatusCode::OK, [(header::CONTENT_TYPE, mime.as_ref())], file.data).into_response();
+            return (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, mime.as_ref())],
+                file.data,
+            )
+                .into_response();
         }
     }
     match FrontendAssets::get("index.html") {
-        Some(f) => (StatusCode::OK, [(header::CONTENT_TYPE, "text/html")], f.data).into_response(),
+        Some(f) => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, "text/html")],
+            f.data,
+        )
+            .into_response(),
         None => (StatusCode::NOT_FOUND, "Frontend not embedded").into_response(),
     }
 }
@@ -234,9 +260,11 @@ async fn static_handler(uri: Uri) -> Response {
 // ─── Unified server ─────────────────────────────────────────
 
 async fn run_server(state: SharedState, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
-
     let app = Router::new()
-        .route("/api/auth-check", get(auth_check).options(preflight_handler))
+        .route(
+            "/api/auth-check",
+            get(auth_check).options(preflight_handler),
+        )
         .route("/api", post(api_handler).options(preflight_handler))
         .route("/health", get(health_handler))
         .route("/ws", get(ws_upgrade))
@@ -245,7 +273,11 @@ async fn run_server(state: SharedState, addr: &str) -> Result<(), Box<dyn std::e
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!("Server listening on {addr}");
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
     Ok(())
 }
 
@@ -253,7 +285,10 @@ fn cors_headers() -> [(&'static str, &'static str); 3] {
     [
         ("access-control-allow-origin", "*"),
         ("access-control-allow-methods", "GET, POST, OPTIONS"),
-        ("access-control-allow-headers", "content-type, authorization"),
+        (
+            "access-control-allow-headers",
+            "content-type, authorization",
+        ),
     ]
 }
 
@@ -264,18 +299,19 @@ async fn handle_ws(socket: WebSocket, state: SharedState, pre_authed: bool, need
 
     // Auth handshake if needed
     if needs_auth && !pre_authed {
-        let authed = match tokio::time::timeout(std::time::Duration::from_secs(10), rx.next()).await {
-            Ok(Some(Ok(AxumWsMsg::Text(text)))) => {
-                serde_json::from_str::<Value>(&text)
-                    .ok()
-                    .and_then(|v| v.get("auth")?.as_str().map(String::from))
-                    .map(|t| pi_session_manager::auth::validate(&t))
-                    .unwrap_or(false)
-            }
+        let authed = match tokio::time::timeout(std::time::Duration::from_secs(10), rx.next()).await
+        {
+            Ok(Some(Ok(AxumWsMsg::Text(text)))) => serde_json::from_str::<Value>(&text)
+                .ok()
+                .and_then(|v| v.get("auth")?.as_str().map(String::from))
+                .map(|t| pi_session_manager::auth::validate(&t))
+                .unwrap_or(false),
             _ => false,
         };
         if !authed {
-            let _ = tx.send(AxumWsMsg::Text(r#"{"error":"Unauthorized"}"#.into())).await;
+            let _ = tx
+                .send(AxumWsMsg::Text(r#"{"error":"Unauthorized"}"#.into()))
+                .await;
             let _ = tx.close().await;
             return;
         }

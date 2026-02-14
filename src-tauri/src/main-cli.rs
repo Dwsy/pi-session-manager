@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use tracing::{info, error};
+use tracing::{error, info};
 
 // CLI 专用状态（无 Tauri 依赖）
 pub struct CliAppState {
@@ -32,15 +32,15 @@ pub type SharedCliState = Arc<CliAppState>;
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
-    
+
     info!("Starting Pi Session Manager - CLI Mode");
-    
+
     // 加载配置
     let server_cfg = load_server_settings();
-    
+
     // 创建状态
     let state = Arc::new(CliAppState::new());
-    
+
     // 启动 WebSocket 服务
     if server_cfg.ws_enabled {
         let ws_state = state.clone();
@@ -54,7 +54,7 @@ async fn main() {
         });
         info!("WebSocket: ws://{}:{}", ws_bind_log, ws_port);
     }
-    
+
     // 启动 HTTP 服务
     if server_cfg.http_enabled {
         let http_state = state.clone();
@@ -68,11 +68,13 @@ async fn main() {
         });
         info!("HTTP: http://{}:{}/api", http_bind_log, http_port);
     }
-    
+
     info!("CLI mode running. Press Ctrl+C to exit.");
-    
+
     // 保持运行
-    tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl+c");
+    tokio::signal::ctrl_c()
+        .await
+        .expect("Failed to listen for ctrl+c");
     info!("Shutting down...");
 }
 
@@ -92,7 +94,7 @@ fn load_server_settings() -> ServerConfig {
     let config_path = dirs::config_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
         .join("pi-session-manager.json");
-    
+
     if let Ok(content) = std::fs::read_to_string(&config_path) {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
             return ServerConfig {
@@ -100,12 +102,15 @@ fn load_server_settings() -> ServerConfig {
                 http_enabled: json["http_enabled"].as_bool().unwrap_or(true),
                 ws_port: json["ws_port"].as_u64().unwrap_or(52130) as u16,
                 http_port: json["http_port"].as_u64().unwrap_or(52131) as u16,
-                bind_addr: json["bind_addr"].as_str().unwrap_or("127.0.0.1").to_string(),
+                bind_addr: json["bind_addr"]
+                    .as_str()
+                    .unwrap_or("127.0.0.1")
+                    .to_string(),
                 auth_enabled: json["auth_enabled"].as_bool().unwrap_or(false),
             };
         }
     }
-    
+
     // 默认配置
     ServerConfig {
         ws_enabled: true,
@@ -123,14 +128,14 @@ async fn init_ws_adapter(
     bind_addr: &str,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    use futures_util::{SinkExt, StreamExt};
     use tokio::net::TcpListener;
     use tokio_tungstenite::accept_async;
-    use futures_util::{SinkExt, StreamExt};
-    
+
     let addr = format!("{bind_addr}:{port}");
     let listener = TcpListener::bind(&addr).await?;
     info!("WebSocket listening on {}", addr);
-    
+
     while let Ok((stream, _)) = listener.accept().await {
         let state = state.clone();
         tokio::spawn(async move {
@@ -141,9 +146,9 @@ async fn init_ws_adapter(
                     return;
                 }
             };
-            
+
             let (mut sender, mut receiver) = ws_stream.split();
-            
+
             // 简单 echo + 命令处理
             while let Some(msg) = receiver.next().await {
                 if let Ok(msg) = msg {
@@ -170,16 +175,18 @@ async fn init_ws_adapter(
                                     })
                                 }
                             };
-                            let _ = sender.send(tokio_tungstenite::tungstenite::Message::Text(
-                                response.to_string()
-                            )).await;
+                            let _ = sender
+                                .send(tokio_tungstenite::tungstenite::Message::Text(
+                                    response.to_string(),
+                                ))
+                                .await;
                         }
                     }
                 }
             }
         });
     }
-    
+
     Ok(())
 }
 
@@ -189,9 +196,9 @@ async fn init_http_adapter(
     bind_addr: &str,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use axum::{Router, routing::post, Json};
+    use axum::{routing::post, Json, Router};
     use serde_json::Value;
-    
+
     async fn api_handler(Json(body): Json<Value>) -> Json<Value> {
         let cmd = body["command"].as_str().unwrap_or("unknown");
         Json(serde_json::json!({
@@ -199,15 +206,14 @@ async fn init_http_adapter(
             "error": format!("Command '{}' not implemented in CLI mode", cmd)
         }))
     }
-    
-    let app = Router::new()
-        .route("/api", post(api_handler));
-    
+
+    let app = Router::new().route("/api", post(api_handler));
+
     let addr = format!("{bind_addr}:{port}");
     info!("HTTP listening on {}", addr);
-    
+
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
-    
+
     Ok(())
 }

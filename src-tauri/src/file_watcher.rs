@@ -66,7 +66,10 @@ impl FileWatcher {
             return Err("No existing paths to watch".to_string());
         }
 
-        info!("Starting file watcher for {} directories:", unique_paths.len());
+        info!(
+            "Starting file watcher for {} directories:",
+            unique_paths.len()
+        );
         for path in &unique_paths {
             info!("  - {:?}", path);
         }
@@ -146,7 +149,10 @@ pub fn restart_watcher_with_config(
     let config = crate::config::load_config().unwrap_or_default();
     let all_dirs = crate::scanner::get_all_session_dirs(&config);
 
-    info!("Restarting file watcher with {} directories", all_dirs.len());
+    info!(
+        "Restarting file watcher with {} directories",
+        all_dirs.len()
+    );
     watcher_state.restart(all_dirs, app_handle)?;
 
     Ok(())
@@ -172,11 +178,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                 Ok(events) => {
                     for event in &events {
                         for path in &event.paths {
-                            if path
-                                .extension()
-                                .map(|ext| ext == "jsonl")
-                                .unwrap_or(false)
-                            {
+                            if path.extension().map(|ext| ext == "jsonl").unwrap_or(false) {
                                 // Skip non-pi-session files: subagent artifacts and
                                 // gateway transcripts use different JSONL formats.
                                 let dominated_by_excluded = path.components().any(|c| {
@@ -214,10 +216,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                 .map(|p| p.to_string_lossy().to_string())
                 .collect();
 
-            info!(
-                "Incremental rescan: {} changed files",
-                changed.len()
-            );
+            info!("Incremental rescan: {} changed files", changed.len());
 
             // Update backend cache, get diff
             match rt.block_on(crate::scanner::rescan_changed_files(changed)) {

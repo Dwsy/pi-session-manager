@@ -130,9 +130,9 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
 
                             let metadata = fs::metadata(&file_path);
                             let file_modified: DateTime<Utc> = match metadata {
-                                Ok(m) => {
-                                    DateTime::from(m.modified().unwrap_or(std::time::SystemTime::now()))
-                                }
+                                Ok(m) => DateTime::from(
+                                    m.modified().unwrap_or(std::time::SystemTime::now()),
+                                ),
                                 Err(_) => continue,
                             };
 

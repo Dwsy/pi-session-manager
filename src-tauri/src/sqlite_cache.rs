@@ -136,14 +136,14 @@ pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
 
     // Insert builtin tags based on system language
     let now = Utc::now().to_rfc3339();
-    
+
     // Detect system language
     let is_chinese = std::env::var("LANG")
         .or_else(|_| std::env::var("LC_ALL"))
         .or_else(|_| std::env::var("LC_MESSAGES"))
         .map(|lang| lang.to_lowercase().contains("zh") || lang.to_lowercase().contains("cn"))
         .unwrap_or(false);
-    
+
     let builtins = if is_chinese {
         // Chinese labels
         [
@@ -163,7 +163,7 @@ pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
             ("builtin-archive", "Archive", "slate", 4),
         ]
     };
-    
+
     for (id, name, color, order) in &builtins {
         conn.execute(
             "INSERT OR IGNORE INTO tags (id, name, color, sort_order, is_builtin, created_at) VALUES (?1, ?2, ?3, ?4, 1, ?5)",

@@ -92,7 +92,9 @@ fn reload_tokens(conn: &Connection) -> Result<(), String> {
 pub fn list_tokens() -> Result<Vec<TokenInfo>, String> {
     let conn = open_db()?;
     let mut stmt = conn
-        .prepare("SELECT token, name, created_at, last_used FROM auth_tokens ORDER BY created_at DESC")
+        .prepare(
+            "SELECT token, name, created_at, last_used FROM auth_tokens ORDER BY created_at DESC",
+        )
         .map_err(|e| format!("{e}"))?;
     let rows = stmt
         .query_map([], |row| {
@@ -131,7 +133,10 @@ pub fn revoke_token(key_preview: &str) -> Result<(), String> {
     let prefix = key_preview.trim_end_matches('…');
     let pattern = format!("{prefix}%");
     let deleted = conn
-        .execute("DELETE FROM auth_tokens WHERE token LIKE ?1", params![pattern])
+        .execute(
+            "DELETE FROM auth_tokens WHERE token LIKE ?1",
+            params![pattern],
+        )
         .map_err(|e| format!("Failed to revoke: {e}"))?;
     if deleted == 0 {
         return Err("Token not found".to_string());

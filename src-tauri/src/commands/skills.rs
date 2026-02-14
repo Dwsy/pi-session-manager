@@ -274,7 +274,9 @@ pub async fn save_pi_settings(settings: PiSettings) -> Result<(), String> {
 // --- scan_all_resources ---
 
 /// Read settings.json from a given path and extract the string arrays for each resource type.
-fn read_settings_arrays(settings_path: &Path) -> (Vec<String>, Vec<String>, Vec<String>, Vec<String>) {
+fn read_settings_arrays(
+    settings_path: &Path,
+) -> (Vec<String>, Vec<String>, Vec<String>, Vec<String>) {
     let empty = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let content = match fs::read_to_string(settings_path) {
         Ok(c) => c,
@@ -287,10 +289,19 @@ fn read_settings_arrays(settings_path: &Path) -> (Vec<String>, Vec<String>, Vec<
     let extract = |key: &str| -> Vec<String> {
         json.get(key)
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default()
     };
-    (extract("skills"), extract("extensions"), extract("prompts"), extract("themes"))
+    (
+        extract("skills"),
+        extract("extensions"),
+        extract("prompts"),
+        extract("themes"),
+    )
 }
 
 /// Check if a resource path is enabled based on settings.json +/- prefix convention.
@@ -370,7 +381,11 @@ fn scan_skills_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<Res
         if !path.is_dir() {
             continue;
         }
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
         if name.starts_with('.') {
             continue;
         }
@@ -411,14 +426,18 @@ fn scan_extensions_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
         if file_name.starts_with('.') || file_name == "README.md" || file_name == "CHANGELOG.md" {
             continue;
         }
-        let is_ext_file = path.is_file()
-            && (file_name.ends_with(".ts") || file_name.ends_with(".js"));
-        let is_ext_dir = path.is_dir()
-            && (path.join("index.ts").exists() || path.join("index.js").exists());
+        let is_ext_file =
+            path.is_file() && (file_name.ends_with(".ts") || file_name.ends_with(".js"));
+        let is_ext_dir =
+            path.is_dir() && (path.join("index.ts").exists() || path.join("index.js").exists());
         if !is_ext_file && !is_ext_dir {
             continue;
         }
@@ -453,14 +472,22 @@ fn scan_prompts_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<Re
         if !path.is_file() {
             continue;
         }
-        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
         if !file_name.ends_with(".md") || file_name.starts_with('.') {
             continue;
         }
         let name = file_name.trim_end_matches(".md").to_string();
         let description = fs::read_to_string(&path)
             .ok()
-            .and_then(|c| c.lines().next().map(|s| s.trim().trim_start_matches("# ").to_string()))
+            .and_then(|c| {
+                c.lines()
+                    .next()
+                    .map(|s| s.trim().trim_start_matches("# ").to_string())
+            })
             .unwrap_or_default();
         let relative = format!("prompts/{file_name}");
         let enabled = is_resource_enabled(settings_list, &relative);
@@ -490,7 +517,11 @@ fn scan_themes_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<Res
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
         if file_name.starts_with('.') {
             continue;
         }
@@ -530,10 +561,26 @@ pub async fn scan_all_resources_internal(cwd: Option<String>) -> Result<Vec<Reso
     let mut all: Vec<ResourceInfo> = Vec::new();
 
     // User scope
-    all.extend(scan_skills_dir(&user_base.join("skills"), "user", &user_skills_cfg));
-    all.extend(scan_extensions_dir(&user_base.join("extensions"), "user", &user_ext_cfg));
-    all.extend(scan_prompts_dir(&user_base.join("prompts"), "user", &user_prompts_cfg));
-    all.extend(scan_themes_dir(&user_base.join("themes"), "user", &user_themes_cfg));
+    all.extend(scan_skills_dir(
+        &user_base.join("skills"),
+        "user",
+        &user_skills_cfg,
+    ));
+    all.extend(scan_extensions_dir(
+        &user_base.join("extensions"),
+        "user",
+        &user_ext_cfg,
+    ));
+    all.extend(scan_prompts_dir(
+        &user_base.join("prompts"),
+        "user",
+        &user_prompts_cfg,
+    ));
+    all.extend(scan_themes_dir(
+        &user_base.join("themes"),
+        "user",
+        &user_themes_cfg,
+    ));
 
     // Project scope (if cwd provided)
     if let Some(cwd_str) = cwd {
@@ -543,10 +590,26 @@ pub async fn scan_all_resources_internal(cwd: Option<String>) -> Result<Vec<Reso
             let (proj_skills_cfg, proj_ext_cfg, proj_prompts_cfg, proj_themes_cfg) =
                 read_settings_arrays(&project_settings_path);
 
-            all.extend(scan_skills_dir(&project_base.join("skills"), "project", &proj_skills_cfg));
-            all.extend(scan_extensions_dir(&project_base.join("extensions"), "project", &proj_ext_cfg));
-            all.extend(scan_prompts_dir(&project_base.join("prompts"), "project", &proj_prompts_cfg));
-            all.extend(scan_themes_dir(&project_base.join("themes"), "project", &proj_themes_cfg));
+            all.extend(scan_skills_dir(
+                &project_base.join("skills"),
+                "project",
+                &proj_skills_cfg,
+            ));
+            all.extend(scan_extensions_dir(
+                &project_base.join("extensions"),
+                "project",
+                &proj_ext_cfg,
+            ));
+            all.extend(scan_prompts_dir(
+                &project_base.join("prompts"),
+                "project",
+                &proj_prompts_cfg,
+            ));
+            all.extend(scan_themes_dir(
+                &project_base.join("themes"),
+                "project",
+                &proj_themes_cfg,
+            ));
         }
     }
 
@@ -804,7 +867,9 @@ pub async fn read_resource_file_internal(path: String, scope: String) -> Result<
     };
     let full = base.join(&path);
     // Security: ensure resolved path is under base
-    let canonical = full.canonicalize().map_err(|e| format!("Resolve path: {e}"))?;
+    let canonical = full
+        .canonicalize()
+        .map_err(|e| format!("Resolve path: {e}"))?;
     let base_canonical = base.canonicalize().unwrap_or(base);
     if !canonical.starts_with(&base_canonical) {
         return Err("Path traversal denied".into());
@@ -912,8 +977,7 @@ pub struct ConfigVersionMeta {
 
 fn get_config_db() -> Result<rusqlite::Connection, String> {
     let db_path = crate::sqlite_cache::get_db_path()?;
-    let conn =
-        rusqlite::Connection::open(&db_path).map_err(|e| format!("Open config DB: {e}"))?;
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| format!("Open config DB: {e}"))?;
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS config_versions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -973,7 +1037,9 @@ pub async fn list_config_versions_internal(
                 })
             })
             .map_err(|e| format!("Query: {e}"))?;
-        return rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("Collect: {e}"));
+        return rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Collect: {e}"));
     } else {
         conn.prepare(
             "SELECT id, file_path, created_at, size_bytes FROM config_versions
@@ -991,7 +1057,8 @@ pub async fn list_config_versions_internal(
             })
         })
         .map_err(|e| format!("Query: {e}"))?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("Collect: {e}"))
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Collect: {e}"))
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]

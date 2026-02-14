@@ -49,7 +49,8 @@ fn main() {
                 let ws_bind = server_cfg.bind_addr.clone();
                 tauri::async_runtime::spawn(async move {
                     if let Err(e) =
-                        pi_session_manager::ws_adapter::init_ws_adapter(ws_state, &ws_bind, ws_port).await
+                        pi_session_manager::ws_adapter::init_ws_adapter(ws_state, &ws_bind, ws_port)
+                            .await
                     {
                         eprintln!("Failed to init WebSocket adapter: {e}");
                     }
@@ -67,7 +68,7 @@ fn main() {
                     // In CLI mode, serve embedded static files
                     if let Err(e) =
                         pi_session_manager::http_adapter::init_http_adapter_with_options(
-                            http_state, &http_bind, http_port, is_cli
+                            http_state, &http_bind, http_port, is_cli,
                         )
                         .await
                     {
@@ -79,7 +80,10 @@ fn main() {
             if cli_mode {
                 let mut info = String::from("CLI mode:");
                 if server_cfg.ws_enabled {
-                    info.push_str(&format!(" WS ws://{}:{}", server_cfg.bind_addr, server_cfg.ws_port));
+                    info.push_str(&format!(
+                        " WS ws://{}:{}",
+                        server_cfg.bind_addr, server_cfg.ws_port
+                    ));
                 }
                 if server_cfg.http_enabled {
                     info.push_str(&format!(

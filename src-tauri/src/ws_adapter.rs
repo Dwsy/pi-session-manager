@@ -38,7 +38,11 @@ pub struct WsAdapter {
 
 impl WsAdapter {
     pub fn new(app_state: SharedAppState, bind_addr: &str, port: u16) -> Self {
-        Self { app_state, bind_addr: bind_addr.to_string(), port }
+        Self {
+            app_state,
+            bind_addr: bind_addr.to_string(),
+            port,
+        }
     }
 
     pub async fn start(self: Arc<Self>) -> Result<(), String> {
@@ -216,8 +220,7 @@ impl WsAdapter {
         let event_tx = self.app_state.event_tx.clone();
 
         app_handle.listen("sessions-changed", move |event| {
-            let payload = serde_json::from_str::<Value>(event.payload())
-                .unwrap_or(Value::Null);
+            let payload = serde_json::from_str::<Value>(event.payload()).unwrap_or(Value::Null);
             let ws_event = WsEvent {
                 event_type: "event".to_string(),
                 event: "sessions-changed".to_string(),
@@ -237,7 +240,10 @@ pub async fn dispatch(
     match command {
         "save_session_paths" => {
             let paths: Vec<String> = serde_json::from_value(
-                payload.get("paths").cloned().unwrap_or(Value::Array(vec![])),
+                payload
+                    .get("paths")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
             )
             .map_err(|e| format!("Invalid paths: {e}"))?;
             let app_handle = app_state.app_handle.clone();

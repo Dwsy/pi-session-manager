@@ -99,7 +99,10 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
         }
         "get_session_stats" => {
             let sessions: Vec<crate::models::SessionInfo> = serde_json::from_value(
-                payload.get("sessions").cloned().unwrap_or(Value::Array(vec![])),
+                payload
+                    .get("sessions")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
             )
             .map_err(|e| format!("Invalid sessions: {e}"))?;
             let result = crate::stats::calculate_stats(&sessions);
@@ -107,7 +110,10 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
         }
         "get_session_stats_light" => {
             let sessions: Vec<crate::stats::SessionStatsInput> = serde_json::from_value(
-                payload.get("sessions").cloned().unwrap_or(Value::Array(vec![])),
+                payload
+                    .get("sessions")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
             )
             .map_err(|e| format!("Invalid sessions: {e}"))?;
             let result = crate::stats::calculate_stats_from_inputs(&sessions);
@@ -115,14 +121,24 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
         }
         "search_sessions" => {
             let sessions: Vec<crate::models::SessionInfo> = serde_json::from_value(
-                payload.get("sessions").cloned().unwrap_or(Value::Array(vec![])),
+                payload
+                    .get("sessions")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
             )
             .map_err(|e| format!("Invalid sessions: {e}"))?;
             let query = extract_string(payload, "query")?;
-            let search_mode = extract_string(payload, "searchMode").unwrap_or_else(|_| "content".to_string());
-            let role_filter = extract_string(payload, "roleFilter").unwrap_or_else(|_| "all".to_string());
-            let include_tools = payload.get("includeTools").and_then(|v| v.as_bool()).unwrap_or(false);
-            let result = crate::search_sessions(sessions, query, search_mode, role_filter, include_tools).await?;
+            let search_mode =
+                extract_string(payload, "searchMode").unwrap_or_else(|_| "content".to_string());
+            let role_filter =
+                extract_string(payload, "roleFilter").unwrap_or_else(|_| "all".to_string());
+            let include_tools = payload
+                .get("includeTools")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let result =
+                crate::search_sessions(sessions, query, search_mode, role_filter, include_tools)
+                    .await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "search_sessions_fts" => {
@@ -202,7 +218,10 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
         }
         "save_pi_settings" => {
             let settings = serde_json::from_value(
-                payload.get("settings").cloned().unwrap_or(Value::Object(Default::default())),
+                payload
+                    .get("settings")
+                    .cloned()
+                    .unwrap_or(Value::Object(Default::default())),
             )
             .map_err(|e| format!("Invalid settings: {e}"))?;
             crate::save_pi_settings(settings).await?;
@@ -226,7 +245,10 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
         "toggle_resource" => {
             let resource_type = extract_string(payload, "resource_type")?;
             let path = extract_string(payload, "path")?;
-            let enabled = payload.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+            let enabled = payload
+                .get("enabled")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
             let scope = extract_string(payload, "scope").unwrap_or_else(|_| "user".to_string());
             crate::toggle_resource_internal(resource_type, path, enabled, scope).await?;
             Ok(Value::Null)
@@ -246,23 +268,35 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             Ok(Value::String(result))
         }
         "list_config_versions" => {
-            let file_path = payload.get("file_path").and_then(|v| v.as_str()).map(String::from);
+            let file_path = payload
+                .get("file_path")
+                .and_then(|v| v.as_str())
+                .map(String::from);
             let result = crate::list_config_versions_internal(file_path).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "get_config_version" => {
-            let id = payload.get("id").and_then(|v| v.as_i64()).ok_or("Missing id")?;
+            let id = payload
+                .get("id")
+                .and_then(|v| v.as_i64())
+                .ok_or("Missing id")?;
             let result = crate::get_config_version_internal(id).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "restore_config_version" => {
-            let id = payload.get("id").and_then(|v| v.as_i64()).ok_or("Missing id")?;
+            let id = payload
+                .get("id")
+                .and_then(|v| v.as_i64())
+                .ok_or("Missing id")?;
             crate::restore_config_version_internal(id).await?;
             Ok(Value::Null)
         }
         "load_app_settings" => crate::load_app_settings_internal().await,
         "save_app_settings" => {
-            let settings = payload.get("settings").cloned().unwrap_or(Value::Object(Default::default()));
+            let settings = payload
+                .get("settings")
+                .cloned()
+                .unwrap_or(Value::Object(Default::default()));
             crate::save_app_settings(settings).await?;
             Ok(Value::Null)
         }
@@ -272,7 +306,10 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
         }
         "save_server_settings" => {
             let settings = serde_json::from_value(
-                payload.get("settings").cloned().unwrap_or(Value::Object(Default::default())),
+                payload
+                    .get("settings")
+                    .cloned()
+                    .unwrap_or(Value::Object(Default::default())),
             )
             .map_err(|e| format!("Invalid settings: {e}"))?;
             crate::save_server_settings(settings).await?;
@@ -284,7 +321,10 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
         }
         "save_session_paths" => {
             let paths: Vec<String> = serde_json::from_value(
-                payload.get("paths").cloned().unwrap_or(Value::Array(vec![])),
+                payload
+                    .get("paths")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
             )
             .map_err(|e| format!("Invalid paths: {e}"))?;
             // Core logic only (no file watcher restart — GUI handles that in ws_adapter)
@@ -311,7 +351,10 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
         }
         "test_models_batch" => {
             let models: Vec<(String, String)> = serde_json::from_value(
-                payload.get("models").cloned().unwrap_or(Value::Array(vec![])),
+                payload
+                    .get("models")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
             )
             .map_err(|e| format!("Invalid models: {e}"))?;
             let prompt = extract_optional_string(payload, "prompt");
@@ -371,13 +414,19 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             let session_id = extract_string(payload, "sessionId")?;
             let from_tag_id = extract_optional_string(payload, "fromTagId");
             let to_tag_id = extract_string(payload, "toTagId")?;
-            let position = payload.get("position").and_then(|v| v.as_i64()).unwrap_or(0);
+            let position = payload
+                .get("position")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
             crate::move_session_tag(session_id, from_tag_id, to_tag_id, position).await?;
             Ok(Value::Null)
         }
         "reorder_tags" => {
             let tag_ids: Vec<String> = serde_json::from_value(
-                payload.get("tagIds").cloned().unwrap_or(Value::Array(vec![])),
+                payload
+                    .get("tagIds")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
             )
             .map_err(|e| format!("Invalid tagIds: {e}"))?;
             crate::reorder_tags(tag_ids).await?;
@@ -413,10 +462,14 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
         }
 
         // Desktop/GUI-only commands
-        "terminal_create" | "terminal_write" | "terminal_resize" | "terminal_close"
-        | "get_default_shell" | "get_available_shells" => {
-            Err(format!("Command '{command}' requires GUI mode (terminal not available in CLI)"))
-        }
+        "terminal_create"
+        | "terminal_write"
+        | "terminal_resize"
+        | "terminal_close"
+        | "get_default_shell"
+        | "get_available_shells" => Err(format!(
+            "Command '{command}' requires GUI mode (terminal not available in CLI)"
+        )),
         "open_session_in_browser" => Err("open_session_in_browser is desktop-only".to_string()),
         "open_session_in_terminal" => Err("open_session_in_terminal is desktop-only".to_string()),
         "toggle_devtools" => Err("toggle_devtools is not supported via WebSocket".to_string()),

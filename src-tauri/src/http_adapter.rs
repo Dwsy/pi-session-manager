@@ -205,9 +205,7 @@ async fn handle_ws_connection(
             let _ = tx.close().await;
             return;
         }
-        let _ = tx
-            .send(AxumWsMsg::Text(r#"{"auth":"ok"}"#.into()))
-            .await;
+        let _ = tx.send(AxumWsMsg::Text(r#"{"auth":"ok"}"#.into())).await;
     }
 
     let mut event_rx = app_state.subscribe_events();

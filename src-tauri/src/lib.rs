@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod commands;
 pub mod config;
 pub mod dispatch;
 pub mod export;
@@ -12,7 +13,6 @@ pub mod sqlite_cache;
 pub mod stats;
 pub mod tantivy_search;
 pub mod write_buffer;
-pub mod commands;
 
 #[cfg(feature = "gui")]
 pub mod app_state;
