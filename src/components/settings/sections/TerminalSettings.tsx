@@ -101,12 +101,12 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 {t('settings.terminal.defaultShell')}
               </label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {SHELL_OPTIONS.map(s => (
                   <button
                     key={s.path}
                     onClick={() => onUpdate('terminal', 'defaultShell', s.path)}
-                    className={`px-4 py-2 text-sm rounded-lg border transition-all duration-200 ${
+                    className={`px-4 py-2 min-h-[40px] text-sm rounded-lg border transition-all duration-200 ${
                       settings.terminal.defaultShell === s.path
                         ? 'border-info bg-info/10 text-foreground'
                         : 'border-border text-muted-foreground hover:border-border-hover hover:text-foreground'
@@ -227,7 +227,7 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
         <label className="text-sm font-medium text-foreground">
           {t('settings.terminal.piCommandPath', 'Pi 命令路径')}
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           <input
             type="text"
             value={settings.terminal.piCommandPath}

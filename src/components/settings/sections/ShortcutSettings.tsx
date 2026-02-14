@@ -51,12 +51,12 @@ export default function ShortcutSettings() {
             {group.items.map(item => (
               <div
                 key={item.keys}
-                className="flex items-center justify-between px-4 py-3"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 px-4 py-3 min-h-[44px]"
               >
-                <span className="text-sm text-foreground">
+                <span className="text-sm text-foreground min-w-0">
                   {t(item.labelKey, item.fallback)}
                 </span>
-                <kbd className="inline-flex items-center gap-1 px-2 py-1 bg-surface-dark border border-border-hover rounded text-xs font-mono text-foreground shadow-sm">
+                <kbd className="inline-flex items-center gap-1 px-2 py-1 bg-surface-dark border border-border-hover rounded text-xs font-mono text-foreground shadow-sm flex-shrink-0 w-fit">
                   {item.keys}
                 </kbd>
               </div>

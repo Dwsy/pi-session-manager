@@ -17,7 +17,7 @@ export default function PiConfigSettings() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 p-1 bg-surface rounded-lg">
+      <div className="flex gap-1 p-1 bg-surface rounded-lg overflow-x-auto [-webkit-overflow-scrolling:touch]">
         <PillTab active={activeTab === 'resources'} onClick={() => setActiveTab('resources')}
           icon={<Blocks className="h-3.5 w-3.5" />} label={t('settings.piConfig.tabs.resources', 'Resources')} />
         <PillTab active={activeTab === 'settings'} onClick={() => setActiveTab('settings')}
@@ -37,7 +37,7 @@ function PillTab({ active, onClick, icon, label }: {
 }) {
   return (
     <button onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+      className={`flex-1 min-w-0 min-h-[40px] flex items-center justify-center gap-1.5 px-3 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
         active ? 'bg-info text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
       }`}
     >{icon}{label}</button>
