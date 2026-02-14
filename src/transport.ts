@@ -34,6 +34,82 @@ const enum WsState {
   Connected,
 }
 
+type TransportPreference = 'auto' | 'ws' | 'http'
+
+interface RemoteConfig {
+  wsUrl: string
+  httpBaseUrl: string
+  token?: string
+  transport: TransportPreference
+}
+
+function normalizeHttpBase(url: string): string {
+  let out = url.trim().replace(/\/+$/, '')
+  if (!/^https?:\/\//i.test(out)) out = `http://${out}`
+  if (out.endsWith('/api')) out = out.slice(0, -4)
+  return out
+}
+
+function toWsUrl(input: string): string {
+  const trimmed = input.trim()
+  if (/^wss?:\/\//i.test(trimmed)) return trimmed
+  const normalized = normalizeHttpBase(trimmed)
+  const wsBase = normalized.startsWith('https://') ? `wss://${normalized.slice(8)}` :
+    normalized.startsWith('http://') ? `ws://${normalized.slice(7)}` : `ws://${normalized}`
+  return wsBase.endsWith('/ws') ? wsBase : `${wsBase}/ws`
+}
+
+function readRemoteConfig(): RemoteConfig {
+  const host = typeof location !== 'undefined' ? location.hostname : 'localhost'
+  const proto = typeof location !== 'undefined' ? location.protocol : 'http:'
+  const port = typeof location !== 'undefined' ? location.port : ''
+  const isSecure = proto === 'https:'
+  const origin = port ? `${host}:${port}` : host
+  const defaultHttp = `${proto}//${origin}`
+  const defaultWs = `${isSecure ? 'wss' : 'ws'}://${origin}/ws`
+
+  if (typeof window === 'undefined') {
+    return {
+      wsUrl: import.meta.env.VITE_WS_URL || defaultWs,
+      httpBaseUrl: import.meta.env.VITE_HTTP_BASE_URL || defaultHttp,
+      token: import.meta.env.VITE_API_TOKEN,
+      transport: (import.meta.env.VITE_TRANSPORT as TransportPreference) || 'auto',
+    }
+  }
+
+  const params = new URLSearchParams(window.location.search)
+  const qServer = params.get('server')
+  const qWs = params.get('ws')
+  const qHttp = params.get('http')
+  const qToken = params.get('token')
+  const qTransport = params.get('transport') as TransportPreference | null
+
+  if (qServer) {
+    const httpBase = normalizeHttpBase(qServer)
+    localStorage.setItem('psm.httpBaseUrl', httpBase)
+    localStorage.setItem('psm.wsUrl', toWsUrl(httpBase))
+  }
+  if (qHttp) {
+    const httpBase = normalizeHttpBase(qHttp)
+    localStorage.setItem('psm.httpBaseUrl', httpBase)
+    localStorage.setItem('psm.wsUrl', toWsUrl(httpBase))
+  }
+  if (qWs) localStorage.setItem('psm.wsUrl', toWsUrl(qWs))
+  if (qToken) localStorage.setItem('psm.apiToken', qToken)
+  if (qTransport && ['auto', 'ws', 'http'].includes(qTransport)) {
+    localStorage.setItem('psm.transport', qTransport)
+  }
+
+  return {
+    wsUrl: toWsUrl(localStorage.getItem('psm.wsUrl') || import.meta.env.VITE_WS_URL || defaultWs),
+    httpBaseUrl: normalizeHttpBase(localStorage.getItem('psm.httpBaseUrl') || import.meta.env.VITE_HTTP_BASE_URL || defaultHttp),
+    token: localStorage.getItem('psm.apiToken') || import.meta.env.VITE_API_TOKEN || undefined,
+    transport: (localStorage.getItem('psm.transport') as TransportPreference | null)
+      || (import.meta.env.VITE_TRANSPORT as TransportPreference | undefined)
+      || 'auto',
+  }
+}
+
 export class WebSocketTransport implements Transport {
   private ws: WebSocket | null = null
   private state = WsState.Disconnected
@@ -44,12 +120,14 @@ export class WebSocketTransport implements Transport {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private pingTimer: ReturnType<typeof setInterval> | null = null
   private readonly url: string
+  private readonly token?: string
   private disposed = false
   private connectWaiters: { resolve: () => void; reject: (e: Error) => void }[] = []
   private statusListeners = new Set<StatusListener>()
 
-  constructor(url = `ws://${typeof location !== 'undefined' ? location.hostname : 'localhost'}:52130`) {
+  constructor(url = readRemoteConfig().wsUrl, token = readRemoteConfig().token) {
     this.url = url
+    this.token = token
     this.emitStatus('connecting')
     this.connect()
   }
@@ -81,6 +159,9 @@ export class WebSocketTransport implements Transport {
         this.state = WsState.Connected
         this.retryCount = 0
         this.startPing()
+        if (this.token) {
+          ws.send(JSON.stringify({ auth: this.token }))
+        }
         for (const w of this.connectWaiters) w.resolve()
         this.connectWaiters = []
         this.emitStatus('connected')
@@ -264,15 +345,26 @@ export class WebSocketTransport implements Transport {
 
 export class HttpTransport implements Transport {
   private readonly baseUrl: string
+  private readonly wsUrl: string
+  private readonly authToken: string | null
   private eventListeners = new Map<string, Set<(payload: unknown) => void>>()
-  private eventSource: EventSource | null = null
-  private sseConnected = false
+  private ws: WebSocket | null = null
+  private wsConnected = false
   private statusListeners = new Set<StatusListener>()
   private httpOk = false
+  private retryCount = 0
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private disposed = false
 
-  constructor(baseUrl = `http://${location.hostname}:52131`) {
+  constructor(
+    baseUrl = readRemoteConfig().httpBaseUrl,
+    wsUrl = readRemoteConfig().wsUrl,
+    authToken: string | null = readRemoteConfig().token ?? null,
+  ) {
     this.baseUrl = baseUrl
-    this.connectSSE()
+    this.wsUrl = wsUrl
+    this.authToken = authToken
+    this.connectEventWs()
   }
 
   private emitStatus(status: ConnectionStatus): void {
@@ -281,43 +373,103 @@ export class HttpTransport implements Transport {
 
   onStatusChange(listener: StatusListener): () => void {
     this.statusListeners.add(listener)
-    listener(this.httpOk || this.sseConnected ? 'connected' : 'connecting')
+    listener(this.wsConnected ? 'connected' : 'connecting')
     return () => { this.statusListeners.delete(listener) }
   }
 
-  private connectSSE(): void {
-    if (this.eventSource) return
+  private connectEventWs(): void {
+    if (this.disposed || this.ws) return
+    this.emitStatus('connecting')
 
-    const es = new EventSource(`${this.baseUrl}/api/events`)
-    this.eventSource = es
+    try {
+      const ws = new WebSocket(this.wsUrl)
+      this.ws = ws
 
-    es.onopen = () => {
-      this.sseConnected = true
-      this.emitStatus('connected')
-      console.log('[SSE] connected')
-    }
-
-    es.addEventListener('sessions-changed', (e: MessageEvent) => {
-      try {
-        const payload = JSON.parse(e.data)
-        this.eventListeners.get('sessions-changed')?.forEach(cb => cb(payload))
-      } catch (err) {
-        console.error('[SSE] parse error:', err)
+      ws.onopen = () => {
+        if (ws !== this.ws) return
+        if (this.authToken) {
+          ws.send(JSON.stringify({ auth: this.authToken }))
+        } else {
+          this.onWsReady()
+        }
       }
-    })
 
-    es.onerror = () => {
-      this.sseConnected = false
-      if (!this.httpOk) this.emitStatus('disconnected')
-      console.warn('[SSE] connection error, will auto-reconnect')
+      ws.onmessage = (event) => {
+        if (ws !== this.ws) return
+        try {
+          const data = JSON.parse(event.data)
+          if (!this.wsConnected) {
+            if (data.auth === 'ok') {
+              this.onWsReady()
+            } else if (data.error) {
+              console.error('[HTTP-WS] auth failed:', data.error)
+              this.cleanupWs()
+              this.scheduleReconnect()
+            }
+            return
+          }
+          if (data.event_type === 'event' && data.event) {
+            const listeners = this.eventListeners.get(data.event)
+            if (listeners) listeners.forEach((cb) => cb(data.payload))
+          }
+        } catch (e) {
+          console.error('[HTTP-WS] parse error:', e)
+        }
+      }
+
+      ws.onclose = () => {
+        if (ws !== this.ws) return
+        this.wsConnected = false
+        this.ws = null
+        if (!this.httpOk) this.emitStatus('disconnected')
+        if (!this.disposed) this.scheduleReconnect()
+      }
+
+      ws.onerror = () => { /* onclose fires after onerror */ }
+    } catch {
+      this.scheduleReconnect()
     }
   }
 
+  private onWsReady(): void {
+    this.wsConnected = true
+    this.retryCount = 0
+    this.emitStatus('connected')
+    console.log('[HTTP-WS] event channel connected')
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer || this.disposed) return
+    const delay = Math.min(1000 * Math.pow(2, this.retryCount), 10000)
+    this.retryCount++
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
+      this.connectEventWs()
+    }, delay)
+  }
+
+  private cleanupWs(): void {
+    if (this.ws) {
+      const old = this.ws
+      old.onopen = null
+      old.onmessage = null
+      old.onclose = null
+      old.onerror = null
+      if (old.readyState === WebSocket.OPEN || old.readyState === WebSocket.CONNECTING) {
+        old.close()
+      }
+      this.ws = null
+    }
+    this.wsConnected = false
+  }
+
   async invoke<T>(command: string, payload?: unknown): Promise<T> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`
     try {
       const resp = await fetch(`${this.baseUrl}/api`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ command, payload: payload ?? {} }),
       })
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
@@ -325,12 +477,12 @@ export class HttpTransport implements Transport {
       if (!data.success) throw new Error(data.error || 'Command failed')
       if (!this.httpOk) {
         this.httpOk = true
-        this.emitStatus('connected')
+        if (this.wsConnected) this.emitStatus('connected')
       }
       return data.data as T
     } catch (e) {
       this.httpOk = false
-      if (!this.sseConnected) this.emitStatus('disconnected')
+      if (!this.wsConnected) this.emitStatus('disconnected')
       throw e
     }
   }
@@ -348,15 +500,16 @@ export class HttpTransport implements Transport {
   }
 
   isConnected(): boolean {
-    return this.sseConnected
+    return this.wsConnected
   }
 
   disconnect(): void {
-    if (this.eventSource) {
-      this.eventSource.close()
-      this.eventSource = null
+    this.disposed = true
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
     }
-    this.sseConnected = false
+    this.cleanupWs()
     this.eventListeners.clear()
   }
 }
@@ -373,13 +526,17 @@ export function createTransport(): Transport {
     return new TauriTransport()
   }
 
-  if (detectMobileWeb()) {
-    console.log('Using HTTP transport (mobile)')
-    return new HttpTransport()
+  const cfg = readRemoteConfig()
+  const forceHttp = cfg.transport === 'http'
+  const forceWs = cfg.transport === 'ws'
+
+  if (forceHttp || (!forceWs && detectMobileWeb())) {
+    console.log('Using HTTP transport', cfg.httpBaseUrl)
+    return new HttpTransport(cfg.httpBaseUrl, cfg.wsUrl, cfg.token ?? null)
   }
 
-  console.log('Using WebSocket transport')
-  return new WebSocketTransport()
+  console.log('Using WebSocket transport', cfg.wsUrl)
+  return new WebSocketTransport(cfg.wsUrl, cfg.token)
 }
 
 let _transport: Transport | null = null

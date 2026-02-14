@@ -6,6 +6,29 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Added
 
+- **Unified single-port architecture (CLI)** — API, WebSocket, and embedded frontend all served on one port (52131)
+  - `src-tauri-cli/src/main.rs` rewritten with axum Router: `POST /api`, `GET /ws`, `GET /health`, SPA fallback
+  - Eliminates need for separate WS/HTTP ports; single tunnel/proxy sufficient for remote access
+  - rust-embed serves built frontend assets with SPA fallback to `index.html`
+
+- **Remote auth gate** — frontend authentication for non-local access
+  - `AuthGate` component wraps app; detects non-localhost access and prompts for API token
+  - Backend `GET /api/auth-check` endpoint returns `{ needsAuth, authenticated }`
+  - Token stored in localStorage (`psm.apiToken`), sent as `Bearer` header
+  - Show/hide toggle on password input, loading spinner, error feedback
+  - `X-Forwarded-For` header support so auth works behind reverse proxies (ngrok, etc.)
+
+- **Remote config via URL params** — `?server=`, `?token=`, `?transport=` query parameters
+  - `readRemoteConfig()` in transport.ts reads URL params → localStorage → env vars
+  - WS/HTTP URLs derived from `location.protocol`/`hostname`/`port` (no hardcoded ports)
+  - WS path changed to `/ws` on same port as HTTP (merged architecture)
+
+### Changed
+
+- `http_adapter.rs` — unified auth via `is_authorized()` (Bearer header + `?token=` query param), SSE auth added
+- `vite.config.ts` — `allowedHosts: true` for tunnel/proxy access, proxy config for `/api` and `/ws`
+- axum dependency gains `ws` feature in both `src-tauri/Cargo.toml` and `src-tauri-cli/Cargo.toml`
+
 - **Mobile adaptation** — full responsive support for < 768px screens
   - `useIsMobile` hook (matchMedia-based, 768px breakpoint)
   - Full-screen page switching with bottom navigation bar (5 tabs: list, projects, kanban, dashboard, settings)

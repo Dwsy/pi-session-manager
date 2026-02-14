@@ -1,6 +1,7 @@
 use crate::app_state::SharedAppState;
 use crate::auth;
 use crate::ws_adapter::dispatch;
+use axum::extract::ws::{Message as AxumWsMsg, WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::{header, HeaderMap, StatusCode, Uri};
 use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
@@ -8,11 +9,13 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::stream::Stream;
+use futures_util::{SinkExt, StreamExt};
 use rust_embed::Embed;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use tokio::sync::broadcast;
 
 #[derive(Embed)]
 #[folder = "../dist"]
@@ -45,31 +48,55 @@ fn cors_headers() -> [(&'static str, &'static str); 3] {
     ]
 }
 
+fn query_param(uri: &Uri, key: &str) -> Option<String> {
+    uri.query().and_then(|q| {
+        q.split('&').find_map(|pair| {
+            let mut it = pair.splitn(2, '=');
+            let k = it.next()?;
+            let v = it.next().unwrap_or("");
+            (k == key).then(|| v.to_string())
+        })
+    })
+}
+
+fn is_authorized(ip: &std::net::IpAddr, headers: &HeaderMap, uri: &Uri) -> bool {
+    if !auth::is_auth_required(ip) {
+        return true;
+    }
+    let header_ok = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(auth::validate)
+        .unwrap_or(false);
+    if header_ok {
+        return true;
+    }
+    query_param(uri, "token")
+        .as_deref()
+        .map(auth::validate)
+        .unwrap_or(false)
+}
+
+// ─── HTTP POST /api ──────────────────────────────────────────
+
 async fn handle_command(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(app_state): State<SharedAppState>,
     headers: HeaderMap,
+    uri: Uri,
     Json(req): Json<HttpRequest>,
 ) -> impl IntoResponse {
-    if auth::is_auth_required(&addr.ip()) {
-        let valid = headers
-            .get("authorization")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.strip_prefix("Bearer "))
-            .map(auth::validate)
-            .unwrap_or(false);
-
-        if !valid {
-            return (
-                StatusCode::UNAUTHORIZED,
-                cors_headers(),
-                Json(HttpResponse {
-                    success: false,
-                    data: None,
-                    error: Some("Unauthorized".to_string()),
-                }),
-            );
-        }
+    if !is_authorized(&addr.ip(), &headers, &uri) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            cors_headers(),
+            Json(HttpResponse {
+                success: false,
+                data: None,
+                error: Some("Unauthorized".to_string()),
+            }),
+        );
     }
 
     let result = dispatch(&app_state, &req.command, &req.payload).await;
@@ -91,6 +118,159 @@ async fn handle_command(
 async fn handle_preflight() -> impl IntoResponse {
     (StatusCode::NO_CONTENT, cors_headers())
 }
+
+// ─── SSE /api/events ─────────────────────────────────────────
+
+async fn handle_sse(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    State(app_state): State<SharedAppState>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> impl IntoResponse {
+    if !is_authorized(&addr.ip(), &headers, &uri) {
+        return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+    }
+
+    let mut rx = app_state.subscribe_events();
+
+    let stream = async_stream::stream! {
+        loop {
+            match rx.recv().await {
+                Ok(ws_event) => {
+                    if ws_event.event == "sessions-changed" {
+                        let data = serde_json::to_string(&ws_event.payload)
+                            .unwrap_or_default();
+                        yield Ok::<_, Infallible>(SseEvent::default()
+                            .event("sessions-changed")
+                            .data(data));
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    log::warn!("SSE client lagged, skipped {n} events");
+                }
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    };
+
+    (
+        [
+            ("access-control-allow-origin", "*"),
+            ("cache-control", "no-cache"),
+        ],
+        Sse::new(stream).keep_alive(KeepAlive::default()),
+    )
+        .into_response()
+}
+
+// ─── WebSocket /ws ───────────────────────────────────────────
+
+async fn handle_ws_upgrade(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    State(app_state): State<SharedAppState>,
+    headers: HeaderMap,
+    uri: Uri,
+    ws: WebSocketUpgrade,
+) -> Response {
+    let pre_authed = is_authorized(&addr.ip(), &headers, &uri);
+    let needs_auth = auth::is_auth_required(&addr.ip());
+
+    ws.on_upgrade(move |socket| handle_ws_connection(socket, app_state, pre_authed, needs_auth))
+}
+
+async fn handle_ws_connection(
+    socket: WebSocket,
+    app_state: SharedAppState,
+    pre_authed: bool,
+    needs_auth: bool,
+) {
+    let (mut tx, mut rx) = socket.split();
+
+    // Auth: pre-authed via query param, or need first message with { auth: "token" }
+    if needs_auth && !pre_authed {
+        let authed = match tokio::time::timeout(std::time::Duration::from_secs(10), rx.next()).await
+        {
+            Ok(Some(Ok(AxumWsMsg::Text(text)))) => serde_json::from_str::<Value>(&text)
+                .ok()
+                .and_then(|v| v.get("auth")?.as_str().map(String::from))
+                .map(|t| auth::validate(&t))
+                .unwrap_or(false),
+            _ => false,
+        };
+
+        if !authed {
+            let _ = tx
+                .send(AxumWsMsg::Text(r#"{"error":"Unauthorized"}"#.into()))
+                .await;
+            let _ = tx.close().await;
+            return;
+        }
+        let _ = tx
+            .send(AxumWsMsg::Text(r#"{"auth":"ok"}"#.into()))
+            .await;
+    }
+
+    let mut event_rx = app_state.subscribe_events();
+
+    loop {
+        tokio::select! {
+            msg = rx.next() => {
+                match msg {
+                    Some(Ok(AxumWsMsg::Text(text))) => {
+                        if text.contains("\"ping\"") {
+                            if tx.send(AxumWsMsg::Text(r#"{"pong":true}"#.into())).await.is_err() { break; }
+                            continue;
+                        }
+
+                        #[derive(Deserialize)]
+                        struct WsReq { id: String, command: String, #[serde(default)] payload: Value }
+
+                        match serde_json::from_str::<WsReq>(&text) {
+                            Ok(req) => {
+                                let result = dispatch(&app_state, &req.command, &req.payload).await;
+                                let resp = match result {
+                                    Ok(data) => serde_json::json!({ "id": req.id, "command": req.command, "success": true, "data": data }),
+                                    Err(e) => serde_json::json!({ "id": req.id, "command": req.command, "success": false, "error": e }),
+                                };
+                                if tx.send(AxumWsMsg::Text(resp.to_string())).await.is_err() { break; }
+                            }
+                            Err(e) => {
+                                let resp = serde_json::json!({ "id": "unknown", "command": "unknown", "success": false, "error": format!("Invalid request: {e}") });
+                                if tx.send(AxumWsMsg::Text(resp.to_string())).await.is_err() { break; }
+                            }
+                        }
+                    }
+                    Some(Ok(AxumWsMsg::Ping(data))) => {
+                        let _ = tx.send(AxumWsMsg::Pong(data)).await;
+                    }
+                    Some(Ok(AxumWsMsg::Close(_))) | None => break,
+                    Some(Err(e)) => {
+                        let msg = e.to_string();
+                        if !msg.contains("Connection reset") && !msg.contains("Broken pipe") {
+                            log::warn!("WebSocket error: {msg}");
+                        }
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            event = event_rx.recv() => {
+                match event {
+                    Ok(ws_event) => {
+                        let text = serde_json::to_string(&ws_event).unwrap_or_default();
+                        if tx.send(AxumWsMsg::Text(text)).await.is_err() { break; }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        log::debug!("WS event channel lagged by {n}");
+                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        }
+    }
+}
+
+// ─── Static files ────────────────────────────────────────────
 
 fn serve_embedded(path: &str) -> Response {
     let mime = mime_guess::from_path(path).first_or_octet_stream();
@@ -121,43 +301,13 @@ async fn serve_static(uri: Uri) -> Response {
     serve_embedded(path)
 }
 
-async fn handle_sse(
-    State(app_state): State<SharedAppState>,
-) -> impl IntoResponse {
-    let mut rx = app_state.subscribe_events();
+// ─── Init ────────────────────────────────────────────────────
 
-    let stream = async_stream::stream! {
-        loop {
-            match rx.recv().await {
-                Ok(ws_event) => {
-                    if ws_event.event == "sessions-changed" {
-                        let data = serde_json::to_string(&ws_event.payload)
-                            .unwrap_or_default();
-                        yield Ok::<_, Infallible>(SseEvent::default()
-                            .event("sessions-changed")
-                            .data(data));
-                    }
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                    log::warn!("SSE client lagged, skipped {n} events");
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                    break;
-                }
-            }
-        }
-    };
-
-    (
-        [
-            ("access-control-allow-origin", "*"),
-            ("cache-control", "no-cache"),
-        ],
-        Sse::new(stream).keep_alive(KeepAlive::default()),
-    )
-}
-
-pub async fn init_http_adapter(app_state: SharedAppState, bind_addr: &str, port: u16) -> Result<(), String> {
+pub async fn init_http_adapter(
+    app_state: SharedAppState,
+    bind_addr: &str,
+    port: u16,
+) -> Result<(), String> {
     let has_frontend = FrontendAssets::get("index.html").is_some();
     if has_frontend {
         log::info!("Frontend assets embedded in binary");
@@ -168,6 +318,7 @@ pub async fn init_http_adapter(app_state: SharedAppState, bind_addr: &str, port:
     let app = Router::new()
         .route("/api", post(handle_command).options(handle_preflight))
         .route("/api/events", get(handle_sse))
+        .route("/ws", get(handle_ws_upgrade))
         .fallback(get(serve_static))
         .with_state(app_state);
 
@@ -176,7 +327,7 @@ pub async fn init_http_adapter(app_state: SharedAppState, bind_addr: &str, port:
         .await
         .map_err(|e| format!("Failed to bind HTTP: {e}"))?;
 
-    log::info!("HTTP server listening on http://{addr}");
+    log::info!("HTTP+WS server listening on http://{addr}");
 
     axum::serve(
         listener,

@@ -1,0 +1,28 @@
+[package]
+name = "pi-session-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "pi-session-cli"
+path = "src/main.rs"
+
+[dependencies]
+# Reuse business logic from the main crate (cli feature = no Tauri)
+pi-session-manager = { path = "../src-tauri", default-features = false, features = ["cli"] }
+
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.5", features = ["cors"] }
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
+dirs = "5.0"
+rust-embed = "8"
+mime_guess = "2"
+
+[features]
+default = []
