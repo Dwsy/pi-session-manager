@@ -108,6 +108,8 @@ export const settings = {
   },
   advanced: {
     serverSection: '服务设置',
+    serverSectionDesc: 'WebSocket、HTTP API 及认证配置',
+    generalTitle: '常规选项',
     bindAddr: '绑定地址',
     bindAddrHelp: '127.0.0.1 仅本地访问，0.0.0.0 允许远程连接',
     bindAddrLocal: '127.0.0.1 (仅本地)',

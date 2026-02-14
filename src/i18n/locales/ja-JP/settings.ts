@@ -108,6 +108,8 @@ export const settings = {
   },
   advanced: {
     serverSection: 'サーバー設定',
+    serverSectionDesc: 'WebSocket、HTTP API、認証設定',
+    generalTitle: '一般オプション',
     bindAddr: 'バインドアドレス',
     bindAddrHelp: '127.0.0.1 はローカルのみ、0.0.0.0 はリモートアクセス許可',
     bindAddrLocal: '127.0.0.1 (ローカルのみ)',
