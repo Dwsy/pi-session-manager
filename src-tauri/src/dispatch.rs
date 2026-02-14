@@ -451,8 +451,10 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             Ok(serde_json::to_value(result).unwrap())
         }
         "create_api_key" => {
-            let name = extract_string(payload, "name")?;
-            let result = crate::create_api_key(name).await?;
+            let name = extract_optional_string(payload, "name");
+            let key = extract_optional_string(payload, "key");
+            let value = extract_optional_string(payload, "value");
+            let result = crate::create_api_key(name, key, value).await?;
             Ok(serde_json::json!(result))
         }
         "revoke_api_key" => {

@@ -116,14 +116,30 @@ pub fn list_tokens() -> Result<Vec<TokenInfo>, String> {
         .map_err(|e| format!("{e}"))
 }
 
-pub fn create_token(name: &str) -> Result<String, String> {
+pub fn create_token(name: &str, token_value: Option<&str>) -> Result<String, String> {
     let conn = open_db()?;
-    let token = generate_token();
+    let token = match token_value {
+        Some(raw) => {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return Err("Token value cannot be empty".to_string());
+            }
+            trimmed.to_string()
+        }
+        None => generate_token(),
+    };
+
     conn.execute(
         "INSERT INTO auth_tokens (token, name, created_at) VALUES (?1, ?2, ?3)",
         params![token, name, chrono::Utc::now().to_rfc3339()],
     )
-    .map_err(|e| format!("Failed to create token: {e}"))?;
+    .map_err(|e| {
+        if e.to_string().contains("UNIQUE constraint failed") {
+            "Token already exists".to_string()
+        } else {
+            format!("Failed to create token: {e}")
+        }
+    })?;
     reload_tokens(&conn)?;
     Ok(token)
 }

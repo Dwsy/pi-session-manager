@@ -12,9 +12,13 @@ use futures_util::{SinkExt, StreamExt};
 use rust_embed::Embed;
 use serde_json::Value;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 use tracing::{error, info};
+
+mod file_watcher;
+mod terminal;
+use terminal::TerminalManager;
 
 #[derive(Embed)]
 #[folder = "../dist/"]
@@ -29,6 +33,7 @@ pub struct WsEvent {
 
 pub struct AppState {
     pub event_tx: broadcast::Sender<WsEvent>,
+    pub terminal_manager: Mutex<TerminalManager>,
 }
 
 pub type SharedState = Arc<AppState>;
@@ -125,7 +130,10 @@ async fn main() {
 
     let config = load_config();
     let (event_tx, _) = broadcast::channel(100);
-    let state = Arc::new(AppState { event_tx });
+    let state = Arc::new(AppState {
+        event_tx,
+        terminal_manager: Mutex::new(TerminalManager::new()),
+    });
 
     info!("🚀 Pi Session Manager — CLI Mode");
     info!("═══════════════════════════════════════");
@@ -144,6 +152,17 @@ async fn main() {
         error!("HTTP server is disabled in config (http_enabled=false), nothing to start");
         return;
     }
+
+    let _watcher_guard = match file_watcher::CliFileWatcher::start(state.event_tx.clone()) {
+        Ok(w) => {
+            info!("👀 File watcher started");
+            Some(w)
+        }
+        Err(e) => {
+            error!("File watcher disabled: {e}");
+            None
+        }
+    };
 
     let addr = format!("{}:{}", config.bind_addr, config.http_port);
     info!("🌐 http://{addr}  (API + WS + Frontend)");
@@ -173,7 +192,7 @@ struct ApiReq {
 
 async fn api_handler(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(_state): State<SharedState>,
+    State(state): State<SharedState>,
     headers: HeaderMap,
     uri: Uri,
     Json(body): Json<ApiReq>,
@@ -185,7 +204,7 @@ async fn api_handler(
             Json(serde_json::json!({ "success": false, "error": "Unauthorized" })),
         );
     }
-    let result = pi_session_manager::dispatch::dispatch(&body.command, &body.payload).await;
+    let result = dispatch_command(&state, &body.command, &body.payload).await;
     let resp = match result {
         Ok(data) => serde_json::json!({ "success": true, "data": data }),
         Err(e) => serde_json::json!({ "success": false, "error": e }),
@@ -217,6 +236,77 @@ async fn auth_check(
 
 async fn health_handler() -> Json<Value> {
     Json(serde_json::json!({ "status": "ok", "version": env!("CARGO_PKG_VERSION"), "mode": "cli" }))
+}
+
+fn extract_string(payload: &Value, key: &str) -> Result<String, String> {
+    payload
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| format!("Missing or invalid '{key}'"))
+}
+
+async fn dispatch_command(
+    state: &SharedState,
+    command: &str,
+    payload: &Value,
+) -> Result<Value, String> {
+    match command {
+        "terminal_create" => {
+            let id = extract_string(payload, "id")?;
+            let cwd = extract_string(payload, "cwd")?;
+            let shell = extract_string(payload, "shell")?;
+            let rows = payload.get("rows").and_then(Value::as_u64).unwrap_or(24) as u16;
+            let cols = payload.get("cols").and_then(Value::as_u64).unwrap_or(80) as u16;
+            let manager = state
+                .terminal_manager
+                .lock()
+                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            let result =
+                manager.create_session(id, state.event_tx.clone(), cwd, shell, rows, cols)?;
+            Ok(serde_json::json!(result))
+        }
+        "terminal_write" => {
+            let id = extract_string(payload, "id")?;
+            let data = extract_string(payload, "data")?;
+            let manager = state
+                .terminal_manager
+                .lock()
+                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            manager.write_to_session(&id, data)?;
+            Ok(Value::Null)
+        }
+        "terminal_resize" => {
+            let id = extract_string(payload, "id")?;
+            let rows = payload.get("rows").and_then(Value::as_u64).unwrap_or(24) as u16;
+            let cols = payload.get("cols").and_then(Value::as_u64).unwrap_or(80) as u16;
+            let manager = state
+                .terminal_manager
+                .lock()
+                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            manager.resize_session(&id, rows, cols)?;
+            Ok(Value::Null)
+        }
+        "terminal_close" => {
+            let id = extract_string(payload, "id")?;
+            let manager = state
+                .terminal_manager
+                .lock()
+                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            manager.close_session(&id)?;
+            Ok(Value::Null)
+        }
+        "get_default_shell" => {
+            let shells = terminal::scan_shells();
+            let fallback = if cfg!(windows) { "cmd.exe" } else { "/bin/sh" };
+            Ok(serde_json::json!(shells
+                .first()
+                .map(|(_, p)| p.as_str())
+                .unwrap_or(fallback)))
+        }
+        "get_available_shells" => Ok(serde_json::json!(terminal::scan_shells())),
+        _ => pi_session_manager::dispatch::dispatch(command, payload).await,
+    }
 }
 
 async fn ws_upgrade(
@@ -338,7 +428,7 @@ async fn handle_ws(socket: WebSocket, state: SharedState, pre_authed: bool, need
 
                         match serde_json::from_str::<WsReq>(&text) {
                             Ok(req) => {
-                                let result = pi_session_manager::dispatch::dispatch(&req.command, &req.payload).await;
+                                let result = dispatch_command(&state, &req.command, &req.payload).await;
                                 let resp = match result {
                                     Ok(data) => serde_json::json!({ "id": req.id, "command": req.command, "success": true, "data": data }),
                                     Err(e) => serde_json::json!({ "id": req.id, "command": req.command, "success": false, "error": e }),

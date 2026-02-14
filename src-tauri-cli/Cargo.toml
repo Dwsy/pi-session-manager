@@ -23,6 +23,9 @@ futures-util = "0.3"
 dirs = "5.0"
 rust-embed = "8"
 mime_guess = "2"
+portable-pty = "0.9"
+notify = "6.1"
+notify-debouncer-full = "0.3"
 
 [features]
 default = []

@@ -37,6 +37,9 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
   const [serverDirty, setServerDirty] = useState(false)
   const [apiKeys, setApiKeys] = useState<TokenInfo[]>([])
   const [newKeyName, setNewKeyName] = useState('')
+  const [keyMode, setKeyMode] = useState<'auto' | 'manual'>('auto')
+  const [manualKey, setManualKey] = useState('')
+  const [manualValue, setManualValue] = useState('')
   const [newKeyValue, setNewKeyValue] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
@@ -71,15 +74,31 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
   }
 
   const handleCreateKey = async () => {
-    const name = newKeyName.trim() || 'unnamed'
+    const name = newKeyName.trim() || undefined
+    const key = manualKey.trim()
+    const value = manualValue.trim()
+    const isManual = keyMode === 'manual'
+
+    if (isManual && (!key || !value)) {
+      alert(t('settings.advanced.manualKeyValidation', '手动创建时，Key 和 Value 必须同时填写'))
+      return
+    }
+
     setCreating(true)
     try {
-      const key = await invoke<string>('create_api_key', { name })
-      setNewKeyValue(key)
+      const created = await invoke<string>('create_api_key', {
+        name,
+        key: isManual ? key : undefined,
+        value: isManual ? value : undefined,
+      })
+      setNewKeyValue(created)
       setNewKeyName('')
+      setManualKey('')
+      setManualValue('')
       await loadApiKeys()
     } catch (e) {
       console.error('Failed to create API key:', e)
+      alert(t('settings.advanced.createKeyFailed', '创建密钥失败'))
     } finally {
       setCreating(false)
     }
@@ -300,15 +319,68 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2">
+          <div className="space-y-2">
+            <label className="block text-xs text-muted-foreground">
+              {t('settings.advanced.keyMode', '创建模式')}
+            </label>
+            <div className="inline-flex rounded-lg border border-border p-1 bg-surface/60">
+              <button
+                type="button"
+                onClick={() => {
+                  setKeyMode('auto')
+                  setManualKey('')
+                  setManualValue('')
+                }}
+                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${keyMode === 'auto' ? 'bg-info text-white' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {t('settings.advanced.keyModeAuto', '自动生成')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setKeyMode('manual')}
+                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${keyMode === 'manual' ? 'bg-info text-white' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {t('settings.advanced.keyModeManual', '手动设置')}
+              </button>
+            </div>
+          </div>
+
+          <div className={`grid grid-cols-1 ${keyMode === 'manual' ? 'md:grid-cols-3' : 'md:grid-cols-1'} gap-2`}>
             <input
               type="text"
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
               placeholder={t('settings.advanced.keyNamePlaceholder', '密钥名称（可选）')}
-              className={`flex-1 min-w-[120px] ${inputBase}`}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreateKey()}
+              className={inputBase}
             />
+            {keyMode === 'manual' && (
+              <>
+                <input
+                  type="text"
+                  value={manualKey}
+                  onChange={(e) => setManualKey(e.target.value)}
+                  placeholder={t('settings.advanced.manualKeyPlaceholder', '手动 Key（可选）')}
+                  className={inputBase}
+                />
+                <input
+                  type="text"
+                  value={manualValue}
+                  onChange={(e) => setManualValue(e.target.value)}
+                  placeholder={t('settings.advanced.manualValuePlaceholder', '手动 Value（可选）')}
+                  className={inputBase}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateKey()}
+                />
+              </>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {keyMode === 'manual'
+              ? t('settings.advanced.manualKeyHint', '手动模式下需要同时填写 Key 和 Value。')
+              : t('settings.advanced.autoKeyHint', '自动模式将随机生成安全密钥。')}
+          </p>
+
+          <div>
             <button
               onClick={handleCreateKey}
               disabled={creating}
