@@ -1103,6 +1103,11 @@ body {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  /* Safe area for top (notch) */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
   /* Session viewer header: compact on mobile */
   .session-viewer-header {
     flex-wrap: wrap;
