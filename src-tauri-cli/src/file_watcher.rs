@@ -69,8 +69,8 @@ fn process_events(
         .expect("Failed to create tokio runtime for CLI file watcher");
 
     loop {
-        match rx.recv_timeout(Duration::from_secs(1)) {
-            Ok(event_result) => match event_result {
+        if let Ok(event_result) = rx.recv_timeout(Duration::from_secs(1)) {
+            match event_result {
                 Ok(events) => {
                     for event in &events {
                         for path in &event.paths {
@@ -93,8 +93,7 @@ fn process_events(
                         error!("CLI watcher error: {:?}", e);
                     }
                 }
-            },
-            Err(_) => {}
+            }
         }
 
         if pending_paths.is_empty() || last_notification.elapsed() < min_interval {
