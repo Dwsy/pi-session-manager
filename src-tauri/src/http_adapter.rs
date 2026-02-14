@@ -156,6 +156,7 @@ async fn handle_command(
                             "access-control-allow-headers",
                             "content-type, authorization",
                         )
+                        .header("content-type", "application/json")
                         .header("content-encoding", "gzip")
                         .body(Body::from(compressed))
                         .unwrap()
