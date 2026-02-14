@@ -8,16 +8,25 @@ import type { SearchContext, SearchPluginResult } from '../types'
  */
 export class ProjectSearchPlugin extends BaseSearchPlugin {
   id = 'project-search'
-  name = '项目搜索'
   icon = FolderOpen
-  description = '搜索项目路径'
   keywords = ['project', 'folder', 'directory', '项目', '文件夹', '目录']
   priority = 70
+  
+  get name(): string {
+    return this.context?.t('plugins.project.name', '项目搜索') || '项目搜索'
+  }
+  
+  get description(): string {
+    return this.context?.t('plugins.project.description', '搜索项目路径') || '搜索项目路径'
+  }
   
   async search(
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]> {
+    // 保存 context 以便访问 i18n
+    this.setContext(context)
+    
     try {
       // 从 sessions 中提取项目列表
       const projectMap = new Map<string, number>()

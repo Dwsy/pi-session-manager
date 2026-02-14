@@ -1,27 +1,37 @@
-pub mod app_state;
 pub mod auth;
-pub mod commands;
 pub mod config;
+pub mod dispatch;
 pub mod export;
-pub mod file_watcher;
-pub mod http_adapter;
 pub mod models;
 pub mod scanner;
 pub mod scanner_scheduler;
 pub mod search;
-mod session_parser;
+pub mod session_parser;
 pub mod settings_store;
-mod sqlite_cache;
+pub mod sqlite_cache;
 pub mod stats;
-mod tantivy_search;
+pub mod tantivy_search;
+pub mod write_buffer;
+pub mod commands;
+
+#[cfg(feature = "gui")]
+pub mod app_state;
+#[cfg(feature = "gui")]
+pub mod file_watcher;
+#[cfg(feature = "gui")]
+pub mod http_adapter;
+#[cfg(feature = "gui")]
 pub mod terminal;
-mod write_buffer;
+#[cfg(feature = "gui")]
 pub mod ws_adapter;
 
 pub use commands::*;
+#[cfg(feature = "gui")]
 use std::sync::Mutex;
+#[cfg(feature = "gui")]
 use tauri::{Listener, Manager};
 
+#[cfg(feature = "gui")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -46,6 +56,7 @@ pub fn run() {
             get_skill_content,
             get_prompt_content,
             get_system_prompt,
+            get_session_system_prompt,
             load_pi_settings,
             save_pi_settings,
             list_models,
@@ -84,7 +95,17 @@ pub fn run() {
             evaluate_auto_rules,
             list_api_keys,
             create_api_key,
-            revoke_api_key
+            revoke_api_key,
+            scan_all_resources,
+            load_pi_settings_full,
+            save_pi_setting,
+            toggle_resource,
+            list_model_options_fast,
+            list_model_options_full,
+            read_resource_file,
+            list_config_versions,
+            get_config_version,
+            restore_config_version
         ])
         .setup(|app| {
             // Create and manage app state

@@ -11,17 +11,17 @@ pub struct FileStats {
     pub is_file: bool,
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
     scanner::scan_sessions().await
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn read_session_file(path: String) -> Result<String, String> {
     fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn read_session_file_incremental(
     path: String,
     from_line: usize,
@@ -42,7 +42,7 @@ pub async fn read_session_file_incremental(
     Ok((total_lines, new_content))
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_file_stats(path: String) -> Result<FileStats, String> {
     let metadata = fs::metadata(&path).map_err(|e| format!("Failed to get file metadata: {e}"))?;
 
@@ -62,7 +62,7 @@ pub async fn get_file_stats(path: String) -> Result<FileStats, String> {
     })
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_entries(path: String) -> Result<Vec<SessionEntry>, String> {
     let content =
         fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
@@ -101,12 +101,12 @@ pub async fn get_session_entries(path: String) -> Result<Vec<SessionEntry>, Stri
     Ok(entries)
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn delete_session(path: String) -> Result<(), String> {
     fs::remove_file(&path).map_err(|e| format!("Failed to delete session: {e}"))
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn export_session(
     path: String,
     format: String,
@@ -115,7 +115,7 @@ pub async fn export_session(
     export::export_session(&path, &format, &output_path).await
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn rename_session(path: String, new_name: String) -> Result<(), String> {
     let content =
         fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
@@ -161,19 +161,19 @@ pub async fn rename_session(path: String, new_name: String) -> Result<(), String
     Ok(())
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_stats(sessions: Vec<SessionInfo>) -> Result<stats::SessionStats, String> {
     Ok(stats::calculate_stats(&sessions))
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_stats_light(
     sessions: Vec<stats::SessionStatsInput>,
 ) -> Result<stats::SessionStats, String> {
     Ok(stats::calculate_stats_from_inputs(&sessions))
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn open_session_in_terminal(
     path: String,
     cwd: String,
@@ -259,7 +259,7 @@ end tell"#
     Ok(())
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn open_session_in_browser(path: String) -> Result<(), String> {
     let temp_dir = std::env::temp_dir();
     let session_id = std::path::Path::new(&path)

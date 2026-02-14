@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { invoke, listen } from '../transport'
 import { useTranslation } from 'react-i18next'
-import { ArrowUp, ArrowDown, Loader2, Bot, Search } from 'lucide-react'
+import { ArrowUp, ArrowDown, Loader2, Bot, Search, Eye, EyeOff, ChevronsUpDown } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo, SessionEntry, SessionsDiff } from '../types'
 import { parseSessionEntries, computeStats } from '../utils/session'
@@ -23,19 +23,17 @@ import '../styles/session.css'
 
 // Session content cache — avoids re-reading file when switching back
 const SESSION_CONTENT_CACHE = new Map<string, {
-  modified: string
   entries: SessionEntry[]
   lineCount: number
 }>()
 const MAX_CACHE_SIZE = 5
 
-function cacheSessionContent(path: string, modified: string, entries: SessionEntry[], lineCount: number) {
+function cacheSessionContent(path: string, entries: SessionEntry[], lineCount: number) {
   if (SESSION_CONTENT_CACHE.size >= MAX_CACHE_SIZE) {
-    // Evict oldest
     const firstKey = SESSION_CONTENT_CACHE.keys().next().value
     if (firstKey) SESSION_CONTENT_CACHE.delete(firstKey)
   }
-  SESSION_CONTENT_CACHE.set(path, { modified, entries, lineCount })
+  SESSION_CONTENT_CACHE.set(path, { entries, lineCount })
 }
 
 interface SessionViewerProps {
@@ -57,7 +55,7 @@ const MESSAGE_ITEM_GAP = 16
 
 function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume, terminal = getPlatformDefaults().defaultTerminal, piPath, customCommand }: SessionViewerProps) {
   const { t } = useTranslation()
-  const { toggleThinking, toggleToolsExpanded } = useSessionView()
+  const { showThinking, toggleThinking, toolsExpanded, toggleToolsExpanded } = useSessionView()
   const isMobile = useIsMobile()
   const [entries, setEntries] = useState<SessionEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -120,10 +118,9 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
         setError(null)
         measuredHeightsRef.current.clear()
 
-        // Check cache first — skip file read if session hasn't changed
+        // Check cache first — skip file read when switching back to a previously viewed session
         const cached = SESSION_CONTENT_CACHE.get(session.path)
-        if (cached && cached.modified === session.modified) {
-          console.log('[SessionViewer] Using cached content, entries:', cached.entries.length)
+        if (cached) {
           setEntries(cached.entries)
           setLineCount(cached.lineCount)
           const lastMessage = cached.entries.filter(e => e.type === 'message').pop()
@@ -134,7 +131,6 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
 
         loadingTimerRef.current = setTimeout(() => {
           if (!cancelled) {
-            console.log('[SessionViewer] Setting showLoading to true after 300ms')
             setShowLoading(true)
           }
         }, 300)
@@ -145,7 +141,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
         const parsedEntries = parseSessionEntries(jsonlContent)
 
         // Always cache, even if cancelled — so StrictMode's second mount hits cache
-        cacheSessionContent(session.path, session.modified, parsedEntries, lines)
+        cacheSessionContent(session.path, parsedEntries, lines)
 
         if (cancelled) return
 
@@ -186,7 +182,9 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
         loadingTimerRef.current = null
       }
     }
-  }, [session.path, session.modified, t])
+  // Only re-run full load when user selects a DIFFERENT session
+  // File updates while viewing are handled by the incremental listener below
+  }, [session.path, t])
 
   // Incremental update: listen for diff events, load new lines if this session was updated
   useEffect(() => {
@@ -472,7 +470,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
           setEntries(prev => {
             const merged = [...prev, ...newEntries]
             // Update cache with merged entries
-            cacheSessionContent(session.path, session.modified, merged, newLineCount)
+            cacheSessionContent(session.path, merged, newLineCount)
             return merged
           })
 
@@ -622,7 +620,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
       )}
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 transition-all duration-200" style={{ paddingLeft: showSidebar && !isMobile ? `${sidebarWidth}px` : 0 }}>
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border relative z-20" data-tauri-drag-region>
           <div className="flex items-center gap-1.5 min-w-0">
             {isMobile && onBack && (
               <button
@@ -665,6 +663,20 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
                 <Search className="h-3.5 w-3.5" />
               </button>
             )}
+            <button
+              onClick={toggleThinking}
+              className={`p-1.5 text-xs rounded transition-colors ${showThinking ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
+              title={`${showThinking ? 'Hide' : 'Show'} thinking (⌘T)`}
+            >
+              {showThinking ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            </button>
+            <button
+              onClick={toggleToolsExpanded}
+              className={`p-1.5 text-xs rounded transition-colors ${toolsExpanded ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
+              title={`${toolsExpanded ? 'Collapse' : 'Expand'} tools (⌘O)`}
+            >
+              <ChevronsUpDown className="h-3.5 w-3.5" />
+            </button>
             <button
               onClick={() => setShowSystemPromptDialog(true)}
               className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
@@ -813,6 +825,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
         isOpen={showSystemPromptDialog}
         onClose={() => setShowSystemPromptDialog(false)}
         entries={entries}
+        sessionPath={session.path}
       />
     </div>
   )

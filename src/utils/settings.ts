@@ -2,6 +2,7 @@
  * 设置工具函数
  */
 
+import i18n from '../i18n'
 import type { AppSettings } from '../components/settings/types'
 
 export interface ValidationError {
@@ -12,25 +13,25 @@ export interface ValidationError {
 export const settingsValidationRules: Record<string, (value: unknown) => ValidationError | null> = {
   'terminal.piCommandPath': (value) => {
     if (typeof value !== 'string' || value.trim() === '') {
-      return { field: 'terminal.piCommandPath', message: 'Pi 命令路径不能为空' }
+      return { field: 'terminal.piCommandPath', message: i18n.t('settings.validation.piCommandPathRequired') }
     }
     return null
   },
   'session.refreshInterval': (value) => {
     if (typeof value !== 'number' || value < 5 || value > 300) {
-      return { field: 'session.refreshInterval', message: '刷新间隔必须在 5-300 秒之间' }
+      return { field: 'session.refreshInterval', message: i18n.t('settings.validation.refreshIntervalRange') }
     }
     return null
   },
   'advanced.maxCacheSize': (value) => {
     if (typeof value !== 'number' || value < 10 || value > 1000) {
-      return { field: 'advanced.maxCacheSize', message: '缓存大小必须在 10-1000 MB 之间' }
+      return { field: 'advanced.maxCacheSize', message: i18n.t('settings.validation.cacheSizeRange') }
     }
     return null
   },
   'appearance.sidebarWidth': (value) => {
     if (typeof value !== 'number' || value < 200 || value > 600) {
-      return { field: 'appearance.sidebarWidth', message: '侧边栏宽度必须在 200-600 px 之间' }
+      return { field: 'appearance.sidebarWidth', message: i18n.t('settings.validation.sidebarWidthRange') }
     }
     return null
   },
@@ -83,7 +84,7 @@ export function validateSettingValue(
  */
 export function formatSettingValue(_section: string, _key: string, value: unknown): string {
   if (typeof value === 'boolean') {
-    return value ? '启用' : '禁用'
+    return value ? i18n.t('common.enabled') : i18n.t('common.disabled')
   }
   if (typeof value === 'number') {
     return value.toString()
@@ -167,53 +168,4 @@ export function checkSettingsCompatibility(_version: string): boolean {
 export function migrateSettings(oldSettings: any): AppSettings {
   // TODO: 实现迁移逻辑
   return oldSettings as AppSettings
-}
-
-/**
- * 获取设置的显示名称
- */
-export function getSettingDisplayName(section: string, key: string): string {
-  const displayNames: Record<string, Record<string, string>> = {
-    terminal: {
-      defaultTerminal: '默认终端',
-      customTerminalCommand: '自定义终端命令',
-      piCommandPath: 'Pi 命令路径',
-    },
-    appearance: {
-      theme: '主题',
-      sidebarWidth: '侧边栏宽度',
-      fontSize: '字体大小',
-      codeBlockTheme: '代码块主题',
-      messageSpacing: '消息间距',
-    },
-    language: {
-      locale: '语言',
-    },
-    session: {
-      autoRefresh: '自动刷新',
-      refreshInterval: '刷新间隔',
-      defaultViewMode: '默认视图模式',
-      showMessagePreview: '显示消息预览',
-      previewLines: '预览行数',
-    },
-    search: {
-      defaultSearchMode: '默认搜索模式',
-      caseSensitive: '区分大小写',
-      includeToolCalls: '包含工具调用',
-      highlightMatches: '高亮匹配',
-    },
-    export: {
-      defaultFormat: '默认导出格式',
-      includeMetadata: '包含元数据',
-      includeTimestamps: '包含时间戳',
-    },
-    advanced: {
-      sessionDirs: '会话目录',
-      cacheEnabled: '启用缓存',
-      debugMode: '调试模式',
-      maxCacheSize: '最大缓存大小',
-    },
-  }
-
-  return displayNames[section]?.[key] || key
 }

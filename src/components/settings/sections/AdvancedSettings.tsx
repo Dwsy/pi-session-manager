@@ -138,8 +138,8 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
                 onChange={(e) => updateServer('bind_addr', e.target.value)}
                 className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
               >
-                <option value="127.0.0.1">127.0.0.1 (仅本地)</option>
-                <option value="0.0.0.0">0.0.0.0 (所有接口)</option>
+                <option value="127.0.0.1">{t('settings.advanced.bindAddrLocal')}</option>
+                <option value="0.0.0.0">{t('settings.advanced.bindAddrAll')}</option>
               </select>
               {isRemoteBind && (
                 <span className="flex items-center gap-1 text-xs text-amber-400">

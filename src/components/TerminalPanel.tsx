@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -169,6 +170,7 @@ const MIN_HEIGHT = 120
 const DEFAULT_HEIGHT = 280
 
 export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, defaultShell: propShell, fontSize = 13, pendingCommand, onCommandConsumed }: TerminalPanelProps) {
+  const { t } = useTranslation()
   const resolvedTheme = useResolvedTheme()
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
@@ -376,10 +378,10 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
 
         {/* Actions */}
         <div className="relative flex items-center gap-0.5 ml-1 shrink-0">
-          <button onClick={() => addTab()} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" title="New terminal">
+          <button onClick={() => addTab()} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" title={t('components.terminalPanel.newTerminal')}>
             <Plus className="h-3.5 w-3.5" />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); setShowShellMenu(!showShellMenu) }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" title="Select shell">
+          <button onClick={(e) => { e.stopPropagation(); setShowShellMenu(!showShellMenu) }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" title={t('components.terminalPanel.selectShell')}>
             <ChevronDown className="h-3 w-3" />
           </button>
           {showShellMenu && (
@@ -395,7 +397,7 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
           <button onClick={toggleMaximize} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" title={maximized ? 'Restore panel' : 'Maximize panel'}>
             {maximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
           </button>
-          <button onClick={onClose} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" title="Hide panel">
+          <button onClick={onClose} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" title={t('components.terminalPanel.hidePanel')}>
             <ChevronDown className="h-3 w-3" />
           </button>
         </div>

@@ -12,6 +12,10 @@ export default function LanguageSettings({ settings, onUpdate }: LanguageSetting
   const languages = [
     { code: 'zh-CN', name: '简体中文', flag: '🇨🇳' },
     { code: 'en-US', name: 'English', flag: '🇺🇸' },
+    { code: 'ja-JP', name: '日本語', flag: '🇯🇵' },
+    { code: 'fr-FR', name: 'Français', flag: '🇫🇷' },
+    { code: 'de-DE', name: 'Deutsch', flag: '🇩🇪' },
+    { code: 'es-ES', name: 'Español', flag: '🇪🇸' },
   ]
 
   const handleLanguageChange = (langCode: string) => {

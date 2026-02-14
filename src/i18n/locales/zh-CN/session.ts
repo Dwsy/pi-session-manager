@@ -35,6 +35,7 @@ export const session = {
     date: '日期',
     models: '模型',
     messages: '消息',
+    messagesLabel: '消息',
     toolCalls: '工具调用',
     tokens: '令牌',
     cost: '成本',
@@ -59,5 +60,17 @@ export const session = {
   tree: {
     nodes: '节点',
     search: '搜索...',
+    loading: '加载中...',
+    sessionStart: '会话开始',
+    model: '模型',
+    toolCalls: '{{count}} 个工具调用',
+    toolCallsPlural: '{{count}} 个工具调用',
   },
+  tooltip: {
+    path: '路径',
+    created: '创建',
+    updated: '更新',
+    messages: '消息',
+  },
+  newMessages: '有新消息',
 } as const

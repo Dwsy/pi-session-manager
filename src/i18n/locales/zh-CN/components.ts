@@ -194,4 +194,34 @@ export const components = {
       totalCost: '总成本',
     },
   },
+  subagent: {
+    thinking: '思考',
+    tools: '工具',
+    close: '关闭 (Esc)',
+    showThinking: '显示思考 (⌘T)',
+    hideThinking: '隐藏思考 (⌘T)',
+    expandTools: '展开工具 (⌘O)',
+    collapseTools: '折叠工具 (⌘O)',
+    clickToView: '点击查看子代理会话',
+  },
+  sessionFlow: {
+    zoomIn: '放大',
+    zoomOut: '缩小',
+    fitView: '适应视图',
+    focusActive: '聚焦活动节点',
+  },
+  terminalPanel: {
+    newTerminal: '新建终端',
+    selectShell: '选择 Shell',
+    hidePanel: '隐藏面板',
+  },
+  tokenTrend: {
+    noData: '暂无令牌使用数据',
+  },
+  tagManager: {
+    addChild: '添加子标签',
+  },
+  piConfig: {
+    view: '查看',
+  },
 } as const

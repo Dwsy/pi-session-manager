@@ -1,4 +1,5 @@
 import { TrendingUp, Zap } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { SessionStats } from '../../types'
 import { format, subDays } from 'date-fns'
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
@@ -9,7 +10,9 @@ interface TokenTrendChartProps {
   days?: number
 }
 
-export default function TokenTrendChart({ stats, title = 'Token Usage Trend', days = 30 }: TokenTrendChartProps) {
+export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendChartProps) {
+  const { t } = useTranslation()
+  const displayTitle = title || t('dashboard.tokenStats.title')
   // Generate daily token data from messages_by_date
   const generateDailyTokenData = () => {
     const today = new Date()
@@ -96,7 +99,7 @@ export default function TokenTrendChart({ stats, title = 'Token Usage Trend', da
             <div className="p-1 rounded bg-success/10">
               <TrendingUp className="h-3 w-3 text-success" />
             </div>
-            {title}
+            {displayTitle}
           </h3>
           <div className="flex items-center gap-2 text-[10px]">
             <div className="text-muted-foreground">
@@ -113,7 +116,7 @@ export default function TokenTrendChart({ stats, title = 'Token Usage Trend', da
           <div className="h-24 flex items-center justify-center text-muted-foreground text-xs">
             <div className="text-center">
               <TrendingUp className="h-6 w-6 mx-auto mb-2 opacity-30" />
-              <p>No token usage data available</p>
+              <p>{t('components.tokenTrend.noData')}</p>
               <p className="text-[10px] mt-1 opacity-70">Start using sessions to see trends</p>
             </div>
           </div>

@@ -1,0 +1,17 @@
+export const time = {
+  justNow: '刚刚',
+  minutesAgo: '{{count}} 分钟前',
+  minutesAgo_one: '1 分钟前',
+  hoursAgo: '{{count}} 小时前',
+  hoursAgo_one: '1 小时前',
+  daysAgo: '{{count}} 天前',
+  daysAgo_one: '1 天前',
+  weeksAgo: '{{count}} 周前',
+  weeksAgo_one: '1 周前',
+  monthsAgo: '{{count}} 月前',
+  monthsAgo_one: '1 月前',
+  yearsAgo: '{{count}} 年前',
+  yearsAgo_one: '1 年前',
+  today: '今天',
+  yesterday: '昨天',
+} as const

@@ -1,7 +1,7 @@
 use crate::models::SessionInfo;
 use crate::{config, search, sqlite_cache};
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn search_sessions(
     sessions: Vec<SessionInfo>,
     query: String,
@@ -29,7 +29,7 @@ pub async fn search_sessions(
     ))
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn search_sessions_fts(query: String, limit: usize) -> Result<Vec<SessionInfo>, String> {
     let config = config::load_config()?;
     let conn = sqlite_cache::init_db_with_config(&config)?;

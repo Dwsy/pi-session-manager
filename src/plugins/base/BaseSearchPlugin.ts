@@ -13,6 +13,16 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
   
   priority: number = 50 // 默认优先级
   
+  // 存储 context 以便子类访问 i18n
+  protected context?: SearchContext
+  
+  /**
+   * 设置搜索上下文（包含 i18n）
+   */
+  setContext(context: SearchContext): void {
+    this.context = context
+  }
+  
   /**
    * 抽象搜索方法，子类必须实现
    */

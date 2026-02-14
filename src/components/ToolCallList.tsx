@@ -4,6 +4,7 @@ import ReadExecution from './ReadExecution'
 import WriteExecution from './WriteExecution'
 import EditExecution from './EditExecution'
 import GenericToolCall from './GenericToolCall'
+import SubagentToolCall from './SubagentToolCall'
 import { useSessionView } from '../contexts/SessionViewContext'
 
 interface ToolCallListProps {
@@ -95,6 +96,17 @@ export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListPr
                 output={output}
                 timestamp={timestamp}
                 expanded={toolsExpanded}
+              />
+            )
+
+          case 'subagent':
+            return (
+              <SubagentToolCall
+                key={index}
+                arguments={args}
+                details={result?.message?.details}
+                output={output}
+                timestamp={timestamp}
               />
             )
 

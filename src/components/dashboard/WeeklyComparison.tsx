@@ -1,4 +1,5 @@
 import { Calendar, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { format, parseISO, startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 import type { SessionStats } from '../../types'
 
@@ -7,7 +8,9 @@ interface WeeklyComparisonProps {
   title?: string
 }
 
-export default function WeeklyComparison({ stats, title = 'Weekly Comparison' }: WeeklyComparisonProps) {
+export default function WeeklyComparison({ stats, title }: WeeklyComparisonProps) {
+  const { t } = useTranslation()
+  const displayTitle = title || t('dashboard.weeklyComparison.title')
   // Get current week and previous week data
   const now = new Date()
   const currentWeekStart = startOfWeek(now)
@@ -81,14 +84,14 @@ export default function WeeklyComparison({ stats, title = 'Weekly Comparison' }:
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
           <Calendar className="h-4 w-4 text-muted-foreground" />
-          {title}
+          {displayTitle}
         </h3>
         <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${getChangeColor()}`}>
           {getChangeIcon()}
           <span className="font-medium">
             {change > 0 ? '+' : ''}{change.toFixed(1)}%
           </span>
-          <span>vs last week</span>
+          <span>{t('dashboard.weeklyComparison.vsLastWeek')}</span>
         </div>
       </div>
 

@@ -28,28 +28,7 @@ struct WsResponse {
     error: Option<String>,
 }
 
-fn extract_string(payload: &Value, key: &str) -> Result<String, String> {
-    payload
-        .get(key)
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| format!("Missing required parameter: {key}"))
-}
-
-fn extract_optional_string(payload: &Value, key: &str) -> Option<String> {
-    payload
-        .get(key)
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-}
-
-fn extract_usize(payload: &Value, key: &str) -> Result<usize, String> {
-    payload
-        .get(key)
-        .and_then(|v| v.as_u64())
-        .map(|v| v as usize)
-        .ok_or_else(|| format!("Missing required parameter: {key}"))
-}
+use crate::dispatch::{extract_string, extract_usize};
 
 pub struct WsAdapter {
     app_state: SharedAppState,
@@ -254,272 +233,17 @@ pub async fn dispatch(
     command: &str,
     payload: &Value,
 ) -> Result<Value, String> {
+    // GUI-only overrides that need AppState (terminal, save_session_paths with watcher)
     match command {
-        "scan_sessions" => {
-            let result = crate::scanner::scan_sessions().await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "session_digest" => {
-            let (version, count) = crate::scanner::get_session_digest();
-            Ok(serde_json::json!({ "version": version, "count": count }))
-        }
-        "read_session_file" => {
-            let path = extract_string(payload, "path")?;
-            let result = std::fs::read_to_string(&path)
-                .map_err(|e| format!("Failed to read session file: {e}"))?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "read_session_file_incremental" => {
-            let path = extract_string(payload, "path")?;
-            let from_line = extract_usize(payload, "fromLine")?;
-            let content = std::fs::read_to_string(&path)
-                .map_err(|e| format!("Failed to read session file: {e}"))?;
-            let lines: Vec<&str> = content.lines().collect();
-            let total_lines = lines.len();
-            let new_content = if from_line >= total_lines {
-                String::new()
-            } else {
-                lines[from_line..].join("\n")
-            };
-            Ok(serde_json::json!([total_lines, new_content]))
-        }
-        "get_file_stats" => {
-            let path = extract_string(payload, "path")?;
-            let metadata = std::fs::metadata(&path)
-                .map_err(|e| format!("Failed to get file metadata: {e}"))?;
-            let modified = metadata
-                .modified()
-                .map_err(|e| format!("Failed to get modified time: {e}"))?;
-            let modified_at = modified
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_err(|e| format!("Failed to convert modified time: {e}"))?
-                .as_millis() as u64;
-            Ok(serde_json::json!({
-                "size": metadata.len(),
-                "modified_at": modified_at,
-                "is_file": metadata.is_file()
-            }))
-        }
-        "get_session_entries" => {
-            let path = extract_string(payload, "path")?;
-            let result = crate::get_session_entries(path).await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "delete_session" => {
-            let path = extract_string(payload, "path")?;
-            std::fs::remove_file(&path).map_err(|e| format!("Failed to delete session: {e}"))?;
-            Ok(Value::Null)
-        }
-        "export_session" => {
-            let path = extract_string(payload, "path")?;
-            let format = extract_string(payload, "format")?;
-            let output_path = extract_string(payload, "outputPath")?;
-            crate::export::export_session(&path, &format, &output_path).await?;
-            Ok(Value::Null)
-        }
-        "rename_session" => {
-            let path = extract_string(payload, "path")?;
-            let new_name = extract_string(payload, "newName")?;
-            crate::rename_session(path, new_name).await?;
-            Ok(Value::Null)
-        }
-        "get_session_stats" => {
-            let sessions: Vec<crate::models::SessionInfo> = serde_json::from_value(
-                payload
-                    .get("sessions")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid sessions: {e}"))?;
-            let result = crate::stats::calculate_stats(&sessions);
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "get_session_stats_light" => {
-            let sessions: Vec<crate::stats::SessionStatsInput> = serde_json::from_value(
-                payload
-                    .get("sessions")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid sessions: {e}"))?;
-            let result = crate::stats::calculate_stats_from_inputs(&sessions);
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "search_sessions" => {
-            let sessions: Vec<crate::models::SessionInfo> = serde_json::from_value(
-                payload
-                    .get("sessions")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid sessions: {e}"))?;
-            let query = extract_string(payload, "query")?;
-            let search_mode =
-                extract_string(payload, "searchMode").unwrap_or_else(|_| "content".to_string());
-            let role_filter =
-                extract_string(payload, "roleFilter").unwrap_or_else(|_| "all".to_string());
-            let include_tools = payload
-                .get("includeTools")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            let result =
-                crate::search_sessions(sessions, query, search_mode, role_filter, include_tools)
-                    .await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "search_sessions_fts" => {
-            let query = extract_string(payload, "query")?;
-            let limit = payload.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
-            let result = crate::search_sessions_fts(query, limit).await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-
-        // Favorites
-        "get_all_favorites" => {
-            let result = crate::get_all_favorites().await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "add_favorite" => {
-            let id = extract_string(payload, "id")?;
-            let favorite_type = extract_string(payload, "favoriteType")?;
-            let name = extract_string(payload, "name")?;
-            let path = extract_string(payload, "path")?;
-            crate::add_favorite(id, favorite_type, name, path).await?;
-            Ok(Value::Null)
-        }
-        "remove_favorite" => {
-            let id = extract_string(payload, "id")?;
-            crate::remove_favorite(id).await?;
-            Ok(Value::Null)
-        }
-        "is_favorite" => {
-            let id = extract_string(payload, "id")?;
-            let result = crate::is_favorite(id).await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "toggle_favorite" => {
-            let id = extract_string(payload, "id")?;
-            let favorite_type = extract_string(payload, "favoriteType")?;
-            let name = extract_string(payload, "name")?;
-            let path = extract_string(payload, "path")?;
-            let result = crate::toggle_favorite(id, favorite_type, name, path).await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-
-        // Skills & prompts
-        "scan_skills" => {
-            let result = crate::scan_skills_internal().await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "scan_prompts" => {
-            let result = crate::scan_prompts_internal().await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "get_skill_content" => {
-            let path = extract_string(payload, "path")?;
-            let content = std::fs::read_to_string(&path)
-                .map_err(|e| format!("Failed to read skill file: {e}"))?;
-            Ok(serde_json::to_value(content).unwrap())
-        }
-        "get_prompt_content" => {
-            let path = extract_string(payload, "path")?;
-            let content = std::fs::read_to_string(&path)
-                .map_err(|e| format!("Failed to read prompt file: {e}"))?;
-            Ok(serde_json::to_value(content).unwrap())
-        }
-        "get_system_prompt" => {
-            let result = crate::get_system_prompt().await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-
-        // Settings
-        "load_pi_settings" => {
-            let result = crate::load_pi_settings_internal().await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "save_pi_settings" => {
-            let settings = serde_json::from_value(
-                payload
-                    .get("settings")
-                    .cloned()
-                    .unwrap_or(Value::Object(Default::default())),
-            )
-            .map_err(|e| format!("Invalid settings: {e}"))?;
-            crate::save_pi_settings(settings).await?;
-            Ok(Value::Null)
-        }
-        "load_app_settings" => crate::load_app_settings_internal().await,
-        "save_app_settings" => {
-            let settings = payload
-                .get("settings")
-                .cloned()
-                .unwrap_or(Value::Object(Default::default()));
-            crate::save_app_settings(settings).await?;
-            Ok(Value::Null)
-        }
-        "load_server_settings" => {
-            let result = crate::load_server_settings().await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "save_server_settings" => {
-            let settings = serde_json::from_value(
-                payload
-                    .get("settings")
-                    .cloned()
-                    .unwrap_or(Value::Object(Default::default())),
-            )
-            .map_err(|e| format!("Invalid settings: {e}"))?;
-            crate::save_server_settings(settings).await?;
-            Ok(Value::Null)
-        }
-        "get_session_paths" => {
-            let result = crate::get_session_paths().await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
         "save_session_paths" => {
             let paths: Vec<String> = serde_json::from_value(
-                payload
-                    .get("paths")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
+                payload.get("paths").cloned().unwrap_or(Value::Array(vec![])),
             )
             .map_err(|e| format!("Invalid paths: {e}"))?;
             let app_handle = app_state.app_handle.clone();
             crate::save_session_paths(paths, app_handle).await?;
-            Ok(Value::Null)
+            return Ok(Value::Null);
         }
-        "get_all_session_dirs" => {
-            let result = crate::get_all_session_dirs().await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-
-        // Models
-        "list_models" => {
-            let search = extract_optional_string(payload, "search");
-            let result = crate::list_models(search).await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "test_model" => {
-            let provider = extract_string(payload, "provider")?;
-            let model = extract_string(payload, "model")?;
-            let prompt = extract_optional_string(payload, "prompt");
-            let result = crate::test_model(provider, model, prompt).await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "test_models_batch" => {
-            let models: Vec<(String, String)> = serde_json::from_value(
-                payload
-                    .get("models")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid models: {e}"))?;
-            let prompt = extract_optional_string(payload, "prompt");
-            let result = crate::test_models_batch(models, prompt).await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-
-        // Terminal commands
         "terminal_create" => {
             let id = extract_string(payload, "id")?;
             let cwd = extract_string(payload, "cwd")?;
@@ -533,7 +257,7 @@ pub async fn dispatch(
                 .lock()
                 .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
             manager.create_session(id, app_handle, event_tx, cwd, shell, rows, cols)?;
-            Ok(serde_json::json!("Terminal created"))
+            return Ok(serde_json::json!("Terminal created"));
         }
         "terminal_write" => {
             let id = extract_string(payload, "id")?;
@@ -543,7 +267,7 @@ pub async fn dispatch(
                 .lock()
                 .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
             manager.write_to_session(&id, data)?;
-            Ok(Value::Null)
+            return Ok(Value::Null);
         }
         "terminal_resize" => {
             let id = extract_string(payload, "id")?;
@@ -554,7 +278,7 @@ pub async fn dispatch(
                 .lock()
                 .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
             manager.resize_session(&id, rows, cols)?;
-            Ok(Value::Null)
+            return Ok(Value::Null);
         }
         "terminal_close" => {
             let id = extract_string(payload, "id")?;
@@ -563,124 +287,24 @@ pub async fn dispatch(
                 .lock()
                 .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
             manager.close_session(&id)?;
-            Ok(Value::Null)
+            return Ok(Value::Null);
         }
         "get_default_shell" => {
             let shells = crate::commands::terminal::scan_shells();
             let fallback = if cfg!(windows) { "cmd.exe" } else { "/bin/sh" };
-            Ok(serde_json::json!(shells
+            return Ok(serde_json::json!(shells
                 .first()
                 .map(|(_, p)| p.as_str())
-                .unwrap_or(fallback)))
+                .unwrap_or(fallback)));
         }
-        "get_available_shells" => Ok(serde_json::json!(crate::commands::terminal::scan_shells())),
-
-        // Tags
-        "get_all_tags" => {
-            let result = crate::get_all_tags().await?;
-            Ok(serde_json::to_value(result).unwrap())
+        "get_available_shells" => {
+            return Ok(serde_json::json!(crate::commands::terminal::scan_shells()));
         }
-        "create_tag" => {
-            let name = extract_string(payload, "name")?;
-            let color = extract_string(payload, "color")?;
-            let icon = extract_optional_string(payload, "icon");
-            let parent_id = extract_optional_string(payload, "parentId");
-            let result = crate::create_tag(name, color, icon, parent_id).await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "update_tag" => {
-            let id = extract_string(payload, "id")?;
-            let name = extract_optional_string(payload, "name");
-            let color = extract_optional_string(payload, "color");
-            let icon = extract_optional_string(payload, "icon");
-            let sort_order = payload.get("sortOrder").and_then(|v| v.as_i64());
-            let parent_id = if payload.get("parentId").is_some() {
-                Some(extract_optional_string(payload, "parentId"))
-            } else {
-                None
-            };
-            crate::update_tag(id, name, color, icon, sort_order, parent_id).await?;
-            Ok(Value::Null)
-        }
-        "delete_tag" => {
-            let id = extract_string(payload, "id")?;
-            crate::delete_tag(id).await?;
-            Ok(Value::Null)
-        }
-        "get_all_session_tags" => {
-            let result = crate::get_all_session_tags().await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "assign_tag" => {
-            let session_id = extract_string(payload, "sessionId")?;
-            let tag_id = extract_string(payload, "tagId")?;
-            crate::assign_tag(session_id, tag_id).await?;
-            Ok(Value::Null)
-        }
-        "remove_tag_from_session" => {
-            let session_id = extract_string(payload, "sessionId")?;
-            let tag_id = extract_string(payload, "tagId")?;
-            crate::remove_tag_from_session(session_id, tag_id).await?;
-            Ok(Value::Null)
-        }
-        "move_session_tag" => {
-            let session_id = extract_string(payload, "sessionId")?;
-            let from_tag_id = extract_optional_string(payload, "fromTagId");
-            let to_tag_id = extract_string(payload, "toTagId")?;
-            let position = payload
-                .get("position")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0);
-            crate::move_session_tag(session_id, from_tag_id, to_tag_id, position).await?;
-            Ok(Value::Null)
-        }
-        "reorder_tags" => {
-            let tag_ids: Vec<String> = serde_json::from_value(
-                payload
-                    .get("tagIds")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid tagIds: {e}"))?;
-            crate::reorder_tags(tag_ids).await?;
-            Ok(Value::Null)
-        }
-        "update_tag_auto_rules" => {
-            let id = extract_string(payload, "id")?;
-            let auto_rules = extract_optional_string(payload, "autoRules");
-            crate::update_tag_auto_rules(id, auto_rules).await?;
-            Ok(Value::Null)
-        }
-        "evaluate_auto_rules" => {
-            let session_id = extract_string(payload, "sessionId")?;
-            let text = extract_string(payload, "text")?;
-            let result = crate::evaluate_auto_rules(session_id, text).await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-
-        // Auth / API keys
-        "list_api_keys" => {
-            let result = crate::list_api_keys().await?;
-            Ok(serde_json::to_value(result).unwrap())
-        }
-        "create_api_key" => {
-            let name = extract_string(payload, "name")?;
-            let result = crate::create_api_key(name).await?;
-            Ok(serde_json::json!(result))
-        }
-        "revoke_api_key" => {
-            let key_preview = extract_string(payload, "keyPreview")?;
-            crate::revoke_api_key(key_preview).await?;
-            Ok(Value::Null)
-        }
-
-        // Desktop-only commands
-        "open_session_in_browser" => Err("open_session_in_browser is desktop-only".to_string()),
-        "open_session_in_terminal" => Err("open_session_in_terminal is desktop-only".to_string()),
-        "toggle_devtools" => Err("toggle_devtools is not supported via WebSocket".to_string()),
-
-        _ => Err(format!("Unknown command: {command}")),
+        _ => {}
     }
+
+    // Delegate to shared dispatch (pure business logic)
+    crate::dispatch::dispatch(command, payload).await
 }
 
 pub async fn init_ws_adapter(

@@ -36,6 +36,8 @@ export const onboarding = {
       bindLocal: '仅本机访问',
       bindRemote: '允许局域网设备（手机/平板）连接',
       mobileHint: '移动端通过浏览器访问 http://<电脑IP>:52131 即可使用，自动切换 HTTP 模式',
+      websocket: 'WebSocket',
+      httpApi: 'HTTP API',
     },
   },
 } as const

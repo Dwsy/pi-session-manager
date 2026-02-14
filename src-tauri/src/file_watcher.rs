@@ -177,7 +177,14 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                                 .map(|ext| ext == "jsonl")
                                 .unwrap_or(false)
                             {
-                                pending_paths.insert(path.clone());
+                                // Skip subagent artifact files — they are child sessions,
+                                // not top-level sessions, and should not pollute the main list.
+                                let dominated_by_subagent = path.components().any(|c| {
+                                    c.as_os_str() == "subagent-artifacts"
+                                });
+                                if !dominated_by_subagent {
+                                    pending_paths.insert(path.clone());
+                                }
                             }
                         }
                     }

@@ -1,0 +1,39 @@
+FROM rust:latest AS builder
+
+WORKDIR /app
+
+# musl target for static linking (no glibc dependency)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    musl-tools build-essential cmake pkg-config && \
+    rm -rf /var/lib/apt/lists/* && \
+    rustup target add x86_64-unknown-linux-musl
+
+# Copy workspace Cargo files first for dependency caching
+COPY Cargo.toml Cargo.lock* ./
+COPY src-tauri/Cargo.toml src-tauri/
+COPY src-tauri-cli/Cargo.toml src-tauri-cli/
+
+# Stub sources for dep caching
+RUN mkdir -p src-tauri/src src-tauri-cli/src && \
+    echo "pub fn stub(){}" > src-tauri/src/lib.rs && \
+    echo "fn main(){}" > src-tauri-cli/src/main.rs && \
+    echo "fn main(){}" > src-tauri/src/main.rs
+
+# Pre-build dependencies
+RUN cargo build --release --target x86_64-unknown-linux-musl -p pi-session-cli 2>/dev/null || true
+
+# Copy real source + pre-built frontend
+COPY src-tauri/src src-tauri/src
+COPY src-tauri/build.rs src-tauri/build.rs
+COPY src-tauri/tauri-build.json src-tauri/tauri-build.json
+COPY src-tauri-cli/src src-tauri-cli/src
+COPY dist/ dist/
+
+# Invalidate stubs and build
+RUN touch src-tauri/src/lib.rs src-tauri-cli/src/main.rs
+RUN cargo build --release --target x86_64-unknown-linux-musl -p pi-session-cli && \
+    strip /app/target/x86_64-unknown-linux-musl/release/pi-session-cli
+
+# Output
+FROM scratch AS output
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/pi-session-cli /pi-session-cli

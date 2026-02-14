@@ -134,15 +134,36 @@ pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
     conn.execute("ALTER TABLE tags ADD COLUMN parent_id TEXT", [])
         .ok();
 
-    // Insert builtin tags
+    // Insert builtin tags based on system language
     let now = Utc::now().to_rfc3339();
-    let builtins = [
-        ("builtin-todo", "待处理", "warning", 0),
-        ("builtin-wip", "进行中", "info", 1),
-        ("builtin-done", "已完成", "success", 2),
-        ("builtin-important", "重要", "destructive", 3),
-        ("builtin-archive", "归档", "slate", 4),
-    ];
+    
+    // Detect system language
+    let is_chinese = std::env::var("LANG")
+        .or_else(|_| std::env::var("LC_ALL"))
+        .or_else(|_| std::env::var("LC_MESSAGES"))
+        .map(|lang| lang.to_lowercase().contains("zh") || lang.to_lowercase().contains("cn"))
+        .unwrap_or(false);
+    
+    let builtins = if is_chinese {
+        // Chinese labels
+        [
+            ("builtin-todo", "待处理", "warning", 0),
+            ("builtin-wip", "进行中", "info", 1),
+            ("builtin-done", "已完成", "success", 2),
+            ("builtin-important", "重要", "destructive", 3),
+            ("builtin-archive", "归档", "slate", 4),
+        ]
+    } else {
+        // English labels
+        [
+            ("builtin-todo", "To Do", "warning", 0),
+            ("builtin-wip", "In Progress", "info", 1),
+            ("builtin-done", "Done", "success", 2),
+            ("builtin-important", "Important", "destructive", 3),
+            ("builtin-archive", "Archive", "slate", 4),
+        ]
+    };
+    
     for (id, name, color, order) in &builtins {
         conn.execute(
             "INSERT OR IGNORE INTO tags (id, name, color, sort_order, is_builtin, created_at) VALUES (?1, ?2, ?3, ?4, 1, ?5)",

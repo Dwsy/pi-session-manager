@@ -10,7 +10,7 @@ pub struct FavoriteItem {
     pub added_at: String,
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn add_favorite(
     id: String,
     favorite_type: String,
@@ -23,7 +23,7 @@ pub async fn add_favorite(
     Ok(())
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn remove_favorite(id: String) -> Result<(), String> {
     let config = config::load_config()?;
     let conn = sqlite_cache::init_db_with_config(&config)?;
@@ -31,7 +31,7 @@ pub async fn remove_favorite(id: String) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_all_favorites() -> Result<Vec<FavoriteItem>, String> {
     let config = config::load_config()?;
     let conn = sqlite_cache::init_db_with_config(&config)?;
@@ -48,14 +48,14 @@ pub async fn get_all_favorites() -> Result<Vec<FavoriteItem>, String> {
         .collect())
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn is_favorite(id: String) -> Result<bool, String> {
     let config = config::load_config()?;
     let conn = sqlite_cache::init_db_with_config(&config)?;
     sqlite_cache::is_favorite(&conn, &id)
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn toggle_favorite(
     id: String,
     favorite_type: String,

@@ -101,7 +101,7 @@ export default function ProjectFilterList({
       </button>
 
       {/* Project List */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 relative">
         <div
           className="absolute inset-0 w-full"
           style={{ height: `${virtualizer.getTotalSize()}px` }}
@@ -163,7 +163,7 @@ export default function ProjectFilterList({
 }
 
 function getDirectoryName(cwd: string): string {
-  if (!cwd || cwd === 'Unknown' || cwd === '未知') {
+  if (!cwd || cwd === 'Unknown') {
     return cwd || 'Unknown Directory'
   }
 

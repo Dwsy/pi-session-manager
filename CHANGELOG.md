@@ -6,6 +6,30 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Added
 
+- **Pi Config TUI settings panel** — unified resource management and settings editor aligned with pi source
+  - Resources tab: scan and manage extensions/skills/prompts/themes with user+project scope grouping
+  - `scan_all_resources` backend: scans `~/.pi/agent/` and `.pi/` for all resource types with metadata
+  - YAML frontmatter parsing for SKILL.md descriptions (handles `>`, `|`, quoted, unquoted formats)
+  - Resource toggle via `+/-` prefix mechanism matching pi's enable/disable pattern
+  - Resource viewer modal: click Eye icon to preview SKILL.md/README.md content rendered as markdown
+  - Settings tab: full alignment with pi source `settings-manager.js` — 25+ settings across 5 groups (Model, Behavior, Advanced, Terminal, Appearance)
+  - Nested settings support via dot-notation (`compaction.enabled`, `retry.maxRetries`, etc.)
+  - Progressive model loading: fast from `models.json`, then full from `pi --list-models`
+  - Provider/Model as dropdowns with background refresh
+  - Version History as standalone third tab with preview/restore UI
+  - `read_resource_file` command with path traversal security guard
+  - `load_pi_settings_full`, `save_pi_setting`, `toggle_resource` backend commands
+
+### Fixed
+
+- **Pi Config settings default values** — boolean settings now use correct defaults from pi source code
+  - `compaction.enabled`, `retry.enabled`, `enableSkillCommands`, `terminal.showImages`, `images.autoResize` default to `true` when absent
+  - `hideThinkingBlock`, `quietStartup`, `collapseChangelog`, `terminal.clearOnShrink`, `images.blockImages`, `showHardwareCursor` default to `false`
+  - Enum/number settings also respect their pi source defaults (`steeringMode` → `one-at-a-time`, `autocompleteMaxVisible` → `5`, etc.)
+- **Resource viewer modal clipping** — modal now renders via `createPortal` to `#portal-root` outside React tree, preventing overflow clipping by Settings panel ancestors
+
+### Added
+
 - **Unified SearchFilterBar component** — reusable search + tag filter bar shared across all views
   - New `SearchFilterBar` component combining inline search input with `LabelFilter` dropdown
   - Desktop sidebar: search + tag filter always visible for list, project, and kanban views

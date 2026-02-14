@@ -104,7 +104,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
         let entries = match fs::read_dir(sessions_dir) {
             Ok(e) => e,
             Err(e) => {
-                log::warn!("Failed to read sessions directory {:?}: {}", sessions_dir, e);
+                log::warn!("Failed to read sessions directory {sessions_dir:?}: {e}");
                 continue;
             }
         };
@@ -326,7 +326,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             sessions.retain(|s| s.path != *path_str);
             if sessions.len() != before {
                 diff.removed.push(path_str.clone());
-                log::info!("Session removed (file deleted): {}", path_str);
+                log::info!("Session removed (file deleted): {path_str}");
             }
             continue;
         }
@@ -349,7 +349,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                 }
             }
             Err(e) => {
-                log::warn!("Failed to re-parse {}: {}", path_str, e);
+                log::warn!("Failed to re-parse {path_str}: {e}");
             }
         }
     }

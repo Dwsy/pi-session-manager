@@ -83,7 +83,7 @@ export default function ModelSettings() {
       const result = await invoke<ModelTestResult>('test_model', {
         provider,
         model,
-        prompt: '用一句话介绍你自己，不超过50字。',
+        prompt: t('settings.models.testPrompt'),
       })
 
       // 更新模型信息
@@ -121,7 +121,7 @@ export default function ModelSettings() {
         const result = await invoke<ModelTestResult>('test_model', {
           provider: model.provider,
           model: model.model,
-          prompt: '用一句话介绍你自己，不超过50字。',
+          prompt: t('settings.models.testPrompt'),
         })
 
         // 更新模型信息
@@ -281,12 +281,12 @@ export default function ModelSettings() {
                     {model.response_time < 3 ? (
                       <span className="text-green-400 flex items-center gap-1">
                         <Zap className="h-3 w-3" />
-                        快
+                        {t('settings.models.speed.fast')}
                       </span>
                     ) : model.response_time < 5 ? (
-                      <span className="text-yellow-400">中</span>
+                      <span className="text-yellow-400">{t('settings.models.speed.medium')}</span>
                     ) : (
-                      <span className="text-red-400">慢</span>
+                      <span className="text-red-400">{t('settings.models.speed.slow')}</span>
                     )}
                   </div>
                 )}

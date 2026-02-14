@@ -135,6 +135,7 @@ fn main() {
             pi_session_manager::get_skill_content,
             pi_session_manager::get_prompt_content,
             pi_session_manager::get_system_prompt,
+            pi_session_manager::get_session_system_prompt,
             pi_session_manager::load_pi_settings,
             pi_session_manager::save_pi_settings,
             pi_session_manager::list_models,
@@ -179,6 +180,7 @@ fn main() {
             pi_session_manager::toggle_resource,
             pi_session_manager::list_model_options_fast,
             pi_session_manager::list_model_options_full,
+            pi_session_manager::read_resource_file,
             pi_session_manager::list_config_versions,
             pi_session_manager::get_config_version,
             pi_session_manager::restore_config_version

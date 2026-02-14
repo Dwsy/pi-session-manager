@@ -65,6 +65,7 @@ export const dashboard = {
     sessions: '会话',
     messages: '消息',
     change: '变化',
+    vsLastWeek: '较上周',
   },
   productivityMetrics: {
     title: '生产力指标',

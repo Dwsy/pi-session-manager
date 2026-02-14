@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { SessionEntry } from '../types'
 
 interface TreeNodeProps {
@@ -17,6 +18,7 @@ export interface FlatTreeNode {
 }
 
 function TreeNodeDisplay({ entry }: { entry: SessionEntry }) {
+  const { t } = useTranslation()
   if (entry.type === 'message' && entry.message) {
     const role = entry.message.role
     const content = entry.message.content || []
@@ -31,13 +33,13 @@ function TreeNodeDisplay({ entry }: { entry: SessionEntry }) {
     } else if (role === 'assistant') {
       const parts = []
       if (text) parts.push(text)
-      if (toolCalls.length > 0) parts.push(`[${toolCalls.length} tool call${toolCalls.length > 1 ? 's' : ''}]`)
+      if (toolCalls.length > 0) parts.push(`[${t(toolCalls.length > 1 ? 'session.tree.toolCallsPlural' : 'session.tree.toolCalls', { count: toolCalls.length })}]`)
       return <span className="tree-role-assistant">Assistant: {parts.join(' ') || '(empty)'}</span>
     } else if (role === 'toolResult') {
       return <span className="tree-role-tool">Tool Result</span>
     }
   } else if (entry.type === 'model_change') {
-    return <span>Model: {entry.provider}/{entry.modelId}</span>
+    return <span>{t('session.tree.model')}: {entry.provider}/{entry.modelId}</span>
   } else if (entry.type === 'compaction') {
     return <span className="tree-compaction">Compaction ({entry.tokensBefore} tokens)</span>
   } else if (entry.type === 'branch_summary') {
@@ -45,7 +47,7 @@ function TreeNodeDisplay({ entry }: { entry: SessionEntry }) {
   } else if (entry.type === 'custom_message') {
     return <span className="tree-custom-message">[{entry.customType}]</span>
   } else if (entry.type === 'session') {
-    return <span>Session Start</span>
+    return <span>{t('session.tree.sessionStart')}</span>
   }
 
   return <span className="tree-muted">{entry.type}</span>

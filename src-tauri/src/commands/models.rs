@@ -22,7 +22,7 @@ pub struct ModelTestResult {
     pub error_msg: Option<String>,
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn list_models(search: Option<String>) -> Result<Vec<ModelInfo>, String> {
     let mut args = vec!["--list-models".to_string()];
     if let Some(query) = search {
@@ -72,7 +72,7 @@ pub async fn list_models(search: Option<String>) -> Result<Vec<ModelInfo>, Strin
     Ok(models)
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn test_model(
     provider: String,
     model: String,
@@ -121,7 +121,7 @@ pub async fn test_model(
     }
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn test_models_batch(
     models: Vec<(String, String)>,
     prompt: Option<String>,

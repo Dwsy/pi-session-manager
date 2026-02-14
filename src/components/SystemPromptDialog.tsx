@@ -9,6 +9,7 @@ interface SystemPromptDialogProps {
   isOpen: boolean;
   onClose: () => void;
   entries?: SessionEntry[];
+  sessionPath?: string;
 }
 
 interface ToolUsage {
@@ -18,7 +19,7 @@ interface ToolUsage {
 
 type TabType = 'prompt' | 'tools';
 
-const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose, entries = [] }) => {
+const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose, entries = [], sessionPath }) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('prompt');
   const [systemPrompt, setSystemPrompt] = useState<string>('');
@@ -53,15 +54,18 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
     if (isOpen) {
       loadSystemPrompt();
     }
-  }, [isOpen]);
+  }, [isOpen, sessionPath]);
 
   const loadSystemPrompt = async () => {
     setLoading(true);
     try {
-      const prompt = await invoke<string>('get_system_prompt');
+      const prompt = sessionPath
+        ? await invoke<string>('get_session_system_prompt', { path: sessionPath })
+        : await invoke<string>('get_system_prompt');
       setSystemPrompt(prompt);
     } catch (error) {
       console.error('Failed to load system prompt:', error);
+      setSystemPrompt('');
     } finally {
       setLoading(false);
     }

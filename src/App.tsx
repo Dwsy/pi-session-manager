@@ -645,6 +645,7 @@ function App() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                 </svg>
               </button>
+              <KbdTooltip shortcut="Cmd+P" label={t('app.viewMode.project')}>
               <button
                 onClick={() => { setViewMode('project'); setSelectedProject(null); setShowFavorites(false) }}
                 className={`p-1 rounded transition-colors ${viewMode === 'project' && !showFavorites ? 'text-blue-400 bg-secondary' : 'text-muted-foreground hover:text-foreground'}`}
@@ -654,6 +655,7 @@ function App() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
               </button>
+              </KbdTooltip>
               <button
                 onClick={() => { setViewMode('kanban'); setSelectedSession(null); setShowFavorites(false) }}
                 className={`p-1 rounded transition-colors ${viewMode === 'kanban' && !showFavorites ? 'text-blue-400 bg-secondary' : 'text-muted-foreground hover:text-foreground'}`}
@@ -675,6 +677,7 @@ function App() {
             >
               <Star className="h-3.5 w-3.5" />
             </button>
+            <KbdTooltip shortcut="Cmd+K">
             <button
               onClick={() => {
                 window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
@@ -684,7 +687,9 @@ function App() {
             >
               <Search className="h-3.5 w-3.5" />
             </button>
+            </KbdTooltip>
             {terminalConfig.enabled && (
+            <KbdTooltip shortcut="Ctrl+`">
             <button
               onClick={() => setShowTerminal(!showTerminal)}
               className={`p-1 rounded transition-colors ml-0.5 ${
@@ -696,7 +701,9 @@ function App() {
             >
               <Terminal className="h-3.5 w-3.5" />
             </button>
+            </KbdTooltip>
             )}
+            <KbdTooltip shortcut="Cmd+,">
             <button
               onClick={() => setShowSettings(true)}
               className="p-1 rounded transition-colors ml-0.5 text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -704,6 +711,7 @@ function App() {
             >
               <Settings className="h-3.5 w-3.5" />
             </button>
+            </KbdTooltip>
           </div>
         </div>
 

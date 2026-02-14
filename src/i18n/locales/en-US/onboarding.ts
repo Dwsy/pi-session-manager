@@ -36,6 +36,8 @@ export const onboarding = {
       bindLocal: 'Local access only',
       bindRemote: 'Allow LAN devices (phone/tablet) to connect',
       mobileHint: 'Access from mobile via http://<your-PC-IP>:52131 in a browser — HTTP mode is auto-selected',
+      websocket: 'WebSocket',
+      httpApi: 'HTTP API',
     },
   },
 } as const

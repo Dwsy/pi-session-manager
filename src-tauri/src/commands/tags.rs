@@ -55,7 +55,7 @@ fn get_conn() -> Result<rusqlite::Connection, String> {
     sqlite_cache::init_db_with_config(&config)
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_all_tags() -> Result<Vec<TagItem>, String> {
     let conn = get_conn()?;
     Ok(sqlite_cache::get_all_tags(&conn)?
@@ -64,7 +64,7 @@ pub async fn get_all_tags() -> Result<Vec<TagItem>, String> {
         .collect())
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn create_tag(
     name: String,
     color: String,
@@ -81,7 +81,7 @@ pub async fn create_tag(
         .ok_or_else(|| "Failed to find created tag".to_string())
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn update_tag(
     id: String,
     name: Option<String>,
@@ -102,13 +102,13 @@ pub async fn update_tag(
     )
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn delete_tag(id: String) -> Result<(), String> {
     let conn = get_conn()?;
     sqlite_cache::delete_tag(&conn, &id)
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_all_session_tags() -> Result<Vec<SessionTagItem>, String> {
     let conn = get_conn()?;
     Ok(sqlite_cache::get_all_session_tags(&conn)?
@@ -117,19 +117,19 @@ pub async fn get_all_session_tags() -> Result<Vec<SessionTagItem>, String> {
         .collect())
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn assign_tag(session_id: String, tag_id: String) -> Result<(), String> {
     let conn = get_conn()?;
     sqlite_cache::assign_tag(&conn, &session_id, &tag_id)
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn remove_tag_from_session(session_id: String, tag_id: String) -> Result<(), String> {
     let conn = get_conn()?;
     sqlite_cache::remove_tag_from_session(&conn, &session_id, &tag_id)
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn move_session_tag(
     session_id: String,
     from_tag_id: Option<String>,
@@ -146,19 +146,19 @@ pub async fn move_session_tag(
     )
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn reorder_tags(tag_ids: Vec<String>) -> Result<(), String> {
     let conn = get_conn()?;
     sqlite_cache::reorder_tags(&conn, &tag_ids)
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn update_tag_auto_rules(id: String, auto_rules: Option<String>) -> Result<(), String> {
     let conn = get_conn()?;
     sqlite_cache::update_tag_auto_rules(&conn, &id, auto_rules.as_deref())
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn evaluate_auto_rules(session_id: String, text: String) -> Result<Vec<String>, String> {
     let conn = get_conn()?;
     sqlite_cache::evaluate_auto_rules(&conn, &session_id, &text)

@@ -161,9 +161,9 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
           }`}
         >
           {isBuiltinExpanded ? (
-            <><ChevronUp className="h-3 w-3" /> 收起</>
+            <><ChevronUp className="h-3 w-3" /> {t('settings.terminal.collapse')}</>
           ) : (
-            <><ChevronDown className="h-3 w-3" /> 展开设置</>
+            <><ChevronDown className="h-3 w-3" /> {t('settings.terminal.expandSettings')}</>
           )}
         </button>
       </div>

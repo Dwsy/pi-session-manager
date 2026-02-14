@@ -83,10 +83,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
                   : 'border-border text-muted-foreground hover:border-border-hover'
               }`}
             >
-              {t(
-                `settings.appearance.spacing.${spacing}`,
-                spacing === 'compact' ? '紧凑' : spacing === 'comfortable' ? '舒适' : '宽松'
-              )}
+              {t(`settings.appearance.spacing.${spacing}`)}
             </button>
           ))}
         </div>

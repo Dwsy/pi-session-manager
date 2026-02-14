@@ -756,7 +756,7 @@ ref
 
       {viewMode === 'flow' ? (
         <div className="flex-1 min-h-0">
-          <Suspense fallback={<div style={{ padding: 12, color: 'var(--color-text-secondary)' }}>Loading...</div>}>
+          <Suspense fallback={<div style={{ padding: 12, color: 'var(--color-text-secondary)' }}>{t('session.tree.loading')}</div>}>
             <SessionFlowView
               entries={entries}
               activeLeafId={activeLeafId}

@@ -65,6 +65,7 @@ export const dashboard = {
     sessions: 'Sessions',
     messages: 'Messages',
     change: 'Change',
+    vsLastWeek: 'vs last week',
   },
   productivityMetrics: {
     title: 'Productivity Metrics',

@@ -1,4 +1,5 @@
 import { useMemo, useCallback, useEffect, memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ReactFlow,
   Background,
@@ -385,6 +386,7 @@ interface FlowInnerProps {
 }
 
 function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, activeLeafId }: FlowInnerProps) {
+  const { t } = useTranslation()
   const { zoomIn, zoomOut, fitView, setCenter, getZoom } = useReactFlow()
 
   const focusActive = useCallback(() => {
@@ -398,10 +400,10 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div className="flow-toolbar">
-        <button onClick={() => zoomIn({ duration: 200 })} title="Zoom In"><ZoomIn size={14} /></button>
-        <button onClick={() => zoomOut({ duration: 200 })} title="Zoom Out"><ZoomOut size={14} /></button>
-        <button onClick={() => fitView({ padding: 0.2, duration: 300 })} title="Fit View"><Maximize size={14} /></button>
-        <button onClick={focusActive} title="Focus Active"><LocateFixed size={14} /></button>
+        <button onClick={() => zoomIn({ duration: 200 })} title={t('components.sessionFlow.zoomIn')}><ZoomIn size={14} /></button>
+        <button onClick={() => zoomOut({ duration: 200 })} title={t('components.sessionFlow.zoomOut')}><ZoomOut size={14} /></button>
+        <button onClick={() => fitView({ padding: 0.2, duration: 300 })} title={t('components.sessionFlow.fitView')}><Maximize size={14} /></button>
+        <button onClick={focusActive} title={t('components.sessionFlow.focusActive')}><LocateFixed size={14} /></button>
       </div>
       <ReactFlow
         nodes={nodes} edges={edges}

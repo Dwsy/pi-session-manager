@@ -8,16 +8,25 @@ import type { SearchContext, SearchPluginResult } from '../types'
  */
 export class SessionSearchPlugin extends BaseSearchPlugin {
   id = 'session-search'
-  name = '会话搜索'
   icon = FileText
-  description = '搜索会话名称和元数据'
   keywords = ['session', 'file', 'conversation', '会话', '文件', '对话']
   priority = 60
+  
+  get name(): string {
+    return this.context?.t('plugins.session.name', '会话搜索') || '会话搜索'
+  }
+  
+  get description(): string {
+    return this.context?.t('plugins.session.description', '搜索会话名称和元数据') || '搜索会话名称和元数据'
+  }
   
   async search(
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]> {
+    // 保存 context 以便访问 i18n
+    this.setContext(context)
+    
     try {
       const results: SearchPluginResult[] = []
       
@@ -104,38 +113,41 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
    * 格式化相对时间
    */
   private formatRelativeTime(timestamp: string): string {
+    if (!this.context) return timestamp
+    
     try {
       const date = new Date(timestamp)
       const now = new Date()
       const diff = now.getTime() - date.getTime()
+      const seconds = Math.floor(diff / 1000)
       
       // 小于 1 分钟
-      if (diff < 60 * 1000) {
-        return '刚刚'
+      if (seconds < 60) {
+        return this.context.t('time.justNow')
       }
       
       // 小于 1 小时
-      if (diff < 60 * 60 * 1000) {
-        const minutes = Math.floor(diff / (60 * 1000))
-        return `${minutes} 分钟前`
+      const minutes = Math.floor(seconds / 60)
+      if (minutes < 60) {
+        return this.context.t('time.minutesAgo', { count: minutes })
       }
       
       // 小于 24 小时
-      if (diff < 24 * 60 * 60 * 1000) {
-        const hours = Math.floor(diff / (60 * 60 * 1000))
-        return `${hours} 小时前`
+      const hours = Math.floor(minutes / 60)
+      if (hours < 24) {
+        return this.context.t('time.hoursAgo', { count: hours })
       }
       
       // 小于 7 天
-      if (diff < 7 * 24 * 60 * 60 * 1000) {
-        const days = Math.floor(diff / (24 * 60 * 60 * 1000))
-        return `${days} 天前`
+      const days = Math.floor(hours / 24)
+      if (days < 7) {
+        return this.context.t('time.daysAgo', { count: days })
       }
       
       // 小于 30 天
-      if (diff < 30 * 24 * 60 * 60 * 1000) {
-        const weeks = Math.floor(diff / (7 * 24 * 60 * 60 * 1000))
-        return `${weeks} 周前`
+      const weeks = Math.floor(days / 7)
+      if (weeks < 4) {
+        return this.context.t('time.weeksAgo', { count: weeks })
       }
       
       // 显示日期

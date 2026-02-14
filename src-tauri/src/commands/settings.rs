@@ -1,7 +1,8 @@
 use serde_json::Value;
 use std::fs;
-use tauri::Manager;
 use tracing::warn;
+#[cfg(feature = "gui")]
+use tauri::Manager;
 
 const APP_SETTINGS_KEY: &str = "app_settings";
 const SERVER_SETTINGS_KEY: &str = "server_settings";
@@ -39,12 +40,12 @@ pub fn load_server_settings_sync() -> ServerSettings {
     crate::settings_store::get_or_default::<ServerSettings>(SERVER_SETTINGS_KEY).unwrap_or_default()
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn load_server_settings() -> Result<ServerSettings, String> {
     crate::settings_store::get_or_default::<ServerSettings>(SERVER_SETTINGS_KEY)
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn save_server_settings(settings: ServerSettings) -> Result<(), String> {
     crate::settings_store::set(SERVER_SETTINGS_KEY, &settings)
 }
@@ -70,36 +71,41 @@ pub async fn load_app_settings_internal() -> Result<Value, String> {
     Ok(serde_json::json!({}))
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn load_app_settings() -> Result<Value, String> {
     load_app_settings_internal().await
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn save_app_settings(settings: Value) -> Result<(), String> {
     crate::settings_store::set(APP_SETTINGS_KEY, &settings)
 }
 
 /// Get configured session paths (extra paths beyond the default)
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_paths() -> Result<Vec<String>, String> {
     let config = crate::config::Config::load().unwrap_or_default();
     Ok(config.session_paths)
 }
 
+/// Save session paths to config (pure logic, no GUI dependency)
+pub async fn save_session_paths_core(paths: Vec<String>) -> Result<(), String> {
+    let mut config = crate::config::Config::load().unwrap_or_default();
+    config.session_paths = paths.clone();
+    crate::config::save_config(&config)?;
+    crate::settings_store::set(SESSION_PATHS_KEY, &paths)?;
+    crate::scanner::invalidate_cache();
+    Ok(())
+}
+
 /// Save session paths to config and sync to settings store
+#[cfg(feature = "gui")]
 #[tauri::command]
 pub async fn save_session_paths(
     paths: Vec<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    let mut config = crate::config::Config::load().unwrap_or_default();
-    config.session_paths = paths.clone();
-    crate::config::save_config(&config)?;
-    // Also persist in settings store for WS/HTTP access
-    crate::settings_store::set(SESSION_PATHS_KEY, &paths)?;
-    // Invalidate scan cache so next scan picks up new paths
-    crate::scanner::invalidate_cache();
+    save_session_paths_core(paths).await?;
 
     // Restart file watcher with new paths
     let watcher_state: tauri::State<'_, crate::file_watcher::FileWatcherState> = app_handle.state();
@@ -111,7 +117,7 @@ pub async fn save_session_paths(
 }
 
 /// Get all resolved session directories (default + configured)
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_all_session_dirs() -> Result<Vec<String>, String> {
     let config = crate::config::Config::load().unwrap_or_default();
     let dirs = crate::scanner::get_all_session_dirs(&config);

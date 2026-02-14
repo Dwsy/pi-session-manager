@@ -35,6 +35,7 @@ export const session = {
     date: 'Date',
     models: 'Models',
     messages: 'Messages',
+    messagesLabel: 'messages',
     toolCalls: 'Tool Calls',
     tokens: 'Tokens',
     cost: 'Cost',
@@ -59,5 +60,17 @@ export const session = {
   tree: {
     nodes: 'nodes',
     search: 'Search...',
+    loading: 'Loading...',
+    sessionStart: 'Session Start',
+    model: 'Model',
+    toolCalls: '{{count}} tool call',
+    toolCallsPlural: '{{count}} tool calls',
   },
+  tooltip: {
+    path: 'Path',
+    created: 'Created',
+    updated: 'Updated',
+    messages: 'Messages',
+  },
+  newMessages: 'New messages',
 } as const

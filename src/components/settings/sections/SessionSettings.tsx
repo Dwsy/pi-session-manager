@@ -67,10 +67,7 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
                   : 'border-border text-muted-foreground hover:border-border-hover'
               }`}
             >
-              {t(
-                `settings.session.viewModes.${mode}`,
-                mode === 'list' ? '列表' : mode === 'directory' ? '目录' : '项目'
-              )}
+              {t(`settings.session.viewModes.${mode}`)}
             </button>
           ))}
         </div>

@@ -62,7 +62,13 @@ export function useSessionBadges(sessions: SessionInfo[]) {
       delete newStates[sessionId]
       return newStates
     })
-  }, [])
+
+    // 同时更新 baseline，防止增量更新后 badge 重新出现
+    const session = sessions.find(s => s.id === sessionId)
+    if (session && baselineRef.current) {
+      baselineRef.current.set(sessionId, session)
+    }
+  }, [sessions])
 
   const clearAllBadges = useCallback(() => {
     setBadgeStates({})

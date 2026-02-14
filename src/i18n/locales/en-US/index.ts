@@ -15,6 +15,8 @@ import { favorites } from './favorites'
 import { onboarding } from './onboarding'
 import terminal from './terminal'
 import { tags } from './tags'
+import { plugins } from './plugins'
+import { time } from './time'
 
 export const enUS = {
   common,
@@ -34,6 +36,8 @@ export const enUS = {
   onboarding,
   terminal,
   tags,
+  plugins,
+  time,
   connection: {
     disconnected: 'Cannot connect to server — is the app running?',
     connecting: 'Reconnecting…',

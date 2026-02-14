@@ -172,10 +172,10 @@ export default function SessionListByDirectory({
           const session = row.session
           const hoverTitle = [
             session.name || session.first_message || t('session.list.untitled'),
-            `路径: ${session.path}`,
-            `创建: ${new Date(session.created).toLocaleString()}`,
-            `更新: ${new Date(session.modified).toLocaleString()}`,
-            `消息: ${session.message_count}`,
+            `${t('session.tooltip.path')}: ${session.path}`,
+            `${t('session.tooltip.created')}: ${new Date(session.created).toLocaleString()}`,
+            `${t('session.tooltip.updated')}: ${new Date(session.modified).toLocaleString()}`,
+            `${t('session.tooltip.messages')}: ${session.message_count}`,
           ].join('\n')
           return (
             <div
@@ -261,7 +261,7 @@ export default function SessionListByDirectory({
 }
 
 function getDirectoryName(cwd: string, t: any): string {
-  if (!cwd || cwd === 'Unknown' || cwd === '未知') {
+  if (!cwd || cwd === 'Unknown') {
     return cwd || t('session.list.unknownDirectory')
   }
 

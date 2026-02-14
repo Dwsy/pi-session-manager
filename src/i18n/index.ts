@@ -1,4 +1,8 @@
 export { default, detectSystemLocale } from './config'
 export { enUS } from './locales/en-US/index'
 export { zhCN } from './locales/zh-CN/index'
+export { jaJP } from './locales/ja-JP/index'
+export { frFR } from './locales/fr-FR/index'
+export { deDE } from './locales/de-DE/index'
+export { esES } from './locales/es-ES/index'
 export type { Translations } from './locales/en-US/index'

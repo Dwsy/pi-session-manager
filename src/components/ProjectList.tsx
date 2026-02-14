@@ -232,7 +232,7 @@ function formatDirectory(path: string): string {
 }
 
 function getDirectoryName(cwd: string): string {
-  if (!cwd || cwd === 'Unknown' || cwd === '未知') {
+  if (!cwd || cwd === 'Unknown') {
     return cwd || 'Unknown Directory'
   }
 

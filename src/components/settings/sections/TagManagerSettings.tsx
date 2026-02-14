@@ -143,7 +143,7 @@ function TagNodeContent({
           <>
             <ColorPicker value={tag.color} onChange={(c) => { onStartEdit(tag); onSetEditColor(c) }} />
             <span className="flex-1 text-sm text-foreground cursor-pointer hover:text-info" onClick={() => onStartEdit(tag)}>{tag.name}</span>
-            <button onClick={() => onCreateChild(tag.id)} className="p-1 text-muted-foreground/40 hover:text-info opacity-0 group-hover:opacity-100 transition-all" title="Add child label">
+            <button onClick={() => onCreateChild(tag.id)} className="p-1 text-muted-foreground/40 hover:text-info opacity-0 group-hover:opacity-100 transition-all" title={t('components.tagManager.addChild')}>
               <Plus className="h-3 w-3" />
             </button>
             <button onClick={() => onToggleRules(tag.id)} className={`p-1 rounded transition-all ${rulesExpanded ? 'text-info' : 'text-muted-foreground/40 hover:text-muted-foreground'} ${rules.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} title={t('tags.autoRules.title')}>

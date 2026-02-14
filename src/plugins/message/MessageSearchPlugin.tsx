@@ -10,11 +10,17 @@ import type { SessionInfo } from '../../types'
  */
 export class MessageSearchPlugin extends BaseSearchPlugin {
   id = 'message-search'
-  name = '消息搜索'
   icon = MessageSquare
-  description = '搜索用户消息和助手回复'
   keywords = ['message', 'content', 'text', 'conversation', '消息', '内容', '对话']
   priority = 80
+  
+  get name(): string {
+    return this.context?.t('plugins.message.name', '消息搜索') || '消息搜索'
+  }
+  
+  get description(): string {
+    return this.context?.t('plugins.message.description', '搜索用户消息和助手回复') || '搜索用户消息和助手回复'
+  }
 
   private truncateText(text: string, maxLength: number): string {
     if (!text) return ''
@@ -26,6 +32,9 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]> {
+    // 保存 context 以便访问 i18n
+    this.setContext(context)
+    
     try {
       // 使用 SQLite FTS5 搜索，快速且高效
       const sessions = await invoke<SessionInfo[]>('search_sessions_fts', {
@@ -85,16 +94,25 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
   }
   
   private formatDate(date: Date | string): string {
+    if (!this.context) return String(date)
+    
     const dateObj = typeof date === 'string' ? new Date(date) : date
     const now = new Date()
     const diff = now.getTime() - dateObj.getTime()
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     
-    if (days === 0) return '今天'
-    if (days === 1) return '昨天'
-    if (days < 7) return `${days} 天前`
-    if (days < 30) return `${Math.floor(days / 7)} 周前`
-    if (days < 365) return `${Math.floor(days / 30)} 月前`
-    return `${Math.floor(days / 365)} 年前`
+    if (days === 0) return this.context.t('time.today')
+    if (days === 1) return this.context.t('time.yesterday')
+    if (days < 7) return this.context.t('time.daysAgo', { count: days })
+    if (days < 30) {
+      const weeks = Math.floor(days / 7)
+      return this.context.t('time.weeksAgo', { count: weeks })
+    }
+    if (days < 365) {
+      const months = Math.floor(days / 30)
+      return this.context.t('time.monthsAgo', { count: months })
+    }
+    const years = Math.floor(days / 365)
+    return this.context.t('time.yearsAgo', { count: years })
   }
 }

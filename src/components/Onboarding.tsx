@@ -193,13 +193,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 </p>
               </div>
               <ToggleRow
-                label="WebSocket"
+                label={t('onboarding.steps.services.websocket')}
                 hint={`ws://${serverSettings.bind_addr}:${serverSettings.ws_port}`}
                 checked={serverSettings.ws_enabled}
                 onChange={(v) => setServerSettings((s) => ({ ...s, ws_enabled: v }))}
               />
               <ToggleRow
-                label="HTTP API"
+                label={t('onboarding.steps.services.httpApi')}
                 hint={`http://${serverSettings.bind_addr}:${serverSettings.http_port}/api`}
                 checked={serverSettings.http_enabled}
                 onChange={(v) => setServerSettings((s) => ({ ...s, http_enabled: v }))}

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { AppSettings } from '../components/settings/types'
 import { defaultSettings } from '../components/settings/types'
 import { loadAppSettings, saveAppSettings } from '../utils/settingsApi'
@@ -25,6 +26,7 @@ interface SettingsProviderProps {
 }
 
 export function SettingsProvider({ children }: SettingsProviderProps) {
+  const { t } = useTranslation()
   const [settings, setSettings] = useState<AppSettings>(defaultSettings)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -38,7 +40,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
       setSettings(s)
     } catch (err) {
       console.error('Failed to load settings:', err)
-      setError('加载设置失败')
+      setError(t('settings.error.loadFailed', '加载设置失败'))
     } finally {
       setLoading(false)
     }
@@ -51,7 +53,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
       await saveAppSettings(settings)
     } catch (err) {
       console.error('Failed to save settings:', err)
-      setError('保存设置失败')
+      setError(t('settings.error.saveFailed', '保存设置失败'))
       throw err
     } finally {
       setSaving(false)

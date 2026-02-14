@@ -6,7 +6,7 @@ pub struct ClearCacheResult {
     pub details_deleted: usize,
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn clear_cache() -> Result<ClearCacheResult, String> {
     let config = config::load_config()?;
     let conn = sqlite_cache::init_db_with_config(&config)?;

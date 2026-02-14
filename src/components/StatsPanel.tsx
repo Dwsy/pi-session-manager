@@ -193,13 +193,14 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
 
 // Overview Tab
 function OverviewTab({ stats, sessions }: { stats: SessionStats; sessions: SessionInfo[] }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
       <div className="grid grid-cols-4 gap-4">
         <StatCard
           icon={BarChart3}
-          label="Total Sessions"
+          label={t('stats.cards.totalSessions')}
           value={stats.total_sessions}
           color="#569cd6"
           change="+12%"
@@ -207,7 +208,7 @@ function OverviewTab({ stats, sessions }: { stats: SessionStats; sessions: Sessi
         />
         <StatCard
           icon={Zap}
-          label="Total Messages"
+          label={t('stats.cards.totalMessages')}
           value={stats.total_messages}
           color="#7ee787"
           change="+8%"
@@ -215,7 +216,7 @@ function OverviewTab({ stats, sessions }: { stats: SessionStats; sessions: Sessi
         />
         <StatCard
           icon={Clock}
-          label="Avg/Session"
+          label={t('stats.cards.avgPerSession')}
           value={stats.average_messages_per_session.toFixed(1)}
           color="#ffa657"
           change="+5%"
@@ -223,7 +224,7 @@ function OverviewTab({ stats, sessions }: { stats: SessionStats; sessions: Sessi
         />
         <StatCard
           icon={Calendar}
-          label="Active Days"
+          label={t('stats.cards.activeDays')}
           value={stats.heatmap_data.filter((p) => p.level > 0).length}
           color="#ff6b6b"
           change=""
@@ -304,12 +305,13 @@ function ProjectsTab({ stats }: { stats: SessionStats }) {
 
 // Time Tab
 function TimeTab({ stats }: { stats: SessionStats }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-6">
-      <TimeDistribution stats={stats} type="hourly" title="Hourly Activity" />
+      <TimeDistribution stats={stats} type="hourly" title={t('stats.time.hourly')} />
       <div className="grid grid-cols-2 gap-6">
-        <TimeDistribution stats={stats} type="weekly" title="Weekly Activity" />
-        <TimeDistribution stats={stats} type="daily" title="Monthly Activity" />
+        <TimeDistribution stats={stats} type="weekly" title={t('stats.time.weekly')} />
+        <TimeDistribution stats={stats} type="daily" title={t('stats.time.monthly')} />
       </div>
     </div>
   )
