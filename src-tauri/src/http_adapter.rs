@@ -308,19 +308,37 @@ pub async fn init_http_adapter(
     bind_addr: &str,
     port: u16,
 ) -> Result<(), String> {
+    init_http_adapter_with_options(app_state, bind_addr, port, true).await
+}
+
+pub async fn init_http_adapter_with_options(
+    app_state: SharedAppState,
+    bind_addr: &str,
+    port: u16,
+    serve_frontend: bool,
+) -> Result<(), String> {
     let has_frontend = FrontendAssets::get("index.html").is_some();
-    if has_frontend {
-        log::info!("Frontend assets embedded in binary");
+
+    if serve_frontend {
+        if has_frontend {
+            log::info!("Frontend assets embedded in binary");
+        } else {
+            log::warn!("No embedded frontend assets, API-only mode");
+        }
     } else {
-        log::warn!("No embedded frontend assets, API-only mode");
+        log::info!("HTTP adapter in API-only mode (GUI dev mode)");
     }
 
-    let app = Router::new()
+    let mut app = Router::new()
         .route("/api", post(handle_command).options(handle_preflight))
         .route("/api/events", get(handle_sse))
         .route("/ws", get(handle_ws_upgrade))
-        .fallback(get(serve_static))
         .with_state(app_state);
+
+    // Only serve static files in CLI mode or production GUI mode
+    if serve_frontend {
+        app = app.fallback(get(serve_static));
+    }
 
     let addr = format!("{bind_addr}:{port}");
     let listener = tokio::net::TcpListener::bind(&addr)

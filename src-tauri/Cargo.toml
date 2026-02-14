@@ -2,14 +2,30 @@
 name = "pi-session-manager"
 version = "0.1.0"
 edition = "2021"
+default-run = "pi-session-manager"
+
+[[bin]]
+name = "pi-session-manager"
+path = "src/main.rs"
+required-features = ["gui"]
+
+[[bin]]
+name = "pi-session-cli"
+path = "src/main-cli.rs"
 
 [build-dependencies]
-tauri-build = { version = "2.0", features = [] }
+tauri-build = { version = "2.0", features = [], optional = true }
+
+[features]
+default = ["gui"]
+gui = ["dep:tauri", "dep:tauri-plugin-shell", "dep:tauri-plugin-dialog", "dep:tauri-build"]
+cli = []
+custom-protocol = ["tauri?/custom-protocol"]
 
 [dependencies]
-tauri = { version = "2.1", features = ["devtools"] }
-tauri-plugin-shell = "2.1"
-tauri-plugin-dialog = "2.0"
+tauri = { version = "2.1", features = ["devtools"], optional = true }
+tauri-plugin-shell = { version = "2.1", optional = true }
+tauri-plugin-dialog = { version = "2.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.0", features = ["full"] }
@@ -27,16 +43,12 @@ notify-debouncer-full = "0.3"
 tokio-tungstenite = "0.21"
 futures-util = "0.3"
 log = "0.4"
-axum = "0.7"
+axum = { version = "0.7", features = ["ws"] }
 tower-http = { version = "0.5", features = ["fs", "cors"] }
 rust-embed = "8"
 mime_guess = "2"
 portable-pty = "0.9"
 async-stream = "0.3.6"
-
-[features]
-default = ["custom-protocol"]
-custom-protocol = ["tauri/custom-protocol"]
 
 [lints.rust]
 dead_code = "allow"

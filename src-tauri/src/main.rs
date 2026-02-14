@@ -1,3 +1,5 @@
+#![cfg(feature = "gui")]
+
 use tauri::Manager;
 
 fn main() {
@@ -59,10 +61,15 @@ fn main() {
                 let http_state = app_state.clone();
                 let http_port = server_cfg.http_port;
                 let http_bind = server_cfg.bind_addr.clone();
+                let is_cli = cli_mode;
                 tauri::async_runtime::spawn(async move {
+                    // In GUI mode, don't serve static files (use Vite dev server)
+                    // In CLI mode, serve embedded static files
                     if let Err(e) =
-                        pi_session_manager::http_adapter::init_http_adapter(http_state, &http_bind, http_port)
-                            .await
+                        pi_session_manager::http_adapter::init_http_adapter_with_options(
+                            http_state, &http_bind, http_port, is_cli
+                        )
+                        .await
                     {
                         eprintln!("Failed to init HTTP adapter: {e}");
                     }
@@ -92,6 +99,8 @@ fn main() {
                 .min_inner_size(1000.0, 600.0)
                 .resizable(true)
                 .fullscreen(false);
+
+                let builder = builder.zoom_hotkeys_enabled(true);
 
                 #[cfg(target_os = "macos")]
                 let builder = builder
@@ -163,7 +172,16 @@ fn main() {
             pi_session_manager::evaluate_auto_rules,
             pi_session_manager::list_api_keys,
             pi_session_manager::create_api_key,
-            pi_session_manager::revoke_api_key
+            pi_session_manager::revoke_api_key,
+            pi_session_manager::scan_all_resources,
+            pi_session_manager::load_pi_settings_full,
+            pi_session_manager::save_pi_setting,
+            pi_session_manager::toggle_resource,
+            pi_session_manager::list_model_options_fast,
+            pi_session_manager::list_model_options_full,
+            pi_session_manager::list_config_versions,
+            pi_session_manager::get_config_version,
+            pi_session_manager::restore_config_version
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -4,6 +4,15 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **GUI dev mode now correctly uses Vite dev server** — fixed `tauri://localhost` white screen issue
+  - Removed `custom-protocol` from default `gui` feature in `Cargo.toml` (only needed for production builds)
+  - Added `init_http_adapter_with_options()` to control static file serving based on runtime mode
+  - GUI dev mode: HTTP adapter serves API only, Tauri connects to `http://localhost:1420` (Vite)
+  - CLI mode: HTTP adapter serves API + embedded frontend from `dist/`
+  - Hot module replacement (HMR) now works correctly in development
+
 ### Added
 
 - **Unified single-port architecture (CLI)** — API, WebSocket, and embedded frontend all served on one port (52131)
