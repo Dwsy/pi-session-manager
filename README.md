@@ -18,6 +18,12 @@
 </p>
 
 <p align="center">
+  <a href="https://dwsy.github.io/pi-session-manager/">📖 Documentation</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/cn/">中文文档</a> ·
+  <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">⬇️ Download</a>
+</p>
+
+<p align="center">
   <img width="1800" alt="screenshot-dark" src="https://github.com/user-attachments/assets/4cb92d95-f50e-48d2-8c5e-4bb814d45b8f" />
 </p>
 <p align="center">
