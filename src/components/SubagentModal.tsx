@@ -51,7 +51,22 @@ function messagesAsEntries(messages: any[]): SessionEntry[] {
   }))
 }
 
-/** Try multiple paths to find the subagent JSONL, fall back to inline messages */
+/**
+ * Try multiple paths to load subagent session entries.
+ *
+ * Why file paths usually fail:
+ *   pi-subagents (upstream) sets DEFAULT_ARTIFACT_CONFIG.includeJsonl = false,
+ *   so JSONL artifact files are NOT written by default. The artifactPaths.jsonlPath
+ *   in the result is always populated as a "would-be" path, but the file rarely
+ *   exists. On top of that, cleanupOldArtifacts() runs on session_start and
+ *   removes files older than 7 days, so even the few that were written get purged.
+ *
+ * Fallback strategy:
+ *   1. Try artifactPaths.jsonlPath / sessionFile (works for the rare cases)
+ *   2. Fall back to result.messages[] — the inline message array that pi-subagents
+ *      always embeds in the toolResult details. This covers ~95% of real sessions.
+ *   3. Return [] only when both are empty (failed runs with exitCode != 0).
+ */
 async function loadSubagentEntries(result: SubagentResult): Promise<SessionEntry[]> {
   const key = cacheKey(result)
   if (jsonlCache.has(key)) return jsonlCache.get(key)!
@@ -65,7 +80,7 @@ async function loadSubagentEntries(result: SubagentResult): Promise<SessionEntry
     return entries
   }
 
-  // 1. Try file paths (artifactPaths.jsonlPath, sessionFile)
+  // 1. Try file paths (almost always missing — see comment above)
   const paths = [
     result.artifactPaths?.jsonlPath,
     result.sessionFile,
