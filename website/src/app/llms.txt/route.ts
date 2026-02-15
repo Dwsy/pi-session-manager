@@ -1,5 +1,6 @@
 import { source } from '@/lib/source';
 
+export const dynamic = 'force-static';
 export const revalidate = false;
 
 export async function GET() {
