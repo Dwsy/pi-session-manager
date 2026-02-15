@@ -1,0 +1,143 @@
+---
+title: Architecture
+description: Technical architecture of Pi Session Manager — frontend, backend, and multi-protocol communication.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+> "Architecture is the thoughtful making of space." — Louis Kahn
+
+Pi Session Manager is built on a three-layer architecture: a React frontend, a Rust backend, and a multi-protocol communication layer that bridges them.
+
+## Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Clients                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
+│  │   Desktop    │  │    Mobile    │  │      Web Browser         │  │
+│  │  (Tauri App) │  │  (PWA/Web)   │  │  (Chrome/Safari/Firefox) │  │
+│  └──────┬───────┘  └──────┬───────┘  └────────────┬─────────────┘  │
+└─────────┼─────────────────┼───────────────────────┼────────────────┘
+          │                 │                       │
+          └─────────────────┼───────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────────────┐
+│                    Frontend (React 18 / TypeScript / Vite)          │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  99+ Components · 19 Hooks · Plugin System · i18n · xterm.js │   │
+│  │  React Flow · Recharts · dnd-kit · cmdk · Virtual Scroll    │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+├───────────────────────────┬───────────────────┬─────────────────────┤
+│       Tauri IPC           │    WebSocket      │  HTTP + Embedded UI │
+│       (Desktop)           │   ws://:52130     │  http://:52131      │
+└───────────────────────────┴───────────────────┴─────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────────────┐
+│                    Rust Backend (Tauri 2)                           │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  Scanner · SQLite Cache · FTS5 · Tantivy · File Watcher     │   │
+│  │  PTY Terminal · Auth · Export · Config · Stats · Tags       │   │
+│  │  WebSocket/HTTP Adapters · Incremental Updates              │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Frontend
+
+| Technology | Purpose |
+|-----------|---------|
+| React 18 | UI framework with hooks and concurrent features |
+| TypeScript | Type safety across 99+ components |
+| Vite | Build tool with HMR for development |
+| Tailwind CSS | Utility-first styling with CSS custom properties for theming |
+| i18next | Internationalization (en-US, zh-CN) |
+| xterm.js | Terminal emulator in the browser |
+| React Flow | Graph visualization for flow view |
+| Recharts | Charts for the dashboard |
+| dnd-kit | Drag-and-drop for Kanban board |
+| cmdk | Command palette |
+| @tanstack/react-virtual | Virtual scrolling for large session lists |
+
+### Key Patterns
+
+- **Transport abstraction** — `transport.ts` provides a unified interface that auto-detects the runtime (Tauri IPC vs. WebSocket vs. HTTP) and routes commands accordingly
+- **Plugin system** — search plugins in `src/plugins/` allow extending search sources
+- **Context providers** — `TransportContext`, `SettingsContext`, `SessionViewContext` manage shared state
+- **19 custom hooks** — encapsulate reusable logic (keyboard shortcuts, file watcher, mobile detection, etc.)
+
+## Backend
+
+| Technology | Purpose |
+|-----------|---------|
+| Tauri 2 | Desktop app framework with native APIs |
+| Rust | Systems language for performance and safety |
+| Tokio | Async runtime for concurrent I/O |
+| Axum | HTTP/WebSocket server framework |
+| SQLite (rusqlite) | Persistent cache, settings, tags, favorites |
+| Tantivy | Full-text search index |
+| portable-pty | PTY terminal sessions |
+| rust-embed | Embed frontend assets into binary |
+| notify | File system watcher |
+
+### Module Structure
+
+```
+src-tauri/src/
+├── main.rs              # Entry: CLI args, window, adapter startup
+├── lib.rs               # Module declarations, command registration
+├── ws_adapter.rs        # WebSocket server + dispatch() router
+├── http_adapter.rs      # HTTP server, embedded frontend (rust-embed)
+├── app_state.rs         # SharedAppState (Arc)
+├── scanner.rs           # Session file scanner (multi-path, incremental)
+├── scanner_scheduler.rs # Background scan scheduling
+├── terminal.rs          # PTY session manager
+├── sqlite_cache.rs      # Dual-layer cache (FS + SQLite)
+├── tantivy_search.rs    # Full-text search index
+├── file_watcher.rs      # FS watcher for incremental updates
+├── write_buffer.rs      # Async write batching
+├── dispatch.rs          # Pure business logic shared by WS/HTTP/CLI
+└── commands/            # Tauri IPC command handlers (12 modules)
+```
+
+### Pure Modules
+
+The core business logic modules (`scanner.rs`, `search.rs`, `tags.rs`, etc.) have **no Tauri dependency**. The `commands/` layer is a thin wrapper that bridges Tauri IPC to the pure logic. This design enables the CLI binary to reuse the same code without pulling in Tauri.
+
+## Multi-Protocol Communication
+
+All three protocols share a single command router — `dispatch()`:
+
+| Protocol | Address | Use Case |
+|----------|---------|----------|
+| Tauri IPC | `invoke()` | Desktop app (GUI mode only) |
+| WebSocket | `ws://127.0.0.1:52130` | Real-time bidirectional (browser) |
+| HTTP POST | `http://127.0.0.1:52131/api` | Stateless single calls (curl, integrations) |
+
+Adding a new command requires only one `match` arm in `dispatch()`. WebSocket and HTTP inherit it automatically.
+
+### Transport Auto-Detection
+
+The frontend detects its runtime environment and selects the appropriate transport:
+
+1. **Tauri IPC** — when `window.__TAURI__` is available (desktop app)
+2. **WebSocket** — default for browser access (real-time updates via SSE fallback)
+3. **HTTP** — fallback for mobile web (POST for commands, SSE for events)
+
+### Embedded Frontend
+
+The HTTP server embeds the frontend via `rust-embed`, so the packaged binary serves the full UI at `http://localhost:52131` — no external `dist/` directory needed. The embedded assets add ~12MB to the binary size.
+
+<Callout type="info">
+The CLI binary (`pi-session-cli`) serves API, WebSocket (`/ws`), and the embedded frontend all on a single port (52131) using one axum Router.
+</Callout>
+
+## Incremental Updates
+
+The backend uses a multi-layer caching and update strategy:
+
+1. **Scanner cache** — persistent in-memory cache with atomic version counter
+2. **File watcher** — `notify` crate with `RecursiveMode::Recursive`, batches changed paths
+3. **Incremental rescan** — only re-parses changed JSONL files
+4. **SessionsDiff** — pushes diffs to frontend via WebSocket/SSE
+5. **Frontend patch** — `patchSessions()` merges diffs without full reload

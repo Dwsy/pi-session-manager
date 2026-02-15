@@ -86,6 +86,8 @@ export const settings = {
     showMessagePreview: 'Show Message Preview',
     showMessagePreviewHelp: 'Display last message in session list',
     previewLines: 'Preview Lines',
+    colorizeToolCalls: 'Colorize Tool Calls',
+    colorizeToolCallsHelp: 'Show different colors for tool calls in session tree',
   },
   search: {
     defaultSearchMode: 'Default Search Mode',

@@ -1,0 +1,87 @@
+---
+title: Changelog
+description: Release history and notable changes for Pi Session Manager.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+For the full changelog, see [CHANGELOG.md on GitHub](https://github.com/Dwsy/pi-session-manager/blob/main/CHANGELOG.md).
+
+## Unreleased
+
+### Subagent Session Viewer
+- View full subagent conversations inline with clickable cards showing agent name, model, duration, tokens
+- Modal with scale+fade animation renders complete subagent JSONL sessions
+- Supports single, parallel, chain, and management action modes
+- Nested subagent support — stacked modals with incremental z-index
+- Thinking/Tools toggle buttons (`Cmd/Ctrl + T` / `Cmd/Ctrl + O`) in both main and subagent toolbars
+
+### Pi Config Settings Panel
+- Resources tab: scan and manage extensions, skills, prompts, themes with scope grouping
+- Settings tab: full alignment with Pi source — 25+ settings across 5 groups
+- Version History as standalone tab with preview/restore UI
+- Progressive model loading with provider/model dropdowns
+
+### Unified SearchFilterBar
+- Reusable search + tag filter bar shared across list, project, and Kanban views
+- Desktop sidebar: always visible; mobile: compact layout with toggles
+
+### i18n Cleanup
+- Fixed ~50 hardcoded Chinese/English strings across 19 component files
+- Added missing translation keys for settings, dashboard, viewer, subagent, and terminal
+
+### Single-Port Architecture (CLI)
+- API, WebSocket (`/ws`), and embedded frontend all served on port 52131
+- One tunnel/proxy sufficient for remote access
+
+### Remote Access
+- Auth gate for non-localhost access with API token management
+- Remote config via URL params (`?server=`, `?token=`, `?transport=`)
+- SSE transport for mobile-friendly real-time updates
+
+### Mobile Adaptation
+- Full responsive support for screens < 768px
+- Bottom navigation bar with 5 tabs
+- Long-press context menu, snap-scroll Kanban, safe-area insets
+
+### Other Highlights
+- Connection status banner (disconnect/reconnect indicators)
+- Incremental session scanning with diff-based frontend updates
+- HTTP transport + SSE as WebSocket alternative
+- Configurable bind address for network exposure control
+- Session content LRU cache for faster back-navigation
+- Terminal resume command (`Cmd/Ctrl + R`)
+- Flow view with React Flow graph visualization
+- Multi-path session directories
+- Hierarchical tags with parent-child relationships
+- Kanban UX improvements (project filtering, context menu, untagged column)
+
+---
+
+## v0.1.0 — 2026-01-30
+
+The initial release with core functionality:
+
+### Session Management
+- Session list scanning from `~/.pi/agent/sessions/`
+- Session viewer with Pi HTML template
+- Delete, export (HTML/Markdown/JSON), and rename sessions
+
+### Search & Analytics
+- Full-text search across user and AI messages
+- Statistics dashboard (total sessions, messages, top projects)
+- Search result match count badges
+
+### UX
+- Keyboard shortcuts (`Cmd/Ctrl + R`, `Cmd/Ctrl + F`, `Cmd/Ctrl + Shift + S`, `Esc`)
+- Dark mode UI
+- Virtual scrolling for large session lists
+
+### Technical Foundation
+- Tauri 2 + Rust backend with SQLite and Tantivy
+- React 18 + TypeScript + Vite frontend
+- Export, stats, and search modules
+
+<Callout type="info">
+Pi Session Manager follows [Conventional Commits](https://www.conventionalcommits.org/) and [Semantic Versioning](https://semver.org/).
+</Callout>

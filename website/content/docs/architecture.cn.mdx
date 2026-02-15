@@ -1,0 +1,143 @@
+---
+title: 架构概览
+description: Pi Session Manager 的技术架构——前端、后端与多协议通信。
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+> "架构是对空间的深思熟虑的营造。" — Louis Kahn
+
+Pi Session Manager 基于三层架构构建：React 前端、Rust 后端，以及连接两者的多协议通信层。
+
+## 总览
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          客户端                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
+│  │    桌面端     │  │    移动端     │  │       Web 浏览器          │  │
+│  │  (Tauri App) │  │  (PWA/Web)   │  │  (Chrome/Safari/Firefox) │  │
+│  └──────┬───────┘  └──────┬───────┘  └────────────┬─────────────┘  │
+└─────────┼─────────────────┼───────────────────────┼────────────────┘
+          │                 │                       │
+          └─────────────────┼───────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────────────┐
+│                    前端 (React 18 / TypeScript / Vite)               │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  99+ 组件 · 19 Hooks · 插件系统 · i18n · xterm.js           │   │
+│  │  React Flow · Recharts · dnd-kit · cmdk · 虚拟滚动          │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+├───────────────────────────┬───────────────────┬─────────────────────┤
+│       Tauri IPC           │    WebSocket      │  HTTP + 嵌入式 UI   │
+│       (桌面端)             │   ws://:52130     │  http://:52131      │
+└───────────────────────────┴───────────────────┴─────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────────────┐
+│                    Rust 后端 (Tauri 2)                               │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  扫描器 · SQLite 缓存 · FTS5 · Tantivy · 文件监听器         │   │
+│  │  PTY 终端 · 认证 · 导出 · 配置 · 统计 · 标签               │   │
+│  │  WebSocket/HTTP 适配器 · 增量更新                            │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## 前端
+
+| 技术 | 用途 |
+|------|------|
+| React 18 | UI 框架，支持 Hooks 和并发特性 |
+| TypeScript | 99+ 组件的类型安全 |
+| Vite | 构建工具，开发时支持 HMR |
+| Tailwind CSS | 原子化样式，通过 CSS 自定义属性实现主题 |
+| i18next | 国际化（en-US、zh-CN） |
+| xterm.js | 浏览器内终端模拟器 |
+| React Flow | 流程视图的图形可视化 |
+| Recharts | 仪表板图表 |
+| dnd-kit | 看板拖拽 |
+| cmdk | 命令面板 |
+| @tanstack/react-virtual | 大型会话列表的虚拟滚动 |
+
+### 关键模式
+
+- **传输层抽象** — `transport.ts` 提供统一接口，自动检测运行环境（Tauri IPC vs. WebSocket vs. HTTP）并路由命令
+- **插件系统** — `src/plugins/` 中的搜索插件允许扩展搜索源
+- **Context 提供者** — `TransportContext`、`SettingsContext`、`SessionViewContext` 管理共享状态
+- **19 个自定义 Hooks** — 封装可复用逻辑（快捷键、文件监听、移动端检测等）
+
+## 后端
+
+| 技术 | 用途 |
+|------|------|
+| Tauri 2 | 桌面应用框架，提供原生 API |
+| Rust | 系统级语言，兼顾性能与安全 |
+| Tokio | 异步运行时，支持并发 I/O |
+| Axum | HTTP/WebSocket 服务器框架 |
+| SQLite (rusqlite) | 持久化缓存、设置、标签、收藏 |
+| Tantivy | 全文搜索索引 |
+| portable-pty | PTY 终端会话 |
+| rust-embed | 将前端资源嵌入二进制文件 |
+| notify | 文件系统监听器 |
+
+### 模块结构
+
+```
+src-tauri/src/
+├── main.rs              # 入口：CLI 参数、窗口、适配器启动
+├── lib.rs               # 模块声明、命令注册
+├── ws_adapter.rs        # WebSocket 服务 + dispatch() 路由
+├── http_adapter.rs      # HTTP 服务、嵌入式前端 (rust-embed)
+├── app_state.rs         # SharedAppState (Arc)
+├── scanner.rs           # 会话文件扫描器（多路径、增量）
+├── scanner_scheduler.rs # 后台扫描调度
+├── terminal.rs          # PTY 会话管理
+├── sqlite_cache.rs      # 双层缓存（文件系统 + SQLite）
+├── tantivy_search.rs    # 全文搜索索引
+├── file_watcher.rs      # 文件系统监听器（增量更新）
+├── write_buffer.rs      # 异步写入批处理
+├── dispatch.rs          # 纯业务逻辑，WS/HTTP/CLI 共享
+└── commands/            # Tauri IPC 命令处理器（12 个模块）
+```
+
+### 纯模块
+
+核心业务逻辑模块（`scanner.rs`、`search.rs`、`tags.rs` 等）**不依赖 Tauri**。`commands/` 层是一个薄包装，将 Tauri IPC 桥接到纯逻辑。这种设计使 CLI 二进制文件可以复用相同代码，无需引入 Tauri。
+
+## 多协议通信
+
+三种协议共享同一个命令路由——`dispatch()`：
+
+| 协议 | 地址 | 使用场景 |
+|------|------|----------|
+| Tauri IPC | `invoke()` | 桌面应用（仅 GUI 模式） |
+| WebSocket | `ws://127.0.0.1:52130` | 实时双向通信（浏览器） |
+| HTTP POST | `http://127.0.0.1:52131/api` | 无状态单次调用（curl、集成） |
+
+添加新命令只需在 `dispatch()` 中增加一个 `match` 分支。WebSocket 和 HTTP 自动继承。
+
+### 传输层自动检测
+
+前端检测运行环境并选择合适的传输方式：
+
+1. **Tauri IPC** — 当 `window.__TAURI__` 可用时（桌面应用）
+2. **WebSocket** — 浏览器访问的默认方式（实时更新，SSE 作为回退）
+3. **HTTP** — 移动端 Web 的回退方式（POST 发送命令，SSE 接收事件）
+
+### 嵌入式前端
+
+HTTP 服务器通过 `rust-embed` 嵌入前端，因此打包后的二进制文件在 `http://localhost:52131` 提供完整 UI——无需外部 `dist/` 目录。嵌入的资源约增加 12MB 二进制体积。
+
+<Callout type="info">
+CLI 二进制文件（`pi-session-cli`）在单个端口（52131）上通过一个 axum Router 同时提供 API、WebSocket（`/ws`）和嵌入式前端。
+</Callout>
+
+## 增量更新
+
+后端采用多层缓存和更新策略：
+
+1. **扫描器缓存** — 持久化内存缓存，带原子版本计数器
+2. **文件监听器** — `notify` crate，`RecursiveMode::Recursive`，批量处理变更路径
+3. **增量重扫** — 仅重新解析变更的 JSONL 文件
+4. **SessionsDiff** — 通过 WebSocket/SSE 推送差异到前端
+5. **前端补丁** — `patchSessions()` 合并差异，无需完整重载

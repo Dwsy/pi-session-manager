@@ -203,6 +203,8 @@ export const components = {
     expandTools: '展开工具 (⌘O)',
     collapseTools: '折叠工具 (⌘O)',
     clickToView: '点击查看子代理会话',
+    failedNoOutput: '子代理执行失败，无输出内容。',
+    artifactsUnavailable: '子代理产物不可用 — 文件可能已被清理。',
   },
   sessionFlow: {
     zoomIn: '放大',

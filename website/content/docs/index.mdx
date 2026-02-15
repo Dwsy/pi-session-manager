@@ -1,0 +1,71 @@
+---
+title: Getting Started
+description: Pi Session Manager — cross-platform app for browsing, searching, and managing Pi AI coding sessions.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## What is Pi Session Manager?
+
+Pi Session Manager is a cross-platform application for browsing, searching, and managing [Pi](https://github.com/badlogic/pi-mono) AI coding sessions. It works as a native desktop app (macOS, Windows, Linux), a responsive mobile web app, and a headless server — all from a single codebase.
+
+> "The best tool is the one that gets out of your way." — Jef Raskin
+
+Whether you're reviewing past conversations, searching for a specific code snippet across hundreds of sessions, or tracking your AI-assisted development workflow on a Kanban board, Pi Session Manager has you covered.
+
+### Key Features
+
+- **Session Browser** — List, project, directory, and Kanban views with favorites and batch export
+- **Full-Text Search** — SQLite FTS5 + Tantivy with role/tool filters and snippet highlighting
+- **Session Viewer** — Tree view, flow visualization (React Flow), collapsible tool calls and thinking blocks
+- **Dashboard** — Activity heatmap, project mix, model usage, token costs, achievements
+- **Built-in Terminal** — Integrated xterm.js with PTY backend for resuming sessions
+- **Hierarchical Tags** — Parent-child tag tree with auto-rules
+- **Multi-Platform** — Desktop, mobile web, and headless CLI mode
+- **Multi-Protocol API** — Tauri IPC, WebSocket, and HTTP all sharing one command router
+
+## Quick Install
+
+### Desktop App
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/Dwsy/pi-session-manager/releases):
+
+| Platform | File |
+|----------|------|
+| macOS (Apple Silicon) | `Pi.Session.Manager_*_aarch64.dmg` |
+| macOS (Intel) | `Pi.Session.Manager_*_x64.dmg` |
+| Windows (x64) | `Pi.Session.Manager_*_x64-setup.exe` / `.msi` |
+| Linux | `.deb` / `.AppImage` / `.rpm` |
+
+### CLI / Headless Server
+
+Download the `pi-session-cli` binary from the same release page, or build with Docker:
+
+```bash
+docker build -f Dockerfile.cli -t pi-session-cli .
+docker cp $(docker create pi-session-cli):/pi-session-cli ./pi-session-cli
+chmod +x pi-session-cli
+./pi-session-cli
+```
+
+<Callout type="info">
+Pi must be installed for session resume and terminal integration. Install it from [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono).
+</Callout>
+
+## First Launch
+
+1. **Open the app** — sessions from `~/.pi/agent/sessions/` are scanned automatically
+2. **Browse sessions** — switch between list, project, directory, or Kanban views
+3. **Search** — press `Cmd/Ctrl + K` for the command palette, or `Cmd/Ctrl + F` for sidebar search
+4. **View a session** — click any session to open the viewer with tree navigation and flow visualization
+5. **Open terminal** — press `Cmd/Ctrl + J` to toggle the built-in terminal
+
+## What's Next?
+
+<Cards>
+  <Card title="Installation" href="/docs/installation" description="Detailed setup for all platforms" />
+  <Card title="Session Browser" href="/docs/session-browser" description="Browse and organize your sessions" />
+  <Card title="Search" href="/docs/search" description="Full-text search with filters" />
+  <Card title="Architecture" href="/docs/architecture" description="How it all fits together" />
+</Cards>

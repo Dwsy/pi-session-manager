@@ -1,0 +1,144 @@
+---
+title: CLI 模式
+description: 将 Pi Session Manager 作为无头后端服务运行，适用于服务器和远程访问。
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+CLI 模式将 Pi Session Manager 作为无头后端服务运行——没有 GUI 窗口，仅提供带嵌入式前端的 API 服务器。适用于服务器、远程访问和 Docker 部署。
+
+## 使用方式
+
+### 桌面二进制文件
+
+桌面应用通过启动参数支持 CLI 模式：
+
+```bash
+./pi-session-manager --cli
+# 或
+./pi-session-manager --headless
+```
+
+### 独立 CLI 二进制文件
+
+专用的 `pi-session-cli` 二进制文件不需要 Tauri 或任何 GUI 依赖：
+
+```bash
+./pi-session-cli
+```
+
+这将在端口 52131 启动一个 axum 服务器，提供：
+
+- `POST /api` — 命令端点
+- `GET /ws` — WebSocket 端点
+- `GET /health` — 健康检查
+- `GET /` — 嵌入式前端（SPA）
+
+## 配置
+
+CLI 从 `~/.config/pi-session-manager.json` 读取配置：
+
+```json
+{
+  "ws_enabled": true,
+  "http_enabled": true,
+  "ws_port": 52131,
+  "http_port": 52131,
+  "bind_addr": "0.0.0.0",
+  "auth_enabled": false
+}
+```
+
+<Callout type="warn">
+当 `bind_addr` 设置为 `0.0.0.0` 时，服务器可从网络访问。请启用认证并使用 API Token 以确保安全。
+</Callout>
+
+## Docker 部署
+
+### 构建镜像
+
+```bash
+docker build -f Dockerfile.cli -t pi-session-cli .
+```
+
+### 使用 Docker 运行
+
+```bash
+docker run -d \
+  --name pi-session-manager \
+  -v ~/.pi:/root/.pi:ro \
+  -p 52131:52131 \
+  pi-session-cli
+```
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  pi-session-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    ports:
+      - "52131:52131"
+    volumes:
+      - ~/.pi:/root/.pi:ro
+    restart: unless-stopped
+```
+
+## 远程访问
+
+CLI 运行后，可从任意浏览器访问完整 UI：
+
+```
+http://your-server-ip:52131
+```
+
+### 配合反向代理
+
+在 nginx 或类似工具后面：
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:52131;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header X-Forwarded-For $remote_addr;
+}
+```
+
+<Callout type="info">
+`X-Forwarded-For` 头很重要——认证系统在反向代理后面时使用它来确定真实的客户端 IP。
+</Callout>
+
+### 配合 ngrok
+
+无需配置反向代理即可快速远程访问：
+
+```bash
+ngrok http 52131
+```
+
+## 文件监听
+
+CLI 监控会话目录的变化：
+
+- 默认：`~/.pi/agent/sessions/` 和 `~/.pi/gateway/sessions/`
+- 配置中的额外路径
+- 自动过滤 `subagent-artifacts/` 和 `transcripts/` 目录
+
+## 日志
+
+CLI 默认输出到 stdout。在部署主机上，可重定向到文件：
+
+```bash
+./pi-session-cli > /var/log/pi-session-cli.log 2>&1
+```
+
+或在 tmux 会话中运行以便管理：
+
+```bash
+tmux new-session -d -s pi-session-cli './pi-session-cli'
+```

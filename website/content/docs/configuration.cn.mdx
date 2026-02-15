@@ -1,0 +1,170 @@
+---
+title: 配置说明
+description: 配置会话路径、扫描行为、搜索和应用设置。
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Pi Session Manager 使用多个配置文件来管理应用的不同方面。
+
+## 配置文件
+
+| 路径 | 用途 |
+|------|------|
+| `~/.pi/agent/session-manager.db` | SQLite 数据库（缓存、设置、标签、收藏） |
+| `~/.pi/agent/session-manager-config.toml` | 扫描器和搜索配置 |
+| `~/.pi/agent/settings.json` | Pi Agent 设置（与 Pi 共享） |
+| `~/.config/pi-session-manager.json` | CLI/服务器配置 |
+
+## 扫描器配置
+
+主配置文件控制扫描行为：
+
+```toml
+# ~/.pi/agent/session-manager-config.toml
+
+# 保留在内存中用于实时访问的会话天数
+realtime_cutoff_days = 2
+
+# 后台扫描间隔（秒）
+scan_interval_seconds = 30
+
+# 启用 SQLite FTS5 全文搜索索引
+enable_fts5 = true
+
+# 启动时预加载的最近会话数量
+preload_count = 20
+
+# 自动清理超过 N 天的会话（可选，0 = 禁用）
+auto_cleanup_days = 0
+
+# 额外的会话扫描目录
+session_paths = [
+  "/path/to/other/sessions",
+  "/path/to/gateway/sessions"
+]
+```
+
+## 多路径扫描
+
+默认从 `~/.pi/agent/sessions/` 扫描会话。要扫描额外目录：
+
+### 通过设置界面
+
+1. 打开设置（`Cmd/Ctrl + ,`）
+2. 进入高级部分
+3. 在"会话目录"列表中添加目录
+
+### 通过配置文件
+
+在 `session-manager-config.toml` 的 `session_paths` 数组中添加路径：
+
+```toml
+session_paths = [
+  "~/.pi/gateway/sessions",
+  "~/projects/my-project/.pi/sessions"
+]
+```
+
+### 通过 API
+
+```bash
+curl -X POST http://127.0.0.1:52131/api \
+  -H "Content-Type: application/json" \
+  -d '{"command":"save_session_paths","payload":{"paths":["~/.pi/gateway/sessions"]}}'
+```
+
+<Callout type="info">
+文件监听器会监控所有已配置的目录。添加新路径后，监听器会自动重启以包含该路径。
+</Callout>
+
+## 服务器配置
+
+CLI/无头模式下，在 `~/.config/pi-session-manager.json` 中配置服务器：
+
+```json
+{
+  "ws_enabled": true,
+  "http_enabled": true,
+  "ws_port": 52131,
+  "http_port": 52131,
+  "bind_addr": "127.0.0.1",
+  "auth_enabled": false
+}
+```
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `ws_enabled` | `true` | 启用 WebSocket 服务器 |
+| `http_enabled` | `true` | 启用 HTTP 服务器 |
+| `ws_port` | `52131` | WebSocket 端口（与 HTTP 共享） |
+| `http_port` | `52131` | HTTP 端口 |
+| `bind_addr` | `127.0.0.1` | 绑定地址（`0.0.0.0` 开放网络访问） |
+| `auth_enabled` | `false` | 非本地访问时要求 API Token |
+
+## Pi Agent 设置
+
+Pi Session Manager 可以读写 Pi 自身的设置文件（`~/.pi/agent/settings.json`）。应用中的设置面板提供以下管理界面：
+
+### 模型设置
+- 默认模型选择
+- 提供商配置
+- 调度模式（`one-at-a-time` 等）
+
+### 行为设置
+- 压缩（启用、阈值）
+- 重试（启用、最大重试次数）
+- 技能命令开关
+- 静默启动
+
+### 终端设置
+- 在终端中显示图片
+- 收缩时清除
+- 图片自动调整大小
+
+### 外观设置
+- 主题（深色/浅色/跟随系统）
+- 隐藏思考块
+- 折叠更新日志
+- 自动补全可见性
+
+### 高级设置
+- 绑定地址
+- API Token 管理
+- 会话目录
+
+<Callout type="warn">
+对 Pi Agent 设置的更改在 Pi 下次启动新会话时生效，不会影响正在运行的 Pi 实例。
+</Callout>
+
+## 资源管理
+
+设置面板还提供资源标签页，用于管理 Pi 的扩展、技能、提示词和主题：
+
+- 扫描 `~/.pi/agent/` 下的所有资源类型
+- 使用 Pi 的 `+/-` 前缀机制切换资源启用/禁用
+- 在模态窗口中查看资源内容（SKILL.md、README.md）
+- 按作用域（用户 vs. 项目）和类型分组
+
+## 主题
+
+Pi Session Manager 支持三种主题模式：
+
+- **深色** — 默认深色主题
+- **浅色** — 浅色主题
+- **跟随系统** — 跟随操作系统偏好
+
+主题通过 CSS 自定义属性实现：
+
+```css
+--body-bg
+--bg-subtle
+--borderMuted
+--text
+--muted
+--accent
+--success
+--error
+```
+
+覆盖这些变量即可创建自定义主题。

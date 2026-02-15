@@ -203,6 +203,8 @@ export const components = {
     expandTools: 'ツールを展開 (⌘O)',
     collapseTools: 'ツールを折りたたむ (⌘O)',
     clickToView: 'クリックしてサブエージェントセッションを表示',
+    failedNoOutput: 'サブエージェントが失敗し、出力がありません。',
+    artifactsUnavailable: 'サブエージェントの成果物が利用できません — ファイルが削除された可能性があります。',
   },
   sessionFlow: {
     zoomIn: 'ズームイン',

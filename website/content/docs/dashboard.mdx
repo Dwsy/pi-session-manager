@@ -1,0 +1,51 @@
+---
+title: Dashboard
+description: Analytics dashboard with activity heatmap, project distribution, model usage, and achievements.
+---
+
+The dashboard provides a visual overview of your AI coding activity. It aggregates data from all scanned sessions to surface trends and insights.
+
+## Stats Overview
+
+The top row shows key metrics at a glance:
+
+- **Total Sessions** — number of sessions across all scanned directories
+- **Total Messages** — combined user + assistant message count
+- **User Messages** — messages you sent
+- **Assistant Messages** — AI responses
+- **Average Messages/Session** — conversation depth indicator
+
+A weekly comparison badge shows the trend vs. the previous week.
+
+## Activity Heatmap
+
+A GitHub-style contribution heatmap showing daily session activity over the past year. Darker cells indicate more sessions on that day. Hover for exact counts.
+
+## Project Distribution
+
+A chart showing which projects (working directories) have the most sessions. Useful for understanding where you spend your AI-assisted development time.
+
+## Model Usage
+
+Breakdown of which AI models were used across sessions. Tracks model switches within sessions (Pi logs `model_change` entries in JSONL).
+
+## Token Costs
+
+Aggregated token usage and estimated costs across sessions. Helps track spending on AI-assisted development.
+
+## Achievements
+
+A gamification layer that awards badges based on your usage patterns:
+
+- Session milestones (10, 50, 100, 500 sessions)
+- Message volume achievements
+- Streak tracking (consecutive days with sessions)
+- Project diversity badges
+
+## Top Projects
+
+A ranked list of your most active projects by session count, with quick navigation to filter the session browser by project.
+
+## Performance
+
+The dashboard uses incremental data aggregation — stats are computed from the cached session metadata rather than re-parsing JSONL files. This keeps the dashboard responsive even with thousands of sessions.

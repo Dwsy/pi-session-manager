@@ -203,6 +203,8 @@ export const components = {
     expandTools: 'Tools aufklappen (⌘O)',
     collapseTools: 'Tools einklappen (⌘O)',
     clickToView: 'Klicken, um Subagent-Sitzung anzuzeigen',
+    failedNoOutput: 'Subagent fehlgeschlagen, keine Ausgabe.',
+    artifactsUnavailable: 'Subagent-Artefakte nicht verfügbar — Dateien wurden möglicherweise bereinigt.',
   },
   sessionFlow: {
     zoomIn: 'Vergrößern',

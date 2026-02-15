@@ -1,0 +1,25 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "installation",
+    "---Features---",
+    "session-browser",
+    "search",
+    "session-viewer",
+    "dashboard",
+    "kanban",
+    "terminal",
+    "tags",
+    "export",
+    "---Advanced---",
+    "architecture",
+    "api",
+    "cli",
+    "configuration",
+    "---Community---",
+    "contributing",
+    "changelog"
+  ]
+}

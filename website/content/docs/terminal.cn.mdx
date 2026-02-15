@@ -1,0 +1,54 @@
+---
+title: 内置终端
+description: 集成 xterm.js 终端，带 PTY 后端，支持运行命令和恢复会话。
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Pi Session Manager 内置终端，前端基于 [xterm.js](https://xtermjs.org/)，后端基于 [portable-pty](https://docs.rs/portable-pty)。
+
+## 打开终端
+
+按 `Cmd/Ctrl + J` 切换终端面板。终端从窗口底部滑出。
+
+## 功能
+
+### PTY 后端
+
+终端在后端运行真实的伪终端（PTY）会话，支持：
+
+- 完整的 Shell 集成（bash、zsh、fish 等）
+- ANSI 颜色代码和光标移动
+- 交互式程序（vim、htop 等）
+- Shell 选择——选择你偏好的 Shell
+
+### 会话恢复
+
+核心功能：直接从终端恢复任意 Pi 会话。
+
+1. 在浏览器中选择一个会话
+2. 按 `Cmd/Ctrl + R` 或点击恢复按钮
+3. 终端执行 `cd <project-dir> && pi --session-dir <session-path> --continue`
+
+这会让你直接回到上次离开的对话位置。
+
+<Callout type="info">
+恢复命令由 `buildResumeCommand()` 构建，在 500ms 延迟后写入 Shell，以确保 PTY 已就绪。
+</Callout>
+
+### 多终端
+
+创建新的终端标签页以支持并行工作流。每个标签页运行独立的 PTY 会话。
+
+## 快捷键
+
+| 快捷键 | 操作 |
+|--------|------|
+| `Cmd/Ctrl + J` | 切换终端面板 |
+| `Cmd/Ctrl + R` | 在终端中恢复选中的会话 |
+
+## 仅限桌面端
+
+<Callout type="warn">
+终端需要 PTY 后端，仅在桌面端（Tauri）应用中可用。在 Web/移动端浏览器模式或 CLI 模式下不可用。
+</Callout>

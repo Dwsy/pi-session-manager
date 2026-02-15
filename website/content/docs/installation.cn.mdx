@@ -1,0 +1,164 @@
+---
+title: 安装指南
+description: 在 macOS、Windows、Linux 上安装 Pi Session Manager，或部署为无头 CLI 服务器。
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+
+## 前置要求
+
+会话恢复和终端集成需要安装 [Pi](https://github.com/badlogic/pi-mono)。Session Manager 从 `~/.pi/agent/sessions/` 读取 Pi 的 JSONL 会话文件。
+
+## 桌面应用
+
+从 [GitHub Releases](https://github.com/Dwsy/pi-session-manager/releases) 下载最新版本。
+
+### macOS
+
+| 芯片 | 文件 |
+|------|------|
+| Apple Silicon (M1/M2/M3/M4) | `Pi.Session.Manager_*_aarch64.dmg` |
+| Intel | `Pi.Session.Manager_*_x64.dmg` |
+
+打开 `.dmg` 文件，将 Pi Session Manager 拖入应用程序文件夹。首次启动时，可能需要右键点击 → 打开以绕过 Gatekeeper。
+
+### Windows
+
+| 格式 | 文件 |
+|------|------|
+| 安装程序（推荐） | `Pi.Session.Manager_*_x64-setup.exe` |
+| MSI | `Pi.Session.Manager_*_x64-setup.msi` |
+
+运行安装程序并按提示操作。需要 WebView2（Windows 11 已预装）。
+
+### Linux
+
+| 格式 | 文件 |
+|------|------|
+| Debian/Ubuntu | `pi-session-manager_*_amd64.deb` |
+| AppImage | `pi-session-manager_*_amd64.AppImage` |
+| Fedora/RHEL | `pi-session-manager_*_x86_64.rpm` |
+
+```bash
+# Debian/Ubuntu
+sudo dpkg -i pi-session-manager_*_amd64.deb
+
+# AppImage
+chmod +x pi-session-manager_*.AppImage
+./pi-session-manager_*.AppImage
+
+# Fedora
+sudo rpm -i pi-session-manager_*_x86_64.rpm
+```
+
+## CLI / 无头服务器
+
+`pi-session-cli` 二进制文件可在无 GUI 窗口的情况下运行后端——适用于服务器、远程访问或 Docker 部署。
+
+从 [Releases](https://github.com/Dwsy/pi-session-manager/releases) 页面下载 `pi-session-cli`（与桌面版一同发布）。
+
+```bash
+chmod +x pi-session-cli
+./pi-session-cli
+```
+
+这将在 `http://0.0.0.0:52131` 启动 HTTP 服务器，包含嵌入式前端、WebSocket（`/ws`）和 API（`/api`）。
+
+## Docker
+
+使用项目自带的 Dockerfile 构建静态链接的 CLI 二进制文件：
+
+```bash
+# 构建镜像
+docker build -f Dockerfile.cli -t pi-session-cli .
+
+# 提取二进制文件
+docker cp $(docker create pi-session-cli):/pi-session-cli ./pi-session-cli
+chmod +x pi-session-cli
+```
+
+或直接使用 Docker 运行，挂载你的 Pi 会话目录：
+
+```bash
+docker run -d \
+  -v ~/.pi:/root/.pi:ro \
+  -p 52131:52131 \
+  pi-session-cli
+```
+
+<Callout type="warn">
+Docker 镜像使用 musl 进行静态链接，生成的二进制文件无 glibc 依赖。可在任何 Linux 发行版上运行，包括 CentOS 9 等较旧的版本。
+</Callout>
+
+## 从源码构建
+
+### 环境要求
+
+- **Node.js** >= 20，需安装 pnpm
+- **Rust** stable（通过 [rustup](https://rustup.rs/) 安装）
+- 平台特定依赖（见下文）
+
+### 平台依赖
+
+**macOS：**
+```bash
+xcode-select --install
+```
+
+**Ubuntu / Debian：**
+```bash
+sudo apt-get update
+sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+```
+
+**Fedora：**
+```bash
+sudo dnf install webkit2gtk4.1-devel libappindicator-gtk3-devel librsvg2-devel patchelf
+```
+
+**Windows：**
+- [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)，需包含 C++ 桌面开发工作负载
+- [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)（Windows 11 已预装）
+
+### 构建步骤
+
+<Steps>
+<Step>
+### 克隆并安装依赖
+
+```bash
+git clone https://github.com/Dwsy/pi-session-manager.git
+cd pi-session-manager
+pnpm install
+```
+</Step>
+
+<Step>
+### 开发模式
+
+```bash
+pnpm run tauri:dev
+```
+
+这将同时启动 Vite 开发服务器（支持 HMR）和 Rust 后端。
+</Step>
+
+<Step>
+### 生产构建
+
+```bash
+pnpm run tauri:build
+```
+
+构建产物位于 `src-tauri/target/release/bundle/`。
+</Step>
+</Steps>
+
+### 构建 CLI
+
+```bash
+bash scripts/build-cli.sh
+```
+
+CLI 二进制文件输出到 `target/release/pi-session-cli`。

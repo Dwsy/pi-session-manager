@@ -1,0 +1,97 @@
+---
+title: Session Viewer
+description: View session conversations with tree navigation, flow visualization, and subagent support.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+The session viewer renders Pi's JSONL session files as a rich, interactive conversation. It supports branching conversations, collapsible sections, and multiple visualization modes.
+
+## Tree View
+
+The left sidebar shows the conversation as a tree structure. Each node represents a message, with branches at decision points where the conversation forked.
+
+### Navigation
+
+- Click any node to jump to that message
+- The tree follows the "newest leaf" strategy — clicking a node navigates to the newest descendant in that branch
+- Branch points (nodes with multiple children) show a collapse toggle
+
+### Filters
+
+The tree view toolbar provides filters to control which nodes are visible:
+
+| Filter | Shows |
+|--------|-------|
+| Default | User + Assistant messages |
+| No Tools | Hides tool call nodes |
+| User | Only user messages |
+| All | Every entry including metadata |
+| Read | Only read tool calls |
+| Edit | Only edit tool calls |
+| Write | Only write tool calls |
+
+## Flow Visualization
+
+Switch to the Flow view for a graph-based visualization powered by [React Flow](https://reactflow.dev/). This mode:
+
+- Renders the conversation as a directed graph with compact tree layout
+- Collapses linear tool call chains into edge labels (e.g., `bash ×2, read, edit`)
+- Uses role-based node icons: User / Bot / Wrench / Settings
+- Includes a MiniMap with role-based coloring
+- Click any node to navigate to the corresponding conversation branch
+
+### Flow Toolbar
+
+- Zoom in / out
+- Fit view (auto-zoom to show all nodes)
+- Focus active node
+
+The flow view shares the same filter bar as the tree view.
+
+## Collapsible Sections
+
+### Tool Calls
+
+Tool calls (bash, read, edit, write, etc.) are rendered as collapsible cards. Toggle all tool calls with `Cmd/Ctrl + O`.
+
+Each tool call shows:
+- Tool name and arguments
+- Execution result (expandable)
+- Syntax-highlighted code blocks with copy buttons
+
+### Thinking Blocks
+
+AI thinking/reasoning blocks are collapsible by default. Toggle with `Cmd/Ctrl + T`.
+
+## Subagent Sessions
+
+When a session uses subagents (via Pi's `subagent` tool), the viewer renders clickable cards for each subagent run showing:
+
+- Agent name and model
+- Duration and token usage
+- Task preview
+
+Click a card to open the full subagent conversation in a modal overlay. The modal reuses the same message rendering components (UserMessage, AssistantMessage, ToolCallList) and supports:
+
+- Nested subagents (stacked modals with incremental z-index)
+- Thinking/Tools toggles (`Cmd/Ctrl + T` / `Cmd/Ctrl + O`)
+- Single, parallel, chain, and management action modes
+
+<Callout type="info">
+Subagent artifacts are stored at `session-dir/subagent-artifacts/` with the same JSONL format as main sessions. The viewer resolves artifact paths with fallback logic.
+</Callout>
+
+## Session Content Cache
+
+An LRU cache (5 entries) keyed by file path + modification timestamp speeds up back-navigation. Cache hits skip the file read entirely.
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + T` | Toggle thinking blocks |
+| `Cmd/Ctrl + O` | Toggle tool call expansion |
+| `Cmd/Ctrl + F` | Focus search |
+| `Cmd/Ctrl + E` | Export & open in browser |
+| `Cmd/Ctrl + R` | Resume session in terminal |

@@ -2,6 +2,25 @@ import { useState, useMemo, useCallback, useEffect, forwardRef, useRef, useImper
 import { useTranslation } from 'react-i18next'
 import type { SessionEntry } from '../types'
 import SessionTreeSearch, { type SessionTreeSearchRef } from './SessionTreeSearch'
+import { getCachedSettings } from '../utils/settingsApi'
+
+// Known tools map to CSS variable names: var(--tool-color-<name>)
+// Unknown tools use palette variables: var(--tool-palette-<N>)
+const KNOWN_TOOLS = new Set(['read', 'edit', 'write', 'bash', 'search', 'web_fetch'])
+const TOOL_PALETTE_SIZE = 8
+
+function hashToolName(name: string): number {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash)
+}
+
+function getToolColorVar(toolName: string): string {
+  if (KNOWN_TOOLS.has(toolName)) return `var(--tool-color-${toolName.replace(/_/g, '-')})`
+  return `var(--tool-palette-${hashToolName(toolName) % TOOL_PALETTE_SIZE})`
+}
 
 const SessionFlowView = lazy(() => import('./SessionFlowView'))
 
@@ -403,37 +422,34 @@ ref
             .filter((c: any) => c.type === 'text' && c.text)
             .map((c: any) => c.text)
             .join(' ')
-          return text.slice(0, 50) || 'User message'
+          return text.slice(0, 80) || 'User message'
         } else if (msg.role === 'assistant') {
           const toolCalls = Array.isArray(msg.content)
             ? msg.content.filter((c: any) => c.type === 'toolCall')
             : []
           
           if (toolCalls.length > 0) {
-            // 显示第一个工具调用的名称和参数
             const firstTool = toolCalls[0]
             const toolName = firstTool.name || 'unknown'
+            const suffix = toolCalls.length > 1 ? ` +${toolCalls.length - 1}` : ''
             
-            // 根据工具类型显示不同的信息
             if (toolName === 'bash') {
               const command = firstTool.arguments?.command || ''
-              const shortCmd = command.length > 30 ? command.slice(0, 30) + '...' : command
-              return `bash: ${shortCmd}`
+              return `bash: ${command}${suffix}`
             } else if (toolName === 'read') {
               const path = firstTool.arguments?.path || firstTool.arguments?.file_path || ''
               const fileName = path.split('/').pop() || path
-              return `read: ${fileName}`
+              return `read: ${fileName}${suffix}`
             } else if (toolName === 'write') {
               const path = firstTool.arguments?.path || firstTool.arguments?.file_path || ''
               const fileName = path.split('/').pop() || path
-              return `write: ${fileName}`
+              return `write: ${fileName}${suffix}`
             } else if (toolName === 'edit') {
               const path = firstTool.arguments?.path || firstTool.arguments?.file_path || ''
               const fileName = path.split('/').pop() || path
-              return `edit: ${fileName}`
+              return `edit: ${fileName}${suffix}`
             } else {
-              // 其他工具显示工具名称
-              return `${toolName}${toolCalls.length > 1 ? ` +${toolCalls.length - 1}` : ''}`
+              return `${toolName}${suffix}`
             }
           }
           
@@ -504,6 +520,16 @@ ref
         return 'tree-muted'
     }
   }
+
+  // Extract primary tool name from an assistant message entry
+  const getEntryToolName = (entry: SessionEntry): string | null => {
+    if (entry.type !== 'message' || entry.message?.role !== 'assistant') return null
+    const content = Array.isArray(entry.message.content) ? entry.message.content : []
+    const firstToolCall = content.find((c: any) => c.type === 'toolCall')
+    return firstToolCall?.name || null
+  }
+
+  const colorizeEnabled = getCachedSettings().session?.colorizeToolCalls !== false
 
   // 获取完整文本用于摘要
   const getFullText = (entry: SessionEntry, label?: string): string => {
@@ -809,7 +835,19 @@ ref
               ) : (
                 <span className="tree-marker">{marker}</span>
               )}
-              <span className={`tree-content ${roleClass}`}>{displayText}</span>
+              {entry.type === 'message' && entry.message?.role === 'user' ? (
+                <span className={`tree-content tree-content-user ${roleClass}`}>
+                  <span className="tree-user-label">User:</span>
+                  <span className="tree-user-text">{displayText}</span>
+                </span>
+              ) : (
+                <span
+                  className={`tree-content ${roleClass}`}
+                  style={colorizeEnabled && getEntryToolName(entry) ? { color: getToolColorVar(getEntryToolName(entry)!) } : undefined}
+                >
+                  {displayText}
+                </span>
+              )}
               {isCollapsed && flatNode.isBranchPoint && (
                 <span className="tree-collapsed-hint">...</span>
               )}

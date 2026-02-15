@@ -1,0 +1,100 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+/* ── Teal accent (matches pi-session-manager app theme) ── */
+:root {
+  /* Light: #0d9488 teal-600 */
+  --color-fd-primary: oklch(0.600 0.118 181.7);
+  --color-fd-primary-foreground: oklch(0.985 0.002 180);
+
+  --accent: oklch(0.600 0.118 181.7);
+  --accent-light: oklch(0.700 0.100 181.7);
+  --accent-dark: oklch(0.500 0.118 181.7);
+  --gradient-start: oklch(0.600 0.118 181.7);
+  --gradient-end: oklch(0.520 0.105 195);
+}
+
+.dark {
+  /* Dark: #8abeb7 */
+  --color-fd-primary: oklch(0.770 0.080 181.7);
+  --color-fd-primary-foreground: oklch(0.160 0.010 260);
+
+  --accent: oklch(0.770 0.080 181.7);
+  --accent-light: oklch(0.830 0.060 181.7);
+  --accent-dark: oklch(0.680 0.090 181.7);
+  --gradient-start: oklch(0.770 0.080 181.7);
+  --gradient-end: oklch(0.650 0.090 195);
+}
+
+/* ── Smooth scroll ── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(0.600 0.05 181 / 0.4);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.600 0.08 181 / 0.6);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: oklch(0.5 0.03 181 / 0.4);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.5 0.06 181 / 0.6);
+}
+
+/* ── Landing page animations ── */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0%, 100% {
+    background-size: 200% 200%;
+    background-position: left center;
+  }
+  50% {
+    background-size: 200% 200%;
+    background-position: right center;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out both;
+}
+
+.animate-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+.stagger-6 { animation-delay: 0.6s; }
+.stagger-7 { animation-delay: 0.7s; }
+.stagger-8 { animation-delay: 0.8s; }

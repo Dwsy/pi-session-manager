@@ -1,0 +1,164 @@
+---
+title: Installation
+description: Install Pi Session Manager on macOS, Windows, Linux, or as a headless CLI server.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+
+## Prerequisites
+
+[Pi](https://github.com/badlogic/pi-mono) must be installed for session resume and terminal integration. The session manager reads Pi's JSONL session files from `~/.pi/agent/sessions/`.
+
+## Desktop App
+
+Download the latest release from [GitHub Releases](https://github.com/Dwsy/pi-session-manager/releases).
+
+### macOS
+
+| Chip | File |
+|------|------|
+| Apple Silicon (M1/M2/M3/M4) | `Pi.Session.Manager_*_aarch64.dmg` |
+| Intel | `Pi.Session.Manager_*_x64.dmg` |
+
+Open the `.dmg` and drag Pi Session Manager to your Applications folder. On first launch, you may need to right-click → Open to bypass Gatekeeper.
+
+### Windows
+
+| Format | File |
+|--------|------|
+| Installer (recommended) | `Pi.Session.Manager_*_x64-setup.exe` |
+| MSI | `Pi.Session.Manager_*_x64-setup.msi` |
+
+Run the installer and follow the prompts. WebView2 is required (pre-installed on Windows 11).
+
+### Linux
+
+| Format | File |
+|--------|------|
+| Debian/Ubuntu | `pi-session-manager_*_amd64.deb` |
+| AppImage | `pi-session-manager_*_amd64.AppImage` |
+| Fedora/RHEL | `pi-session-manager_*_x86_64.rpm` |
+
+```bash
+# Debian/Ubuntu
+sudo dpkg -i pi-session-manager_*_amd64.deb
+
+# AppImage
+chmod +x pi-session-manager_*.AppImage
+./pi-session-manager_*.AppImage
+
+# Fedora
+sudo rpm -i pi-session-manager_*_x86_64.rpm
+```
+
+## CLI / Headless Server
+
+The `pi-session-cli` binary runs the backend without a GUI window — ideal for servers, remote access, or Docker deployments.
+
+Download `pi-session-cli` from the [Releases](https://github.com/Dwsy/pi-session-manager/releases) page (listed alongside the desktop builds).
+
+```bash
+chmod +x pi-session-cli
+./pi-session-cli
+```
+
+This starts the HTTP server on `http://0.0.0.0:52131` with the embedded frontend, WebSocket at `/ws`, and API at `/api`.
+
+## Docker
+
+Build a statically-linked CLI binary using the included Dockerfile:
+
+```bash
+# Build the image
+docker build -f Dockerfile.cli -t pi-session-cli .
+
+# Extract the binary
+docker cp $(docker create pi-session-cli):/pi-session-cli ./pi-session-cli
+chmod +x pi-session-cli
+```
+
+Or run directly with Docker, mounting your Pi sessions directory:
+
+```bash
+docker run -d \
+  -v ~/.pi:/root/.pi:ro \
+  -p 52131:52131 \
+  pi-session-cli
+```
+
+<Callout type="warn">
+The Docker image uses musl for static linking, producing a binary with zero glibc dependency. This works on any Linux distribution, including older ones like CentOS 9.
+</Callout>
+
+## Building from Source
+
+### Requirements
+
+- **Node.js** >= 20 with pnpm
+- **Rust** stable (via [rustup](https://rustup.rs/))
+- Platform-specific dependencies (see below)
+
+### Platform Dependencies
+
+**macOS:**
+```bash
+xcode-select --install
+```
+
+**Ubuntu / Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+```
+
+**Fedora:**
+```bash
+sudo dnf install webkit2gtk4.1-devel libappindicator-gtk3-devel librsvg2-devel patchelf
+```
+
+**Windows:**
+- [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with C++ desktop workload
+- [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (pre-installed on Windows 11)
+
+### Build Steps
+
+<Steps>
+<Step>
+### Clone and install
+
+```bash
+git clone https://github.com/Dwsy/pi-session-manager.git
+cd pi-session-manager
+pnpm install
+```
+</Step>
+
+<Step>
+### Development mode
+
+```bash
+pnpm run tauri:dev
+```
+
+This starts both the Vite dev server (with HMR) and the Rust backend.
+</Step>
+
+<Step>
+### Production build
+
+```bash
+pnpm run tauri:build
+```
+
+Build artifacts are in `src-tauri/target/release/bundle/`.
+</Step>
+</Steps>
+
+### Building the CLI
+
+```bash
+bash scripts/build-cli.sh
+```
+
+The CLI binary is output to `target/release/pi-session-cli`.

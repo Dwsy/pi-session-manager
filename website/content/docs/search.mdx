@@ -1,0 +1,92 @@
+---
+title: Search
+description: Full-text search across all sessions with role filters, tool filters, and snippet highlighting.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+> "Searching is half of finding." — Senegalese proverb
+
+Pi Session Manager provides powerful full-text search across all your sessions, powered by a dual-engine architecture.
+
+## Search Engines
+
+### SQLite FTS5
+
+The primary search engine. All session content is indexed into an FTS5 virtual table inside the SQLite database (`~/.pi/agent/session-manager.db`). This provides:
+
+- Fast prefix and phrase matching
+- BM25 ranking
+- Low memory footprint
+
+FTS5 can be toggled via the `enable_fts5` setting in the [configuration file](/docs/configuration).
+
+### Tantivy
+
+A Rust-native full-text search library (similar to Lucene) used as a secondary index. Tantivy provides:
+
+- More sophisticated tokenization
+- Better relevance scoring for complex queries
+- Concurrent indexing
+
+Both engines run in parallel and results are merged.
+
+## Filters
+
+### Role Filter
+
+Narrow results to specific message roles:
+
+| Role | Description |
+|------|-------------|
+| All | Search across all messages |
+| User | Only user messages |
+| Assistant | Only AI responses |
+| Tool | Only tool call results |
+
+### Tool Filter
+
+Filter by specific tool types used in sessions:
+
+- `bash` — shell commands
+- `read` / `edit` / `write` — file operations
+- `search` — code search calls
+- Custom tool names
+
+## Snippet Highlighting
+
+Search results display highlighted snippets showing the matching text in context. Click a result to jump directly to the matching message in the [Session Viewer](/docs/session-viewer).
+
+<Callout type="info">
+When a match is inside a `toolResult` entry, the viewer automatically resolves it to the parent assistant message containing the matching tool call, then scrolls to the correct position.
+</Callout>
+
+## Plugin System
+
+The search system uses a plugin architecture with three built-in plugins:
+
+| Plugin | Searches |
+|--------|----------|
+| Session Plugin | Session names and metadata |
+| Message Plugin | Message content (user, assistant, tool) |
+| Project Plugin | Project directories and paths |
+
+Plugins are registered in `src/plugins/` and can be extended to add custom search sources.
+
+## Command Palette
+
+Press `Cmd/Ctrl + K` to open the command palette — a [cmdk](https://cmdk.paco.me/)-based interface that combines search with quick actions:
+
+- Search sessions by name or content
+- Switch views (list, project, kanban)
+- Open settings
+- Toggle terminal
+- Navigate to any session
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + K` | Open command palette |
+| `Cmd/Ctrl + F` | Focus sidebar search |
+| `Esc` | Clear search / close palette |

@@ -1,0 +1,58 @@
+---
+title: Kanban Board
+description: Drag-and-drop Kanban board for organizing sessions by tags.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+> "Kanban is not about the board. It's about limiting work in progress." — David J. Anderson
+
+The Kanban board provides a visual, drag-and-drop interface for organizing sessions into columns based on [tags](/docs/tags).
+
+## Layout
+
+Each column represents a tag. Sessions appear as cards within their assigned tag column. An "Untagged" column is placed first for sessions without any tags.
+
+### Desktop
+
+Columns are displayed horizontally with horizontal scrolling. Drag sessions between columns to reassign tags.
+
+### Mobile
+
+On mobile devices, columns switch to a top-tab layout with single-column display and snap scrolling. Swipe between columns.
+
+## Drag and Drop
+
+Powered by [dnd-kit](https://dndkit.com/), the Kanban board supports:
+
+- Drag sessions between columns to change tags
+- Visual drop indicators
+- Smooth animations
+
+## Project Filtering
+
+A sidebar `ProjectFilterList` lets you filter the board to show sessions from a specific project. The selection persists across view switches.
+
+## Context Menu
+
+Right-click (or long-press on mobile) any session card for quick actions:
+
+- Open in terminal
+- Open project in file browser
+- Toggle favorite
+- Assign/change tags
+- Delete session
+
+## Search
+
+A search box is integrated into the Kanban header, next to the project badge and session count. It filters cards across all columns by session name, messages, and project directory.
+
+<Callout type="info">
+The Kanban board shares the same `SearchFilterBar` component used in list and project views, ensuring consistent filtering behavior across all views.
+</Callout>
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + K` | Command palette (includes Kanban navigation) |

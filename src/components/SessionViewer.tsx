@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { invoke, listen } from '../transport'
 import { useTranslation } from 'react-i18next'
-import { ArrowUp, ArrowDown, Loader2, Bot, Search, Eye, EyeOff, ChevronsUpDown } from 'lucide-react'
+import { ArrowUp, ArrowDown, Loader2, Bot, Search, Eye, EyeOff, ChevronsUpDown, MoreVertical, Pencil, Download, Play } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo, SessionEntry, SessionsDiff } from '../types'
 import { parseSessionEntries, computeStats } from '../utils/session'
@@ -81,6 +81,20 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [hasNewMessages, setHasNewMessages] = useState(false)
   const [showSystemPromptDialog, setShowSystemPromptDialog] = useState(false)
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
+
+  // Close mobile menu on outside click
+  useEffect(() => {
+    if (!showMobileMenu) return
+    const handler = (e: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setShowMobileMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showMobileMenu])
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
@@ -649,8 +663,10 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
               {messageEntries.length} {t('session.messages')}
             </span>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {isMobile && (
+
+          {/* Mobile: compact toolbar with overflow menu */}
+          {isMobile ? (
+            <div className="flex items-center gap-1 flex-shrink-0">
               <button
                 onClick={() => {
                   setShowSidebar(!showSidebar)
@@ -663,7 +679,80 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
               >
                 <Search className="h-3.5 w-3.5" />
               </button>
-            )}
+              <button
+                onClick={toggleThinking}
+                className={`p-1.5 text-xs rounded transition-colors ${showThinking ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
+              >
+                {showThinking ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                onClick={toggleToolsExpanded}
+                className={`p-1.5 text-xs rounded transition-colors ${toolsExpanded ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
+              >
+                <ChevronsUpDown className="h-3.5 w-3.5" />
+              </button>
+              {/* Overflow menu trigger */}
+              <div className="relative" ref={mobileMenuRef}>
+                <button
+                  onClick={() => setShowMobileMenu(!showMobileMenu)}
+                  className={`p-1.5 text-xs rounded transition-colors ${showMobileMenu ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
+                >
+                  <MoreVertical className="h-3.5 w-3.5" />
+                </button>
+                {showMobileMenu && (
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-popover border border-border rounded-lg shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      onClick={() => { setShowSystemPromptDialog(true); setShowMobileMenu(false) }}
+                      className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
+                    >
+                      <Bot className="h-3.5 w-3.5 text-muted-foreground" />
+                      {t('session.systemPromptAndTools', '系统提示词')}
+                    </button>
+                    <button
+                      onClick={() => { scrollToTop(); setShowMobileMenu(false) }}
+                      className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5 text-muted-foreground" />
+                      {t('session.scrollToTop', '滚动到顶部')}
+                    </button>
+                    <button
+                      onClick={() => { scrollToBottom(); setShowMobileMenu(false) }}
+                      className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      {t('session.scrollToBottom', '滚动到底部')}
+                    </button>
+                    <div className="border-t border-border my-1" />
+                    <button
+                      onClick={() => { onRename(); setShowMobileMenu(false) }}
+                      className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                      {t('common.rename')}
+                    </button>
+                    <button
+                      onClick={() => { onExport(); setShowMobileMenu(false) }}
+                      className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                      {t('common.export')}
+                    </button>
+                    {onWebResume && (
+                      <button
+                        onClick={() => { onWebResume(); setShowMobileMenu(false) }}
+                        className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
+                      >
+                        <Play className="h-3.5 w-3.5 text-muted-foreground" />
+                        {t('session.resume', '恢复')}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Desktop: full toolbar */
+            <div className="flex items-center gap-1 flex-shrink-0">
             <KbdTooltip shortcut="Cmd+T">
             <button
               onClick={toggleThinking}
@@ -689,31 +778,6 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
             >
               <Bot className="h-3.5 w-3.5" />
             </button>
-            {isMobile && (
-              <>
-                <button
-                  onClick={() => scrollToBottom()}
-                  className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
-                  title={t('session.scrollToBottom', '滚动到底部')}
-                >
-                  <ArrowDown className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={onRename}
-                  className="px-2 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
-                >
-                  {t('common.rename')}
-                </button>
-                <button
-                  onClick={onExport}
-                  className="px-2 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
-                >
-                  {t('common.export')}
-                </button>
-              </>
-            )}
-            {!isMobile && (
-              <>
                 <button
                   onClick={scrollToTop}
                   className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
@@ -757,9 +821,8 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
                   onError={(error) => console.error('[SessionViewer] Failed to open in terminal:', error)}
                 />
                 </KbdTooltip>
-              </>
-            )}
           </div>
+          )}
         </div>
 
         {showLoading ? (

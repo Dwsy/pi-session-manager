@@ -6,6 +6,12 @@ import { TransportProvider } from './contexts/TransportContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import './i18n'
 import './index.css'
+import { isTauri } from './transport'
+
+// Set titlebar height for Tauri desktop (drag region)
+if (isTauri()) {
+  document.documentElement.style.setProperty('--titlebar-height', '32px')
+}
 
 // 全局复制代码函数
 declare global {

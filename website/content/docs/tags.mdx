@@ -1,0 +1,75 @@
+---
+title: Hierarchical Tags
+description: Organize sessions with parent-child tag trees, auto-rules, and drag-to-reorder.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Tags (also called "labels") let you categorize sessions beyond their project directory. Pi Session Manager supports a hierarchical tag system with parent-child relationships.
+
+## Tag Tree
+
+Tags are organized in a tree structure:
+
+```
+📁 Status
+  ├── 🟢 Active
+  ├── 🟡 In Progress
+  └── 🔴 Archived
+📁 Priority
+  ├── 🔥 High
+  ├── ⚡ Medium
+  └── 💤 Low
+Custom Tag A
+Custom Tag B
+```
+
+### Creating Tags
+
+Open Settings → Tags to manage your tag tree. You can:
+
+- Create root-level tags
+- Add child tags under any parent
+- Rename or delete tags
+- Reorder tags via drag-and-drop
+
+### Assigning Tags
+
+- Right-click a session → Assign tags
+- Use the tag picker in the Kanban context menu
+- Drag sessions between Kanban columns
+
+## Tag Picker
+
+The `TagPicker` component renders the full tree with expand/collapse controls. It supports:
+
+- Multi-select (assign multiple tags to one session)
+- Search within the picker
+- Visual hierarchy with indentation
+
+## Label Filter
+
+The `LabelFilter` dropdown appears in the sidebar and Kanban header. It provides:
+
+- Grouped sections (Status vs. Custom)
+- Descendant filtering — selecting a parent tag also includes all its children
+- Search within the filter
+
+## Auto-Rules
+
+Configure automatic tag assignment based on patterns:
+
+- Project directory patterns (e.g., all sessions in `~/work/` get tagged "Work")
+- Session name patterns
+
+<Callout type="info">
+Tags are stored in the SQLite database (`~/.pi/agent/session-manager.db`), not in the JSONL session files. This means tags are local to your Pi Session Manager instance.
+</Callout>
+
+## Backend
+
+The tag system uses a `parent_id` column in the SQLite tags table. The frontend provides utility functions:
+
+- `getDescendantIds(tagId)` — all children recursively
+- `getRootTags()` — top-level tags only
+- `getChildTags(parentId)` — direct children

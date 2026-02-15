@@ -39,6 +39,53 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Fixed
 
+- **Dashboard flash-on-update** — incremental session updates no longer trigger full skeleton screen
+  - Only show `DashboardSkeleton` on first load (stats === null); subsequent updates refresh data silently in background
+  - Refresh button spins (`animate-spin`) during background reload as lightweight visual feedback
+  - Project switch correctly resets state to show skeleton for the new context
+  - Removed the 300ms minimum skeleton timer that was adding unnecessary delay
+
+### Fixed
+
+- **Mobile viewport height** — fixed iOS Safari address bar causing layout overflow
+  - Added `viewport-fit=cover` to enable `env(safe-area-inset-*)` on iOS
+  - Introduced `.h-screen-safe` utility using `100dvh` with `100vh` fallback, replacing raw `h-screen` on all root containers (App, AuthGate)
+  - `html, body, #root` use `height: 100% + overflow: hidden` to prevent whole-page scrolling
+  - Added `overscroll-behavior: none` to prevent iOS bounce scroll
+- **Mobile safe area insets** — top/bottom/left/right safe area padding classes now available
+  - Mobile session detail and tab layout apply `safe-area-top` to avoid notch overlap
+  - Bottom nav already had `safe-area-bottom`; added `safe-area-left/right/all` for landscape
+- **Desktop drag region conditional** — Tauri title bar drag region only renders in desktop app, not web
+  - Sidebar toolbar adapts height: fixed `h-8` with drag in Tauri, auto-height without drag in web
+  - Right-side transparent drag overlay only renders when `isTauri()` is true
+  - `--titlebar-height` CSS variable set to `32px` in Tauri, `0px` in web
+  - Drag overlay hidden when terminal is maximized to prevent click blocking
+- **Mobile SessionViewer toolbar overflow** — redesigned with overflow menu
+  - Toolbar now shows: back + title + search + thinking + tools + ⋮ (overflow menu)
+  - Overflow menu contains: system prompt, scroll top/bottom, rename, export, resume
+  - Click-outside-to-close with proper ref-based detection
+
+### Changed
+
+- **SessionTree user messages** — two-line layout with "User:" label
+  - User message nodes now display a small "User:" label on the first line and message preview on the second
+  - Preview text increased from 50 to 80 characters
+  - Tree node alignment switches to `flex-start` for user messages via `:has()` selector
+
+### Added
+
+- **SessionTree tool call colorization** — different tools display in distinct colors
+  - Fixed colors for core tools: read (blue), edit (yellow), write (purple), bash (green), search (cyan), web_fetch (orange)
+  - Other tools auto-assigned from an 8-color palette via deterministic hash
+  - Dark and light theme variants via CSS variables for proper contrast in both modes
+  - Toggleable in Settings → Session → "Colorize Tool Calls" (enabled by default)
+
+### Fixed
+
+- **SessionTree text truncation** — replaced JS hard-truncation (`slice + '...'`) with CSS `text-overflow: ellipsis`
+  - Tool call text (bash commands, file paths) now uses native `…` instead of ugly `...`
+  - Added `min-width: 0; flex: 1` to `.tree-content` for correct ellipsis in flex layout
+
 - **Pi Config settings default values** — boolean settings now use correct defaults from pi source code
   - `compaction.enabled`, `retry.enabled`, `enableSkillCommands`, `terminal.showImages`, `images.autoResize` default to `true` when absent
   - `hideThinkingBlock`, `quietStartup`, `collapseChangelog`, `terminal.clearOnShrink`, `images.blockImages`, `showHardwareCursor` default to `false`

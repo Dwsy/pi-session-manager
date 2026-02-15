@@ -86,6 +86,8 @@ export const settings = {
     showMessagePreview: '显示消息预览',
     showMessagePreviewHelp: '在会话列表中显示最后一条消息',
     previewLines: '预览行数',
+    colorizeToolCalls: '工具调用着色',
+    colorizeToolCallsHelp: '在会话树中为不同工具调用显示不同颜色',
   },
   search: {
     defaultSearchMode: '默认搜索模式',

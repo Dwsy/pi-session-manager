@@ -1,0 +1,144 @@
+---
+title: CLI Mode
+description: Run Pi Session Manager as a headless backend service for servers and remote access.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+The CLI mode runs Pi Session Manager as a headless backend service — no GUI window, just the API server with the embedded frontend. Ideal for servers, remote access, and Docker deployments.
+
+## Usage
+
+### Desktop Binary
+
+The desktop app supports CLI mode via flags:
+
+```bash
+./pi-session-manager --cli
+# or
+./pi-session-manager --headless
+```
+
+### Standalone CLI Binary
+
+A dedicated `pi-session-cli` binary is available that doesn't require Tauri or any GUI dependencies:
+
+```bash
+./pi-session-cli
+```
+
+This starts a single axum server on port 52131 serving:
+
+- `POST /api` — command endpoint
+- `GET /ws` — WebSocket endpoint
+- `GET /health` — health check
+- `GET /` — embedded frontend (SPA)
+
+## Configuration
+
+The CLI reads configuration from `~/.config/pi-session-manager.json`:
+
+```json
+{
+  "ws_enabled": true,
+  "http_enabled": true,
+  "ws_port": 52131,
+  "http_port": 52131,
+  "bind_addr": "0.0.0.0",
+  "auth_enabled": false
+}
+```
+
+<Callout type="warn">
+When `bind_addr` is set to `0.0.0.0`, the server is accessible from the network. Enable authentication and use API tokens for security.
+</Callout>
+
+## Docker Deployment
+
+### Build the Image
+
+```bash
+docker build -f Dockerfile.cli -t pi-session-cli .
+```
+
+### Run with Docker
+
+```bash
+docker run -d \
+  --name pi-session-manager \
+  -v ~/.pi:/root/.pi:ro \
+  -p 52131:52131 \
+  pi-session-cli
+```
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  pi-session-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    ports:
+      - "52131:52131"
+    volumes:
+      - ~/.pi:/root/.pi:ro
+    restart: unless-stopped
+```
+
+## Remote Access
+
+Once the CLI is running, access the full UI from any browser:
+
+```
+http://your-server-ip:52131
+```
+
+### With a Reverse Proxy
+
+Behind nginx or similar:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:52131;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header X-Forwarded-For $remote_addr;
+}
+```
+
+<Callout type="info">
+The `X-Forwarded-For` header is important — the auth system uses it to determine the real client IP when behind a reverse proxy.
+</Callout>
+
+### With ngrok
+
+For quick remote access without configuring a reverse proxy:
+
+```bash
+ngrok http 52131
+```
+
+## File Watcher
+
+The CLI monitors session directories for changes:
+
+- Default: `~/.pi/agent/sessions/` and `~/.pi/gateway/sessions/`
+- Additional paths from configuration
+- Automatically filters out `subagent-artifacts/` and `transcripts/` directories
+
+## Logging
+
+The CLI logs to stdout by default. On the deploy host, redirect to a file:
+
+```bash
+./pi-session-cli > /var/log/pi-session-cli.log 2>&1
+```
+
+Or run in a tmux session for easy management:
+
+```bash
+tmux new-session -d -s pi-session-cli './pi-session-cli'
+```

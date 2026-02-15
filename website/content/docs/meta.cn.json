@@ -1,0 +1,25 @@
+{
+  "title": "文档",
+  "pages": [
+    "---快速开始---",
+    "index",
+    "installation",
+    "---功能特性---",
+    "session-browser",
+    "search",
+    "session-viewer",
+    "dashboard",
+    "kanban",
+    "terminal",
+    "tags",
+    "export",
+    "---进阶---",
+    "architecture",
+    "api",
+    "cli",
+    "configuration",
+    "---社区---",
+    "contributing",
+    "changelog"
+  ]
+}

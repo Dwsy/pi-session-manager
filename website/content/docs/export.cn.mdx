@@ -1,0 +1,89 @@
+---
+title: 导出功能
+description: 将会话导出为 HTML、Markdown 或 JSON 格式。
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Pi Session Manager 支持将会话导出为三种格式，方便分享、归档或处理你的 AI 对话。
+
+## 格式
+
+### HTML
+
+使用 Pi 的原生模板生成自包含的 HTML 文件。导出文件包含：
+
+- 完整对话，带语法高亮的代码块
+- 可折叠的工具调用和思考块
+- 内嵌样式（无外部依赖）
+- 会话元数据（模型、时间戳、消息数量）
+
+按 `Cmd/Ctrl + E` 导出当前会话并在默认浏览器中打开。
+
+### Markdown
+
+将对话导出为简洁的 Markdown 文档：
+
+```markdown
+# Session: my-coding-session
+
+## User
+Can you fix the bug in auth.rs?
+
+## Assistant
+Looking at the code...
+
+### Tool Call: read
+**File:** src/auth.rs
+...
+```
+
+适合粘贴到文档、GitHub Issues 或笔记应用中。
+
+### JSON
+
+会话数据的原始结构化导出：
+
+```json
+{
+  "session_id": "abc123",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Can you fix the bug in auth.rs?"
+    },
+    {
+      "role": "assistant",
+      "content": "Looking at the code..."
+    }
+  ]
+}
+```
+
+适合程序化处理、数据分析或接入其他工具。
+
+## 批量导出
+
+在浏览器中选择多个会话，一次性全部导出。导出对话框允许你选择格式和输出位置。
+
+## 导出对话框
+
+导出对话框（`Cmd/Ctrl + E` 或右键 → 导出）提供：
+
+- 格式选择（HTML / Markdown / JSON）
+- 导出预览
+- 一键在浏览器中打开（HTML 格式）
+
+<Callout type="info">
+在移动端，导出对话框扩展到 95% 视口宽度，以便在小屏幕上舒适使用。
+</Callout>
+
+## API 导出
+
+你也可以通过 [API](/docs/api) 以编程方式导出会话：
+
+```bash
+curl -s -X POST http://127.0.0.1:52131/api \
+  -H "Content-Type: application/json" \
+  -d '{"command":"export_session","payload":{"path":"/path/to/session.jsonl","format":"markdown"}}'
+```

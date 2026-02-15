@@ -1,0 +1,54 @@
+---
+title: Built-in Terminal
+description: Integrated xterm.js terminal with PTY backend for running commands and resuming sessions.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Pi Session Manager includes a built-in terminal powered by [xterm.js](https://xtermjs.org/) on the frontend and [portable-pty](https://docs.rs/portable-pty) on the backend.
+
+## Opening the Terminal
+
+Press `Cmd/Ctrl + J` to toggle the terminal panel. It slides up from the bottom of the window.
+
+## Features
+
+### PTY Backend
+
+The terminal runs a real pseudo-terminal (PTY) session on the backend, supporting:
+
+- Full shell integration (bash, zsh, fish, etc.)
+- ANSI color codes and cursor movement
+- Interactive programs (vim, htop, etc.)
+- Shell selection — choose your preferred shell
+
+### Session Resume
+
+The killer feature: resume any Pi session directly from the terminal.
+
+1. Select a session in the browser
+2. Press `Cmd/Ctrl + R` or click the Resume button
+3. The terminal runs `cd <project-dir> && pi --session-dir <session-path> --continue`
+
+This drops you right back into the conversation where you left off.
+
+<Callout type="info">
+The resume command is built by `buildResumeCommand()` and written to the shell after a 500ms delay to ensure the PTY is ready.
+</Callout>
+
+### Multiple Terminals
+
+Create new terminal tabs for parallel workflows. Each tab runs an independent PTY session.
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + J` | Toggle terminal panel |
+| `Cmd/Ctrl + R` | Resume selected session in terminal |
+
+## Desktop Only
+
+<Callout type="warn">
+The terminal requires a PTY backend and is only available in the desktop (Tauri) app. It is not available in the web/mobile browser mode or CLI mode.
+</Callout>

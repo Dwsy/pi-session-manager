@@ -1,0 +1,180 @@
+---
+title: API Reference
+description: HTTP and WebSocket API for programmatic access to Pi Session Manager.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Pi Session Manager exposes its full functionality through HTTP and WebSocket APIs. Both protocols share the same command router (`dispatch()`), so every command works identically on both.
+
+## HTTP API
+
+### Endpoint
+
+```
+POST http://127.0.0.1:52131/api
+Content-Type: application/json
+```
+
+### Request Format
+
+```json
+{
+  "command": "command_name",
+  "payload": { }
+}
+```
+
+### Response Format
+
+```json
+{
+  "success": true,
+  "data": { },
+  "error": null
+}
+```
+
+### Authentication
+
+When accessing from a non-localhost address, requests must include a Bearer token:
+
+```bash
+curl -X POST http://your-server:52131/api \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -d '{"command":"scan_sessions","payload":{}}'
+```
+
+Tokens can also be passed as a query parameter: `?token=YOUR_API_TOKEN`
+
+Manage tokens via the API itself or through Settings → Advanced → API Keys.
+
+## WebSocket API
+
+### Connection
+
+```
+ws://127.0.0.1:52131/ws
+```
+
+Send JSON messages in the same `{ command, payload }` format. Responses are pushed back on the same connection.
+
+### Authentication
+
+After connecting, send an auth message if required:
+
+```json
+{"command": "auth", "payload": {"token": "YOUR_API_TOKEN"}}
+```
+
+### Real-Time Events
+
+The WebSocket connection also receives push events:
+
+- `session-changed` — when session files are modified (includes `changed_paths` for incremental rescan)
+- `sessions-diff` — incremental session list updates
+
+## SSE (Server-Sent Events)
+
+For HTTP-only clients that need real-time updates:
+
+```
+GET http://127.0.0.1:52131/api/events
+```
+
+Streams the same events as WebSocket in SSE format. Used by the mobile web frontend as a WebSocket alternative.
+
+## Available Commands
+
+### Session Management
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `scan_sessions` | `{}` | Scan and return all sessions |
+| `read_session_file` | `{ "path": "..." }` | Read a session's JSONL content |
+| `rename_session` | `{ "path": "...", "name": "..." }` | Rename a session |
+| `delete_session` | `{ "path": "..." }` | Delete a session file |
+| `export_session` | `{ "path": "...", "format": "html\|markdown\|json" }` | Export a session |
+
+### Search
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `search` | `{ "query": "...", "role": "all\|user\|assistant\|tool" }` | Full-text search |
+
+### Tags
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `list_tags` | `{}` | List all tags |
+| `create_tag` | `{ "name": "...", "color": "...", "parent_id": null }` | Create a tag |
+| `update_tag` | `{ "id": ..., "name": "...", "color": "..." }` | Update a tag |
+| `delete_tag` | `{ "id": ... }` | Delete a tag |
+| `assign_tag` | `{ "session_path": "...", "tag_id": ... }` | Assign tag to session |
+| `remove_tag` | `{ "session_path": "...", "tag_id": ... }` | Remove tag from session |
+
+### Favorites
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `list_favorites` | `{}` | List favorited session paths |
+| `toggle_favorite` | `{ "path": "..." }` | Toggle favorite status |
+
+### Configuration
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `get_session_paths` | `{}` | Get configured session directories |
+| `save_session_paths` | `{ "paths": ["..."] }` | Update session directories |
+| `get_all_session_dirs` | `{}` | Get all resolved scan directories |
+
+### Authentication
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `list_tokens` | `{}` | List API tokens |
+| `create_token` | `{ "name": "..." }` | Create a new API token |
+| `revoke_token` | `{ "id": ... }` | Revoke an API token |
+
+### Statistics
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `get_session_stats` | `{}` | Get aggregated session statistics |
+
+### Health
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `ping` | `{}` | Health check (returns `{ "pong": true }`) |
+
+## Examples
+
+### Scan all sessions
+
+```bash
+curl -s -X POST http://127.0.0.1:52131/api \
+  -H "Content-Type: application/json" \
+  -d '{"command":"scan_sessions","payload":{}}' | jq '.data | length'
+```
+
+### Search for a term
+
+```bash
+curl -s -X POST http://127.0.0.1:52131/api \
+  -H "Content-Type: application/json" \
+  -d '{"command":"search","payload":{"query":"authentication bug","role":"all"}}' | jq
+```
+
+### WebSocket with wscat
+
+```bash
+wscat -c ws://127.0.0.1:52131/ws
+> {"command":"scan_sessions","payload":{}}
+< {"success":true,"data":[...]}
+```
+
+<Callout type="info">
+The HTTP endpoint also supports `GET /health` which returns `200 OK` — useful for load balancer health checks and monitoring.
+</Callout>

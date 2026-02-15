@@ -1,0 +1,81 @@
+---
+title: Session Browser
+description: Browse, organize, and manage your Pi sessions across multiple views.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+The session browser is the main interface for navigating your Pi sessions. It supports four distinct views, each optimized for different workflows.
+
+## Views
+
+### List View
+
+The default view shows all sessions in a flat, chronological list. Each entry displays:
+
+- Session name (auto-generated or custom)
+- Project directory
+- Message count and timestamp
+- Favorite star and tag indicators
+
+Click any session to open it in the [Session Viewer](/docs/session-viewer).
+
+### Project View
+
+Groups sessions by their working directory (`cwd`). Useful when you work across multiple codebases and want to see all sessions for a specific project.
+
+Press `Cmd/Ctrl + P` to switch to project view.
+
+### Directory View
+
+Organizes sessions by their file system location — helpful when you have [multiple session paths](/docs/configuration) configured.
+
+### Kanban View
+
+A drag-and-drop board that organizes sessions into columns based on [tags](/docs/tags). See the dedicated [Kanban](/docs/kanban) page for details.
+
+## Session Actions
+
+### Favorites
+
+Star sessions to pin them to the top of any view. Favorites persist across restarts via the SQLite database.
+
+### Rename
+
+Right-click a session or use the toolbar rename button (`Cmd/Ctrl + R` in viewer) to give it a meaningful name. The original JSONL file is untouched — the name is stored in the database.
+
+### Batch Export
+
+Select multiple sessions and export them in bulk. Supported formats: HTML, Markdown, JSON. See [Export](/docs/export) for details.
+
+### Context Menu
+
+Right-click any session for quick actions:
+
+- Open in terminal
+- Open project in file browser
+- Toggle favorite
+- Assign tags
+- Export
+- Delete (with confirmation)
+
+## Search & Filter
+
+A unified `SearchFilterBar` appears at the top of every view. It combines:
+
+- **Text search** — filters by session name, first/last message, and project directory
+- **Tag filter** — dropdown with grouped sections and descendant filtering
+
+Press `Cmd/Ctrl + F` to focus the search input from anywhere.
+
+<Callout type="info">
+On mobile, the filter bar adapts to a compact layout with search and tag toggles. Long-press a session for the context menu instead of right-click.
+</Callout>
+
+## Multi-Path Scanning
+
+By default, sessions are scanned from `~/.pi/agent/sessions/`. You can add additional directories in [Configuration](/docs/configuration) to scan sessions from multiple locations (e.g., gateway sessions, project-specific paths).
+
+## Incremental Updates
+
+The backend uses a file watcher with incremental scanning. When a session file changes on disk, only that file is re-parsed and the diff is pushed to the frontend — no full reload needed.

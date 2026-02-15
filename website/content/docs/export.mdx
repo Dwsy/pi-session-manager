@@ -1,0 +1,89 @@
+---
+title: Export
+description: Export sessions to HTML, Markdown, or JSON formats.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Pi Session Manager supports exporting sessions in three formats, making it easy to share, archive, or process your AI conversations.
+
+## Formats
+
+### HTML
+
+Generates a self-contained HTML file using Pi's native template. The exported file includes:
+
+- Full conversation with syntax-highlighted code blocks
+- Collapsible tool calls and thinking blocks
+- Embedded styles (no external dependencies)
+- Session metadata (model, timestamps, message count)
+
+Press `Cmd/Ctrl + E` to export the current session and open it in your default browser.
+
+### Markdown
+
+Exports the conversation as a clean Markdown document:
+
+```markdown
+# Session: my-coding-session
+
+## User
+Can you fix the bug in auth.rs?
+
+## Assistant
+Looking at the code...
+
+### Tool Call: read
+**File:** src/auth.rs
+...
+```
+
+Useful for pasting into documentation, GitHub issues, or note-taking apps.
+
+### JSON
+
+Raw structured export of the session data:
+
+```json
+{
+  "session_id": "abc123",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Can you fix the bug in auth.rs?"
+    },
+    {
+      "role": "assistant",
+      "content": "Looking at the code..."
+    }
+  ]
+}
+```
+
+Ideal for programmatic processing, analytics, or feeding into other tools.
+
+## Batch Export
+
+Select multiple sessions in the browser and export them all at once. The export dialog lets you choose the format and output location.
+
+## Export Dialog
+
+The export dialog (`Cmd/Ctrl + E` or right-click → Export) provides:
+
+- Format selection (HTML / Markdown / JSON)
+- Preview of the export
+- One-click open in browser (HTML format)
+
+<Callout type="info">
+On mobile, the export dialog expands to 95% viewport width for comfortable use on smaller screens.
+</Callout>
+
+## API Export
+
+You can also export sessions programmatically via the [API](/docs/api):
+
+```bash
+curl -s -X POST http://127.0.0.1:52131/api \
+  -H "Content-Type: application/json" \
+  -d '{"command":"export_session","payload":{"path":"/path/to/session.jsonl","format":"markdown"}}'
+```

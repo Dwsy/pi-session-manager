@@ -1,0 +1,87 @@
+---
+title: 更新日志
+description: Pi Session Manager 的发布历史和重要变更。
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+完整更新日志请查看 [GitHub 上的 CHANGELOG.md](https://github.com/Dwsy/pi-session-manager/blob/main/CHANGELOG.md)。
+
+## 未发布
+
+### 子代理会话查看器
+- 内联查看完整子代理对话，可点击卡片显示代理名称、模型、时长、Token 用量
+- 带缩放+淡入动画的模态窗口渲染完整子代理 JSONL 会话
+- 支持单次、并行、链式和管理操作模式
+- 嵌套子代理支持——堆叠模态窗口，递增 z-index
+- 主视图和子代理工具栏均支持思考/工具切换按钮（`Cmd/Ctrl + T` / `Cmd/Ctrl + O`）
+
+### Pi 配置设置面板
+- 资源标签页：扫描和管理扩展、技能、提示词、主题，按作用域分组
+- 设置标签页：与 Pi 源码完全对齐——5 个分组中的 25+ 项设置
+- 版本历史作为独立标签页，带预览/恢复界面
+- 渐进式模型加载，提供商/模型下拉菜单
+
+### 统一搜索过滤栏
+- 可复用的搜索 + 标签过滤栏，在列表、项目和看板视图间共享
+- 桌面端侧边栏：始终可见；移动端：紧凑布局带切换按钮
+
+### i18n 清理
+- 修复了 19 个组件文件中约 50 处硬编码的中英文字符串
+- 为设置、仪表板、查看器、子代理和终端添加了缺失的翻译键
+
+### 单端口架构（CLI）
+- API、WebSocket（`/ws`）和嵌入式前端全部在端口 52131 上提供
+- 远程访问只需一个隧道/代理
+
+### 远程访问
+- 非 localhost 访问的认证网关，支持 API Token 管理
+- 通过 URL 参数进行远程配置（`?server=`、`?token=`、`?transport=`）
+- SSE 传输，适合移动端的实时更新
+
+### 移动端适配
+- 完整响应式支持，适配 < 768px 屏幕
+- 底部导航栏，5 个标签页
+- 长按右键菜单、滑动切换看板、安全区域适配
+
+### 其他亮点
+- 连接状态横幅（断开/重连指示器）
+- 基于差异的增量会话扫描和前端更新
+- HTTP 传输 + SSE 作为 WebSocket 替代方案
+- 可配置的绑定地址，控制网络暴露
+- 会话内容 LRU 缓存，加速回退导航
+- 终端恢复命令（`Cmd/Ctrl + R`）
+- 基于 React Flow 的流程图可视化
+- 多路径会话目录
+- 带父子关系的层级标签
+- 看板体验优化（项目过滤、右键菜单、未标记列）
+
+---
+
+## v0.1.0 — 2026-01-30
+
+包含核心功能的初始版本：
+
+### 会话管理
+- 从 `~/.pi/agent/sessions/` 扫描会话列表
+- 使用 Pi HTML 模板的会话查看器
+- 删除、导出（HTML/Markdown/JSON）和重命名会话
+
+### 搜索与分析
+- 跨用户和 AI 消息的全文搜索
+- 统计仪表板（总会话数、消息数、热门项目）
+- 搜索结果匹配数量徽章
+
+### 用户体验
+- 快捷键（`Cmd/Ctrl + R`、`Cmd/Ctrl + F`、`Cmd/Ctrl + Shift + S`、`Esc`）
+- 深色模式界面
+- 大型会话列表的虚拟滚动
+
+### 技术基础
+- Tauri 2 + Rust 后端，集成 SQLite 和 Tantivy
+- React 18 + TypeScript + Vite 前端
+- 导出、统计和搜索模块
+
+<Callout type="info">
+Pi Session Manager 遵循 [Conventional Commits](https://www.conventionalcommits.org/) 和[语义化版本](https://semver.org/)。
+</Callout>

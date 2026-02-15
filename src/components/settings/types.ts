@@ -48,6 +48,7 @@ export interface AppSettings {
     defaultViewMode: 'list' | 'directory' | 'project' | 'kanban'
     showMessagePreview: boolean
     previewLines: number
+    colorizeToolCalls: boolean
   }
   search: {
     defaultSearchMode: 'content' | 'name'
@@ -105,6 +106,7 @@ export const defaultSettings: AppSettings = {
     defaultViewMode: 'project',
     showMessagePreview: true,
     previewLines: 2,
+    colorizeToolCalls: true,
   },
   search: {
     defaultSearchMode: 'content',

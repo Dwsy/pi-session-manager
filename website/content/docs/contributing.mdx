@@ -1,0 +1,199 @@
+---
+title: Contributing
+description: How to contribute to Pi Session Manager.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+
+> "The best way to predict the future is to implement it." — David Heinemeier Hansson
+
+We welcome contributions to Pi Session Manager! Here's how to get started.
+
+## Prerequisites
+
+- Node.js 20+ with pnpm
+- Rust stable (via [rustup](https://rustup.rs/))
+- Tauri CLI (`cargo install tauri-cli`)
+
+## Setup
+
+<Steps>
+<Step>
+### Clone the repository
+
+```bash
+git clone https://github.com/Dwsy/pi-session-manager.git
+cd pi-session-manager
+```
+</Step>
+
+<Step>
+### Install dependencies
+
+```bash
+pnpm install
+```
+</Step>
+
+<Step>
+### Start development
+
+```bash
+pnpm run tauri:dev
+```
+
+This launches both the Vite dev server (with HMR) and the Rust backend.
+</Step>
+</Steps>
+
+## Project Structure
+
+```
+src/                    # Frontend (React + TypeScript)
+  components/           #   UI components (99+ files)
+  hooks/                #   Custom React hooks (19)
+  plugins/              #   Search plugin system
+  contexts/             #   React contexts
+  i18n/                 #   Internationalization (en-US, zh-CN)
+src-tauri/              # Backend (Rust + Tauri 2)
+  src/
+    commands/           #   Tauri IPC command handlers
+    scanner.rs          #   Session file scanner
+    search.rs           #   Search functionality
+    export.rs           #   Export functionality
+  tests/                #   Integration tests
+src-tauri-cli/          # CLI binary (standalone Rust)
+```
+
+## Development Workflow
+
+### Code Style
+
+**TypeScript/React:**
+- Functional components with hooks
+- TypeScript strict mode (`strict: true`, no `any`)
+- Import order: React → third-party → internal components → hooks → utils → types
+
+**Rust:**
+- `cargo fmt` for formatting (enforced in CI)
+- `cargo clippy -D warnings` for linting (enforced in CI)
+- All public functions return `Result<T, String>`
+- Document public functions with `///` comments
+
+### Adding a New Command
+
+When adding a new backend command, update these locations:
+
+1. **`ws_adapter.rs`** — add a `match` arm in `dispatch()`
+2. **`main.rs`** — register in `invoke_handler` for Tauri IPC
+3. WebSocket and HTTP automatically inherit from `dispatch()`
+
+Example:
+
+```rust
+// In dispatch()
+"my_command" => {
+    let result = my_module::do_something(&state, &payload).await?;
+    Ok(serde_json::to_value(result).unwrap())
+}
+```
+
+### Adding Frontend Components
+
+```typescript
+// One component per file, PascalCase naming
+function MyComponent({ prop1, prop2 }: MyComponentProps) {
+  const { t } = useTranslation()
+  const [state, setState] = useState<string>('')
+
+  return <div>{t('my.key')}</div>
+}
+
+export default MyComponent
+```
+
+## Testing
+
+### Rust Tests
+
+```bash
+cd src-tauri && cargo test
+cd src-tauri && cargo test test_name -- --nocapture  # specific test with output
+cd src-tauri && cargo test --test integration_test    # integration tests
+```
+
+### Code Quality Checks
+
+```bash
+cd src-tauri && cargo fmt --check
+cd src-tauri && cargo clippy -- -D warnings
+npx tsc --noEmit  # TypeScript type checking
+```
+
+## Commit Convention
+
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat: add session export to markdown
+fix: resolve search not returning results
+docs: update API documentation
+refactor: simplify scanner logic
+test: add unit tests for export module
+chore: update dependencies
+```
+
+## Submitting Changes
+
+<Steps>
+<Step>
+### Fork and branch
+
+```bash
+git checkout -b feature/my-feature
+```
+</Step>
+
+<Step>
+### Make changes and test
+
+```bash
+cd src-tauri && cargo fmt && cargo clippy -- -D warnings
+cd src-tauri && cargo test
+```
+</Step>
+
+<Step>
+### Commit and push
+
+```bash
+git commit -m "feat: add my feature"
+git push origin feature/my-feature
+```
+</Step>
+
+<Step>
+### Open a Pull Request
+
+Submit a PR against the `main` branch with a clear description of your changes.
+</Step>
+</Steps>
+
+<Callout type="info">
+All PRs must pass CI checks (rustfmt, clippy, build) before merging. The CI pipeline also builds the CLI binary as a sanity check.
+</Callout>
+
+## Reporting Issues
+
+When filing an issue, include:
+
+1. OS and version (e.g., macOS 15.0, Windows 11)
+2. App version (from Settings or `package.json`)
+3. Steps to reproduce
+4. Expected vs. actual behavior
+5. Relevant logs or error messages
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the [MIT License](https://github.com/Dwsy/pi-session-manager/blob/main/LICENSE).

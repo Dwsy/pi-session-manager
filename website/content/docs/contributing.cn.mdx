@@ -1,0 +1,199 @@
+---
+title: 贡献指南
+description: 如何为 Pi Session Manager 做出贡献。
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+
+> "预测未来最好的方式就是去实现它。" — David Heinemeier Hansson
+
+欢迎为 Pi Session Manager 做出贡献！以下是入门指南。
+
+## 前置要求
+
+- Node.js 20+，需安装 pnpm
+- Rust stable（通过 [rustup](https://rustup.rs/) 安装）
+- Tauri CLI（`cargo install tauri-cli`）
+
+## 环境搭建
+
+<Steps>
+<Step>
+### 克隆仓库
+
+```bash
+git clone https://github.com/Dwsy/pi-session-manager.git
+cd pi-session-manager
+```
+</Step>
+
+<Step>
+### 安装依赖
+
+```bash
+pnpm install
+```
+</Step>
+
+<Step>
+### 启动开发环境
+
+```bash
+pnpm run tauri:dev
+```
+
+这将同时启动 Vite 开发服务器（支持 HMR）和 Rust 后端。
+</Step>
+</Steps>
+
+## 项目结构
+
+```
+src/                    # 前端 (React + TypeScript)
+  components/           #   UI 组件 (99+ 文件)
+  hooks/                #   自定义 React Hooks (19 个)
+  plugins/              #   搜索插件系统
+  contexts/             #   React Contexts
+  i18n/                 #   国际化 (en-US, zh-CN)
+src-tauri/              # 后端 (Rust + Tauri 2)
+  src/
+    commands/           #   Tauri IPC 命令处理器
+    scanner.rs          #   会话文件扫描器
+    search.rs           #   搜索功能
+    export.rs           #   导出功能
+  tests/                #   集成测试
+src-tauri-cli/          # CLI 二进制文件 (独立 Rust)
+```
+
+## 开发工作流
+
+### 代码风格
+
+**TypeScript/React：**
+- 函数式组件 + Hooks
+- TypeScript 严格模式（`strict: true`，禁止 `any`）
+- 导入顺序：React → 第三方库 → 内部组件 → Hooks → 工具函数 → 类型
+
+**Rust：**
+- `cargo fmt` 格式化（CI 强制检查）
+- `cargo clippy -D warnings` 静态检查（CI 强制检查）
+- 所有公共函数返回 `Result<T, String>`
+- 公共函数使用 `///` 文档注释
+
+### 添加新命令
+
+添加新的后端命令时，需更新以下位置：
+
+1. **`ws_adapter.rs`** — 在 `dispatch()` 中添加 `match` 分支
+2. **`main.rs`** — 在 `invoke_handler` 中注册 Tauri IPC 命令
+3. WebSocket 和 HTTP 自动从 `dispatch()` 继承
+
+示例：
+
+```rust
+// 在 dispatch() 中
+"my_command" => {
+    let result = my_module::do_something(&state, &payload).await?;
+    Ok(serde_json::to_value(result).unwrap())
+}
+```
+
+### 添加前端组件
+
+```typescript
+// 每个文件一个组件，PascalCase 命名
+function MyComponent({ prop1, prop2 }: MyComponentProps) {
+  const { t } = useTranslation()
+  const [state, setState] = useState<string>('')
+
+  return <div>{t('my.key')}</div>
+}
+
+export default MyComponent
+```
+
+## 测试
+
+### Rust 测试
+
+```bash
+cd src-tauri && cargo test
+cd src-tauri && cargo test test_name -- --nocapture  # 指定测试并显示输出
+cd src-tauri && cargo test --test integration_test    # 集成测试
+```
+
+### 代码质量检查
+
+```bash
+cd src-tauri && cargo fmt --check
+cd src-tauri && cargo clippy -- -D warnings
+npx tsc --noEmit  # TypeScript 类型检查
+```
+
+## 提交规范
+
+使用 [Conventional Commits](https://www.conventionalcommits.org/)：
+
+```
+feat: add session export to markdown
+fix: resolve search not returning results
+docs: update API documentation
+refactor: simplify scanner logic
+test: add unit tests for export module
+chore: update dependencies
+```
+
+## 提交变更
+
+<Steps>
+<Step>
+### Fork 并创建分支
+
+```bash
+git checkout -b feature/my-feature
+```
+</Step>
+
+<Step>
+### 修改并测试
+
+```bash
+cd src-tauri && cargo fmt && cargo clippy -- -D warnings
+cd src-tauri && cargo test
+```
+</Step>
+
+<Step>
+### 提交并推送
+
+```bash
+git commit -m "feat: add my feature"
+git push origin feature/my-feature
+```
+</Step>
+
+<Step>
+### 发起 Pull Request
+
+向 `main` 分支提交 PR，并清晰描述你的变更内容。
+</Step>
+</Steps>
+
+<Callout type="info">
+所有 PR 必须通过 CI 检查（rustfmt、clippy、构建）才能合并。CI 流水线还会构建 CLI 二进制文件作为健全性检查。
+</Callout>
+
+## 报告问题
+
+提交 Issue 时，请包含：
+
+1. 操作系统和版本（如 macOS 15.0、Windows 11）
+2. 应用版本（来自设置或 `package.json`）
+3. 复现步骤
+4. 预期行为 vs. 实际行为
+5. 相关日志或错误信息
+
+## 许可证
+
+参与贡献即表示你同意你的贡献将在 [MIT License](https://github.com/Dwsy/pi-session-manager/blob/main/LICENSE) 下发布。

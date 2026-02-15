@@ -33,9 +33,10 @@ function getProjectName(path: string): string {
 export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, projectName, loading: parentLoading = false }: DashboardProps) {
   const { t } = useTranslation()
   const [stats, setStats] = useState<SessionStats | null>(null)
-  const [showSkeleton, setShowSkeleton] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const isLoadingRef = useRef(false)
-  const minShowSkeletonTimeRef = useRef<number>(0)
+  const hasLoadedOnce = useRef(false)
+  const prevProjectRef = useRef(projectName)
   const statsKey = useMemo(() => {
     const first = sessions[0]
     const last = sessions[sessions.length - 1]
@@ -51,32 +52,35 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
 
   // sessions 或项目切换时重新加载统计
   useEffect(() => {
-    // 如果父组件还在加载 sessions，显示骨架屏
-    if (parentLoading) {
-      setShowSkeleton(true)
-      return
+    if (parentLoading) return
+
+    // 项目切换时重置，显示骨架屏
+    if (prevProjectRef.current !== projectName) {
+      prevProjectRef.current = projectName
+      hasLoadedOnce.current = false
+      setStats(null)
     }
+
     if (sessions.length === 0) {
       setStats(null)
-      setShowSkeleton(false)
+      hasLoadedOnce.current = false
       return
     }
-    // 设置最小显示骨架屏的时间（300ms）
-    minShowSkeletonTimeRef.current = Date.now() + 300
     loadStats()
   }, [statsKey, parentLoading])
 
   const loadStats = async () => {
     if (isLoadingRef.current) return
     isLoadingRef.current = true
-    setShowSkeleton(true)
+    // 只在后续更新时显示刷新指示器，不替换整个 UI
+    if (hasLoadedOnce.current) {
+      setIsRefreshing(true)
+    }
 
     try {
-      // Check if in demo mode
       const isDemoMode = getCachedSettings()?.advanced?.demoMode === true
 
       if (isDemoMode) {
-        // Use demo stats in demo mode
         const result = getDemoStats()
         setStats(result)
       } else {
@@ -99,22 +103,17 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
         }
         setStats(result)
       }
+      hasLoadedOnce.current = true
     } catch (error) {
       console.error('Failed to load stats:', error)
     } finally {
       isLoadingRef.current = false
-      // 确保骨架屏至少显示最小时间，避免闪烁
-      const remainingTime = minShowSkeletonTimeRef.current - Date.now()
-      if (remainingTime > 0) {
-        setTimeout(() => setShowSkeleton(false), remainingTime)
-      } else {
-        setShowSkeleton(false)
-      }
+      setIsRefreshing(false)
     }
   }
 
-  // 显示骨架屏加载状态
-  if (showSkeleton) {
+  // 仅首次加载且无数据时显示骨架屏
+  if (!hasLoadedOnce.current && stats === null && (parentLoading || sessions.length > 0)) {
     return <DashboardSkeleton />
   }
 
@@ -163,9 +162,10 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
         </div>
         <button
           onClick={loadStats}
+          disabled={isRefreshing}
           className="flex items-center gap-1.5 px-2.5 py-1.5 md:gap-2 md:px-3 md:py-2 glass-card rounded-lg text-xs transition-all duration-300 hover:scale-105 active:scale-95 group flex-shrink-0"
         >
-          <RefreshCw className="h-3.5 w-3.5 transition-transform duration-500 group-hover:rotate-180" />
+          <RefreshCw className={`h-3.5 w-3.5 transition-transform duration-500 ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180'}`} />
           <span className="hidden md:inline">{t('common.refresh')}</span>
         </button>
       </div>

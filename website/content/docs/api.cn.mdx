@@ -1,0 +1,180 @@
+---
+title: API 参考
+description: 用于编程访问 Pi Session Manager 的 HTTP 和 WebSocket API。
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Pi Session Manager 通过 HTTP 和 WebSocket API 暴露全部功能。两种协议共享同一个命令路由（`dispatch()`），因此每个命令在两种协议上的行为完全一致。
+
+## HTTP API
+
+### 端点
+
+```
+POST http://127.0.0.1:52131/api
+Content-Type: application/json
+```
+
+### 请求格式
+
+```json
+{
+  "command": "command_name",
+  "payload": { }
+}
+```
+
+### 响应格式
+
+```json
+{
+  "success": true,
+  "data": { },
+  "error": null
+}
+```
+
+### 认证
+
+从非 localhost 地址访问时，请求必须包含 Bearer Token：
+
+```bash
+curl -X POST http://your-server:52131/api \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -d '{"command":"scan_sessions","payload":{}}'
+```
+
+Token 也可以通过查询参数传递：`?token=YOUR_API_TOKEN`
+
+通过 API 本身或设置 → 高级 → API 密钥来管理 Token。
+
+## WebSocket API
+
+### 连接
+
+```
+ws://127.0.0.1:52131/ws
+```
+
+以相同的 `{ command, payload }` 格式发送 JSON 消息。响应通过同一连接推送回来。
+
+### 认证
+
+连接后，如需认证则发送 auth 消息：
+
+```json
+{"command": "auth", "payload": {"token": "YOUR_API_TOKEN"}}
+```
+
+### 实时事件
+
+WebSocket 连接还会接收推送事件：
+
+- `session-changed` — 会话文件被修改时触发（包含 `changed_paths` 用于增量重扫）
+- `sessions-diff` — 增量会话列表更新
+
+## SSE（Server-Sent Events）
+
+对于仅支持 HTTP 但需要实时更新的客户端：
+
+```
+GET http://127.0.0.1:52131/api/events
+```
+
+以 SSE 格式推送与 WebSocket 相同的事件。移动端 Web 前端将其作为 WebSocket 的替代方案。
+
+## 可用命令
+
+### 会话管理
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `scan_sessions` | `{}` | 扫描并返回所有会话 |
+| `read_session_file` | `{ "path": "..." }` | 读取会话的 JSONL 内容 |
+| `rename_session` | `{ "path": "...", "name": "..." }` | 重命名会话 |
+| `delete_session` | `{ "path": "..." }` | 删除会话文件 |
+| `export_session` | `{ "path": "...", "format": "html\|markdown\|json" }` | 导出会话 |
+
+### 搜索
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `search` | `{ "query": "...", "role": "all\|user\|assistant\|tool" }` | 全文搜索 |
+
+### 标签
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `list_tags` | `{}` | 列出所有标签 |
+| `create_tag` | `{ "name": "...", "color": "...", "parent_id": null }` | 创建标签 |
+| `update_tag` | `{ "id": ..., "name": "...", "color": "..." }` | 更新标签 |
+| `delete_tag` | `{ "id": ... }` | 删除标签 |
+| `assign_tag` | `{ "session_path": "...", "tag_id": ... }` | 为会话分配标签 |
+| `remove_tag` | `{ "session_path": "...", "tag_id": ... }` | 移除会话标签 |
+
+### 收藏
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `list_favorites` | `{}` | 列出已收藏的会话路径 |
+| `toggle_favorite` | `{ "path": "..." }` | 切换收藏状态 |
+
+### 配置
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `get_session_paths` | `{}` | 获取已配置的会话目录 |
+| `save_session_paths` | `{ "paths": ["..."] }` | 更新会话目录 |
+| `get_all_session_dirs` | `{}` | 获取所有已解析的扫描目录 |
+
+### 认证
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `list_tokens` | `{}` | 列出 API Token |
+| `create_token` | `{ "name": "..." }` | 创建新的 API Token |
+| `revoke_token` | `{ "id": ... }` | 撤销 API Token |
+
+### 统计
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `get_session_stats` | `{}` | 获取聚合的会话统计数据 |
+
+### 健康检查
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `ping` | `{}` | 健康检查（返回 `{ "pong": true }`） |
+
+## 示例
+
+### 扫描所有会话
+
+```bash
+curl -s -X POST http://127.0.0.1:52131/api \
+  -H "Content-Type: application/json" \
+  -d '{"command":"scan_sessions","payload":{}}' | jq '.data | length'
+```
+
+### 搜索关键词
+
+```bash
+curl -s -X POST http://127.0.0.1:52131/api \
+  -H "Content-Type: application/json" \
+  -d '{"command":"search","payload":{"query":"authentication bug","role":"all"}}' | jq
+```
+
+### 使用 wscat 连接 WebSocket
+
+```bash
+wscat -c ws://127.0.0.1:52131/ws
+> {"command":"scan_sessions","payload":{}}
+< {"success":true,"data":[...]}
+```
+
+<Callout type="info">
+HTTP 端点还支持 `GET /health`，返回 `200 OK`——适用于负载均衡器的健康检查和监控。
+</Callout>

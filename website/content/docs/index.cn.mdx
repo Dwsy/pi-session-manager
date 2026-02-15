@@ -1,0 +1,71 @@
+---
+title: 快速开始
+description: Pi Session Manager — 跨平台的 Pi AI 编程会话浏览、搜索与管理工具。
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## 什么是 Pi Session Manager？
+
+Pi Session Manager 是一款跨平台应用，用于浏览、搜索和管理 [Pi](https://github.com/badlogic/pi-mono) AI 编程会话。它可以作为原生桌面应用（macOS、Windows、Linux）、响应式移动端 Web 应用，以及无头服务器运行——全部基于同一套代码。
+
+> "最好的工具是那种不会妨碍你的工具。" — Jef Raskin
+
+无论你是在回顾过去的对话、在数百个会话中搜索特定代码片段，还是在看板上追踪 AI 辅助开发工作流，Pi Session Manager 都能满足你的需求。
+
+### 核心功能
+
+- **会话浏览器** — 列表、项目、目录和看板视图，支持收藏和批量导出
+- **全文搜索** — SQLite FTS5 + Tantivy 双引擎，支持角色/工具过滤和片段高亮
+- **会话查看器** — 树形视图、流程可视化（React Flow）、可折叠的工具调用和思考块
+- **数据仪表板** — 活动热力图、项目分布、模型使用、Token 消耗、成就系统
+- **内置终端** — 集成 xterm.js 与 PTY 后端，支持恢复会话
+- **层级标签** — 父子标签树与自动规则
+- **多平台** — 桌面端、移动端 Web 和无头 CLI 模式
+- **多协议 API** — Tauri IPC、WebSocket 和 HTTP 共享同一命令路由
+
+## 快速安装
+
+### 桌面应用
+
+从 [GitHub Releases](https://github.com/Dwsy/pi-session-manager/releases) 下载适合你平台的最新版本：
+
+| 平台 | 文件 |
+|------|------|
+| macOS (Apple Silicon) | `Pi.Session.Manager_*_aarch64.dmg` |
+| macOS (Intel) | `Pi.Session.Manager_*_x64.dmg` |
+| Windows (x64) | `Pi.Session.Manager_*_x64-setup.exe` / `.msi` |
+| Linux | `.deb` / `.AppImage` / `.rpm` |
+
+### CLI / 无头服务器
+
+从同一发布页面下载 `pi-session-cli` 二进制文件，或使用 Docker 构建：
+
+```bash
+docker build -f Dockerfile.cli -t pi-session-cli .
+docker cp $(docker create pi-session-cli):/pi-session-cli ./pi-session-cli
+chmod +x pi-session-cli
+./pi-session-cli
+```
+
+<Callout type="info">
+会话恢复和终端集成需要安装 Pi。请从 [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono) 安装。
+</Callout>
+
+## 首次启动
+
+1. **打开应用** — 自动扫描 `~/.pi/agent/sessions/` 中的会话
+2. **浏览会话** — 在列表、项目、目录或看板视图之间切换
+3. **搜索** — 按 `Cmd/Ctrl + K` 打开命令面板，或 `Cmd/Ctrl + F` 进行侧边栏搜索
+4. **查看会话** — 点击任意会话，打开带有树形导航和流程可视化的查看器
+5. **打开终端** — 按 `Cmd/Ctrl + J` 切换内置终端
+
+## 下一步
+
+<Cards>
+  <Card title="安装指南" href="/docs/installation" description="各平台的详细安装说明" />
+  <Card title="会话浏览器" href="/docs/session-browser" description="浏览和管理你的会话" />
+  <Card title="搜索系统" href="/docs/search" description="带过滤器的全文搜索" />
+  <Card title="架构概览" href="/docs/architecture" description="了解整体架构设计" />
+</Cards>

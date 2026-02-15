@@ -29,7 +29,7 @@ export default function UserMessage({ id, timestamp, content, className = '', se
 
   return (
     <div className={`user-message ${className}`} id={`entry-${id}`}>
-      {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
+      {timestamp && <span className="message-timestamp user-timestamp-inline">{formatDate(timestamp)}</span>}
 
       {images.length > 0 && (
         <div className="message-images">

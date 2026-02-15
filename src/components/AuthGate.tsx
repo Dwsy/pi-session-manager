@@ -80,7 +80,7 @@ function AuthGate({ children }: AuthGateProps) {
 
   if (state === 'checking') {
     return (
-      <div className="flex items-center justify-center h-screen bg-zinc-950">
+      <div className="flex items-center justify-center h-screen-safe bg-zinc-950">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-6 h-6 text-zinc-500 animate-spin" />
           <span className="text-sm text-zinc-500">
@@ -93,7 +93,7 @@ function AuthGate({ children }: AuthGateProps) {
 
   if (state === 'needs-auth') {
     return (
-      <div className="flex items-center justify-center h-screen bg-zinc-950 px-4">
+      <div className="flex items-center justify-center h-screen-safe bg-zinc-950 px-4">
         <div className="w-full max-w-sm">
           {/* Logo / Icon */}
           <div className="flex flex-col items-center mb-8">

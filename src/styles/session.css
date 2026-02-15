@@ -348,6 +348,10 @@
    border-radius: 4px;
  }
 
+ .tree-node:has(.tree-content-user) {
+   align-items: flex-start;
+ }
+
  .tree-node:hover {
    background: rgba(var(--accent-rgb), 0.08);
  }
@@ -402,10 +406,34 @@
    color: var(--text-secondary);
    overflow: hidden;
    text-overflow: ellipsis;
+   min-width: 0;
+   flex: 1;
  }
 
  .tree-role-user {
    color: var(--accent);
+ }
+
+ /* User message: 2-line layout */
+ .tree-content-user {
+   display: flex;
+   flex-direction: column;
+   line-height: 14px;
+   gap: 1px;
+   white-space: normal;
+ }
+
+ .tree-user-label {
+   font-size: 10px;
+   font-weight: 600;
+   opacity: 0.7;
+ }
+
+ .tree-user-text {
+   font-size: 11px;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   white-space: nowrap;
  }
 
  .tree-role-assistant {

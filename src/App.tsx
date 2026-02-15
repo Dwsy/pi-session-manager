@@ -555,24 +555,21 @@ function App() {
   // Mobile layout: full-screen pages + bottom nav
   // ═══════════════════════════════════
   if (isMobile) {
-    // Session detail takes over the entire screen
-    if (selectedSession) {
-      return (
-        <div className="flex flex-col h-screen bg-background text-foreground">
-          <ConnectionBanner />
-          <div className="flex-1 overflow-hidden">
-            {renderSessionViewer()}
-          </div>
-          {renderOverlays()}
-        </div>
-      )
-    }
-
     return (
-      <div className="flex flex-col h-screen bg-background text-foreground">
+      <div className="relative flex flex-col h-screen-safe bg-background text-foreground safe-area-top">
         <ConnectionBanner />
-        {/* Main content area */}
-        <div className="flex-1 overflow-hidden flex flex-col">
+
+        {/* Session viewer overlay — sits on top, keeps tab content mounted underneath */}
+        {selectedSession && (
+          <div className="absolute inset-0 z-30 flex flex-col bg-background">
+            <div className="flex-1 overflow-hidden">
+              {renderSessionViewer()}
+            </div>
+          </div>
+        )}
+
+        {/* Main content area — always mounted so virtualizer refs stay alive */}
+        <div className="flex-1 overflow-hidden flex flex-col" style={{ visibility: selectedSession ? 'hidden' : 'visible' }}>
           {mobileTab === 'list' && renderSessionList()}
           {mobileTab === 'projects' && renderProjectList()}
           {mobileTab === 'kanban' && renderKanban()}
@@ -586,28 +583,30 @@ function App() {
         </div>
 
         {/* Bottom navigation bar */}
-        <nav className="flex-shrink-0 border-t border-border bg-background/95 backdrop-blur-sm flex items-center justify-around px-1 safe-area-bottom">
-          {([
-            { id: 'list' as const, icon: <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>, label: t('app.viewMode.list', '列表') },
-            { id: 'projects' as const, icon: <FolderOpen className="h-5 w-5" />, label: t('app.viewMode.project', '项目') },
-            { id: 'kanban' as const, icon: <Columns3 className="h-5 w-5" />, label: t('tags.kanban.title', '看板') },
-            { id: 'dashboard' as const, icon: <LayoutDashboard className="h-5 w-5" />, label: t('dashboard.title', '概览') },
-            { id: 'settings' as const, icon: <Settings className="h-5 w-5" />, label: t('settings.title', '设置') },
-          ]).map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setMobileTab(tab.id)}
-              className={`flex flex-col items-center gap-0.5 py-2 px-3 rounded-lg transition-colors ${
-                mobileTab === tab.id
-                  ? 'text-primary'
-                  : 'text-muted-foreground'
-              }`}
-            >
-              {tab.icon}
-              <span className="text-[10px] leading-tight">{tab.label}</span>
-            </button>
-          ))}
-        </nav>
+        {!selectedSession && (
+          <nav className="flex-shrink-0 border-t border-border bg-background/95 backdrop-blur-sm flex items-center justify-around px-1 safe-area-bottom">
+            {([
+              { id: 'list' as const, icon: <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>, label: t('app.viewMode.list', '列表') },
+              { id: 'projects' as const, icon: <FolderOpen className="h-5 w-5" />, label: t('app.viewMode.project', '项目') },
+              { id: 'kanban' as const, icon: <Columns3 className="h-5 w-5" />, label: t('tags.kanban.title', '看板') },
+              { id: 'dashboard' as const, icon: <LayoutDashboard className="h-5 w-5" />, label: t('dashboard.title', '概览') },
+              { id: 'settings' as const, icon: <Settings className="h-5 w-5" />, label: t('settings.title', '设置') },
+            ]).map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setMobileTab(tab.id)}
+                className={`flex flex-col items-center gap-0.5 py-2 px-3 rounded-lg transition-colors ${
+                  mobileTab === tab.id
+                    ? 'text-primary'
+                    : 'text-muted-foreground'
+                }`}
+              >
+                {tab.icon}
+                <span className="text-[10px] leading-tight">{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
 
         {renderOverlays()}
       </div>
@@ -618,14 +617,13 @@ function App() {
   // Desktop layout: sidebar + content (unchanged)
   // ═══════════════════════════════════
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground">
+    <div className="flex flex-col h-screen-safe bg-background text-foreground">
       <ConnectionBanner />
       <div className="flex flex-1 min-h-0">
       <div className="w-80 border-r border-border flex flex-col">
         <div
-          className="h-8 border-b border-border flex items-center px-3 select-none"
-          data-tauri-drag-region
-          onMouseDown={startDragging}
+          className={`${isTauri() ? 'h-8' : ''} border-b border-border flex items-center px-3 ${isTauri() ? 'py-0' : 'py-1.5'} select-none`}
+          {...(isTauri() ? { 'data-tauri-drag-region': true, onMouseDown: startDragging } : {})}
         >
           <div className="flex items-center gap-0.5 ml-auto no-drag">
             <button
@@ -843,10 +841,12 @@ function App() {
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col relative">
-        <div
-          className="absolute top-0 left-0 right-0 h-8 z-10"
-          data-tauri-drag-region
-        />
+        {isTauri() && !(showTerminal && terminalMaximized) && (
+          <div
+            className="absolute top-0 left-0 right-0 h-8 z-10"
+            data-tauri-drag-region
+          />
+        )}
         <div className="flex-1 overflow-hidden flex flex-col">
           <div className="flex-1 overflow-hidden" style={{ display: showTerminal && terminalMaximized ? 'none' : undefined }}>
             {selectedSession ? renderSessionViewer() : viewMode === 'kanban' ? renderKanban() : renderDashboard()}

@@ -1,0 +1,170 @@
+---
+title: Configuration
+description: Configure session paths, scanning behavior, search, and application settings.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Pi Session Manager uses several configuration files for different aspects of the application.
+
+## Configuration Files
+
+| Path | Purpose |
+|------|---------|
+| `~/.pi/agent/session-manager.db` | SQLite database (cache, settings, tags, favorites) |
+| `~/.pi/agent/session-manager-config.toml` | Scanner and search configuration |
+| `~/.pi/agent/settings.json` | Pi agent settings (shared with Pi) |
+| `~/.config/pi-session-manager.json` | CLI/server configuration |
+
+## Scanner Configuration
+
+The main configuration file controls scanning behavior:
+
+```toml
+# ~/.pi/agent/session-manager-config.toml
+
+# Days of sessions to keep in memory for real-time access
+realtime_cutoff_days = 2
+
+# Background scan interval in seconds
+scan_interval_seconds = 30
+
+# Enable SQLite FTS5 full-text search indexing
+enable_fts5 = true
+
+# Number of recent sessions to preload on startup
+preload_count = 20
+
+# Auto-cleanup sessions older than N days (optional, 0 = disabled)
+auto_cleanup_days = 0
+
+# Additional session directories to scan
+session_paths = [
+  "/path/to/other/sessions",
+  "/path/to/gateway/sessions"
+]
+```
+
+## Multi-Path Scanning
+
+By default, sessions are scanned from `~/.pi/agent/sessions/`. To scan additional directories:
+
+### Via Settings UI
+
+1. Open Settings (`Cmd/Ctrl + ,`)
+2. Go to Advanced section
+3. Add directories in the "Session Directories" list
+
+### Via Config File
+
+Add paths to the `session_paths` array in `session-manager-config.toml`:
+
+```toml
+session_paths = [
+  "~/.pi/gateway/sessions",
+  "~/projects/my-project/.pi/sessions"
+]
+```
+
+### Via API
+
+```bash
+curl -X POST http://127.0.0.1:52131/api \
+  -H "Content-Type: application/json" \
+  -d '{"command":"save_session_paths","payload":{"paths":["~/.pi/gateway/sessions"]}}'
+```
+
+<Callout type="info">
+The file watcher monitors all configured directories. When you add a new path, the watcher is automatically restarted to include it.
+</Callout>
+
+## Server Configuration
+
+For CLI/headless mode, configure the server in `~/.config/pi-session-manager.json`:
+
+```json
+{
+  "ws_enabled": true,
+  "http_enabled": true,
+  "ws_port": 52131,
+  "http_port": 52131,
+  "bind_addr": "127.0.0.1",
+  "auth_enabled": false
+}
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `ws_enabled` | `true` | Enable WebSocket server |
+| `http_enabled` | `true` | Enable HTTP server |
+| `ws_port` | `52131` | WebSocket port (shared with HTTP) |
+| `http_port` | `52131` | HTTP port |
+| `bind_addr` | `127.0.0.1` | Bind address (`0.0.0.0` for network access) |
+| `auth_enabled` | `false` | Require API token for non-local access |
+
+## Pi Agent Settings
+
+Pi Session Manager can read and write Pi's own settings file (`~/.pi/agent/settings.json`). The Settings panel in the app provides a UI for managing:
+
+### Model Settings
+- Default model selection
+- Provider configuration
+- Steering mode (`one-at-a-time`, etc.)
+
+### Behavior Settings
+- Compaction (enabled, threshold)
+- Retry (enabled, max retries)
+- Skill commands toggle
+- Quiet startup
+
+### Terminal Settings
+- Show images in terminal
+- Clear on shrink
+- Image auto-resize
+
+### Appearance Settings
+- Theme (dark/light/system)
+- Hide thinking blocks
+- Collapse changelog
+- Autocomplete visibility
+
+### Advanced Settings
+- Bind address
+- API token management
+- Session directories
+
+<Callout type="warn">
+Changes to Pi agent settings take effect the next time Pi starts a new session. They do not affect running Pi instances.
+</Callout>
+
+## Resource Management
+
+The Settings panel also provides a Resources tab for managing Pi extensions, skills, prompts, and themes:
+
+- Scan `~/.pi/agent/` for all resource types
+- Toggle resources on/off using Pi's `+/-` prefix mechanism
+- View resource content (SKILL.md, README.md) in a modal
+- Group by scope (user vs. project) and type
+
+## Theme
+
+Pi Session Manager supports three theme modes:
+
+- **Dark** — default dark theme
+- **Light** — light theme
+- **System** — follows OS preference
+
+Themes are implemented via CSS custom properties:
+
+```css
+--body-bg
+--bg-subtle
+--borderMuted
+--text
+--muted
+--accent
+--success
+--error
+```
+
+Override these in your own CSS to create custom themes.

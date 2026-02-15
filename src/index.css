@@ -176,6 +176,22 @@
   --body-bg: rgb(26, 27, 38);
   --container-bg: rgb(44, 45, 59);
   --info-bg: rgb(72, 68, 65);
+
+  /* Tool call colors (dark theme) */
+  --tool-color-read: #61afef;
+  --tool-color-edit: #e5c07b;
+  --tool-color-write: #c678dd;
+  --tool-color-bash: #98c379;
+  --tool-color-search: #56b6c2;
+  --tool-color-web-fetch: #d19a66;
+  --tool-palette-0: #e06c75;
+  --tool-palette-1: #d19a66;
+  --tool-palette-2: #56b6c2;
+  --tool-palette-3: #c678dd;
+  --tool-palette-4: #98c379;
+  --tool-palette-5: #ff6ac1;
+  --tool-palette-6: #9cdcfe;
+  --tool-palette-7: #e5c07b;
 }
 
 /* Light theme overrides */
@@ -272,6 +288,22 @@
   --body-bg: rgb(248, 249, 250);
   --container-bg: rgb(255, 255, 255);
   --info-bg: rgb(240, 241, 243);
+
+  /* Tool call colors (light theme — deeper tones for white bg) */
+  --tool-color-read: #2563eb;
+  --tool-color-edit: #b45309;
+  --tool-color-write: #7c3aed;
+  --tool-color-bash: #16a34a;
+  --tool-color-search: #0891b2;
+  --tool-color-web-fetch: #c2410c;
+  --tool-palette-0: #dc2626;
+  --tool-palette-1: #c2410c;
+  --tool-palette-2: #0891b2;
+  --tool-palette-3: #7c3aed;
+  --tool-palette-4: #16a34a;
+  --tool-palette-5: #db2777;
+  --tool-palette-6: #2563eb;
+  --tool-palette-7: #b45309;
 }
 
 /* System theme: follow OS preference */
@@ -369,6 +401,34 @@
     --body-bg: rgb(248, 249, 250);
     --container-bg: rgb(255, 255, 255);
     --info-bg: rgb(240, 241, 243);
+
+    /* Tool call colors (system light) */
+    --tool-color-read: #2563eb;
+    --tool-color-edit: #b45309;
+    --tool-color-write: #7c3aed;
+    --tool-color-bash: #16a34a;
+    --tool-color-search: #0891b2;
+    --tool-color-web-fetch: #c2410c;
+    --tool-palette-0: #dc2626;
+    --tool-palette-1: #c2410c;
+    --tool-palette-2: #0891b2;
+    --tool-palette-3: #7c3aed;
+    --tool-palette-4: #16a34a;
+    --tool-palette-5: #db2777;
+    --tool-palette-6: #2563eb;
+    --tool-palette-7: #b45309;
+  }
+}
+
+/* Mobile viewport height: use dvh where supported, fallback to vh */
+:root {
+  --app-height: 100vh;
+  --titlebar-height: 0px;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-height: 100dvh;
   }
 }
 
@@ -386,6 +446,13 @@ body {
   background: var(--body-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent overscroll bounce on iOS */
+  overscroll-behavior: none;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
 }
 
 /* Tauri drag region styles */
@@ -409,6 +476,13 @@ body {
 #root {
   width: 100%;
   height: 100%;
+  overflow: hidden;
+}
+
+/* Dynamic viewport height: dvh avoids iOS Safari address bar overlap */
+.h-screen-safe {
+  height: 100vh;
+  height: 100dvh;
 }
 
 /* Message Styles */
@@ -424,6 +498,12 @@ body {
   padding: var(--line-height);
   border-radius: 4px;
   position: relative;
+}
+
+.user-timestamp-inline {
+  float: right;
+  margin-left: 8px;
+  line-height: 1.6;
 }
 
 .assistant-message {
@@ -1106,6 +1186,23 @@ body {
   /* Safe area for top (notch) */
   .safe-area-top {
     padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Safe area for left/right (landscape mode) */
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* Combined safe area for all edges */
+  .safe-area-all {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
 
   /* Session viewer header: compact on mobile */
