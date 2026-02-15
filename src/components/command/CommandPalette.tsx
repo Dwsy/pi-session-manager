@@ -65,7 +65,7 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
   
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] sm:pt-[20vh] bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[9998] flex items-start justify-center pt-[10vh] sm:pt-[20vh] bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={close}
     >
       <div
