@@ -4,8 +4,14 @@ set -e
 
 OUT_DIR="out"
 
-# Root redirect to /en/
-cat > "$OUT_DIR/index.html" << 'EOF'
+if [ -n "$GITHUB_ACTIONS" ]; then
+  BASE="/pi-session-manager"
+else
+  BASE=""
+fi
+
+# Root redirect with language detection
+cat > "$OUT_DIR/index.html" << EOF
 <!DOCTYPE html>
 <html>
 <head>
@@ -13,27 +19,18 @@ cat > "$OUT_DIR/index.html" << 'EOF'
   <title>Redirecting...</title>
   <script>
     var lang = navigator.language || navigator.userLanguage || 'en';
-    var target = lang.startsWith('zh') ? '/cn/' : '/en/';
+    var target = lang.startsWith('zh') ? '${BASE}/cn/' : '${BASE}/en/';
     window.location.replace(target);
   </script>
-  <meta http-equiv="refresh" content="0;url=/en/">
+  <meta http-equiv="refresh" content="0;url=${BASE}/en/">
 </head>
 <body>
-  <p>Redirecting to <a href="/en/">English</a> | <a href="/cn/">中文</a></p>
+  <p>Redirecting to <a href="${BASE}/en/">English</a> | <a href="${BASE}/cn/">中文</a></p>
 </body>
 </html>
 EOF
 
-# Also copy en.html as docs/index.html redirect if missing
-if [ ! -f "$OUT_DIR/docs/index.html" ] && [ -f "$OUT_DIR/en/docs.html" ]; then
-  mkdir -p "$OUT_DIR/docs"
-  cat > "$OUT_DIR/docs/index.html" << 'EOF'
-<!DOCTYPE html>
-<html><head><meta http-equiv="refresh" content="0;url=/en/docs"></head></html>
-EOF
-fi
-
 # GitHub Pages: disable Jekyll processing
 touch "$OUT_DIR/.nojekyll"
 
-echo "✅ Post-build complete"
+echo "✅ Post-build complete (basePath=${BASE:-/})"
