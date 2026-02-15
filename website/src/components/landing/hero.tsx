@@ -4,7 +4,7 @@ import { t } from '@/lib/landing-i18n';
 
 export function Hero({ lang = 'en' }: { lang?: string }) {
   const i = t(lang).hero;
-  const docsHref = lang === 'en' ? '/docs' : `/${lang}/docs`;
+  const docsHref = `/${lang}/docs`;
 
   return (
     <section className="relative overflow-hidden px-4 pt-20 pb-16 sm:pt-28 sm:pb-24">

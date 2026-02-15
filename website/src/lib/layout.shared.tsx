@@ -6,15 +6,17 @@ export const gitConfig = {
   branch: 'main',
 };
 
-export function baseOptions(): BaseLayoutProps {
+export function baseOptions(lang?: string): BaseLayoutProps {
+  const prefix = lang ? `/${lang}` : '';
+
   return {
     nav: {
       title: 'Pi Session Manager',
     },
     links: [
-      { text: 'Features', url: '/#features' },
-      { text: 'Docs', url: '/docs' },
-      { text: 'Download', url: '/#download' },
+      { text: lang === 'cn' ? '功能' : 'Features', url: `${prefix}/#features` },
+      { text: lang === 'cn' ? '文档' : 'Docs', url: `${prefix}/docs` },
+      { text: lang === 'cn' ? '下载' : 'Download', url: `${prefix}/#download` },
       {
         text: 'GitHub',
         url: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,

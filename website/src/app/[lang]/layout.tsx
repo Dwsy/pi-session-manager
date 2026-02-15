@@ -7,5 +7,9 @@ export default async function LangLayout({
 }: LayoutProps<'/[lang]'>) {
   const { lang } = await params;
 
-  return <RootProvider {...i18nUI.provider(lang)}>{children}</RootProvider>;
+  return (
+    <RootProvider i18n={i18nUI.provider(lang)}>
+      {children}
+    </RootProvider>
+  );
 }
