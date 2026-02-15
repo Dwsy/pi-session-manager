@@ -264,13 +264,21 @@
    color: rgb(var(--color-muted-foreground));
  }
 
- .sidebar-filters {
-   display: flex;
-   padding: 8px 12px 12px 12px;
-   gap: 6px;
-   align-items: center;
-   flex-wrap: wrap;
- }
+.sidebar-filters {
+  display: flex;
+  padding: 10px 12px 12px 12px;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+/* Tree/Flow 与下方过滤器之间的间距 */
+.sidebar-filters-view-mode {
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.08);
+}
 
  .filter-btn {
    padding: 4px 10px;
@@ -642,9 +650,10 @@
 */
 
 .session-tree-search {
-  padding: 12px 12px 8px 12px;
+  padding: 14px 12px 12px 12px;
   border-bottom: 1px solid rgba(var(--accent-rgb), 0.1);
   background: var(--bg-subtle);
+  flex-shrink: 0;
 }
 
 .session-tree-search-content {

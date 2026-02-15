@@ -688,7 +688,7 @@ ref
       />
 
       {/* View mode toggle */}
-      <div className="sidebar-filters" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+      <div className="sidebar-filters sidebar-filters-view-mode">
         <button
           className={`filter-btn ${viewMode === 'tree' ? 'active' : ''}`}
           onClick={() => setViewMode('tree')}
