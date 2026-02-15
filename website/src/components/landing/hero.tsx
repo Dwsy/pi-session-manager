@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { ArrowRight, Github } from 'lucide-react';
 import { t } from '@/lib/landing-i18n';
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+
 export function Hero({ lang = 'en' }: { lang?: string }) {
   const i = t(lang).hero;
   const docsHref = `/${lang}/docs`;
@@ -67,7 +69,7 @@ export function Hero({ lang = 'en' }: { lang?: string }) {
                 media="(prefers-color-scheme: dark)"
               />
               <img
-                src="https://github.com/user-attachments/assets/87630b70-84a1-4417-9b66-b35124ebdcea"
+                src={`${basePath}/screenshot-light.png`}
                 alt="Pi Session Manager screenshot"
                 className="w-full"
                 loading="eager"
