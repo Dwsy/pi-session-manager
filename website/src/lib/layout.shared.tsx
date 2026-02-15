@@ -1,4 +1,5 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
+import { i18n } from './i18n';
 
 export const gitConfig = {
   user: 'Dwsy',
@@ -10,6 +11,7 @@ export function baseOptions(lang?: string): BaseLayoutProps {
   const prefix = lang ? `/${lang}` : '';
 
   return {
+    i18n,
     nav: {
       title: 'Pi Session Manager',
     },
