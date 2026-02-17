@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search, Terminal, Columns3 } from 'lucide-react'
+import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search, Terminal, Columns3, Loader2 } from 'lucide-react'
 import KbdTooltip from './components/KbdTooltip'
 import ProjectFilterList from './components/ProjectFilterList'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -15,14 +15,9 @@ import ProjectList from './components/ProjectList'
 import SessionViewer from './components/SessionViewer'
 import ExportDialog from './components/ExportDialog'
 import RenameDialog from './components/RenameDialog'
-import Dashboard from './components/Dashboard'
 import FavoritesPanel from './components/FavoritesPanel'
-import SettingsPanel from './components/settings/SettingsPanel'
 import Onboarding from './components/Onboarding'
-import { CommandPalette } from './components/command'
-import TerminalPanel from './components/TerminalPanel'
 import SearchFilterBar from './components/SearchFilterBar'
-import KanbanBoard from './components/kanban/KanbanBoard'
 import FullTextSearch from './components/FullTextSearch'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useFileWatcher } from './hooks/useFileWatcher'
@@ -40,6 +35,20 @@ import type { SearchContext } from './plugins/types'
 import { invoke, isTauri } from './transport'
 import { getCachedSettings } from './utils/settingsApi'
 import { getPlatformDefaults } from './components/settings/types'
+
+// Lazy load heavy components
+const Dashboard = lazy(() => import('./components/Dashboard'))
+const KanbanBoard = lazy(() => import('./components/kanban/KanbanBoard'))
+const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel'))
+const TerminalPanel = lazy(() => import('./components/TerminalPanel'))
+const CommandPalette = lazy(() => import('./components/command').then(m => ({ default: m.CommandPalette })))
+
+// Loading fallback
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center h-full">
+    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+  </div>
+)
 
 // Define sqlite_cache types for Tauri responses
 namespace sqlite_cache {
@@ -479,41 +488,45 @@ function App() {
   )
 
   const renderKanban = () => (
-    <KanbanBoard
-      sessions={filteredSessions}
-      tags={tags}
-      sessionTags={sessionTags}
-      selectedSession={selectedSession}
-      onSelectSession={handleSelectSession}
-      onMoveSession={moveSession}
-      getTagsForSession={getTagsForSession}
-      onToggleTag={(sessionId, tagId, assigned) => assigned ? removeTagFromSession(sessionId, tagId) : assignTag(sessionId, tagId)}
-      onDeleteSession={handleDeleteSession}
-      favorites={favorites}
-      onToggleFavorite={toggleFavorite}
-      terminal={terminal}
-      piPath={piPath}
-      customCommand={customCommand}
-      onCreateTag={createTag}
-      projectFilter={selectedProject}
-      filterTagIds={filterTagIds}
-      onFilterChange={setFilterTagIds}
-      getDescendantIds={getDescendantIds}
-    />
+    <Suspense fallback={<LoadingSpinner />}>
+      <KanbanBoard
+        sessions={filteredSessions}
+        tags={tags}
+        sessionTags={sessionTags}
+        selectedSession={selectedSession}
+        onSelectSession={handleSelectSession}
+        onMoveSession={moveSession}
+        getTagsForSession={getTagsForSession}
+        onToggleTag={(sessionId, tagId, assigned) => assigned ? removeTagFromSession(sessionId, tagId) : assignTag(sessionId, tagId)}
+        onDeleteSession={handleDeleteSession}
+        favorites={favorites}
+        onToggleFavorite={toggleFavorite}
+        terminal={terminal}
+        piPath={piPath}
+        customCommand={customCommand}
+        onCreateTag={createTag}
+        projectFilter={selectedProject}
+        filterTagIds={filterTagIds}
+        onFilterChange={setFilterTagIds}
+        getDescendantIds={getDescendantIds}
+      />
+    </Suspense>
   )
 
   const renderDashboard = () => (
-    <Dashboard
-      sessions={selectedProject ? sessions.filter(s => s.cwd === selectedProject) : sessions}
-      onSessionSelect={setSelectedSession}
-      onProjectSelect={(path) => {
-        setSelectedProject(path)
-        if (isMobile) setMobileTab('projects')
-        else { setViewMode('project'); setShowFavorites(false) }
-      }}
-      projectName={selectedProject || undefined}
-      loading={loading}
-    />
+    <Suspense fallback={<LoadingSpinner />}>
+      <Dashboard
+        sessions={selectedProject ? sessions.filter(s => s.cwd === selectedProject) : sessions}
+        onSessionSelect={setSelectedSession}
+        onProjectSelect={(path) => {
+          setSelectedProject(path)
+          if (isMobile) setMobileTab('projects')
+          else { setViewMode('project'); setShowFavorites(false) }
+        }}
+        projectName={selectedProject || undefined}
+        loading={loading}
+      />
+    </Suspense>
   )
 
   const renderSessionViewer = () => (
@@ -553,11 +566,15 @@ function App() {
           onClose={() => setShowRenameDialog(false)}
         />
       )}
-      <SettingsPanel
-        isOpen={showSettings}
-        onClose={() => { setShowSettings(false); reloadTerminalConfig() }}
-      />
-      <CommandPalette context={commandContext} />
+      <Suspense fallback={null}>
+        <SettingsPanel
+          isOpen={showSettings}
+          onClose={() => { setShowSettings(false); reloadTerminalConfig() }}
+        />
+      </Suspense>
+      <Suspense fallback={null}>
+        <CommandPalette context={commandContext} />
+      </Suspense>
       {showFullTextSearch && (
         <FullTextSearch
           isOpen={true}
@@ -600,10 +617,12 @@ function App() {
           {mobileTab === 'kanban' && renderKanban()}
           {mobileTab === 'dashboard' && renderDashboard()}
           {mobileTab === 'settings' && (
-            <SettingsPanel
-              isOpen={true}
-              onClose={() => { setMobileTab('list'); reloadTerminalConfig() }}
-            />
+            <Suspense fallback={<LoadingSpinner />}>
+              <SettingsPanel
+                isOpen={true}
+                onClose={() => { setMobileTab('list'); reloadTerminalConfig() }}
+              />
+            </Suspense>
           )}
         </div>
 
@@ -877,16 +896,18 @@ function App() {
             {selectedSession ? renderSessionViewer() : viewMode === 'kanban' ? renderKanban() : renderDashboard()}
           </div>
           {terminalConfig.enabled && (
-          <TerminalPanel
-            isOpen={showTerminal}
-            onClose={() => { setShowTerminal(false); setTerminalMaximized(false) }}
-            onMaximizedChange={setTerminalMaximized}
-            cwd={selectedSession?.cwd || selectedProject || sessions[0]?.cwd || '/'}
-            defaultShell={terminalConfig.defaultShell}
-            fontSize={terminalConfig.fontSize}
-            pendingCommand={terminalPendingCommand}
-            onCommandConsumed={() => setTerminalPendingCommand(null)}
-          />
+          <Suspense fallback={null}>
+            <TerminalPanel
+              isOpen={showTerminal}
+              onClose={() => { setShowTerminal(false); setTerminalMaximized(false) }}
+              onMaximizedChange={setTerminalMaximized}
+              cwd={selectedSession?.cwd || selectedProject || sessions[0]?.cwd || '/'}
+              defaultShell={terminalConfig.defaultShell}
+              fontSize={terminalConfig.fontSize}
+              pendingCommand={terminalPendingCommand}
+              onCommandConsumed={() => setTerminalPendingCommand(null)}
+            />
+          </Suspense>
           )}
         </div>
       </div>
