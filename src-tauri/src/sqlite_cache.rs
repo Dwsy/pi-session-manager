@@ -847,11 +847,11 @@ pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>,
                 modified: parse_timestamp(&row.get::<_, String>(5)?),
                 message_count: row.get(6)?,
                 first_message: row.get(7)?,
-                all_messages_text: row.get(8)?,
-                user_messages_text: row.get(9)?,
-                assistant_messages_text: row.get(10)?,
-                last_message: row.get(11)?,
-                last_message_role: row.get(12)?,
+                all_messages_text: row.get(8).unwrap_or_default(),
+                user_messages_text: row.get(9).unwrap_or_default(),
+                assistant_messages_text: row.get(10).unwrap_or_default(),
+                last_message: row.get(11).unwrap_or_default(),
+                last_message_role: row.get(12).unwrap_or_default(),
             })
         })
         .ok();
@@ -884,11 +884,11 @@ pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
                 modified: parse_timestamp(&row.get::<_, String>(5)?),
                 message_count: row.get(6)?,
                 first_message: row.get(7)?,
-                all_messages_text: row.get(8)?,
-                user_messages_text: row.get(9)?,
-                assistant_messages_text: row.get(10)?,
-                last_message: row.get(11)?,
-                last_message_role: row.get(12)?,
+                all_messages_text: row.get(8).unwrap_or_default(),
+                user_messages_text: row.get(9).unwrap_or_default(),
+                assistant_messages_text: row.get(10).unwrap_or_default(),
+                last_message: row.get(11).unwrap_or_default(),
+                last_message_role: row.get(12).unwrap_or_default(),
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?
@@ -918,11 +918,11 @@ pub fn get_sessions_modified_after(
                 modified: parse_timestamp(&row.get::<_, String>(5)?),
                 message_count: row.get(6)?,
                 first_message: row.get(7)?,
-                all_messages_text: row.get(8)?,
-                user_messages_text: row.get(9)?,
-                assistant_messages_text: row.get(10)?,
-                last_message: row.get(11)?,
-                last_message_role: row.get(12)?,
+                all_messages_text: row.get(8).unwrap_or_default(),
+                user_messages_text: row.get(9).unwrap_or_default(),
+                assistant_messages_text: row.get(10).unwrap_or_default(),
+                last_message: row.get(11).unwrap_or_default(),
+                last_message_role: row.get(12).unwrap_or_default(),
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?
@@ -952,11 +952,11 @@ pub fn get_sessions_modified_before(
                 modified: parse_timestamp(&row.get::<_, String>(5)?),
                 message_count: row.get(6)?,
                 first_message: row.get(7)?,
-                all_messages_text: row.get(8)?,
-                user_messages_text: row.get(9)?,
-                assistant_messages_text: row.get(10)?,
-                last_message: row.get(11)?,
-                last_message_role: row.get(12)?,
+                all_messages_text: row.get(8).unwrap_or_default(),
+                user_messages_text: row.get(9).unwrap_or_default(),
+                assistant_messages_text: row.get(10).unwrap_or_default(),
+                last_message: row.get(11).unwrap_or_default(),
+                last_message_role: row.get(12).unwrap_or_default(),
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?
@@ -1163,11 +1163,11 @@ pub fn preload_recent_sessions(
                 modified: parse_timestamp(&row.get::<_, String>(5)?),
                 message_count: row.get(6)?,
                 first_message: row.get(7)?,
-                all_messages_text: row.get(8)?,
-                user_messages_text: row.get(9)?,
-                assistant_messages_text: row.get(10)?,
-                last_message: row.get(11)?,
-                last_message_role: row.get(12)?,
+                all_messages_text: row.get(8).unwrap_or_default(),
+                user_messages_text: row.get(9).unwrap_or_default(),
+                assistant_messages_text: row.get(10).unwrap_or_default(),
+                last_message: row.get(11).unwrap_or_default(),
+                last_message_role: row.get(12).unwrap_or_default(),
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?
