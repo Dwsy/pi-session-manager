@@ -47,6 +47,12 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Fixed
 
+- **Project filter state persistence** — filter state now preserved when switching between project list and detail views
+  - `filteredSessions` used instead of raw `sessions` in `ProjectList` and project detail `SessionList`
+  - Tag filters and search queries persist when navigating project views
+  - Independent `projectScrollRef` for separate scrolling between list and project views
+  - Added `sidebarSearchQuery` state for search filtering support
+
 - **Mobile viewport height** — fixed iOS Safari address bar causing layout overflow
   - Added `viewport-fit=cover` to enable `env(safe-area-inset-*)` on iOS
   - Introduced `.h-screen-safe` utility using `100dvh` with `100vh` fallback, replacing raw `h-screen` on all root containers (App, AuthGate)
