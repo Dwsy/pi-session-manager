@@ -8,7 +8,9 @@ export interface SessionInfo {
   modified: string
   message_count: number
   first_message: string
-  all_messages_text?: string
+  all_messages_text: string
+  user_messages_text: string
+  assistant_messages_text: string
   last_message: string
   last_message_role: string
   isFavorite?: boolean
@@ -200,6 +202,23 @@ export interface Match {
   role: string
   snippet: string
   timestamp: string
+}
+
+export interface FullTextSearchHit {
+  session_id: string
+  session_path: string
+  session_name?: string
+  entry_id: string
+  role: string
+  content: string
+  timestamp: string
+  score: number
+}
+
+export interface FullTextSearchResponse {
+  hits: FullTextSearchHit[]
+  total_hits: number
+  has_more: boolean
 }
 
 export interface HeatmapPoint {

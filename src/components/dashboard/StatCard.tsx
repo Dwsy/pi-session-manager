@@ -1,9 +1,10 @@
 import { LucideIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 interface StatCardProps {
   icon: LucideIcon
   label: string
-  value: string | number
+  value: ReactNode
   color: string
   change?: string
   trend?: 'up' | 'down' | 'neutral'

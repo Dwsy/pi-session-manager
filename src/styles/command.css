@@ -72,3 +72,12 @@
 mark {
   @apply bg-yellow-400/20 text-yellow-400 rounded px-0.5;
 }
+
+/* Full‑text search snippet highlighting */
+.fts-snippet b {
+  background-color: #fbbf24;
+  color: black;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 600;
+}

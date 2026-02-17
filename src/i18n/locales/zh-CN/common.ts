@@ -33,11 +33,13 @@ export const common = {
   updated: '更新',
   time: {
     justNow: '刚刚',
-    minutesAgo: '{{count}}分钟前',
-    hoursAgo: '{{count}}小时前',
-    daysAgo: '{{count}}天前',
-    monthsAgo: '{{count}}个月前',
+    minutesAgo: '{{count}} 分钟前',
+    hoursAgo: '{{count}} 小时前',
+    daysAgo: '{{count}} 天前',
+    weeksAgo: '{{count}} 周前',
+    monthsAgo: '{{count}} 个月前',
   },
+  loadMoreCount: '加载 {{loadCount}} 更多（剩余 {{remaining}} 条）',
   systemPrompt: {
     systemPrompt: '系统提示词',
     toolsUsed: '使用的工具',

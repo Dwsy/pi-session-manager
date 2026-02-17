@@ -1221,3 +1221,49 @@ html, body {
     padding: 8px;
   }
 }
+
+/* =========================================
+   Full‑Text Search Scroll & Highlighting
+   ========================================= */
+
+/* Custom scrollbar for FTS results */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.4);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.6);
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Force scrolling on full‑text search results container */
+#search-results-wrapper {
+  overflow-y: auto !important;
+}
+
+/* Highlighted snippet styling */
+.fts-snippet b {
+  background-color: #fbbf24;
+  color: black;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 600;
+}

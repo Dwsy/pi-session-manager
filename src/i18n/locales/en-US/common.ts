@@ -36,8 +36,10 @@ export const common = {
     minutesAgo: '{{count}} min ago',
     hoursAgo: '{{count}} hr ago',
     daysAgo: '{{count}} days ago',
+    weeksAgo: '{{count}} weeks ago',
     monthsAgo: '{{count}} months ago',
   },
+  loadMoreCount: 'Load {{loadCount}} more ({{remaining}} remaining)',
   systemPrompt: {
     systemPrompt: 'System Prompt',
     toolsUsed: 'Tools Used',

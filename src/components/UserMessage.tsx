@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { parseMarkdown } from '../utils/markdown'
 import { highlightSearchInHTML } from '../utils/search'
 import { formatDate } from '../utils/format'
+import { Copy, Check } from 'lucide-react'
+import { useState } from 'react'
 
 interface UserMessageProps {
   id: string
@@ -14,6 +16,8 @@ interface UserMessageProps {
 
 export default function UserMessage({ id, timestamp, content, className = '', searchQuery = '' }: UserMessageProps) {
   const { t } = useTranslation()
+  const [copied, setCopied] = useState(false)
+
   // Extract images
   const images = content.filter(c => c.type === 'image' && c.data)
 
@@ -25,6 +29,16 @@ export default function UserMessage({ id, timestamp, content, className = '', se
   let html = parseMarkdown(text)
   if (searchQuery) {
     html = highlightSearchInHTML(html, searchQuery)
+  }
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy message text:', err)
+    }
   }
 
   return (
@@ -45,7 +59,29 @@ export default function UserMessage({ id, timestamp, content, className = '', se
       )}
 
       {text.trim() && (
-        <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />
+        <>
+          <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />
+          <div className="flex justify-end mt-2">
+            <button
+              onClick={handleCopy}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleCopy();
+                }
+              }}
+              className="tool-copy-button"
+              aria-label={copied ? (t('components.userMessage.copied') || 'Copied') : (t('components.userMessage.copyText') || 'Copy text')}
+              title={copied ? t('components.userMessage.copied') || 'Copied!' : t('components.userMessage.copyText') || 'Copy text'}
+            >
+              {copied ? (
+                <Check className="w-4 h-4" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+        </>
       )}
     </div>
   )

@@ -356,6 +356,13 @@ async fn serve_static(uri: Uri) -> Response {
     serve_embedded(path)
 }
 
+// ─── Metrics endpoint ───────────────────────────────────────────────
+
+async fn handle_metrics() -> impl IntoResponse {
+    let metrics_text = crate::metrics::render();
+    ([(header::CONTENT_TYPE, "text/plain; version=0.0.4")], metrics_text)
+}
+
 // ─── Init ────────────────────────────────────────────────────
 
 pub async fn init_http_adapter(
@@ -388,6 +395,7 @@ pub async fn init_http_adapter_with_options(
         .route("/api", post(handle_command).options(handle_preflight))
         .route("/api/events", get(handle_sse))
         .route("/ws", get(handle_ws_upgrade))
+        .route("/metrics", get(handle_metrics))
         .with_state(app_state);
 
     // Only serve static files in CLI mode or production GUI mode

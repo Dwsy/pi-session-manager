@@ -13,4 +13,20 @@ export const search = {
   close: 'Cerrar búsqueda (Esc)',
   searching: 'Buscando...',
   results: '{count} resultados',
+  fullText: {
+    placeholder: 'Buscar en todas las sesiones...',
+    resultsFound: '{{count}} coincidencias encontradas',
+    filters: 'Filtros',
+    role: {
+      all: 'Todos',
+      user: 'Usuario',
+      assistant: 'IA',
+    },
+    globPlaceholder: 'Ruta glob (ej. **/src/**)',
+    startTyping: 'Escribe para iniciar la búsqueda de texto completo',
+    sortScore: 'Relevancia',
+    sortNewest: 'Más reciente',
+    sortOldest: 'Más antiguo',
+    sortTitle: 'Ordenar por',
+  },
 } as const

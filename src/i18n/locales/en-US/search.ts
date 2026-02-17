@@ -12,5 +12,21 @@ export const search = {
   next: 'Next result (Enter)',
   close: 'Close search (Esc)',
   searching: 'Searching...',
-  results: '{count} results',
+  results: '{{count}} results',
+  fullText: {
+    placeholder: 'Search all sessions...',
+    resultsFound: '{{count}} matches found',
+    filters: 'Filters',
+    role: {
+      all: 'All',
+      user: 'User',
+      assistant: 'AI',
+    },
+    globPlaceholder: 'Path glob (e.g. **/src/**)',
+    startTyping: 'Type to start full-text search',
+    sortScore: 'Relevance',
+    sortNewest: 'Newest',
+    sortOldest: 'Oldest',
+    sortTitle: 'Sort by',
+  },
 } as const

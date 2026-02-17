@@ -39,7 +39,11 @@
 - **Session Browser** — List / project / directory / kanban views, favorites, rename, batch export
 - **Kanban Board** — Drag-and-drop sessions across tag columns, context menu, project filtering
 - **Hierarchical Tags** — Parent-child tag tree with auto-rules and reordering
-- **Full-Text Search** — SQLite FTS5 + Tantivy, role / tool filters, snippet highlighting, plugin system
+- **Full-Text Search** — SQLite FTS5 powered search across message content
+  - Press `Cmd+Shift+F` to open full-text search modal from any view
+  - Filter by role (User / Assistant / All) and optional path glob pattern (e.g., `**/src/**`)
+  - Paginated results with scoring, snippets, and timestamps; click to jump to entry
+  - Incremental indexing during scanning ensures fast updates
 - **Session Viewer** — Tree view with collapsible tool calls / thinking blocks, flow visualization (React Flow)
 - **Built-in Terminal** — Integrated xterm.js terminal with PTY backend (`Cmd/Ctrl+J`)
 - **Export** — HTML / Markdown / JSON, one-click open in browser
@@ -53,6 +57,22 @@
 - **Multi-Protocol API** — Tauri IPC + WebSocket (`ws://:52130`) + HTTP (`http://:52131`)
 - **CLI Mode** — Headless backend service via `--cli` / `--headless`
 - **Mobile Optimized** — Touch-friendly UI with bottom navigation on phones
+
+---
+
+## Full-Text Search
+
+Press <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> to open the full‑text search modal from any view.
+
+**Features**:
+- **Search Modes**:
+  - `any` (default): matches any of the query words (OR semantics).
+  - `all`: matches sessions containing all the words (AND semantics).
+  - `phrase`: exact phrase match (word order and proximity preserved).
+- **Role Filter**: restrict results to `user` or `assistant` messages; default shows all.
+- **Path Globbing**: filter sessions by file path using `*` and `?` glob patterns (they are automatically converted to SQL `LIKE` with proper escaping).
+- **Ranking & Limits**: results are ranked by BM25 relevance. A per‑session limit of 3 ensures a diverse set of sessions; pagination allows browsing through all hits.
+- **Metrics**: when the metrics subsystem is enabled, detailed counters (query count, latency, result count) are available at the `/metrics` endpoint in the HTTP adapter.
 
 ---
 

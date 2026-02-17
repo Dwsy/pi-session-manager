@@ -79,6 +79,11 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             let result = crate::get_session_entries(path).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
+        "get_session_by_path" => {
+            let path = extract_string(payload, "path")?;
+            let result = crate::get_session_by_path(path).await?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
         "delete_session" => {
             let path = extract_string(payload, "path")?;
             std::fs::remove_file(&path).map_err(|e| format!("Failed to delete session: {e}"))?;
@@ -145,6 +150,40 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             let query = extract_string(payload, "query")?;
             let limit = payload.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
             let result = crate::search_sessions_fts(query, limit).await?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+
+        "full_text_search" => {
+            let query = extract_string(payload, "query")?;
+            // Accept both snake_case and camelCase for role_filter
+            let role_filter = extract_string(payload, "role_filter")
+                .or_else(|_| extract_string(payload, "roleFilter"))
+                .map_err(|_| "Missing required field: role_filter or roleFilter")?;
+            let glob_pattern = payload
+                .get("glob_pattern")
+                .or_else(|| payload.get("globPattern"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let page = payload.get("page").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+            let page_size = payload
+                .get("page_size")
+                .or_else(|| payload.get("pageSize"))
+                .and_then(|v| v.as_u64())
+                .unwrap_or(20) as usize;
+            let match_mode = payload
+                .get("match_mode")
+                .or_else(|| payload.get("matchMode"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let result = crate::full_text_search(
+                query,
+                role_filter,
+                glob_pattern,
+                page,
+                page_size,
+                match_mode,
+            )
+            .await?;
             Ok(serde_json::to_value(result).unwrap())
         }
 

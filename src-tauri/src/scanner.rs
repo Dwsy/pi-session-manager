@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::models::{SessionInfo, SessionsDiff};
+use crate::models::{Content, Message, SessionEntry, SessionInfo, SessionsDiff};
 use crate::sqlite_cache;
 use crate::write_buffer;
 use chrono::{DateTime, Duration, Utc};
@@ -9,6 +9,15 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use tracing::{debug, error, info, trace, warn};
+
+/// Check if an error message indicates database corruption
+fn is_corruption_error(err: &str) -> bool {
+    err.contains("malformed")
+        || err.contains("disk image")
+        || err.contains("not a database")
+        || err.contains("vtable constructor failed")
+}
 
 static SCAN_CACHE: Mutex<Option<Vec<SessionInfo>>> = Mutex::new(None);
 static CACHE_VERSION: AtomicU64 = AtomicU64::new(0);
@@ -91,108 +100,157 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
 pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInfo>, String> {
     let all_dirs = get_all_session_dirs(config);
     let realtime_cutoff = Utc::now() - Duration::days(config.realtime_cutoff_days);
+    const MAX_RETRIES: usize = 1;
+    let mut attempt = 0;
 
-    let conn = sqlite_cache::init_db_with_config(config)?;
-
-    let mut sessions: Vec<SessionInfo> = vec![];
-
-    for sessions_dir in &all_dirs {
-        if !sessions_dir.exists() {
-            continue;
-        }
-
-        let entries = match fs::read_dir(sessions_dir) {
-            Ok(e) => e,
+    loop {
+        attempt += 1;
+        // Initialize database connection (may fail if corrupted)
+        let conn = match sqlite_cache::init_db_with_config(config) {
+            Ok(conn) => conn,
             Err(e) => {
-                log::warn!("Failed to read sessions directory {sessions_dir:?}: {e}");
-                continue;
+                if is_corruption_error(&e) && attempt <= MAX_RETRIES {
+                    warn!("[Recovery] Database init failed (corruption suspected): {}. Attempting to recover...", e);
+                    // Attempt to delete corrupted DB and retry
+                    if let Ok(db_path) = sqlite_cache::get_db_path() {
+                        let _ = std::fs::remove_file(&db_path);
+                    }
+                    continue;
+                } else {
+                    return Err(e);
+                }
             }
         };
 
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                // Skip non-pi-session directories (gateway transcripts, subagent artifacts, etc.)
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name == "transcripts" || name == "subagent-artifacts" {
+        // Perform the scan with error handling
+        let scan_result = (|| -> Result<Vec<SessionInfo>, String> {
+            let mut sessions: Vec<SessionInfo> = vec![];
+
+            for sessions_dir in &all_dirs {
+                if !sessions_dir.exists() {
+                    continue;
+                }
+
+                let entries = match fs::read_dir(sessions_dir) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        log::warn!("Failed to read sessions directory {sessions_dir:?}: {e}");
                         continue;
                     }
-                }
-                if let Ok(files) = fs::read_dir(&path) {
-                    for file in files.flatten() {
-                        let file_path = file.path();
-                        if file_path
-                            .extension()
-                            .map(|ext| ext == "jsonl")
-                            .unwrap_or(false)
-                        {
-                            let path_str = file_path.to_string_lossy().to_string();
+                };
 
-                            let metadata = fs::metadata(&file_path);
-                            let file_modified: DateTime<Utc> = match metadata {
-                                Ok(m) => DateTime::from(
-                                    m.modified().unwrap_or(std::time::SystemTime::now()),
-                                ),
-                                Err(_) => continue,
-                            };
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        // Skip non-pi-session directories (gateway transcripts, subagent artifacts, etc.)
+                        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                            if name == "transcripts" || name == "subagent-artifacts" {
+                                continue;
+                            }
+                        }
+                        if let Ok(files) = fs::read_dir(&path) {
+                            for file in files.flatten() {
+                                let file_path = file.path();
+                                if file_path
+                                    .extension()
+                                    .map(|ext| ext == "jsonl")
+                                    .unwrap_or(false)
+                                {
+                                    let path_str = file_path.to_string_lossy().to_string();
 
-                            if file_modified > realtime_cutoff {
-                                if let Ok(info) = parse_session_info(&file_path) {
-                                    sessions.push(info);
-                                    write_buffer::buffer_session_write(
-                                        sessions.last().unwrap(),
-                                        file_modified,
-                                    );
-                                }
-                            } else if let Some(cached_mtime) =
-                                sqlite_cache::get_cached_file_modified(&conn, &path_str)?
-                            {
-                                if file_modified > cached_mtime {
-                                    if let Ok(info) = parse_session_info(&file_path) {
+                                    let metadata = fs::metadata(&file_path);
+                                    let file_modified: DateTime<Utc> = match metadata {
+                                        Ok(m) => DateTime::from(
+                                            m.modified().unwrap_or(std::time::SystemTime::now()),
+                                        ),
+                                        Err(_) => continue,
+                                    };
+
+                                    if file_modified > realtime_cutoff {
+                                        if let Ok((info, _entries)) = parse_session_info(&file_path)
+                                        {
+                                            sessions.push(info);
+                                            write_buffer::buffer_session_write(
+                                                sessions.last().unwrap(),
+                                                file_modified,
+                                            );
+                                        }
+                                    } else if let Some(cached_mtime) =
+                                        sqlite_cache::get_cached_file_modified(&conn, &path_str)?
+                                    {
+                                        if file_modified > cached_mtime {
+                                            if let Ok((info, _entries)) =
+                                                parse_session_info(&file_path)
+                                            {
+                                                write_buffer::buffer_session_write(
+                                                    &info,
+                                                    file_modified,
+                                                );
+                                            }
+                                        }
+                                    } else if let Ok((info, _entries)) =
+                                        parse_session_info(&file_path)
+                                    {
                                         write_buffer::buffer_session_write(&info, file_modified);
                                     }
                                 }
-                            } else if let Ok(info) = parse_session_info(&file_path) {
-                                write_buffer::buffer_session_write(&info, file_modified);
                             }
                         }
                     }
                 }
             }
+
+            let historical_sessions =
+                sqlite_cache::get_sessions_modified_before(&conn, realtime_cutoff)?;
+
+            for session in historical_sessions {
+                if !sessions.iter().any(|s| s.path == session.path) {
+                    sessions.push(session);
+                }
+            }
+
+            sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+
+            let realtime_count = sessions
+                .iter()
+                .filter(|s| s.modified > realtime_cutoff)
+                .count();
+            let historical_count = sessions.len() - realtime_count;
+
+            trace!(
+                "Scan complete: {} realtime (≤{}d), {} historical (>{}d), total {}",
+                realtime_count,
+                config.realtime_cutoff_days,
+                historical_count,
+                config.realtime_cutoff_days,
+                sessions.len()
+            );
+
+            Ok(sessions)
+        })();
+
+        match scan_result {
+            Ok(sessions) => break Ok(sessions),
+            Err(e) => {
+                if is_corruption_error(&e) && attempt <= MAX_RETRIES {
+                    warn!("[Recovery] Database corruption detected during scan: {}. Dropping connection and retrying...", e);
+                    // Connection will be dropped at end of loop iteration; delete DB and retry
+                    if let Ok(db_path) = sqlite_cache::get_db_path() {
+                        let _ = std::fs::remove_file(&db_path);
+                    }
+                    continue;
+                } else {
+                    return Err(e);
+                }
+            }
         }
     }
-
-    let historical_sessions = sqlite_cache::get_sessions_modified_before(&conn, realtime_cutoff)?;
-
-    for session in historical_sessions {
-        if !sessions.iter().any(|s| s.path == session.path) {
-            sessions.push(session);
-        }
-    }
-
-    sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
-
-    let realtime_count = sessions
-        .iter()
-        .filter(|s| s.modified > realtime_cutoff)
-        .count();
-    let historical_count = sessions.len() - realtime_count;
-
-    log::trace!(
-        "Scan complete: {} realtime (≤{}d), {} historical (>{}d), total {}",
-        realtime_count,
-        config.realtime_cutoff_days,
-        historical_count,
-        config.realtime_cutoff_days,
-        sessions.len()
-    );
-
-    Ok(sessions)
 }
 
-/// 解析会话信息
+/// 解析会话信息并提取消息条目
 /// 优化：使用 BufReader 流式读取，减少大文件内存占用
-pub fn parse_session_info(path: &Path) -> Result<SessionInfo, String> {
+/// 返回：(SessionInfo, Vec<SessionEntry>) - 会话信息和消息条目列表
+pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
     let file = fs::File::open(path).map_err(|e| format!("Failed to open file: {e}"))?;
     let reader = BufReader::new(file);
     let mut lines = reader.lines();
@@ -225,9 +283,12 @@ pub fn parse_session_info(path: &Path) -> Result<SessionInfo, String> {
     let mut message_count = 0;
     let mut first_message = String::new();
     let mut all_messages = Vec::new();
+    let mut user_messages = Vec::new();
+    let mut assistant_messages = Vec::new();
     let mut name: Option<String> = None;
     let mut last_message = String::new();
     let mut last_message_role = String::new();
+    let mut entries = Vec::new();
 
     // 流式读取剩余行，减少内存占用
     for line_result in lines {
@@ -261,6 +322,33 @@ pub fn parse_session_info(path: &Path) -> Result<SessionInfo, String> {
                         // 更新最后一条消息
                         last_message = text.chars().take(150).collect();
                         last_message_role = role.to_string();
+
+                        // 收集用户和助手的消息文本
+                        if role == "user" {
+                            user_messages.push(text.clone());
+                        } else if role == "assistant" {
+                            assistant_messages.push(text.clone());
+                        }
+
+                        // 构建 SessionEntry 用于 message_entries 表
+                        let entry_id = entry["id"].as_str().unwrap_or("").to_string();
+                        let timestamp_str = entry["timestamp"].as_str().unwrap_or("");
+                        let timestamp = parse_timestamp(timestamp_str)?;
+
+                        let session_entry = SessionEntry {
+                            entry_type: "message".to_string(),
+                            id: entry_id,
+                            parent_id: None,
+                            timestamp,
+                            message: Some(Message {
+                                role: role.to_string(),
+                                content: vec![Content {
+                                    content_type: "text".to_string(),
+                                    text: Some(text),
+                                }],
+                            }),
+                        };
+                        entries.push(session_entry);
                     }
                 }
             }
@@ -268,20 +356,27 @@ pub fn parse_session_info(path: &Path) -> Result<SessionInfo, String> {
     }
 
     let all_messages_text = all_messages.join("\n");
+    let user_messages_text = user_messages.join("\n");
+    let assistant_messages_text = assistant_messages.join("\n");
 
-    Ok(SessionInfo {
-        path: path.to_string_lossy().to_string(),
-        id,
-        cwd,
-        name,
-        created,
-        modified,
-        message_count,
-        first_message,
-        all_messages_text,
-        last_message,
-        last_message_role,
-    })
+    Ok((
+        SessionInfo {
+            path: path.to_string_lossy().to_string(),
+            id,
+            cwd,
+            name,
+            created,
+            modified,
+            message_count,
+            first_message,
+            all_messages_text,
+            user_messages_text,
+            assistant_messages_text,
+            last_message,
+            last_message_role,
+        },
+        entries,
+    ))
 }
 
 fn extract_message_text(entry: &Value) -> String {
@@ -324,6 +419,9 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
         removed: vec![],
     };
 
+    let config = Config::load().unwrap_or_default();
+    let conn = sqlite_cache::init_db_with_config(&config)?;
+
     for path_str in &changed_paths {
         let path = PathBuf::from(path_str);
 
@@ -338,13 +436,19 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
         }
 
         match parse_session_info(&path) {
-            Ok(info) => {
-                if let Ok(m) = fs::metadata(&path) {
-                    if let Ok(mt) = m.modified() {
-                        let file_modified: DateTime<Utc> = DateTime::from(mt);
-                        write_buffer::buffer_session_write(&info, file_modified);
-                    }
+            Ok((info, entries)) => {
+                let file_modified = match fs::metadata(&path).and_then(|m| m.modified()) {
+                    Ok(mt) => DateTime::from(mt),
+                    Err(_) => continue,
+                };
+
+                // Ensure session row exists (also populates message_entries via insert_message_entries)
+                if let Err(e) = sqlite_cache::upsert_session(&conn, &info, file_modified, Some(&entries)) {
+                    log::warn!("Failed to upsert session for {}: {}", info.path, e);
                 }
+
+                // Buffer for stats cache updates (periodic flush)
+                write_buffer::buffer_session_write(&info, file_modified);
 
                 diff.updated.push(info.clone());
 

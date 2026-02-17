@@ -7,6 +7,9 @@ use std::time::{Duration, Instant};
 
 const BUFFER_FLUSH_INTERVAL: Duration = Duration::from_secs(30);
 const BUFFER_SIZE_THRESHOLD: usize = 50;
+/// Maximum capacity for session and detail buffers to prevent unbounded memory growth.
+const MAX_SESSION_BUFFER: usize = 1000;
+const MAX_DETAILS_BUFFER: usize = 1000;
 
 #[derive(Clone, Debug)]
 pub struct SessionCacheEntry {
@@ -56,28 +59,60 @@ pub fn buffer_session_write(session: &SessionInfo, file_modified: DateTime<Utc>)
     if let Ok(mut buffer) = get_buffer().lock() {
         let path = session.path.clone();
         buffer.sessions.insert(
-            path,
+            path.clone(),
             SessionCacheEntry {
                 session: session.clone(),
                 file_modified,
                 cached_at: Instant::now(),
             },
         );
+        // Evict oldest entries if buffer exceeds max capacity
+        while buffer.sessions.len() > MAX_SESSION_BUFFER {
+            // Find key of oldest entry
+            let key_opt = buffer
+                .sessions
+                .iter()
+                .min_by_key(|(_, entry)| entry.cached_at)
+                .map(|(k, _)| k.clone());
+            if let Some(key) = key_opt {
+                buffer.sessions.remove(&key);
+            } else {
+                break;
+            }
+        }
+        // Record gauge
+        crate::metrics::set_write_buffer_sessions_size(buffer.sessions.len());
     }
 }
 
 /// 缓冲写入详情缓存，减少数据库写入频率
 pub fn buffer_details_write(path: &str, file_modified: DateTime<Utc>, details: &SessionDetails) {
     if let Ok(mut buffer) = get_buffer().lock() {
+        let path_string = path.to_string();
         buffer.details.insert(
-            path.to_string(),
+            path_string.clone(),
             DetailsCacheEntry {
-                path: path.to_string(),
+                path: path_string,
                 details: details.clone(),
                 file_modified,
                 cached_at: Instant::now(),
             },
         );
+        // Evict oldest entries if buffer exceeds max capacity
+        while buffer.details.len() > MAX_DETAILS_BUFFER {
+            let key_opt = buffer
+                .details
+                .iter()
+                .min_by_key(|(_, entry)| entry.cached_at)
+                .map(|(k, _)| k.clone());
+            if let Some(key) = key_opt {
+                buffer.details.remove(&key);
+            } else {
+                break;
+            }
+        }
+        // Record gauge
+        crate::metrics::set_write_buffer_details_size(buffer.details.len());
     }
 }
 

@@ -23,6 +23,12 @@ pub struct Config {
 
     #[serde(default)]
     pub session_paths: Vec<String>,
+
+    #[serde(default = "default_metrics_enabled")]
+    pub metrics_enabled: bool,
+
+    #[serde(default = "default_metrics_port")]
+    pub metrics_port: u16,
 }
 
 fn default_realtime_cutoff_days() -> i64 {
@@ -45,6 +51,14 @@ fn default_auto_cleanup_days() -> Option<i64> {
     None
 }
 
+fn default_metrics_enabled() -> bool {
+    false
+}
+
+fn default_metrics_port() -> u16 {
+    9090
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -54,6 +68,8 @@ impl Default for Config {
             preload_count: 20,
             auto_cleanup_days: None,
             session_paths: vec![],
+            metrics_enabled: false,
+            metrics_port: 9090,
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::models::{SessionEntry, SessionInfo};
-use crate::{export, scanner, stats};
+use crate::{config, export, scanner, sqlite_cache, stats};
 use serde_json::Value;
 use std::fs;
 use std::process::Command;
@@ -287,4 +287,11 @@ pub async fn open_session_in_browser(path: String) -> Result<(), String> {
 
     result.map_err(|e| format!("Failed to open browser: {e}"))?;
     Ok(())
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn get_session_by_path(path: String) -> Result<Option<SessionInfo>, String> {
+    let config = config::load_config()?;
+    let conn = sqlite_cache::init_db_with_config(&config)?;
+    sqlite_cache::get_session(&conn, &path)
 }

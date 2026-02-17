@@ -12,5 +12,21 @@ export const search = {
   next: '下一个结果 (Enter)',
   close: '关闭搜索 (Esc)',
   searching: '搜索中...',
-  results: '{count} 个结果',
+  results: '{{count}} 个结果',
+  fullText: {
+    placeholder: '搜索所有会话...',
+    resultsFound: '找到 {{count}} 个匹配项',
+    filters: '过滤器',
+    role: {
+      all: '全部',
+      user: '用户',
+      assistant: 'AI',
+    },
+    globPlaceholder: '路径通配符 (如: **/src/**)',
+    startTyping: '输入关键词开始全文搜索',
+    sortScore: '相关度',
+    sortNewest: '最新',
+    sortOldest: '最早',
+    sortTitle: '排序方式',
+  },
 } as const

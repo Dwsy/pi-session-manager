@@ -17,6 +17,8 @@ fn main() {
             created: chrono::Utc::now(),
             modified: chrono::Utc::now(),
             all_messages_text: "资产管理系统 实现资产管理功能 完成资产列表 资产数据".to_string(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
         },
         SessionInfo {
             id: "test-2".to_string(),
@@ -30,6 +32,8 @@ fn main() {
             created: chrono::Utc::now(),
             modified: chrono::Utc::now(),
             all_messages_text: "用户认证 添加用户登录功能 完成认证".to_string(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
         },
         SessionInfo {
             id: "test-3".to_string(),
@@ -43,6 +47,8 @@ fn main() {
             created: chrono::Utc::now(),
             modified: chrono::Utc::now(),
             all_messages_text: "数据库优化 优化数据库查询 完成索引".to_string(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
         },
     ];
 

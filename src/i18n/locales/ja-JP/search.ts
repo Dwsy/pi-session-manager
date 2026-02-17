@@ -13,4 +13,20 @@ export const search = {
   close: '検索を閉じる (Esc)',
   searching: '検索中...',
   results: '{count} 件',
+  fullText: {
+    placeholder: '全セッションを検索...',
+    resultsFound: '{{count}} 件の一致が見つかりました',
+    filters: 'フィルター',
+    role: {
+      all: 'すべて',
+      user: 'ユーザー',
+      assistant: 'AI',
+    },
+    globPlaceholder: 'パスのglob (例: **/src/**)',
+    startTyping: '入力して全文検索を開始',
+    sortScore: '関連度',
+    sortNewest: '最新',
+    sortOldest: '最古',
+    sortTitle: 'ソート順',
+  },
 } as const

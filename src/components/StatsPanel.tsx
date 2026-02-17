@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { invoke } from '../transport'
 import { useTranslation } from 'react-i18next'
 import { X, BarChart3, Calendar, Folder, Clock, Zap, RefreshCw, Download, Settings, Award } from 'lucide-react'
-import type { SessionInfo, SessionStats, SessionStatsInput } from '../types'
+import type { SessionInfo, SessionStats } from '../types'
 import StatCard from './dashboard/StatCard'
 import ActivityHeatmap from './dashboard/ActivityHeatmap'
 import MessageDistribution from './dashboard/MessageDistribution'
@@ -68,23 +68,7 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
 
     try {
       setLoading(true)
-      const statsSessions: SessionStatsInput[] = sessions.map((session) => ({
-        path: session.path,
-        cwd: session.cwd,
-        modified: session.modified,
-        message_count: session.message_count,
-      }))
-      let result: SessionStats
-      try {
-        result = await invoke<SessionStats>('get_session_stats_light', { sessions: statsSessions })
-      } catch (error: any) {
-        const message = typeof error === 'string' ? error : error?.message
-        if (message && String(message).includes('get_session_stats_light')) {
-          result = await invoke<SessionStats>('get_session_stats', { sessions })
-        } else {
-          throw error
-        }
-      }
+      const result = await invoke<SessionStats>('get_session_stats', { sessions })
       setStats(result)
     } catch (error) {
       console.error('Failed to load stats:', error)

@@ -13,6 +13,8 @@ pub struct SessionInfo {
     pub first_message: String,
     #[serde(skip_serializing)]
     pub all_messages_text: String,
+    pub user_messages_text: String,
+    pub assistant_messages_text: String,
     pub last_message: String,
     pub last_message_role: String,
 }
@@ -63,4 +65,22 @@ pub struct Match {
     pub role: String,
     pub snippet: String,
     pub timestamp: DateTime<Utc>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FullTextSearchHit {
+    pub session_id: String,
+    pub session_path: String,
+    pub session_name: Option<String>,
+    pub entry_id: String,
+    pub role: String,
+    pub content: String,
+    pub timestamp: DateTime<Utc>,
+    pub score: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FullTextSearchResponse {
+    pub hits: Vec<FullTextSearchHit>,
+    pub total_hits: usize,
+    pub has_more: bool,
 }

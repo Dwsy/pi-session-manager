@@ -5,7 +5,7 @@ use chrono::{DateTime, Duration, Utc};
 use std::fs;
 use std::path::PathBuf;
 use tokio::time::{interval, Duration as TokioDuration};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub struct ScannerScheduler {
     config: Config,
@@ -115,8 +115,8 @@ impl ScannerScheduler {
             }
         }
 
-        if let Ok(session) = scanner::parse_session_info(file_path) {
-            sqlite_cache::upsert_session(conn, &session, file_modified)?;
+        if let Ok((info, entries)) = scanner::parse_session_info(file_path) {
+            sqlite_cache::upsert_session(conn, &info, file_modified, Some(&entries))?;
             return Ok(if cached_mtime.is_some() {
                 FileUpdateResult::Updated
             } else {

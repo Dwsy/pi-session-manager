@@ -46,6 +46,7 @@ interface SessionViewerProps {
   terminal?: TerminalType
   piPath?: string
   customCommand?: string
+  initialEntryId?: string
 }
 
 const SIDEBAR_MIN_WIDTH = 200
@@ -54,7 +55,7 @@ const SIDEBAR_DEFAULT_WIDTH = 400
 const SIDEBAR_WIDTH_KEY = 'pi-session-manager-sidebar-width'
 const MESSAGE_ITEM_GAP = 16
 
-function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume, terminal = getPlatformDefaults().defaultTerminal, piPath, customCommand }: SessionViewerProps) {
+function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume, terminal = getPlatformDefaults().defaultTerminal, piPath, customCommand, initialEntryId }: SessionViewerProps) {
   const { t } = useTranslation()
   const { showThinking, toggleThinking, toolsExpanded, toggleToolsExpanded } = useSessionView()
   const isMobile = useIsMobile()
@@ -138,9 +139,15 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
         if (cached) {
           setEntries(cached.entries)
           setLineCount(cached.lineCount)
+          // Always set active entry to last message (preserves full view for linear sessions)
           const lastMessage = cached.entries.filter(e => e.type === 'message').pop()
-          if (lastMessage) setActiveEntryId(lastMessage.id)
-          pendingScrollToBottomRef.current = true
+          if (lastMessage) {
+            setActiveEntryId(lastMessage.id)
+          } else if (cached.entries.length > 0) {
+            setActiveEntryId(cached.entries[0].id)
+          }
+          // If navigating from FTS, suppress auto-scroll to bottom; otherwise enable
+          pendingScrollToBottomRef.current = !initialEntryId
           return
         }
 
@@ -163,13 +170,15 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
         setLineCount(lines)
         setEntries(parsedEntries)
 
+        // Always set active entry to last message (preserves full view for linear sessions)
         const lastMessage = parsedEntries.filter(e => e.type === 'message').pop()
         if (lastMessage) {
           setActiveEntryId(lastMessage.id)
+        } else if (parsedEntries.length > 0) {
+          setActiveEntryId(parsedEntries[0].id)
         }
-
-        // 首次加载后滚动到底部
-        pendingScrollToBottomRef.current = true
+        // If navigating from FTS, suppress auto-scroll to bottom; otherwise enable
+        pendingScrollToBottomRef.current = !initialEntryId
       } catch (err) {
         if (!cancelled) {
           console.error('[SessionViewer] Failed to load session:', err)
@@ -200,6 +209,13 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
   // Only re-run full load when user selects a DIFFERENT session
   // File updates while viewing are handled by the incremental listener below
   }, [session.path, t])
+
+  // Handle external navigation request (e.g., from full-text search)
+  useEffect(() => {
+    if (initialEntryId) {
+      setScrollTargetId(initialEntryId);
+    }
+  }, [initialEntryId]);
 
   // Incremental update: listen for diff events, load new lines if this session was updated
   useEffect(() => {

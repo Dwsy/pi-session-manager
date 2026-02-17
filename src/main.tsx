@@ -4,6 +4,7 @@ import App from './App.tsx'
 import AuthGate from './components/AuthGate'
 import { TransportProvider } from './contexts/TransportContext'
 import { SettingsProvider } from './contexts/SettingsContext'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import './i18n'
 import './index.css'
 import { isTauri } from './transport'
@@ -63,12 +64,14 @@ window.copyCode = async (button: HTMLButtonElement) => {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AuthGate>
-      <TransportProvider>
-        <SettingsProvider>
-          <App />
-        </SettingsProvider>
-      </TransportProvider>
-    </AuthGate>
+    <ErrorBoundary>
+      <AuthGate>
+        <TransportProvider>
+          <SettingsProvider>
+            <App />
+          </SettingsProvider>
+        </TransportProvider>
+      </AuthGate>
+    </ErrorBoundary>
   </React.StrictMode>,
 )

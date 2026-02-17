@@ -13,4 +13,20 @@ export const search = {
   close: 'Suche schließen (Esc)',
   searching: 'Suche läuft...',
   results: '{count} Ergebnisse',
+  fullText: {
+    placeholder: 'Alle Sitzungen durchsuchen...',
+    resultsFound: '{{count}} Treffer gefunden',
+    filters: 'Filter',
+    role: {
+      all: 'Alle',
+      user: 'Benutzer',
+      assistant: 'KI',
+    },
+    globPlaceholder: 'Pfad-Glob (z.B. **/src/**)',
+    startTyping: 'Tippen Sie, um die Volltextsuche zu starten',
+    sortScore: 'Relevanz',
+    sortNewest: 'Neueste',
+    sortOldest: 'Älteste',
+    sortTitle: 'Sortieren nach',
+  },
 } as const

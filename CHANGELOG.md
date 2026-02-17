@@ -103,6 +103,16 @@ All notable changes to Pi Session Manager will be documented in this file.
   - Search filters by session name, first/last message, and project directory
   - Added i18n keys: `common.searchProjectsPlaceholder` (en-US / zh-CN)
 
+- **Full-text search (FTS)** — message-level search across all sessions
+  - New `full_text_search` Tauri command with SQLite FTS5 virtual table for fast full-text search
+  - Supports role filtering (user/assistant/all), path glob patterns, pagination, and scoring
+  - Integrated into UI: press `Cmd+Shift+F` to open search modal from anywhere
+  - Results show role icons, snippets, timestamps; click to jump to entry with automatic scroll and highlight
+  - Incremental indexing during scanning writes to `message_entries` and `message_fts` virtual table
+  - Backfill migration automatically indexes existing sessions on first run
+  - Corruption recovery: automatically rebuilds database if FTS triggers corruption
+  - Updated i18n with full-text search keys across 6 locales (en-US, zh-CN, de-DE, es-ES, fr-FR, ja-JP)
+
 ### Fixed
 
 - **i18n hardcoded strings cleanup** — fixed ~50 hardcoded Chinese/English strings across 19 component files

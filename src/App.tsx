@@ -23,6 +23,7 @@ import { CommandPalette } from './components/command'
 import TerminalPanel from './components/TerminalPanel'
 import SearchFilterBar from './components/SearchFilterBar'
 import KanbanBoard from './components/kanban/KanbanBoard'
+import FullTextSearch from './components/FullTextSearch'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useSessionBadges } from './hooks/useSessionBadges'
@@ -92,6 +93,8 @@ function App() {
     return !localStorage.getItem('onboarding-completed')
   })
   const [showTerminal, setShowTerminal] = useState(false)
+  const [showFullTextSearch, setShowFullTextSearch] = useState(false)
+  const [pendingScrollEntryId, setPendingScrollEntryId] = useState<string | null>(null)
   const [terminalMaximized, setTerminalMaximized] = useState(false)
   const [terminalPendingCommand, setTerminalPendingCommand] = useState<string | null>(null)
   const [terminalConfig, setTerminalConfig] = useState({ enabled: true, defaultShell: getPlatformDefaults().defaultShell, fontSize: 13 })
@@ -159,6 +162,11 @@ function App() {
     setSelectedSession(session)
     clearBadge(session.id)
   }, [setSelectedSession, clearBadge])
+
+  const handleFTSResultSelect = useCallback((session: SessionInfo, entryId: string) => {
+    setSelectedSession(session)
+    setPendingScrollEntryId(entryId)
+  }, [setSelectedSession])
 
   useEffect(() => {
     registerBuiltinPlugins()
@@ -260,6 +268,7 @@ function App() {
     'cmd+p': () => { setViewMode('project'); setSelectedProject(null); setShowFavorites(false) },
     'cmd+,': () => setShowSettings(true),
     'cmd+`': () => { if (terminalConfig.enabled) setShowTerminal(v => !v) },
+    'cmd+shift+f': () => setShowFullTextSearch(true),
     'escape': () => {
       if (showSettings) {
         setShowSettings(false)
@@ -296,6 +305,14 @@ function App() {
     window.addEventListener('keydown', handleRefresh)
     return () => window.removeEventListener('keydown', handleRefresh)
   }, [])
+
+  // Clear pending scroll entry after it's been passed to SessionViewer
+  useEffect(() => {
+    if (pendingScrollEntryId && selectedSession) {
+      const timer = setTimeout(() => setPendingScrollEntryId(null), 0)
+      return () => clearTimeout(timer)
+    }
+  }, [pendingScrollEntryId, selectedSession])
 
   const commandContext = useMemo<SearchContext>(() => ({
     sessions,
@@ -514,6 +531,7 @@ function App() {
       terminal={terminal}
       piPath={piPath}
       customCommand={customCommand}
+      initialEntryId={pendingScrollEntryId || undefined}
     />
   )
 
@@ -540,6 +558,13 @@ function App() {
         onClose={() => { setShowSettings(false); reloadTerminalConfig() }}
       />
       <CommandPalette context={commandContext} />
+      {showFullTextSearch && (
+        <FullTextSearch
+          isOpen={true}
+          onClose={() => setShowFullTextSearch(false)}
+          onSelectResult={handleFTSResultSelect}
+        />
+      )}
       {showOnboarding && (
         <Onboarding
           onComplete={() => {
