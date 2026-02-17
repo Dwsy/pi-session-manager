@@ -56,6 +56,7 @@ function App() {
   const isMobile = useIsMobile()
   const [mobileTab, setMobileTab] = useState<'list' | 'projects' | 'kanban' | 'dashboard' | 'settings'>('list')
   const listScrollRef = useRef<HTMLDivElement>(null)
+  const projectScrollRef = useRef<HTMLDivElement>(null)
 
   const {
     sessions,
@@ -399,7 +400,7 @@ function App() {
   const renderProjectList = () => (
     <>
       {isMobile && renderMobileFilterBar(selectedProject ? undefined : t('common.searchProjectsPlaceholder'))}
-      <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
+      <div className="flex-1 overflow-y-auto" ref={projectScrollRef}>
       {selectedProject ? (
         <div className="flex flex-col h-full">
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30 flex-shrink-0 sticky top-0 z-10">
@@ -429,7 +430,7 @@ function App() {
             terminal={terminal}
             piPath={piPath}
             customCommand={customCommand}
-            scrollParentRef={listScrollRef}
+            scrollParentRef={projectScrollRef}
             favorites={favorites}
             onToggleFavorite={toggleFavorite}
             showDirectory={false}
@@ -452,7 +453,7 @@ function App() {
           piPath={piPath}
           customCommand={customCommand}
           getBadgeType={getBadgeType}
-          scrollParentRef={listScrollRef}
+          scrollParentRef={projectScrollRef}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
         />
