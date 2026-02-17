@@ -19,8 +19,7 @@ pub fn get_db_path() -> Result<PathBuf, String> {
     if let Ok(test_db) = std::env::var("PPM_TEST_DB") {
         let path = PathBuf::from(test_db);
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create test db dir: {}", e))?;
+            fs::create_dir_all(parent).map_err(|e| format!("Failed to create test db dir: {e}"))?;
         }
         return Ok(path);
     }
@@ -31,8 +30,7 @@ pub fn get_db_path() -> Result<PathBuf, String> {
         Err(_) => dirs::home_dir().ok_or("Cannot find home directory")?,
     };
     let sessions_dir = home.join(".pi").join("agent").join("sessions");
-    fs::create_dir_all(&sessions_dir)
-        .map_err(|e| format!("Failed to create sessions dir: {}", e))?;
+    fs::create_dir_all(&sessions_dir).map_err(|e| format!("Failed to create sessions dir: {e}"))?;
     Ok(sessions_dir.join("sessions.db"))
 }
 
@@ -60,19 +58,22 @@ pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
             if db_path.exists() {
                 // Backup corrupted DB before deletion
                 let backup_path = {
-                    let file_name = db_path.file_name()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("db");
+                    let file_name = db_path.file_name().and_then(|s| s.to_str()).unwrap_or("db");
                     let parent = db_path.parent().unwrap_or_else(|| Path::new("."));
-                    parent.join(format!("{}.corrupted.{}", file_name, Utc::now().timestamp()))
+                    parent.join(format!(
+                        "{}.corrupted.{}",
+                        file_name,
+                        Utc::now().timestamp()
+                    ))
                 };
-                fs::copy(&db_path, &backup_path)
-                    .map_err(|e| format!("Failed to backup corrupted DB to {:?}: {}", backup_path, e))?;
+                fs::copy(&db_path, &backup_path).map_err(|e| {
+                    format!("Failed to backup corrupted DB to {backup_path:?}: {e}")
+                })?;
                 info!("Backed up corrupted DB to {:?}", backup_path);
                 // Increment recovery counter
                 crate::metrics::inc_corruption_recovery();
                 fs::remove_file(&db_path)
-                    .map_err(|err| format!("Failed to delete corrupted DB: {}", err))?;
+                    .map_err(|err| format!("Failed to delete corrupted DB: {err}"))?;
             }
             open_and_init_db(&db_path, config)
         }
@@ -88,7 +89,7 @@ fn ensure_schema_version_table(conn: &Connection) -> Result<(), String> {
         )",
         [],
     )
-    .map_err(|e| format!("Failed to create schema_version table: {}", e))?;
+    .map_err(|e| format!("Failed to create schema_version table: {e}"))?;
 
     // Check if any row exists; if not, insert version 0.
     let count: i64 = conn
@@ -96,7 +97,7 @@ fn ensure_schema_version_table(conn: &Connection) -> Result<(), String> {
         .unwrap_or(0);
     if count == 0 {
         conn.execute("INSERT INTO schema_version (version) VALUES (0)", [])
-            .map_err(|e| format!("Failed to insert initial schema version: {}", e))?;
+            .map_err(|e| format!("Failed to insert initial schema version: {e}"))?;
     }
     Ok(())
 }
@@ -104,15 +105,17 @@ fn ensure_schema_version_table(conn: &Connection) -> Result<(), String> {
 /// Get the current schema version (assumes table exists and has at least one row)
 fn get_current_version(conn: &Connection) -> Result<i64, String> {
     let version: i64 = conn
-        .query_row("SELECT version FROM schema_version LIMIT 1", [], |row| row.get(0))
-        .map_err(|e| format!("Failed to get schema version: {}", e))?;
+        .query_row("SELECT version FROM schema_version LIMIT 1", [], |row| {
+            row.get(0)
+        })
+        .map_err(|e| format!("Failed to get schema version: {e}"))?;
     Ok(version)
 }
 
 /// Set the current schema version
 fn set_schema_version(conn: &Connection, version: i64) -> Result<(), String> {
     conn.execute("UPDATE schema_version SET version = ?", params![version])
-        .map_err(|e| format!("Failed to set schema version: {}", e))?;
+        .map_err(|e| format!("Failed to set schema version: {e}"))?;
     Ok(())
 }
 
@@ -124,7 +127,7 @@ fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(), String> 
         match current {
             1 => migration_1(conn)?,
             2 => migration_2(conn)?,
-            _ => return Err(format!("Unknown migration version: {}", current)),
+            _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
         set_schema_version(conn, current)?;
@@ -137,60 +140,48 @@ fn migration_1(conn: &Connection) -> Result<(), String> {
     // Helper to check if a column exists in a table
     fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
         let mut stmt = conn
-            .prepare(&format!("PRAGMA table_info({})", table))
-            .map_err(|e| format!("Failed to prepare PRAGMA table_info for {}: {}", table, e))?;
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .map_err(|e| format!("Failed to prepare PRAGMA table_info for {table}: {e}"))?;
         let column_names: Vec<String> = stmt
             .query_map([], |row| row.get(1))
-            .map_err(|e| format!("Failed to query columns for {}: {}", table, e))?
+            .map_err(|e| format!("Failed to query columns for {table}: {e}"))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("Failed to collect columns for {}: {}", table, e))?;
+            .map_err(|e| format!("Failed to collect columns for {table}: {e}"))?;
         Ok(column_names.iter().any(|name| name == column))
     }
 
     // For sessions table
     if !column_exists(conn, "sessions", "last_message")? {
-        conn.execute(
-            "ALTER TABLE sessions ADD COLUMN last_message TEXT",
-            [],
-        )
-        .map_err(|e| format!("Failed to add last_message column: {}", e))?;
+        conn.execute("ALTER TABLE sessions ADD COLUMN last_message TEXT", [])
+            .map_err(|e| format!("Failed to add last_message column: {e}"))?;
     }
     if !column_exists(conn, "sessions", "last_message_role")? {
-        conn.execute(
-            "ALTER TABLE sessions ADD COLUMN last_message_role TEXT",
-            [],
-        )
-        .map_err(|e| format!("Failed to add last_message_role column: {}", e))?;
+        conn.execute("ALTER TABLE sessions ADD COLUMN last_message_role TEXT", [])
+            .map_err(|e| format!("Failed to add last_message_role column: {e}"))?;
     }
     if !column_exists(conn, "sessions", "user_messages_text")? {
         conn.execute(
             "ALTER TABLE sessions ADD COLUMN user_messages_text TEXT",
             [],
         )
-        .map_err(|e| format!("Failed to add user_messages_text column: {}", e))?;
+        .map_err(|e| format!("Failed to add user_messages_text column: {e}"))?;
     }
     if !column_exists(conn, "sessions", "assistant_messages_text")? {
         conn.execute(
             "ALTER TABLE sessions ADD COLUMN assistant_messages_text TEXT",
             [],
         )
-        .map_err(|e| format!("Failed to add assistant_messages_text column: {}", e))?;
+        .map_err(|e| format!("Failed to add assistant_messages_text column: {e}"))?;
     }
 
     // For tags table
     if !column_exists(conn, "tags", "auto_rules")? {
-        conn.execute(
-            "ALTER TABLE tags ADD COLUMN auto_rules TEXT",
-            [],
-        )
-        .map_err(|e| format!("Failed to add auto_rules column: {}", e))?;
+        conn.execute("ALTER TABLE tags ADD COLUMN auto_rules TEXT", [])
+            .map_err(|e| format!("Failed to add auto_rules column: {e}"))?;
     }
     if !column_exists(conn, "tags", "parent_id")? {
-        conn.execute(
-            "ALTER TABLE tags ADD COLUMN parent_id TEXT",
-            [],
-        )
-        .map_err(|e| format!("Failed to add parent_id column: {}", e))?;
+        conn.execute("ALTER TABLE tags ADD COLUMN parent_id TEXT", [])
+            .map_err(|e| format!("Failed to add parent_id column: {e}"))?;
     }
 
     Ok(())
@@ -203,27 +194,27 @@ fn migration_2(conn: &Connection) -> Result<(), String> {
         "CREATE INDEX IF NOT EXISTS idx_message_entries_session_time ON message_entries(session_path, timestamp)",
         [],
     )
-    .map_err(|e| format!("Migration 2 failed: {}", e))?;
+    .map_err(|e| format!("Migration 2 failed: {e}"))?;
 
     Ok(())
 }
 
 fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, String> {
-    let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+    let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
 
     // Enable WAL mode for better concurrency and reliability
     conn.prepare("PRAGMA journal_mode=WAL;")
-        .map_err(|e| format!("Failed to set WAL mode: {}", e))?
+        .map_err(|e| format!("Failed to set WAL mode: {e}"))?
         .query_row([], |_| Ok(()))
-        .map_err(|e| format!("Failed to set WAL mode: {}", e))?;
+        .map_err(|e| format!("Failed to set WAL mode: {e}"))?;
 
     // Set synchronous mode (does not return a result row)
     conn.execute("PRAGMA synchronous=NORMAL;", [])
-        .map_err(|e| format!("Failed to set synchronous mode: {}", e))?;
+        .map_err(|e| format!("Failed to set synchronous mode: {e}"))?;
 
     // Enable foreign key constraints
     conn.execute("PRAGMA foreign_keys=ON;", [])
-        .map_err(|e| format!("Failed to enable foreign keys: {}", e))?;
+        .map_err(|e| format!("Failed to enable foreign keys: {e}"))?;
 
     // Ensure schema_version table exists for migrations
     ensure_schema_version_table(&conn)?;
@@ -250,7 +241,7 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         )",
         [],
     )
-    .map_err(|e| format!("Failed to create table: {}", e))?;
+    .map_err(|e| format!("Failed to create table: {e}"))?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS session_details_cache (
@@ -270,22 +261,22 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         )",
         [],
     )
-    .map_err(|e| format!("Failed to create table session_details_cache: {}", e))?;
+    .map_err(|e| format!("Failed to create table session_details_cache: {e}"))?;
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_modified ON sessions(modified DESC)",
         [],
     )
-    .map_err(|e| format!("Failed to create index idx_modified: {}", e))?;
+    .map_err(|e| format!("Failed to create index idx_modified: {e}"))?;
 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_cwd ON sessions(cwd)", [])
-        .map_err(|e| format!("Failed to create index idx_cwd: {}", e))?;
+        .map_err(|e| format!("Failed to create index idx_cwd: {e}"))?;
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_file_modified ON sessions(file_modified)",
         [],
     )
-    .map_err(|e| format!("Failed to create index idx_file_modified: {}", e))?;
+    .map_err(|e| format!("Failed to create index idx_file_modified: {e}"))?;
 
     // Create favorites table
     conn.execute(
@@ -298,7 +289,7 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         )",
         [],
     )
-    .map_err(|e| format!("Failed to create favorites table: {}", e))?;
+    .map_err(|e| format!("Failed to create favorites table: {e}"))?;
 
     // Create tags table
     conn.execute(
@@ -376,13 +367,13 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         )",
         [],
     )
-    .map_err(|e| format!("Failed to create message_entries table: {}", e))?;
+    .map_err(|e| format!("Failed to create message_entries table: {e}"))?;
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)",
         [],
     )
-    .map_err(|e| format!("Failed to create index on message_entries: {}", e))?;
+    .map_err(|e| format!("Failed to create index on message_entries: {e}"))?;
 
     // Migrate message_entries schema: add missing columns (non-destructive)
     {
@@ -398,13 +389,10 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         let mut migrated = false;
         for &col in &required_me_columns {
             if !me_columns.contains(&col.to_string()) {
-                eprintln!(
-                    "[Migration] Adding missing column '{}' to message_entries",
-                    col
-                );
-                let sql = format!("ALTER TABLE message_entries ADD COLUMN {}", col);
+                eprintln!("[Migration] Adding missing column '{col}' to message_entries");
+                let sql = format!("ALTER TABLE message_entries ADD COLUMN {col}");
                 conn.execute(&sql, [])
-                    .map_err(|e| format!("Failed to add column {}: {}", col, e))?;
+                    .map_err(|e| format!("Failed to add column {col}: {e}"))?;
                 migrated = true;
             }
         }
@@ -474,12 +462,12 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
     // Check and migrate message_entries schema: add any missing columns (non-destructive)
     let mut stmt = conn
         .prepare("PRAGMA table_info(message_entries)")
-        .map_err(|e| format!("Failed to query message_entries schema: {}", e))?;
+        .map_err(|e| format!("Failed to query message_entries schema: {e}"))?;
     let me_columns: Vec<String> = stmt
         .query_map([], |row| row.get(1))
-        .map_err(|e| format!("Failed to read message_entries columns: {}", e))?
+        .map_err(|e| format!("Failed to read message_entries columns: {e}"))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect message_entries columns: {}", e))?;
+        .map_err(|e| format!("Failed to collect message_entries columns: {e}"))?;
     let required_me_columns = ["id", "session_path", "role", "content", "timestamp"];
     let mut migrated = false;
     for &col in &required_me_columns {
@@ -488,9 +476,9 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
                 "[Migration] message_entries missing column '{}', adding...",
                 col
             );
-            let sql = format!("ALTER TABLE message_entries ADD COLUMN {}", col);
+            let sql = format!("ALTER TABLE message_entries ADD COLUMN {col}");
             conn.execute(&sql, [])
-                .map_err(|e| format!("Failed to add column {}: {}", col, e))?;
+                .map_err(|e| format!("Failed to add column {col}: {e}"))?;
             migrated = true;
         }
     }
@@ -503,7 +491,7 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
     // Ensure message_fts exists with correct schema (no triggers needed for content-bearing FTS5)
     let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_fts'")
-        .map_err(|e| format!("Failed to check message_fts existence: {}", e))?;
+        .map_err(|e| format!("Failed to check message_fts existence: {e}"))?;
     let fts_exists = stmt
         .query_row([], |row| Ok(row.get::<_, String>(0)? == "message_fts"))
         .unwrap_or(false);
@@ -520,12 +508,12 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
     // Check if FTS has required columns
     let mut stmt = conn
         .prepare("PRAGMA table_info(message_fts)")
-        .map_err(|e| format!("Failed to query message_fts schema: {}", e))?;
+        .map_err(|e| format!("Failed to query message_fts schema: {e}"))?;
     let fts_columns: Vec<String> = stmt
         .query_map([], |row| row.get(1))
-        .map_err(|e| format!("Failed to read message_fts columns: {}", e))?
+        .map_err(|e| format!("Failed to read message_fts columns: {e}"))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect message_fts columns: {}", e))?;
+        .map_err(|e| format!("Failed to collect message_fts columns: {e}"))?;
     let required_fts_columns = ["session_path", "role", "content"];
     let fts_has_all = required_fts_columns
         .iter()
@@ -534,7 +522,7 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
     if !fts_has_all {
         error!("[Migration] message_fts schema incomplete. Has columns: {:?}. Recreating virtual table...", fts_columns);
         conn.execute("DROP TABLE IF EXISTS message_fts", [])
-            .map_err(|e| format!("Failed to drop old message_fts: {}", e))?;
+            .map_err(|e| format!("Failed to drop old message_fts: {e}"))?;
         create_message_fts5(conn)?;
         rebuild_message_fts_index(conn)?;
         // Index will be automatically rebuilt from message_entries content.
@@ -544,17 +532,17 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
         // Check if it's using auto-sync with content='message_entries'
         let mut stmt_sql = conn
             .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='message_fts'")
-            .map_err(|e| format!("Failed to query message_fts definition: {}", e))?;
+            .map_err(|e| format!("Failed to query message_fts definition: {e}"))?;
         let sql: String = stmt_sql
             .query_row([], |row| row.get(0))
-            .map_err(|e| format!("Failed to read message_fts sql: {}", e))?;
+            .map_err(|e| format!("Failed to read message_fts sql: {e}"))?;
         // Detect if content='message_entries' is present
         let is_auto_sync = sql.contains("content='message_entries'")
             || sql.contains("content=\"message_entries\"");
         if !is_auto_sync {
             error!("[Migration] message_fts is manual (no content=). Converting to auto-sync...");
             conn.execute("DROP TABLE IF EXISTS message_fts", [])
-                .map_err(|e| format!("Failed to drop manual message_fts: {}", e))?;
+                .map_err(|e| format!("Failed to drop manual message_fts: {e}"))?;
             create_message_fts5(conn)?;
             rebuild_message_fts_index(conn)?;
             // Index will be automatically rebuilt from message_entries content.
@@ -655,22 +643,22 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
 fn drop_message_entries_triggers(conn: &Connection) -> Result<(), String> {
     // Drop legacy manual triggers; with content='message_entries' auto-sync, they are not needed.
     conn.execute("DROP TRIGGER IF EXISTS message_entries_ai", [])
-        .map_err(|e| format!("Failed to drop trigger message_entries_ai: {}", e))?;
+        .map_err(|e| format!("Failed to drop trigger message_entries_ai: {e}"))?;
     conn.execute("DROP TRIGGER IF EXISTS message_entries_ad", [])
-        .map_err(|e| format!("Failed to drop trigger message_entries_ad: {}", e))?;
+        .map_err(|e| format!("Failed to drop trigger message_entries_ad: {e}"))?;
     conn.execute("DROP TRIGGER IF EXISTS message_entries_au", [])
-        .map_err(|e| format!("Failed to drop trigger message_entries_au: {}", e))?;
+        .map_err(|e| format!("Failed to drop trigger message_entries_au: {e}"))?;
     Ok(())
 }
 
 fn drop_sessions_fts_triggers(conn: &Connection) -> Result<(), String> {
     // Drop legacy manual triggers; with content='sessions' auto-sync, they are not needed.
     conn.execute("DROP TRIGGER IF EXISTS sessions_ai", [])
-        .map_err(|e| format!("Failed to drop trigger sessions_ai: {}", e))?;
+        .map_err(|e| format!("Failed to drop trigger sessions_ai: {e}"))?;
     conn.execute("DROP TRIGGER IF EXISTS sessions_ad", [])
-        .map_err(|e| format!("Failed to drop trigger sessions_ad: {}", e))?;
+        .map_err(|e| format!("Failed to drop trigger sessions_ad: {e}"))?;
     conn.execute("DROP TRIGGER IF EXISTS sessions_au", [])
-        .map_err(|e| format!("Failed to drop trigger sessions_au: {}", e))?;
+        .map_err(|e| format!("Failed to drop trigger sessions_au: {e}"))?;
     Ok(())
 }
 
@@ -683,7 +671,7 @@ fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
          VALUES (new.rowid, new.session_path, new.role, new.content); END;",
         [],
     )
-    .map_err(|e| format!("Failed to create trigger message_entries_ai: {}", e))?;
+    .map_err(|e| format!("Failed to create trigger message_entries_ai: {e}"))?;
 
     // Delete trigger (use 'delete' command)
     conn.execute(
@@ -692,7 +680,7 @@ fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
          VALUES('delete', old.rowid, old.session_path, old.role, old.content); END;",
         [],
     )
-    .map_err(|e| format!("Failed to create trigger message_entries_ad: {}", e))?;
+    .map_err(|e| format!("Failed to create trigger message_entries_ad: {e}"))?;
 
     // Update trigger (delete old, insert new)
     conn.execute(
@@ -703,7 +691,7 @@ fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
          VALUES (new.rowid, new.session_path, new.role, new.content); END;",
         [],
     )
-    .map_err(|e| format!("Failed to create trigger message_entries_au: {}", e))?;
+    .map_err(|e| format!("Failed to create trigger message_entries_au: {e}"))?;
 
     debug!("[FTS] Created message_entries sync triggers");
     Ok(())
@@ -717,7 +705,7 @@ fn create_sessions_triggers(conn: &Connection) -> Result<(), String> {
          INSERT INTO sessions_fts(rowid, path, cwd, name, first_message, all_messages_text, user_messages_text, assistant_messages_text)
          VALUES (new.rowid, new.path, new.cwd, new.name, new.first_message, new.all_messages_text, new.user_messages_text, new.assistant_messages_text); END;",
         [],
-    ).map_err(|e| format!("Failed to create trigger sessions_ai: {}", e))?;
+    ).map_err(|e| format!("Failed to create trigger sessions_ai: {e}"))?;
 
     // Delete trigger
     conn.execute(
@@ -725,7 +713,7 @@ fn create_sessions_triggers(conn: &Connection) -> Result<(), String> {
          INSERT INTO sessions_fts(sessions_fts, rowid, path, cwd, name, first_message, all_messages_text, user_messages_text, assistant_messages_text)
          VALUES('delete', old.rowid, old.path, old.cwd, old.name, old.first_message, old.all_messages_text, old.user_messages_text, old.assistant_messages_text); END;",
         [],
-    ).map_err(|e| format!("Failed to create trigger sessions_ad: {}", e))?;
+    ).map_err(|e| format!("Failed to create trigger sessions_ad: {e}"))?;
 
     // Update trigger
     conn.execute(
@@ -735,7 +723,7 @@ fn create_sessions_triggers(conn: &Connection) -> Result<(), String> {
          INSERT INTO sessions_fts(rowid, path, cwd, name, first_message, all_messages_text, user_messages_text, assistant_messages_text)
          VALUES (new.rowid, new.path, new.cwd, new.name, new.first_message, new.all_messages_text, new.user_messages_text, new.assistant_messages_text); END;",
         [],
-    ).map_err(|e| format!("Failed to create trigger sessions_au: {}", e))?;
+    ).map_err(|e| format!("Failed to create trigger sessions_au: {e}"))?;
 
     debug!("[FTS] Created sessions sync triggers");
     Ok(())
@@ -757,7 +745,7 @@ fn create_message_fts5(conn: &Connection) -> Result<(), String> {
         )",
         [],
     )
-    .map_err(|e| format!("Failed to create message_fts: {}", e))?;
+    .map_err(|e| format!("Failed to create message_fts: {e}"))?;
 
     info!("[FTS] Created message_fts virtual table (content auto-sync enabled)");
     Ok(())
@@ -766,7 +754,7 @@ fn create_message_fts5(conn: &Connection) -> Result<(), String> {
 fn rebuild_message_fts_index(conn: &Connection) -> Result<(), String> {
     info!("[FTS] Rebuilding message_fts index from message_entries...");
     conn.execute("INSERT INTO message_fts(message_fts) VALUES('rebuild')", [])
-        .map_err(|e| format!("Failed to rebuild FTS index: {}", e))?;
+        .map_err(|e| format!("Failed to rebuild FTS index: {e}"))?;
     Ok(())
 }
 
@@ -807,7 +795,7 @@ pub fn upsert_session(
             &session.last_message_role,
             &Utc::now().to_rfc3339(),
         ],
-    ).map_err(|e| format!("Failed to upsert session: {}", e))?;
+    ).map_err(|e| format!("Failed to upsert session: {e}"))?;
 
     // Populate message_entries table if it exists (for per-message FTS)
     if conn
@@ -846,7 +834,7 @@ pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>,
     let mut stmt = conn.prepare(
         "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role
          FROM sessions WHERE path = ?"
-    ).map_err(|e| format!("Failed to prepare statement: {}", e))?;
+    ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let session = stmt
         .query_row(params![path], |row| {
@@ -883,7 +871,7 @@ pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
     let mut stmt = conn.prepare(
         "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role
          FROM sessions ORDER BY modified DESC, path ASC"
-    ).map_err(|e| format!("Failed to prepare statement: {}", e))?;
+    ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let sessions = stmt
         .query_map([], |row| {
@@ -903,9 +891,9 @@ pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
                 last_message_role: row.get(12)?,
             })
         })
-        .map_err(|e| format!("Failed to query sessions: {}", e))?
+        .map_err(|e| format!("Failed to query sessions: {e}"))?
         .collect::<SqliteResult<Vec<_>>>()
-        .map_err(|e| format!("Failed to collect sessions: {}", e))?;
+        .map_err(|e| format!("Failed to collect sessions: {e}"))?;
 
     Ok(sessions)
 }
@@ -917,7 +905,7 @@ pub fn get_sessions_modified_after(
     let mut stmt = conn.prepare(
         "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role
          FROM sessions WHERE modified > ? ORDER BY modified DESC, path ASC"
-    ).map_err(|e| format!("Failed to prepare statement: {}", e))?;
+    ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let sessions = stmt
         .query_map(params![cutoff.to_rfc3339()], |row| {
@@ -937,9 +925,9 @@ pub fn get_sessions_modified_after(
                 last_message_role: row.get(12)?,
             })
         })
-        .map_err(|e| format!("Failed to query sessions: {}", e))?
+        .map_err(|e| format!("Failed to query sessions: {e}"))?
         .collect::<SqliteResult<Vec<_>>>()
-        .map_err(|e| format!("Failed to collect sessions: {}", e))?;
+        .map_err(|e| format!("Failed to collect sessions: {e}"))?;
 
     Ok(sessions)
 }
@@ -951,7 +939,7 @@ pub fn get_sessions_modified_before(
     let mut stmt = conn.prepare(
         "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role
          FROM sessions WHERE modified <= ? ORDER BY modified DESC, path ASC"
-    ).map_err(|e| format!("Failed to prepare statement: {}", e))?;
+    ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let sessions = stmt
         .query_map(params![cutoff.to_rfc3339()], |row| {
@@ -971,9 +959,9 @@ pub fn get_sessions_modified_before(
                 last_message_role: row.get(12)?,
             })
         })
-        .map_err(|e| format!("Failed to query sessions: {}", e))?
+        .map_err(|e| format!("Failed to query sessions: {e}"))?
         .collect::<SqliteResult<Vec<_>>>()
-        .map_err(|e| format!("Failed to collect sessions: {}", e))?;
+        .map_err(|e| format!("Failed to collect sessions: {e}"))?;
 
     Ok(sessions)
 }
@@ -984,7 +972,7 @@ pub fn get_cached_file_modified(
 ) -> Result<Option<DateTime<Utc>>, String> {
     let mut stmt = conn
         .prepare("SELECT file_modified FROM sessions WHERE path = ?")
-        .map_err(|e| format!("Failed to prepare statement: {}", e))?;
+        .map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let result = stmt
         .query_row(params![path], |row| {
@@ -998,12 +986,12 @@ pub fn get_cached_file_modified(
 pub fn needs_reindexing(conn: &Connection, path: &str) -> Result<bool, String> {
     let mut stmt = conn.prepare(
         "SELECT user_messages_text IS NULL OR assistant_messages_text IS NULL FROM sessions WHERE path = ?"
-    ).map_err(|e| format!("Failed to prepare statement: {}", e))?;
+    ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let result = stmt
         .query_row(params![path], |row| row.get::<_, bool>(0))
         .optional()
-        .map_err(|e| format!("Failed to query needs_reindexing: {}", e))?;
+        .map_err(|e| format!("Failed to query needs_reindexing: {e}"))?;
 
     Ok(result.unwrap_or(false))
 }
@@ -1013,14 +1001,14 @@ pub fn delete_session(conn: &Connection, path: &str) -> Result<(), String> {
     let _ = delete_message_entries_for_session(conn, path);
 
     conn.execute("DELETE FROM sessions WHERE path = ?", params![path])
-        .map_err(|e| format!("Failed to delete session: {}", e))?;
+        .map_err(|e| format!("Failed to delete session: {e}"))?;
     Ok(())
 }
 
 pub fn get_session_count(conn: &Connection) -> Result<usize, String> {
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
-        .map_err(|e| format!("Failed to count sessions: {}", e))?;
+        .map_err(|e| format!("Failed to count sessions: {e}"))?;
     Ok(count as usize)
 }
 
@@ -1052,7 +1040,7 @@ pub fn get_session_details_cache(
          FROM session_details_cache
          WHERE path = ?",
         )
-        .map_err(|e| format!("Failed to prepare session_details_cache statement: {}", e))?;
+        .map_err(|e| format!("Failed to prepare session_details_cache statement: {e}"))?;
 
     let row = stmt
         .query_row(params![path], |row| {
@@ -1083,7 +1071,7 @@ pub fn upsert_session_details_cache(
     details: &SessionDetails,
 ) -> Result<(), String> {
     let models_json = serde_json::to_string(&details.models)
-        .map_err(|e| format!("Failed to serialize models: {}", e))?;
+        .map_err(|e| format!("Failed to serialize models: {e}"))?;
 
     conn.execute(
         "INSERT INTO session_details_cache (
@@ -1120,27 +1108,27 @@ pub fn upsert_session_details_cache(
             models_json,
         ],
     )
-    .map_err(|e| format!("Failed to upsert session_details_cache: {}", e))?;
+    .map_err(|e| format!("Failed to upsert session_details_cache: {e}"))?;
 
     Ok(())
 }
 
 pub fn vacuum(conn: &Connection) -> Result<(), String> {
     conn.execute("VACUUM", [])
-        .map_err(|e| format!("Failed to vacuum database: {}", e))?;
+        .map_err(|e| format!("Failed to vacuum database: {e}"))?;
     Ok(())
 }
 
 pub fn cleanup_missing_files(conn: &Connection) -> Result<usize, String> {
     let mut stmt = conn
         .prepare("SELECT path FROM sessions")
-        .map_err(|e| format!("Failed to prepare statement: {}", e))?;
+        .map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let paths: Vec<String> = stmt
         .query_map([], |row| row.get(0))
-        .map_err(|e| format!("Failed to query paths: {}", e))?
+        .map_err(|e| format!("Failed to query paths: {e}"))?
         .collect::<SqliteResult<Vec<_>>>()
-        .map_err(|e| format!("Failed to collect paths: {}", e))?;
+        .map_err(|e| format!("Failed to collect paths: {e}"))?;
 
     let mut deleted = 0;
     for path in paths {
@@ -1162,7 +1150,7 @@ pub fn preload_recent_sessions(
          FROM sessions
          ORDER BY last_accessed DESC, access_count DESC, modified DESC, path ASC
          LIMIT ?"
-    ).map_err(|e| format!("Failed to prepare statement: {}", e))?;
+    ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let sessions = stmt
         .query_map(params![count as i64], |row| {
@@ -1182,9 +1170,9 @@ pub fn preload_recent_sessions(
                 last_message_role: row.get(12)?,
             })
         })
-        .map_err(|e| format!("Failed to query sessions: {}", e))?
+        .map_err(|e| format!("Failed to query sessions: {e}"))?
         .collect::<SqliteResult<Vec<_>>>()
-        .map_err(|e| format!("Failed to collect sessions: {}", e))?;
+        .map_err(|e| format!("Failed to collect sessions: {e}"))?;
 
     Ok(sessions)
 }
@@ -1197,13 +1185,13 @@ pub fn search_fts5(conn: &Connection, query: &str, limit: usize) -> Result<Vec<S
          ORDER BY rowid DESC
          LIMIT ?",
         )
-        .map_err(|e| format!("Failed to prepare FTS5 statement: {}", e))?;
+        .map_err(|e| format!("Failed to prepare FTS5 statement: {e}"))?;
 
     let paths: Vec<String> = stmt
         .query_map(params![query, limit as i64], |row| row.get(0))
-        .map_err(|e| format!("Failed to query FTS5: {}", e))?
+        .map_err(|e| format!("Failed to query FTS5: {e}"))?
         .collect::<SqliteResult<Vec<_>>>()
-        .map_err(|e| format!("Failed to collect FTS5 results: {}", e))?;
+        .map_err(|e| format!("Failed to collect FTS5 results: {e}"))?;
 
     Ok(paths)
 }
@@ -1211,7 +1199,7 @@ pub fn search_fts5(conn: &Connection, query: &str, limit: usize) -> Result<Vec<S
 pub fn optimize_database(conn: &Connection) -> Result<(), String> {
     vacuum(conn)?;
     conn.execute("ANALYZE", [])
-        .map_err(|e| format!("Failed to analyze database: {}", e))?;
+        .map_err(|e| format!("Failed to analyze database: {e}"))?;
     Ok(())
 }
 
@@ -1230,7 +1218,7 @@ pub fn delete_message_entries_for_session(
     // Check if message_entries table exists
     let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'")
-        .map_err(|e| format!("Failed to check message_entries existence: {}", e))?;
+        .map_err(|e| format!("Failed to check message_entries existence: {e}"))?;
     let exists: bool = stmt
         .query_row([], |row| Ok(row.get::<_, String>(0)? == "message_entries"))
         .unwrap_or(false);
@@ -1243,12 +1231,12 @@ pub fn delete_message_entries_for_session(
     // Validate schema has all required columns before attempting DELETE
     let mut col_stmt = conn
         .prepare("PRAGMA table_info(message_entries)")
-        .map_err(|e| format!("Failed to query message_entries schema: {}", e))?;
+        .map_err(|e| format!("Failed to query message_entries schema: {e}"))?;
     let column_names: Vec<String> = col_stmt
         .query_map([], |row| row.get(1))
-        .map_err(|e| format!("Failed to read message_entries column names: {}", e))?
+        .map_err(|e| format!("Failed to read message_entries column names: {e}"))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect message_entries column names: {}", e))?;
+        .map_err(|e| format!("Failed to collect message_entries column names: {e}"))?;
 
     let required = ["id", "session_path", "role", "content", "timestamp"];
     let has_all = required
@@ -1262,19 +1250,18 @@ pub fn delete_message_entries_for_session(
         // Retry after migration
         let mut col_stmt2 = conn
             .prepare("PRAGMA table_info(message_entries)")
-            .map_err(|e| format!("Failed to prepare PRAGMA after migration: {}", e))?;
+            .map_err(|e| format!("Failed to prepare PRAGMA after migration: {e}"))?;
         let columns2: Vec<String> = col_stmt2
             .query_map([], |row| row.get(1))
-            .map_err(|e| format!("Failed to query columns after migration: {}", e))?
+            .map_err(|e| format!("Failed to query columns after migration: {e}"))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("Failed to collect columns after migration: {}", e))?;
+            .map_err(|e| format!("Failed to collect columns after migration: {e}"))?;
         if !required
             .iter()
             .all(|&col| columns2.contains(&col.to_string()))
         {
             return Err(format!(
-                "message_entries schema still incomplete after migration: {:?}",
-                columns2
+                "message_entries schema still incomplete after migration: {columns2:?}"
             ));
         }
         debug!("[Delete] Schema migration successful, retrying delete");
@@ -1297,7 +1284,7 @@ pub fn delete_message_entries_for_session(
             );
         }
         Err(e) => {
-            let err_str = format!("{:?}", e);
+            let err_str = format!("{e:?}");
             error!(
                 "[Delete] Failed to delete message entries for session '{}': {:?} (code: {:?})",
                 session_path,
@@ -1317,7 +1304,7 @@ pub fn delete_message_entries_for_session(
                 return Ok(());
             }
 
-            return Err(format!("Failed to delete message entries: {}", err_str));
+            return Err(format!("Failed to delete message entries: {err_str}"));
         }
     }
     Ok(())
@@ -1331,7 +1318,7 @@ pub fn insert_message_entries(conn: &Connection, session: &SessionInfo) -> Resul
     // Check if message_entries table exists (FTS may be disabled)
     let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'")
-        .map_err(|e| format!("Failed to check message_entries existence: {}", e))?;
+        .map_err(|e| format!("Failed to check message_entries existence: {e}"))?;
     let exists: bool = stmt
         .query_row([], |row| Ok(row.get::<_, String>(0)? == "message_entries"))
         .unwrap_or(false);
@@ -1342,7 +1329,7 @@ pub fn insert_message_entries(conn: &Connection, session: &SessionInfo) -> Resul
     }
 
     let file = fs::File::open(&session.path)
-        .map_err(|e| format!("Failed to open file for message entries: {}", e))?;
+        .map_err(|e| format!("Failed to open file for message entries: {e}"))?;
     let reader = BufReader::new(file);
 
     let mut inserted_count = 0;
@@ -1414,7 +1401,7 @@ pub fn upsert_message_entries(
     // Check if message_entries table exists (FTS may be disabled)
     let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'")
-        .map_err(|e| format!("Failed to check message_entries existence: {}", e))?;
+        .map_err(|e| format!("Failed to check message_entries existence: {e}"))?;
     let exists: bool = stmt
         .query_row([], |row| Ok(row.get::<_, String>(0)? == "message_entries"))
         .unwrap_or(false);
@@ -1432,12 +1419,7 @@ pub fn upsert_message_entries(
         "DELETE FROM message_entries WHERE session_path = ?",
         params![session_path],
     )
-    .map_err(|e| {
-        format!(
-            "Failed to delete existing message entries for {}: {}",
-            session_path, e
-        )
-    })?;
+    .map_err(|e| format!("Failed to delete existing message entries for {session_path}: {e}"))?;
 
     // Insert each entry (could be batched but ok)
     for entry in entries {
@@ -1499,7 +1481,7 @@ pub fn search_message_fts(
         }
     }
     // Wrap in double quotes to match as a phrase
-    let fts_query = format!("\"{}\"", escaped);
+    let fts_query = format!("\"{escaped}\"");
 
     // Build role filter condition
     let role_condition = match role_filter {
@@ -1519,15 +1501,14 @@ pub fn search_message_fts(
          FROM message_entries m \
          JOIN message_fts ON m.rowid = message_fts.rowid \
          WHERE message_fts MATCH ? \
-         AND {} \
+         AND {role_condition} \
          ORDER BY m.rowid \
-         LIMIT ?",
-        role_condition
+         LIMIT ?"
     );
 
     let mut stmt = conn
         .prepare(&sql)
-        .map_err(|e| format!("Failed to prepare message FTS query: {}", e))?;
+        .map_err(|e| format!("Failed to prepare message FTS query: {e}"))?;
 
     let rows = stmt
         .query_map(params![fts_query, limit as i64], |row| {
@@ -1540,9 +1521,9 @@ pub fn search_message_fts(
                 row.get::<_, f32>(5)?,    // rank
             ))
         })
-        .map_err(|e| format!("Failed to query message FTS: {}", e))?
+        .map_err(|e| format!("Failed to query message FTS: {e}"))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect message FTS results: {}", e))?;
+        .map_err(|e| format!("Failed to collect message FTS results: {e}"))?;
 
     Ok(rows)
 }
@@ -1574,20 +1555,20 @@ pub fn add_favorite(
     conn.execute(
         "INSERT OR REPLACE INTO favorites (id, type, name, path, added_at) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![id, favorite_type, name, path, Utc::now().to_rfc3339()],
-    ).map_err(|e| format!("Failed to add favorite: {}", e))?;
+    ).map_err(|e| format!("Failed to add favorite: {e}"))?;
     Ok(())
 }
 
 pub fn remove_favorite(conn: &Connection, id: &str) -> Result<(), String> {
     conn.execute("DELETE FROM favorites WHERE id = ?", params![id])
-        .map_err(|e| format!("Failed to remove favorite: {}", e))?;
+        .map_err(|e| format!("Failed to remove favorite: {e}"))?;
     Ok(())
 }
 
 pub fn get_all_favorites(conn: &Connection) -> Result<Vec<DbFavoriteItem>, String> {
     let mut stmt = conn
         .prepare("SELECT id, type, name, path, added_at FROM favorites ORDER BY added_at DESC")
-        .map_err(|e| format!("Failed to prepare favorites statement: {}", e))?;
+        .map_err(|e| format!("Failed to prepare favorites statement: {e}"))?;
 
     let favorites = stmt
         .query_map([], |row| {
@@ -1599,9 +1580,9 @@ pub fn get_all_favorites(conn: &Connection) -> Result<Vec<DbFavoriteItem>, Strin
                 added_at: row.get(4)?,
             })
         })
-        .map_err(|e| format!("Failed to query favorites: {}", e))?
+        .map_err(|e| format!("Failed to query favorites: {e}"))?
         .collect::<SqliteResult<Vec<_>>>()
-        .map_err(|e| format!("Failed to collect favorites: {}", e))?;
+        .map_err(|e| format!("Failed to collect favorites: {e}"))?;
 
     Ok(favorites)
 }
@@ -1613,7 +1594,7 @@ pub fn is_favorite(conn: &Connection, id: &str) -> Result<bool, String> {
             params![id],
             |row| row.get(0),
         )
-        .map_err(|e| format!("Failed to check favorite: {}", e))?;
+        .map_err(|e| format!("Failed to check favorite: {e}"))?;
     Ok(count > 0)
 }
 
@@ -1660,7 +1641,7 @@ pub fn full_rebuild_fts(conn: &Connection) -> Result<(), String> {
         )",
         [],
     )
-    .map_err(|e| format!("Failed to create FTS5 table: {}", e))?;
+    .map_err(|e| format!("Failed to create FTS5 table: {e}"))?;
 
     // No manual triggers: auto-sync maintains the index
 

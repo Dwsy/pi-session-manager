@@ -8,12 +8,11 @@ use tempfile::tempdir;
 /// Helper: create a minimal session file content as JSONL
 fn make_session_file(id: &str, cwd: &str, messages: &[(&str, &str)]) -> String {
     let header = format!(
-        r#"{{"type":"session","version":3,"id":"{}","timestamp":"2026-02-10T22:00:00Z","cwd":"{}"}}"#,
-        id, cwd
+        r#"{{"type":"session","version":3,"id":"{id}","timestamp":"2026-02-10T22:00:00Z","cwd":"{cwd}"}}"#
     );
     let mut lines = vec![header];
     for (i, (role, text)) in messages.iter().enumerate() {
-        let entry_id = format!("{}-msg{}", id, i);
+        let entry_id = format!("{id}-msg{i}");
         let msg = format!(
             r#"{{"type":"message","id":"{}","parentId":null,"timestamp":"2026-02-10T22:00:{:02}Z","message":{{"role":"{}","content":[{{"type":"text","text":"{}"}}]}}}}"#,
             entry_id,
@@ -132,7 +131,7 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
     // Build the pagination query as in full_text_search (page=0, page_size=3)
     let fts_query = "\"banana\"";
     let role_condition = "1=1";
-    let where_clause = format!("WHERE message_fts MATCH ? AND {}", role_condition);
+    let where_clause = format!("WHERE message_fts MATCH ? AND {role_condition}");
 
     // Count total hits after per-session limit
     let count_sql = format!(
@@ -141,10 +140,9 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
                 SELECT ROW_NUMBER() OVER (PARTITION BY m.session_path ORDER BY m.rowid) as rn_in_session
                 FROM message_entries m
                 JOIN message_fts ON m.rowid = message_fts.rowid
-                {}
+                {where_clause}
             ) WHERE rn_in_session <= 3
-        )",
-        where_clause
+        )"
     );
     let total_hits: usize = {
         let mut stmt = conn.prepare(&count_sql).unwrap();
@@ -172,7 +170,7 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
                 ROW_NUMBER() OVER (ORDER BY m.rowid) as global_rn
             FROM message_entries m
             JOIN message_fts ON m.rowid = message_fts.rowid
-            {}
+            {where_clause}
         ),
         filtered AS (
             SELECT id, session_path, role, timestamp, rank, global_rn
@@ -183,8 +181,7 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
         FROM filtered f
         JOIN message_entries m ON f.id = m.id
         WHERE f.global_rn > 0 AND f.global_rn <= 3
-        ORDER BY f.rank",
-        where_clause
+        ORDER BY f.rank"
     );
     let mut stmt = conn.prepare(&data_sql).unwrap();
     let rows: Vec<(String, String, String, String, String, f32)> = stmt

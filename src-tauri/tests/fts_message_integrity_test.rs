@@ -9,13 +9,12 @@ use tempfile::tempdir;
 /// Helper: create a minimal session file content as JSONL
 fn make_session_file(id: &str, cwd: &str, messages: &[(&str, &str)]) -> String {
     let header = format!(
-        r#"{{"type":"session","version":3,"id":"{}","timestamp":"2026-02-10T22:00:00Z","cwd":"{}"}}"#,
-        id, cwd
+        r#"{{"type":"session","version":3,"id":"{id}","timestamp":"2026-02-10T22:00:00Z","cwd":"{cwd}"}}"#
     );
     let mut lines = vec![header];
     for (i, (role, text)) in messages.iter().enumerate() {
         // Use globally unique message IDs by combining session id and index
-        let entry_id = format!("{}-msg{}", id, i);
+        let entry_id = format!("{id}-msg{i}");
         let msg = format!(
             r#"{{"type":"message","id":"{}","parentId":null,"timestamp":"2026-02-10T22:00:{:02}Z","message":{{"role":"{}","content":[{{"type":"text","text":"{}"}}]}}}}"#,
             entry_id,
@@ -183,8 +182,7 @@ fn test_fts_migration_and_integrity() {
         let results = sqlite_cache::search_message_fts(&conn, query, None, 10).unwrap();
         assert!(
             !results.is_empty(),
-            "Search for '{}' should return results",
-            query
+            "Search for '{query}' should return results"
         );
         // At least one result should come from a session containing expected substring
         let found = results
@@ -245,13 +243,11 @@ fn test_fts_migration_and_integrity() {
     if let Some((_, _, _, snippet, _, _)) = results.first() {
         assert!(
             snippet.contains("<b>"),
-            "Snippet missing opening <b> tag: {}",
-            snippet
+            "Snippet missing opening <b> tag: {snippet}"
         );
         assert!(
             snippet.contains("</b>"),
-            "Snippet missing closing </b> tag: {}",
-            snippet
+            "Snippet missing closing </b> tag: {snippet}"
         );
     }
 
@@ -352,7 +348,7 @@ fn test_backfill_when_message_entries_empty() {
             |row| row.get(0),
         )
         .unwrap();
-    eprintln!("[DEBUG] message_fts CREATE (test2): {}", fts_sql);
+    eprintln!("[DEBUG] message_fts CREATE (test2): {fts_sql}");
     let triggers: Vec<String> = match conn.prepare(
         "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='message_entries'",
     ) {
@@ -362,14 +358,11 @@ fn test_backfill_when_message_entries_empty() {
             .collect::<Result<Vec<_>, _>>()
             .unwrap(),
         Err(e) => {
-            eprintln!("[DEBUG] trigger query error: {}", e);
+            eprintln!("[DEBUG] trigger query error: {e}");
             vec![]
         }
     };
-    eprintln!(
-        "[DEBUG] triggers on message_entries after init (test2): {:?}",
-        triggers
-    );
+    eprintln!("[DEBUG] triggers on message_entries after init (test2): {triggers:?}");
 
     // Debug: check FTS table definition
     let fts_sql: String = conn
@@ -379,7 +372,7 @@ fn test_backfill_when_message_entries_empty() {
             |row| row.get(0),
         )
         .unwrap();
-    eprintln!("[DEBUG] message_fts CREATE: {}", fts_sql);
+    eprintln!("[DEBUG] message_fts CREATE: {fts_sql}");
     // Debug: list triggers on message_entries
     let triggers: Vec<String> = match conn.prepare(
         "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='message_entries'",
@@ -390,14 +383,11 @@ fn test_backfill_when_message_entries_empty() {
             .collect::<Result<Vec<_>, _>>()
             .unwrap(),
         Err(e) => {
-            eprintln!("[DEBUG] trigger query error: {}", e);
+            eprintln!("[DEBUG] trigger query error: {e}");
             vec![]
         }
     };
-    eprintln!(
-        "[DEBUG] triggers on message_entries after init: {:?}",
-        triggers
-    );
+    eprintln!("[DEBUG] triggers on message_entries after init: {triggers:?}");
 
     // Insert only sessions (skip message_entries) - simulate old DB with sessions but no per-message data
     let file_modified = Utc::now();
@@ -455,16 +445,13 @@ fn test_backfill_when_message_entries_empty() {
             row.get(0)
         })
         .unwrap();
-    println!("[DEBUG] Sample message_entries.content: {}", sample_content);
+    println!("[DEBUG] Sample message_entries.content: {sample_content}");
     let fts_content_opt: Option<String> = conn
         .query_row("SELECT content FROM message_fts LIMIT 1", [], |row| {
             row.get(0)
         })
         .ok();
-    println!(
-        "[DEBUG] Sample message_fts.content (first row): {:?}",
-        fts_content_opt
-    );
+    println!("[DEBUG] Sample message_fts.content (first row): {fts_content_opt:?}");
 
     // List triggers on message_entries to see if auto-sync triggers exist
     let triggers: Vec<String> = match conn.prepare(
@@ -476,11 +463,11 @@ fn test_backfill_when_message_entries_empty() {
             .collect::<Result<Vec<_>, _>>()
             .unwrap(),
         Err(e) => {
-            println!("[DEBUG] Trigger query error: {}", e);
+            println!("[DEBUG] Trigger query error: {e}");
             vec![]
         }
     };
-    println!("[DEBUG] Triggers on message_entries: {:?}", triggers);
+    println!("[DEBUG] Triggers on message_entries: {triggers:?}");
 
     // Dump FTS rows to see indexed content
     let fts_rows: Vec<(i64, String, String, String)> =
@@ -493,7 +480,7 @@ fn test_backfill_when_message_entries_empty() {
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap(),
             Err(e) => {
-                println!("[DEBUG] FTS dump error: {}", e);
+                println!("[DEBUG] FTS dump error: {e}");
                 vec![]
             }
         };
@@ -512,7 +499,7 @@ fn test_backfill_when_message_entries_empty() {
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap(),
             Err(e) => {
-                println!("[DEBUG] MATCH 'binary*' error: {}", e);
+                println!("[DEBUG] MATCH 'binary*' error: {e}");
                 vec![]
             }
         };
@@ -530,7 +517,7 @@ fn test_backfill_when_message_entries_empty() {
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap(),
             Err(e) => {
-                println!("[DEBUG] MATCH 'tokio*' error: {}", e);
+                println!("[DEBUG] MATCH 'tokio*' error: {e}");
                 vec![]
             }
         };
@@ -548,7 +535,7 @@ fn test_backfill_when_message_entries_empty() {
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap(),
             Err(e) => {
-                println!("[DEBUG] MATCH 'tokio' error: {}", e);
+                println!("[DEBUG] MATCH 'tokio' error: {e}");
                 vec![]
             }
         };
@@ -566,7 +553,7 @@ fn test_backfill_when_message_entries_empty() {
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap(),
             Err(e) => {
-                println!("[DEBUG] MATCH 'binary' error: {}", e);
+                println!("[DEBUG] MATCH 'binary' error: {e}");
                 vec![]
             }
         };

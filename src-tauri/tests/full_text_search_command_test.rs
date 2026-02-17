@@ -69,7 +69,7 @@ fn setup_in_memory_db_with_sessions(sessions: &[(&str, &str, &[(&str, &str)])]) 
 
     // Insert sessions and message entries
     for &(id, cwd, messages) in sessions {
-        let path = format!("/{}/session{}.jsonl", cwd, id);
+        let path = format!("/{cwd}/session{id}.jsonl");
         // Build session row
         let now = chrono::Utc::now().to_rfc3339();
         let first_msg = messages.first().map(|(_, t)| *t).unwrap_or("").to_string();
@@ -116,7 +116,7 @@ fn setup_in_memory_db_with_sessions(sessions: &[(&str, &str, &[(&str, &str)])]) 
 
         // Insert message entries
         for (i, (role, text)) in messages.iter().enumerate() {
-            let entry_id = format!("{}-msg{}", id, i);
+            let entry_id = format!("{id}-msg{i}");
             let timestamp = chrono::Utc::now(); // not important
             conn.execute(
                 "INSERT INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -157,7 +157,7 @@ fn search_message_entries_with_params(
             _ => escaped.push(ch),
         }
     }
-    let fts_query = format!("\"{}\"", escaped);
+    let fts_query = format!("\"{escaped}\"");
 
     let role_condition = match role_filter {
         Some("user") => "m.role = 'user'",
@@ -165,14 +165,14 @@ fn search_message_entries_with_params(
         _ => "1=1",
     };
 
-    let mut where_clause = format!("WHERE message_fts MATCH ? AND {}", role_condition);
+    let mut where_clause = format!("WHERE message_fts MATCH ? AND {role_condition}");
     let pattern_owned: Option<String> = glob_pattern.map(|s| s.to_string());
     let has_glob = pattern_owned
         .as_ref()
         .map(|s| !s.is_empty())
         .unwrap_or(false);
     if has_glob {
-        where_clause = format!("{} AND m.session_path GLOB ?", where_clause);
+        where_clause = format!("{where_clause} AND m.session_path GLOB ?");
     }
 
     // Count total hits with per-session limit
@@ -182,10 +182,9 @@ fn search_message_entries_with_params(
                 SELECT ROW_NUMBER() OVER (PARTITION BY m.session_path ORDER BY m.rowid) as rn_in_session
                 FROM message_entries m
                 JOIN message_fts ON m.rowid = message_fts.rowid
-                {}
+                {where_clause}
             ) WHERE rn_in_session <= 3
-        )",
-        where_clause
+        )"
     );
 
     let total_hits: usize = {
@@ -196,10 +195,10 @@ fn search_message_entries_with_params(
         }
         let mut stmt = conn
             .prepare(&count_sql)
-            .map_err(|e| format!("Failed to prepare count: {}", e))?;
+            .map_err(|e| format!("Failed to prepare count: {e}"))?;
         let total_hits_i64: i64 = stmt
             .query_row(count_params.as_slice(), |row| row.get(0))
-            .map_err(|e| format!("Count query failed: {}", e))?;
+            .map_err(|e| format!("Count query failed: {e}"))?;
         total_hits_i64 as usize
     };
 
@@ -220,7 +219,7 @@ fn search_message_entries_with_params(
                 ROW_NUMBER() OVER (PARTITION BY m.session_path ORDER BY m.rowid) as rn_in_session
             FROM message_entries m
             JOIN message_fts ON m.rowid = message_fts.rowid
-            {}
+            {where_clause}
         ),
         filtered AS (
             SELECT 
@@ -233,8 +232,7 @@ fn search_message_entries_with_params(
         FROM filtered f
         JOIN message_entries m ON f.id = m.id
         WHERE f.global_rn > ? AND f.global_rn <= ?
-        ORDER BY f.rank",
-        where_clause
+        ORDER BY f.rank"
     );
 
     let mut data_params: Vec<&dyn ToSql> = Vec::new();
@@ -247,7 +245,7 @@ fn search_message_entries_with_params(
 
     let mut stmt = conn
         .prepare(&data_sql)
-        .map_err(|e| format!("Failed to prepare data query: {}", e))?;
+        .map_err(|e| format!("Failed to prepare data query: {e}"))?;
 
     let rows = stmt
         .query_map(data_params.as_slice(), |row| {
@@ -260,9 +258,9 @@ fn search_message_entries_with_params(
                 row.get::<_, f32>(5)?,
             ))
         })
-        .map_err(|e| format!("Query failed: {}", e))?
+        .map_err(|e| format!("Query failed: {e}"))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Collect failed: {}", e))?;
+        .map_err(|e| format!("Collect failed: {e}"))?;
 
     Ok((rows, total_hits))
 }
@@ -371,8 +369,6 @@ fn test_full_text_search_relevance_ranking() {
     let rank_second = hits[1].5;
     assert!(
         rank_first < rank_second,
-        "Expected message with more occurrences to rank higher (lower score), got {} vs {}",
-        rank_first,
-        rank_second
+        "Expected message with more occurrences to rank higher (lower score), got {rank_first} vs {rank_second}"
     );
 }

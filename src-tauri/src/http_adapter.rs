@@ -360,7 +360,10 @@ async fn serve_static(uri: Uri) -> Response {
 
 async fn handle_metrics() -> impl IntoResponse {
     let metrics_text = crate::metrics::render();
-    ([(header::CONTENT_TYPE, "text/plain; version=0.0.4")], metrics_text)
+    (
+        [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        metrics_text,
+    )
 }
 
 // ─── Init ────────────────────────────────────────────────────

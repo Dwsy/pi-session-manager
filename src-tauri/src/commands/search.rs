@@ -1,3 +1,4 @@
+use crate::metrics;
 use crate::models::{FullTextSearchHit, FullTextSearchResponse, SessionInfo};
 use crate::{config, search, sqlite_cache};
 use chrono::{DateTime, Utc};
@@ -5,7 +6,6 @@ use rusqlite::ToSql;
 use std::collections::HashMap;
 use std::time::Instant;
 use tokio::time::Duration;
-use crate::metrics;
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn search_sessions(
@@ -52,7 +52,7 @@ pub async fn search_sessions_fts(query: String, limit: usize) -> Result<Vec<Sess
     Ok(sessions)
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn full_text_search(
     query: String,
     role_filter: String,
@@ -81,13 +81,13 @@ pub async fn full_text_search(
 
             // Load config (blocking file I/O)
             let config = config::load_config()
-                .map_err(|e| format!("Failed to load config: {}", e))?;
+                .map_err(|e| format!("Failed to load config: {e}"))?;
             // Open database
             let conn = sqlite_cache::init_db_with_config(&config)
-                .map_err(|e| format!("Failed to init database: {}", e))?;
+                .map_err(|e| format!("Failed to init database: {e}"))?;
             // Set query timeout at SQLite level (in milliseconds)
             conn.execute("PRAGMA query_timeout = 5000", [])
-                .map_err(|e| format!("Failed to set query_timeout: {}", e))?;
+                .map_err(|e| format!("Failed to set query_timeout: {e}"))?;
 
             // Determine role filter for message FTS (case-insensitive)
             let role_filter = role_filter.to_lowercase();
@@ -122,7 +122,7 @@ pub async fn full_text_search(
             let fts_query = if mode == "phrase" {
                 // Treat entire query as a phrase
                 let escaped = escape_word(trimmed);
-                format!("\"{}\"", escaped)
+                format!("\"{escaped}\"")
             } else {
                 // Split into words; for 'all' we use space (AND), for 'any' we use OR
                 let words: Vec<&str> = trimmed.split_whitespace().collect();
@@ -141,7 +141,7 @@ pub async fn full_text_search(
                 Some("assistant") => "m.role = 'assistant'",
                 _ => "1=1",
             };
-            let mut where_clause = format!("WHERE message_fts MATCH ? AND {}", role_condition);
+            let mut where_clause = format!("WHERE message_fts MATCH ? AND {role_condition}");
             let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
             params.push(&fts_query);
 
@@ -166,7 +166,7 @@ pub async fn full_text_search(
                             _ => like_pattern.push(ch),
                         }
                     }
-                    where_clause = format!("{} AND m.session_path LIKE ? ESCAPE '\\'", where_clause);
+                    where_clause = format!("{where_clause} AND m.session_path LIKE ? ESCAPE '\\'");
                     params.push(&like_pattern);
                 }
             }
@@ -178,19 +178,18 @@ pub async fn full_text_search(
                         SELECT
                             ROW_NUMBER() OVER (PARTITION BY m.session_path ORDER BY m.timestamp DESC) as rn_in_session
                         FROM message_entries m JOIN message_fts ON m.rowid = message_fts.rowid
-                        {}
+                        {where_clause}
                     ) WHERE rn_in_session <= 3
-                )",
-                where_clause
+                )"
             );
 
             let total_hits: usize = {
                 let mut stmt = conn
                     .prepare(&count_sql)
-                    .map_err(|e| format!("Failed to prepare total count query: {}", e))?;
+                    .map_err(|e| format!("Failed to prepare total count query: {e}"))?;
                 let count: i64 = match stmt.query_row(params.as_slice(), |row| row.get(0)) {
                     Ok(c) => c,
-                    Err(e) => return Err(format!("Failed to get total hits count: {}", e)),
+                    Err(e) => return Err(format!("Failed to get total hits count: {e}")),
                 };
                 count as usize
             };
@@ -209,7 +208,7 @@ pub async fn full_text_search(
                         ROW_NUMBER() OVER (PARTITION BY m.session_path ORDER BY m.timestamp DESC) as rn_in_session
                     FROM message_entries m
                     JOIN message_fts ON m.rowid = message_fts.rowid
-                    {}
+                    {where_clause}
                 ),
                 filtered AS (
                     SELECT
@@ -222,8 +221,7 @@ pub async fn full_text_search(
                 FROM filtered f
                 JOIN message_entries m ON f.id = m.id
                 WHERE f.global_rn > ? AND f.global_rn <= ?
-                ORDER BY f.rank",
-                where_clause
+                ORDER BY f.rank"
             );
 
             // Prepare parameters for data query: base params (fts_query, optional glob) plus offset and limit for global_rn
@@ -235,7 +233,7 @@ pub async fn full_text_search(
 
             let mut stmt = conn
                 .prepare(&data_sql)
-                .map_err(|e| format!("Failed to prepare data query: {}", e))?;
+                .map_err(|e| format!("Failed to prepare data query: {e}"))?;
 
             let rows = stmt
                 .query_map(data_params.as_slice(), |row| {
@@ -248,9 +246,9 @@ pub async fn full_text_search(
                         row.get::<_, f32>(5)?,    // rank
                     ))
                 })
-                .map_err(|e| format!("Failed to query message FTS: {}", e))?
+                .map_err(|e| format!("Failed to query message FTS: {e}"))?
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| format!("Failed to collect message FTS results: {}", e))?;
+                .map_err(|e| format!("Failed to collect message FTS results: {e}"))?;
 
             // Batch fetch session details and build hits
             let mut all_hits = Vec::new();
@@ -272,8 +270,7 @@ pub async fn full_text_search(
                     Ok(dt) => dt.with_timezone(&chrono::Utc),
                     Err(e) => {
                         eprintln!(
-                            "[FTS] Invalid timestamp '{}' for entry {}: {}",
-                            timestamp_str, entry_id, e
+                            "[FTS] Invalid timestamp '{timestamp_str}' for entry {entry_id}: {e}"
                         );
                         continue;
                     }
@@ -311,7 +308,7 @@ pub async fn full_text_search(
 
     match result {
         Ok(Ok(inner)) => inner,
-        Ok(Err(e)) => Err(format!("Task panicked: {}", e)),
+        Ok(Err(e)) => Err(format!("Task panicked: {e}")),
         Err(_) => Err("Search query timed out after 5 seconds".to_string()),
     }
 }

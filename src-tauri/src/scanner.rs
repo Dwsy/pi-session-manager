@@ -443,7 +443,9 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                 };
 
                 // Ensure session row exists (also populates message_entries via insert_message_entries)
-                if let Err(e) = sqlite_cache::upsert_session(&conn, &info, file_modified, Some(&entries)) {
+                if let Err(e) =
+                    sqlite_cache::upsert_session(&conn, &info, file_modified, Some(&entries))
+                {
                     log::warn!("Failed to upsert session for {}: {}", info.path, e);
                 }
 

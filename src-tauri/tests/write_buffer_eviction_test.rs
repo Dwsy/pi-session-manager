@@ -1,15 +1,17 @@
-use pi_session_manager::write_buffer::{buffer_session_write, buffer_details_write, get_buffered_session, get_buffered_details};
+use chrono::Utc;
 use pi_session_manager::models::SessionInfo;
 use pi_session_manager::session_parser::SessionDetails;
-use chrono::Utc;
+use pi_session_manager::write_buffer::{
+    buffer_details_write, buffer_session_write, get_buffered_details, get_buffered_session,
+};
 
 #[test]
 fn test_write_buffer_eviction() {
     // Helper to create dummy SessionInfo
     fn make_session(i: usize) -> SessionInfo {
         SessionInfo {
-            path: format!("/path/{}", i),
-            id: format!("s{}", i),
+            path: format!("/path/{i}"),
+            id: format!("s{i}"),
             cwd: "/".to_string(),
             name: None,
             created: Utc::now(),
@@ -43,7 +45,7 @@ fn test_write_buffer_eviction() {
     // Details eviction
     let dummy_details = SessionDetails::default();
     for i in 0..total {
-        buffer_details_write(&format!("/path/{}", i), Utc::now(), &dummy_details);
+        buffer_details_write(&format!("/path/{i}"), Utc::now(), &dummy_details);
     }
 
     assert!(get_buffered_details(&format!("/path/{}", 0)).is_none());

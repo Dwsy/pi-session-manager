@@ -1,10 +1,10 @@
+use lazy_static::lazy_static;
 use pi_session_manager::config::Config;
 use pi_session_manager::sqlite_cache;
 use rusqlite::{params, Connection};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use lazy_static::lazy_static;
 
 lazy_static! {
     static ref MIGRATION_LOCK: Mutex<()> = Mutex::new(());
@@ -192,7 +192,7 @@ fn test_database_corruption_recovery() {
             Err(e) => e,
         };
 
-        println!("Got error: '{}'", initial_err);
+        println!("Got error: '{initial_err}'");
         if initial_err.contains("malformed")
             || initial_err.contains("disk image")
             || initial_err.contains("not a database")
@@ -200,7 +200,7 @@ fn test_database_corruption_recovery() {
             fs::remove_file(&test_db_path).map_err(|err| err.to_string())?;
             println!("Deleted corrupted file, reopening...");
             let result = open_init(&test_db_path);
-            println!("Reopen result: {:?}", result);
+            println!("Reopen result: {result:?}");
             result
         } else {
             Err(initial_err)
@@ -300,7 +300,7 @@ fn test_fts_vtable_corruption_triggers_database_recreation() {
         .expect("read dir")
         .map(|e| e.unwrap().file_name())
         .collect();
-    println!("DEBUG: all entries in parent: {:?}", all_entries);
+    println!("DEBUG: all entries in parent: {all_entries:?}");
     let mut backup_files = Vec::new();
     for entry_name in all_entries {
         if let Some(name_str) = entry_name.to_str() {
@@ -309,7 +309,11 @@ fn test_fts_vtable_corruption_triggers_database_recreation() {
             }
         }
     }
-    assert_eq!(backup_files.len(), 1, "Expected exactly one backup file, got {:?}", backup_files);
+    assert_eq!(
+        backup_files.len(),
+        1,
+        "Expected exactly one backup file, got {backup_files:?}"
+    );
     let backup_path = &backup_files[0];
     assert!(backup_path.exists(), "Backup file should exist");
 

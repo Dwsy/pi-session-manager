@@ -18,18 +18,16 @@ lazy_static! {
 /// Helper: create a minimal session file with multiple messages
 fn make_session_file(id: &str, cwd: &str, messages: &[(&str, &str)]) -> String {
     let header = format!(
-        r#"{{"type":"session","version":3,"id":"{}","timestamp":"2026-02-10T22:00:00Z","cwd":"{}"}}"#,
-        id, cwd
+        r#"{{"type":"session","version":3,"id":"{id}","timestamp":"2026-02-10T22:00:00Z","cwd":"{cwd}"}}"#
     );
     let mut lines = vec![header];
     for (i, (role, text)) in messages.iter().enumerate() {
-        let entry_id = format!("{}-msg{}", id, i);
-        let timestamp = format!("2026-02-10T22:00:{:02}Z", i);
+        let entry_id = format!("{id}-msg{i}");
+        let timestamp = format!("2026-02-10T22:00:{i:02}Z");
         // Escape backslashes and double quotes for JSON
         let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
         let msg = format!(
-            r#"{{"type":"message","id":"{}","parentId":null,"timestamp":"{}","message":{{"role":"{}","content":[{{"type":"text","text":"{}"}}]}}}}"#,
-            entry_id, timestamp, role, escaped
+            r#"{{"type":"message","id":"{entry_id}","parentId":null,"timestamp":"{timestamp}","message":{{"role":"{role}","content":[{{"type":"text","text":"{escaped}"}}]}}}}"#
         );
         lines.push(msg);
     }
@@ -50,7 +48,7 @@ fn setup_test_db(sessions: &[(&str, &str, &[(&str, &str)])]) -> tempfile::TempDi
     let conn = sqlite_cache::init_db_with_config(&config).unwrap();
 
     for (id, cwd, messages) in sessions {
-        let path = sessions_dir.join(format!("{}.jsonl", id));
+        let path = sessions_dir.join(format!("{id}.jsonl"));
         let content = make_session_file(id, cwd, messages);
         fs::write(&path, content).unwrap();
 
@@ -149,10 +147,16 @@ async fn test_full_text_search_command_basic() {
     assert!(!response.hits.iter().any(|h| h.role == "assistant"));
 
     // Test 4: Role filter - assistant only on "banana"
-    let response: FullTextSearchResponse =
-        full_text_search("banana".to_string(), "assistant".to_string(), None, 0, 10, None)
-            .await
-            .unwrap();
+    let response: FullTextSearchResponse = full_text_search(
+        "banana".to_string(),
+        "assistant".to_string(),
+        None,
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
 
     assert!(!response.hits.is_empty());
     assert!(response.hits.iter().all(|h| h.role == "assistant"));
@@ -166,10 +170,16 @@ async fn test_full_text_search_command_basic() {
     assert!(response.hits.is_empty());
 
     // Test 6: No match
-    let response: FullTextSearchResponse =
-        full_text_search("xyznonexistent".to_string(), "all".to_string(), None, 0, 10, None)
-            .await
-            .unwrap();
+    let response: FullTextSearchResponse = full_text_search(
+        "xyznonexistent".to_string(),
+        "all".to_string(),
+        None,
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(response.total_hits, 0);
     assert!(response.hits.is_empty());
 
@@ -312,17 +322,29 @@ async fn test_full_text_search_escaping_special_chars() {
     assert!(!response.hits.is_empty());
 
     // Search for backslash
-    let response: FullTextSearchResponse =
-        full_text_search("backslash".to_string(), "all".to_string(), None, 0, 10, None)
-            .await
-            .unwrap();
+    let response: FullTextSearchResponse = full_text_search(
+        "backslash".to_string(),
+        "all".to_string(),
+        None,
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
     assert!(!response.hits.is_empty());
 
     // Search with quote in query
-    let response: FullTextSearchResponse =
-        full_text_search(r#""double""#.to_string(), "all".to_string(), None, 0, 10, None)
-            .await
-            .unwrap();
+    let response: FullTextSearchResponse = full_text_search(
+        r#""double""#.to_string(),
+        "all".to_string(),
+        None,
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
     // Should not panic
 
     println!("✅ Special character escaping test passed!");
@@ -357,7 +379,7 @@ async fn test_full_text_search_after_session_update() {
         .open(&sess_path)
         .unwrap();
     use std::io::Write;
-    writeln!(file, "\n{}", additional).unwrap();
+    writeln!(file, "\n{additional}").unwrap();
     file.sync_all().unwrap();
 
     // Rescan changed file
@@ -452,19 +474,17 @@ async fn test_full_text_search_cascade_delete() {
 async fn test_full_text_search_per_session_limit_uses_recent() {
     let _lock = TEST_DB_LOCK.lock().unwrap();
 
-    let _temp_dir = setup_test_db(&[
-        (
-            "s1",
-            "/cwd1",
-            &[
-                ("user", "test"),
-                ("user", "test"),
-                ("user", "test"),
-                ("user", "test"),
-                ("user", "test"),
-            ],
-        ),
-    ]);
+    let _temp_dir = setup_test_db(&[(
+        "s1",
+        "/cwd1",
+        &[
+            ("user", "test"),
+            ("user", "test"),
+            ("user", "test"),
+            ("user", "test"),
+            ("user", "test"),
+        ],
+    )]);
 
     // Search for "test" with page size 10 to retrieve all hits (per-session limit applies)
     let response: FullTextSearchResponse =
@@ -498,10 +518,7 @@ async fn test_full_text_search_role_filter_case_insensitive() {
     let _temp_dir = setup_test_db(&[(
         "s1",
         "/cwd1",
-        &[
-            ("user", "Hello world"),
-            ("assistant", "Hi there!"),
-        ],
+        &[("user", "Hello world"), ("assistant", "Hi there!")],
     )]);
 
     // Search with uppercase "USER" should still return only user messages
@@ -519,16 +536,10 @@ async fn test_full_text_search_role_filter_case_insensitive() {
     assert!(response.hits.iter().all(|h| h.role == "user"));
 
     // Mixed case "AssIstant" should return only assistant messages for "Hi"
-    let response: FullTextSearchResponse = full_text_search(
-        "Hi".to_string(),
-        "AssIstant".to_string(),
-        None,
-        0,
-        10,
-        None,
-    )
-    .await
-    .unwrap();
+    let response: FullTextSearchResponse =
+        full_text_search("Hi".to_string(), "AssIstant".to_string(), None, 0, 10, None)
+            .await
+            .unwrap();
     assert!(!response.hits.is_empty());
     assert!(response.hits.iter().all(|h| h.role == "assistant"));
 
