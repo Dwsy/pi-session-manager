@@ -784,6 +784,60 @@ async fn v1_analytics_overview(
     }
 }
 
+async fn v1_observability_summary(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> impl IntoResponse {
+    if !is_authorized(&addr.ip(), &headers, &uri) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            cors_headers(),
+            Json(serde_json::json!({ "success": false, "error": "Unauthorized" })),
+        )
+            .into_response();
+    }
+
+    match crate::session_intel::collect_sqlite_overview() {
+        Ok(overview) => (
+            StatusCode::OK,
+            cors_headers(),
+            Json(serde_json::json!({
+                "success": true,
+                "data": {
+                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                    "mode": "readonly",
+                    "capabilities": {
+                        "memory_recall": true,
+                        "memory_unified": true,
+                        "experience_extract": true,
+                        "workflow_route_suggest": true,
+                        "analytics_overview": true,
+                        "checkout_apply": false,
+                        "milestone_create": false
+                    },
+                    "endpoints": [
+                        "/v1/sessions",
+                        "/v1/memory/recall",
+                        "/v1/memory/unified",
+                        "/v1/experience/extract",
+                        "/v1/workflow/route-suggest",
+                        "/v1/analytics/overview"
+                    ],
+                    "overview": overview
+                }
+            })),
+        )
+            .into_response(),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            cors_headers(),
+            Json(serde_json::json!({ "success": false, "error": error })),
+        )
+            .into_response(),
+    }
+}
+
 async fn find_session_path_by_id(
     app_state: &SharedAppState,
     id: &str,
@@ -1423,6 +1477,7 @@ pub async fn init_http_adapter_with_options(
             post(v1_workflow_route_suggest),
         )
         .route("/v1/analytics/overview", get(v1_analytics_overview))
+        .route("/v1/observability/summary", get(v1_observability_summary))
         .route("/ws", get(handle_ws_upgrade))
         .route("/metrics", get(handle_metrics))
         .with_state(app_state);

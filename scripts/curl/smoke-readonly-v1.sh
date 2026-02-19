@@ -99,4 +99,11 @@ say "/v1/analytics/overview -> $code"
 [[ "$code" == "200" || "$code" == "401" ]] || { cat "$body"; exit 1; }
 if [[ "$code" == "200" ]]; then check_json_field "$body" "data.sessions" >/dev/null; fi
 
+# 7) observability/summary
+r=$(request GET "/v1/observability/summary")
+code=${r%%|*}; body=${r#*|}
+say "/v1/observability/summary -> $code"
+[[ "$code" == "200" || "$code" == "401" ]] || { cat "$body"; exit 1; }
+if [[ "$code" == "200" ]]; then check_json_field "$body" "data.mode" >/dev/null; fi
+
 say "smoke readonly v1 done"

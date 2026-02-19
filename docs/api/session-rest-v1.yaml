@@ -190,6 +190,11 @@ paths:
       summary: Read-only SQLite overview for memory/route capacity
       responses:
         '200': { description: ok }
+  /v1/observability/summary:
+    get:
+      summary: Read-only observability summary with capability flags
+      responses:
+        '200': { description: ok }
   /v1/events:
     get:
       summary: SSE stream (sessions-changed)

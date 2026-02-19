@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pi Session Readonly Observability Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background:#0b1020; color:#e6edf3; }
+    .row { display:flex; gap:12px; flex-wrap: wrap; margin-bottom:12px; }
+    input, button, select { padding:8px 10px; border-radius:8px; border:1px solid #334155; background:#111827; color:#e6edf3; }
+    button { cursor:pointer; }
+    .card { border:1px solid #334155; border-radius:10px; padding:12px; margin-top:10px; background:#111827; }
+    pre { white-space: pre-wrap; word-break: break-word; background:#020617; border:1px solid #334155; border-radius:8px; padding:10px; }
+    .ok { color:#22c55e; }
+    .warn { color:#f59e0b; }
+    .err { color:#ef4444; }
+  </style>
+</head>
+<body>
+  <h2>Readonly Memory Observability 测试台</h2>
+  <div class="row">
+    <label>BASE URL <input id="baseUrl" value="http://127.0.0.1:52131" size="28"></label>
+    <label>TOKEN <input id="token" placeholder="可选 Bearer Token" size="24"></label>
+    <button onclick="runAll()">Run All</button>
+  </div>
+
+  <div class="row">
+    <button onclick="callApi('/v1/observability/summary','GET')">observability/summary</button>
+    <button onclick="callApi('/v1/analytics/overview','GET')">analytics/overview</button>
+    <button onclick="callApi('/v1/memory/recall','POST',{query:'修复报错',top_k:5})">memory/recall</button>
+    <button onclick="callApi('/v1/memory/unified','POST',{query:'实现接口',top_k:5,experience_limit:5})">memory/unified</button>
+    <button onclick="callApi('/v1/experience/extract','POST',{limit:5})">experience/extract</button>
+    <button onclick="callApi('/v1/workflow/route-suggest','POST',{query:'实现并测试',top_k:5})">route-suggest</button>
+  </div>
+
+  <div class="card">
+    <div id="status">等待测试...</div>
+  </div>
+
+  <div class="card">
+    <h3>结果</h3>
+    <pre id="output">{}</pre>
+  </div>
+
+<script>
+async function callApi(path, method='GET', body=null) {
+  const baseUrl = document.getElementById('baseUrl').value.trim();
+  const token = document.getElementById('token').value.trim();
+  const headers = {'Content-Type':'application/json'};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(baseUrl + path, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined
+  });
+
+  let json = null;
+  try { json = await res.json(); } catch { json = { raw: await res.text() }; }
+
+  return { path, method, status: res.status, ok: res.ok, json };
+}
+
+async function runAll() {
+  const statusEl = document.getElementById('status');
+  const outputEl = document.getElementById('output');
+  statusEl.textContent = '执行中...';
+
+  const checks = [
+    ['/v1/observability/summary','GET',null],
+    ['/v1/analytics/overview','GET',null],
+    ['/v1/memory/recall','POST',{query:'修复报错',top_k:5}],
+    ['/v1/memory/unified','POST',{query:'实现接口',top_k:5,experience_limit:5}],
+    ['/v1/experience/extract','POST',{limit:5}],
+    ['/v1/workflow/route-suggest','POST',{query:'实现并测试',top_k:5}]
+  ];
+
+  const results = [];
+  for (const [path, method, body] of checks) {
+    try { results.push(await callApi(path, method, body)); }
+    catch (e) { results.push({ path, method, status: 0, ok: false, error: String(e) }); }
+  }
+
+  const okCount = results.filter(r => r.ok || r.status===401).length;
+  const cls = okCount === results.length ? 'ok' : (okCount > 0 ? 'warn' : 'err');
+  statusEl.innerHTML = `<span class="${cls}">完成: ${okCount}/${results.length} 通过(401 视为可达)</span>`;
+  outputEl.textContent = JSON.stringify(results, null, 2);
+}
+</script>
+</body>
+</html>

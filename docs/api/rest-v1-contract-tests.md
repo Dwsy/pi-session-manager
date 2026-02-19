@@ -20,6 +20,7 @@
 13. `POST /v1/sessions/{id}/checkout` with `strategy=reset|squash` returns `403` in read-only mode.
 14. `GET /v1/analytics/overview` returns sessions/details/top_cwds/intent_counts.
 15. `POST /v1/memory/unified` returns intent/confidence/evidence/next_actions/experience.
+16. `GET /v1/observability/summary` returns readonly mode + capabilities + overview.
 
 ## Example curl
 ```bash
