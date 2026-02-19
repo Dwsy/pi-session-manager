@@ -10,7 +10,10 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "build:cli": "bash scripts/build-cli.sh"
+    "build:cli": "bash scripts/build-cli.sh",
+    "docs:dev": "vitepress dev website",
+    "docs:build": "vitepress build website",
+    "docs:preview": "vitepress preview website"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -48,6 +51,6 @@
     "tailwindcss": "^3.4.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
-    "vite-plugin-pwa": "^1.2.0"
+    "vitepress": "^1.6.4"
   }
 }

@@ -1,0 +1,205 @@
+openapi: 3.0.3
+info:
+  title: Pi Session Manager REST v1
+  version: 0.1.0
+  description: REST facade on top of existing /api command-dispatch bus.
+servers:
+  - url: http://localhost:4123
+paths:
+  /v1/sessions:
+    get:
+      summary: List sessions
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: cwd
+          schema: { type: string }
+      responses:
+        '200':
+          description: ok
+  /v1/sessions/{id}/entries:
+    get:
+      summary: Get session entries (tree/raw timeline source)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+        '404': { description: not found }
+  /v1/sessions/{id}/snapshot:
+    get:
+      summary: Build lightweight snapshot for review/handoff
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+  /v1/sessions/{id}/checkout:
+    post:
+      summary: Checkout-like preview (read-only; apply disabled)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_type, target_value]
+              properties:
+                target_type: { type: string, enum: [entry_id, position], default: entry_id }
+                target_value: { type: string }
+                strategy:
+                  type: string
+                  enum: [preview, reset, squash]
+                  default: preview
+                carryover_message: { type: string, nullable: true }
+      responses:
+        '200': { description: ok }
+        '400': { description: invalid target }
+        '404': { description: session not found }
+  /v1/sessions/{id}/milestones:
+    get:
+      summary: List milestones (tag prefix milestone/)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+    post:
+      summary: Create milestone and bind to session
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                color: { type: string, example: '#7c3aed' }
+                icon: { type: string, nullable: true }
+      responses:
+        '201': { description: created }
+  /v1/search/fulltext:
+    post:
+      summary: Full-text search on message index (SQLite FTS5)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string }
+                role_filter: { type: string, enum: [all, user, assistant] }
+                glob_pattern: { type: string, nullable: true }
+                page: { type: integer, minimum: 0, default: 0 }
+                page_size: { type: integer, minimum: 1, default: 20 }
+                match_mode: { type: string, enum: [any, all, phrase], default: any }
+      responses:
+        '200': { description: ok }
+  /v1/memory/recall:
+    post:
+      summary: Recall relevant memories with structured routing hints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string }
+                top_k: { type: integer, minimum: 1, maximum: 50, default: 8 }
+                role_filter: { type: string, enum: [all, user, assistant] }
+                glob_pattern: { type: string, nullable: true }
+      responses:
+        '200': { description: ok }
+  /v1/memory/unified:
+    post:
+      summary: Unified memory payload for role plugin (recall+experience+route)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string }
+                top_k: { type: integer, minimum: 1, maximum: 50, default: 8 }
+                role_filter: { type: string, enum: [all, user, assistant] }
+                glob_pattern: { type: string, nullable: true }
+                experience_limit: { type: integer, minimum: 1, maximum: 50, default: 8 }
+      responses:
+        '200': { description: ok }
+  /v1/experience/extract:
+    post:
+      summary: Extract problem-action-outcome experiences from sessions
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id: { type: string, nullable: true }
+                limit: { type: integer, minimum: 1, maximum: 200, default: 20 }
+      responses:
+        '200': { description: ok }
+  /v1/workflow/route-suggest:
+    post:
+      summary: Suggest next workflow actions from historical evidence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string }
+                top_k: { type: integer, minimum: 1, maximum: 50, default: 8 }
+                role_filter: { type: string, enum: [all, user, assistant] }
+                glob_pattern: { type: string, nullable: true }
+      responses:
+        '200': { description: ok }
+  /v1/analytics/overview:
+    get:
+      summary: Read-only SQLite overview for memory/route capacity
+      responses:
+        '200': { description: ok }
+  /v1/events:
+    get:
+      summary: SSE stream (sessions-changed)
+      responses:
+        '200': { description: text/event-stream }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: token
+security:
+  - bearerAuth: []
