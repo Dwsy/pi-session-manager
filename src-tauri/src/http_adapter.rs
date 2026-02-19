@@ -9,6 +9,7 @@ use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use chrono::{DateTime, Utc};
 use futures_util::stream::Stream;
 use futures_util::{SinkExt, StreamExt};
 use rust_embed::Embed;
@@ -43,6 +44,9 @@ struct SessionsQuery {
     limit: Option<usize>,
     q: Option<String>,
     cwd: Option<String>,
+    project: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -52,6 +56,12 @@ struct FullTextSearchRequest {
     role_filter: Option<String>,
     #[serde(default)]
     glob_pattern: Option<String>,
+    #[serde(default)]
+    project: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+    #[serde(default)]
+    to: Option<String>,
     #[serde(default)]
     page: Option<usize>,
     #[serde(default)]
@@ -69,6 +79,12 @@ struct MemoryRecallRequest {
     role_filter: Option<String>,
     #[serde(default)]
     glob_pattern: Option<String>,
+    #[serde(default)]
+    project: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+    #[serde(default)]
+    to: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -96,6 +112,12 @@ struct ExperienceExtractRequest {
     session_id: Option<String>,
     #[serde(default)]
     limit: Option<usize>,
+    #[serde(default)]
+    project: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+    #[serde(default)]
+    to: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -107,6 +129,12 @@ struct WorkflowRouteSuggestRequest {
     role_filter: Option<String>,
     #[serde(default)]
     glob_pattern: Option<String>,
+    #[serde(default)]
+    project: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+    #[serde(default)]
+    to: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -118,6 +146,12 @@ struct MemoryUnifiedRequest {
     role_filter: Option<String>,
     #[serde(default)]
     glob_pattern: Option<String>,
+    #[serde(default)]
+    project: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+    #[serde(default)]
+    to: Option<String>,
     #[serde(default)]
     experience_limit: Option<usize>,
 }
@@ -161,6 +195,72 @@ fn is_authorized(ip: &std::net::IpAddr, headers: &HeaderMap, uri: &Uri) -> bool 
         .as_deref()
         .map(auth::validate)
         .unwrap_or(false)
+}
+
+fn parse_time_opt(input: &Option<String>) -> Result<Option<DateTime<Utc>>, String> {
+    match input {
+        Some(s) if !s.trim().is_empty() => DateTime::parse_from_rfc3339(s)
+            .map(|dt| Some(dt.with_timezone(&Utc)))
+            .map_err(|e| format!("Invalid time format '{s}': {e}")),
+        _ => Ok(None),
+    }
+}
+
+fn session_matches_scope(
+    session: &crate::models::SessionInfo,
+    project: Option<&str>,
+    from: Option<DateTime<Utc>>,
+    to: Option<DateTime<Utc>>,
+) -> bool {
+    if let Some(p) = project {
+        let p = p.to_lowercase();
+        let hit = session.cwd.to_lowercase().contains(&p)
+            || session.path.to_lowercase().contains(&p)
+            || session
+                .name
+                .as_ref()
+                .map(|n| n.to_lowercase().contains(&p))
+                .unwrap_or(false);
+        if !hit {
+            return false;
+        }
+    }
+
+    if let Some(from_t) = from {
+        if session.modified < from_t {
+            return false;
+        }
+    }
+    if let Some(to_t) = to {
+        if session.modified > to_t {
+            return false;
+        }
+    }
+    true
+}
+
+fn hit_matches_scope(
+    hit: &crate::models::FullTextSearchHit,
+    project: Option<&str>,
+    from: Option<DateTime<Utc>>,
+    to: Option<DateTime<Utc>>,
+) -> bool {
+    if let Some(p) = project {
+        if !hit.session_path.to_lowercase().contains(&p.to_lowercase()) {
+            return false;
+        }
+    }
+    if let Some(from_t) = from {
+        if hit.timestamp < from_t {
+            return false;
+        }
+    }
+    if let Some(to_t) = to {
+        if hit.timestamp > to_t {
+            return false;
+        }
+    }
+    true
 }
 
 // ─── HTTP POST /api ──────────────────────────────────────────
@@ -272,6 +372,29 @@ async fn v1_list_sessions(
             .into_response();
     }
 
+    let from = match parse_time_opt(&query.from) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+    let to = match parse_time_opt(&query.to) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+
     let result = dispatch(&app_state, "scan_sessions", &serde_json::json!({})).await;
     match result {
         Ok(data) => {
@@ -294,6 +417,8 @@ async fn v1_list_sessions(
                         || s.first_message.to_lowercase().contains(&q)
                 });
             }
+
+            sessions.retain(|s| session_matches_scope(s, query.project.as_deref(), from, to));
 
             if let Some(limit) = query.limit {
                 sessions.truncate(limit);
@@ -394,22 +519,63 @@ async fn v1_full_text_search(
             .into_response();
     }
 
+    let from = match parse_time_opt(&req.from) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+    let to = match parse_time_opt(&req.to) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+
+    let effective_glob = req
+        .glob_pattern
+        .clone()
+        .or_else(|| req.project.as_ref().map(|p| format!("*{p}*")));
+
     let payload = serde_json::json!({
         "query": req.query,
         "role_filter": req.role_filter.unwrap_or_else(|| "all".to_string()),
-        "glob_pattern": req.glob_pattern,
+        "glob_pattern": effective_glob,
         "page": req.page.unwrap_or(0),
         "page_size": req.page_size.unwrap_or(20),
         "match_mode": req.match_mode,
     });
 
     match dispatch(&app_state, "full_text_search", &payload).await {
-        Ok(data) => (
-            StatusCode::OK,
-            cors_headers(),
-            Json(serde_json::json!({ "success": true, "data": data })),
-        )
-            .into_response(),
+        Ok(data) => {
+            let mut fts: crate::models::FullTextSearchResponse = serde_json::from_value(data)
+                .unwrap_or(crate::models::FullTextSearchResponse {
+                    hits: vec![],
+                    total_hits: 0,
+                    has_more: false,
+                });
+            fts.hits
+                .retain(|h| hit_matches_scope(h, req.project.as_deref(), from, to));
+            fts.total_hits = fts.hits.len();
+            fts.has_more = false;
+
+            (
+                StatusCode::OK,
+                cors_headers(),
+                Json(serde_json::json!({ "success": true, "data": fts })),
+            )
+                .into_response()
+        }
         Err(error) => (
             StatusCode::BAD_REQUEST,
             cors_headers(),
@@ -437,10 +603,38 @@ async fn v1_memory_recall(
 
     let query_text = req.query;
     let top_k = req.top_k.unwrap_or(8).clamp(1, 50);
+    let from = match parse_time_opt(&req.from) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+    let to = match parse_time_opt(&req.to) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+
+    let effective_glob = req
+        .glob_pattern
+        .clone()
+        .or_else(|| req.project.as_ref().map(|p| format!("*{p}*")));
+
     let payload = serde_json::json!({
         "query": query_text,
         "role_filter": req.role_filter.unwrap_or_else(|| "all".to_string()),
-        "glob_pattern": req.glob_pattern,
+        "glob_pattern": effective_glob,
         "page": 0,
         "page_size": top_k,
         "match_mode": "any",
@@ -458,7 +652,7 @@ async fn v1_memory_recall(
         }
     };
 
-    let fts: crate::models::FullTextSearchResponse = match serde_json::from_value(fts_value) {
+    let mut fts: crate::models::FullTextSearchResponse = match serde_json::from_value(fts_value) {
         Ok(v) => v,
         Err(error) => {
             return (
@@ -470,7 +664,10 @@ async fn v1_memory_recall(
         }
     };
 
-    let total_hits = fts.total_hits;
+    fts.hits
+        .retain(|h| hit_matches_scope(h, req.project.as_deref(), from, to));
+
+    let total_hits = fts.hits.len();
     let structured = crate::session_intel::build_structured_recall(&query_text, fts.hits);
     let route_plan =
         crate::session_intel::suggest_workflow(&structured.intent, structured.confidence);
@@ -511,6 +708,29 @@ async fn v1_experience_extract(
     }
 
     let limit = req.limit.unwrap_or(20).clamp(1, 200);
+    let from = match parse_time_opt(&req.from) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+    let to = match parse_time_opt(&req.to) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+
     let mut experiences: Vec<crate::session_intel::ExperienceItem> = Vec::new();
 
     let sessions_value = match dispatch(&app_state, "scan_sessions", &serde_json::json!({})).await {
@@ -527,15 +747,20 @@ async fn v1_experience_extract(
     let sessions: Vec<crate::models::SessionInfo> =
         serde_json::from_value(sessions_value).unwrap_or_default();
 
-    let selected_sessions: Vec<crate::models::SessionInfo> =
+    let mut selected_sessions: Vec<crate::models::SessionInfo> =
         if let Some(session_id) = req.session_id {
             sessions
                 .into_iter()
                 .filter(|s| s.id == session_id)
                 .collect()
         } else {
-            sessions.into_iter().take(8).collect()
+            sessions.into_iter().collect()
         };
+
+    selected_sessions.retain(|s| session_matches_scope(s, req.project.as_deref(), from, to));
+    if selected_sessions.len() > 8 {
+        selected_sessions.truncate(8);
+    }
 
     for session in selected_sessions {
         let entries_val = match dispatch(
@@ -590,10 +815,38 @@ async fn v1_workflow_route_suggest(
     }
 
     let top_k = req.top_k.unwrap_or(8).clamp(1, 50);
+    let from = match parse_time_opt(&req.from) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+    let to = match parse_time_opt(&req.to) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+
+    let effective_glob = req
+        .glob_pattern
+        .clone()
+        .or_else(|| req.project.as_ref().map(|p| format!("*{p}*")));
+
     let payload = serde_json::json!({
         "query": req.query,
         "role_filter": req.role_filter.unwrap_or_else(|| "all".to_string()),
-        "glob_pattern": req.glob_pattern,
+        "glob_pattern": effective_glob,
         "page": 0,
         "page_size": top_k,
         "match_mode": "any",
@@ -611,7 +864,7 @@ async fn v1_workflow_route_suggest(
         }
     };
 
-    let fts: crate::models::FullTextSearchResponse = match serde_json::from_value(fts_value) {
+    let mut fts: crate::models::FullTextSearchResponse = match serde_json::from_value(fts_value) {
         Ok(v) => v,
         Err(error) => {
             return (
@@ -622,6 +875,9 @@ async fn v1_workflow_route_suggest(
                 .into_response();
         }
     };
+
+    fts.hits
+        .retain(|h| hit_matches_scope(h, req.project.as_deref(), from, to));
 
     let structured = crate::session_intel::build_structured_recall(&req.query, fts.hits);
     let next_actions =
@@ -662,10 +918,39 @@ async fn v1_memory_unified(
 
     let top_k = req.top_k.unwrap_or(8).clamp(1, 50);
     let experience_limit = req.experience_limit.unwrap_or(8).clamp(1, 50);
+
+    let from = match parse_time_opt(&req.from) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+    let to = match parse_time_opt(&req.to) {
+        Ok(v) => v,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                cors_headers(),
+                Json(serde_json::json!({ "success": false, "error": error })),
+            )
+                .into_response();
+        }
+    };
+
+    let effective_glob = req
+        .glob_pattern
+        .clone()
+        .or_else(|| req.project.as_ref().map(|p| format!("*{p}*")));
+
     let payload = serde_json::json!({
         "query": req.query,
         "role_filter": req.role_filter.unwrap_or_else(|| "all".to_string()),
-        "glob_pattern": req.glob_pattern,
+        "glob_pattern": effective_glob,
         "page": 0,
         "page_size": top_k,
         "match_mode": "any",
@@ -682,7 +967,7 @@ async fn v1_memory_unified(
                 .into_response();
         }
     };
-    let fts: crate::models::FullTextSearchResponse = match serde_json::from_value(fts_value) {
+    let mut fts: crate::models::FullTextSearchResponse = match serde_json::from_value(fts_value) {
         Ok(v) => v,
         Err(error) => {
             return (
@@ -693,6 +978,9 @@ async fn v1_memory_unified(
                 .into_response();
         }
     };
+
+    fts.hits
+        .retain(|h| hit_matches_scope(h, req.project.as_deref(), from, to));
 
     let structured = crate::session_intel::build_structured_recall(&req.query, fts.hits);
     let next_actions =
@@ -713,8 +1001,16 @@ async fn v1_memory_unified(
     let sessions: Vec<crate::models::SessionInfo> =
         serde_json::from_value(sessions_value).unwrap_or_default();
 
+    let mut scoped_sessions: Vec<crate::models::SessionInfo> = sessions
+        .into_iter()
+        .filter(|s| session_matches_scope(s, req.project.as_deref(), from, to))
+        .collect();
+    if scoped_sessions.len() > 6 {
+        scoped_sessions.truncate(6);
+    }
+
     let mut experience_items: Vec<crate::session_intel::ExperienceItem> = Vec::new();
-    for s in sessions.into_iter().take(6) {
+    for s in scoped_sessions {
         let entries_val = match dispatch(
             &app_state,
             "get_session_entries",

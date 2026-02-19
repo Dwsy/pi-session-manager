@@ -21,6 +21,9 @@
   <div class="row">
     <label>BASE URL <input id="baseUrl" value="http://127.0.0.1:52131" size="28"></label>
     <label>TOKEN <input id="token" placeholder="可选 Bearer Token" size="24"></label>
+    <label>project <input id="project" placeholder="如 pi-session-manager" size="20"></label>
+    <label>from <input id="from" placeholder="2026-02-01T00:00:00Z" size="24"></label>
+    <label>to <input id="to" placeholder="2026-02-20T00:00:00Z" size="24"></label>
     <button onclick="runAll()">Run All</button>
   </div>
 
@@ -66,13 +69,26 @@ async function runAll() {
   const outputEl = document.getElementById('output');
   statusEl.textContent = '执行中...';
 
+  const project = document.getElementById('project').value.trim();
+  const from = document.getElementById('from').value.trim();
+  const to = document.getElementById('to').value.trim();
+  const scope = {
+    ...(project ? { project } : {}),
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {})
+  };
+
+  const qs = new URLSearchParams(scope).toString();
+  const sessionsPath = qs ? `/v1/sessions?${qs}` : '/v1/sessions';
+
   const checks = [
     ['/v1/observability/summary','GET',null],
     ['/v1/analytics/overview','GET',null],
-    ['/v1/memory/recall','POST',{query:'修复报错',top_k:5}],
-    ['/v1/memory/unified','POST',{query:'实现接口',top_k:5,experience_limit:5}],
-    ['/v1/experience/extract','POST',{limit:5}],
-    ['/v1/workflow/route-suggest','POST',{query:'实现并测试',top_k:5}]
+    [sessionsPath,'GET',null],
+    ['/v1/memory/recall','POST',{query:'修复报错',top_k:5,...scope}],
+    ['/v1/memory/unified','POST',{query:'实现接口',top_k:5,experience_limit:5,...scope}],
+    ['/v1/experience/extract','POST',{limit:5,...scope}],
+    ['/v1/workflow/route-suggest','POST',{query:'实现并测试',top_k:5,...scope}]
   ];
 
   const results = [];
