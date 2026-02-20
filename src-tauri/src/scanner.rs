@@ -167,6 +167,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                                     };
 
                                     if file_modified > realtime_cutoff {
+                                        // Recent file: parse from disk, add to results, buffer for DB
                                         if let Ok((info, _entries)) = parse_session_info(&file_path)
                                         {
                                             sessions.push(info);
@@ -178,20 +179,31 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                                     } else if let Some(cached_mtime) =
                                         sqlite_cache::get_cached_file_modified(&conn, &path_str)?
                                     {
+                                        // In DB: re-parse only if file changed since last cache
                                         if file_modified > cached_mtime {
-                                            if let Ok((info, _entries)) =
+                                            if let Ok((info, entries)) =
                                                 parse_session_info(&file_path)
                                             {
-                                                write_buffer::buffer_session_write(
+                                                let _ = sqlite_cache::upsert_session(
+                                                    &conn,
                                                     &info,
                                                     file_modified,
+                                                    Some(&entries),
                                                 );
                                             }
                                         }
-                                    } else if let Ok((info, _entries)) =
-                                        parse_session_info(&file_path)
-                                    {
-                                        write_buffer::buffer_session_write(&info, file_modified);
+                                    } else {
+                                        // Not in DB (cold start): parse and write directly to DB
+                                        if let Ok((info, entries)) =
+                                            parse_session_info(&file_path)
+                                        {
+                                            let _ = sqlite_cache::upsert_session(
+                                                &conn,
+                                                &info,
+                                                file_modified,
+                                                Some(&entries),
+                                            );
+                                        }
                                     }
                                 }
                             }
@@ -200,6 +212,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                 }
             }
 
+            // Load all historical sessions from DB (now populated for cold start too)
             let historical_sessions =
                 sqlite_cache::get_sessions_modified_before(&conn, realtime_cutoff)?;
 
@@ -217,8 +230,8 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                 .count();
             let historical_count = sessions.len() - realtime_count;
 
-            trace!(
-                "Scan complete: {} realtime (≤{}d), {} historical (>{}d), total {}",
+            info!(
+                "Scan complete: {} realtime (≤{}d), {} historical (>{}d), {} total",
                 realtime_count,
                 config.realtime_cutoff_days,
                 historical_count,

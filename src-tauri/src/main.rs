@@ -1,6 +1,6 @@
 #![cfg(feature = "gui")]
 
-use tauri::Manager;
+use tauri::{Listener, Manager};
 
 fn main() {
     tracing_subscriber::fmt::init();
@@ -76,6 +76,69 @@ fn main() {
                     }
                 });
             }
+
+            // Start periodic write buffer flush (buffers session writes to reduce DB I/O)
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+                loop {
+                    interval.tick().await;
+                    if let Some((sessions, details)) =
+                        pi_session_manager::write_buffer::check_and_take_flush_data()
+                    {
+                        let sessions_count = sessions.len();
+                        let details_count = details.len();
+                        if let Ok(conn) = pi_session_manager::sqlite_cache::init_db() {
+                            for entry in sessions {
+                                let _ = pi_session_manager::sqlite_cache::upsert_session(
+                                    &conn,
+                                    &entry.session,
+                                    entry.file_modified,
+                                    None,
+                                );
+                            }
+                            for entry in details {
+                                let _ =
+                                    pi_session_manager::sqlite_cache::upsert_session_details_cache(
+                                        &conn,
+                                        &entry.path,
+                                        entry.file_modified,
+                                        &entry.details,
+                                    );
+                            }
+                            log::trace!(
+                                "Flushed {sessions_count} sessions and {details_count} details to database"
+                            );
+                        }
+                    }
+                }
+            });
+
+            // Flush write buffer on app exit
+            app.handle().clone().listen("tauri://exit", |_| {
+                if let Some((sessions, details)) =
+                    pi_session_manager::write_buffer::force_flush_all()
+                {
+                    if let Ok(conn) = pi_session_manager::sqlite_cache::init_db() {
+                        for entry in sessions {
+                            let _ = pi_session_manager::sqlite_cache::upsert_session(
+                                &conn,
+                                &entry.session,
+                                entry.file_modified,
+                                None,
+                            );
+                        }
+                        for entry in details {
+                            let _ =
+                                pi_session_manager::sqlite_cache::upsert_session_details_cache(
+                                    &conn,
+                                    &entry.path,
+                                    entry.file_modified,
+                                    &entry.details,
+                                );
+                        }
+                    }
+                }
+            });
 
             if cli_mode {
                 let mut info = String::from("CLI mode:");
