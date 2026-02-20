@@ -88,11 +88,13 @@ function readRemoteConfig(): RemoteConfig {
     const httpBase = normalizeHttpBase(qServer)
     localStorage.setItem('psm.httpBaseUrl', httpBase)
     localStorage.setItem('psm.wsUrl', toWsUrl(httpBase))
+    if (!qTransport) localStorage.setItem('psm.transport', 'http')
   }
   if (qHttp) {
     const httpBase = normalizeHttpBase(qHttp)
     localStorage.setItem('psm.httpBaseUrl', httpBase)
     localStorage.setItem('psm.wsUrl', toWsUrl(httpBase))
+    if (!qTransport) localStorage.setItem('psm.transport', 'http')
   }
   if (qWs) localStorage.setItem('psm.wsUrl', toWsUrl(qWs))
   if (qToken) localStorage.setItem('psm.apiToken', qToken)
