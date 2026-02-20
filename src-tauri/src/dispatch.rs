@@ -401,6 +401,12 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             Ok(serde_json::to_value(result).unwrap())
         }
 
+        // Subscription usage
+        "get_subscription_usage" => {
+            let result = crate::get_subscription_usage().await?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+
         // Tags
         "get_all_tags" => {
             let result = crate::get_all_tags().await?;

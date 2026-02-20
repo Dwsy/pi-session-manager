@@ -6,6 +6,7 @@ pub mod search;
 mod session;
 mod settings;
 mod skills;
+mod subscription;
 mod tags;
 #[cfg(feature = "gui")]
 pub mod terminal;
@@ -18,6 +19,7 @@ pub use search::*;
 pub use session::*;
 pub use settings::*;
 pub use skills::*;
+pub use subscription::*;
 pub use tags::*;
 #[cfg(feature = "gui")]
 pub use terminal::*;

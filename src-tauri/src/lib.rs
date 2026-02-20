@@ -66,6 +66,7 @@ pub fn run() {
             list_models,
             test_model,
             test_models_batch,
+            get_subscription_usage,
             load_app_settings,
             save_app_settings,
             load_server_settings,

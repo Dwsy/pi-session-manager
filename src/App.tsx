@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search, Terminal, Columns3, Loader2 } from 'lucide-react'
+import { FolderOpen, Star, Settings, ArrowLeft, LayoutDashboard, Search, Terminal, Columns3, Loader2, BarChart3 } from 'lucide-react'
 import KbdTooltip from './components/KbdTooltip'
 import ProjectFilterList from './components/ProjectFilterList'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -41,6 +41,7 @@ const Dashboard = lazy(() => import('./components/Dashboard'))
 const KanbanBoard = lazy(() => import('./components/kanban/KanbanBoard'))
 const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel'))
 const TerminalPanel = lazy(() => import('./components/TerminalPanel'))
+const SubscriptionUsagePage = lazy(() => import('./components/subscription/SubscriptionUsagePage'))
 const CommandPalette = lazy(() => import('./components/command').then(m => ({ default: m.CommandPalette })))
 
 // Loading fallback
@@ -64,7 +65,7 @@ namespace sqlite_cache {
 function App() {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
-  const [mobileTab, setMobileTab] = useState<'list' | 'projects' | 'kanban' | 'dashboard' | 'settings'>('list')
+  const [mobileTab, setMobileTab] = useState<'list' | 'projects' | 'kanban' | 'dashboard' | 'subscription' | 'settings'>('list')
   const listScrollRef = useRef<HTMLDivElement>(null)
   const projectScrollRef = useRef<HTMLDivElement>(null)
 
@@ -86,7 +87,7 @@ function App() {
   useAppearance()
 
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'list' | 'project' | 'kanban'>(() => {
+  const [viewMode, setViewMode] = useState<'list' | 'project' | 'kanban' | 'subscription'>(() => {
     const saved = getCachedSettings().session?.defaultViewMode
     return saved === 'list' ? 'list' : saved === 'kanban' ? 'kanban' : 'project'
   })
@@ -530,6 +531,12 @@ function App() {
     </Suspense>
   )
 
+  const renderSubscription = () => (
+    <Suspense fallback={<LoadingSpinner />}>
+      <SubscriptionUsagePage />
+    </Suspense>
+  )
+
   const renderSessionViewer = () => (
     <SessionViewer
       session={selectedSession!}
@@ -617,6 +624,7 @@ function App() {
           {mobileTab === 'projects' && renderProjectList()}
           {mobileTab === 'kanban' && renderKanban()}
           {mobileTab === 'dashboard' && renderDashboard()}
+          {mobileTab === 'subscription' && renderSubscription()}
           {mobileTab === 'settings' && (
             <Suspense fallback={<LoadingSpinner />}>
               <SettingsPanel
@@ -635,6 +643,7 @@ function App() {
               { id: 'projects' as const, icon: <FolderOpen className="h-5 w-5" />, label: t('app.viewMode.project', '项目') },
               { id: 'kanban' as const, icon: <Columns3 className="h-5 w-5" />, label: t('tags.kanban.title', '看板') },
               { id: 'dashboard' as const, icon: <LayoutDashboard className="h-5 w-5" />, label: t('dashboard.title', '概览') },
+              { id: 'subscription' as const, icon: <BarChart3 className="h-5 w-5" />, label: '订阅' },
               { id: 'settings' as const, icon: <Settings className="h-5 w-5" />, label: t('settings.title', '设置') },
             ]).map(tab => (
               <button
@@ -677,6 +686,13 @@ function App() {
               title={t('dashboard.title')}
             >
               <LayoutDashboard className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => { setViewMode('subscription'); setSelectedSession(null); setShowFavorites(false) }}
+              className={`p-1 rounded transition-colors mr-1 ${viewMode === 'subscription' && !showFavorites ? 'text-blue-400 bg-secondary' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'}`}
+              title="订阅用量"
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
             </button>
             <div className="flex items-center bg-surface rounded-lg p-0.5 mr-1">
               <button
@@ -894,7 +910,13 @@ function App() {
         )}
         <div className="flex-1 overflow-hidden flex flex-col">
           <div className="flex-1 overflow-hidden" style={{ display: showTerminal && terminalMaximized ? 'none' : undefined }}>
-            {selectedSession ? renderSessionViewer() : viewMode === 'kanban' ? renderKanban() : renderDashboard()}
+            {selectedSession
+              ? renderSessionViewer()
+              : viewMode === 'kanban'
+                ? renderKanban()
+                : viewMode === 'subscription'
+                  ? renderSubscription()
+                  : renderDashboard()}
           </div>
           {terminalConfig.enabled && (
           <Suspense fallback={null}>

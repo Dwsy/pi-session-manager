@@ -148,6 +148,7 @@ fn main() {
             pi_session_manager::list_models,
             pi_session_manager::test_model,
             pi_session_manager::test_models_batch,
+            pi_session_manager::get_subscription_usage,
             pi_session_manager::add_favorite,
             pi_session_manager::remove_favorite,
             pi_session_manager::get_all_favorites,
