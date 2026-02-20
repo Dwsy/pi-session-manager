@@ -134,10 +134,16 @@
 .react-flow__minimap {
   background: rgb(var(--color-card)) !important;
   border: 1px solid rgb(var(--color-border));
-  border-radius: 4px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgb(var(--color-shadow) / 0.15);
 }
 
 .react-flow__minimap-mask {
   fill: rgb(var(--color-background));
-  fill-opacity: 0.7;
+  fill-opacity: 0.6;
+  cursor: move;
+}
+
+.react-flow__minimap-node {
+  cursor: pointer;
 }

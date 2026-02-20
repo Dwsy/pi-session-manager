@@ -104,7 +104,8 @@ fn main() {
                 .resizable(true)
                 .fullscreen(false);
 
-                let builder = builder.zoom_hotkeys_enabled(true);
+                // Default to false to avoid accidental pinch zoom on macOS
+                let builder = builder.zoom_hotkeys_enabled(false);
 
                 #[cfg(target_os = "macos")]
                 let builder = builder

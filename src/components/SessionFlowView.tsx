@@ -14,7 +14,7 @@ import {
   Handle,
   Position,
 } from '@xyflow/react'
-import { User, Bot, Wrench, Settings, FileText, ZoomIn, ZoomOut, Maximize, LocateFixed } from 'lucide-react'
+import { User, Bot, Wrench, Settings, FileText, ZoomIn, ZoomOut, Maximize, LocateFixed, GitBranch, List } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import '../styles/flow.css'
 import type { SessionEntry } from '../types'
@@ -26,6 +26,8 @@ interface SessionFlowViewProps {
   activeLeafId?: string
   onNodeClick?: (leafId: string, targetId: string) => void
   filter?: FilterMode
+  viewMode?: 'flow' | 'hierarchy'
+  onViewModeChange?: (mode: 'flow' | 'hierarchy') => void
 }
 
 const NODE_W = 200
@@ -383,9 +385,11 @@ interface FlowInnerProps {
   onEdgesChange: any
   onNodeClick: (_: React.MouseEvent, node: Node) => void
   activeLeafId?: string
+  viewMode?: 'flow' | 'hierarchy'
+  onViewModeChange?: (mode: 'flow' | 'hierarchy') => void
 }
 
-function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, activeLeafId }: FlowInnerProps) {
+function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, activeLeafId, viewMode = 'flow', onViewModeChange }: FlowInnerProps) {
   const { t } = useTranslation()
   const { zoomIn, zoomOut, fitView, setCenter, getZoom } = useReactFlow()
 
@@ -404,6 +408,14 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
         <button onClick={() => zoomOut({ duration: 200 })} title={t('components.sessionFlow.zoomOut')}><ZoomOut size={14} /></button>
         <button onClick={() => fitView({ padding: 0.2, duration: 300 })} title={t('components.sessionFlow.fitView')}><Maximize size={14} /></button>
         <button onClick={focusActive} title={t('components.sessionFlow.focusActive')}><LocateFixed size={14} /></button>
+        {onViewModeChange && (
+          <button
+            onClick={() => onViewModeChange(viewMode === 'flow' ? 'hierarchy' : 'flow')}
+            title={viewMode === 'flow' ? 'Switch to Hierarchy View' : 'Switch to Flow View'}
+          >
+            {viewMode === 'flow' ? <GitBranch size={14} /> : <List size={14} />}
+          </button>
+        )}
       </div>
       <ReactFlow
         nodes={nodes} edges={edges}
@@ -414,8 +426,13 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
         minZoom={0.05} maxZoom={2}
         proOptions={{ hideAttribution: true }}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}
+        panOnDrag={true}
+        panOnScroll={true}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
       >
         <Background gap={20} size={1} />
+        {/* Enhanced interactive MiniMap with draggable viewport */}
         <MiniMap
           nodeColor={(n) => {
             const d = n.data as { role: string; isActive: boolean }
@@ -424,6 +441,11 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
             if (d.role === 'tool') return 'rgb(var(--color-success))'
             return 'rgb(var(--color-muted-foreground))'
           }}
+          maskColor="rgb(var(--color-background) / 0.6)"
+          nodeStrokeColor="rgb(var(--color-border))"
+          pannable={true}
+          zoomable={true}
+          draggable
         />
       </ReactFlow>
     </div>
