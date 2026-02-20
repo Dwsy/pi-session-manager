@@ -107,7 +107,7 @@ ref
   const [currentResultIndex, setCurrentResultIndex] = useState(0)
   const [searchResults, setSearchResults] = useState<string[]>([])
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set())
-  const [viewMode, setViewMode] = useState<'tree' | 'flow'>('tree')
+  const [viewMode, setViewMode] = useState<'tree' | 'flow' | 'hierarchy'>('tree')
 
   useImperativeHandle(ref, () => ({
     focusSearch: () => {
@@ -727,6 +727,12 @@ ref
         >
           Flow
         </button>
+        <button
+          className={`filter-btn ${viewMode === 'hierarchy' ? 'active' : ''}`}
+          onClick={() => setViewMode('hierarchy')}
+        >
+          Hierarchy
+        </button>
       </div>
 
       {/* Filters */}
@@ -781,7 +787,7 @@ ref
         </button>
       </div>
 
-      {viewMode === 'flow' ? (
+      {viewMode === 'flow' || viewMode === 'hierarchy' ? (
         <div className="flex-1 min-h-0">
           <Suspense fallback={<div style={{ padding: 12, color: 'var(--color-text-secondary)' }}>{t('session.tree.loading')}</div>}>
             <SessionFlowView
@@ -789,6 +795,8 @@ ref
               activeLeafId={activeLeafId}
               onNodeClick={onNodeClick}
               filter={currentFilter}
+              viewMode={viewMode === 'hierarchy' ? 'hierarchy' : 'flow'}
+              onViewModeChange={(mode) => setViewMode(mode === 'hierarchy' ? 'hierarchy' : 'flow')}
             />
           </Suspense>
         </div>
