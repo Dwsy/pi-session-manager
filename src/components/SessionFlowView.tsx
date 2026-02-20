@@ -263,6 +263,54 @@ function compactTree(roots: TreeNode[], filter: FilterMode): CompactNode[] {
 // --- Layout ---
 interface LayoutResult { nodes: Node[]; edges: Edge[] }
 
+// Hierarchy layout: show ALL nodes (no compaction)
+function layoutHierarchy(roots: TreeNode[], activePathIds: Set<string>, activeLeafId?: string): LayoutResult {
+  const nodes: Node[] = []
+  const edges: Edge[] = []
+  let nextX = 0
+
+  function place(node: TreeNode, depth: number): [number, number] {
+    const role = getRole(node.entry)
+    const label = getLabel(node.entry)
+    const isActive = node.entry.id === activeLeafId
+    const isInPath = activePathIds.has(node.entry.id)
+
+    if (node.children.length === 0) {
+      const x = nextX
+      nextX += NODE_W + GAP_X
+      nodes.push({
+        id: node.entry.id, type: 'flow',
+        position: { x, y: depth * (NODE_H + GAP_Y) },
+        data: { label, role, isActive, isInPath },
+      })
+      return [x, x]
+    }
+
+    const childRanges: [number, number][] = []
+    for (const child of node.children) {
+      childRanges.push(place(child, depth + 1))
+      const inPath = activePathIds.has(child.entry.id)
+      edges.push({
+        id: `${node.entry.id}-${child.entry.id}`,
+        source: node.entry.id, target: child.entry.id,
+        className: inPath ? 'flow-edge-active' : 'flow-edge',
+      })
+    }
+
+    const minX = childRanges[0][0]
+    const maxX = childRanges[childRanges.length - 1][1]
+    nodes.push({
+      id: node.entry.id, type: 'flow',
+      position: { x: (minX + maxX) / 2, y: depth * (NODE_H + GAP_Y) },
+      data: { label, role, isActive, isInPath },
+    })
+    return [minX, maxX]
+  }
+
+  for (const root of roots) place(root, 0)
+  return { nodes, edges }
+}
+
 function layoutTree(roots: CompactNode[], activePathIds: Set<string>, activeLeafId?: string): LayoutResult {
   const nodes: Node[] = []
   const edges: Edge[] = []
@@ -314,7 +362,7 @@ function layoutTree(roots: CompactNode[], activePathIds: Set<string>, activeLeaf
 }
 
 // --- Main component ---
-function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default' }: SessionFlowViewProps) {
+function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default', viewMode = 'flow', onViewModeChange }: SessionFlowViewProps) {
   const activePathIds = useMemo(() => {
     if (!activeLeafId) return new Set<string>()
     const byId = new Map<string, SessionEntry>()
@@ -331,10 +379,18 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default
 
   const { layoutNodes, layoutEdges } = useMemo(() => {
     const rawTree = buildTree(entries)
+    
+    // Hierarchy mode: show all nodes without compacting
+    if (viewMode === 'hierarchy') {
+      const { nodes, edges } = layoutHierarchy(rawTree, activePathIds, activeLeafId)
+      return { layoutNodes: nodes, layoutEdges: edges }
+    }
+    
+    // Flow mode: compact linear chains
     const compact = compactTree(rawTree, filter)
     const { nodes, edges } = layoutTree(compact, activePathIds, activeLeafId)
     return { layoutNodes: nodes, layoutEdges: edges }
-  }, [entries, activePathIds, activeLeafId, filter])
+  }, [entries, activePathIds, activeLeafId, filter, viewMode])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutEdges)
@@ -373,6 +429,8 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default
         onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
         activeLeafId={activeLeafId}
+        viewMode={viewMode}
+        onViewModeChange={onViewModeChange}
       />
     </ReactFlowProvider>
   )
@@ -425,11 +483,11 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
         fitView fitViewOptions={{ padding: 0.2 }}
         minZoom={0.05} maxZoom={2}
         proOptions={{ hideAttribution: true }}
-        nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}
+        nodesDraggable={false} nodesConnectable={false} elementsSelectable={true}
         panOnDrag={true}
-        panOnScroll={true}
+        panOnScroll={false}
         zoomOnScroll={true}
-        zoomOnPinch={true}
+        zoomOnPinch={false}
       >
         <Background gap={20} size={1} />
         {/* Enhanced interactive MiniMap with draggable viewport */}
