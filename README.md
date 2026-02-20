@@ -5,351 +5,126 @@
 <h1 align="center">Pi Session Manager</h1>
 
 <p align="center">
-  Cross-platform desktop, mobile, and web app for browsing, searching, and managing
-  <a href="https://github.com/badlogic/pi-mono">Pi</a> AI coding sessions.
+  跨平台 Pi AI 会话管理工具 — 浏览、搜索、管理 <a href="https://github.com/badlogic/pi-mono">Pi</a> 编程会话
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-blue?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/Tauri-2.x-orange?style=flat-square" alt="Tauri 2">
-  <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square" alt="React 18">
-  <img src="https://img.shields.io/badge/Rust-stable-orange?style=flat-square" alt="Rust">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License">
 </p>
 
 <p align="center">
-  <a href="https://dwsy.github.io/pi-session-manager/">📖 Documentation</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/cn/">中文文档</a> ·
-  <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">⬇️ Download</a>
-</p>
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/4cb92d95-f50e-48d2-8c5e-4bb814d45b8f" />
-    <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/screenshot-light.png" />
-    <img width="1800" alt="Pi Session Manager" src=".github/screenshots/screenshot-light.png" />
-  </picture>
+  <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">⬇️ 下载</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/cn/">📖 文档</a>
 </p>
 
 ---
 
-## Features
+## 核心功能
 
-- **Multi-Platform Support** — Native desktop (macOS/Windows/Linux), responsive mobile web, and headless server mode
-- **Session Browser** — List / project / directory / kanban views, favorites, rename, batch export
-- **Kanban Board** — Drag-and-drop sessions across tag columns, context menu, project filtering
-- **Hierarchical Tags** — Parent-child tag tree with auto-rules and reordering
-- **Full-Text Search** — SQLite FTS5 powered search across message content
-  - Press `Cmd+Shift+F` to open full-text search modal from any view
-  - Filter by role (User / Assistant / All) and optional path glob pattern (e.g., `**/src/**`)
-  - Paginated results with scoring, snippets, and timestamps; click to jump to entry
-  - Incremental indexing during scanning ensures fast updates
-- **Session Viewer** — Tree view with collapsible tool calls / thinking blocks, flow visualization (React Flow)
-- **Built-in Terminal** — Integrated xterm.js terminal with PTY backend (`Cmd/Ctrl+J`)
-- **Export** — HTML / Markdown / JSON, one-click open in browser
-- **Dashboard** — Activity heatmap, project mix, model usage, token costs, achievements
-- **Skills & Prompts** — Scan and manage `~/.pi/agent/skills` and prompts, system prompt editor
-- **Model Tester** — Batch connectivity test for configured models
-- **Multi-Path Scanning** — Configure multiple session directories
-- **Web Access** — Embedded frontend served via HTTP, accessible from any browser or mobile device
-- **Theme** — Dark / Light / System, fully themeable via CSS custom properties
-- **i18n** — English and 简体中文
-- **Multi-Protocol API** — Tauri IPC + WebSocket (`ws://:52130`) + HTTP (`http://:52131`)
-- **CLI Mode** — Headless backend service via `--cli` / `--headless`
-- **Mobile Optimized** — Touch-friendly UI with bottom navigation on phones
+- **多端支持** — 桌面应用 (macOS/Windows/Linux) + 移动端 Web + 无头服务器模式
+- **会话浏览** — 列表/项目/看板视图，收藏，重命名，批量导出
+- **全文搜索** — SQLite FTS5 驱动，支持角色过滤、路径匹配、相关性排序
+- **会话查看** — 树形视图、工具调用折叠、思维链展示、流程图可视化
+- **内建终端** — xterm.js + PTY 后端 (`Cmd/Ctrl+J`)
+- **数据看板** — 活动热力图、项目分布、模型使用、Token 消耗统计
+- **技能管理** — 扫描管理 `~/.pi/agent/skills` 和 prompts，系统提示词编辑
+- **多协议 API** — Tauri IPC + WebSocket (`ws://:52130`) + HTTP (`http://:52131`)
+- **CLI 模式** — 无头后端服务 (`--cli` / `--headless`)
 
 ---
 
-## Full-Text Search
+## 下载
 
-Press <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> to open the full‑text search modal from any view.
+从 [**Releases**](../../releases) 获取最新版本：
 
-**Features**:
-- **Search Modes**:
-  - `any` (default): matches any of the query words (OR semantics).
-  - `all`: matches sessions containing all the words (AND semantics).
-  - `phrase`: exact phrase match (word order and proximity preserved).
-- **Role Filter**: restrict results to `user` or `assistant` messages; default shows all.
-- **Path Globbing**: filter sessions by file path using `*` and `?` glob patterns (they are automatically converted to SQL `LIKE` with proper escaping).
-- **Ranking & Limits**: results are ranked by BM25 relevance. A per‑session limit of 3 ensures a diverse set of sessions; pagination allows browsing through all hits.
-- **Metrics**: when the metrics subsystem is enabled, detailed counters (query count, latency, result count) are available at the `/metrics` endpoint in the HTTP adapter.
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Clients                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
-│  │   Desktop    │  │    Mobile    │  │      Web Browser         │  │
-│  │  (Tauri App) │  │  (PWA/Web)   │  │  (Chrome/Safari/Firefox) │  │
-│  └──────┬───────┘  └──────┬───────┘  └────────────┬─────────────┘  │
-└─────────┼─────────────────┼───────────────────────┼────────────────┘
-          │                 │                       │
-          └─────────────────┼───────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────────────────┐
-│                    Frontend (React 18 / TypeScript / Vite)          │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  99+ Components · 19 Hooks · Plugin System · i18n · xterm.js │   │
-│  │  React Flow · Recharts · dnd-kit · cmdk · Virtual Scroll    │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-├───────────────────────────┬───────────────────┬─────────────────────┤
-│       Tauri IPC           │    WebSocket      │  HTTP + Embedded UI │
-│       (Desktop)           │   ws://:52130     │  http://:52131      │
-└───────────────────────────┴───────────────────┴─────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────────────────┐
-│                    Rust Backend (Tauri 2)                           │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  Scanner · SQLite Cache · FTS5 · Tantivy · File Watcher     │   │
-│  │  PTY Terminal · Auth · Export · Config · Stats · Tags       │   │
-│  │  WebSocket/HTTP Adapters · Incremental Updates              │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-All three protocols share a single command router — `dispatch()`. Adding a new command only requires one `match` arm in Rust; WS and HTTP inherit it automatically.
-
-The HTTP server embeds the frontend via `rust-embed`, so the packaged binary serves the full UI at `http://localhost:52131` — no external `dist/` directory needed. The frontend auto-detects the runtime environment and switches between:
-- **Tauri IPC** — When running as desktop app (window.__TAURI__ available)
-- **WebSocket/HTTP** — When running in browser or mobile
-
----
-
-## Download
-
-Grab the latest build from [**Releases**](../../releases):
-
-| Platform | File |
-|----------|------|
+| 平台 | 文件 |
+|------|------|
 | macOS (Apple Silicon) | `Pi.Session.Manager_*_aarch64.dmg` |
 | macOS (Intel) | `Pi.Session.Manager_*_x64.dmg` |
-| Windows (x64) | `Pi.Session.Manager_*_x64-setup.exe` / `.msi` |
+| Windows (x64) | `Pi.Session.Manager_*_x64-setup.exe` |
 | Linux (deb) | `pi-session-manager_*_amd64.deb` |
-| Linux (AppImage) | `pi-session-manager_*_amd64.AppImage` |
-| Linux (rpm) | `pi-session-manager_*_x86_64.rpm` |
 
-### Prerequisites
-
-[Pi](https://github.com/badlogic/pi-mono) must be installed for session resume and terminal integration.
+> **前置要求**: 需安装 [Pi](https://github.com/badlogic/pi-mono) 以支持会话恢复和终端集成
 
 ---
 
-## Build from Source
+## 快速开始
 
-### Requirements
-
-- **Node.js** >= 20
-- **Rust** stable (via [rustup](https://rustup.rs/))
-- Platform dependencies:
-
-<details>
-<summary><b>macOS</b></summary>
-
-```bash
-xcode-select --install
-```
-</details>
-
-<details>
-<summary><b>Ubuntu / Debian</b></summary>
-
-```bash
-sudo apt-get update
-sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-```
-</details>
-
-<details>
-<summary><b>Fedora</b></summary>
-
-```bash
-sudo dnf install webkit2gtk4.1-devel libappindicator-gtk3-devel librsvg2-devel patchelf
-```
-</details>
-
-<details>
-<summary><b>Windows</b></summary>
-
-- [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) — C++ desktop workload
-- [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (pre-installed on Windows 11)
-</details>
-
-### Steps
-
-```bash
-git clone https://github.com/anthropics/pi-session-manager.git
-cd pi-session-manager
-
-npm install              # Install frontend deps
-npm run tauri:dev        # Development (hot-reload)
-npm run tauri:build      # Production build
-```
-
-Build artifacts land in `src-tauri/target/release/bundle/`.
-
----
-
-## Usage
-
-### Desktop (GUI Mode)
-
-Default mode with full native integration:
+### 桌面应用
 
 ```bash
 ./pi-session-manager
 ```
 
-### Server (CLI / Headless Mode)
-
-Run as a backend service exposing WebSocket + HTTP APIs, accessible from any device on the network:
+### 服务器模式
 
 ```bash
 ./pi-session-manager --cli
-# or
-./pi-session-manager --headless
+# 访问 http://localhost:52131
 ```
 
-Then open `http://localhost:52131` in any browser, or connect mobile apps.
-
-### Web / Mobile Access
-
-Open `http://localhost:52131` in any browser while the app is running (GUI or CLI mode). The frontend:
-- Auto-detects mobile devices and shows touch-optimized UI
-- Uses bottom navigation bar on phones
-- Supports responsive layouts for tablets
-- Works as PWA (add to home screen)
-
-### API Examples
+### 从源码构建
 
 ```bash
-# HTTP
-curl -s -X POST http://127.0.0.1:52131/api \
-  -H "Content-Type: application/json" \
-  -d '{"command":"scan_sessions","payload":{}}' | jq
+git clone https://github.com/Dwsy/pi-session-manager.git
+cd pi-session-manager
 
-# WebSocket
-wscat -c ws://127.0.0.1:52130
-> {"command":"scan_sessions","payload":{}}
+npm install
+npm run tauri:dev        # 开发
+npm run tauri:build      # 生产构建
 ```
 
----
-
-## Keyboard Shortcuts
-
-### Global
-
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl + K` | Command palette / global search |
-| `Cmd/Ctrl + J` | Toggle terminal panel |
-| `Cmd/Ctrl + P` | Switch to project view |
-| `Cmd/Ctrl + R` | Resume session in terminal |
-| `Cmd/Ctrl + E` | Export & open in browser |
-| `Cmd/Ctrl + ,` | Settings |
-| `Esc` | Close dialog / clear selection |
-
-### Session Viewer
-
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl + F` | Sidebar search |
-| `Cmd/Ctrl + T` | Toggle thinking blocks |
-| `Cmd/Ctrl + O` | Toggle tool call expansion |
+**系统依赖**:
+- **macOS**: `xcode-select --install`
+- **Ubuntu/Debian**: `sudo apt-get install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev`
+- **Windows**: Visual Studio Build Tools + WebView2
 
 ---
 
-## Project Structure
+## 快捷键
 
-```
-src/                        # Frontend (React + TypeScript)
-  components/               #   UI components (99+ files)
-    kanban/                 #   Kanban board (drag-drop, context menu)
-    dashboard/              #   Analytics charts (11 components)
-    settings/sections/      #   Settings panels (10+ sections)
-    command/                #   Command palette (cmdk-based)
-  hooks/                    #   React hooks (19)
-  plugins/                  #   Search plugin system (session, message, project)
-  contexts/                 #   React contexts (Transport, Settings, SessionView)
-  i18n/                     #   Internationalization (en-US, zh-CN)
-  transport.ts              #   Multi-protocol transport layer
-  utils/                    #   Utilities
+| 快捷键 | 功能 |
+|--------|------|
+| `Cmd/Ctrl + K` | 命令面板 |
+| `Cmd/Ctrl + J` | 切换终端 |
+| `Cmd/Ctrl + F` | 会话内搜索 |
+| `Cmd/Ctrl + Shift + F` | 全文搜索 |
+| `Cmd/Ctrl + R` | 终端恢复会话 |
+| `Cmd/Ctrl + E` | 导出并打开 |
+| `Cmd/Ctrl + ,` | 设置 |
 
-src-tauri/                  # Backend (Rust + Tauri 2)
-  src/
-    main.rs                 #   Entry: CLI args, window, adapter startup
-    main-cli.rs             #   CLI-only entry point
-    lib.rs                  #   Module declarations, command registration
-    ws_adapter.rs           #   WebSocket server + dispatch() router
-    http_adapter.rs         #   HTTP server, embedded frontend (rust-embed)
-    app_state.rs            #   SharedAppState (Arc)
-    scanner.rs              #   Session file scanner (multi-path, incremental)
-    scanner_scheduler.rs    #   Background scan scheduling
-    terminal.rs             #   PTY session manager (portable-pty)
-    sqlite_cache.rs         #   Dual-layer cache (FS + SQLite)
-    tantivy_search.rs       #   Full-text search index
-    file_watcher.rs         #   FS watcher for incremental updates
-    write_buffer.rs         #   Async write batching
-    commands/               #   Tauri IPC command handlers (12 modules, ~2160 LOC)
-      session.rs            #   Session operations
-      tags.rs               #   Tag management
-      skills.rs             #   Skills & prompts scanning
-      settings.rs           #   Settings persistence
-      terminal.rs           #   Terminal commands
-      search.rs             #   Search commands
-      cache.rs              #   Cache management
-      favorites.rs          #   Favorites system
-      models.rs             #   Model testing
-      auth_cmds.rs          #   Authentication
-  tests/                    #   Integration tests
+---
+
+## 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| **前端** | React 18, TypeScript, Vite, Tailwind CSS, xterm.js, Recharts, React Flow |
+| **后端** | Tauri 2, Rust, Tokio, Axum, SQLite, Tantivy, portable-pty |
+| **通信** | Tauri IPC, WebSocket, HTTP |
+
+---
+
+## 配置路径
+
+| 路径 | 说明 |
+|------|------|
+| `~/.pi/agent/sessions/` | Pi 会话目录 |
+| `~/.pi/agent/session-manager.db` | SQLite 缓存 |
+| `~/.pi/agent/session-manager-config.toml` | 配置文件 |
+
+---
+
+## 贡献
+
+```bash
+cd src-tauri && cargo fmt && cargo clippy
+cd src-tauri && cargo test
 ```
 
----
-
-## Tech Stack
-
-| Layer | Technologies |
-|-------|-------------|
-| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, i18next, xterm.js, cmdk, Recharts, React Flow, dnd-kit, @tanstack/react-virtual |
-| **Backend** | Tauri 2, Rust, Tokio, Axum, SQLite (rusqlite), Tantivy, portable-pty, rust-embed, notify |
-| **Communication** | Tauri IPC, WebSocket (tokio-tungstenite), HTTP (Axum) |
-| **Build** | Cargo, PNPM, GitHub Actions |
-
----
-
-## Configuration
-
-| Path | Description |
-|------|-------------|
-| `~/.pi/agent/sessions/` | Default Pi session directory |
-| `~/.pi/agent/session-manager.db` | SQLite cache, settings, tags, favorites |
-| `~/.pi/agent/session-manager-config.toml` | Scanner config (cutoff days, FTS5, paths, etc.) |
-| `~/.pi/agent/skills/` | Pi skills directory |
-| `~/.pi/agent/prompts/` | Pi prompts directory |
-| `~/.pi/agent/settings.json` | Pi agent settings |
-
-### Config File Example
-
-```toml
-# ~/.pi/agent/session-manager-config.toml
-realtime_cutoff_days = 2      # Days to keep in memory
-scan_interval_seconds = 30    # Background scan interval
-enable_fts5 = true            # Enable full-text search
-preload_count = 20            # Preload recent sessions
-auto_cleanup_days = 90        # Auto cleanup old sessions (optional)
-session_paths = []            # Additional session directories
-```
-
----
-
-## Contributing
-
-1. Fork & create a feature branch
-2. `cd src-tauri && cargo fmt && cargo clippy`
-3. Run tests: `cd src-tauri && cargo test`
-4. Submit PR with [Conventional Commits](https://www.conventionalcommits.org/)
+提交 PR 请遵循 [Conventional Commits](https://www.conventionalcommits.org/)
 
 ---
 
