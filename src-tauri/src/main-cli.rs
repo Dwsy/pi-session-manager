@@ -29,6 +29,13 @@ impl CliAppState {
 
 pub type SharedCliState = Arc<CliAppState>;
 
+async fn handle_command(command: &str, payload: &serde_json::Value) -> serde_json::Value {
+    match pi_session_manager::dispatch::dispatch(command, payload).await {
+        Ok(data) => serde_json::json!({ "success": true, "data": data }),
+        Err(err) => serde_json::json!({ "success": false, "error": err }),
+    }
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
@@ -156,25 +163,18 @@ async fn init_ws_adapter(
                         // 简单处理：解析 JSON 命令
                         if let Ok(req) = serde_json::from_str::<serde_json::Value>(text) {
                             let cmd = req["command"].as_str().unwrap_or("unknown");
-                            let response = match cmd {
-                                "scan_sessions" => {
-                                    // 简化实现
-                                    serde_json::json!({
-                                        "id": req["id"].as_str().unwrap_or(""),
-                                        "command": cmd,
-                                        "success": true,
-                                        "data": []
-                                    })
-                                }
-                                _ => {
-                                    serde_json::json!({
-                                        "id": req["id"].as_str().unwrap_or(""),
-                                        "command": cmd,
-                                        "success": false,
-                                        "error": "Command not implemented in CLI mode"
-                                    })
-                                }
-                            };
+                            let payload = req
+                                .get("payload")
+                                .cloned()
+                                .unwrap_or_else(|| serde_json::json!({}));
+                            let result = handle_command(cmd, &payload).await;
+                            let response = serde_json::json!({
+                                "id": req["id"].as_str().unwrap_or(""),
+                                "command": cmd,
+                                "success": result["success"].as_bool().unwrap_or(false),
+                                "data": result["data"].clone(),
+                                "error": result["error"].as_str().unwrap_or("")
+                            });
                             let _ = sender
                                 .send(tokio_tungstenite::tungstenite::Message::Text(
                                     response.to_string(),
@@ -201,10 +201,12 @@ async fn init_http_adapter(
 
     async fn api_handler(Json(body): Json<Value>) -> Json<Value> {
         let cmd = body["command"].as_str().unwrap_or("unknown");
-        Json(serde_json::json!({
-            "success": false,
-            "error": format!("Command '{}' not implemented in CLI mode", cmd)
-        }))
+        let payload = body
+            .get("payload")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
+        let result = handle_command(cmd, &payload).await;
+        Json(result)
     }
 
     let app = Router::new().route("/api", post(api_handler));

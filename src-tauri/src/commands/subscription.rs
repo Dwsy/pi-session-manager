@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::process::Command;
 
 use serde_json::Value;
 
@@ -24,6 +25,9 @@ pub struct SubscriptionUsageEntry {
 pub struct SubscriptionUsageSnapshot {
     pub source_path: String,
     pub available: bool,
+    pub extension_installed: bool,
+    pub auto_install_attempted: bool,
+    pub auto_install_ok: bool,
     pub entries: Vec<SubscriptionUsageEntry>,
     pub message: Option<String>,
 }
@@ -63,9 +67,45 @@ struct UsageError {
     message: Option<String>,
 }
 
-fn sub_core_cache_path() -> Result<PathBuf, String> {
+fn pi_agent_home() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("Failed to resolve home directory")?;
-    Ok(home.join(".pi/agent/cache/sub-core/cache.json"))
+    Ok(home.join(".pi/agent"))
+}
+
+fn sub_core_cache_path() -> Result<PathBuf, String> {
+    Ok(pi_agent_home()?.join("cache/sub-core/cache.json"))
+}
+
+fn has_sub_core_extension() -> Result<bool, String> {
+    let base = pi_agent_home()?;
+    let candidates = [
+        base.join("extensions/sub-core"),
+        base.join("extensions/pi-sub-core"),
+        base.join("extensions/@marckrenn/pi-sub-core"),
+    ];
+
+    if candidates.iter().any(|p| p.exists()) {
+        return Ok(true);
+    }
+
+    let settings_path = base.join("settings.json");
+    if !settings_path.exists() {
+        return Ok(false);
+    }
+
+    let content = std::fs::read_to_string(settings_path).unwrap_or_default();
+    Ok(content.contains("pi-sub-core") || content.contains("sub-core"))
+}
+
+fn try_install_sub_core() -> bool {
+    let status = Command::new("pi")
+        .args(["install", "npm:@marckrenn/pi-sub-core"])
+        .status();
+
+    match status {
+        Ok(s) => s.success(),
+        Err(_) => false,
+    }
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -73,12 +113,33 @@ pub async fn get_subscription_usage() -> Result<SubscriptionUsageSnapshot, Strin
     let cache_path = sub_core_cache_path()?;
     let source_path = cache_path.to_string_lossy().to_string();
 
+    let mut extension_installed = has_sub_core_extension()?;
+    let mut auto_install_attempted = false;
+    let mut auto_install_ok = false;
+
+    if !extension_installed {
+        auto_install_attempted = true;
+        auto_install_ok = try_install_sub_core();
+        extension_installed = has_sub_core_extension()?;
+    }
+
     if !cache_path.exists() {
+        let msg = if extension_installed {
+            "sub-core is installed, but cache is empty. Run one refresh in pi (sub-core) and reopen this page.".to_string()
+        } else if auto_install_attempted && !auto_install_ok {
+            "sub-core not installed and auto-install failed. Please run: pi install npm:@marckrenn/pi-sub-core".to_string()
+        } else {
+            "sub-core cache not found. Install/enable @marckrenn/pi-sub-core and refresh usage once.".to_string()
+        };
+
         return Ok(SubscriptionUsageSnapshot {
             source_path,
             available: false,
+            extension_installed,
+            auto_install_attempted,
+            auto_install_ok,
             entries: Vec::new(),
-            message: Some("sub-core cache not found. Install/enable @marckrenn/pi-sub-core and refresh usage once.".to_string()),
+            message: Some(msg),
         });
     }
 
@@ -93,9 +154,7 @@ pub async fn get_subscription_usage() -> Result<SubscriptionUsageSnapshot, Strin
             // Fallback: tolerate legacy/partial shape by parsing as generic value
             let value: Value = serde_json::from_str(&content)
                 .map_err(|e| format!("Failed to parse sub-core cache: {e}"))?;
-            let obj = value
-                .as_object()
-                .ok_or("sub-core cache is not an object")?;
+            let obj = value.as_object().ok_or("sub-core cache is not an object")?;
 
             let mut map = HashMap::new();
             for (provider, entry_value) in obj {
@@ -147,6 +206,9 @@ pub async fn get_subscription_usage() -> Result<SubscriptionUsageSnapshot, Strin
     Ok(SubscriptionUsageSnapshot {
         source_path,
         available: !entries.is_empty(),
+        extension_installed,
+        auto_install_attempted,
+        auto_install_ok,
         entries,
         message: None,
     })
