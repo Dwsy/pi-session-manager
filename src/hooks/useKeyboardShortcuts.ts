@@ -7,6 +7,9 @@ interface Shortcuts {
 /**
  * 键盘快捷键 Hook
  * 优化：使用 ref 存储 shortcuts，避免每次渲染都重新绑定事件
+ * 
+ * 注意：终端内使用 attachCustomKeyEventHandler 拦截快捷键，
+ * 因此全局快捷键不会与终端快捷键冲突
  */
 export function useKeyboardShortcuts(shortcuts: Shortcuts) {
   // 使用 ref 存储 shortcuts，避免每次渲染都重新绑定事件
