@@ -97,8 +97,49 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
     termRef.current = term
     fitRef.current = fit
 
+    // Custom key event handler for terminal-specific shortcuts
     term.attachCustomKeyEventHandler((e) => {
+      // Ctrl+` toggle terminal - let app handle it
       if (e.ctrlKey && e.key === '`') return false
+      
+      // Terminal-focused shortcuts: prevent global shortcuts from firing
+      // Cmd/Ctrl+K - Clear screen (instead of command palette)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        term.clear()
+        return false
+      }
+      
+      // Cmd/Ctrl+L - Clear screen (alternative)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') {
+        e.preventDefault()
+        term.clear()
+        return false
+      }
+      
+      // Cmd/Ctrl+C - Copy (when text selected)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c' && term.hasSelection()) {
+        e.preventDefault()
+        const selectedText = term.getSelection()
+        navigator.clipboard.writeText(selectedText).catch(() => {})
+        return false
+      }
+      
+      // Cmd/Ctrl+V - Paste
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'v') {
+        e.preventDefault()
+        navigator.clipboard.readText().then(text => {
+          term.input(text)
+        }).catch(() => {})
+        return false
+      }
+      
+      // Cmd/Ctrl+A - Select all (optional, can be disabled)
+      // if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+      //   e.preventDefault()
+      //   return false
+      // }
+      
       return true
     })
 
