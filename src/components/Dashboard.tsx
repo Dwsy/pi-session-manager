@@ -140,6 +140,13 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
       total_cost: 0,
       tokens_by_model: {},
     },
+    subagent_summary: {
+      total_cost: 0,
+      total_runs: 0,
+      total_tokens: 0,
+      runs_by_agent: {},
+      runs_by_model: {},
+    },
   }
 
   return (
@@ -171,50 +178,68 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
       </div>
 
       {/* Stats Grid - Compact - 5 cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-3 mb-4">
-        <StatCard
-          icon={BarChart3}
-          label={t('components.displayStats.cards.sessions')}
-          value={displayStats.total_sessions}
-          color="#569cd6"
-        />
-        <StatCard
-          icon={Activity}
-          label={t('components.displayStats.cards.messages')}
-          value={displayStats.total_messages}
-          color="#7ee787"
-        />
-        <StatCard
-          icon={Clock}
-          label={t('components.displayStats.cards.avgPerSession')}
-          value={displayStats.average_messages_per_session.toFixed(1)}
-          color="#ffa657"
-        />
-        <StatCard
-          icon={Zap}
-          label={t('components.displayStats.cards.totalTokens')}
-          value={displayStats.total_tokens > 1000000 
-            ? `${(displayStats.total_tokens / 1000000).toFixed(1)}M` 
-            : displayStats.total_tokens > 1000 
-              ? `${(displayStats.total_tokens / 1000).toFixed(1)}k`
-              : displayStats.total_tokens
-          }
-          color="#c792ea"
-        />
-        <div className="col-span-2 md:col-span-1">
-          <StatCard
-            icon={DollarSign}
-            label={t('components.displayStats.cards.totalCost')}
-            value={displayStats.token_details.total_cost < 0.01 
-              ? `$${displayStats.token_details.total_cost.toFixed(4)}` 
-              : displayStats.token_details.total_cost < 1
-                ? `$${displayStats.token_details.total_cost.toFixed(3)}`
-                : `$${displayStats.token_details.total_cost.toFixed(2)}`
-            }
-            color="#ff6b6b"
-          />
-        </div>
-      </div>
+      {(() => {
+        const subagentCost = displayStats.subagent_summary?.total_cost ?? 0
+        const subagentTokens = displayStats.subagent_summary?.total_tokens ?? 0
+        const combinedCost = displayStats.token_details.total_cost + subagentCost
+        const combinedTokens = displayStats.total_tokens + subagentTokens
+
+        const formatCost = (cost: number) =>
+          cost < 0.01 ? `$${cost.toFixed(4)}` : cost < 1 ? `$${cost.toFixed(3)}` : `$${cost.toFixed(2)}`
+
+        const costValue = (
+          <>
+            <span>{formatCost(combinedCost)}</span>
+            {subagentCost > 0 && (
+              <div className="text-[10px] text-muted-foreground font-normal normal-case tracking-normal mt-0.5">
+                incl. {formatCost(subagentCost)} subagents
+              </div>
+            )}
+          </>
+        )
+
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-3 mb-4">
+            <StatCard
+              icon={BarChart3}
+              label={t('components.displayStats.cards.sessions')}
+              value={displayStats.total_sessions}
+              color="#569cd6"
+            />
+            <StatCard
+              icon={Activity}
+              label={t('components.displayStats.cards.messages')}
+              value={displayStats.total_messages}
+              color="#7ee787"
+            />
+            <StatCard
+              icon={Clock}
+              label={t('components.displayStats.cards.avgPerSession')}
+              value={displayStats.average_messages_per_session.toFixed(1)}
+              color="#ffa657"
+            />
+            <StatCard
+              icon={Zap}
+              label={t('components.displayStats.cards.totalTokens')}
+              value={combinedTokens > 1000000
+                ? `${(combinedTokens / 1000000).toFixed(1)}M`
+                : combinedTokens > 1000
+                  ? `${(combinedTokens / 1000).toFixed(1)}k`
+                  : combinedTokens
+              }
+              color="#c792ea"
+            />
+            <div className="col-span-2 md:col-span-1">
+              <StatCard
+                icon={DollarSign}
+                label={t('components.displayStats.cards.totalCost')}
+                value={costValue}
+                color="#ff6b6b"
+              />
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Main Grid - Dense Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
