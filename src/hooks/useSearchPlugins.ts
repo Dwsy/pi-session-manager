@@ -10,7 +10,7 @@ export function useSearchPlugins(context: SearchContext) {
   const cache = useSearchCache()
   const contextRef = useRef(context)
   
-  // 更新 context ref
+  // Update context ref
   contextRef.current = context
   
   /**
@@ -23,16 +23,16 @@ export function useSearchPlugins(context: SearchContext) {
       return []
     }
     
-    // 检查缓存
+    // Check cache
     const cached = cache.get(query)
     if (cached) {
       return cached
     }
     
-    // 执行搜索
+    // Execute search
     const results = await pluginRegistry.search(query, contextRef.current)
     
-    // 缓存结果
+    // Cache results
     cache.set(query, results)
     
     return results

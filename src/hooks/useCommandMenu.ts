@@ -18,7 +18,7 @@ interface UseCommandMenuReturn {
 }
 
 /**
- * 命令菜单状态管理 Hook
+ * Command menu state management hook
  */
 export function useCommandMenu(): UseCommandMenuReturn {
   const [isOpen, setIsOpen] = useState(false)
@@ -33,7 +33,7 @@ export function useCommandMenu(): UseCommandMenuReturn {
   
   const close = useCallback(() => {
     setIsOpen(false)
-    // 延迟重置状态，等待关闭动画完成
+    // Delay state reset, wait for close animation to complete
     setTimeout(() => {
       setQuery('')
       setResults([])
@@ -53,7 +53,7 @@ export function useCommandMenu(): UseCommandMenuReturn {
     setIsSearching(false)
   }, [])
   
-  // 当结果变化时，重置选中索引
+  // Reset selected index when results change
   useEffect(() => {
     setSelectedIndex(0)
   }, [results])

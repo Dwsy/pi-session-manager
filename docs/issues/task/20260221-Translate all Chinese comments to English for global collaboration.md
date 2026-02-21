@@ -1,7 +1,7 @@
 ---
 id: "2026-02-21-Translate all Chinese comments to English for global collaboration"
 title: "Translate all Chinese comments to English for global collaboration"
-status: "in_progress"
+status: "done"
 created: "2026-02-21"
 updated: "2026-02-21"
 category: "task"
@@ -42,31 +42,48 @@ tags: ["i18n", "documentation", "code-quality"]
   - Completed: main.rs, scanner.rs, search.rs, write_buffer.rs, ws_adapter.rs, export.rs, http_adapter.rs, lib.rs, main-cli.rs, stats.rs
   - sqlite_cache.rs: Chinese text is UI labels (conditional on language setting), not comments - kept as-is
   - Quality: ✅ cargo fmt, ✅ cargo clippy --no-deps (no warnings)
-- [x] **子代理 2**: TypeScript/React 注释翻译 (`src/`) - Session: wild-sage (In Progress)
-  - Scanning: ~30+ files (excluding i18n/, __tests__/, *.backup.tsx)
+- [x] **子代理 2**: TypeScript/React 注释翻译 (`src/`) - ✅ 完成 (17 files)
+  - Session: wild-sage
+  - Completed: CodeBlock.tsx, DiffTest.tsx, SessionTree.tsx, useCommandMenu.ts, useKeyboardShortcuts.ts, useResolvedTheme.ts, useSearchCache.ts, useSearchPlugins.ts, useSessionBadges.ts, useSettings.ts, main.tsx, BaseSearchPlugin.ts, ProjectSearchPlugin.tsx, SessionSearchPlugin.tsx, markdown.ts, search.ts, settings.ts
+  - Quality: ✅ npm run build (successful, no errors)
 
 ### Phase 3: 验证
-- [ ] Rust: `cargo check`, `cargo clippy`, `cargo fmt`
-- [ ] TypeScript: `npm run build`
-- [ ] 抽样检查翻译质量
+- [x] Rust: `cargo fmt --check` ✅, `cargo clippy --no-deps` ✅ (no warnings)
+- [x] TypeScript: `npm run build` ✅ (successful, no errors)
+- [x] 抽样检查翻译质量 - All comments translated professionally
 
 ### Phase 4: 交付
-- [ ] 更新 CHANGELOG.md
-- [ ] 创建 PR
+- [x] 更新 CHANGELOG.md
+- [x] 创建 PR: `docs/pr/feat/20260221-Translate all Chinese comments to English for global collaboration.md`
 - [ ] 代码审查
 
 ## 关键决策
 
 | 决策 | 理由 |
 |------|------|
-| [决策 1] | [理由] |
-| [决策 2] | [理由] |
+| 保留 sqlite_cache.rs 中的 UI 标签 | 这些是根据用户语言设置动态显示的标签，不是注释 |
+| 排除 i18n/ 目录 | 国际化文件本身包含多语言翻译，不需要修改 |
+| 排除 __tests__/ 目录 | 测试文件中的中文可能是测试数据，保留原样 |
+| 排除 *.backup.tsx | 备份文件不应修改 |
 
 ## 遇到的错误
 
 | 日期 | 错误 | 解决方案 |
 |------|------|---------|
-| [YYYY-MM-DD] | [错误描述] | [如何解决] |
+| 2026-02-21 | scanner.rs 编码问题导致 edit 工具匹配失败 | 使用 Python 脚本直接处理 UTF-8 编码 |
+| 2026-02-21 | grep 无法正确匹配中文字符 | 改用 Python regex 进行精确匹配 |
+
+## 相关资源
+
+- [x] 相关文档: `docs/issues/task/20260221-Translate all Chinese comments to English for global collaboration.md`
+- [x] 相关 PR: `docs/pr/feat/20260221-Translate all Chinese comments to English for global collaboration.md`
+- [x] CHANGELOG: `CHANGELOG.md` (已更新)
+
+## Notes
+
+- 使用 parallel subagents (tidy-atlas, wild-sage) 同时处理 Rust 和 TypeScript 文件
+- 翻译风格：专业、技术化，保持代码原意
+- 所有翻译均通过代码质量检查（cargo clippy, npm build）
 
 ## 相关资源
 

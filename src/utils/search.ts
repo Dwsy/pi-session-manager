@@ -1,8 +1,8 @@
 /**
- * 在 HTML 字符串中高亮搜索关键词
- * @param html - 原始 HTML 字符串
- * @param searchQuery - 搜索关键词
- * @returns 高亮后的 HTML 字符串
+ * Highlight search keywords in HTML string
+ * @param html - Original HTML string
+ * @param searchQuery - Search query
+ * @returns Highlighted HTML string
  */
 export function highlightSearchInHTML(html: string, searchQuery: string): string {
   if (!searchQuery.trim()) {

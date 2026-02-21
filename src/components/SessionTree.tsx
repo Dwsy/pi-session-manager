@@ -24,7 +24,7 @@ function getToolColorVar(toolName: string): string {
 
 const SessionFlowView = lazy(() => import('./SessionFlowView'))
 
-// 高亮搜索关键词
+// Highlight search keywords
 function highlightText(text: string, tokens: string[]): ReactNode {
   if (!tokens.length || !text) return text
 
@@ -37,7 +37,7 @@ function highlightText(text: string, tokens: string[]): ReactNode {
   })
 }
 
-// 提取匹配摘要
+// Extract matching summary
 function extractSnippet(text: string, tokens: string[], maxLen = 60): string | null {
   if (!text || !tokens.length) return null
 
@@ -223,7 +223,7 @@ ref
 
       result.push({ node, indent, showConnector, isLast, gutters, isVirtualRootChild, multipleRoots, hasChildren, isBranchPoint })
 
-      // 如果当前节点被折叠，跳过子节点
+      // If current node is collapsed, skip children
       if (collapsedNodes.has(node.entry.id)) {
         continue
       }
@@ -455,12 +455,12 @@ ref
           
           return 'Assistant'
         } else if (msg.role === 'toolResult') {
-          // 显示工具结果的相关信息
+          // Display relevant info for tool results
           const content = Array.isArray(msg.content) ? msg.content : []
           const toolResultContent = content.find((c: any) => c.type === 'toolResult')
           
           if (toolResultContent && toolResultContent.id) {
-            // 尝试找到对应的工具调用
+            // Try to find corresponding tool call
             const toolCallEntry = entries.find(e => 
               e.type === 'message' && 
               e.message?.role === 'assistant' &&
@@ -531,7 +531,7 @@ ref
 
   const colorizeEnabled = getCachedSettings().session?.colorizeToolCalls !== false
 
-  // 获取完整文本用于摘要
+  // Get full text for summary
   const getFullText = (entry: SessionEntry, label?: string): string => {
     const parts: string[] = []
     if (label) parts.push(label)
@@ -560,7 +560,7 @@ ref
     return parts.join(' ')
   }
 
-  // 计算搜索结果列表
+  // Calculate search results list
   const matchedEntryIds = useMemo(() => {
     if (!searchQuery.trim()) return []
     
@@ -612,7 +612,7 @@ ref
     return matched
   }, [flatNodes, searchQuery])
 
-  // 更新搜索结果
+  // Update search results
   useEffect(() => {
     setSearchResults(matchedEntryIds)
     setCurrentResultIndex(0)
@@ -620,7 +620,7 @@ ref
 
 
 
-  // toolResult 不会单独渲染，需要跳转到对应的 assistant 消息（包含该 toolCall）
+  // toolResult is not rendered separately, need to jump to corresponding assistant message (contains this toolCall)
   const resolveScrollTarget = useCallback((entryId: string): string => {
     const entry = entries.find(e => e.id === entryId)
     if (!entry || entry.type !== 'message' || entry.message?.role !== 'toolResult') {
@@ -639,7 +639,7 @@ ref
     return assistantEntry ? assistantEntry.id : entryId
   }, [entries])
 
-  // 搜索导航
+  // Search navigation
   const handleSearchNext = useCallback(() => {
     if (searchResults.length === 0) return
     const newIndex = (currentResultIndex + 1) % searchResults.length
