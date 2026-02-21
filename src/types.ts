@@ -72,6 +72,7 @@ export interface SessionStats {
   heatmap_data: HeatmapPoint[]
   time_distribution: TimeDistributionPoint[]
   token_details: TokenDetails
+  subagent_summary?: SubagentSummary
 }
 
 export interface TokenDetails {
@@ -89,6 +90,20 @@ export interface ModelTokenStats {
   cache_read: number
   cache_write: number
   cost: number
+}
+
+export interface AgentStats {
+  runs: number
+  cost: number
+  tokens: number
+}
+
+export interface SubagentSummary {
+  total_cost: number
+  total_runs: number
+  total_tokens: number
+  runs_by_agent: Record<string, AgentStats>
+  runs_by_model: Record<string, number>
 }
 
 // Legacy SessionStats for backward compatibility
