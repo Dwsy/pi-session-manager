@@ -2,7 +2,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tracing::{error, info};
 
-// CLI 专用状态（无 Tauri 依赖）
+// CLI-specific state (no Tauri dependencies)
 pub struct CliAppState {
     pub event_tx: broadcast::Sender<WsEvent>,
 }
@@ -35,13 +35,13 @@ async fn main() {
 
     info!("Starting Pi Session Manager - CLI Mode");
 
-    // 加载配置
+    // Load configuration
     let server_cfg = load_server_settings();
 
-    // 创建状态
+    // Create state
     let state = Arc::new(CliAppState::new());
 
-    // 启动 WebSocket 服务
+    // Start WebSocket service
     if server_cfg.ws_enabled {
         let ws_state = state.clone();
         let ws_port = server_cfg.ws_port;
@@ -55,7 +55,7 @@ async fn main() {
         info!("WebSocket: ws://{}:{}", ws_bind_log, ws_port);
     }
 
-    // 启动 HTTP 服务
+    // Start HTTP service
     if server_cfg.http_enabled {
         let http_state = state.clone();
         let http_port = server_cfg.http_port;
@@ -71,14 +71,14 @@ async fn main() {
 
     info!("CLI mode running. Press Ctrl+C to exit.");
 
-    // 保持运行
+    // Keep running
     tokio::signal::ctrl_c()
         .await
         .expect("Failed to listen for ctrl+c");
     info!("Shutting down...");
 }
 
-// 简化的配置加载
+// Simplified configuration loading
 #[derive(Debug, Clone)]
 struct ServerConfig {
     ws_enabled: bool,
@@ -90,7 +90,7 @@ struct ServerConfig {
 }
 
 fn load_server_settings() -> ServerConfig {
-    // 从文件加载或默认
+    // Load from file or use defaults
     let config_path = dirs::config_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
         .join("pi-session-manager.json");
@@ -111,7 +111,7 @@ fn load_server_settings() -> ServerConfig {
         }
     }
 
-    // 默认配置
+    // Default configuration
     ServerConfig {
         ws_enabled: true,
         http_enabled: true,
@@ -122,7 +122,7 @@ fn load_server_settings() -> ServerConfig {
     }
 }
 
-// 简化的 WS 适配器（复用原逻辑但适配 CLI 状态）
+// Simplified WS adapter (reuse original logic but adapt for CLI state)
 async fn init_ws_adapter(
     state: SharedCliState,
     bind_addr: &str,
@@ -149,16 +149,16 @@ async fn init_ws_adapter(
 
             let (mut sender, mut receiver) = ws_stream.split();
 
-            // 简单 echo + 命令处理
+            // Simple echo + command handling
             while let Some(msg) = receiver.next().await {
                 if let Ok(msg) = msg {
                     if let Ok(text) = msg.to_text() {
-                        // 简单处理：解析 JSON 命令
+                        // Simple handling: parse JSON command
                         if let Ok(req) = serde_json::from_str::<serde_json::Value>(text) {
                             let cmd = req["command"].as_str().unwrap_or("unknown");
                             let response = match cmd {
                                 "scan_sessions" => {
-                                    // 简化实现
+                                    // Simplified implementation
                                     serde_json::json!({
                                         "id": req["id"].as_str().unwrap_or(""),
                                         "command": cmd,
@@ -190,7 +190,7 @@ async fn init_ws_adapter(
     Ok(())
 }
 
-// 简化的 HTTP 适配器
+// Simplified HTTP adapter
 async fn init_http_adapter(
     _state: SharedCliState,
     bind_addr: &str,

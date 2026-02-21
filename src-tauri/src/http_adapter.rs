@@ -110,7 +110,7 @@ async fn handle_command(
     }
 
     let gzip_requested = accepts_gzip(&headers);
-    // 服务端强制压缩开关：设置环境变量 PSM_FORCE_GZIP=1 可强制启用压缩
+    // Server-side force compression switch: set env PSM_FORCE_GZIP=1 to force enable compression
     let force_gzip = std::env::var("PSM_FORCE_GZIP").unwrap_or_default() == "1";
     let gzip_enabled = gzip_requested || force_gzip;
 
@@ -135,7 +135,7 @@ async fn handle_command(
         },
     };
 
-    // 检查请求中是否有压缩开关参数（优先于 Accept-Encoding）
+    // Check if request has compression switch parameter (takes precedence over Accept-Encoding)
     let compression_disabled = query_param(&uri, "no_gzip").is_some()
         || query_param(&uri, "disable_compression").is_some();
 

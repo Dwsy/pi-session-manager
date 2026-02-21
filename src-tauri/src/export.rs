@@ -16,7 +16,7 @@ pub async fn export_session(
 }
 
 fn export_using_pi_command(session_path: &str, output_path: &str) -> Result<(), String> {
-    // 使用 PI 的 export 命令生成 HTML
+    // Use PI export command to generate HTML
     let output = Command::new("pi")
         .arg("--export")
         .arg(session_path)

@@ -117,7 +117,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         let project = extract_project_name(&session.cwd);
         *sessions_by_project.entry(project).or_insert(0) += 1;
 
-        // 1. 先检查内存缓冲（最快）
+        // 1. Check memory buffer first (fastest)
         let memory_cached = write_buffer::get_buffered_details(&session.path)
             .filter(|(_, file_modified)| *file_modified >= session_modified);
 
@@ -163,7 +163,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             continue;
         }
 
-        // 2. 再检查数据库缓存
+        // 2. Then check database cache
         let cached_details = conn.as_ref().and_then(|conn| {
             sqlite_cache::get_session_details_cache(conn, &session.path)
                 .ok()
@@ -219,7 +219,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         if let Ok(content) = std::fs::read_to_string(&session.path) {
             let session_stats = parse_session_details(&content);
 
-            // 使用内存缓冲写入，减少数据库写入频率
+            // Use memory buffer to reduce database write frequency
             write_buffer::buffer_details_write(&session.path, session_modified, &session_stats);
 
             for model in &session_stats.models {

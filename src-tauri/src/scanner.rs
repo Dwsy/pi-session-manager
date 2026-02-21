@@ -269,15 +269,15 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
     }
 }
 
-/// Parse session info并提取消息条目
-/// 优化：使用 BufReader 流式读取，减少大文件内存占用
-/// 返回：(SessionInfo, Vec<SessionEntry>) - 会话信息和消息条目列表
+/// Parse session info and extract message entries
+/// Optimization: Use BufReader for streaming to reduce memory usage on large files
+/// Returns: (SessionInfo, Vec<SessionEntry>) - session info and message entry list
 pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
     let file = fs::File::open(path).map_err(|e| format!("Failed to open file: {e}"))?;
     let reader = BufReader::new(file);
     let mut lines = reader.lines();
 
-    // 读取并解析头部
+    // Read and parse header
     let header_line = lines
         .next()
         .ok_or("Empty session file")?
@@ -312,7 +312,7 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
     let mut last_message_role = String::new();
     let mut entries = Vec::new();
 
-    // 流式读取剩余行，减少内存占用
+    // Stream read remaining lines to reduce memory usage
     for line_result in lines {
         let line = match line_result {
             Ok(l) => l,
@@ -341,18 +341,18 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
                         if first_message.is_empty() && role == "user" {
                             first_message = text.chars().take(100).collect();
                         }
-                        // 更新最后一条消息
+                        // Update last message
                         last_message = text.chars().take(150).collect();
                         last_message_role = role.to_string();
 
-                        // 收集用户和助手的消息文本
+                        // Collect user and assistant message text
                         if role == "user" {
                             user_messages.push(text.clone());
                         } else if role == "assistant" {
                             assistant_messages.push(text.clone());
                         }
 
-                        // 构建 SessionEntry 用于 message_entries 表
+                        // Build SessionEntry for message_entries table
                         let entry_id = entry["id"].as_str().unwrap_or("").to_string();
                         let timestamp_str = entry["timestamp"].as_str().unwrap_or("");
                         let timestamp = parse_timestamp(timestamp_str)?;
