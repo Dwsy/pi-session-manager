@@ -13,6 +13,7 @@ pub mod session_parser;
 pub mod settings_store;
 pub mod sqlite_cache;
 pub mod stats;
+pub mod subagent;
 pub mod tantivy_search;
 pub mod write_buffer;
 
