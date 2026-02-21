@@ -1,4 +1,4 @@
-import { Coins, Zap, DollarSign } from 'lucide-react'
+import { Bot, Coins, DollarSign, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SessionStats } from '../../types'
 
@@ -10,6 +10,7 @@ interface TokenStatsProps {
 export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsProps) {
   const { t } = useTranslation()
   const { token_details } = stats
+  const totalCostIncSubagents = token_details.total_cost + (stats.subagent_summary?.total_cost ?? 0)
 
   const formatCost = (cost: number) => {
     if (cost === 0) return '$0.00'
@@ -62,7 +63,7 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Cache Read</div>
           </div>
           <div className="bg-background/60 rounded-xl p-3 text-center border border-destructive/10 hover:border-destructive/30 transition-all duration-300">
-            <div className="text-lg font-bold text-destructive">{formatCost(token_details.total_cost)}</div>
+            <div className="text-lg font-bold text-destructive">{formatCost(totalCostIncSubagents)}</div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Cost</div>
           </div>
         </div>
@@ -174,6 +175,61 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
                   </div>
                 )
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Subagent Usage */}
+        {stats.subagent_summary && stats.subagent_summary.total_runs > 0 && (
+          <div className="mt-4 pt-4 border-t border-foreground/5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Bot className="h-3.5 w-3.5" />
+                Subagent Usage
+              </span>
+              <span className="text-[10px] text-muted-foreground bg-background/60 px-2 py-0.5 rounded-md">
+                {stats.subagent_summary.total_runs} runs · {formatCost(stats.subagent_summary.total_cost)}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {Object.entries(stats.subagent_summary.runs_by_agent)
+                .sort((a, b) => b[1].cost - a[1].cost)
+                .map(([agent, agentStats]) => {
+                  const maxCost = Math.max(
+                    ...Object.values(stats.subagent_summary!.runs_by_agent).map(s => s.cost)
+                  )
+                  const percent = maxCost > 0 ? (agentStats.cost / maxCost) * 100 : 0
+                  const displayName = agent.charAt(0).toUpperCase() + agent.slice(1)
+
+                  return (
+                    <div
+                      key={agent}
+                      className="flex items-center justify-between p-2.5 bg-background/60 rounded-xl border border-foreground/5 hover:bg-background/90 hover:border-orange-500/20 transition-all duration-300"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="text-xs font-medium text-foreground/90 truncate">{displayName}</div>
+                        <div className="text-[10px] text-muted-foreground shrink-0">
+                          {agentStats.runs} {agentStats.runs === 1 ? 'run' : 'runs'}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-1.5 bg-surface-dark/80 rounded-full overflow-hidden inner-shadow">
+                          <div
+                            className="h-full bg-gradient-to-r from-[#f97316] to-[#fb923c] rounded-full"
+                            style={{
+                              width: `${percent}%`,
+                              boxShadow: '0 0 6px rgba(249, 115, 22, 0.3)'
+                            }}
+                          />
+                        </div>
+                        <div className="text-[10px] text-muted-foreground w-12 text-right font-medium">
+                          {formatCost(agentStats.cost)}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
             </div>
           </div>
         )}
