@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionInfo {
@@ -83,4 +84,51 @@ pub struct FullTextSearchResponse {
     pub hits: Vec<FullTextSearchHit>,
     pub total_hits: usize,
     pub has_more: bool,
+}
+
+/// Parsed stats from a single subagent run's meta.json
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubagentRunInfo {
+    pub run_id: String,
+    pub agent: String,
+    pub model: String,
+    pub exit_code: i32,
+    pub cost: f64,
+    pub input_tokens: usize,
+    pub output_tokens: usize,
+    pub cache_read_tokens: usize,
+    pub cache_write_tokens: usize,
+    pub duration_ms: u64,
+    pub tool_count: usize,
+    pub timestamp: i64,
+}
+
+/// Per-agent-type aggregated stats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentStats {
+    pub runs: usize,
+    pub cost: f64,
+    pub tokens: usize,
+}
+
+/// Aggregated subagent stats across all runs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubagentSummary {
+    pub total_cost: f64,
+    pub total_runs: usize,
+    pub total_tokens: usize,
+    pub runs_by_agent: HashMap<String, AgentStats>,
+    pub runs_by_model: HashMap<String, f64>,
+}
+
+impl Default for SubagentSummary {
+    fn default() -> Self {
+        Self {
+            total_cost: 0.0,
+            total_runs: 0,
+            total_tokens: 0,
+            runs_by_agent: HashMap::new(),
+            runs_by_model: HashMap::new(),
+        }
+    }
 }
