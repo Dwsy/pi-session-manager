@@ -197,7 +197,7 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
                 .sort((a, b) => b[1].cost - a[1].cost)
                 .map(([agent, agentStats]) => {
                   const maxCost = Math.max(
-                    ...Object.values(stats.subagent_summary!.runs_by_agent).map(s => s.cost)
+                    ...Object.values(stats.subagent_summary?.runs_by_agent ?? {}).map(s => s.cost)
                   )
                   const percent = maxCost > 0 ? (agentStats.cost / maxCost) * 100 : 0
                   const displayName = agent.charAt(0).toUpperCase() + agent.slice(1)

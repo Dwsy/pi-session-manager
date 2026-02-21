@@ -297,7 +297,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
-    let subagent_summary = subagent::scan_subagent_artifacts(&unique_session_dirs);
+    let subagent_summary = subagent::scan_subagent_artifacts(&unique_session_dirs, conn.as_ref());
 
     let average_messages_per_session = if total_sessions > 0 {
         total_messages as f32 / total_sessions as f32
