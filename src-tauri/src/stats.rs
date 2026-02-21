@@ -1,11 +1,13 @@
-use crate::models::SessionInfo;
+use crate::models::{SessionInfo, SubagentSummary};
 use crate::session_parser::parse_session_details;
 use crate::sqlite_cache;
+use crate::subagent;
 use crate::write_buffer;
 use chrono::{Datelike, Timelike, Weekday};
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionStats {
@@ -23,6 +25,7 @@ pub struct SessionStats {
     pub heatmap_data: Vec<HeatmapPoint>,
     pub time_distribution: Vec<TimeDistributionPoint>,
     pub token_details: TokenDetails,
+    pub subagent_summary: SubagentSummary,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -287,6 +290,15 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         }
     }
 
+    // Collect unique parent directories from session paths for subagent scanning
+    let unique_session_dirs: Vec<PathBuf> = sessions
+        .iter()
+        .filter_map(|s| PathBuf::from(&s.path).parent().map(|p| p.to_path_buf()))
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    let subagent_summary = subagent::scan_subagent_artifacts(&unique_session_dirs);
+
     let average_messages_per_session = if total_sessions > 0 {
         total_messages as f32 / total_sessions as f32
     } else {
@@ -328,6 +340,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             total_cost,
             tokens_by_model,
         },
+        subagent_summary,
     }
 }
 
