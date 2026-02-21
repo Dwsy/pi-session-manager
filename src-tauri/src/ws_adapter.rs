@@ -15,10 +15,10 @@ struct WsRequest {
     command: String,
     #[serde(default)]
     payload: Value,
-    /// 请求数据是否使用 Gzip 压缩（Base64 编码）
+    /// Whether request data uses Gzip compression (Base64 encoded)
     #[serde(default)]
     compressed: bool,
-    /// 期望响应是否使用 Gzip 压缩
+    /// Whether response should use Gzip compression
     #[serde(default)]
     accept_gzip: bool,
 }
@@ -32,7 +32,7 @@ struct WsResponse {
     data: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
-    /// 响应数据是否使用 Gzip 压缩（Base64 编码）
+    /// Whether response data uses Gzip compression (Base64 encoded)
     #[serde(skip_serializing_if = "Option::is_none")]
     compressed: Option<bool>,
 }

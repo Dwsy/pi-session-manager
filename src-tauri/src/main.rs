@@ -1,5 +1,6 @@
 #![cfg(feature = "gui")]
 
+use rusqlite::Connection;
 use tauri::{Listener, Manager};
 
 fn main() {
@@ -78,8 +79,11 @@ fn main() {
             }
 
             // Start periodic write buffer flush (buffers session writes to reduce DB I/O)
+            // 5 second interval balances data safety with I/O efficiency
             tauri::async_runtime::spawn(async move {
-                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+                let mut last_conn: Option<rusqlite::Connection> = None;
+
                 loop {
                     interval.tick().await;
                     if let Some((sessions, details)) =
@@ -87,28 +91,53 @@ fn main() {
                     {
                         let sessions_count = sessions.len();
                         let details_count = details.len();
-                        if let Ok(conn) = pi_session_manager::sqlite_cache::init_db() {
-                            for entry in sessions {
-                                let _ = pi_session_manager::sqlite_cache::upsert_session(
+
+                        // Reuse connection or create new one
+                        let conn = match last_conn.take() {
+                            Some(c) => c,
+                            None => match pi_session_manager::sqlite_cache::init_db() {
+                                Ok(c) => c,
+                                Err(e) => {
+                                    log::error!("Failed to init DB for flush: {}", e);
+                                    continue;
+                                }
+                            }
+                        };
+
+                        let mut flush_error = false;
+                        for entry in &sessions {
+                            if let Err(e) = pi_session_manager::sqlite_cache::upsert_session(
+                                &conn,
+                                &entry.session,
+                                entry.file_modified,
+                                None,
+                            ) {
+                                log::error!("Failed to upsert session during flush: {}", e);
+                                flush_error = true;
+                            }
+                        }
+                        for entry in &details {
+                            if let Err(e) =
+                                pi_session_manager::sqlite_cache::upsert_session_details_cache(
                                     &conn,
-                                    &entry.session,
+                                    &entry.path,
                                     entry.file_modified,
-                                    None,
-                                );
+                                    &entry.details,
+                                )
+                            {
+                                log::error!("Failed to upsert session details during flush: {}", e);
+                                flush_error = true;
                             }
-                            for entry in details {
-                                let _ =
-                                    pi_session_manager::sqlite_cache::upsert_session_details_cache(
-                                        &conn,
-                                        &entry.path,
-                                        entry.file_modified,
-                                        &entry.details,
-                                    );
-                            }
+                        }
+
+                        if !flush_error {
                             log::trace!(
                                 "Flushed {sessions_count} sessions and {details_count} details to database"
                             );
                         }
+
+                        // Keep connection for next iteration
+                        last_conn = Some(conn);
                     }
                 }
             });
@@ -118,23 +147,43 @@ fn main() {
                 if let Some((sessions, details)) =
                     pi_session_manager::write_buffer::force_flush_all()
                 {
-                    if let Ok(conn) = pi_session_manager::sqlite_cache::init_db() {
-                        for entry in sessions {
-                            let _ = pi_session_manager::sqlite_cache::upsert_session(
-                                &conn,
-                                &entry.session,
-                                entry.file_modified,
-                                None,
-                            );
-                        }
-                        for entry in details {
-                            let _ =
-                                pi_session_manager::sqlite_cache::upsert_session_details_cache(
+                    match pi_session_manager::sqlite_cache::init_db() {
+                        Ok(conn) => {
+                            let mut flush_error = false;
+                            for entry in &sessions {
+                                if let Err(e) = pi_session_manager::sqlite_cache::upsert_session(
                                     &conn,
-                                    &entry.path,
+                                    &entry.session,
                                     entry.file_modified,
-                                    &entry.details,
+                                    None,
+                                ) {
+                                    log::error!("Failed to upsert session on exit: {}", e);
+                                    flush_error = true;
+                                }
+                            }
+                            for entry in &details {
+                                if let Err(e) =
+                                    pi_session_manager::sqlite_cache::upsert_session_details_cache(
+                                        &conn,
+                                        &entry.path,
+                                        entry.file_modified,
+                                        &entry.details,
+                                    )
+                                {
+                                    log::error!("Failed to upsert session details on exit: {}", e);
+                                    flush_error = true;
+                                }
+                            }
+                            if !flush_error {
+                                log::info!(
+                                    "Flushed {} sessions and {} details to database on exit",
+                                    sessions.len(),
+                                    details.len()
                                 );
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Failed to init DB on exit: {}", e);
                         }
                     }
                 }

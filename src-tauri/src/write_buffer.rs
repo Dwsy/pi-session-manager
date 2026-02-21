@@ -54,7 +54,7 @@ fn get_buffer() -> &'static Mutex<WriteBuffer> {
     WRITE_BUFFER.get_or_init(|| Mutex::new(WriteBuffer::new()))
 }
 
-/// 缓冲写入会话缓存，减少数据库写入频率
+/// Buffer session writes to cache, reduce database write frequency
 pub fn buffer_session_write(session: &SessionInfo, file_modified: DateTime<Utc>) {
     if let Ok(mut buffer) = get_buffer().lock() {
         let path = session.path.clone();
@@ -85,7 +85,7 @@ pub fn buffer_session_write(session: &SessionInfo, file_modified: DateTime<Utc>)
     }
 }
 
-/// 缓冲写入详情缓存，减少数据库写入频率
+/// Buffer details writes to cache, reduce database write frequency
 pub fn buffer_details_write(path: &str, file_modified: DateTime<Utc>, details: &SessionDetails) {
     if let Ok(mut buffer) = get_buffer().lock() {
         let path_string = path.to_string();
@@ -116,7 +116,7 @@ pub fn buffer_details_write(path: &str, file_modified: DateTime<Utc>, details: &
     }
 }
 
-/// 获取内存中缓冲的会话（如果存在且未过期）
+/// Get buffered session from memory (if exists and not expired)
 pub fn get_buffered_session(path: &str) -> Option<(SessionInfo, DateTime<Utc>)> {
     if let Ok(buffer) = get_buffer().lock() {
         if let Some(entry) = buffer.sessions.get(path) {
@@ -126,7 +126,7 @@ pub fn get_buffered_session(path: &str) -> Option<(SessionInfo, DateTime<Utc>)> 
     None
 }
 
-/// 获取内存中缓冲的详情（如果存在且未过期）
+/// Get buffered details from memory (if exists and not expired)
 pub fn get_buffered_details(path: &str) -> Option<(SessionDetails, DateTime<Utc>)> {
     if let Ok(buffer) = get_buffer().lock() {
         if let Some(entry) = buffer.details.get(path) {
@@ -136,7 +136,7 @@ pub fn get_buffered_details(path: &str) -> Option<(SessionDetails, DateTime<Utc>
     None
 }
 
-/// 检查是否需要刷新缓冲并获取待写入的数据
+/// Check if buffer needs flushing and get data to write
 pub fn check_and_take_flush_data() -> Option<(Vec<SessionCacheEntry>, Vec<DetailsCacheEntry>)> {
     if let Ok(mut buffer) = get_buffer().lock() {
         if buffer.should_flush() && (!buffer.sessions.is_empty() || !buffer.details.is_empty()) {
@@ -150,7 +150,7 @@ pub fn check_and_take_flush_data() -> Option<(Vec<SessionCacheEntry>, Vec<Detail
     None
 }
 
-/// 强制刷新所有缓冲数据（应用退出时调用）
+/// Force flush all buffered data (called on app exit)
 pub fn force_flush_all() -> Option<(Vec<SessionCacheEntry>, Vec<DetailsCacheEntry>)> {
     if let Ok(mut buffer) = get_buffer().lock() {
         if !buffer.sessions.is_empty() || !buffer.details.is_empty() {
@@ -164,7 +164,7 @@ pub fn force_flush_all() -> Option<(Vec<SessionCacheEntry>, Vec<DetailsCacheEntr
     None
 }
 
-/// 获取当前缓冲统计信息（用于调试）
+/// Get current buffer statistics (for debugging)
 pub fn get_buffer_stats() -> (usize, usize, u64) {
     if let Ok(buffer) = get_buffer().lock() {
         (

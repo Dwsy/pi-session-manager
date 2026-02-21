@@ -184,24 +184,34 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                                             if let Ok((info, entries)) =
                                                 parse_session_info(&file_path)
                                             {
-                                                let _ = sqlite_cache::upsert_session(
+                                                if let Err(e) = sqlite_cache::upsert_session(
                                                     &conn,
                                                     &info,
                                                     file_modified,
                                                     Some(&entries),
-                                                );
+                                                ) {
+                                                    error!(
+                                                        "Failed to upsert cached session {}: {}",
+                                                        path_str, e
+                                                    );
+                                                }
                                             }
                                         }
                                     } else {
                                         // Not in DB (cold start): parse and write directly to DB
                                         if let Ok((info, entries)) = parse_session_info(&file_path)
                                         {
-                                            let _ = sqlite_cache::upsert_session(
+                                            if let Err(e) = sqlite_cache::upsert_session(
                                                 &conn,
                                                 &info,
                                                 file_modified,
                                                 Some(&entries),
-                                            );
+                                            ) {
+                                                error!(
+                                                    "Failed to upsert new session {} (cold start): {}",
+                                                    path_str, e
+                                                );
+                                            }
                                         }
                                     }
                                 }
@@ -259,7 +269,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
     }
 }
 
-/// 解析会话信息并提取消息条目
+/// Parse session info并提取消息条目
 /// 优化：使用 BufReader 流式读取，减少大文件内存占用
 /// 返回：(SessionInfo, Vec<SessionEntry>) - 会话信息和消息条目列表
 pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
