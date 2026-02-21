@@ -138,7 +138,7 @@ impl WsAdapter {
 
                             match serde_json::from_str::<WsRequest>(&text) {
                                 Ok(mut request) => {
-                                    // 处理压缩的请求 payload
+                                    // Handle compressed request payload
                                     if request.compressed {
                                         if let Some(payload_str) = request.payload.as_str() {
                                             match crate::compression::gzip_decompress_from_base64(payload_str) {

@@ -1,6 +1,5 @@
 #![cfg(feature = "gui")]
 
-use rusqlite::Connection;
 use tauri::{Listener, Manager};
 
 fn main() {

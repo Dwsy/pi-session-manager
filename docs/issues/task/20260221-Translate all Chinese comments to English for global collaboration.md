@@ -38,10 +38,12 @@ tags: ["i18n", "documentation", "code-quality"]
 - [x] 按模块分组（后端 Rust / 前端 TS）
 
 ### Phase 2: 并行翻译执行
-- [x] **子代理 1**: Rust 后端注释翻译 (`src-tauri/src/`) - Phase 1 完成 (5 files: main.rs, scanner.rs, search.rs, write_buffer.rs, ws_adapter.rs)
-- [x] **子代理 2**: Rust 剩余文件翻译 - Session: tidy-atlas (export.rs, http_adapter.rs, lib.rs, main-cli.rs, sqlite_cache.rs, stats.rs)
-- [ ] **子代理 3**: TypeScript 核心逻辑注释翻译 (`src/`) - Pending
-- [ ] **子代理 4**: React 组件注释翻译 (`src/components/`) - Pending
+- [x] **子代理 1**: Rust 后端注释翻译 (`src-tauri/src/`) - ✅ 完成 (10 files)
+  - Completed: main.rs, scanner.rs, search.rs, write_buffer.rs, ws_adapter.rs, export.rs, http_adapter.rs, lib.rs, main-cli.rs, stats.rs
+  - sqlite_cache.rs: Chinese text is UI labels (conditional on language setting), not comments - kept as-is
+  - Quality: ✅ cargo fmt, ✅ cargo clippy --no-deps (no warnings)
+- [x] **子代理 2**: TypeScript/React 注释翻译 (`src/`) - Session: wild-sage (In Progress)
+  - Scanning: ~30+ files (excluding i18n/, __tests__/, *.backup.tsx)
 
 ### Phase 3: 验证
 - [ ] Rust: `cargo check`, `cargo clippy`, `cargo fmt`

@@ -110,7 +110,7 @@ function readRemoteConfig(): RemoteConfig {
   }
 }
 
-// Gzip 压缩相关工具函数
+// Gzip compression utility functions
 async function gzipCompress(data: Uint8Array): Promise<Uint8Array> {
   const cs = new CompressionStream('gzip')
   const writer = cs.writable.getWriter()
@@ -350,7 +350,7 @@ export class WebSocketTransport implements Transport {
       this.pendingRequests.delete(data.id)
 
       let responseData = data.data
-      // 处理压缩的响应数据
+      // Handle compressed response data
       if (data.compressed && typeof data.data === 'string') {
         try {
           const compressed = base64Decode(data.data)
@@ -602,7 +602,7 @@ export class HttpTransport implements Transport {
       })
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
 
-      // 浏览器会自动处理 gzip 解码
+      // Browser will handle gzip decoding automatically
       const data = await resp.json() as { success: boolean; data?: T; error?: string }
       if (!data.success) throw new Error(data.error || 'Command failed')
       if (!this.httpOk) {

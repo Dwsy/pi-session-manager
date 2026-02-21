@@ -1,6 +1,6 @@
 /**
- * 设置管理 Hook
- * 提供便捷的设置访问和更新方法
+ * Settings Management Hook
+ * Provides convenient methods for accessing and updating settings
  */
 
 import { useSettings as useSettingsContext } from '../contexts/SettingsContext'
@@ -12,8 +12,8 @@ export interface ValidationError {
 }
 
 /**
- * 使用设置 Hook
- * 提供对全局设置的访问和操作
+ * Use Settings Hook
+ * Provides access and operations for global settings
  */
 export function useSettings() {
   const context = useSettingsContext()

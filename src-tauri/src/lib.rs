@@ -115,7 +115,7 @@ pub fn run() {
             // Create and manage app state
             let app_state = app_state::create_app_state(app.handle().clone());
             app.manage(app_state.clone());
-            // 启动定期刷新缓冲的任务
+            // Start periodic buffer flush task
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
@@ -149,7 +149,7 @@ pub fn run() {
                 }
             });
 
-            // 应用退出时强制刷新
+            // Force flush on application exit
             let app_handle_clone = app.handle().clone();
             app_handle_clone.listen("tauri://exit", |_| {
                 if let Some((sessions, details)) = write_buffer::force_flush_all() {
