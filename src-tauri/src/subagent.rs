@@ -109,8 +109,13 @@ pub fn aggregate_runs(runs: &[SubagentRunInfo]) -> SubagentSummary {
 /// For each directory, checks for a `subagent-artifacts/` subdirectory, reads all
 /// files whose name ends with `_meta.json`, and uses the SQLite cache to avoid
 /// re-parsing unchanged files. Returns an aggregated `SubagentSummary`.
-pub fn scan_subagent_artifacts(session_dirs: &[PathBuf]) -> SubagentSummary {
-    let conn = sqlite_cache::init_db().ok();
+///
+/// Accepts an optional SQLite connection to reuse the caller's connection instead
+/// of opening a second one.
+pub fn scan_subagent_artifacts(
+    session_dirs: &[PathBuf],
+    conn: Option<&rusqlite::Connection>,
+) -> SubagentSummary {
     let mut all_runs: Vec<SubagentRunInfo> = Vec::new();
 
     for dir in session_dirs {
@@ -157,7 +162,7 @@ pub fn scan_subagent_artifacts(session_dirs: &[PathBuf]) -> SubagentSummary {
             let path_str = path.to_string_lossy().to_string();
 
             // Check cache
-            if let (Some(mtime), Some(ref c)) = (file_mtime, &conn) {
+            if let (Some(mtime), Some(c)) = (file_mtime, conn) {
                 if let Ok(Some((cached_mtime, run_info))) =
                     sqlite_cache::get_cached_subagent_meta(c, &path_str)
                 {
@@ -180,7 +185,7 @@ pub fn scan_subagent_artifacts(session_dirs: &[PathBuf]) -> SubagentSummary {
             match parse_meta_json(&content) {
                 Some(run_info) => {
                     // Write to cache if we have a connection and mtime
-                    if let (Some(mtime), Some(ref c)) = (file_mtime, &conn) {
+                    if let (Some(mtime), Some(c)) = (file_mtime, conn) {
                         if let Err(err) =
                             sqlite_cache::upsert_subagent_meta(c, &path_str, mtime, &run_info)
                         {
