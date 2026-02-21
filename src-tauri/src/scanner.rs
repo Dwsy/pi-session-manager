@@ -194,8 +194,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                                         }
                                     } else {
                                         // Not in DB (cold start): parse and write directly to DB
-                                        if let Ok((info, entries)) =
-                                            parse_session_info(&file_path)
+                                        if let Ok((info, entries)) = parse_session_info(&file_path)
                                         {
                                             let _ = sqlite_cache::upsert_session(
                                                 &conn,
