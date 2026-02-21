@@ -31,7 +31,19 @@ function formatTime(ts?: number | null): string {
 
 function formatPercent(v?: number | null): string {
   if (typeof v !== 'number' || Number.isNaN(v)) return '—'
-  return `${Math.max(0, Math.min(100, v)).toFixed(1)}%`
+  return `${Math.max(0, Math.min(100, v)).toFixed(0)}%`
+}
+
+function ProgressBar({ percent, colorClass = "bg-blue-500" }: { percent: number; colorClass?: string }) {
+  const clamped = Math.max(0, Math.min(100, percent))
+  return (
+    <div className="h-2 bg-secondary rounded-full overflow-hidden mt-1">
+      <div 
+        className={`h-full ${colorClass} transition-all duration-300`} 
+        style={{ width: `${clamped}%` }}
+      />
+    </div>
+  )
 }
 
 export default function SubscriptionUsagePage() {
@@ -137,17 +149,27 @@ export default function SubscriptionUsagePage() {
               {entry.windows.length === 0 ? (
                 <div className="text-xs text-muted-foreground">暂无窗口数据</div>
               ) : (
-                entry.windows.map((w, idx) => (
-                  <div key={`${entry.provider}-${idx}`} className="rounded-md border border-border/70 p-3">
-                    <div className="text-sm font-medium">{w.label}</div>
-                    <div className="text-xs text-muted-foreground mt-1">使用率：{formatPercent(w.used_percent)}</div>
-                    {(w.reset_description || w.reset_at) && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        重置：{w.reset_description || w.reset_at}
+                entry.windows.map((w, idx) => {
+                  const usedPercent = typeof w.used_percent === 'number' ? w.used_percent : 0
+                  const leftPercent = 100 - usedPercent
+                  // Color based on remaining (green = plenty left, red = running low)
+                  const colorClass = leftPercent < 10 ? "bg-red-500" : leftPercent < 30 ? "bg-yellow-500" : "bg-green-500"
+                  return (
+                    <div key={`${entry.provider}-${idx}`} className="rounded-md border border-border/70 p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium">{w.label}</div>
+                        <div className="text-xs font-mono text-muted-foreground">
+                          {formatPercent(leftPercent)} left
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))
+                      {/* Progress bar shows remaining (like pi native UI) */}
+                      <ProgressBar percent={leftPercent} colorClass={colorClass} />
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Used {formatPercent(usedPercent)} · Resets: {w.reset_description || '—'}
+                      </div>
+                    </div>
+                  )
+                })
               )}
             </div>
           </div>
