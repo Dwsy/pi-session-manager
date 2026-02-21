@@ -20,6 +20,14 @@
   <a href="https://dwsy.github.io/pi-session-manager/cn/">📖 中文文档</a>
 </p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/4cb92d95-f50e-48d2-8c5e-4bb814d45b8f" />
+    <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/screenshot-light.png" />
+    <img width="1800" alt="Pi Session Manager" src=".github/screenshots/screenshot-light.png" />
+  </picture>
+</p>
+
 ---
 
 ## Features
