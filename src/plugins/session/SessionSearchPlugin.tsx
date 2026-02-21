@@ -3,8 +3,8 @@ import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '../types'
 
 /**
- * 会话搜索插件
- * 搜索会话名称和元数据
+ * Session search plugin
+ * Searches session names and metadata
  */
 export class SessionSearchPlugin extends BaseSearchPlugin {
   id = 'session-search'
@@ -24,33 +24,33 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]> {
-    // 保存 context 以便访问 i18n
+    // Save context for i18n access
     this.setContext(context)
     
     try {
       const results: SearchPluginResult[] = []
       
-      // 如果启用了"只搜索当前项目"，过滤会话列表
+      // Filter session list if 'Search current project only' is enabled
       const sessionsToSearch = context.searchCurrentProjectOnly && context.selectedProject
         ? context.sessions.filter(s => s.cwd === context.selectedProject)
         : context.sessions
       
       for (const session of sessionsToSearch) {
-        // 搜索会话名称
+        // Search session name
         const nameScore = session.name 
           ? this.fuzzyMatch(query, session.name)
           : 0
         
-        // 搜索第一条消息
+        // Search first message
         const messageScore = this.fuzzyMatch(query, session.first_message) * 0.8
         
-        // 搜索路径
+        // Search path
         const pathScore = this.fuzzyMatch(query, session.path) * 0.5
         
-        // 搜索项目路径
+        // Search project path
         const cwdScore = this.fuzzyMatch(query, session.cwd) * 0.3
         
-        // 综合分数
+        // Combined score
         const score = Math.max(nameScore, messageScore, pathScore, cwdScore)
         
         if (score > 0) {
@@ -82,7 +82,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
   }
   
   onSelect(result: SearchPluginResult, context: SearchContext): void {
-    // 打开会话
+    // Open session
     const session = result.metadata?.session
     
     if (session) {
@@ -92,25 +92,25 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
   }
   
   /**
-   * 获取会话描述
+   * Get session description
    */
   private getSessionDescription(session: any, context: SearchContext): string {
     const parts: string[] = []
     
-    // 消息数量
+    // Message count
     parts.push(context.t('session.messageCount', {
       count: session.message_count,
       defaultValue: `${session.message_count} 条消息`
     }))
     
-    // 修改时间
+    // Modified time
     parts.push(this.formatRelativeTime(session.modified))
     
     return parts.join(' • ')
   }
   
   /**
-   * 格式化相对时间
+   * Format relative time
    */
   private formatRelativeTime(timestamp: string): string {
     if (!this.context) return timestamp
@@ -121,36 +121,36 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
       const diff = now.getTime() - date.getTime()
       const seconds = Math.floor(diff / 1000)
       
-      // 小于 1 分钟
+      // Less than 1 minute
       if (seconds < 60) {
         return this.context.t('time.justNow')
       }
       
-      // 小于 1 小时
+      // Less than 1 hour
       const minutes = Math.floor(seconds / 60)
       if (minutes < 60) {
         return this.context.t('time.minutesAgo', { count: minutes })
       }
       
-      // 小于 24 小时
+      // Less than 24 hours
       const hours = Math.floor(minutes / 60)
       if (hours < 24) {
         return this.context.t('time.hoursAgo', { count: hours })
       }
       
-      // 小于 7 天
+      // Less than 7 days
       const days = Math.floor(hours / 24)
       if (days < 7) {
         return this.context.t('time.daysAgo', { count: days })
       }
       
-      // 小于 30 天
+      // Less than 30 days
       const weeks = Math.floor(days / 7)
       if (weeks < 4) {
         return this.context.t('time.weeksAgo', { count: weeks })
       }
       
-      // 显示日期
+      // Show date
       return date.toLocaleDateString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
@@ -162,7 +162,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
   }
   
   /**
-   * 截断文本
+   * Truncate text
    */
   private truncateText(text: string, maxLength: number): string {
     if (text.length <= maxLength) return text
@@ -170,7 +170,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
   }
   
   /**
-   * 获取项目名称
+   * Get project name
    */
   private getProjectName(path: string): string {
     const parts = path.split('/')

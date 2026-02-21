@@ -1,5 +1,5 @@
 /**
- * 设置工具函数
+ * Settings utility functions
  */
 
 import i18n from '../i18n'

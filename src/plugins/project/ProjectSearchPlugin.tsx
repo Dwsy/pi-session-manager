@@ -3,8 +3,8 @@ import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '../types'
 
 /**
- * 项目搜索插件
- * 搜索项目路径
+ * Project search plugin
+ * Searches project paths
  */
 export class ProjectSearchPlugin extends BaseSearchPlugin {
   id = 'project-search'
@@ -24,11 +24,11 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]> {
-    // 保存 context 以便访问 i18n
+    // Save context for i18n access
     this.setContext(context)
     
     try {
-      // 从 sessions 中提取项目列表
+      // Extract project list from sessions
       const projectMap = new Map<string, number>()
       
       context.sessions.forEach(session => {
@@ -36,7 +36,7 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
         projectMap.set(project, (projectMap.get(project) || 0) + 1)
       })
       
-      // 搜索匹配的项目
+      // Search matching projects
       const results: SearchPluginResult[] = []
       
       for (const [project, count] of projectMap.entries()) {
@@ -79,7 +79,7 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
   }
   
   onSelect(result: SearchPluginResult, context: SearchContext): void {
-    // 切换到项目视图
+    // Switch to project view
     const project = result.metadata?.project
     
     if (project) {
@@ -89,7 +89,7 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
   }
   
   /**
-   * 获取项目名称（路径的最后一部分）
+   * Get project name (last part of path)
    */
   private getProjectName(path: string): string {
     const parts = path.split('/')

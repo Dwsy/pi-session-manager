@@ -6,15 +6,15 @@ interface BadgeState {
 }
 
 /**
- * Badge 状态管理 Hook
- * 以程序启动时间为基准，追踪启动后新增和更新的会话
+ * Badge state management hook
+ * Tracks new and updated sessions since app startup
  */
 export function useSessionBadges(sessions: SessionInfo[]) {
   const [badgeStates, setBadgeStates] = useState<Record<string, BadgeState>>({})
   const baselineRef = useRef<Map<string, SessionInfo> | null>(null)
   const previousSessionsRef = useRef<Map<string, SessionInfo>>(new Map())
 
-  // 检测会话变化并更新 badge 状态
+  // Detect session changes and update badge status
   useEffect(() => {
     if (sessions.length === 0) {
       return
@@ -63,7 +63,7 @@ export function useSessionBadges(sessions: SessionInfo[]) {
       return newStates
     })
 
-    // 同时更新 baseline，防止增量更新后 badge 重新出现
+    // Also update baseline to prevent badge from reappearing after incremental updates
     const session = sessions.find(s => s.id === sessionId)
     if (session && baselineRef.current) {
       baselineRef.current.set(sessionId, session)
@@ -74,7 +74,7 @@ export function useSessionBadges(sessions: SessionInfo[]) {
     setBadgeStates({})
   }, [])
 
-  // 获取指定会话的 badge 类型
+  // Get badge type for specified session
   const getBadgeType = useCallback((sessionId: string): 'new' | 'updated' | null => {
     return badgeStates[sessionId]?.type || null
   }, [badgeStates])

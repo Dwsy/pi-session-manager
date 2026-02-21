@@ -1,6 +1,6 @@
 import { PatchDiff } from '@pierre/diffs/react'
 
-// 标准的 unified diff 格式示例
+// Standard unified diff format example
 const validDiff = `--- a/example.ts
 +++ b/example.ts
 @@ -1,3 +1,3 @@

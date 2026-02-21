@@ -1,15 +1,15 @@
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 
-// 自定义渲染器
+// Custom renderer
 const renderer = new marked.Renderer()
 
-// 自定义代码块渲染
+// Custom code block rendering
 renderer.code = function({ text, lang }: { text: string; lang?: string }): string {
   const language = lang || ''
   const validLang = language && hljs.getLanguage(language) ? language : ''
   
-  // 高亮代码
+  // Highlight code
   let highlightedCode = text
   if (validLang) {
     try {
@@ -21,16 +21,16 @@ renderer.code = function({ text, lang }: { text: string; lang?: string }): strin
     highlightedCode = hljs.highlightAuto(text).value
   }
   
-  // 计算行数
+  // Calculate line count
   const lines = text.split('\n')
   const lineCount = lines.length
   
-  // 生成行号
+  // Generate line numbers
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => 
     `<div class="code-line-number">${i + 1}</div>`
   ).join('')
   
-  // 返回完整的代码块 HTML
+  // Return complete code block HTML
   return `
     <div class="code-block-wrapper">
       <div class="code-block-header">
@@ -50,7 +50,7 @@ renderer.code = function({ text, lang }: { text: string; lang?: string }): strin
   `
 }
 
-// 配置 marked
+// Configure marked
 marked.setOptions({
   breaks: true,
   gfm: true,

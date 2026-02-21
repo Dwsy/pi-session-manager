@@ -6,14 +6,14 @@ import { useEffect, useState } from 'react'
  */
 export function useResolvedTheme(): 'dark' | 'light' {
   const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => {
-    // 初始化：检查 DOM 类名或系统偏好
+    // Initialize: check DOM class or system preference
     if (document.documentElement.classList.contains('theme-dark')) {
       return 'dark'
     }
     if (document.documentElement.classList.contains('theme-light')) {
       return 'light'
     }
-    // 如果没有类名，使用系统偏好
+    // If no class name, use system preference
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   })
 
@@ -24,24 +24,24 @@ export function useResolvedTheme(): 'dark' | 'light' {
       } else if (document.documentElement.classList.contains('theme-light')) {
         setResolvedTheme('light')
       } else {
-        // system 主题：使用系统偏好
+        // system theme: use system preference
         setResolvedTheme(
           window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
         )
       }
     }
 
-    // 监听 DOM 类名变化
+    // Listen for DOM class changes
     const observer = new MutationObserver(updateTheme)
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class'],
     })
 
-    // 监听系统主题变化
+    // Listen for system theme changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     const handleChange = () => {
-      // 只有在 system 主题时才响应系统变化
+      // Only respond to system changes when in system theme
       if (
         !document.documentElement.classList.contains('theme-dark') &&
         !document.documentElement.classList.contains('theme-light')

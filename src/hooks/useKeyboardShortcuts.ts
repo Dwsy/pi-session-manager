@@ -12,24 +12,24 @@ interface Shortcuts {
  * 因此全局快捷键不会与终端快捷键冲突
  */
 export function useKeyboardShortcuts(shortcuts: Shortcuts) {
-  // 使用 ref 存储 shortcuts，避免每次渲染都重新绑定事件
+  // Use ref to store shortcuts, avoid rebinding events on every render
   const shortcutsRef = useRef(shortcuts)
 
-  // 更新 ref 中的 shortcuts
+  // Update shortcuts in ref
   useEffect(() => {
     shortcutsRef.current = shortcuts
   }, [shortcuts])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 在输入框中不触发快捷键
+      // Don't trigger shortcuts in input fields
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return
       }
 
       const key = `${e.metaKey || e.ctrlKey ? 'cmd+' : ''}${e.altKey ? 'alt+' : ''}${e.shiftKey ? 'shift+' : ''}${e.key.toLowerCase()}`
 
-      // 从 ref 中获取最新的 shortcuts
+      // Get latest shortcuts from ref
       const handler = shortcutsRef.current[key]
       if (handler) {
         e.preventDefault()
@@ -39,5 +39,5 @@ export function useKeyboardShortcuts(shortcuts: Shortcuts) {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, []) // 空依赖数组，只在挂载时绑定一次
+  }, []) // Empty dependency array, bind only once on mount
 }

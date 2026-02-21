@@ -7,32 +7,32 @@ interface CacheEntry {
 }
 
 const CACHE_SIZE = 100
-const CACHE_TTL = 5 * 60 * 1000 // 5 分钟
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 /**
- * 搜索缓存 Hook
- * 使用 LRU 策略缓存搜索结果
+ * Search cache hook
+ * Caches search results using LRU strategy
  * 
- * ⚠️ 重要：使用 useMemo 确保返回的对象引用稳定
- * 否则会导致 useSearchPlugins 的 search 函数每次都变化，触发无限循环
+ * ⚠️ Important: Use useMemo to ensure returned object reference is stable
+ * Otherwise will cause useSearchPlugins' search function to change on every call, triggering infinite loop
  */
 export function useSearchCache() {
   const cacheRef = useRef<Map<string, CacheEntry>>(new Map())
   
-  // 使用 useMemo 确保返回的对象是稳定的引用
-  // 空依赖数组表示只创建一次，避免无限循环
+  // Use useMemo to ensure returned object is a stable reference
+  // Empty dependency array means create only once, avoid infinite loops
   return useMemo(() => ({
     /**
-     * 获取缓存结果
-     * @param query 查询字符串
-     * @returns 缓存的结果或 null
+     * Get cached results
+     * @param query Query string
+     * @returns Cached results or null
      */
     get: (query: string): SearchPluginResult[] | null => {
       const entry = cacheRef.current.get(query)
       
       if (!entry) return null
       
-      // 检查是否过期
+      // Check if expired
       if (Date.now() - entry.timestamp > CACHE_TTL) {
         cacheRef.current.delete(query)
         return null
@@ -42,12 +42,12 @@ export function useSearchCache() {
     },
     
     /**
-     * 设置缓存结果
-     * @param query 查询字符串
-     * @param results 搜索结果
+     * Set cached results
+     * @param query Query string
+     * @param results Search results
      */
     set: (query: string, results: SearchPluginResult[]): void => {
-      // LRU: 如果缓存满了，删除最旧的
+      // LRU: If cache is full, remove oldest
       if (cacheRef.current.size >= CACHE_SIZE) {
         const firstKey = cacheRef.current.keys().next().value
         if (firstKey !== undefined) {
@@ -67,5 +67,5 @@ export function useSearchCache() {
     clear: (): void => {
       cacheRef.current.clear()
     }
-  }), []) // ⚠️ 空依赖数组很关键！确保对象只创建一次
+  }), []) // ⚠️ Empty dependency array is critical! Ensure object is created only once
 }

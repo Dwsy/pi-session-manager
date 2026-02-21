@@ -1,8 +1,8 @@
 import type { SearchPlugin, SearchContext, SearchPluginResult, HighlightRange } from '../types'
 
 /**
- * 搜索插件基类
- * 提供通用功能和默认实现
+ * Base search plugin
+ * Provides common functionality and default implementations
  */
 export abstract class BaseSearchPlugin implements SearchPlugin {
   abstract id: string
@@ -11,20 +11,20 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
   abstract description: string
   abstract keywords: string[]
   
-  priority: number = 50 // 默认优先级
+  priority: number = 50 // Default priority
   
-  // 存储 context 以便子类访问 i18n
+  // Store context for subclass i18n access
   protected context?: SearchContext
   
   /**
-   * 设置搜索上下文（包含 i18n）
+   * Set search context (includes i18n)
    */
   setContext(context: SearchContext): void {
     this.context = context
   }
   
   /**
-   * 抽象搜索方法，子类必须实现
+   * Abstract search method, must be implemented by subclasses
    */
   abstract search(
     query: string,
@@ -32,14 +32,14 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
   ): Promise<SearchPluginResult[]>
   
   /**
-   * 默认选中处理（可覆盖）
+   * Default selection handling (can be overridden)
    */
   onSelect(_result: SearchPluginResult, _context: SearchContext): void {
     // Default: do nothing, subclasses should override
   }
   
   /**
-   * 默认启用检查（可覆盖）
+   * Default enable check (can be overridden)
    */
   isEnabled(_context: SearchContext): boolean {
     return true
@@ -55,7 +55,7 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
     const lowerQuery = query.toLowerCase()
     const lowerText = text.toLowerCase()
     
-    // 精确匹配
+    // Exact match
     if (lowerText === lowerQuery) return 1.0
     
     // 包含匹配

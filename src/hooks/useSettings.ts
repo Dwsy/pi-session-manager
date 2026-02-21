@@ -18,14 +18,14 @@ export interface ValidationError {
 export function useSettings() {
   const context = useSettingsContext()
 
-  // 获取终端设置
+  // Get terminal setting
   const getTerminalSetting = <K extends keyof AppSettings['terminal']>(
     key: K
   ): AppSettings['terminal'][K] => {
     return context.settings.terminal[key]
   }
 
-  // 更新终端设置
+  // Update terminal setting
   const updateTerminalSetting = <K extends keyof AppSettings['terminal']>(
     key: K,
     value: AppSettings['terminal'][K]
@@ -33,14 +33,14 @@ export function useSettings() {
     context.updateSetting('terminal', key, value)
   }
 
-  // 获取外观设置
+  // Get appearance setting
   const getAppearanceSetting = <K extends keyof AppSettings['appearance']>(
     key: K
   ): AppSettings['appearance'][K] => {
     return context.settings.appearance[key]
   }
 
-  // 更新外观设置
+  // Update appearance setting
   const updateAppearanceSetting = <K extends keyof AppSettings['appearance']>(
     key: K,
     value: AppSettings['appearance'][K]
@@ -48,14 +48,14 @@ export function useSettings() {
     context.updateSetting('appearance', key, value)
   }
 
-  // 获取语言设置
+  // Get language setting
   const getLanguageSetting = <K extends keyof AppSettings['language']>(
     key: K
   ): AppSettings['language'][K] => {
     return context.settings.language[key]
   }
 
-  // 更新语言设置
+  // Update language setting
   const updateLanguageSetting = <K extends keyof AppSettings['language']>(
     key: K,
     value: AppSettings['language'][K]
@@ -63,14 +63,14 @@ export function useSettings() {
     context.updateSetting('language', key, value)
   }
 
-  // 获取会话设置
+  // Get session setting
   const getSessionSetting = <K extends keyof AppSettings['session']>(
     key: K
   ): AppSettings['session'][K] => {
     return context.settings.session[key]
   }
 
-  // 更新会话设置
+  // Update session setting
   const updateSessionSetting = <K extends keyof AppSettings['session']>(
     key: K,
     value: AppSettings['session'][K]
@@ -78,14 +78,14 @@ export function useSettings() {
     context.updateSetting('session', key, value)
   }
 
-  // 获取搜索设置
+  // Get search setting
   const getSearchSetting = <K extends keyof AppSettings['search']>(
     key: K
   ): AppSettings['search'][K] => {
     return context.settings.search[key]
   }
 
-  // 更新搜索设置
+  // Update search setting
   const updateSearchSetting = <K extends keyof AppSettings['search']>(
     key: K,
     value: AppSettings['search'][K]
@@ -93,14 +93,14 @@ export function useSettings() {
     context.updateSetting('search', key, value)
   }
 
-  // 获取导出设置
+  // Get export setting
   const getExportSetting = <K extends keyof AppSettings['export']>(
     key: K
   ): AppSettings['export'][K] => {
     return context.settings.export[key]
   }
 
-  // 更新导出设置
+  // Update export setting
   const updateExportSetting = <K extends keyof AppSettings['export']>(
     key: K,
     value: AppSettings['export'][K]
@@ -108,14 +108,14 @@ export function useSettings() {
     context.updateSetting('export', key, value)
   }
 
-  // 获取高级设置
+  // Get advanced setting
   const getAdvancedSetting = <K extends keyof AppSettings['advanced']>(
     key: K
   ): AppSettings['advanced'][K] => {
     return context.settings.advanced[key]
   }
 
-  // 更新高级设置
+  // Update advanced setting
   const updateAdvancedSetting = <K extends keyof AppSettings['advanced']>(
     key: K,
     value: AppSettings['advanced'][K]
@@ -125,31 +125,31 @@ export function useSettings() {
 
   return {
     ...context,
-    // 终端设置
+    // Terminal settings
     terminal: context.settings.terminal,
     getTerminalSetting,
     updateTerminalSetting,
-    // 外观设置
+    // Appearance settings
     appearance: context.settings.appearance,
     getAppearanceSetting,
     updateAppearanceSetting,
-    // 语言设置
+    // Language settings
     language: context.settings.language,
     getLanguageSetting,
     updateLanguageSetting,
-    // 会话设置
+    // Session settings
     session: context.settings.session,
     getSessionSetting,
     updateSessionSetting,
-    // 搜索设置
+    // Search settings
     search: context.settings.search,
     getSearchSetting,
     updateSearchSetting,
-    // 导出设置
+    // Export settings
     export: context.settings.export,
     getExportSetting,
     updateExportSetting,
-    // 高级设置
+    // Advanced settings
     advanced: context.settings.advanced,
     getAdvancedSetting,
     updateAdvancedSetting,
@@ -157,19 +157,19 @@ export function useSettings() {
 }
 
 /**
- * 设置验证 Hook
- * 提供设置验证功能
+ * Settings Validation Hook
+ * Provides settings validation functionality
  */
 export function useSettingsValidation() {
   const { validateSettings: _validateSettings } = require('../types/settings')
 
   const validate = (_settings: AppSettings): ValidationError[] => {
-    // TODO: 实现验证逻辑
+    // TODO: Implement validation logic
     return []
   }
 
   const validateField = (_field: string, _value: unknown): ValidationError | null => {
-    // TODO: 实现字段验证
+    // TODO: Implement field validation
     return null
   }
 
@@ -180,14 +180,14 @@ export function useSettingsValidation() {
 }
 
 /**
- * 设置导入导出 Hook
- * 提供设置的导入和导出功能
+ * Settings Import/Export Hook
+ * Provides import and export functionality for settings
  */
 export function useSettingsImportExport() {
   const { settings } = useSettingsContext()
 
   const exportSettings = async (_format: 'json' | 'yaml'): Promise<string> => {
-    // TODO: 实现导出逻辑
+    // TODO: Implement export logic
     const exportData = {
       version: '1.0.0',
       exportedAt: new Date().toISOString(),
@@ -197,9 +197,9 @@ export function useSettingsImportExport() {
   }
 
   const importSettings = async (_data: string): Promise<void> => {
-    // TODO: 实现导入逻辑
+    // TODO: Implement import logic
     // const parsed = JSON.parse(data)
-    // 验证并应用设置
+    // Validate and apply settings
   }
 
   return {

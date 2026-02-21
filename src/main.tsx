@@ -14,7 +14,7 @@ if (isTauri()) {
   document.documentElement.style.setProperty('--titlebar-height', '32px')
 }
 
-// 全局复制代码函数
+// Global copy code function
 declare global {
   interface Window {
     copyCode: (button: HTMLButtonElement) => void
@@ -23,20 +23,20 @@ declare global {
 
 window.copyCode = async (button: HTMLButtonElement) => {
   try {
-    // 找到代码块
+    // Find code block
     const wrapper = button.closest('.code-block-wrapper')
     if (!wrapper) return
     
     const codeElement = wrapper.querySelector('code')
     if (!codeElement) return
     
-    // 获取纯文本代码（不包含 HTML 标签）
+    // Get plain text code (without HTML tags)
     const code = codeElement.textContent || ''
     
-    // 复制到剪贴板
+    // Copy to clipboard
     await navigator.clipboard.writeText(code)
     
-    // 更新按钮状态
+    // Update button state
     const textSpan = button.querySelector('.code-copy-text')
     const svg = button.querySelector('svg')
     

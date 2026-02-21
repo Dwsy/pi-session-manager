@@ -44,7 +44,7 @@ export default function CodeBlock({ code, language, filename, showLineNumbers = 
     }
   }
 
-  // 计算行号
+  // Calculate line numbers
   const lines = code.split('\n')
   const lineCount = lines.length
 
