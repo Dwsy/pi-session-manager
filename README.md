@@ -5,7 +5,7 @@
 <h1 align="center">Pi Session Manager</h1>
 
 <p align="center">
-  跨平台 Pi AI 会话管理工具 — 浏览、搜索、管理 <a href="https://github.com/badlogic/pi-mono">Pi</a> 编程会话
+  Cross-platform Pi AI session management tool — Browse, search, and manage <a href="https://github.com/badlogic/pi-mono">Pi</a> programming sessions
 </p>
 
 <p align="center">
@@ -15,116 +15,117 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">⬇️ 下载</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/cn/">📖 文档</a>
+  <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">⬇️ Download</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/">📖 Documentation</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/cn/">📖 中文文档</a>
 </p>
 
 ---
 
-## 核心功能
+## Features
 
-- **多端支持** — 桌面应用 (macOS/Windows/Linux) + 移动端 Web + 无头服务器模式
-- **会话浏览** — 列表/项目/看板视图，收藏，重命名，批量导出
-- **全文搜索** — SQLite FTS5 驱动，支持角色过滤、路径匹配、相关性排序
-- **会话查看** — 树形视图、工具调用折叠、思维链展示、流程图可视化
-- **内建终端** — xterm.js + PTY 后端 (`Cmd/Ctrl+J`)
-- **数据看板** — 活动热力图、项目分布、模型使用、Token 消耗统计
-- **技能管理** — 扫描管理 `~/.pi/agent/skills` 和 prompts，系统提示词编辑
-- **多协议 API** — Tauri IPC + WebSocket (`ws://:52130`) + HTTP (`http://:52131`)
-- **CLI 模式** — 无头后端服务 (`--cli` / `--headless`)
+- **Cross-Platform** — Desktop app (macOS/Windows/Linux) + Mobile Web + Headless server mode
+- **Session Browser** — List/Project/Kanban views, favorites, rename, batch export
+- **Full-Text Search** — SQLite FTS5 powered, role filtering, path matching, relevance ranking
+- **Session Viewer** — Tree view, collapsible tool calls, chain-of-thought display, flow visualization
+- **Built-in Terminal** — xterm.js + PTY backend (`Cmd/Ctrl+J`)
+- **Dashboard** — Activity heatmap, project distribution, model usage, token consumption stats
+- **Skill Management** — Scan and manage `~/.pi/agent/skills` and prompts, system prompt editor
+- **Multi-Protocol API** — Tauri IPC + WebSocket (`ws://:52130`) + HTTP (`http://:52131`)
+- **CLI Mode** — Headless backend service (`--cli` / `--headless`)
 
 ---
 
-## 下载
+## Download
 
-从 [**Releases**](../../releases) 获取最新版本：
+Get the latest version from [**Releases**](../../releases):
 
-| 平台 | 文件 |
+| Platform | File |
 |------|------|
 | macOS (Apple Silicon) | `Pi.Session.Manager_*_aarch64.dmg` |
 | macOS (Intel) | `Pi.Session.Manager_*_x64.dmg` |
 | Windows (x64) | `Pi.Session.Manager_*_x64-setup.exe` |
 | Linux (deb) | `pi-session-manager_*_amd64.deb` |
 
-> **前置要求**: 需安装 [Pi](https://github.com/badlogic/pi-mono) 以支持会话恢复和终端集成
+> **Prerequisites**: [Pi](https://github.com/badlogic/pi-mono) must be installed for session restoration and terminal integration
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 桌面应用
+### Desktop App
 
 ```bash
 ./pi-session-manager
 ```
 
-### 服务器模式
+### Server Mode
 
 ```bash
 ./pi-session-manager --cli
-# 访问 http://localhost:52131
+# Access http://localhost:52131
 ```
 
-### 从源码构建
+### Build from Source
 
 ```bash
 git clone https://github.com/Dwsy/pi-session-manager.git
 cd pi-session-manager
 
 npm install
-npm run tauri:dev        # 开发
-npm run tauri:build      # 生产构建
+npm run tauri:dev        # Development
+npm run tauri:build      # Production build
 ```
 
-**系统依赖**:
+**System Dependencies**:
 - **macOS**: `xcode-select --install`
 - **Ubuntu/Debian**: `sudo apt-get install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev`
 - **Windows**: Visual Studio Build Tools + WebView2
 
 ---
 
-## 快捷键
+## Keyboard Shortcuts
 
-| 快捷键 | 功能 |
+| Shortcut | Action |
 |--------|------|
-| `Cmd/Ctrl + K` | 命令面板 |
-| `Cmd/Ctrl + J` | 切换终端 |
-| `Cmd/Ctrl + F` | 会话内搜索 |
-| `Cmd/Ctrl + Shift + F` | 全文搜索 |
-| `Cmd/Ctrl + R` | 终端恢复会话 |
-| `Cmd/Ctrl + E` | 导出并打开 |
-| `Cmd/Ctrl + ,` | 设置 |
+| `Cmd/Ctrl + K` | Command Palette |
+| `Cmd/Ctrl + J` | Toggle Terminal |
+| `Cmd/Ctrl + F` | Session Search |
+| `Cmd/Ctrl + Shift + F` | Full-Text Search |
+| `Cmd/Ctrl + R` | Restore Session in Terminal |
+| `Cmd/Ctrl + E` | Export and Open |
+| `Cmd/Ctrl + ,` | Settings |
 
 ---
 
-## 技术栈
+## Tech Stack
 
-| 层级 | 技术 |
+| Layer | Technology |
 |------|------|
-| **前端** | React 18, TypeScript, Vite, Tailwind CSS, xterm.js, Recharts, React Flow |
-| **后端** | Tauri 2, Rust, Tokio, Axum, SQLite, Tantivy, portable-pty |
-| **通信** | Tauri IPC, WebSocket, HTTP |
+| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, xterm.js, Recharts, React Flow |
+| **Backend** | Tauri 2, Rust, Tokio, Axum, SQLite, Tantivy, portable-pty |
+| **Communication** | Tauri IPC, WebSocket, HTTP |
 
 ---
 
-## 配置路径
+## Configuration Paths
 
-| 路径 | 说明 |
+| Path | Description |
 |------|------|
-| `~/.pi/agent/sessions/` | Pi 会话目录 |
-| `~/.pi/agent/session-manager.db` | SQLite 缓存 |
-| `~/.pi/agent/session-manager-config.toml` | 配置文件 |
+| `~/.pi/agent/sessions/` | Pi session directory |
+| `~/.pi/agent/session-manager.db` | SQLite cache |
+| `~/.pi/agent/session-manager-config.toml` | Configuration file |
 
 ---
 
-## 贡献
+## Contributing
 
 ```bash
 cd src-tauri && cargo fmt && cargo clippy
 cd src-tauri && cargo test
 ```
 
-提交 PR 请遵循 [Conventional Commits](https://www.conventionalcommits.org/)
+Please follow [Conventional Commits](https://www.conventionalcommits.org/) for PR submissions.
 
 ---
 
