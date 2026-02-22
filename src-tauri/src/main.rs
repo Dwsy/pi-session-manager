@@ -97,7 +97,7 @@ fn main() {
                             None => match pi_session_manager::sqlite_cache::init_db() {
                                 Ok(c) => c,
                                 Err(e) => {
-                                    log::error!("Failed to init DB for flush: {}", e);
+                                    log::error!("Failed to init DB for flush: {e}");
                                     continue;
                                 }
                             }
@@ -111,7 +111,7 @@ fn main() {
                                 entry.file_modified,
                                 None,
                             ) {
-                                log::error!("Failed to upsert session during flush: {}", e);
+                                log::error!("Failed to upsert session during flush: {e}");
                                 flush_error = true;
                             }
                         }
@@ -124,7 +124,7 @@ fn main() {
                                     &entry.details,
                                 )
                             {
-                                log::error!("Failed to upsert session details during flush: {}", e);
+                                log::error!("Failed to upsert session details during flush: {e}");
                                 flush_error = true;
                             }
                         }
@@ -156,7 +156,7 @@ fn main() {
                                     entry.file_modified,
                                     None,
                                 ) {
-                                    log::error!("Failed to upsert session on exit: {}", e);
+                                    log::error!("Failed to upsert session on exit: {e}");
                                     flush_error = true;
                                 }
                             }
@@ -169,7 +169,7 @@ fn main() {
                                         &entry.details,
                                     )
                                 {
-                                    log::error!("Failed to upsert session details on exit: {}", e);
+                                    log::error!("Failed to upsert session details on exit: {e}");
                                     flush_error = true;
                                 }
                             }
@@ -182,7 +182,7 @@ fn main() {
                             }
                         }
                         Err(e) => {
-                            log::error!("Failed to init DB on exit: {}", e);
+                            log::error!("Failed to init DB on exit: {e}");
                         }
                     }
                 }
