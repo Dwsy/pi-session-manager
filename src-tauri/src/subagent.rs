@@ -32,42 +32,18 @@ pub fn parse_meta_json(content: &str) -> Option<SubagentRunInfo> {
             .and_then(|x| x.as_str())
             .unwrap_or("unknown")
             .to_string(),
-        exit_code: v
-            .get("exitCode")
-            .and_then(|x| x.as_i64())
-            .unwrap_or(0) as i32,
-        cost: usage
-            .get("cost")
-            .and_then(|x| x.as_f64())
-            .unwrap_or(0.0),
-        input_tokens: usage
-            .get("input")
-            .and_then(|x| x.as_u64())
-            .unwrap_or(0) as usize,
-        output_tokens: usage
-            .get("output")
-            .and_then(|x| x.as_u64())
-            .unwrap_or(0) as usize,
-        cache_read_tokens: usage
-            .get("cacheRead")
-            .and_then(|x| x.as_u64())
-            .unwrap_or(0) as usize,
+        exit_code: v.get("exitCode").and_then(|x| x.as_i64()).unwrap_or(0) as i32,
+        cost: usage.get("cost").and_then(|x| x.as_f64()).unwrap_or(0.0),
+        input_tokens: usage.get("input").and_then(|x| x.as_u64()).unwrap_or(0) as usize,
+        output_tokens: usage.get("output").and_then(|x| x.as_u64()).unwrap_or(0) as usize,
+        cache_read_tokens: usage.get("cacheRead").and_then(|x| x.as_u64()).unwrap_or(0) as usize,
         cache_write_tokens: usage
             .get("cacheWrite")
             .and_then(|x| x.as_u64())
             .unwrap_or(0) as usize,
-        duration_ms: v
-            .get("durationMs")
-            .and_then(|x| x.as_u64())
-            .unwrap_or(0),
-        tool_count: v
-            .get("toolCount")
-            .and_then(|x| x.as_u64())
-            .unwrap_or(0) as usize,
-        timestamp: v
-            .get("timestamp")
-            .and_then(|x| x.as_i64())
-            .unwrap_or(0),
+        duration_ms: v.get("durationMs").and_then(|x| x.as_u64()).unwrap_or(0),
+        tool_count: v.get("toolCount").and_then(|x| x.as_u64()).unwrap_or(0) as usize,
+        timestamp: v.get("timestamp").and_then(|x| x.as_i64()).unwrap_or(0),
     })
 }
 
@@ -83,11 +59,13 @@ pub fn aggregate_runs(runs: &[SubagentRunInfo]) -> SubagentSummary {
         let tokens = run.input_tokens + run.output_tokens;
         total_tokens += tokens;
 
-        let agent_stats = runs_by_agent.entry(run.agent.clone()).or_insert(AgentStats {
-            runs: 0,
-            cost: 0.0,
-            tokens: 0,
-        });
+        let agent_stats = runs_by_agent
+            .entry(run.agent.clone())
+            .or_insert(AgentStats {
+                runs: 0,
+                cost: 0.0,
+                tokens: 0,
+            });
         agent_stats.runs += 1;
         agent_stats.cost += run.cost;
         agent_stats.tokens += tokens;
@@ -151,9 +129,7 @@ pub fn scan_subagent_artifacts(
                 .ok()
                 .and_then(|m| m.modified().ok())
                 .map(|t| {
-                    let dur = t
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default();
+                    let dur = t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
                     Utc.timestamp_opt(dur.as_secs() as i64, 0)
                         .single()
                         .unwrap_or_else(Utc::now)
