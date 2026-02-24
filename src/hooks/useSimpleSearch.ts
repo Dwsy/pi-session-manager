@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import type { SessionInfo } from '../types'
+import { parseQuotedQuery } from '../utils/search'
 
 export interface UseSimpleSearchReturn {
   searchQuery: string
@@ -18,8 +19,10 @@ export function useSimpleSearch(sessions: SessionInfo[]): UseSimpleSearchReturn 
       return sessions
     }
 
-    const query = searchQuery.toLowerCase().trim()
-    const tokens = query.split(/\s+/).filter(Boolean)
+    const parsedQuery = parseQuotedQuery(searchQuery)
+    const terms = parsedQuery.hasPhrases
+      ? [...parsedQuery.phrases, ...parsedQuery.remainderTokens].map(term => term.toLowerCase())
+      : parsedQuery.remainderTokens.map(term => term.toLowerCase())
 
     return sessions.filter(session => {
       const searchableText = [
@@ -30,7 +33,7 @@ export function useSimpleSearch(sessions: SessionInfo[]): UseSimpleSearchReturn 
         session.id || ''
       ].join(' ').toLowerCase()
 
-      return tokens.every(token => searchableText.includes(token))
+      return terms.every(term => searchableText.includes(term))
     })
   }, [sessions, searchQuery])
 

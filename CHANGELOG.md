@@ -6,6 +6,12 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Changed
 
+- **Exact phrase search with quotes** — search now supports exact contiguous phrase matching via double quotes across frontend filters, command palette plugins, Rust non-FTS search, and SQLite FTS query construction
+  - Example: `"foo bar baz"` matches only contiguous `foo bar baz` occurrences
+  - Unquoted behavior remains unchanged for existing search flows
+  - Added and updated focused tests for FullTextSearch highlighting and Rust quoted-phrase search behavior
+  - Improved incremental typing behavior for quoted queries in sidebar and in-session (tree/flow) search inputs
+
 - **Internationalization** — All Chinese code comments translated to English for global collaboration
   - Rust backend (`src-tauri/src/`): 10 files translated (search.rs, scanner.rs, sqlite_cache.rs, http_adapter.rs, ws_adapter.rs, write_buffer.rs, stats.rs, export.rs, lib.rs, main-cli.rs)
   - TypeScript/React frontend (`src/`): 17 files translated (components, hooks, utils, plugins)

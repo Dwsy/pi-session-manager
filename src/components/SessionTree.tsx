@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { SessionEntry } from '../types'
 import SessionTreeSearch, { type SessionTreeSearchRef } from './SessionTreeSearch'
 import { getCachedSettings } from '../utils/settingsApi'
+import { parseQuotedQuery } from '../utils/search'
 
 // Known tools map to CSS variable names: var(--tool-color-<name>)
 // Unknown tools use palette variables: var(--tool-palette-<N>)
@@ -127,6 +128,20 @@ ref
       return next
     })
   }, [])
+
+  const searchTerms = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return []
+    }
+
+    const parsedQuery = parseQuotedQuery(searchQuery)
+    return (parsedQuery.hasPhrases
+      ? [...parsedQuery.phrases, ...parsedQuery.remainderTokens]
+      : parsedQuery.remainderTokens
+    )
+      .map(term => term.toLowerCase())
+      .filter(Boolean)
+  }, [searchQuery])
 
   // Build tree structure
   const treeData = useMemo(() => {
@@ -352,10 +367,9 @@ ref
       const label = flatNode.node.label
 
       // Search filter
-      if (searchQuery) {
-        const searchTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean)
+      if (searchTerms.length > 0) {
         const text = getSearchableText(entry, label)
-        if (!searchTokens.every(token => text.includes(token))) {
+        if (!searchTerms.every(term => text.includes(term))) {
           return false
         }
       }
@@ -405,7 +419,7 @@ ref
           return true
       }
     })
-  }, [flatNodes, searchQuery, currentFilter])
+  }, [flatNodes, searchTerms, currentFilter])
 
   // Get node display text
   const getNodeDisplayText = (entry: SessionEntry, label?: string): string => {
@@ -562,9 +576,8 @@ ref
 
   // Calculate search results list
   const matchedEntryIds = useMemo(() => {
-    if (!searchQuery.trim()) return []
-    
-    const searchTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean)
+    if (searchTerms.length === 0) return []
+
     const matched: string[] = []
     
     flatNodes.forEach(flatNode => {
@@ -604,13 +617,13 @@ ref
       }
       
       const text = parts.join(' ').toLowerCase()
-      if (searchTokens.every(token => text.includes(token))) {
+      if (searchTerms.every(term => text.includes(term))) {
         matched.push(entry.id)
       }
     })
     
     return matched
-  }, [flatNodes, searchQuery])
+  }, [flatNodes, searchTerms])
 
   // Update search results
   useEffect(() => {
@@ -818,12 +831,11 @@ ref
 
           const isSearchMatch = searchResults.includes(entry.id)
           const isCurrentMatch = isSearchMatch && searchResults[currentResultIndex] === entry.id
-          const searchTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean)
 
           let snippet: string | null = null
-          if (isSearchMatch && searchQuery) {
+          if (isSearchMatch && searchTerms.length > 0) {
             const fullText = getFullText(entry, label)
-            snippet = extractSnippet(fullText, searchTokens)
+            snippet = extractSnippet(fullText, searchTerms)
           }
 
           return (
@@ -860,7 +872,7 @@ ref
                 <span className="tree-collapsed-hint">...</span>
               )}
               {snippet && (
-                <span className="tree-snippet">{highlightText(snippet, searchTokens)}</span>
+                <span className="tree-snippet">{highlightText(snippet, searchTerms)}</span>
               )}
             </div>
           )

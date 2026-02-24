@@ -766,3 +766,134 @@ fn test_unicode_search() {
 
     cleanup_test_dir(&test_dir);
 }
+
+#[test]
+fn test_quoted_phrase_content_search_requires_contiguous_match() {
+    let test_dir = PathBuf::from("/tmp/pi_search_test_quoted_phrase_content");
+    fs::create_dir_all(&test_dir).expect("Failed to create test directory");
+
+    let session_content_1 = r#"{"type":"message","id":"msg1","timestamp":"2025-01-01T00:00:00Z","message":{"role":"user","content":[{"type":"text","text":"foo something bar"}]}}"#;
+    let session_content_2 = r#"{"type":"message","id":"msg2","timestamp":"2025-01-01T00:00:01Z","message":{"role":"user","content":[{"type":"text","text":"prefix foo bar suffix"}]}}"#;
+
+    let session_path_1 = create_test_session_file(&test_dir, "session1.jsonl", session_content_1);
+    let session_path_2 = create_test_session_file(&test_dir, "session2.jsonl", session_content_2);
+
+    let sessions = vec![
+        SessionInfo {
+            path: session_path_1,
+            id: "session1".to_string(),
+            cwd: "/test".to_string(),
+            name: Some("Non contiguous".to_string()),
+            created: DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            modified: DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            message_count: 1,
+            first_message: "foo something bar".to_string(),
+            all_messages_text: "foo something bar".to_string(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
+            last_message: "foo something bar".to_string(),
+            last_message_role: "user".to_string(),
+        },
+        SessionInfo {
+            path: session_path_2,
+            id: "session2".to_string(),
+            cwd: "/test".to_string(),
+            name: Some("Contiguous".to_string()),
+            created: DateTime::parse_from_rfc3339("2025-01-01T00:00:01Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            modified: DateTime::parse_from_rfc3339("2025-01-01T00:00:01Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            message_count: 1,
+            first_message: "prefix foo bar suffix".to_string(),
+            all_messages_text: "prefix foo bar suffix".to_string(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
+            last_message: "prefix foo bar suffix".to_string(),
+            last_message_role: "user".to_string(),
+        },
+    ];
+
+    let results = search_sessions(
+        &sessions,
+        "\"foo bar\"",
+        SearchMode::Content,
+        RoleFilter::All,
+        true,
+    );
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].session_id, "session2");
+
+    cleanup_test_dir(&test_dir);
+}
+
+#[test]
+fn test_quoted_phrase_name_search_requires_phrase_and_remainder_terms() {
+    let test_dir = PathBuf::from("/tmp/pi_search_test_quoted_phrase_name");
+    fs::create_dir_all(&test_dir).expect("Failed to create test directory");
+
+    let session_content = r#"{"type":"message","id":"msg1","timestamp":"2025-01-01T00:00:00Z","message":{"role":"user","content":[{"type":"text","text":"message text"}]}}"#;
+
+    let session_path_1 = create_test_session_file(&test_dir, "session1.jsonl", session_content);
+    let session_path_2 = create_test_session_file(&test_dir, "session2.jsonl", session_content);
+
+    let sessions = vec![
+        SessionInfo {
+            path: session_path_1,
+            id: "session1".to_string(),
+            cwd: "/test".to_string(),
+            name: Some("Project foo bar".to_string()),
+            created: DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            modified: DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            message_count: 1,
+            first_message: "contains baz".to_string(),
+            all_messages_text: "contains baz".to_string(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
+            last_message: "contains baz".to_string(),
+            last_message_role: "user".to_string(),
+        },
+        SessionInfo {
+            path: session_path_2,
+            id: "session2".to_string(),
+            cwd: "/test".to_string(),
+            name: Some("Project foo bar".to_string()),
+            created: DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            modified: DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            message_count: 1,
+            first_message: "no additional term".to_string(),
+            all_messages_text: "no additional term".to_string(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
+            last_message: "no additional term".to_string(),
+            last_message_role: "user".to_string(),
+        },
+    ];
+
+    let results = search_sessions(
+        &sessions,
+        "\"foo bar\" baz",
+        SearchMode::Name,
+        RoleFilter::All,
+        true,
+    );
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].session_id, "session1");
+
+    cleanup_test_dir(&test_dir);
+}
