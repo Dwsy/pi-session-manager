@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, useRef } from 'react'
+import { useLayoutEffect, useCallback, useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, Maximize2 } from 'lucide-react'
 import type { SessionInfo } from '../../types'
@@ -118,7 +118,7 @@ export default function SessionPreviewModal({
     [handleCloseWithAnimation]
   )
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown)
       document.body.style.overflow = 'hidden'
