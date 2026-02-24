@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, Maximize2 } from 'lucide-react'
 import type { SessionInfo } from '../../types'
@@ -15,6 +15,7 @@ export interface SessionPreviewModalProps {
   terminal?: TerminalType
   piPath?: string
   customCommand?: string
+  initialCardRect?: DOMRect | null
 }
 
 export default function SessionPreviewModal({
@@ -27,10 +28,14 @@ export default function SessionPreviewModal({
   terminal,
   piPath,
   customCommand,
+  initialCardRect,
 }: SessionPreviewModalProps) {
   const { t } = useTranslation()
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [animationStyles, setAnimationStyles] = useState<React.CSSProperties>({})
+  const modalRef = useRef<HTMLDivElement>(null)
+  const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Handle ESC key to close modal
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -43,24 +48,70 @@ export default function SessionPreviewModal({
   useEffect(() => {
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown)
-      // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden'
+
+      // Start FLIP animation if we have initial card rect
+      if (initialCardRect) {
+        setIsAnimating(true)
+
+        // Calculate initial transform to match card position
+        const viewportWidth = window.innerWidth
+        const viewportHeight = window.innerHeight
+        const modalWidth = viewportWidth * 0.9
+        const modalHeight = viewportHeight * 0.9
+        const modalCenterX = (viewportWidth - modalWidth) / 2
+        const modalCenterY = (viewportHeight - modalHeight) / 2
+
+        // Calculate the initial position (card position) to final position (modal center)
+        const initialX = initialCardRect.left - modalCenterX
+        const initialY = initialCardRect.top - modalCenterY
+        const initialScaleX = initialCardRect.width / modalWidth
+        const initialScaleY = initialCardRect.height / modalHeight
+
+        // Apply initial styles (starting state)
+        setAnimationStyles({
+          transform: `translate(${initialX}px, ${initialY}px) scale(${initialScaleX}, ${initialScaleY})`,
+          opacity: 0,
+          transition: 'none',
+        })
+
+        // Force a reflow to ensure the browser applies the initial styles
+        requestAnimationFrame(() => {
+          // Apply final styles (ending state) with animation
+          setAnimationStyles({
+            transform: 'translate(0, 0) scale(1)',
+            opacity: 1,
+            transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+          })
+
+          // Clear animation state after animation completes
+          animationTimeoutRef.current = setTimeout(() => {
+            setIsAnimating(false)
+            setAnimationStyles({})
+          }, 300)
+        })
+      }
+    } else {
+      // Clear animation styles when closed
+      setAnimationStyles({})
+      setIsAnimating(false)
     }
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = ''
+      if (animationTimeoutRef.current) {
+        clearTimeout(animationTimeoutRef.current)
+      }
     }
-  }, [isOpen, handleKeyDown])
+  }, [isOpen, handleKeyDown, initialCardRect])
 
-  // Handle overlay click to close
   const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) {
       onClose()
     }
   }
 
-  // Handle expand button click
   const handleExpand = () => {
     onExpand()
   }
@@ -72,15 +123,30 @@ export default function SessionPreviewModal({
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      style={{
+        opacity: isAnimating ? 0 : 1,
+        animation: isAnimating ? 'fadeIn 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards' : undefined,
+      }}
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby="session-preview-title"
     >
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
       {/* Modal Container - 90vw × 90vh, centered */}
       <div
+        ref={modalRef}
         className="bg-surface rounded-lg shadow-2xl flex flex-col overflow-hidden border border-border"
-        style={{ width: '90vw', height: '90vh' }}
+        style={{
+          width: '90vw',
+          height: '90vh',
+          ...animationStyles,
+        }}
       >
         {/* Header with session name and Expand button */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-dark">

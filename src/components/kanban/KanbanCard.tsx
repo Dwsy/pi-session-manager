@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Clock, MessageSquare } from 'lucide-react'
@@ -11,7 +11,7 @@ interface KanbanCardProps {
   isSelected: boolean
   isDragging?: boolean
   isOverlay?: boolean
-  onSelect: () => void
+  onSelect: (rect: DOMRect) => void
   onContextMenu?: (e: React.MouseEvent) => void
 }
 
@@ -24,6 +24,7 @@ function KanbanCardInner({
   onSelect,
   onContextMenu,
 }: KanbanCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null)
   const {
     attributes,
     listeners,
@@ -31,6 +32,13 @@ function KanbanCardInner({
     transform,
     transition,
   } = useSortable({ id: session.id, disabled: isOverlay })
+
+  const handleClick = () => {
+    if (cardRef.current) {
+      const rect = cardRef.current.getBoundingClientRect()
+      onSelect(rect)
+    }
+  }
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -55,10 +63,16 @@ function KanbanCardInner({
 
   return (
     <div
-      ref={isOverlay ? undefined : setNodeRef}
+      ref={(node) => {
+        // Combine refs for sortable and local access
+        if (!isOverlay) {
+          setNodeRef(node)
+        }
+        ;(cardRef as React.MutableRefObject<HTMLDivElement | null>).current = node
+      }}
       style={isOverlay ? undefined : style}
       className={cardClasses}
-      onClick={onSelect}
+      onClick={isOverlay ? undefined : handleClick}
       onContextMenu={onContextMenu}
       {...(isOverlay ? {} : { ...attributes, ...listeners })}
     >

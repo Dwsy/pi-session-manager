@@ -71,6 +71,7 @@ export default function KanbanBoard({
   const [mobileColIndex, setMobileColIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null)
+  const [initialCardRect, setInitialCardRect] = useState<DOMRect | null>(null)
 
   // Filter sessions by project + search query
   const filteredSessions = useMemo(() => {
