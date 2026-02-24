@@ -2,12 +2,19 @@ import { useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, Maximize2 } from 'lucide-react'
 import type { SessionInfo } from '../../types'
+import type { TerminalType } from '../settings/types'
+import SessionViewer from '../SessionViewer'
 
 export interface SessionPreviewModalProps {
   session: SessionInfo | null
   isOpen: boolean
   onClose: () => void
   onExpand: () => void
+  onExport: () => void
+  onRename: () => void
+  terminal?: TerminalType
+  piPath?: string
+  customCommand?: string
 }
 
 export default function SessionPreviewModal({
@@ -15,6 +22,11 @@ export default function SessionPreviewModal({
   isOpen,
   onClose,
   onExpand,
+  onExport,
+  onRename,
+  terminal,
+  piPath,
+  customCommand,
 }: SessionPreviewModalProps) {
   const { t } = useTranslation()
 
@@ -98,18 +110,17 @@ export default function SessionPreviewModal({
           </div>
         </div>
 
-        {/* Content area placeholder */}
-        <div className="flex-1 overflow-y-auto p-6 bg-background">
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            <div className="text-center">
-              <p className="text-lg mb-2">
-                {t('kanban.previewPlaceholder', 'Session Preview Content')}
-              </p>
-              <p className="text-sm opacity-70">
-                {t('kanban.previewPlaceholderHint', 'Session content will be displayed here')}
-              </p>
-            </div>
-          </div>
+        {/* Content area with SessionViewer */}
+        <div className="flex-1 overflow-hidden bg-background h-[calc(90vh-4rem)]">
+          <SessionViewer
+            session={session}
+            onExport={onExport}
+            onRename={onRename}
+            onBack={onClose}
+            terminal={terminal}
+            piPath={piPath}
+            customCommand={customCommand}
+          />
         </div>
       </div>
     </div>

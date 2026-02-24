@@ -1,0 +1,10 @@
+{
+  "runId": "96823f6b",
+  "agent": "crew-worker",
+  "index": 2,
+  "exitCode": 1,
+  "durationMs": 527939,
+  "tokens": 0,
+  "truncated": false,
+  "error": "unexpected EOF"
+}

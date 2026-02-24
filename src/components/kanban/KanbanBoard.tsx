@@ -18,6 +18,7 @@ import type { TerminalType } from '../settings/types'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
 import SearchFilterBar from '../SearchFilterBar'
+import SessionPreviewModal from './SessionPreviewModal'
 
 interface KanbanBoardProps {
   sessions: SessionInfo[]
@@ -69,6 +70,7 @@ export default function KanbanBoard({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [mobileColIndex, setMobileColIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
+  const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null)
 
   // Filter sessions by project + search query
   const filteredSessions = useMemo(() => {
@@ -214,6 +216,24 @@ export default function KanbanBoard({
     onMoveSession(sessionId, fromTagId, toColId, position)
   }, [columns, findColumnForSession, onMoveSession, onToggleTag])
 
+  
+  const handleCardClick = useCallback((session: SessionInfo) => {
+    setPreviewSession(session)
+  }, [])
+
+  
+  const handleClosePreview = useCallback(() => {
+    setPreviewSession(null)
+  }, [])
+
+  
+  const handleExpandToFull = useCallback(() => {
+    if (previewSession) {
+      onSelectSession(previewSession)
+      setPreviewSession(null)
+    }
+  }, [previewSession, onSelectSession])
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -283,7 +303,7 @@ export default function KanbanBoard({
                   tag={columns[mobileColIndex].tag}
                   sessions={columns[mobileColIndex].sessions}
                   selectedSession={selectedSession}
-                  onSelectSession={onSelectSession}
+                  onSelectSession={handleCardClick}
                   getTagsForSession={getTagsForSession}
                   allTags={tags}
                   favorites={favorites || []}
@@ -306,7 +326,7 @@ export default function KanbanBoard({
                     tag={col.tag}
                     sessions={col.sessions}
                     selectedSession={selectedSession}
-                    onSelectSession={onSelectSession}
+                    onSelectSession={handleCardClick}
                     getTagsForSession={getTagsForSession}
                     allTags={tags}
                     favorites={favorites || []}
@@ -333,6 +353,14 @@ export default function KanbanBoard({
           )}
         </DragOverlay>
       </DndContext>
+
+      {/* Session Preview Modal */}
+      <SessionPreviewModal
+        session={previewSession}
+        isOpen={!!previewSession}
+        onClose={handleClosePreview}
+        onExpand={handleExpandToFull}
+      />
     </div>
   )
 }
