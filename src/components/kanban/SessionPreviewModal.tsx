@@ -38,6 +38,7 @@ export default function SessionPreviewModal({
   const [animationStyles, setAnimationStyles] = useState<React.CSSProperties>({})
   const modalRef = useRef<HTMLDivElement>(null)
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleCloseWithAnimation = useCallback(() => {
     if (isClosing || !session) {
@@ -47,11 +48,9 @@ export default function SessionPreviewModal({
 
     setIsClosing(true)
 
-    // Query current card position
     const cardEl = document.querySelector(`[data-session-id="${session.id}"]`)
     const currentCardRect = cardEl ? cardEl.getBoundingClientRect() : null
 
-    // Check if card is visible in viewport
     const isCardVisible = currentCardRect && (
       currentCardRect.top >= 0 &&
       currentCardRect.left >= 0 &&
@@ -60,7 +59,6 @@ export default function SessionPreviewModal({
     )
 
     if (isCardVisible && currentCardRect) {
-      // Card is visible - animate back to it
       const viewportWidth = window.innerWidth
       const viewportHeight = window.innerHeight
       const modalWidth = viewportWidth * 0.9
@@ -73,14 +71,12 @@ export default function SessionPreviewModal({
       const targetScaleX = currentCardRect.width / modalWidth
       const targetScaleY = currentCardRect.height / modalHeight
 
-      // Start from current position and animate to card
       setAnimationStyles({
         transform: `translate(${targetX}px, ${targetY}px) scale(${targetScaleX}, ${targetScaleY})`,
         opacity: 0,
         transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
       })
     } else {
-      // Card not visible - fade out in place
       setAnimationStyles({
         transform: 'translate(0, 0) scale(0.95)',
         opacity: 0,
@@ -88,7 +84,6 @@ export default function SessionPreviewModal({
       })
     }
 
-    // Wait for animation then close
     animationTimeoutRef.current = setTimeout(() => {
       setIsClosing(false)
       setAnimationStyles({})
@@ -101,6 +96,23 @@ export default function SessionPreviewModal({
     (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         handleCloseWithAnimation()
+        return
+      }
+
+      if (event.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        const firstElement = focusableElements[0]
+        const lastElement = focusableElements[focusableElements.length - 1]
+
+        if (event.shiftKey && document.activeElement === firstElement) {
+          event.preventDefault()
+          lastElement?.focus()
+        } else if (!event.shiftKey && document.activeElement === lastElement) {
+          event.preventDefault()
+          firstElement?.focus()
+        }
       }
     },
     [handleCloseWithAnimation]
@@ -111,11 +123,18 @@ export default function SessionPreviewModal({
       document.addEventListener('keydown', handleKeyDown)
       document.body.style.overflow = 'hidden'
 
-      // Start FLIP animation if we have initial card rect
+      focusTimeoutRef.current = setTimeout(() => {
+        if (modalRef.current) {
+          const focusable = modalRef.current.querySelector<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+          focusable?.focus()
+        }
+      }, 50)
+
       if (initialCardRect) {
         setIsAnimating(true)
 
-        // Calculate initial transform to match card position
         const viewportWidth = window.innerWidth
         const viewportHeight = window.innerHeight
         const modalWidth = viewportWidth * 0.9
@@ -123,29 +142,24 @@ export default function SessionPreviewModal({
         const modalCenterX = (viewportWidth - modalWidth) / 2
         const modalCenterY = (viewportHeight - modalHeight) / 2
 
-        // Calculate the initial position (card position) to final position (modal center)
         const initialX = initialCardRect.left - modalCenterX
         const initialY = initialCardRect.top - modalCenterY
         const initialScaleX = initialCardRect.width / modalWidth
         const initialScaleY = initialCardRect.height / modalHeight
 
-        // Apply initial styles (starting state)
         setAnimationStyles({
           transform: `translate(${initialX}px, ${initialY}px) scale(${initialScaleX}, ${initialScaleY})`,
           opacity: 0,
           transition: 'none',
         })
 
-        // Force a reflow to ensure the browser applies the initial styles
         requestAnimationFrame(() => {
-          // Apply final styles (ending state) with animation
           setAnimationStyles({
             transform: 'translate(0, 0) scale(1)',
             opacity: 1,
             transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
           })
 
-          // Clear animation state after animation completes
           animationTimeoutRef.current = setTimeout(() => {
             setIsAnimating(false)
             setAnimationStyles({})
@@ -153,7 +167,6 @@ export default function SessionPreviewModal({
         })
       }
     } else {
-      // Clear animation styles when closed
       setAnimationStyles({})
       setIsAnimating(false)
     }
@@ -163,6 +176,9 @@ export default function SessionPreviewModal({
       document.body.style.overflow = ''
       if (animationTimeoutRef.current) {
         clearTimeout(animationTimeoutRef.current)
+      }
+      if (focusTimeoutRef.current) {
+        clearTimeout(focusTimeoutRef.current)
       }
     }
   }, [isOpen, handleKeyDown, initialCardRect])
@@ -183,7 +199,7 @@ export default function SessionPreviewModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-0"
       style={{
         opacity: isAnimating ? 0 : 1,
         animation: isAnimating ? 'fadeIn 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards' : undefined,
@@ -199,46 +215,41 @@ export default function SessionPreviewModal({
           to { opacity: 1; }
         }
       `}</style>
-      {/* Modal Container - 90vw × 90vh, centered */}
       <div
         ref={modalRef}
-        className="bg-surface rounded-lg shadow-2xl flex flex-col overflow-hidden border border-border"
+        className="bg-surface rounded-lg shadow-2xl flex flex-col overflow-hidden border border-border w-full h-full sm:w-[90vw] sm:h-[90vh] sm:max-w-[90vw] sm:max-h-[90vh]"
         style={{
-          width: '90vw',
-          height: '90vh',
           ...animationStyles,
         }}
       >
-        {/* Header with session name and Expand button */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-dark">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border bg-surface-dark flex-shrink-0">
           <h2
             id="session-preview-title"
-            className="text-lg font-semibold text-foreground truncate pr-4"
+            className="text-base sm:text-lg font-semibold text-foreground truncate pr-4"
             title={session.name || t('kanban.untitledSession', 'Untitled Session')}
           >
             {session.name || t('kanban.untitledSession', 'Untitled Session')}
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={handleExpand}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground bg-surface hover:bg-surface-light rounded-md transition-colors cursor-pointer"
+              className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-foreground bg-surface hover:bg-surface-light rounded-md transition-colors cursor-pointer"
               aria-label={t('kanban.expand', 'Expand to full view')}
             >
-              <Maximize2 className="w-4 h-4" />
-              <span>{t('kanban.expand', 'Expand')}</span>
+              <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">{t('kanban.expand', 'Expand')}</span>
             </button>
             <button
               onClick={handleCloseWithAnimation}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-surface-light rounded-md transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 text-muted-foreground hover:text-foreground hover:bg-surface-light rounded-md transition-colors cursor-pointer"
               aria-label={t('common.close', 'Close')}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
 
-        {/* Content area with SessionViewer */}
-        <div className="flex-1 overflow-hidden bg-background h-[calc(90vh-4rem)]">
+        <div className="flex-1 overflow-hidden bg-background">
           <SessionViewer
             session={session}
             onExport={onExport}

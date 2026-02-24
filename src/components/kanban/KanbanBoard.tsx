@@ -72,6 +72,7 @@ export default function KanbanBoard({
   const [searchQuery, setSearchQuery] = useState('')
   const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null)
   const [initialCardRect, setInitialCardRect] = useState<DOMRect | null>(null)
+  const [isPreviewAnimating, setIsPreviewAnimating] = useState(false)
 
   // Filter sessions by project + search query
   const filteredSessions = useMemo(() => {
@@ -219,7 +220,10 @@ export default function KanbanBoard({
 
   
   const handleCardClick = useCallback((session: SessionInfo, rect?: DOMRect) => {
-    // Measure card position for FLIP animation
+    // Prevent rapid clicks during animation
+    if (isPreviewAnimating) return
+
+    setIsPreviewAnimating(true)
     if (rect) {
       setInitialCardRect(rect)
     } else {
@@ -227,18 +231,19 @@ export default function KanbanBoard({
       setInitialCardRect(cardEl ? cardEl.getBoundingClientRect() : null)
     }
     setPreviewSession(session)
-  }, [])
+  }, [isPreviewAnimating])
 
-  
   const handleClosePreview = useCallback(() => {
     setPreviewSession(null)
+    // Allow clicks again after a short delay
+    setTimeout(() => setIsPreviewAnimating(false), 100)
   }, [])
 
-  
   const handleExpandToFull = useCallback(() => {
     if (previewSession) {
       onSelectSession(previewSession)
       setPreviewSession(null)
+      setIsPreviewAnimating(false)
     }
   }, [previewSession, onSelectSession])
 
