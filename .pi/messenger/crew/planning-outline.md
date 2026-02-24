@@ -1,9 +1,6 @@
-Now I have a comprehensive understanding of the codebase. Let me create the task breakdown.
-
----
+# Planning Outline
 
 ## 1. PRD Understanding Summary
-
 **Feature**: Kanban Session Preview Modal with Full-Screen Expand
 
 **Core Requirements:**
@@ -26,7 +23,6 @@ Now I have a comprehensive understanding of the codebase. Let me create the task
 ---
 
 ## 2. Relevant Code/Docs/Resources Reviewed
-
 | Resource | Purpose |
 |----------|---------|
 | `docs/KANBAN_UX_ANALYSIS.md` | Kanban UX context and BBD tests |
@@ -49,7 +45,6 @@ Now I have a comprehensive understanding of the codebase. Let me create the task
 ---
 
 ## 3. Sequential Implementation Steps
-
 1. **Create SessionPreviewModal Component**
    - Build `src/components/kanban/SessionPreviewModal.tsx`
    - Accept `session`, `isOpen`, `onClose`, `onExpand` props
@@ -89,7 +84,6 @@ Now I have a comprehensive understanding of the codebase. Let me create the task
 ---
 
 ## 4. Parallelized Task Graph
-
 ### Task Breakdown
 
 ### Task 1: Create SessionPreviewModal Component Skeleton
