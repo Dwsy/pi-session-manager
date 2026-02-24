@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { invoke, listen } from '../transport'
 import { useTranslation } from 'react-i18next'
-import { ArrowUp, ArrowDown, Loader2, Bot, Search, Eye, EyeOff, ChevronsUpDown, MoreVertical, Pencil, Download, Play } from 'lucide-react'
+import { ArrowUp, ArrowDown, Loader2, Bot, Search, Eye, EyeOff, ChevronsUpDown, MoreVertical, Pencil, Download, Play, List } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo, SessionEntry, SessionsDiff } from '../types'
 import { parseSessionEntries, computeStats } from '../utils/session'
 import SessionHeader from './SessionHeader'
+import SessionScrollMarkers from './SessionScrollMarkers'
 import UserMessage from './UserMessage'
 import AssistantMessage from './AssistantMessage'
 import ModelChange from './ModelChange'
@@ -20,6 +21,7 @@ import type { TerminalType } from './settings/types'
 import { getPlatformDefaults } from './settings/types'
 import { SessionViewProvider, useSessionView } from '../contexts/SessionViewContext'
 import { useIsMobile } from '../hooks/useIsMobile'
+import { useSessionScrollMarkers } from '../hooks/useSessionScrollMarkers'
 import '../styles/session.css'
 
 // Session content cache — avoids re-reading file when switching back
@@ -98,6 +100,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
   }, [showMobileMenu])
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const messagesWrapperRef = useRef<HTMLDivElement>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
   const resizeHandleRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
@@ -371,7 +374,28 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
     }
   })
 
-  // Clear height cache when tool expand state changes to force re-measure
+  const {
+    markers: scrollMarkers,
+    showMarkers: showScrollMarkers,
+    toggleMarkers: toggleScrollMarkers,
+    activeMarkerId,
+    markersPanelRef,
+    onPointerDown: handleMarkersPointerDown,
+    onPointerMove: handleMarkersPointerMove,
+    onPointerUp: handleMarkersPointerUp,
+    onPointerLeave: handleMarkersPointerLeave,
+  } = useSessionScrollMarkers({
+    entries: renderableEntries,
+    rowVirtualizer,
+    estimateEntrySize,
+    messagesContainerRef,
+    messagesWrapperRef,
+    isMobile,
+    onSelectEntry: setScrollTargetId,
+    previewFallback: t('session.userMessage', 'User message'),
+    layoutDeps: [showSidebar, sidebarWidth],
+  })
+
   useEffect(() => {
     measuredHeightsRef.current.clear()
   }, [expandedToolIds, toolsExpanded])
@@ -445,12 +469,19 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
       if (rafId) return
       rafId = requestAnimationFrame(() => {
         rafId = null
-        const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+        const currentScrollTop = container.scrollTop
+        const distanceToBottom = container.scrollHeight - currentScrollTop - container.clientHeight
         const atBottom = distanceToBottom <= 8
         if (isAtBottomRef.current !== atBottom) {
           isAtBottomRef.current = atBottom
           setIsAtBottom(atBottom)
         }
+        const { scrollHeight, clientHeight } = container
+        setScrollMetrics(prev =>
+          prev.scrollHeight === scrollHeight && prev.clientHeight === clientHeight
+            ? prev
+            : { scrollHeight, clientHeight }
+        )
         if (atBottom) {
           setHasNewMessages(false)
         }
@@ -735,6 +766,13 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
               >
                 <ChevronsUpDown className="h-3.5 w-3.5" />
               </button>
+              <button
+                onClick={toggleScrollMarkers}
+                className={`p-1.5 text-xs rounded transition-colors ${showScrollMarkers ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
+                title={t('session.userMarkers', '用户消息锚点')}
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
               {/* Overflow menu trigger */}
               <div className="relative" ref={mobileMenuRef}>
                 <button
@@ -904,7 +942,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
                 timestamp={headerEntry?.timestamp}
                 stats={stats}
               />
-            <div className="messages">
+            <div className="messages" ref={messagesWrapperRef}>
               {renderableEntries.length > 0 ? (
                 <div
                   className="relative w-full"
@@ -934,6 +972,18 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
               )}
             </div>
           </div>
+          <SessionScrollMarkers
+            markers={scrollMarkers}
+            activeMarkerId={activeMarkerId}
+            isMobile={isMobile}
+            show={showScrollMarkers}
+            panelRef={markersPanelRef}
+            onMarkerClick={setScrollTargetId}
+            onPointerDown={handleMarkersPointerDown}
+            onPointerMove={handleMarkersPointerMove}
+            onPointerUp={handleMarkersPointerUp}
+            onPointerLeave={handleMarkersPointerLeave}
+          />
         </div>
         )}
       </div>

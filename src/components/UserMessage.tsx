@@ -43,7 +43,10 @@ export default function UserMessage({ id, timestamp, content, className = '', se
 
   return (
     <div className={`user-message ${className}`} id={`entry-${id}`}>
-      {timestamp && <span className="message-timestamp user-timestamp-inline">{formatDate(timestamp)}</span>}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+        {timestamp && <span className="message-timestamp user-timestamp-inline">{formatDate(timestamp)}</span>}
+      </div>
 
       {images.length > 0 && (
         <div className="message-images">
