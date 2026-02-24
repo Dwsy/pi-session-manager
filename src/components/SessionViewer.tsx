@@ -57,7 +57,7 @@ const MESSAGE_ITEM_GAP = 16
 
 function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume, terminal = getPlatformDefaults().defaultTerminal, piPath, customCommand, initialEntryId }: SessionViewerProps) {
   const { t } = useTranslation()
-  const { showThinking, toggleThinking, toolsExpanded, toggleToolsExpanded } = useSessionView()
+  const { showThinking, toggleThinking, toolsExpanded, toggleToolsExpanded, expandedToolIds } = useSessionView()
   const isMobile = useIsMobile()
   const [entries, setEntries] = useState<SessionEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -370,6 +370,11 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
       return height
     }
   })
+
+  // Clear height cache when tool expand state changes to force re-measure
+  useEffect(() => {
+    measuredHeightsRef.current.clear()
+  }, [expandedToolIds, toolsExpanded])
 
   // Force scroll to bottom when entries are loaded
   useEffect(() => {
