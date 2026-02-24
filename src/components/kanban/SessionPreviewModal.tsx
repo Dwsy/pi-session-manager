@@ -200,21 +200,11 @@ export default function SessionPreviewModal({
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-0"
-      style={{
-        opacity: isAnimating ? 0 : 1,
-        animation: isAnimating ? 'fadeIn 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards' : undefined,
-      }}
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby="session-preview-title"
     >
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-      `}</style>
       <div
         ref={modalRef}
         className="bg-surface rounded-lg shadow-2xl flex flex-col overflow-hidden border border-border w-full h-full sm:w-[90vw] sm:h-[90vh] sm:max-w-[90vw] sm:max-h-[90vh]"
