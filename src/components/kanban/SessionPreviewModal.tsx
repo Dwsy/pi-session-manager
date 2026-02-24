@@ -10,8 +10,8 @@ export interface SessionPreviewModalProps {
   isOpen: boolean
   onClose: () => void
   onExpand: () => void
-  onExport: () => void
-  onRename: () => void
+  onExport?: () => void
+  onRename?: () => void
   terminal?: TerminalType
   piPath?: string
   customCommand?: string
