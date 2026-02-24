@@ -148,7 +148,7 @@
 }
 
 .subagent-task-preview {
-  font-size: 12px;
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
   color: var(--muted);
   line-height: 1.4;
   overflow: hidden;
@@ -227,7 +227,7 @@
 }
 
 .subagent-modal-model {
-  font-size: 12px;
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
   color: var(--muted);
   padding: 2px 8px;
   background: var(--bg-inset);
@@ -275,7 +275,7 @@
 
 .subagent-modal-task-text {
   flex: 1;
-  font-size: 12px;
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
   color: var(--text-secondary);
   line-height: 1.5;
   max-height: 60px;
@@ -421,14 +421,14 @@
 
 /* Management output (list, get, etc.) */
 .subagent-management-output {
-  font-size: 12px;
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
   line-height: 1.5;
   color: var(--text-secondary);
   padding: 8px 0 0;
   max-height: 300px;
   overflow-y: auto;
   white-space: pre-wrap;
-  font-family: var(--font-mono, 'SF Mono', 'Fira Code', monospace);
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
 }
 
 /* Pending state */

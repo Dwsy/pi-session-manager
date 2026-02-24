@@ -33,7 +33,10 @@ export interface AppSettings {
     terminalFontSize: number
   }
   appearance: {
-    theme: 'dark' | 'light' | 'system'
+    theme: 'dark' | 'light' | 'system' | 'custom'
+    customTheme: string
+    fontFamily: string
+    fontFamilyMono: string
     sidebarWidth: number
     fontSize: 'small' | 'medium' | 'large'
     codeBlockTheme: 'github' | 'monokai' | 'dracula' | 'one-dark'
@@ -92,6 +95,9 @@ export const defaultSettings: AppSettings = {
   },
   appearance: {
     theme: 'dark',
+    customTheme: 'app-default',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif',
+    fontFamilyMono: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
     sidebarWidth: 320,
     fontSize: 'medium',
     codeBlockTheme: 'github',

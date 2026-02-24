@@ -15,6 +15,12 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Added
 
+- **Appearance customization** — add custom Pi theme mode and configurable UI/monospace fonts
+  - Theme mode now supports `dark | light | system | custom`, with custom presets loaded from `~/.pi/agent/themes`
+  - Custom mode derives dark/light behavior from the selected theme, while `system` remains OS-driven
+  - New font controls split UI text (`fontFamily`) and code-like text (`fontFamilyMono`) for better readability
+  - Added defensive theme-name sanitization and async de-racing to prevent stale theme re-application during rapid toggles
+
 - **Subagent session viewer** — view full subagent conversations inline
   - Clickable subagent tool call cards showing agent name, model, duration, tokens, task preview
   - Modal with scale+fade animation renders the complete subagent JSONL session (reuses UserMessage, AssistantMessage, ToolCallList, etc.)
@@ -47,6 +53,10 @@ All notable changes to Pi Session Manager will be documented in this file.
   - `load_pi_settings_full`, `save_pi_setting`, `toggle_resource` backend commands
 
 ### Fixed
+
+- **Appearance font sizing consistency** — font size settings now apply consistently across the UI
+  - Small/Medium/Large now scales session content, tool calls (commands/outputs/arguments/diffs/metadata), subagent surfaces, and related code-like rendering instead of leaving parts at hardcoded sizes
+  - Typography variables are propagated through root CSS so runtime appearance changes are reflected immediately and uniformly
 
 - **Dashboard flash-on-update** — incremental session updates no longer trigger full skeleton screen
   - Only show `DashboardSkeleton` on first load (stats === null); subsequent updates refresh data silently in background

@@ -36,6 +36,7 @@
 - **Session Browser** — List/Project/Kanban views, favorites, rename, batch export
 - **Full-Text Search** — SQLite FTS5 powered, role filtering, path matching, relevance ranking
 - **Session Viewer** — Tree view, collapsible tool calls, chain-of-thought display, flow visualization
+- **Appearance Customization** — Dark/Light/System + Custom Pi theme preset mode, with separate UI and monospace font controls
 - **Built-in Terminal** — xterm.js + PTY backend (`Cmd/Ctrl+J`)
 - **Dashboard** — Activity heatmap, project distribution, model usage, token consumption stats
 - **Skill Management** — Scan and manage `~/.pi/agent/skills` and prompts, system prompt editor
@@ -123,6 +124,7 @@ npm run tauri:build      # Production build
 | `~/.pi/agent/sessions/` | Pi session directory |
 | `~/.pi/agent/session-manager.db` | SQLite cache |
 | `~/.pi/agent/session-manager-config.toml` | Configuration file |
+| `~/.pi/agent/themes/` | Custom Pi theme presets |
 
 ---
 
