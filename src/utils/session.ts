@@ -7,13 +7,24 @@ export function isTauriReady(): boolean {
 export function parseSessionEntries(jsonlContent: string): SessionEntry[] {
   const entries: SessionEntry[] = []
   const lines = jsonlContent.split('\n').filter(line => line.trim())
+  const seenIds = new Map<string, number>()
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
     try {
-      const entry = JSON.parse(line)
+      const entry = JSON.parse(lines[i])
+      
+      // Ensure unique IDs - append suffix if duplicate
+      if (entry.id) {
+        const count = seenIds.get(entry.id) || 0
+        if (count > 0) {
+          entry.id = `${entry.id}__dup_${count}`
+        }
+        seenIds.set(entry.id.split('__dup_')[0], count + 1)
+      }
+      
       entries.push(entry)
     } catch (e) {
-      console.warn('Failed to parse line:', line.substring(0, 100))
+      console.warn('Failed to parse line:', lines[i].substring(0, 100))
     }
   }
 
