@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import {
@@ -224,12 +225,17 @@ export default function KanbanBoard({
     if (isPreviewAnimating) return
 
     setIsPreviewAnimating(true)
-    if (rect) {
-      setInitialCardRect(rect)
-    } else {
-      const cardEl = document.querySelector(`[data-session-id="${session.id}"]`)
-      setInitialCardRect(cardEl ? cardEl.getBoundingClientRect() : null)
-    }
+
+    // Use flushSync to ensure rect is set before modal renders
+    flushSync(() => {
+      if (rect) {
+        setInitialCardRect(rect)
+      } else {
+        const cardEl = document.querySelector(`[data-session-id="${session.id}"]`)
+        setInitialCardRect(cardEl ? cardEl.getBoundingClientRect() : null)
+      }
+    })
+
     setPreviewSession(session)
   }, [isPreviewAnimating])
 
