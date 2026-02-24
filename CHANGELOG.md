@@ -21,6 +21,10 @@ All notable changes to Pi Session Manager will be documented in this file.
   - New font controls split UI text (`fontFamily`) and code-like text (`fontFamilyMono`) for better readability
   - Added defensive theme-name sanitization and async de-racing to prevent stale theme re-application during rapid toggles
 
+- **Fast paging scroll** — PageUp/PageDown scrolls whichever view is currently focused
+  - Global handler scrolls the nearest scrollable ancestor of the focused element (browser-like paging)
+  - Text inputs are excluded, and the built-in terminal intercepts PageUp/PageDown to scroll its scrollback
+
 - **Subagent session viewer** — view full subagent conversations inline
   - Clickable subagent tool call cards showing agent name, model, duration, tokens, task preview
   - Modal with scale+fade animation renders the complete subagent JSONL session (reuses UserMessage, AssistantMessage, ToolCallList, etc.)

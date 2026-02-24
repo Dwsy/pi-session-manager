@@ -13,6 +13,8 @@ const shortcuts: ShortcutItem[] = [
   { keys: 'Cmd+P', labelKey: 'app.shortcuts.projectView', fallback: '项目视图', category: 'navigation' },
   { keys: 'Cmd+R', labelKey: 'app.shortcuts.resume', fallback: '恢复会话', category: 'session' },
   { keys: 'Cmd+E', labelKey: 'app.shortcuts.exportHtml', fallback: '导出并打开', category: 'session' },
+  { keys: 'PageUp', labelKey: 'app.shortcuts.pageUp', fallback: '快速向上滚动 (PageUp)', category: 'general' },
+  { keys: 'PageDown', labelKey: 'app.shortcuts.pageDown', fallback: '快速向下滚动 (PageDown)', category: 'general' },
   { keys: 'Cmd+,', labelKey: 'app.shortcuts.settings', fallback: '打开设置', category: 'general' },
   { keys: 'Esc', labelKey: 'app.shortcuts.close', fallback: '关闭', category: 'general' },
   { keys: 'F12', labelKey: 'settings.shortcuts.devtools', fallback: '开发者工具', category: 'general' },

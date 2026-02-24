@@ -14,6 +14,8 @@ export const app = {
     projectView: '项目视图 (Cmd+P)',
     searchAll: '搜索所有会话 (Cmd+K)',
     search: '聚焦搜索框 (Cmd+F)',
+    pageUp: '快速向上滚动 (PageUp)',
+    pageDown: '快速向下滚动 (PageDown)',
     settings: '打开设置 (Cmd+,)',
     close: '关闭 (Esc)',
   },

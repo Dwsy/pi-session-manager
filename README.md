@@ -103,6 +103,7 @@ npm run tauri:build      # Production build
 | `Cmd/Ctrl + Shift + F` | Full-Text Search |
 | `Cmd/Ctrl + R` | Restore Session in Terminal |
 | `Cmd/Ctrl + E` | Export and Open |
+| `PageUp` / `PageDown` | Page-scroll the currently focused view |
 | `Cmd/Ctrl + ,` | Settings |
 
 ---

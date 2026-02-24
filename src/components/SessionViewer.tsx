@@ -870,7 +870,20 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
                 {t('session.newMessages', '有新消息')}
               </button>
             )}
-            <div className="h-full overflow-y-auto session-viewer" ref={messagesContainerRef}>
+            <div
+              className="h-full overflow-y-auto session-viewer focus:outline-none"
+              ref={messagesContainerRef}
+              tabIndex={0}
+              onMouseDown={(e) => {
+                const target = e.target as HTMLElement
+                const isInteractive = Boolean(
+                  target.closest('button, a, input, textarea, select, [contenteditable="true"], [role="textbox"]'),
+                )
+                if (!isInteractive) {
+                  e.currentTarget.focus()
+                }
+              }}
+            >
               <SessionHeader
                 sessionId={headerEntry?.id || session.id}
                 timestamp={headerEntry?.timestamp}

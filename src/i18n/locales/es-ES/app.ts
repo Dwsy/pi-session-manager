@@ -14,6 +14,8 @@ export const app = {
     projectView: 'Vista de proyecto (Cmd+P)',
     searchAll: 'Buscar en todas las sesiones (Cmd+K)',
     search: 'Enfocar búsqueda (Cmd+F)',
+    pageUp: 'Desplazamiento rápido hacia arriba (PageUp)',
+    pageDown: 'Desplazamiento rápido hacia abajo (PageDown)',
     settings: 'Abrir ajustes (Cmd+,)',
     close: 'Cerrar (Esc)',
   },

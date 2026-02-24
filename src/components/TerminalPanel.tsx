@@ -99,6 +99,15 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
 
     // Custom key event handler for terminal-specific shortcuts
     term.attachCustomKeyEventHandler((e) => {
+      // PageUp/PageDown should scroll terminal scrollback (not emit escape sequences)
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && (e.key === 'PageUp' || e.key === 'PageDown')) {
+        e.preventDefault()
+        const pageDelta = Math.max(1, Math.floor(term.rows * 0.9))
+        const direction = e.key === 'PageDown' ? 1 : -1
+        term.scrollLines(direction * pageDelta)
+        return false
+      }
+
       // Ctrl+` toggle terminal - let app handle it
       if (e.ctrlKey && e.key === '`') return false
       
@@ -200,6 +209,7 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
   return (
     <div
       ref={containerRef}
+      data-terminal-root="true"
       className="absolute inset-0 p-1"
       style={{ display: isVisible ? 'block' : 'none' }}
     />

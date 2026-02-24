@@ -14,6 +14,8 @@ export const app = {
     projectView: 'Projektansicht (Cmd+P)',
     searchAll: 'Alle Sitzungen durchsuchen (Cmd+K)',
     search: 'Suche fokussieren (Cmd+F)',
+    pageUp: 'Schnell nach oben scrollen (PageUp)',
+    pageDown: 'Schnell nach unten scrollen (PageDown)',
     settings: 'Einstellungen öffnen (Cmd+,)',
     close: 'Schließen (Esc)',
   },

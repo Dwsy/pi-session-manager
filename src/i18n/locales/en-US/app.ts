@@ -14,6 +14,8 @@ export const app = {
     projectView: 'Project view (Cmd+P)',
     searchAll: 'Search all sessions (Cmd+K)',
     search: 'Focus search (Cmd+F)',
+    pageUp: 'Fast scroll up (PageUp)',
+    pageDown: 'Fast scroll down (PageDown)',
     settings: 'Open settings (Cmd+,)',
     close: 'Close (Esc)',
   },

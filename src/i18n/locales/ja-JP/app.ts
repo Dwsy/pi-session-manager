@@ -14,6 +14,8 @@ export const app = {
     projectView: 'プロジェクト表示 (Cmd+P)',
     searchAll: '全セッション検索 (Cmd+K)',
     search: '検索にフォーカス (Cmd+F)',
+    pageUp: '高速スクロール（上）(PageUp)',
+    pageDown: '高速スクロール（下）(PageDown)',
     settings: '設定を開く (Cmd+,)',
     close: '閉じる (Esc)',
   },

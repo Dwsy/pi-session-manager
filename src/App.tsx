@@ -20,6 +20,7 @@ import Onboarding from './components/Onboarding'
 import SearchFilterBar from './components/SearchFilterBar'
 import FullTextSearch from './components/FullTextSearch'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { usePageUpDownScroll } from './hooks/usePageUpDownScroll'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useSessionBadges } from './hooks/useSessionBadges'
 import { useSessions } from './hooks/useSessions'
@@ -330,6 +331,7 @@ function App() {
   }), [showSettings, showExportDialog, showRenameDialog, showTerminal, terminalMaximized, selectedProject, setSelectedSession, handleResumeSession, handleExportAndOpen, terminalConfig.enabled])
 
   useKeyboardShortcuts(shortcuts)
+  usePageUpDownScroll()
 
   // Restore browser-like refresh shortcuts (Cmd+Shift+R, F5, Ctrl+Shift+R)
   useEffect(() => {
