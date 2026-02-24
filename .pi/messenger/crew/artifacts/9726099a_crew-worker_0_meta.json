@@ -1,0 +1,10 @@
+{
+  "runId": "9726099a",
+  "agent": "crew-worker",
+  "index": 0,
+  "exitCode": 0,
+  "durationMs": 249419,
+  "tokens": 0,
+  "truncated": false,
+  "error": "500 auth_unavailable: no auth available"
+}
