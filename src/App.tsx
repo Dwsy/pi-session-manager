@@ -34,7 +34,7 @@ import type { SessionInfo, FavoriteItem } from './types'
 import type { SearchContext } from './plugins/types'
 import { invoke, isTauri } from './transport'
 import { getCachedSettings } from './utils/settingsApi'
-import { applyPiChatTheme, resolvePiThemeColorScheme } from './utils/piTheme'
+import { applyPiChatTheme } from './utils/piTheme'
 import { parseQuotedQuery } from './utils/search'
 import { getPlatformDefaults } from './components/settings/types'
 

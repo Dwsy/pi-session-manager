@@ -1825,12 +1825,14 @@ pub async fn init_http_adapter_with_embedding(
 
 #[cfg(feature = "gui")]
 async fn v1_embedding_handler(
-    axum::Extension(service): axum::Extension<std::sync::Arc<crate::embedding_service::EmbeddingService>>,
+    axum::Extension(service): axum::Extension<
+        std::sync::Arc<crate::embedding_service::EmbeddingService>,
+    >,
     axum::Json(req): axum::Json<crate::embedding_service::EmbeddingRequest>,
 ) -> impl axum::response::IntoResponse {
     use crate::embedding_service::{EmbeddingData, EmbeddingResponse};
     use axum::http::StatusCode;
-    
+
     let endpoint = match service.ensure_running().await {
         Ok(url) => url,
         Err(e) => {
@@ -1847,7 +1849,7 @@ async fn v1_embedding_handler(
 
     let client = reqwest::Client::new();
     let url = format!("{}/embed", endpoint);
-    
+
     let payload = serde_json::json!({
         "text": req.text,
         "normalize": req.normalize,
@@ -1902,24 +1904,29 @@ async fn v1_embedding_handler(
 
 #[cfg(feature = "gui")]
 async fn v1_embedding_batch_handler(
-    axum::Extension(service): axum::Extension<std::sync::Arc<crate::embedding_service::EmbeddingService>>,
+    axum::Extension(service): axum::Extension<
+        std::sync::Arc<crate::embedding_service::EmbeddingService>,
+    >,
     axum::Json(req): axum::Json<crate::embedding_service::EmbeddingBatchRequest>,
 ) -> impl axum::response::IntoResponse {
     use serde_json::json;
-    
+
     let endpoint = match service.ensure_running().await {
         Ok(url) => url,
         Err(e) => {
-            return (axum::http::StatusCode::SERVICE_UNAVAILABLE, axum::Json(json!({
-                "success": false,
-                "error": e
-            })));
+            return (
+                axum::http::StatusCode::SERVICE_UNAVAILABLE,
+                axum::Json(json!({
+                    "success": false,
+                    "error": e
+                })),
+            );
         }
     };
 
     let client = reqwest::Client::new();
     let url = format!("{}/embed/batch", endpoint);
-    
+
     let payload = serde_json::json!({
         "texts": req.texts,
         "normalize": req.normalize,
@@ -1927,37 +1934,51 @@ async fn v1_embedding_batch_handler(
 
     match client.post(&url).json(&payload).send().await {
         Ok(resp) => match resp.json::<serde_json::Value>().await {
-            Ok(data) => (axum::http::StatusCode::OK, axum::Json(json!({"success": true, "data": data}))),
-            Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({
-                "success": false,
-                "error": format!("Failed to parse response: {}", e)
-            }))),
+            Ok(data) => (
+                axum::http::StatusCode::OK,
+                axum::Json(json!({"success": true, "data": data})),
+            ),
+            Err(e) => (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(json!({
+                    "success": false,
+                    "error": format!("Failed to parse response: {}", e)
+                })),
+            ),
         },
-        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({
-            "success": false,
-            "error": format!("Request failed: {}", e)
-        }))),
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(json!({
+                "success": false,
+                "error": format!("Request failed: {}", e)
+            })),
+        ),
     }
 }
 
 #[cfg(feature = "gui")]
 async fn v1_embedding_status_handler(
-    axum::Extension(service): axum::Extension<std::sync::Arc<crate::embedding_service::EmbeddingService>>,
+    axum::Extension(service): axum::Extension<
+        std::sync::Arc<crate::embedding_service::EmbeddingService>,
+    >,
 ) -> impl axum::response::IntoResponse {
     use crate::embedding_service::EmbeddingStatusResponse;
-    
+
     let endpoint = format!("http://127.0.0.1:{}/health", service.config().port);
-    
+
     let (ready, model_loaded) = match reqwest::get(&endpoint).await {
         Ok(resp) if resp.status().is_success() => (true, true),
         _ => (false, false),
     };
 
-    (axum::http::StatusCode::OK, axum::Json(EmbeddingStatusResponse {
-        ready,
-        model_loaded,
-        model: Some("embeddinggemma-300m-qat-q8_0".to_string()),
-        dimensions: 768,
-        memory_mb: None,
-    }))
+    (
+        axum::http::StatusCode::OK,
+        axum::Json(EmbeddingStatusResponse {
+            ready,
+            model_loaded,
+            model: Some("embeddinggemma-300m-qat-q8_0".to_string()),
+            dimensions: 768,
+            memory_mb: None,
+        }),
+    )
 }
