@@ -125,10 +125,29 @@ function toRelativeLuminance(rgb: [number, number, number]): number {
 }
 
 function resolveThemeColorScheme(theme: PiThemeFile): 'dark' | 'light' | null {
-  const backgroundHex = resolveThemeHex(theme, 'background', ['bg', 'panel'])
-  if (!backgroundHex) return null
+  // 1. Try to infer from theme name
+  const themeName = (theme.name || '').toLowerCase()
+  if (themeName.includes('dark')) return 'dark'
+  if (themeName.includes('light')) return 'light'
 
-  const rgb = hexToRgb(backgroundHex)
+  // 2. Try to resolve from background color with extended fallbacks
+  const backgroundHex = resolveThemeHex(theme, 'background', [
+    'bg',
+    'panel',
+    'userBg',
+    'customBg',
+    'toolPending',
+    'userMessageBg',
+    'customMessageBg',
+  ])
+
+  // 3. Fallback to export.pageBg
+  const exportPageBg = theme.export?.pageBg ? normalizeHexColor(theme.export.pageBg) : undefined
+
+  const finalBg = backgroundHex || exportPageBg
+  if (!finalBg) return null
+
+  const rgb = hexToRgb(finalBg)
   if (!rgb) return null
 
   return toRelativeLuminance(rgb) >= 0.5 ? 'light' : 'dark'
@@ -264,6 +283,7 @@ export function clearPiThemeOverrides() {
   OVERRIDE_VARS.forEach((variable) => root.style.removeProperty(variable))
   root.removeAttribute('data-chat-theme')
   root.removeAttribute('data-chat-theme-scheme')
+  root.classList.remove('theme-dark', 'theme-light')
 }
 
 export async function applyPiChatTheme(selection: string | undefined) {
@@ -274,7 +294,10 @@ export async function applyPiChatTheme(selection: string | undefined) {
   const themeName = resolveThemeName(normalized)
 
   if (!themeName) {
-    clearPiThemeOverrides()
+    // Not a custom theme, clear only CSS variable overrides but preserve theme class
+    OVERRIDE_VARS.forEach((variable) => root.style.removeProperty(variable))
+    root.removeAttribute('data-chat-theme')
+    root.removeAttribute('data-chat-theme-scheme')
     return
   }
 
@@ -377,6 +400,9 @@ export async function applyPiChatTheme(selection: string | undefined) {
   const resolvedScheme = resolveThemeColorScheme(theme)
   if (resolvedScheme) {
     root.setAttribute('data-chat-theme-scheme', resolvedScheme)
+    // Auto-set theme class for components that depend on theme-dark/theme-light
+    root.classList.remove('theme-dark', 'theme-light')
+    root.classList.add(resolvedScheme === 'dark' ? 'theme-dark' : 'theme-light')
   }
 
   root.setAttribute('data-chat-theme', theme.name || themeName)

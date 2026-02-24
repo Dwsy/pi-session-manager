@@ -22,7 +22,7 @@ import {
 import type { AppSettings, SettingsSection } from './types'
 import { defaultSettings } from './types'
 import { loadAppSettings, saveAppSettings } from '../../utils/settingsApi'
-import { applyPiChatTheme, resolvePiThemeColorScheme } from '../../utils/piTheme'
+import { applyPiChatTheme } from '../../utils/piTheme'
 import TerminalSettings from './sections/TerminalSettings'
 import AppearanceSettings from './sections/AppearanceSettings'
 import LanguageSettings from './sections/LanguageSettings'
@@ -105,14 +105,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         root.classList.add('theme-dark')
       } else if (theme === 'light') {
         root.classList.add('theme-light')
-      } else if (theme === 'custom') {
-        const resolvedScheme = await resolvePiThemeColorScheme(customTheme)
-        if (resolvedScheme === 'dark') {
-          root.classList.add('theme-dark')
-        } else if (resolvedScheme === 'light') {
-          root.classList.add('theme-light')
-        }
       }
+      // For custom theme, applyPiChatTheme will set the theme class automatically
       if (sidebarWidth) root.style.setProperty('--sidebar-width', `${sidebarWidth}px`)
       const fontMap: Record<string, string> = { small: '14px', medium: '16px', large: '18px' }
       root.style.setProperty('--font-size-base', fontMap[fontSize] || '16px')

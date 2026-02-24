@@ -34,7 +34,7 @@ import type { SessionInfo, FavoriteItem } from './types'
 import type { SearchContext } from './plugins/types'
 import { invoke, isTauri } from './transport'
 import { getCachedSettings } from './utils/settingsApi'
-import { applyPiChatTheme, resolvePiThemeColorScheme } from './utils/piTheme'
+import { applyPiChatTheme } from './utils/piTheme'
 import { getPlatformDefaults } from './components/settings/types'
 
 // Lazy load heavy components
@@ -206,16 +206,8 @@ function App() {
         root.classList.add('theme-dark')
       } else if (theme === 'light') {
         root.classList.add('theme-light')
-      } else if (theme === 'custom') {
-        resolvePiThemeColorScheme(customTheme).then((resolvedScheme) => {
-          root.classList.remove('theme-dark', 'theme-light')
-          if (resolvedScheme === 'dark') {
-            root.classList.add('theme-dark')
-          } else if (resolvedScheme === 'light') {
-            root.classList.add('theme-light')
-          }
-        })
       }
+      // For custom theme, applyPiChatTheme will set the theme class automatically
       if (sidebarWidth) root.style.setProperty('--sidebar-width', `${sidebarWidth}px`)
       const fontMap: Record<string, string> = { small: '14px', medium: '16px', large: '18px' }
       if (fontSize) root.style.setProperty('--font-size-base', fontMap[fontSize] || '16px')

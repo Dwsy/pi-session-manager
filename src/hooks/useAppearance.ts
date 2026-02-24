@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useSettings } from './useSettings'
 import type { AppSettings } from '../components/settings/types'
-import { applyPiChatTheme, resolvePiThemeColorScheme } from '../utils/piTheme'
+import { applyPiChatTheme } from '../utils/piTheme'
 
 export type AppearanceSettings = AppSettings['appearance']
 
@@ -20,32 +20,13 @@ export function useAppearance() {
   const { appearance, updateAppearanceSetting } = useSettings()
 
   useEffect(() => {
-    let active = true
-
-    const applyResolvedThemeClass = async () => {
-      if (appearance.theme === 'dark' || appearance.theme === 'light' || appearance.theme === 'system') {
-        applyThemeClass(appearance.theme)
-        return
-      }
-
-      const root = document.documentElement
-      const resolvedScheme = await resolvePiThemeColorScheme(appearance.customTheme)
-      if (!active) return
-
-      root.classList.remove('theme-dark', 'theme-light')
-      if (resolvedScheme === 'dark') {
-        root.classList.add('theme-dark')
-      } else if (resolvedScheme === 'light') {
-        root.classList.add('theme-light')
-      }
+    // For dark/light/system themes, set class directly
+    // For custom theme, applyPiChatTheme will set the class automatically
+    if (appearance.theme === 'dark' || appearance.theme === 'light' || appearance.theme === 'system') {
+      applyThemeClass(appearance.theme)
     }
 
-    applyResolvedThemeClass()
     document.documentElement.style.setProperty('--sidebar-width', `${appearance.sidebarWidth}px`)
-
-    return () => {
-      active = false
-    }
   }, [appearance.theme, appearance.customTheme, appearance.sidebarWidth])
 
   // Listen for OS color scheme changes when in system mode
