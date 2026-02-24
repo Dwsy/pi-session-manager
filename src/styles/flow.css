@@ -47,36 +47,36 @@
 }
 
 .flow-node-user {
-  background: rgb(var(--color-info) / 0.12);
-  border-color: rgb(var(--color-info));
-  color: rgb(var(--color-info));
+  background: var(--userMessageBg, rgb(var(--color-info) / 0.12));
+  border-color: var(--borderAccent, rgb(var(--color-info)));
+  color: var(--userMessageText, var(--accent, rgb(var(--color-info))));
 }
 
 .flow-node-assistant {
   background: rgb(var(--color-card));
-  border-color: rgb(var(--color-border));
-  color: rgb(var(--color-foreground));
+  border-color: var(--borderMuted, rgb(var(--color-border)));
+  color: var(--text, rgb(var(--color-foreground)));
 }
 
 .flow-node-tool {
-  background: rgb(var(--color-success) / 0.12);
-  border-color: rgb(var(--color-success));
-  color: rgb(var(--color-success));
+  background: var(--toolPendingBg, rgb(var(--color-success) / 0.12));
+  border-color: var(--border, rgb(var(--color-success)));
+  color: var(--toolTitle, var(--accent, rgb(var(--color-success))));
 }
 
 .flow-node-meta {
-  background: rgb(var(--color-warning) / 0.12);
-  border-color: rgb(var(--color-warning));
-  color: rgb(var(--color-warning));
+  background: var(--customMessageBg, rgb(var(--color-warning) / 0.12));
+  border-color: var(--customMessageLabel, rgb(var(--color-warning)));
+  color: var(--customMessageLabel, rgb(var(--color-warning)));
 }
 
 .flow-node-active {
-  border-color: rgb(var(--color-warning)) !important;
-  box-shadow: 0 0 0 1px rgb(var(--color-warning) / 0.3);
+  border-color: var(--accent, rgb(var(--color-warning))) !important;
+  box-shadow: 0 0 0 1px var(--selectedBg, var(--accent, rgb(var(--color-warning))));
 }
 
 .flow-node-in-path:not(.flow-node-active) {
-  border-color: rgb(var(--color-warning) / 0.5) !important;
+  border-color: var(--selectedBg, var(--accent, rgb(var(--color-warning)))) !important;
 }
 
 .flow-node-icon {
@@ -108,7 +108,7 @@
 }
 
 .flow-edge-active .react-flow__edge-path {
-  stroke: rgb(var(--color-warning));
+  stroke: var(--accent, rgb(var(--color-warning)));
   stroke-width: 2;
 }
 

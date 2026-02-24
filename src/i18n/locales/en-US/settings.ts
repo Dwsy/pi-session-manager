@@ -55,6 +55,7 @@ export const settings = {
       dark: 'Dark',
       light: 'Light',
       system: 'System',
+      custom: 'Custom',
     },
     fontSize: 'Font Size',
     fontSizes: {
@@ -63,6 +64,12 @@ export const settings = {
       large: 'Large',
     },
     codeBlockTheme: 'Code Block Theme',
+    fontFamily: 'Font Family',
+    fontFamilyMono: 'Monospace Font Family',
+    customTheme: 'Custom Theme Preset',
+    appDefaultTheme: 'App default',
+    customThemeHelp: 'Uses theme files from ~/.pi/agent/themes',
+    noCustomThemes: 'No custom themes found in ~/.pi/agent/themes',
     messageSpacing: 'Message Spacing',
     spacing: {
       compact: 'Compact',

@@ -125,7 +125,7 @@ export default function EditExecution({
             <pre style={{ 
               margin: 0,
               whiteSpace: 'pre-wrap', 
-              fontFamily: 'var(--font-mono, monospace)',
+              fontFamily: 'var(--font-family-mono, ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace)',
               fontSize: '0.875rem',
               lineHeight: '1.5',
               color: 'var(--code-fg, #d4d4d4)'
@@ -179,7 +179,7 @@ export default function EditExecution({
             <pre style={{ 
               margin: 0,
               whiteSpace: 'pre-wrap', 
-              fontFamily: 'var(--font-mono, monospace)',
+              fontFamily: 'var(--font-family-mono, ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace)',
               fontSize: '0.875rem',
               lineHeight: '1.5',
               color: 'var(--code-fg, #d4d4d4)'

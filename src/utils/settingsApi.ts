@@ -18,9 +18,32 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
       : ['~/.pi/agent/sessions', legacyDir]
   }
 
+  // Migrate legacy appearance keys
+  const rawAppearance = raw.appearance as Record<string, unknown> | undefined
+  const legacyChatTheme = typeof rawAppearance?.chatTheme === 'string' ? rawAppearance.chatTheme : undefined
+  const legacyUiFontFamily = typeof rawAppearance?.uiFontFamily === 'string' ? rawAppearance.uiFontFamily : undefined
+  const legacyMonoFontFamily = typeof rawAppearance?.monoFontFamily === 'string' ? rawAppearance.monoFontFamily : undefined
+
+  const rawTheme = typeof rawAppearance?.theme === 'string' ? rawAppearance.theme : undefined
+  const migratedTheme: AppSettings['appearance']['theme'] =
+    rawTheme === 'dark' || rawTheme === 'light' || rawTheme === 'system' || rawTheme === 'custom'
+      ? rawTheme
+      : legacyChatTheme
+        ? 'custom'
+        : defaultSettings.appearance.theme
+
+  const appearance = {
+    ...defaultSettings.appearance,
+    ...raw.appearance,
+    theme: migratedTheme,
+    customTheme: raw.appearance?.customTheme ?? legacyChatTheme ?? defaultSettings.appearance.customTheme,
+    fontFamily: raw.appearance?.fontFamily ?? legacyUiFontFamily ?? defaultSettings.appearance.fontFamily,
+    fontFamilyMono: raw.appearance?.fontFamilyMono ?? legacyMonoFontFamily ?? defaultSettings.appearance.fontFamilyMono,
+  }
+
   return {
     terminal: { ...defaultSettings.terminal, ...raw.terminal },
-    appearance: { ...defaultSettings.appearance, ...raw.appearance },
+    appearance,
     language: { ...defaultSettings.language, ...raw.language },
     session: { ...defaultSettings.session, ...raw.session },
     search: { ...defaultSettings.search, ...raw.search },

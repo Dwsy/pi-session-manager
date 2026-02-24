@@ -34,6 +34,7 @@ import type { SessionInfo, FavoriteItem } from './types'
 import type { SearchContext } from './plugins/types'
 import { invoke, isTauri } from './transport'
 import { getCachedSettings } from './utils/settingsApi'
+import { applyPiChatTheme, resolvePiThemeColorScheme } from './utils/piTheme'
 import { getPlatformDefaults } from './components/settings/types'
 
 // Lazy load heavy components
@@ -107,7 +108,11 @@ function App() {
   const [pendingScrollEntryId, setPendingScrollEntryId] = useState<string | null>(null)
   const [terminalMaximized, setTerminalMaximized] = useState(false)
   const [terminalPendingCommand, setTerminalPendingCommand] = useState<string | null>(null)
-  const [terminalConfig, setTerminalConfig] = useState({ enabled: true, defaultShell: getPlatformDefaults().defaultShell, fontSize: 13 })
+  const [terminalConfig, setTerminalConfig] = useState({
+    enabled: true,
+    defaultShell: getPlatformDefaults().defaultShell,
+    fontSize: 13,
+  })
   const hasInitializedRef = useRef(false)
 
   const reloadTerminalConfig = useCallback(() => {
@@ -186,16 +191,40 @@ function App() {
     const s = getCachedSettings()
     const root = document.documentElement
     if (s.appearance) {
-      const { theme, sidebarWidth, fontSize, messageSpacing, codeBlockTheme } = s.appearance
+      const {
+        theme,
+        customTheme,
+        fontFamily,
+        fontFamilyMono,
+        sidebarWidth,
+        fontSize,
+        messageSpacing,
+        codeBlockTheme,
+      } = s.appearance
       root.classList.remove('theme-dark', 'theme-light')
-      if (theme === 'dark') root.classList.add('theme-dark')
-      else if (theme === 'light') root.classList.add('theme-light')
+      if (theme === 'dark') {
+        root.classList.add('theme-dark')
+      } else if (theme === 'light') {
+        root.classList.add('theme-light')
+      } else if (theme === 'custom') {
+        resolvePiThemeColorScheme(customTheme).then((resolvedScheme) => {
+          root.classList.remove('theme-dark', 'theme-light')
+          if (resolvedScheme === 'dark') {
+            root.classList.add('theme-dark')
+          } else if (resolvedScheme === 'light') {
+            root.classList.add('theme-light')
+          }
+        })
+      }
       if (sidebarWidth) root.style.setProperty('--sidebar-width', `${sidebarWidth}px`)
       const fontMap: Record<string, string> = { small: '14px', medium: '16px', large: '18px' }
       if (fontSize) root.style.setProperty('--font-size-base', fontMap[fontSize] || '16px')
+      if (fontFamily) root.style.setProperty('--font-family', fontFamily)
+      if (fontFamilyMono) root.style.setProperty('--font-family-mono', fontFamilyMono)
       const spacingMap: Record<string, string> = { compact: '8px', comfortable: '16px', spacious: '24px' }
       if (messageSpacing) root.style.setProperty('--spacing-base', spacingMap[messageSpacing] || '16px')
       if (codeBlockTheme) root.setAttribute('data-code-theme', codeBlockTheme)
+      applyPiChatTheme(theme === 'custom' ? customTheme : 'app-default')
     }
 
     const initialize = async () => {

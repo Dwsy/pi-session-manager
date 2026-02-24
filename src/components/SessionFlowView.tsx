@@ -494,10 +494,11 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
         <MiniMap
           nodeColor={(n) => {
             const d = n.data as { role: string; isActive: boolean }
-            if (d.isActive) return 'rgb(var(--color-warning))'
-            if (d.role === 'user') return 'rgb(var(--color-info))'
-            if (d.role === 'tool') return 'rgb(var(--color-success))'
-            return 'rgb(var(--color-muted-foreground))'
+            if (d.isActive) return 'var(--accent, #f0c674)'
+            if (d.role === 'user') return 'var(--userMessageText, #81a2be)'
+            if (d.role === 'tool') return 'var(--toolTitle, #b5bd68)'
+            if (d.role === 'meta') return 'var(--customMessageLabel, #b294bb)'
+            return 'var(--muted, #808080)'
           }}
           maskColor="rgb(var(--color-background) / 0.6)"
           nodeStrokeColor="rgb(var(--color-border))"

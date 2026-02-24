@@ -5,7 +5,11 @@
 @layer base {
   :root {
     color-scheme: dark;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', Arial, sans-serif;
+    font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', Arial, sans-serif);
+  }
+  body,
+  #root {
+    font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', Arial, sans-serif);
   }
   .theme-dark { color-scheme: dark; }
   .theme-light { color-scheme: light; }
@@ -13,6 +17,12 @@
   @media (prefers-color-scheme: light) {
     :root:not(.theme-dark):not(.theme-light) { color-scheme: light; }
   }
+}
+
+code,
+pre,
+.font-mono {
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
 }
 
 /* Glassmorphism utilities */
@@ -74,6 +84,10 @@
 }
 
 :root {
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', Arial, sans-serif;
+  --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  --font-size-base: 16px;
+
   /* Tailwind semantic colors (space-separated RGB for alpha support) */
   --color-background: 26 27 38;
   --color-foreground: 229 229 231;
@@ -439,8 +453,8 @@
 }
 
 body {
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-  font-size: 12px;
+  font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', Arial, sans-serif);
+  font-size: var(--font-size-base, 16px);
   line-height: var(--line-height);
   color: var(--text);
   background: var(--body-bg);
@@ -448,6 +462,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
   /* Prevent overscroll bounce on iOS */
   overscroll-behavior: none;
+}
+
+html {
+  font-size: var(--font-size-base, 16px);
 }
 
 html, body {
@@ -487,7 +505,7 @@ html, body {
 
 /* Message Styles */
 .message-timestamp {
-  font-size: 10px;
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
   color: rgb(var(--color-muted-foreground));
   opacity: 0.7;
 }
@@ -571,21 +589,21 @@ html, body {
 .tool-execution > .message-timestamp {
   padding-left: 12px;
   padding-top: 8px;
-  font-size: 10px;
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
   color: rgb(var(--color-muted-foreground));
   opacity: 0.7;
 }
 
 .tool-execution.pending {
-  background: var(--bg-subtle);
+  background: var(--toolPendingBg, var(--bg-subtle));
 }
 
 .tool-execution.success {
-  background: rgba(var(--success-rgb), 0.08);
+  background: var(--toolSuccessBg, rgba(var(--success-rgb), 0.08));
 }
 
 .tool-execution.error {
-  background: rgba(var(--destructive-rgb), 0.08);
+  background: var(--toolErrorBg, rgba(var(--destructive-rgb), 0.08));
 }
 
 .tool-header {
@@ -593,12 +611,12 @@ html, body {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  font-size: 11px;
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
 }
 
 .tool-name {
   font-weight: 500;
-  color: var(--accent);
+  color: var(--toolTitle, var(--accent));
   display: flex;
   align-items: center;
   gap: 6px;
@@ -611,15 +629,15 @@ html, body {
 }
 
 .tool-path {
-  color: var(--text-secondary);
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  color: var(--toolOutput, var(--text-secondary));
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
 }
 
 .tool-command {
   padding: 12px 16px;
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+  color: var(--toolOutput, var(--text-secondary));
   flex: 1;
   min-width: 0;
   overflow-x: auto;
@@ -655,7 +673,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 6px 0;
-  font-size: 10px;
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
   border-radius: 4px;
   transition: all 0.2s ease;
 }
@@ -669,7 +687,7 @@ html, body {
 }
 
 .tool-output-label {
-  font-size: 10px;
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
   color: rgb(var(--color-muted-foreground));
   font-weight: 500;
   transition: color 0.2s ease;
@@ -701,16 +719,16 @@ html, body {
 
 .tool-output {
   padding: 8px 0;
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  color: var(--toolOutput, var(--text-secondary));
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .tool-meta {
   color: rgb(var(--color-muted-foreground));
-  font-size: 10px;
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
   margin-left: auto;
 }
 
@@ -722,8 +740,8 @@ html, body {
 
 .tool-arguments pre {
   margin: 0;
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-  font-size: 11px;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
   color: var(--text-secondary);
 }
 
@@ -732,7 +750,7 @@ html, body {
 }
 
 .tool-arguments-title {
-  font-size: 10px;
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
   color: rgb(var(--color-muted-foreground));
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -740,8 +758,8 @@ html, body {
 }
 
 .tool-arguments-content {
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-  font-size: 11px;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
   color: var(--text-secondary);
 }
 
@@ -761,16 +779,16 @@ html, body {
 
 .tool-diff {
   padding: 12px;
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-  font-size: 11px;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
   background: var(--bg-inset);
   overflow-x: auto;
 }
 
 /* Pierre Diffs overrides */
 .tool-diff [class*='pierre-'] {
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-  font-size: 11px;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
 }
 
 .tool-diff .pierre-dark {
@@ -838,7 +856,7 @@ html, body {
   padding: 12px;
   overflow: auto;
   max-height: inherit;
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
   font-size: 11px;
   color: var(--text-secondary);
   line-height: var(--line-height);
@@ -990,7 +1008,7 @@ html, body {
   font-size: 11px;
   line-height: var(--line-height);
   color: rgb(var(--color-muted-foreground));
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
 }
 
 .code-block {
@@ -1004,7 +1022,7 @@ html, body {
 }
 
 .code-block code {
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
 }
 
 /* Scrollbar for code blocks */
