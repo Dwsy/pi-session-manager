@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { escapeHtml, getLanguageFromPath } from '../utils/markdown'
 import { shortenPath, formatDate } from '../utils/format'

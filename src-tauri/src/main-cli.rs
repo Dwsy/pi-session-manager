@@ -1,7 +1,10 @@
+use pi_session_manager::embedding_service::{
+    EmbeddingBatchRequest, EmbeddingConfig, EmbeddingData, EmbeddingRequest, EmbeddingResponse,
+    EmbeddingService, EmbeddingStatusResponse,
+};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tracing::{error, info};
-use pi_session_manager::embedding_service::{EmbeddingService, EmbeddingConfig, EmbeddingRequest, EmbeddingBatchRequest, EmbeddingResponse, EmbeddingData, EmbeddingStatusResponse};
 
 // CLI-specific state (no Tauri dependencies)
 pub struct CliAppState {
@@ -62,20 +65,31 @@ async fn main() {
         let http_port = server_cfg.http_port;
         let http_bind = server_cfg.bind_addr.clone();
         let http_bind_log = http_bind.clone();
-        
+
         // Initialize embedding service
         let embedding_service = init_embedding_service();
         let embedding_enabled = embedding_service.is_some();
         if embedding_enabled {
             info!("Embedding service initialized");
         }
-        
+
         tokio::spawn(async move {
-            if let Err(e) = init_http_adapter(http_state, &http_bind, http_port, embedding_service).await {
+            if let Err(e) =
+                init_http_adapter(http_state, &http_bind, http_port, embedding_service).await
+            {
                 error!("HTTP adapter failed: {}", e);
             }
         });
-        info!("HTTP: http://{}:{}/api{}", http_bind_log, http_port, if embedding_enabled { " (with embedding)" } else { "" });
+        info!(
+            "HTTP: http://{}:{}/api{}",
+            http_bind_log,
+            http_port,
+            if embedding_enabled {
+                " (with embedding)"
+            } else {
+                ""
+            }
+        );
     }
 
     info!("CLI mode running. Press Ctrl+C to exit.");
@@ -102,12 +116,15 @@ struct ServerConfig {
 fn init_embedding_service() -> Option<Arc<EmbeddingService>> {
     let home = dirs::home_dir().unwrap_or_default();
     let model_path = home.join(".pi/models/embedding-models/embeddinggemma-300M-Q8_0.gguf");
-    
+
     if !model_path.exists() {
-        info!("Embedding model not found at {:?}, embedding service disabled", model_path);
+        info!(
+            "Embedding model not found at {:?}, embedding service disabled",
+            model_path
+        );
         return None;
     }
-    
+
     let config = EmbeddingConfig {
         enabled: true,
         model_path,
@@ -115,13 +132,13 @@ fn init_embedding_service() -> Option<Arc<EmbeddingService>> {
         auto_release_minutes: 5,
         node_path: None,
     };
-    
+
     let service = Arc::new(EmbeddingService::new(config));
-    
+
     // Start auto-release background task
     let service_clone = service.clone();
     service_clone.start_auto_release();
-    
+
     Some(service)
 }
 
@@ -225,7 +242,6 @@ async fn init_ws_adapter(
 
     Ok(())
 }
-
 
 // CLI HTTP adapter（支持只读 v1 接口）
 
@@ -389,27 +405,44 @@ async fn init_http_adapter(
             "match_mode": "any"
         });
 
-        let value = match pi_session_manager::dispatch::dispatch("full_text_search", &payload).await {
+        let value = match pi_session_manager::dispatch::dispatch("full_text_search", &payload).await
+        {
             Ok(v) => v,
             Err(error) => return Json(serde_json::json!({ "success": false, "error": error })),
         };
-        let mut fts: pi_session_manager::models::FullTextSearchResponse =
-            serde_json::from_value(value).unwrap_or(pi_session_manager::models::FullTextSearchResponse {
-                hits: vec![], total_hits: 0, has_more: false
-            });
+        let mut fts: pi_session_manager::models::FullTextSearchResponse = serde_json::from_value(
+            value,
+        )
+        .unwrap_or(pi_session_manager::models::FullTextSearchResponse {
+            hits: vec![],
+            total_hits: 0,
+            has_more: false,
+        });
         fts.hits.retain(|h| {
             if let Some(p) = req.project.as_deref() {
                 if !h.session_path.to_lowercase().contains(&p.to_lowercase()) {
                     return false;
                 }
             }
-            if let Some(f) = from { if h.timestamp < f { return false; } }
-            if let Some(t) = to { if h.timestamp > t { return false; } }
+            if let Some(f) = from {
+                if h.timestamp < f {
+                    return false;
+                }
+            }
+            if let Some(t) = to {
+                if h.timestamp > t {
+                    return false;
+                }
+            }
             true
         });
 
-        let structured = pi_session_manager::session_intel::build_structured_recall(&query_text, fts.hits);
-        let next_actions = pi_session_manager::session_intel::suggest_workflow(&structured.intent, structured.confidence);
+        let structured =
+            pi_session_manager::session_intel::build_structured_recall(&query_text, fts.hits);
+        let next_actions = pi_session_manager::session_intel::suggest_workflow(
+            &structured.intent,
+            structured.confidence,
+        );
 
         Json(serde_json::json!({
             "success": true,
@@ -482,25 +515,40 @@ async fn init_http_adapter(
             Err(error) => return Json(serde_json::json!({ "success": false, "error": error })),
         };
         let limit = req.experience_limit.unwrap_or(20).clamp(1, 200);
-        let sessions_value = match pi_session_manager::dispatch::dispatch("scan_sessions", &serde_json::json!({})).await {
-            Ok(v) => v,
-            Err(error) => return Json(serde_json::json!({ "success": false, "error": error })),
-        };
+        let sessions_value =
+            match pi_session_manager::dispatch::dispatch("scan_sessions", &serde_json::json!({}))
+                .await
+            {
+                Ok(v) => v,
+                Err(error) => return Json(serde_json::json!({ "success": false, "error": error })),
+            };
         let mut sessions: Vec<pi_session_manager::models::SessionInfo> =
             serde_json::from_value(sessions_value).unwrap_or_default();
         sessions.retain(|s| session_matches_scope(s, req.project.as_deref(), from, to));
-        if sessions.len() > 8 { sessions.truncate(8); }
+        if sessions.len() > 8 {
+            sessions.truncate(8);
+        }
 
         let mut items = Vec::new();
         for s in sessions {
-            let evalue = match pi_session_manager::dispatch::dispatch("get_session_entries", &serde_json::json!({"path": s.path})).await {
+            let evalue = match pi_session_manager::dispatch::dispatch(
+                "get_session_entries",
+                &serde_json::json!({"path": s.path}),
+            )
+            .await
+            {
                 Ok(v) => v,
                 Err(_) => continue,
             };
-            let entries: Vec<pi_session_manager::models::SessionEntry> = serde_json::from_value(evalue).unwrap_or_default();
-            let mut xs = pi_session_manager::session_intel::extract_experiences(&s.id, &entries, limit);
+            let entries: Vec<pi_session_manager::models::SessionEntry> =
+                serde_json::from_value(evalue).unwrap_or_default();
+            let mut xs =
+                pi_session_manager::session_intel::extract_experiences(&s.id, &entries, limit);
             items.append(&mut xs);
-            if items.len() >= limit { items.truncate(limit); break; }
+            if items.len() >= limit {
+                items.truncate(limit);
+                break;
+            }
         }
         Json(serde_json::json!({"success": true, "data": {"count": items.len(), "items": items}}))
     }
@@ -587,9 +635,13 @@ async fn init_http_adapter(
         match pi_session_manager::dispatch::dispatch("full_text_search", &payload).await {
             Ok(value) => {
                 let fts: pi_session_manager::models::FullTextSearchResponse =
-                    serde_json::from_value(value).unwrap_or(pi_session_manager::models::FullTextSearchResponse {
-                        hits: vec![], total_hits: 0, has_more: false
-                    });
+                    serde_json::from_value(value).unwrap_or(
+                        pi_session_manager::models::FullTextSearchResponse {
+                            hits: vec![],
+                            total_hits: 0,
+                            has_more: false,
+                        },
+                    );
                 Json(serde_json::json!({
                     "success": true,
                     "data": {
@@ -627,7 +679,7 @@ async fn init_http_adapter(
 
         let client = reqwest::Client::new();
         let url = format!("{}/embed", endpoint);
-        
+
         let payload = serde_json::json!({
             "text": req.text,
             "normalize": req.normalize,
@@ -682,7 +734,7 @@ async fn init_http_adapter(
 
         let client = reqwest::Client::new();
         let url = format!("{}/embed/batch", endpoint);
-        
+
         let payload = serde_json::json!({
             "texts": req.texts,
             "normalize": req.normalize,
@@ -691,9 +743,13 @@ async fn init_http_adapter(
         match client.post(&url).json(&payload).send().await {
             Ok(resp) => match resp.json::<serde_json::Value>().await {
                 Ok(data) => Json(serde_json::json!({"success": true, "data": data})),
-                Err(e) => Json(serde_json::json!({"success": false, "error": format!("Parse error: {}", e)})),
+                Err(e) => Json(
+                    serde_json::json!({"success": false, "error": format!("Parse error: {}", e)}),
+                ),
             },
-            Err(e) => Json(serde_json::json!({"success": false, "error": format!("Request failed: {}", e)})),
+            Err(e) => Json(
+                serde_json::json!({"success": false, "error": format!("Request failed: {}", e)}),
+            ),
         }
     }
 
@@ -701,7 +757,7 @@ async fn init_http_adapter(
         axum::Extension(svc): axum::Extension<Arc<EmbeddingService>>,
     ) -> Json<EmbeddingStatusResponse> {
         let endpoint = format!("http://127.0.0.1:{}/health", svc.config().port);
-        
+
         let (ready, model_loaded) = match reqwest::get(&endpoint).await {
             Ok(resp) if resp.status().is_success() => (true, true),
             _ => (false, false),

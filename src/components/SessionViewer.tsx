@@ -358,7 +358,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
     return height + MESSAGE_ITEM_GAP
   }, [renderableEntries])
 
-  const rowVirtualizer = useVirtualizer({
+  const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: renderableEntries.length,
     getScrollElement: () => messagesContainerRef.current,
     estimateSize: estimateEntrySize,
@@ -476,12 +476,6 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
           isAtBottomRef.current = atBottom
           setIsAtBottom(atBottom)
         }
-        const { scrollHeight, clientHeight } = container
-        setScrollMetrics(prev =>
-          prev.scrollHeight === scrollHeight && prev.clientHeight === clientHeight
-            ? prev
-            : { scrollHeight, clientHeight }
-        )
         if (atBottom) {
           setHasNewMessages(false)
         }
