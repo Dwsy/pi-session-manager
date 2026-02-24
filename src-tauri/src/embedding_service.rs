@@ -3,12 +3,7 @@
 //! Provides HTTP endpoints for text embedding generation using local models.
 //! Manages a node-llama-cpp child process for model inference.
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
@@ -33,8 +28,7 @@ impl Default for EmbeddingConfig {
         let home = dirs::home_dir().unwrap_or_default();
         Self {
             enabled: true,
-            model_path: home
-                .join(".pi/models/embedding-models/embeddinggemma-300M-Q8_0.gguf"),
+            model_path: home.join(".pi/models/embedding-models/embeddinggemma-300M-Q8_0.gguf"),
             port: 11435,
             auto_release_minutes: 5,
             node_path: None,
@@ -50,7 +44,6 @@ pub struct EmbeddingService {
 }
 
 impl EmbeddingService {
-
     /// Get the service configuration
     pub fn config(&self) -> &EmbeddingConfig {
         &self.config
@@ -66,14 +59,14 @@ impl EmbeddingService {
     /// Ensure the embedding server is running
     pub async fn ensure_running(&self) -> Result<String, String> {
         let mut child = self.child_process.lock().await;
-        
+
         if child.is_none() {
             self.start(&mut child).await?;
         }
-        
+
         // Update last used time
         *self.last_used.lock().await = std::time::Instant::now();
-        
+
         Ok(format!("http://127.0.0.1:{}", self.config.port))
     }
 
@@ -88,7 +81,7 @@ impl EmbeddingService {
 
         let node = self.config.node_path.as_deref().unwrap_or("node");
         let script_path = Self::get_server_script_path()?;
-        
+
         info!(
             "Starting embedding server with model: {}",
             self.config.model_path.display()
@@ -109,7 +102,7 @@ impl EmbeddingService {
 
         // Wait for server to be ready
         sleep(Duration::from_secs(2)).await;
-        
+
         match self.check_health().await {
             Ok(_) => {
                 info!("Embedding server ready on port {}", self.config.port);
@@ -129,7 +122,7 @@ impl EmbeddingService {
     /// Check if the embedding server is healthy
     async fn check_health(&self) -> Result<(), String> {
         let url = format!("http://127.0.0.1:{}/health", self.config.port);
-        
+
         match reqwest::get(&url).await {
             Ok(resp) if resp.status().is_success() => Ok(()),
             Ok(resp) => Err(format!("Health check failed: {}", resp.status())),
@@ -154,7 +147,7 @@ impl EmbeddingService {
             .parent()
             .ok_or("No parent dir")?
             .to_path_buf();
-        
+
         let script_path = exe_dir.join("embedding-server.mjs");
         if script_path.exists() {
             return Ok(script_path);
@@ -164,7 +157,7 @@ impl EmbeddingService {
         let project_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("scripts")
             .join("embedding-server.mjs");
-        
+
         if project_path.exists() {
             return Ok(project_path);
         }
@@ -182,10 +175,10 @@ impl EmbeddingService {
         tokio::spawn(async move {
             loop {
                 sleep(Duration::from_secs(60)).await;
-                
+
                 let last_used = *self.last_used.lock().await;
                 let idle_duration = std::time::Instant::now() - last_used;
-                
+
                 if idle_duration > Duration::from_secs(minutes * 60) {
                     let child_exists = self.child_process.lock().await.is_some();
                     if child_exists {
@@ -249,7 +242,10 @@ fn cors_headers() -> [(&'static str, &'static str); 3] {
     [
         ("access-control-allow-origin", "*"),
         ("access-control-allow-methods", "GET, POST, OPTIONS"),
-        ("access-control-allow-headers", "content-type, authorization"),
+        (
+            "access-control-allow-headers",
+            "content-type, authorization",
+        ),
     ]
 }
 
@@ -276,7 +272,7 @@ pub async fn v1_embedding(
 
     let client = reqwest::Client::new();
     let url = format!("{}/embed", endpoint);
-    
+
     let payload = serde_json::json!({
         "text": req.text,
         "normalize": req.normalize,
@@ -357,7 +353,7 @@ pub async fn v1_embedding_batch(
 
     let client = reqwest::Client::new();
     let url = format!("{}/embed/batch", endpoint);
-    
+
     let payload = serde_json::json!({
         "texts": req.texts,
         "normalize": req.normalize,
@@ -401,7 +397,7 @@ pub async fn v1_embedding_status(
     State(service): State<Arc<EmbeddingService>>,
 ) -> impl IntoResponse {
     let endpoint = format!("http://127.0.0.1:{}/health", service.config.port);
-    
+
     let (ready, model_loaded) = match reqwest::get(&endpoint).await {
         Ok(resp) if resp.status().is_success() => (true, true),
         _ => (false, false),
