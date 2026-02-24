@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { formatDate } from '../utils/format'
-import ExpandableOutput from './ExpandableOutput'
+import { useSessionView } from '../contexts/SessionViewContext'
+import CodeBlock from './CodeBlock'
 import hljs from 'highlight.js'
 
 interface BashExecutionProps {
@@ -10,8 +11,9 @@ interface BashExecutionProps {
   cancelled?: boolean
   timestamp?: string
   entryId: string
-  expanded?: boolean
 }
+
+const OUTPUT_MAX_HEIGHT = 300
 
 export default function BashExecution({
   command,
@@ -20,24 +22,14 @@ export default function BashExecution({
   cancelled,
   timestamp,
   entryId,
-  expanded = false,
 }: BashExecutionProps) {
-  const [localExpanded, setLocalExpanded] = useState(false)
-  const [outputCopied, setOutputCopied] = useState(false)
-  const [commandCopied, setCommandCopied] = useState(false)
+  const { isToolExpanded, toggleToolExpanded } = useSessionView()
+  const expanded = isToolExpanded(entryId)
   const codeRef = useRef<HTMLElement>(null)
+  const [commandCopied, setCommandCopied] = useState(false)
 
   useEffect(() => {
-    setLocalExpanded(expanded)
-  }, [expanded])
-
-  useEffect(() => {
-    if (codeRef.current) {
-      // Skip if already highlighted
-      if (codeRef.current.dataset.highlighted === 'yes') {
-        return
-      }
-
+    if (codeRef.current && codeRef.current.dataset.highlighted !== 'yes') {
       try {
         hljs.highlightElement(codeRef.current)
       } catch (e) {
@@ -59,22 +51,16 @@ export default function BashExecution({
     }
   }
 
-  const handleCopyOutput = async () => {
-    try {
-      if (output) {
-        await navigator.clipboard.writeText(output)
-        setOutputCopied(true)
-        setTimeout(() => setOutputCopied(false), 2000)
-      }
-    } catch (err) {
-      console.error('Failed to copy output:', err)
-    }
-  }
-
   return (
     <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
       {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
-      <div className="tool-header">
+      <div
+        className="tool-header cursor-pointer select-none"
+        onClick={() => toggleToolExpanded(entryId)}
+      >
+        <span className="tool-expand-indicator">
+          {expanded ? '▾' : '▸'}
+        </span>
         <span className="tool-name">
           <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -92,9 +78,10 @@ export default function BashExecution({
           </span>
         )}
       </div>
+
       <div className="tool-command-wrapper">
         <pre className="tool-command-highlighted">
-          <code ref={codeRef} className="language-bash">{command}</code>
+          <code ref={codeRef} className="language-shell">{command}</code>
         </pre>
         <button
           onClick={handleCopyCommand}
@@ -112,40 +99,18 @@ export default function BashExecution({
           )}
         </button>
       </div>
-      {output && (
-        <div
-          className="tool-output-wrapper"
-          onClick={() => setLocalExpanded(!localExpanded)}
-          style={{ cursor: 'pointer' }}
-        >
-          <div className="tool-output-header">
-            <span className="tool-output-label">
-              {localExpanded ? '▾ Output' : '▸ Output'}
-            </span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleCopyOutput()
-              }}
-              className="tool-copy-button"
-              title={outputCopied ? 'Copied!' : 'Copy output'}
-            >
-              {outputCopied ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              )}
-            </button>
+
+      {expanded && output && (
+        <div className="tool-output-wrapper">
+          <div className="tool-output">
+            <CodeBlock
+              code={output}
+              language="shell"
+              showLineNumbers={true}
+              scrollable
+              maxHeight={OUTPUT_MAX_HEIGHT}
+            />
           </div>
-          {localExpanded && (
-            <div className="tool-output" onClick={(e) => e.stopPropagation()}>
-              <ExpandableOutput text={output} maxLines={20} />
-            </div>
-          )}
         </div>
       )}
     </div>

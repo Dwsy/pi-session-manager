@@ -1,42 +1,41 @@
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { escapeHtml } from '../utils/markdown'
 import { shortenPath, formatDate } from '../utils/format'
 import { useTheme } from '../hooks/useAppearance'
 import { useIsMobile } from '../hooks/useIsMobile'
+import { useSessionView } from '../contexts/SessionViewContext'
 
 interface EditExecutionProps {
   filePath: string
   diff?: string
   output?: string
   timestamp?: string
-  expanded?: boolean
+  entryId: string
 }
+
+const OUTPUT_MAX_HEIGHT = 300
 
 export default function EditExecution({
   filePath,
   diff,
   output,
   timestamp,
-  expanded = false,
+  entryId,
 }: EditExecutionProps) {
   const { t } = useTranslation()
   const { theme } = useTheme()
   const isMobile = useIsMobile()
   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  const [localExpanded, setLocalExpanded] = useState(false)
+  const { isToolExpanded, toggleToolExpanded } = useSessionView()
+  const expanded = isToolExpanded(entryId)
   const [copied, setCopied] = useState(false)
   const displayPath = shortenPath(filePath)
 
-  useEffect(() => {
-    setLocalExpanded(expanded)
-  }, [expanded])
-
-  // 复制 diff 内容到剪贴板
   const copyDiffToClipboard = async () => {
     if (!diff) return
-    
+
     try {
       await navigator.clipboard.writeText(diff)
       setCopied(true)
@@ -46,7 +45,6 @@ export default function EditExecution({
     }
   }
 
-  // 解析 Pi 的 diff 格式并提取 oldText 和 newText
   const parsePiDiff = (diffText: string): { oldText: string; newText: string } | null => {
     if (!diffText) return null
 
@@ -56,41 +54,30 @@ export default function EditExecution({
       const newLines: string[] = []
 
       for (const line of lines) {
-        // 跳过省略标记
         if (line.trim() === '...') {
           continue
         }
-        
+
         if (line.trim() === '') {
-          // 空行也要保留
           oldLines.push('')
           newLines.push('')
           continue
         }
 
-        // 匹配行号格式：
-        // "  39 content" - 上下文行（无标记）
-        // "- 43 content" - 删除的行
-        // "+ 43 content" - 添加的行
-        // 注意：行号后面可能直接跟内容，也可能有空格
         const lineMatch = line.match(/^([+-]?)\s*\d+\s+(.*)$/)
-        
+
         if (lineMatch) {
           const [, marker, content] = lineMatch
-          
+
           if (marker === '-') {
-            // 删除的行：只在 oldText 中
             oldLines.push(content)
           } else if (marker === '+') {
-            // 添加的行：只在 newText 中
             newLines.push(content)
           } else {
-            // 上下文行：在两边都有
             oldLines.push(content)
             newLines.push(content)
           }
         } else {
-          // 如果不匹配行号格式，可能是纯内容行，作为上下文处理
           oldLines.push(line)
           newLines.push(line)
         }
@@ -106,25 +93,23 @@ export default function EditExecution({
     }
   }
 
-  // 渲染 diff
   const renderDiff = () => {
     if (!diff) return null
 
     const parsed = parsePiDiff(diff)
-    
+
     if (!parsed) {
-      // Failed to parse diff, showing raw content
       return (
         <div className="tool-output">
-          <div style={{ 
+          <div style={{
             backgroundColor: 'var(--code-bg, #1e1e1e)',
             padding: '12px',
             borderRadius: '6px',
             overflow: 'auto'
           }}>
-            <pre style={{ 
+            <pre style={{
               margin: 0,
-              whiteSpace: 'pre-wrap', 
+              whiteSpace: 'pre-wrap',
               fontFamily: 'var(--font-family-mono, ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace)',
               fontSize: '0.875rem',
               lineHeight: '1.5',
@@ -139,7 +124,7 @@ export default function EditExecution({
 
     try {
       const fileName = filePath.split('/').pop() || 'file'
-      
+
       const oldFile: FileContents = {
         name: fileName,
         contents: parsed.oldText,
@@ -149,7 +134,7 @@ export default function EditExecution({
         name: fileName,
         contents: parsed.newText,
       }
-      
+
       return (
         <div className="tool-diff">
           <MultiFileDiff
@@ -166,19 +151,18 @@ export default function EditExecution({
       )
     } catch (error) {
       console.error('Error rendering MultiFileDiff:', error)
-      
-      // 降级显示：彩色文本
+
       return (
         <div className="tool-output">
-          <div style={{ 
+          <div style={{
             backgroundColor: 'var(--code-bg, #1e1e1e)',
             padding: '12px',
             borderRadius: '6px',
             overflow: 'auto'
           }}>
-            <pre style={{ 
+            <pre style={{
               margin: 0,
-              whiteSpace: 'pre-wrap', 
+              whiteSpace: 'pre-wrap',
               fontFamily: 'var(--font-family-mono, ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace)',
               fontSize: '0.875rem',
               lineHeight: '1.5',
@@ -187,7 +171,7 @@ export default function EditExecution({
               {diff.split('\n').map((line, i) => {
                 let color = 'inherit'
                 let bgColor = 'transparent'
-                
+
                 if (line.match(/^\s*-\s*\d+/)) {
                   color = '#f85149'
                   bgColor = 'rgba(248, 81, 73, 0.1)'
@@ -195,12 +179,12 @@ export default function EditExecution({
                   color = '#3fb950'
                   bgColor = 'rgba(63, 185, 80, 0.1)'
                 }
-                
+
                 return (
-                  <div 
-                    key={i} 
-                    style={{ 
-                      color, 
+                  <div
+                    key={i}
+                    style={{
+                      color,
                       backgroundColor: bgColor,
                       padding: '0 4px'
                     }}
@@ -216,10 +200,20 @@ export default function EditExecution({
     }
   }
 
+  const hasContent = diff || output
+
   return (
-    <div className="tool-execution success">
+    <div className="tool-execution success" id={`entry-${entryId}`}>
       {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
-      <div className="tool-header">
+      <div
+        className={`tool-header ${hasContent ? 'cursor-pointer select-none' : ''}`}
+        onClick={hasContent ? () => toggleToolExpanded(entryId) : undefined}
+      >
+        {hasContent && (
+          <span className="tool-expand-indicator">
+            {expanded ? '▾' : '▸'}
+          </span>
+        )}
         <span className="tool-name">
           <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -229,22 +223,13 @@ export default function EditExecution({
         <span className="tool-path">{escapeHtml(displayPath)}</span>
       </div>
 
-      {diff && (
-        <div
-          className="tool-diff-wrapper"
-          onClick={() => setLocalExpanded(!localExpanded)}
-          style={{ cursor: 'pointer' }}
-        >
+      {expanded && diff && (
+        <div className="tool-diff-wrapper">
           <div className="tool-diff-actions">
-            <span style={{ color: 'var(--muted)', fontSize: '11px' }}>
-              {localExpanded ? '▾ Diff' : '▸ Diff'}
-            </span>
+            <span className="tool-output-label">Diff</span>
             <div style={{ flex: 1 }} />
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                copyDiffToClipboard()
-              }}
+              onClick={copyDiffToClipboard}
               className="tool-action-button"
               title={copied ? t('components.editExecution.copied') : t('components.editExecution.copyDiff')}
             >
@@ -259,17 +244,19 @@ export default function EditExecution({
               )}
             </button>
           </div>
-          {localExpanded && <div onClick={(e) => e.stopPropagation()}>{renderDiff()}</div>}
+          <div style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}>
+            {renderDiff()}
+          </div>
         </div>
       )}
 
-      {output && (
+      {expanded && output && (
         <div className="tool-output">
           <div>{escapeHtml(output)}</div>
         </div>
       )}
 
-      {!diff && !output && (
+      {!hasContent && (
         <div className="tool-output" style={{ color: 'var(--muted)', fontStyle: 'italic' }}>
           {t('components.editExecution.noChanges')}
         </div>

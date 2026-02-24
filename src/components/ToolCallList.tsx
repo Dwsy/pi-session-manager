@@ -5,7 +5,6 @@ import WriteExecution from './WriteExecution'
 import EditExecution from './EditExecution'
 import GenericToolCall from './GenericToolCall'
 import SubagentToolCall from './SubagentToolCall'
-import { useSessionView } from '../contexts/SessionViewContext'
 
 interface ToolCallListProps {
   toolCalls: Content[]
@@ -13,7 +12,6 @@ interface ToolCallListProps {
 }
 
 export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListProps) {
-  const { toolsExpanded } = useSessionView()
   const findToolResult = (toolCallId: string) => {
     return entries.find(
       (e: any) => e.type === 'message' &&
@@ -25,7 +23,7 @@ export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListPr
   const getToolResultContent = (toolCallId: string) => {
     const result = findToolResult(toolCallId)
     if (!result?.message?.content) return null
-    // 返回 content 数组的第一个元素（输出内容）
+
     return result.message.content[0] || null
   }
 
@@ -39,13 +37,14 @@ export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListPr
         const toolResultContent = getToolResultContent(toolCallId)
 
         const isError = result?.message?.isError || toolResultContent?.isError || false
-        // 输出内容可能在不同位置：content[0].text 或 output
+
         const output = toolResultContent?.text || toolResultContent?.output || result?.message?.output || ''
-        // diff 可能在多个位置：content[0].details.diff, message.details.diff, 或 content[0].diff
+
         const diff = toolResultContent?.details?.diff || toolResultContent?.diff || result?.message?.details?.diff
         const timestamp = result?.timestamp
 
-        // Route to specific component based on tool name
+        const entryId = result?.id || `tool-${toolCallId || index}`
+
         switch (name) {
           case 'bash':
             return (
@@ -56,8 +55,7 @@ export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListPr
                 exitCode={result?.message?.exitCode}
                 cancelled={result?.message?.cancelled}
                 timestamp={timestamp}
-                entryId={result?.id || `tool-${index}`}
-                expanded={toolsExpanded}
+                entryId={entryId}
               />
             )
 
@@ -71,7 +69,7 @@ export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListPr
                 output={output}
                 images={toolResultContent?.content?.filter((c: any) => c.type === 'image') || []}
                 timestamp={timestamp}
-                expanded={toolsExpanded}
+                entryId={entryId}
               />
             )
 
@@ -83,7 +81,7 @@ export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListPr
                 content={args.content || ''}
                 output={output}
                 timestamp={timestamp}
-                expanded={toolsExpanded}
+                entryId={entryId}
               />
             )
 
@@ -95,7 +93,7 @@ export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListPr
                 diff={diff}
                 output={output}
                 timestamp={timestamp}
-                expanded={toolsExpanded}
+                entryId={entryId}
               />
             )
 
@@ -107,6 +105,7 @@ export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListPr
                 details={result?.message?.details}
                 output={output}
                 timestamp={timestamp}
+                entryId={entryId}
               />
             )
 
@@ -119,7 +118,7 @@ export default function ToolCallList({ toolCalls, entries = [] }: ToolCallListPr
                 output={output}
                 isError={isError}
                 timestamp={timestamp}
-                expanded={toolsExpanded}
+                entryId={entryId}
               />
             )
         }

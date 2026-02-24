@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
 import { escapeHtml } from '../utils/markdown'
 import { formatDate } from '../utils/format'
+import { useSessionView } from '../contexts/SessionViewContext'
 
 interface GenericToolCallProps {
   name: string
@@ -8,8 +8,10 @@ interface GenericToolCallProps {
   output?: string
   isError?: boolean
   timestamp?: string
-  expanded?: boolean
+  entryId: string
 }
+
+const OUTPUT_MAX_HEIGHT = 300
 
 export default function GenericToolCall({
   name,
@@ -17,15 +19,10 @@ export default function GenericToolCall({
   output,
   isError = false,
   timestamp,
-  expanded = false,
+  entryId,
 }: GenericToolCallProps) {
-  const [argsExpanded, setArgsExpanded] = useState(false)
-  const [outputExpanded, setOutputExpanded] = useState(false)
-
-  useEffect(() => {
-    setArgsExpanded(expanded)
-    setOutputExpanded(expanded)
-  }, [expanded])
+  const { isToolExpanded, toggleToolExpanded } = useSessionView()
+  const expanded = isToolExpanded(entryId)
 
   const statusClass = isError ? 'error' : 'success'
 
@@ -34,16 +31,21 @@ export default function GenericToolCall({
   }
 
   const argsText = args ? formatArgs(args) : ''
-  const argsLines = argsText.split('\n')
-  const argsRemaining = argsLines.length - 10
-
-  const outputLines = output ? output.split('\n') : []
-  const outputRemaining = outputLines.length - 20
+  const hasArgs = args && Object.keys(args).length > 0
+  const hasOutput = output && output.length > 0
 
   return (
-    <div className={`tool-execution ${statusClass}`}>
+    <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
       {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
-      <div className="tool-header">
+      <div
+        className={`tool-header ${(hasArgs || hasOutput) ? 'cursor-pointer select-none' : ''}`}
+        onClick={(hasArgs || hasOutput) ? () => toggleToolExpanded(entryId) : undefined}
+      >
+        {(hasArgs || hasOutput) && (
+          <span className="tool-expand-indicator">
+            {expanded ? '▾' : '▸'}
+          </span>
+        )}
         <span className="tool-name">
           <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -53,67 +55,33 @@ export default function GenericToolCall({
         </span>
       </div>
 
-      {args && Object.keys(args).length > 0 && (
-        <div
-          className="tool-output-wrapper"
-          style={{ marginTop: '8px', cursor: argsRemaining > 0 ? 'pointer' : 'default' }}
-          onClick={argsRemaining > 0 ? () => setArgsExpanded(!argsExpanded) : undefined}
-        >
-          {argsRemaining > 0 ? (
-            <>
-              <div className="tool-output-header">
-                <span className="tool-output-label">
-                  {argsExpanded ? '▾ Arguments' : `▸ Arguments (${argsRemaining} more lines)`}
-                </span>
-              </div>
-              <div className="tool-arguments" style={{ margin: 0 }} onClick={(e) => e.stopPropagation()}>
-                {argsExpanded ? (
-                  <pre><code>{escapeHtml(argsText)}</code></pre>
-                ) : (
-                  <pre><code>{escapeHtml(argsLines.slice(0, 10).join('\n'))}</code></pre>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="tool-arguments" style={{ margin: '0 12px 12px 12px' }} onClick={(e) => e.stopPropagation()}>
-              <pre><code>{escapeHtml(argsText)}</code></pre>
-            </div>
-          )}
+      {expanded && hasArgs && (
+        <div className="tool-output-wrapper">
+          <div className="tool-output-header">
+            <span className="tool-output-label">Arguments</span>
+          </div>
+          <div
+            className="tool-arguments"
+            style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto', margin: 0 }}
+          >
+            <pre><code>{escapeHtml(argsText)}</code></pre>
+          </div>
         </div>
       )}
 
-      {output && (
-        <div
-          className="tool-output-wrapper"
-          style={{ cursor: outputRemaining > 0 ? 'pointer' : 'default' }}
-          onClick={outputRemaining > 0 ? () => setOutputExpanded(!outputExpanded) : undefined}
-        >
-          {outputRemaining > 0 ? (
-            <>
-              <div className="tool-output-header">
-                <span className="tool-output-label">
-                  {outputExpanded ? '▾ Output' : `▸ Output (${outputRemaining} more lines)`}
-                </span>
-              </div>
-              <div className="tool-output" onClick={(e) => e.stopPropagation()}>
-                {outputExpanded ? (
-                  outputLines.map((line, idx) => (
-                    <div key={idx}>{escapeHtml(line)}</div>
-                  ))
-                ) : (
-                  outputLines.slice(0, 20).map((line, idx) => (
-                    <div key={idx}>{escapeHtml(line)}</div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="tool-output" style={{ paddingTop: '8px' }} onClick={(e) => e.stopPropagation()}>
-              {outputLines.map((line, idx) => (
-                <div key={idx}>{escapeHtml(line)}</div>
-              ))}
-            </div>
-          )}
+      {expanded && hasOutput && (
+        <div className="tool-output-wrapper">
+          <div className="tool-output-header">
+            <span className="tool-output-label">Output</span>
+          </div>
+          <div
+            className="tool-output"
+            style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}
+          >
+            {output.split('\n').map((line, idx) => (
+              <div key={idx}>{escapeHtml(line)}</div>
+            ))}
+          </div>
         </div>
       )}
     </div>

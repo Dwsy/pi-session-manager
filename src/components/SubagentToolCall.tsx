@@ -11,6 +11,7 @@ interface SubagentToolCallProps {
   details?: SubagentDetails
   output?: string
   timestamp?: string
+  entryId?: string
 }
 
 function formatDuration(ms: number): string {
