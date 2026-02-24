@@ -218,10 +218,10 @@ export default function KanbanBoard({
   }, [columns, findColumnForSession, onMoveSession, onToggleTag])
 
   
-  const handleCardClick = useCallback((session: SessionInfo, cardElement?: HTMLElement) => {
+  const handleCardClick = useCallback((session: SessionInfo, rect?: DOMRect) => {
     // Measure card position for FLIP animation
-    if (cardElement) {
-      setInitialCardRect(cardElement.getBoundingClientRect())
+    if (rect) {
+      setInitialCardRect(rect)
     } else {
       const cardEl = document.querySelector(`[data-session-id="${session.id}"]`)
       setInitialCardRect(cardEl ? cardEl.getBoundingClientRect() : null)
