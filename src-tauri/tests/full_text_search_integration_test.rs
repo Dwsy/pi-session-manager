@@ -619,3 +619,39 @@ async fn test_full_text_search_match_modes() {
 
     println!("✅ Match modes test passed!");
 }
+
+#[tokio::test]
+async fn test_full_text_search_any_mode_honors_quoted_phrase() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+
+    let _temp_dir = setup_test_db(&[(
+        "s1",
+        "/cwd",
+        &[
+            ("user", "foo middle bar"),
+            ("user", "prefix foo bar suffix"),
+            ("user", "foo bar and extra"),
+        ],
+    )]);
+
+    let response: FullTextSearchResponse = full_text_search(
+        "\"foo bar\"".to_string(),
+        "all".to_string(),
+        None,
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
+
+    assert!(!response.hits.is_empty());
+    assert!(response
+        .hits
+        .iter()
+        .all(|hit| hit.content.to_lowercase().contains("foo bar")));
+    assert!(!response
+        .hits
+        .iter()
+        .any(|hit| hit.content.to_lowercase().contains("foo middle bar")));
+}

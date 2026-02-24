@@ -98,6 +98,37 @@ describe('FullTextSearch', () => {
     expect(snippetContainer?.innerHTML).toContain('<b>bold</b>');
   });
 
+  it('highlights quoted exact phrases as a contiguous match', async () => {
+    mockInvoke.mockResolvedValue({
+      hits: [
+        {
+          session_id: 's1',
+          entry_id: 'e1',
+          session_path: '/x/y/z.jsonl',
+          session_name: '',
+          role: 'assistant',
+          timestamp: '2025-01-01T00:00:00Z',
+          content: 'prefix bold highlight suffix',
+          score: 1.0,
+        },
+      ],
+      total_hits: 1,
+    });
+
+    renderFullTextSearch(true);
+
+    const input = screen.getByPlaceholderText(/search all sessions/i);
+    fireEvent.change(input, { target: { value: '"bold highlight"' } });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalled();
+    });
+
+    const snippetContainer = document.querySelector('.fts-snippet');
+    expect(snippetContainer).not.toBeNull();
+    expect(snippetContainer?.innerHTML).toContain('<b>bold highlight</b>');
+  });
+
   it('shows loading spinner when search is in progress and no hits yet', async () => {
     // Simulate a pending promise so spinner remains
     mockInvoke.mockReturnValue(new Promise(() => {})); // never resolves
@@ -119,7 +150,7 @@ describe('FullTextSearch', () => {
   });
 
   it('closes modal when ESC key is pressed, even when input is focused', async () => {
-    renderFullTextSearch(true);
+    const { onClose } = renderFullTextSearch(true);
 
     // Verify modal is open
     const overlay = document.querySelector('[class*="fixed inset-0"]');
