@@ -4,6 +4,29 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Embedding Service** — local GGUF model inference for shared embedding across pi processes
+  - New Rust module `embedding_service.rs` manages node-llama-cpp child process
+  - ES module `embedding-server.mjs` provides HTTP API for text embeddings
+  - Endpoints: `POST /v1/embedding`, `POST /v1/embedding/batch`, `GET /v1/embedding/status`
+  - Model: EmbeddingGemma 300M Q8_0 (768 dims, ~435MB RAM, ~4-8ms inference)
+  - Auto-release after 5 min idle to free memory
+  - Solves: multiple pi processes each loading model = 1.3GB waste → shared 435MB
+
+- **API Test Panel** — online diagnostics in Settings
+  - New settings section for testing pi-session-manager backend connection
+  - Tests all endpoints: embedding, sessions, memory recall, analytics
+  - Latency measurement with color-coded results (<100ms green, <500ms yellow, >500ms red)
+  - Auto-runs on panel open with retry support for individual endpoints
+  - Displays embedding service status (model, dimensions, ready state)
+  - Troubleshooting help section for common issues
+
+- **Session Intel Module** — `session_intel.rs` for memory/experience analytics
+  - Structured recall with intent detection and confidence scoring
+  - Experience extraction from session entries
+  - SQLite overview for analytics dashboard
+
 ### Changed
 
 - **Internationalization** — All Chinese code comments translated to English for global collaboration
