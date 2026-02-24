@@ -18,6 +18,7 @@ import {
   Cpu,
   Keyboard,
   Tags,
+  Activity,
 } from 'lucide-react'
 import type { AppSettings, SettingsSection } from './types'
 import { defaultSettings } from './types'
@@ -34,6 +35,7 @@ import ModelSettings from './sections/ModelSettings'
 import AdvancedSettings from './sections/AdvancedSettings'
 import ShortcutSettings from './sections/ShortcutSettings'
 import TagManagerSettings from './sections/TagManagerSettings'
+import APITestSettings from './sections/APITestSettings'
 
 interface SettingsPanelProps {
   isOpen: boolean
@@ -166,6 +168,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     { id: 'models', icon: <Cpu className="h-4 w-4" />, label: t('settings.sections.models', '模型') },
     { id: 'shortcuts', icon: <Keyboard className="h-4 w-4" />, label: t('settings.sections.shortcuts', '快捷键') },
     { id: 'advanced', icon: <Shield className="h-4 w-4" />, label: t('settings.sections.advanced', '高级') },
+    { id: 'api-test', icon: <Activity className="h-4 w-4" />, label: t('settings.sections.apiTest', 'API 测试') },
   ]
 
   return (
@@ -274,6 +277,7 @@ function MobileSettings({
       case 'models': return <ModelSettings />
       case 'shortcuts': return <ShortcutSettings />
       case 'advanced': return <AdvancedSettings settings={settings} onUpdate={onUpdate} />
+      case 'api-test': return <APITestSettings />
       default: return null
     }
   }
