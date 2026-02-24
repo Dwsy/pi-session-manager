@@ -8,9 +8,18 @@ interface CodeBlockProps {
   language?: string
   filename?: string
   showLineNumbers?: boolean
+  maxHeight?: number | string
+  scrollable?: boolean
 }
 
-export default function CodeBlock({ code, language, filename, showLineNumbers = true }: CodeBlockProps) {
+export default function CodeBlock({
+  code,
+  language,
+  filename,
+  showLineNumbers = true,
+  maxHeight,
+  scrollable = false,
+}: CodeBlockProps) {
   const { t } = useTranslation()
   const codeRef = useRef<HTMLElement>(null)
   const [copied, setCopied] = useState(false)
@@ -47,9 +56,14 @@ export default function CodeBlock({ code, language, filename, showLineNumbers = 
   // Calculate line numbers
   const lines = code.split('\n')
   const lineCount = lines.length
+  const wrapperClassName = scrollable ? 'code-block-wrapper code-block-scrollable' : 'code-block-wrapper'
+  const wrapperStyle =
+    scrollable && maxHeight !== undefined
+      ? { maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight }
+      : undefined
 
   return (
-    <div className="code-block-wrapper">
+    <div className={wrapperClassName} style={wrapperStyle}>
       <div className="code-block-header">
         {filename && <div className="code-filename">{filename}</div>}
         {language && !filename && <div className="code-language">{language}</div>}
