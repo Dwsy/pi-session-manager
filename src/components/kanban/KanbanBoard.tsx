@@ -20,6 +20,7 @@ import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
 import SearchFilterBar from '../SearchFilterBar'
 import SessionPreviewModal from './SessionPreviewModal'
+import { parseQuotedQuery } from '../../utils/search'
 
 interface KanbanBoardProps {
   sessions: SessionInfo[]
@@ -82,13 +83,38 @@ export default function KanbanBoard({
       result = result.filter(s => s.cwd === projectFilter)
     }
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      result = result.filter(s =>
-        (s.name && s.name.toLowerCase().includes(q)) ||
-        (s.first_message && s.first_message.toLowerCase().includes(q)) ||
-        (s.last_message && s.last_message.toLowerCase().includes(q)) ||
-        (s.cwd && s.cwd.toLowerCase().includes(q))
-      )
+      const parsedQuery = parseQuotedQuery(searchQuery)
+
+      if (!parsedQuery.hasPhrases) {
+        const q = parsedQuery.remainder.trim().toLowerCase()
+        if (q) {
+          result = result.filter(s =>
+            (s.name && s.name.toLowerCase().includes(q)) ||
+            (s.first_message && s.first_message.toLowerCase().includes(q)) ||
+            (s.last_message && s.last_message.toLowerCase().includes(q)) ||
+            (s.cwd && s.cwd.toLowerCase().includes(q))
+          )
+        }
+      } else {
+        const remainderTerms = parsedQuery.remainderTokens.map(term => term.toLowerCase())
+
+        result = result.filter(s => {
+          const searchableFields = [s.name || '', s.first_message || '', s.last_message || '', s.cwd || '']
+            .map(field => field.toLowerCase())
+
+          const phrasesMatched = parsedQuery.phrases.every(
+            phrase => searchableFields.some(field => field.includes(phrase.toLowerCase()))
+          )
+
+          if (!phrasesMatched) {
+            return false
+          }
+
+          return remainderTerms.every(
+            term => searchableFields.some(field => field.includes(term))
+          )
+        })
+      }
     }
     return result
   }, [sessions, projectFilter, searchQuery])

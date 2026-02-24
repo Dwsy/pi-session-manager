@@ -3,6 +3,7 @@ import { Search, X, Loader2, User, Bot, FileText, Globe, ArrowUpDown } from 'luc
 import { useTranslation } from 'react-i18next';
 import { invoke } from '../transport';
 import { shortenPath } from '../utils/format';
+import { parseQuotedQuery } from '../utils/search';
 import type { FullTextSearchHit, FullTextSearchResponse, SessionInfo } from '../types';
 
 function getProjectDirName(path: string): string {
@@ -232,15 +233,27 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
     if (!query.trim()) {
       return escapeHtml(content);
     }
+
+    const parsedQuery = parseQuotedQuery(query);
+    const terms = parsedQuery.hasPhrases
+      ? [...parsedQuery.phrases, ...parsedQuery.remainderTokens]
+      : query.trim().split(/\s+/).filter(Boolean);
+
+    if (terms.length === 0) {
+      return escapeHtml(content);
+    }
+
     const escaped = escapeHtml(content);
-    const terms = query.trim().split(/\s+/).filter(Boolean);
+    const deduplicatedTerms = [...new Set(terms.filter(Boolean))]
+      .sort((a, b) => b.length - a.length);
+
     let result = escaped;
-    terms.forEach(term => {
-      if (!term) return;
+    deduplicatedTerms.forEach(term => {
       const escapedTerm = escapeHtml(term);
-      const regex = new RegExp(`(${escapedTerm})`, 'gi');
+      const regex = new RegExp(`(${escapedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
       result = result.replace(regex, '<b>$1</b>');
     });
+
     return result;
   };
 

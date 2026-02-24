@@ -13,6 +13,59 @@ pub enum RoleFilter {
     Assistant,
 }
 
+#[derive(Debug, Clone)]
+struct ParsedQuotedQuery {
+    phrases: Vec<String>,
+    words: Vec<String>,
+}
+
+fn parse_quoted_query_lower(query: &str) -> ParsedQuotedQuery {
+    let quote_count = query.chars().filter(|ch| *ch == '"').count();
+    if quote_count == 0 || quote_count % 2 != 0 {
+        let words = query
+            .to_lowercase()
+            .split_whitespace()
+            .map(|word| word.to_string())
+            .collect();
+        return ParsedQuotedQuery {
+            phrases: vec![],
+            words,
+        };
+    }
+
+    let mut phrases = Vec::new();
+    let mut remainder = String::new();
+    let mut current_phrase = String::new();
+    let mut in_phrase = false;
+
+    for ch in query.chars() {
+        if ch == '"' {
+            if in_phrase {
+                if !current_phrase.trim().is_empty() {
+                    phrases.push(current_phrase.to_lowercase());
+                }
+                current_phrase.clear();
+            }
+            in_phrase = !in_phrase;
+            continue;
+        }
+
+        if in_phrase {
+            current_phrase.push(ch);
+        } else {
+            remainder.push(ch);
+        }
+    }
+
+    let words = remainder
+        .to_lowercase()
+        .split_whitespace()
+        .map(|word| word.to_string())
+        .collect();
+
+    ParsedQuotedQuery { phrases, words }
+}
+
 /// Search sessions
 /// Optimizations:
 /// 1. Use lowercase query cache to avoid repeated conversions
@@ -30,11 +83,15 @@ pub fn search_sessions(
         return vec![];
     }
 
-    // Pre-compute query words (lowercase) to avoid repeated conversions
-    let query_lower = query_trimmed.to_lowercase();
-    let query_words: Vec<&str> = query_lower.split_whitespace().collect();
+    let parsed_query = parse_quoted_query_lower(query_trimmed);
+    let query_terms: Vec<&str> = parsed_query
+        .words
+        .iter()
+        .chain(parsed_query.phrases.iter())
+        .map(String::as_str)
+        .collect();
 
-    if query_words.is_empty() {
+    if query_terms.is_empty() {
         return vec![];
     }
 
@@ -43,7 +100,7 @@ pub fn search_sessions(
     for session in sessions {
         if search_mode == SearchMode::Name {
             // Search session name and first message
-            if matches_session_name(session, &query_words) {
+            if matches_session_name(session, &query_terms) {
                 results.push(SearchResult {
                     session_id: session.id.clone(),
                     session_path: session.path.clone(),
@@ -56,14 +113,14 @@ pub fn search_sessions(
         } else {
             // Fast filter: check if all_messages_text contains query first
             // Avoid reading file for every session
-            if !has_match_in_text(&session.all_messages_text, &query_words) {
+            if !has_match_in_text(&session.all_messages_text, &query_terms) {
                 continue;
             }
 
             // Search message content
-            let matches = find_matches(session, &query_words, role_filter, include_tools);
+            let matches = find_matches(session, &query_terms, role_filter, include_tools);
             if !matches.is_empty() {
-                let score = calculate_score(&matches, &query_words);
+                let score = calculate_score(&matches, &query_terms);
                 results.push(SearchResult {
                     session_id: session.id.clone(),
                     session_path: session.path.clone(),
@@ -357,6 +414,10 @@ fn calculate_score(matches: &[Match], query_words: &[&str]) -> f32 {
     for m in matches {
         let snippet_lower = m.snippet.to_lowercase();
         for word in query_words {
+            if word.chars().any(char::is_whitespace) {
+                continue;
+            }
+
             // Check word boundary matches, avoid creating too many temporary strings
             if let Some(pos) = snippet_lower.find(word) {
                 let word_len = word.len();

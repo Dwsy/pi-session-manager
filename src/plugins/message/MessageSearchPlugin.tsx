@@ -3,6 +3,7 @@ import { invoke } from '../../transport'
 import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '../types'
 import type { SessionInfo } from '../../types'
+import { parseQuotedQuery } from '../../utils/search'
 
 /**
  * 消息搜索插件
@@ -47,10 +48,23 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
         ? sessions.filter(s => s.cwd === context.selectedProject)
         : sessions
       
+      const parsedQuery = parseQuotedQuery(query)
+      const phraseTerms = parsedQuery.phrases.map(phrase => phrase.toLowerCase())
+      const remainderTerms = parsedQuery.remainderTokens.map(term => term.toLowerCase())
+      const hasPhraseMode = parsedQuery.hasPhrases
+      const queryTerms = hasPhraseMode ? [...phraseTerms, ...remainderTerms] : [query.toLowerCase()]
+
       // 转换为插件结果格式
       const pluginResults = filteredSessions.map(session => {
-        const score = this.fuzzyMatch(query, session.first_message)
-        
+        const score = hasPhraseMode
+          ? Math.max(
+              ...queryTerms.map(term => Math.max(
+                this.fuzzyMatch(term, session.name || ''),
+                this.fuzzyMatch(term, session.first_message)
+              ))
+            )
+          : this.fuzzyMatch(query, session.first_message)
+
         return {
           id: `session-${session.id}`,
           pluginId: this.id,
@@ -64,10 +78,10 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
             session
           },
           score,
-          highlights: [
-            ...this.calculateHighlights(query, session.name || '', 'title'),
-            ...this.calculateHighlights(query, session.first_message, 'title')
-          ]
+          highlights: queryTerms.flatMap(term => [
+            ...this.calculateHighlights(term, session.name || '', 'title'),
+            ...this.calculateHighlights(term, session.first_message, 'title')
+          ])
         }
       }).slice(0, 20) // 最多显示 20 条结果
       

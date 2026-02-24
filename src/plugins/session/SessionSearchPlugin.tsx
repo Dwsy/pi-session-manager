@@ -1,6 +1,7 @@
 import { FileText } from 'lucide-react'
 import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '../types'
+import { parseQuotedQuery } from '../../utils/search'
 
 /**
  * Session search plugin
@@ -35,25 +36,66 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
         ? context.sessions.filter(s => s.cwd === context.selectedProject)
         : context.sessions
       
+      const parsedQuery = parseQuotedQuery(query)
+      const phraseTerms = parsedQuery.phrases.map(phrase => phrase.toLowerCase())
+      const remainderTerms = parsedQuery.remainderTokens.map(term => term.toLowerCase())
+      const hasPhraseMode = parsedQuery.hasPhrases
+
       for (const session of sessionsToSearch) {
+        const sessionName = session.name || ''
+        const firstMessage = session.first_message
+        const sessionPath = session.path
+        const sessionCwd = session.cwd
+
+        const fields = [sessionName, firstMessage, sessionPath, sessionCwd]
+        const lowerFields = fields.map(field => field.toLowerCase())
+
+        if (hasPhraseMode) {
+          const phrasesMatched = phraseTerms.every(
+            phrase => lowerFields.some(field => field.includes(phrase))
+          )
+
+          if (!phrasesMatched) {
+            continue
+          }
+
+          const remainderMatched = remainderTerms.every(
+            term => fields.some(field => this.fuzzyMatch(term, field) > 0)
+          )
+
+          if (!remainderMatched) {
+            continue
+          }
+        }
+
         // Search session name
-        const nameScore = session.name 
-          ? this.fuzzyMatch(query, session.name)
+        const nameScore = sessionName
+          ? this.fuzzyMatch(query, sessionName)
           : 0
-        
+
         // Search first message
-        const messageScore = this.fuzzyMatch(query, session.first_message) * 0.8
-        
+        const messageScore = this.fuzzyMatch(query, firstMessage) * 0.8
+
         // Search path
-        const pathScore = this.fuzzyMatch(query, session.path) * 0.5
-        
+        const pathScore = this.fuzzyMatch(query, sessionPath) * 0.5
+
         // Search project path
-        const cwdScore = this.fuzzyMatch(query, session.cwd) * 0.3
-        
-        // Combined score
-        const score = Math.max(nameScore, messageScore, pathScore, cwdScore)
-        
+        const cwdScore = this.fuzzyMatch(query, sessionCwd) * 0.3
+
+        const score = hasPhraseMode
+          ? Math.max(
+              ...[...phraseTerms, ...remainderTerms].map(term => Math.max(
+                this.fuzzyMatch(term, sessionName),
+                this.fuzzyMatch(term, firstMessage) * 0.8,
+                this.fuzzyMatch(term, sessionPath) * 0.5,
+                this.fuzzyMatch(term, sessionCwd) * 0.3,
+              ))
+            )
+          : Math.max(nameScore, messageScore, pathScore, cwdScore)
+
         if (score > 0) {
+          const highlightTerms = hasPhraseMode ? [...phraseTerms, ...remainderTerms] : [query]
+
           results.push({
             id: `session-${session.id}`,
             pluginId: this.id,
@@ -65,10 +107,10 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
               session
             },
             score,
-            highlights: [
-              ...this.calculateHighlights(query, session.name || '', 'title'),
-              ...this.calculateHighlights(query, session.first_message, 'title')
-            ]
+            highlights: highlightTerms.flatMap(term => [
+              ...this.calculateHighlights(term, session.name || '', 'title'),
+              ...this.calculateHighlights(term, session.first_message, 'title')
+            ])
           })
         }
       }
