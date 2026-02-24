@@ -1,8 +1,0 @@
-{
-  "prd": "(prompt)",
-  "prompt": "Implement Kanban Session Preview Modal with Full-Screen Expand (Issue #10)\n\n## Overview\nIn desktop/web desktop Kanban board view, clicking a session card should open a preview modal instead of direct navigation, with ability to expand to full-screen session page.\n\n## Feature Spec\n\n### Core Interactions\n- Click Kanban card → Open preview modal (90vw × 90vh)\n- \"Expand\" button in modal → Animated transition to full session page\n- ESC / Click overlay → Close preview modal\n\n### Animation Flow\n1. Open: Card position → Modal center, scale + fadeIn, 300ms ease-out\n2. Expand: Modal → Full page, shared element transition\n3. Close: Reverse animation, return to Kanban position\n\n### Technical Specs\n- Preview modal size: 90vw × 90vh\n- Overlay: rgba(0,0,0,0.6)\n- Duration: 300ms\n- Easing: cubic-bezier(0.4, 0, 0.2, 1)\n\n### Component Reuse Strategy\n- Reuse existing SessionView component for preview content\n- Reuse Modal component as container\n- Add SessionPreviewModal component to encapsulate preview logic\n\n## Acceptance Criteria\n- Click Kanban card opens preview modal (not direct navigation)\n- Modal size is 90% viewport (90vw × 90vh)\n- One-click expand to full session page from modal\n- Smooth animations for open/close/expand transitions\n- Reuse existing SessionView component, no duplicate code\n- ESC and overlay click close the modal\n- Support both desktop and web desktop\n\n## Related Files\n- docs/KANBAN_UX_ANALYSIS.md\n- src/components/KanbanBoard/",
-  "created_at": "2026-02-24T10:53:56.710Z",
-  "updated_at": "2026-02-24T11:14:19.694Z",
-  "task_count": 7,
-  "completed_count": 5
-}

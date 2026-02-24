@@ -70,3 +70,6 @@ pi-session-*.html
 tasks/
 .ace-tool/
 build-output/
+
+# Pi messenger/crew runtime files
+.pi/messenger/

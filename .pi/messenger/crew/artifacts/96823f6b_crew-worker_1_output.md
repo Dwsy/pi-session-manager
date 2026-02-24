@@ -1,1 +1,0 @@
-Now I'll implement the FLIP-style animation. Since task-2 hasn't completed yet, I'll create the SessionPreviewModal with animation support and update KanbanBoard to measure card positions.
