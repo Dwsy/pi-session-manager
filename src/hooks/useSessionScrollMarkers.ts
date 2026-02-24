@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent, RefObject } from 'react'
-import type { Virtualizer } from '@tanstack/virtual-core'
+import type { Virtualizer } from '@tanstack/react-virtual'
 import type { SessionEntry } from '../types'
 
 export interface ScrollMarker {
