@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
 import { useSettings } from './useSettings'
 import type { AppSettings } from '../components/settings/types'
+import { applyPiChatTheme, resolvePiThemeColorScheme } from '../utils/piTheme'
 
 export type AppearanceSettings = AppSettings['appearance']
 
-function applyThemeClass(theme: AppearanceSettings['theme']) {
+function applyThemeClass(theme: 'dark' | 'light' | 'system') {
   const root = document.documentElement
   root.classList.remove('theme-dark', 'theme-light')
 
@@ -13,16 +14,39 @@ function applyThemeClass(theme: AppearanceSettings['theme']) {
   } else if (theme === 'light') {
     root.classList.add('theme-light')
   }
-  // system: no class — CSS @media handles it
 }
 
 export function useAppearance() {
   const { appearance, updateAppearanceSetting } = useSettings()
 
   useEffect(() => {
-    applyThemeClass(appearance.theme)
+    let active = true
+
+    const applyResolvedThemeClass = async () => {
+      if (appearance.theme === 'dark' || appearance.theme === 'light' || appearance.theme === 'system') {
+        applyThemeClass(appearance.theme)
+        return
+      }
+
+      const root = document.documentElement
+      const resolvedScheme = await resolvePiThemeColorScheme(appearance.customTheme)
+      if (!active) return
+
+      root.classList.remove('theme-dark', 'theme-light')
+      if (resolvedScheme === 'dark') {
+        root.classList.add('theme-dark')
+      } else if (resolvedScheme === 'light') {
+        root.classList.add('theme-light')
+      }
+    }
+
+    applyResolvedThemeClass()
     document.documentElement.style.setProperty('--sidebar-width', `${appearance.sidebarWidth}px`)
-  }, [appearance.theme, appearance.sidebarWidth])
+
+    return () => {
+      active = false
+    }
+  }, [appearance.theme, appearance.customTheme, appearance.sidebarWidth])
 
   // Listen for OS color scheme changes when in system mode
   useEffect(() => {
@@ -36,8 +60,11 @@ export function useAppearance() {
 
   useEffect(() => {
     const fontSizeMap = { small: '14px', medium: '16px', large: '18px' }
-    document.documentElement.style.setProperty('--font-size-base', fontSizeMap[appearance.fontSize])
-  }, [appearance.fontSize])
+    const root = document.documentElement
+    root.style.setProperty('--font-size-base', fontSizeMap[appearance.fontSize])
+    root.style.setProperty('--font-family', appearance.fontFamily)
+    root.style.setProperty('--font-family-mono', appearance.fontFamilyMono)
+  }, [appearance.fontSize, appearance.fontFamily, appearance.fontFamilyMono])
 
   useEffect(() => {
     const spacingMap = { compact: '8px', comfortable: '16px', spacious: '24px' }
@@ -47,6 +74,11 @@ export function useAppearance() {
   useEffect(() => {
     document.documentElement.setAttribute('data-code-theme', appearance.codeBlockTheme || 'github')
   }, [appearance.codeBlockTheme])
+
+  useEffect(() => {
+    const selectedTheme = appearance.theme === 'custom' ? appearance.customTheme : 'app-default'
+    applyPiChatTheme(selectedTheme)
+  }, [appearance.theme, appearance.customTheme])
 
   return { appearance, updateAppearanceSetting }
 }
@@ -59,7 +91,7 @@ export function useTheme() {
   }
 
   const toggleTheme = () => {
-    const themes: AppearanceSettings['theme'][] = ['dark', 'light', 'system']
+    const themes: AppearanceSettings['theme'][] = ['dark', 'light', 'system', 'custom']
     const currentIndex = themes.indexOf(appearance.theme)
     const nextIndex = (currentIndex + 1) % themes.length
     setTheme(themes[nextIndex])

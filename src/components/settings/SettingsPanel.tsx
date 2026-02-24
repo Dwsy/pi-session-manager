@@ -22,6 +22,7 @@ import {
 import type { AppSettings, SettingsSection } from './types'
 import { defaultSettings } from './types'
 import { loadAppSettings, saveAppSettings } from '../../utils/settingsApi'
+import { applyPiChatTheme, resolvePiThemeColorScheme } from '../../utils/piTheme'
 import TerminalSettings from './sections/TerminalSettings'
 import AppearanceSettings from './sections/AppearanceSettings'
 import LanguageSettings from './sections/LanguageSettings'
@@ -89,17 +90,38 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
       // Apply appearance settings to DOM immediately
       const root = document.documentElement
-      const { theme, sidebarWidth, fontSize, messageSpacing, codeBlockTheme } = settings.appearance
+      const {
+        theme,
+        customTheme,
+        fontFamily,
+        fontFamilyMono,
+        sidebarWidth,
+        fontSize,
+        messageSpacing,
+        codeBlockTheme,
+      } = settings.appearance
       root.classList.remove('theme-dark', 'theme-light')
-      if (theme === 'dark') root.classList.add('theme-dark')
-      else if (theme === 'light') root.classList.add('theme-light')
-      // system: no class — CSS @media handles it
+      if (theme === 'dark') {
+        root.classList.add('theme-dark')
+      } else if (theme === 'light') {
+        root.classList.add('theme-light')
+      } else if (theme === 'custom') {
+        const resolvedScheme = await resolvePiThemeColorScheme(customTheme)
+        if (resolvedScheme === 'dark') {
+          root.classList.add('theme-dark')
+        } else if (resolvedScheme === 'light') {
+          root.classList.add('theme-light')
+        }
+      }
       if (sidebarWidth) root.style.setProperty('--sidebar-width', `${sidebarWidth}px`)
       const fontMap: Record<string, string> = { small: '14px', medium: '16px', large: '18px' }
       root.style.setProperty('--font-size-base', fontMap[fontSize] || '16px')
+      root.style.setProperty('--font-family', fontFamily)
+      root.style.setProperty('--font-family-mono', fontFamilyMono)
       const spacingMap: Record<string, string> = { compact: '8px', comfortable: '16px', spacious: '24px' }
       root.style.setProperty('--spacing-base', spacingMap[messageSpacing] || '16px')
       if (codeBlockTheme) root.setAttribute('data-code-theme', codeBlockTheme)
+      await applyPiChatTheme(theme === 'custom' ? customTheme : 'app-default')
 
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
