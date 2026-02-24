@@ -294,10 +294,10 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
 
   const renderableEntries = useMemo(() => {
     return entries.filter(entry => {
-      // If we have a path, only show entries on that path
-      if (pathEntryIds && !pathEntryIds.has(entry.id)) return false
-
+      // Only filter by path for message entries
+      // model_change, compaction, etc. should always show regardless of active path
       if (entry.type === 'message') {
+        if (pathEntryIds && !pathEntryIds.has(entry.id)) return false
         const role = entry.message?.role
         return role === 'user' || role === 'assistant'
       }
@@ -320,11 +320,12 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
 
   const estimateEntrySize = useCallback((index: number) => {
     const cachedHeight = measuredHeightsRef.current.get(index)
-    if (cachedHeight) return cachedHeight
+    if (cachedHeight) return cachedHeight + MESSAGE_ITEM_GAP
 
     const entry = renderableEntries[index]
-    if (!entry) return 140
+    if (!entry) return 140 + MESSAGE_ITEM_GAP
 
+    let height: number
     switch (entry.type) {
       case 'message': {
         const content = entry.message?.content || []
@@ -332,34 +333,58 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
           .filter(c => c.type === 'text')
           .reduce((sum, c) => sum + (c.text?.length || 0), 0)
         const baseHeight = 100
-        const contentHeight = Math.ceil(textLength / 100) * 40
-        return Math.min(baseHeight + contentHeight, 800)
+        const contentHeight = Math.ceil(textLength / 80) * 32
+        height = Math.min(baseHeight + contentHeight, 800)
+        break
       }
       case 'model_change':
-        return 64
+        height = 64
+        break
       case 'compaction':
-        return 180
+        height = 180
+        break
       case 'branch_summary':
-        return 160
+        height = 160
+        break
       case 'custom_message':
-        return 120
+        height = 120
+        break
       default:
-        return 120
+        height = 120
     }
+    return height + MESSAGE_ITEM_GAP
   }, [renderableEntries])
 
   const rowVirtualizer = useVirtualizer({
     count: renderableEntries.length,
     getScrollElement: () => messagesContainerRef.current,
     estimateSize: estimateEntrySize,
-    overscan: 15,
+    overscan: 5,
+    lanes: 1,
     measureElement: (el) => {
-      const index = Number(el.getAttribute('data-index'))
       const height = el.getBoundingClientRect().height
-      measuredHeightsRef.current.set(index, height)
+      const index = Number(el.getAttribute('data-index'))
+      if (!isNaN(index)) {
+        measuredHeightsRef.current.set(index, height)
+      }
       return height
     }
   })
+
+  // Force scroll to bottom when entries are loaded
+  useEffect(() => {
+    if (loading || error || renderableEntries.length === 0) return
+    
+    if (pendingScrollToBottomRef.current) {
+      // Wait for virtual list to render
+      const rafId = requestAnimationFrame(() => {
+        const lastIndex = renderableEntries.length - 1
+        rowVirtualizer.scrollToIndex(lastIndex, { align: 'end' })
+        pendingScrollToBottomRef.current = false
+      })
+      return () => cancelAnimationFrame(rafId)
+    }
+  }, [loading, error, renderableEntries.length, rowVirtualizer])
 
   // 滚动到顶部
   const scrollToTop = useCallback(() => {
@@ -369,15 +394,12 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
   }, [renderableEntries.length, rowVirtualizer])
 
   // 滚动到底部
-  const scrollToBottom = useCallback((smooth = false) => {
-    const container = messagesContainerRef.current
-    if (!container) return
-    // 直接滚动到容器最大滚动位置，比 scrollToIndex 更可靠
-    container.scrollTo({
-      top: container.scrollHeight,
-      behavior: smooth ? 'smooth' : 'instant'
-    })
-  }, [])
+  const scrollToBottom = useCallback((_smooth = false) => {
+    if (renderableEntries.length === 0) return
+    
+    const lastIndex = renderableEntries.length - 1
+    rowVirtualizer.scrollToIndex(lastIndex, { align: 'end' })
+  }, [renderableEntries.length, rowVirtualizer])
 
   useEffect(() => {
     if (scrollTargetId && messagesContainerRef.current) {
@@ -413,36 +435,37 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
     const container = messagesContainerRef.current
     if (!container) return
 
+    let rafId: number | null = null
     const handleScroll = () => {
-      const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight
-      const atBottom = distanceToBottom <= 8
-      isAtBottomRef.current = atBottom
-      setIsAtBottom(atBottom)
-      if (atBottom) {
-        setHasNewMessages(false)
-      }
+      if (rafId) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+        const atBottom = distanceToBottom <= 8
+        if (isAtBottomRef.current !== atBottom) {
+          isAtBottomRef.current = atBottom
+          setIsAtBottom(atBottom)
+        }
+        if (atBottom) {
+          setHasNewMessages(false)
+        }
+      })
     }
 
     handleScroll()
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (rafId) cancelAnimationFrame(rafId)
+    }
   }, [loading, error])
 
-  // 监听新消息，延迟执行自动滚动
+  // Track renderableEntries length changes
   useEffect(() => {
-    if (loading || showLoading || error) return
-
-    const currentLength = renderableEntries.length
-    if (currentLength > prevEntriesLengthRef.current && pendingScrollToBottomRef.current) {
-      // 延迟滚动，确保虚拟滚动已测量新元素
-      const timeoutId = setTimeout(() => {
-        scrollToBottom()
-        pendingScrollToBottomRef.current = false
-      }, 50)
-      return () => clearTimeout(timeoutId)
+    if (!loading && !showLoading && !error) {
+      prevEntriesLengthRef.current = renderableEntries.length
     }
-    prevEntriesLengthRef.current = currentLength
-  }, [renderableEntries.length, scrollToBottom, loading, showLoading, error])
+  }, [renderableEntries.length, loading, showLoading, error])
 
   // 拖拽调整宽度
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
