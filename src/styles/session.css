@@ -33,6 +33,98 @@
    padding: 20px;
  }
 
+ .session-scroll-markers {
+   position: absolute;
+   right: 6px;
+   top: 12px;
+   bottom: 12px;
+   width: 16px;
+   pointer-events: none;
+   z-index: 5;
+ }
+
+ .session-scroll-markers.mobile {
+   right: 8px;
+   top: 8px;
+   bottom: 8px;
+   width: 34px;
+   padding: 8px 6px;
+   background: rgba(var(--color-card), 0.35);
+   border-radius: 14px;
+   border: 1px solid rgba(var(--accent-rgb), 0.15);
+   backdrop-filter: blur(8px);
+   -webkit-backdrop-filter: blur(8px);
+   pointer-events: auto;
+   touch-action: none;
+ }
+
+ .session-scroll-marker {
+   position: absolute;
+   right: 0;
+   width: 12px;
+   height: 4px;
+   border-radius: 4px;
+   background: rgba(var(--accent-rgb), 0.35);
+   border: none;
+   padding: 0;
+   cursor: pointer;
+   pointer-events: auto;
+   transform: translateY(-50%);
+   transition: background 0.08s ease;
+ }
+
+ .session-scroll-markers.mobile .session-scroll-marker {
+   width: 14px;
+   height: 6px;
+ }
+
+ .session-scroll-marker:hover {
+   background: rgba(var(--accent-rgb), 0.85);
+ }
+
+ .session-scroll-marker.active {
+   background: rgba(var(--accent-rgb), 0.95);
+ }
+
+ .session-scroll-marker.active .session-scroll-marker-tooltip {
+   opacity: 1;
+   transform: translateY(-50%) translateX(0);
+ }
+
+ .session-scroll-marker-tooltip {
+   position: absolute;
+   right: 16px;
+   top: 50%;
+   transform: translateY(-50%) translateX(-4px);
+   background: var(--bg-inset);
+   color: var(--text-secondary);
+   border: 1px solid rgba(var(--accent-rgb), 0.2);
+   border-radius: 6px;
+   padding: 6px 8px;
+   font-size: 11px;
+   line-height: 1.4;
+   min-width: 260px;
+   width: 320px;
+   max-width: 360px;
+   text-align: left;
+   white-space: normal;
+   word-break: break-word;
+   writing-mode: horizontal-tb;
+   display: -webkit-box;
+   -webkit-line-clamp: 3;
+   -webkit-box-orient: vertical;
+   overflow: hidden;
+   opacity: 0;
+   pointer-events: none;
+   box-shadow: 0 4px 12px rgba(var(--shadow-rgb), 0.25);
+   transition: opacity 0.08s ease, transform 0.08s ease;
+ }
+
+ .session-scroll-marker:hover .session-scroll-marker-tooltip {
+   opacity: 1;
+   transform: translateY(-50%) translateX(0);
+ }
+
  .session-header {
    margin-bottom: 24px;
    padding-bottom: 16px;
