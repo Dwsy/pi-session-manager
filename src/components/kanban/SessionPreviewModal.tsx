@@ -16,6 +16,7 @@ export interface SessionPreviewModalProps {
   piPath?: string
   customCommand?: string
   initialCardRect?: DOMRect | null
+  onCloseAnimationComplete?: () => void
 }
 
 export default function SessionPreviewModal({
@@ -29,20 +30,80 @@ export default function SessionPreviewModal({
   piPath,
   customCommand,
   initialCardRect,
+  onCloseAnimationComplete,
 }: SessionPreviewModalProps) {
   const { t } = useTranslation()
   const [isAnimating, setIsAnimating] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
   const [animationStyles, setAnimationStyles] = useState<React.CSSProperties>({})
   const modalRef = useRef<HTMLDivElement>(null)
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  const handleCloseWithAnimation = useCallback(() => {
+    if (isClosing || !session) {
+      onClose()
+      return
+    }
+
+    setIsClosing(true)
+
+    // Query current card position
+    const cardEl = document.querySelector(`[data-session-id="${session.id}"]`)
+    const currentCardRect = cardEl ? cardEl.getBoundingClientRect() : null
+
+    // Check if card is visible in viewport
+    const isCardVisible = currentCardRect && (
+      currentCardRect.top >= 0 &&
+      currentCardRect.left >= 0 &&
+      currentCardRect.bottom <= window.innerHeight &&
+      currentCardRect.right <= window.innerWidth
+    )
+
+    if (isCardVisible && currentCardRect) {
+      // Card is visible - animate back to it
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      const modalWidth = viewportWidth * 0.9
+      const modalHeight = viewportHeight * 0.9
+      const modalCenterX = (viewportWidth - modalWidth) / 2
+      const modalCenterY = (viewportHeight - modalHeight) / 2
+
+      const targetX = currentCardRect.left - modalCenterX
+      const targetY = currentCardRect.top - modalCenterY
+      const targetScaleX = currentCardRect.width / modalWidth
+      const targetScaleY = currentCardRect.height / modalHeight
+
+      // Start from current position and animate to card
+      setAnimationStyles({
+        transform: `translate(${targetX}px, ${targetY}px) scale(${targetScaleX}, ${targetScaleY})`,
+        opacity: 0,
+        transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+      })
+    } else {
+      // Card not visible - fade out in place
+      setAnimationStyles({
+        transform: 'translate(0, 0) scale(0.95)',
+        opacity: 0,
+        transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+      })
+    }
+
+    // Wait for animation then close
+    animationTimeoutRef.current = setTimeout(() => {
+      setIsClosing(false)
+      setAnimationStyles({})
+      onClose()
+      onCloseAnimationComplete?.()
+    }, 300)
+  }, [isClosing, session, onClose, onCloseAnimationComplete])
+
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose()
+        handleCloseWithAnimation()
       }
     },
-    [onClose]
+    [handleCloseWithAnimation]
   )
 
   useEffect(() => {
@@ -108,7 +169,7 @@ export default function SessionPreviewModal({
 
   const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) {
-      onClose()
+      handleCloseWithAnimation()
     }
   }
 
@@ -167,7 +228,7 @@ export default function SessionPreviewModal({
               <span>{t('kanban.expand', 'Expand')}</span>
             </button>
             <button
-              onClick={onClose}
+              onClick={handleCloseWithAnimation}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-surface-light rounded-md transition-colors cursor-pointer"
               aria-label={t('common.close', 'Close')}
             >

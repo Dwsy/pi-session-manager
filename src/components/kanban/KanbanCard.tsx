@@ -74,6 +74,7 @@ function KanbanCardInner({
       className={cardClasses}
       onClick={isOverlay ? undefined : handleClick}
       onContextMenu={onContextMenu}
+      data-session-id={session.id}
       {...(isOverlay ? {} : { ...attributes, ...listeners })}
     >
       {/* Header: Title + Tags */}

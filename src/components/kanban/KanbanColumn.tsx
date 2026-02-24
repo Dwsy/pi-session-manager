@@ -13,7 +13,7 @@ interface KanbanColumnProps {
   tag: Tag | null
   sessions: SessionInfo[]
   selectedSession: SessionInfo | null
-  onSelectSession: (session: SessionInfo) => void
+  onSelectSession: (session: SessionInfo, rect: DOMRect) => void
   getTagsForSession: (sessionId: string) => Tag[]
   allTags: Tag[]
   favorites: FavoriteItem[]
@@ -110,7 +110,7 @@ export default function KanbanColumn({
                     session={session}
                     tags={getTagsForSession(session.id)}
                     isSelected={selectedSession?.id === session.id}
-                    onSelect={() => onSelectSession(session)}
+                    onSelect={(rect) => onSelectSession(session, rect)}
                     onContextMenu={(e) => handleContextMenu(session, e)}
                   />
                 </div>
@@ -130,7 +130,7 @@ export default function KanbanColumn({
             session={session}
             tags={getTagsForSession(session.id)}
             isSelected={selectedSession?.id === session.id}
-            onSelect={() => onSelectSession(session)}
+            onSelect={(rect) => onSelectSession(session, rect)}
             onContextMenu={(e) => handleContextMenu(session, e)}
           />
         ))}
