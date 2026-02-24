@@ -4,6 +4,15 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Session scroll markers** — quick navigation to user messages via scrollbar markers
+  - Shows up to 8 recent user messages as clickable markers on the right side of session view
+  - Hover displays message preview tooltip (80 chars max)
+  - Click jumps to the corresponding message position
+  - Markers positioned proportionally based on virtual scroll calculations
+  - Improves navigation in long conversations with many tool calls
+
 ### Changed
 
 - **Internationalization** — All Chinese code comments translated to English for global collaboration
