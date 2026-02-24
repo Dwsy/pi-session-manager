@@ -18,11 +18,12 @@ import {
   Cpu,
   Keyboard,
   Tags,
+  Activity,
 } from 'lucide-react'
 import type { AppSettings, SettingsSection } from './types'
 import { defaultSettings } from './types'
 import { loadAppSettings, saveAppSettings } from '../../utils/settingsApi'
-import { applyPiChatTheme } from '../../utils/piTheme'
+import { applyPiChatTheme, resolvePiThemeColorScheme } from '../../utils/piTheme'
 import TerminalSettings from './sections/TerminalSettings'
 import AppearanceSettings from './sections/AppearanceSettings'
 import LanguageSettings from './sections/LanguageSettings'
@@ -34,6 +35,7 @@ import ModelSettings from './sections/ModelSettings'
 import AdvancedSettings from './sections/AdvancedSettings'
 import ShortcutSettings from './sections/ShortcutSettings'
 import TagManagerSettings from './sections/TagManagerSettings'
+import APITestSettings from './sections/APITestSettings'
 
 interface SettingsPanelProps {
   isOpen: boolean
@@ -105,8 +107,14 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         root.classList.add('theme-dark')
       } else if (theme === 'light') {
         root.classList.add('theme-light')
+      } else if (theme === 'custom') {
+        const resolvedScheme = await resolvePiThemeColorScheme(customTheme)
+        if (resolvedScheme === 'dark') {
+          root.classList.add('theme-dark')
+        } else if (resolvedScheme === 'light') {
+          root.classList.add('theme-light')
+        }
       }
-      // For custom theme, applyPiChatTheme will set the theme class automatically
       if (sidebarWidth) root.style.setProperty('--sidebar-width', `${sidebarWidth}px`)
       const fontMap: Record<string, string> = { small: '14px', medium: '16px', large: '18px' }
       root.style.setProperty('--font-size-base', fontMap[fontSize] || '16px')
@@ -160,6 +168,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     { id: 'models', icon: <Cpu className="h-4 w-4" />, label: t('settings.sections.models', '模型') },
     { id: 'shortcuts', icon: <Keyboard className="h-4 w-4" />, label: t('settings.sections.shortcuts', '快捷键') },
     { id: 'advanced', icon: <Shield className="h-4 w-4" />, label: t('settings.sections.advanced', '高级') },
+    { id: 'api-test', icon: <Activity className="h-4 w-4" />, label: t('settings.sections.apiTest', 'API 测试') },
   ]
 
   return (
@@ -268,6 +277,7 @@ function MobileSettings({
       case 'models': return <ModelSettings />
       case 'shortcuts': return <ShortcutSettings />
       case 'advanced': return <AdvancedSettings settings={settings} onUpdate={onUpdate} />
+      case 'api-test': return <APITestSettings />
       default: return null
     }
   }

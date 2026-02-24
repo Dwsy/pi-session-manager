@@ -146,6 +146,7 @@ export type SettingsSection =
   | 'models'
   | 'shortcuts'
   | 'advanced'
+  | 'api-test'
 
 export type SettingsProps<T extends keyof AppSettings> = {
   settings: AppSettings
