@@ -26,6 +26,8 @@ export const tags = {
     dragHint: 'Arrastra para mover entre columnas',
     emptyColumn: 'Sin sesiones',
     allProjects: 'Todos los proyectos',
+    untitledSession: 'Sesión sin título',
+    expand: 'Expandir',
   },
   contextMenu: {
     labels: 'Etiquetas',

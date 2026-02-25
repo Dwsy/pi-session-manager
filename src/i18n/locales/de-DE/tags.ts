@@ -26,6 +26,8 @@ export const tags = {
     dragHint: 'Ziehen, um zwischen Spalten zu verschieben',
     emptyColumn: 'Keine Sitzungen',
     allProjects: 'Alle Projekte',
+    untitledSession: 'Unbenannte Sitzung',
+    expand: 'Aufklappen',
   },
   contextMenu: {
     labels: 'Labels',

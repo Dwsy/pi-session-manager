@@ -26,6 +26,8 @@ export const tags = {
     dragHint: 'Drag to move between columns',
     emptyColumn: 'No sessions',
     allProjects: 'All Projects',
+    untitledSession: 'Untitled Session',
+    expand: 'Expand',
   },
   contextMenu: {
     labels: 'Labels',

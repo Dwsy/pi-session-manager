@@ -26,6 +26,8 @@ export const tags = {
     dragHint: 'ドラッグして列間を移動',
     emptyColumn: 'セッションなし',
     allProjects: '全プロジェクト',
+    untitledSession: '無題のセッション',
+    expand: '展開',
   },
   contextMenu: {
     labels: 'ラベル',

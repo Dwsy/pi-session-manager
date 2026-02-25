@@ -26,6 +26,8 @@ export const tags = {
     dragHint: '拖拽移动到其他列',
     emptyColumn: '暂无会话',
     allProjects: '全部项目',
+    untitledSession: '未命名会话',
+    expand: '展开',
   },
   contextMenu: {
     labels: '标签',
