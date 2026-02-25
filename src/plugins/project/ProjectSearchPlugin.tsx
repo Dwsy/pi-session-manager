@@ -1,6 +1,7 @@
 import { FolderOpen } from 'lucide-react'
 import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '../types'
+import { parseQuotedQuery } from '../../utils/search'
 
 /**
  * Project search plugin
@@ -38,15 +39,49 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
       
       // Search matching projects
       const results: SearchPluginResult[] = []
-      
+      const parsedQuery = parseQuotedQuery(query)
+      const phraseTerms = parsedQuery.phrases.map(phrase => phrase.toLowerCase())
+      const remainderTerms = parsedQuery.remainderTokens.map(term => term.toLowerCase())
+      const hasPhraseMode = parsedQuery.hasPhrases
+
       for (const [project, count] of projectMap.entries()) {
         const projectName = this.getProjectName(project)
-        const score = Math.max(
-          this.fuzzyMatch(query, projectName),
-          this.fuzzyMatch(query, project) * 0.8
-        )
-        
+        const projectLower = project.toLowerCase()
+        const projectNameLower = projectName.toLowerCase()
+
+        if (hasPhraseMode) {
+          const phrasesMatched = phraseTerms.every(
+            phrase => projectNameLower.includes(phrase) || projectLower.includes(phrase)
+          )
+
+          if (!phrasesMatched) {
+            continue
+          }
+
+          const remainderMatched = remainderTerms.every(
+            term => this.fuzzyMatch(term, projectName) > 0 || this.fuzzyMatch(term, project) > 0
+          )
+
+          if (!remainderMatched) {
+            continue
+          }
+        }
+
+        const score = hasPhraseMode
+          ? Math.max(
+              ...[...phraseTerms, ...remainderTerms].map(term => Math.max(
+                this.fuzzyMatch(term, projectName),
+                this.fuzzyMatch(term, project) * 0.8,
+              ))
+            )
+          : Math.max(
+              this.fuzzyMatch(query, projectName),
+              this.fuzzyMatch(query, project) * 0.8
+            )
+
         if (score > 0) {
+          const highlightTerms = hasPhraseMode ? [...phraseTerms, ...remainderTerms] : [query]
+
           results.push({
             id: `project-${project}`,
             pluginId: this.id,
@@ -62,10 +97,10 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
               sessionCount: count
             },
             score,
-            highlights: [
-              ...this.calculateHighlights(query, projectName, 'title'),
-              ...this.calculateHighlights(query, project, 'subtitle')
-            ]
+            highlights: highlightTerms.flatMap(term => [
+              ...this.calculateHighlights(term, projectName, 'title'),
+              ...this.calculateHighlights(term, project, 'subtitle')
+            ])
           })
         }
       }

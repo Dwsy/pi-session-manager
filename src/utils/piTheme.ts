@@ -5,6 +5,9 @@ interface PiThemeFile {
   name?: string
   vars?: Record<string, string>
   colors?: Record<string, string>
+  export?: {
+    pageBg?: string
+  }
 }
 
 const APP_DEFAULT_THEME = 'app-default'

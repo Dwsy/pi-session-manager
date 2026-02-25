@@ -35,6 +35,7 @@ import type { SearchContext } from './plugins/types'
 import { invoke, isTauri } from './transport'
 import { getCachedSettings } from './utils/settingsApi'
 import { applyPiChatTheme } from './utils/piTheme'
+import { parseQuotedQuery } from './utils/search'
 import { getPlatformDefaults } from './components/settings/types'
 
 // Lazy load heavy components
@@ -375,13 +376,38 @@ function App() {
 
     // Search filter
     if (sidebarSearchQuery.trim()) {
-      const q = sidebarSearchQuery.toLowerCase()
-      result = result.filter(s =>
-        (s.name && s.name.toLowerCase().includes(q)) ||
-        (s.first_message && s.first_message.toLowerCase().includes(q)) ||
-        (s.last_message && s.last_message.toLowerCase().includes(q)) ||
-        (s.cwd && s.cwd.toLowerCase().includes(q))
-      )
+      const parsedQuery = parseQuotedQuery(sidebarSearchQuery)
+
+      if (!parsedQuery.hasPhrases) {
+        const q = parsedQuery.remainder.trim().toLowerCase()
+        if (q) {
+          result = result.filter(s =>
+            (s.name && s.name.toLowerCase().includes(q)) ||
+            (s.first_message && s.first_message.toLowerCase().includes(q)) ||
+            (s.last_message && s.last_message.toLowerCase().includes(q)) ||
+            (s.cwd && s.cwd.toLowerCase().includes(q))
+          )
+        }
+      } else {
+        const remainderTerms = parsedQuery.remainderTokens.map(term => term.toLowerCase())
+
+        result = result.filter(s => {
+          const searchableFields = [s.name || '', s.first_message || '', s.last_message || '', s.cwd || '']
+            .map(field => field.toLowerCase())
+
+          const phrasesMatched = parsedQuery.phrases.every(
+            phrase => searchableFields.some(field => field.includes(phrase.toLowerCase()))
+          )
+
+          if (!phrasesMatched) {
+            return false
+          }
+
+          return remainderTerms.every(
+            term => searchableFields.some(field => field.includes(term))
+          )
+        })
+      }
     }
 
     return result

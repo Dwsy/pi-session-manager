@@ -33,7 +33,7 @@ export default function SessionPreviewModal({
   onCloseAnimationComplete,
 }: SessionPreviewModalProps) {
   const { t } = useTranslation()
-  const [isAnimating, setIsAnimating] = useState(false)
+  const [, setIsAnimating] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
   const [animationStyles, setAnimationStyles] = useState<React.CSSProperties>({})
   const modalRef = useRef<HTMLDivElement>(null)

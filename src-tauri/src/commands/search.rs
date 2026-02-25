@@ -105,10 +105,9 @@ pub async fn full_text_search(
                 _ => "any", // default to any (OR)
             };
 
-            // Helper to escape a word for FTS5
-            fn escape_word(word: &str) -> String {
+            fn escape_fts_term(term: &str) -> String {
                 let mut escaped = String::new();
-                for ch in word.chars() {
+                for ch in term.chars() {
                     match ch {
                         '"' => escaped.push_str("\"\""),
                         '\\' => escaped.push_str("\\\\"),
@@ -118,22 +117,103 @@ pub async fn full_text_search(
                 escaped
             }
 
-            // Build the FTS query string
-            let fts_query = if mode == "phrase" {
-                // Treat entire query as a phrase
-                let escaped = escape_word(trimmed);
-                format!("\"{escaped}\"")
-            } else {
-                // Split into words; for 'all' we use space (AND), for 'any' we use OR
-                let words: Vec<&str> = trimmed.split_whitespace().collect();
-                let escaped_words: Vec<String> = words.iter().map(|w| escape_word(w)).collect();
-                if mode == "all" {
-                    escaped_words.join(" ")
-                } else {
-                    // any mode
-                    escaped_words.join(" OR ")
+            fn parse_quoted_terms(query: &str) -> (Vec<String>, Vec<String>, bool) {
+                let quote_count = query.chars().filter(|ch| *ch == '"').count();
+                if quote_count == 0 || quote_count % 2 != 0 {
+                    let words = query
+                        .split_whitespace()
+                        .map(|word| word.to_string())
+                        .collect::<Vec<String>>();
+                    return (vec![], words, false);
                 }
-            };
+
+                let mut phrases = Vec::new();
+                let mut remainder = String::new();
+                let mut current_phrase = String::new();
+                let mut in_phrase = false;
+
+                for ch in query.chars() {
+                    if ch == '"' {
+                        if in_phrase {
+                            if !current_phrase.trim().is_empty() {
+                                phrases.push(current_phrase.clone());
+                            }
+                            current_phrase.clear();
+                        }
+                        in_phrase = !in_phrase;
+                        continue;
+                    }
+
+                    if in_phrase {
+                        current_phrase.push(ch);
+                    } else {
+                        remainder.push(ch);
+                    }
+                }
+
+                let words = remainder
+                    .split_whitespace()
+                    .map(|word| word.to_string())
+                    .collect::<Vec<String>>();
+
+                if phrases.is_empty() {
+                    let fallback_words = query
+                        .split_whitespace()
+                        .map(|word| word.to_string())
+                        .collect::<Vec<String>>();
+                    return (vec![], fallback_words, false);
+                }
+
+                (phrases, words, true)
+            }
+
+            fn build_fts_query(trimmed_query: &str, mode: &str) -> String {
+                let (phrases, words, has_phrases) = parse_quoted_terms(trimmed_query);
+
+                if mode == "phrase" {
+                    if has_phrases && words.is_empty() && phrases.len() == 1 {
+                        let escaped = escape_fts_term(&phrases[0]);
+                        return format!("\"{escaped}\"");
+                    }
+
+                    let escaped = escape_fts_term(trimmed_query);
+                    return format!("\"{escaped}\"");
+                }
+
+                if !has_phrases {
+                    let escaped_words: Vec<String> = words
+                        .iter()
+                        .map(|word| escape_fts_term(word))
+                        .collect();
+
+                    if mode == "all" {
+                        return escaped_words.join(" ");
+                    }
+
+                    return escaped_words.join(" OR ");
+                }
+
+                let mut terms: Vec<String> = words.iter().map(|word| escape_fts_term(word)).collect();
+                terms.extend(
+                    phrases
+                        .iter()
+                        .map(|phrase| format!("\"{}\"", escape_fts_term(phrase))),
+                );
+
+                if terms.is_empty() {
+                    let escaped = escape_fts_term(trimmed_query);
+                    return format!("\"{escaped}\"");
+                }
+
+                if mode == "all" {
+                    terms.join(" ")
+                } else {
+                    terms.join(" OR ")
+                }
+            }
+
+            // Build the FTS query string
+            let fts_query = build_fts_query(trimmed, mode);
 
             // Build the base WHERE clause for FTS and role filter
             let role_condition = match role_opt {
