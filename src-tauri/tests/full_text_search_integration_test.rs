@@ -1,3 +1,6 @@
+#![allow(clippy::await_holding_lock)]
+#![allow(clippy::type_complexity)]
+
 use chrono::Utc;
 use lazy_static::lazy_static;
 use pi_session_manager::commands::full_text_search;

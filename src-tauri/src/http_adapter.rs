@@ -1848,7 +1848,7 @@ async fn v1_embedding_handler(
     };
 
     let client = reqwest::Client::new();
-    let url = format!("{}/embed", endpoint);
+    let url = format!("{endpoint}/embed");
 
     let payload = serde_json::json!({
         "text": req.text,
@@ -1887,7 +1887,7 @@ async fn v1_embedding_handler(
                 axum::Json(EmbeddingResponse {
                     success: false,
                     data: None,
-                    error: Some(format!("Failed to parse response: {}", e)),
+                    error: Some(format!("Failed to parse response: {e}")),
                 }),
             ),
         },
@@ -1896,7 +1896,7 @@ async fn v1_embedding_handler(
             axum::Json(EmbeddingResponse {
                 success: false,
                 data: None,
-                error: Some(format!("Request failed: {}", e)),
+                error: Some(format!("Request failed: {e}")),
             }),
         ),
     }
@@ -1925,7 +1925,7 @@ async fn v1_embedding_batch_handler(
     };
 
     let client = reqwest::Client::new();
-    let url = format!("{}/embed/batch", endpoint);
+    let url = format!("{endpoint}/embed/batch");
 
     let payload = serde_json::json!({
         "texts": req.texts,

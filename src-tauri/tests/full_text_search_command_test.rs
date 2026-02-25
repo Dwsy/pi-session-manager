@@ -1,3 +1,6 @@
+#![allow(clippy::empty_line_after_doc_comments)]
+#![allow(clippy::type_complexity)]
+
 use pi_session_manager::commands::full_text_search;
 use pi_session_manager::config::Config;
 use pi_session_manager::sqlite_cache;

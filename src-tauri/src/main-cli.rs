@@ -678,7 +678,7 @@ async fn init_http_adapter(
         };
 
         let client = reqwest::Client::new();
-        let url = format!("{}/embed", endpoint);
+        let url = format!("{endpoint}/embed");
 
         let payload = serde_json::json!({
             "text": req.text,
@@ -712,13 +712,13 @@ async fn init_http_adapter(
                 Err(e) => Json(EmbeddingResponse {
                     success: false,
                     data: None,
-                    error: Some(format!("Failed to parse response: {}", e)),
+                    error: Some(format!("Failed to parse response: {e}")),
                 }),
             },
             Err(e) => Json(EmbeddingResponse {
                 success: false,
                 data: None,
-                error: Some(format!("Request failed: {}", e)),
+                error: Some(format!("Request failed: {e}")),
             }),
         }
     }
@@ -733,7 +733,7 @@ async fn init_http_adapter(
         };
 
         let client = reqwest::Client::new();
-        let url = format!("{}/embed/batch", endpoint);
+        let url = format!("{endpoint}/embed/batch");
 
         let payload = serde_json::json!({
             "texts": req.texts,

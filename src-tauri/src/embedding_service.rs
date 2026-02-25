@@ -96,7 +96,7 @@ impl EmbeddingService {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|e| format!("Failed to start embedding server: {}", e))?;
+            .map_err(|e| format!("Failed to start embedding server: {e}"))?;
 
         *child = Some(new_child);
 
@@ -126,7 +126,7 @@ impl EmbeddingService {
         match reqwest::get(&url).await {
             Ok(resp) if resp.status().is_success() => Ok(()),
             Ok(resp) => Err(format!("Health check failed: {}", resp.status())),
-            Err(e) => Err(format!("Health check error: {}", e)),
+            Err(e) => Err(format!("Health check error: {e}")),
         }
     }
 
@@ -143,7 +143,7 @@ impl EmbeddingService {
     fn get_server_script_path() -> Result<PathBuf, String> {
         // Try to find the script relative to the executable
         let exe_dir = std::env::current_exe()
-            .map_err(|e| format!("Failed to get exe dir: {}", e))?
+            .map_err(|e| format!("Failed to get exe dir: {e}"))?
             .parent()
             .ok_or("No parent dir")?
             .to_path_buf();
@@ -271,7 +271,7 @@ pub async fn v1_embedding(
     };
 
     let client = reqwest::Client::new();
-    let url = format!("{}/embed", endpoint);
+    let url = format!("{endpoint}/embed");
 
     let payload = serde_json::json!({
         "text": req.text,
@@ -313,7 +313,7 @@ pub async fn v1_embedding(
                 Json(EmbeddingResponse {
                     success: false,
                     data: None,
-                    error: Some(format!("Failed to parse response: {}", e)),
+                    error: Some(format!("Failed to parse response: {e}")),
                 }),
             )
                 .into_response(),
@@ -324,7 +324,7 @@ pub async fn v1_embedding(
             Json(EmbeddingResponse {
                 success: false,
                 data: None,
-                error: Some(format!("Request failed: {}", e)),
+                error: Some(format!("Request failed: {e}")),
             }),
         )
             .into_response(),
@@ -352,7 +352,7 @@ pub async fn v1_embedding_batch(
     };
 
     let client = reqwest::Client::new();
-    let url = format!("{}/embed/batch", endpoint);
+    let url = format!("{endpoint}/embed/batch");
 
     let payload = serde_json::json!({
         "texts": req.texts,
