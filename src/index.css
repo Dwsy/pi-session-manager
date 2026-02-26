@@ -272,7 +272,7 @@ pre,
   --customMessageText: #1a1b2e;
   --customMessageLabel: #7c3aed;
   --toolPendingBg: #f0f1f5;
-  --toolSuccessBg: #ecfdf5;
+  --toolSuccessBg: #E6F0E7;
   --toolErrorBg: #fef2f2;
   --toolTitle: #1a1b2e;
   --toolOutput: #6b7280;
@@ -385,7 +385,7 @@ pre,
     --customMessageText: #1a1b2e;
     --customMessageLabel: #7c3aed;
     --toolPendingBg: #f0f1f5;
-    --toolSuccessBg: #ecfdf5;
+    --toolSuccessBg: #E6F0E7;
     --toolErrorBg: #fef2f2;
     --toolTitle: #1a1b2e;
     --toolOutput: #6b7280;
@@ -841,7 +841,7 @@ html, body {
   padding: 12px;
   font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
   font-size: calc(var(--font-size-base, 16px) * 0.6875);
-  background: var(--bg-inset);
+  background: transparent;
   overflow-x: auto;
 }
 

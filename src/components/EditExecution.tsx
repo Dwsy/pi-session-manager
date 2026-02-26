@@ -1,4 +1,5 @@
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react'
+import { registerCustomTheme, RegisteredCustomThemes } from '@pierre/diffs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { escapeHtml } from '../utils/markdown'
@@ -6,6 +7,28 @@ import { shortenPath, formatDate } from '../utils/format'
 import { useTheme } from '../hooks/useAppearance'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useSessionView } from '../contexts/SessionViewContext'
+
+// Custom themes: inherit pierre themes but override editor.background to match tool card bg
+let themesRegistered = false
+if (!themesRegistered) {
+  themesRegistered = true
+
+  const lightLoader = RegisteredCustomThemes.get('pierre-light')!
+  registerCustomTheme('card-light', () =>
+    lightLoader().then((r: any) => {
+      const base = r.default ?? r
+      return { ...base, name: 'card-light', colors: { ...base.colors, 'editor.background': '#E6F0E7' } }
+    })
+  )
+
+  const darkLoader = RegisteredCustomThemes.get('pierre-dark')!
+  registerCustomTheme('card-dark', () =>
+    darkLoader().then((r: any) => {
+      const base = r.default ?? r
+      return { ...base, name: 'card-dark', colors: { ...base.colors, 'editor.background': '#283228' } }
+    })
+  )
+}
 
 interface EditExecutionProps {
   filePath: string
@@ -141,7 +164,7 @@ export default function EditExecution({
             oldFile={oldFile}
             newFile={newFile}
             options={{
-              theme: { dark: 'pierre-dark', light: 'pierre-light' },
+              theme: { dark: 'card-dark', light: 'card-light' },
               themeType: isDark ? 'dark' : 'light',
               diffStyle: isMobile ? 'unified' : 'split',
               overflow: 'wrap',
