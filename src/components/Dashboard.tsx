@@ -3,10 +3,11 @@ import { invoke } from '../transport'
 import { useTranslation } from 'react-i18next'
 import { BarChart3, Clock, RefreshCw, Activity, Zap, DollarSign } from 'lucide-react'
 
-import type { SessionInfo, SessionStats, SessionStatsInput } from '../types'
+import type { HeatmapPoint, SessionInfo, SessionStats, SessionStatsInput, DayStats } from '../types'
 import { getDemoStats } from '../hooks/useDemoMode'
 import StatCard from './dashboard/StatCard'
 import ActivityHeatmap from './dashboard/ActivityHeatmap'
+import HeatmapDayModal from './dashboard/HeatmapDayModal'
 import MessageDistribution from './dashboard/MessageDistribution'
 import ProjectsChart from './dashboard/ProjectsChart'
 import RecentSessions from './dashboard/RecentSessions'
@@ -34,6 +35,9 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
   const { t } = useTranslation()
   const [stats, setStats] = useState<SessionStats | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [selectedDay, setSelectedDay] = useState<HeatmapPoint | null>(null)
+  const [dayStats, setDayStats] = useState<DayStats | undefined>(undefined)
+  const [isLoadingDayStats, setIsLoadingDayStats] = useState(false)
   const isLoadingRef = useRef(false)
   const hasLoadedOnce = useRef(false)
   const prevProjectRef = useRef(projectName)
@@ -109,6 +113,73 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
     } finally {
       isLoadingRef.current = false
       setIsRefreshing(false)
+    }
+  }
+
+  const handleDayClick = async (point: HeatmapPoint) => {
+    setSelectedDay(point)
+    setIsLoadingDayStats(true)
+    setDayStats(undefined)
+
+    try {
+      // Fetch detailed day stats from backend
+      const result = await invoke<DayStats>('get_day_stats', {
+        date: point.date,
+        sessions: sessions,
+      })
+      setDayStats(result)
+    } catch (error) {
+      console.log('Detailed day stats not available, using heatmap data:', error)
+      // Fallback: use the data from the heatmap point
+      setDayStats(undefined)
+    } finally {
+      setIsLoadingDayStats(false)
+    }
+  }
+
+  const handleCloseModal = () => {
+    setSelectedDay(null)
+    setDayStats(undefined)
+  }
+
+  const resolveProjectPath = (projectPathOrName: string): string | null => {
+    if (!projectPathOrName) return null
+
+    if (projectPathOrName.includes('/')) {
+      return projectPathOrName
+    }
+
+    const matchedSession = sessions.find((session) => {
+      const nameFromPath = session.cwd.split('/').pop() || ''
+      return nameFromPath === projectPathOrName
+    })
+
+    return matchedSession?.cwd || null
+  }
+
+  const handleFilterProjectFromHeatmap = (projectName: string) => {
+    if (!onProjectSelect) return
+    const resolvedPath = resolveProjectPath(projectName)
+    if (resolvedPath) {
+      onProjectSelect(resolvedPath)
+    }
+  }
+
+  const handleFilterProjectFromModal = (projectPathOrName: string) => {
+    if (!onProjectSelect) return
+    const resolvedPath = resolveProjectPath(projectPathOrName)
+    if (resolvedPath) {
+      onProjectSelect(resolvedPath)
+      handleCloseModal()
+    }
+  }
+
+  const handleOpenSessionFromModal = (sessionPath: string) => {
+    if (!onSessionSelect) return
+    const targetSession = sessions.find((session) => session.path === sessionPath)
+    if (targetSession) {
+      onSessionSelect(targetSession)
+      handleCloseModal()
     }
   }
 
@@ -251,7 +322,13 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
           {/* Message Distribution + Heatmap */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <MessageDistribution stats={displayStats} />
-            <ActivityHeatmap data={displayStats.heatmap_data} size="mini" showLabels={false} />
+            <ActivityHeatmap
+              data={displayStats.heatmap_data}
+              size="mini"
+              showLabels={false}
+              onDayClick={handleDayClick}
+              onProjectFilter={handleFilterProjectFromHeatmap}
+            />
           </div>
 
           {/* Recent Sessions */}
@@ -270,6 +347,18 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
           <TimeDistribution stats={displayStats} type="hourly" />
         </div>
       </div>
+
+      {/* Heatmap Day Detail Modal */}
+      {selectedDay && (
+        <HeatmapDayModal
+          point={selectedDay}
+          onClose={handleCloseModal}
+          dayStats={dayStats}
+          loading={isLoadingDayStats}
+          onFilterProject={handleFilterProjectFromModal}
+          onOpenSession={handleOpenSessionFromModal}
+        />
+      )}
     </div>
   )
 }
