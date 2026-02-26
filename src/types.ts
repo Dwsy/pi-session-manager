@@ -239,6 +239,42 @@ export interface FullTextSearchResponse {
 export interface HeatmapPoint {
   date: string
   level: number // 0-5, 0 = no data, 5 = most active
+  // Enhanced fields for tooltip and modal
+  total_messages: number
+  total_tokens: number
+  session_count: number
+  top_project?: string
+}
+
+export interface DayProjectBreakdown {
+  project_path: string
+  project_name: string
+  session_count: number
+  message_count: number
+  token_count: number
+}
+
+export interface DaySession {
+  path: string
+  cwd: string
+  name?: string
+  first_message: string
+  message_count: number
+  token_count: number
+  model: string
+  timestamp: string
+}
+
+export interface DayStats {
+  date: string
+  total_messages: number
+  total_tokens: number
+  session_count: number
+  project_count: number
+  project_breakdown: DayProjectBreakdown[]
+  sessions: DaySession[]
+  hourly_distribution: number[] // 24 hours
+  models_used: Record<string, number>
 }
 
 export interface TimeDistributionPoint {

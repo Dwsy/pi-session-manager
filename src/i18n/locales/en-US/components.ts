@@ -138,6 +138,13 @@ export const components = {
     more: 'More',
     activityLevel: 'Activity Level',
   },
+  activityLevels: {
+    none: 'No Activity',
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    veryHigh: 'Very High',
+  },
   dashboard: {
     title: 'Dashboard',
     subtitle: 'Session insights and activity metrics',

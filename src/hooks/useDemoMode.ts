@@ -260,7 +260,14 @@ export function getDemoStats(): SessionStats {
 
     // Heatmap data (level 0-5)
     const level = messageCount > 40 ? 5 : messageCount > 30 ? 4 : messageCount > 20 ? 3 : messageCount > 10 ? 2 : messageCount > 5 ? 1 : 0
-    heatmapData.push({ date: dateStr, level })
+    heatmapData.push({
+      date: dateStr,
+      level,
+      total_messages: messageCount,
+      total_tokens: Math.floor(Math.random() * 5000) + 500,
+      session_count: Math.floor(Math.random() * 3) + 1,
+      top_project: ['pi-session-manager', 'dotfiles', 'my-app'][Math.floor(Math.random() * 3)],
+    })
   }
 
   // Hourly distribution (0-23)
