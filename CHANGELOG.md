@@ -83,6 +83,12 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Fixed
 
+- **Compaction component styling** — collapsed/expanded states now render correctly
+  - Added CSS rules for `.compaction`, `.compaction-collapsed`, `.compaction-content`
+  - Collapsed view shows token count summary by default; expanded view reveals full summary markdown
+  - Also added matching styles for `BranchSummary` component (header, background, border)
+  - Previously, both states displayed simultaneously due to missing CSS
+
 - **Appearance font sizing consistency** — font size settings now apply consistently across the UI
   - Small/Medium/Large now scales session content, tool calls (commands/outputs/arguments/diffs/metadata), subagent surfaces, and related code-like rendering instead of leaving parts at hardcoded sizes
   - Typography variables are propagated through root CSS so runtime appearance changes are reflected immediately and uniformly

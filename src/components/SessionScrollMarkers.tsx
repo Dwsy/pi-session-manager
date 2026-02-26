@@ -38,12 +38,12 @@ export default function SessionScrollMarkers({
       onPointerUp={isMobile ? onPointerUp : undefined}
       onPointerLeave={isMobile ? onPointerLeave : undefined}
     >
-      {markers.map(({ entry, top, preview }) => {
+      {markers.map(({ entry, top, preview, markerType }) => {
         const isActive = activeMarkerId === entry.id
         return (
           <button
             key={entry.id}
-            className={`session-scroll-marker${isActive ? ' active' : ''}`}
+            className={`session-scroll-marker session-scroll-marker--${markerType}${isActive ? ' active' : ''}`}
             style={{ top: `${top * 100}%` }}
             onClick={() => onMarkerClick(entry.id)}
             title={preview}

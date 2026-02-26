@@ -82,6 +82,14 @@
    background: rgba(var(--accent-rgb), 0.85);
  }
 
+ .session-scroll-marker--compaction {
+   background: rgba(168, 139, 250, 0.5);
+ }
+
+ .session-scroll-marker--compaction:hover {
+   background: rgba(168, 139, 250, 0.75);
+ }
+
  .session-scroll-marker.active {
    background: rgba(var(--accent-rgb), 0.95);
  }
@@ -93,19 +101,22 @@
 
  .session-scroll-marker-tooltip {
    position: absolute;
-   right: 16px;
+   right: 20px;
    top: 50%;
-   transform: translateY(-50%) translateX(-4px);
-   background: var(--bg-inset);
-   color: var(--text-secondary);
-   border: 1px solid rgba(var(--accent-rgb), 0.2);
-   border-radius: 6px;
-   padding: 6px 8px;
-   font-size: 11px;
-   line-height: 1.4;
-   min-width: 260px;
-   width: 320px;
-   max-width: 360px;
+   transform: translateY(-50%) translateX(-8px);
+   background: rgba(50, 50, 60, 0.88);
+   backdrop-filter: blur(20px) saturate(1.6);
+   -webkit-backdrop-filter: blur(20px) saturate(1.6);
+   color: #fff;
+   border: 1px solid rgba(255, 255, 255, 0.18);
+   border-radius: 10px;
+   padding: 12px 16px;
+   font-size: 14px;
+   font-weight: 450;
+   line-height: 1.6;
+   min-width: 200px;
+   width: 280px;
+   max-width: min(360px, calc(100vw - 80px));
    text-align: left;
    white-space: normal;
    word-break: break-word;
@@ -116,8 +127,10 @@
    overflow: hidden;
    opacity: 0;
    pointer-events: none;
-   box-shadow: 0 4px 12px rgba(var(--shadow-rgb), 0.25);
-   transition: opacity 0.08s ease, transform 0.08s ease;
+   box-shadow: 
+     0 4px 24px rgba(0, 0, 0, 0.5),
+     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+   transition: opacity 0.15s ease, transform 0.15s ease;
  }
 
  .session-scroll-marker:hover .session-scroll-marker-tooltip {
@@ -542,7 +555,7 @@
    color: var(--error);
  }
 
- .tree-compaction {
+.tree-compaction {
    color: var(--borderAccent);
  }
 
@@ -552,6 +565,69 @@
 
  .tree-custom-message {
    color: var(--customMessageLabel);
+ }
+
+ /* Compaction 组件样式 */
+ .compaction {
+   background: var(--bg-subtle);
+   border: 1px solid rgba(var(--accent-rgb), 0.15);
+   border-radius: 8px;
+   padding: 12px 16px;
+   margin: 8px 0;
+   transition: all 0.2s ease;
+ }
+
+ .compaction:hover {
+   background: var(--bg-inset-hover);
+ }
+
+ .compaction-label {
+   font-size: 11px;
+   font-weight: 600;
+   color: var(--borderAccent);
+   text-transform: uppercase;
+   letter-spacing: 0.5px;
+   margin-bottom: 4px;
+ }
+
+ .compaction-collapsed {
+   font-size: 12px;
+   color: rgb(var(--color-muted-foreground));
+ }
+
+ .compaction-content {
+   display: none;
+   font-size: 12px;
+   color: var(--text-secondary);
+   margin-top: 8px;
+   white-space: pre-wrap;
+   line-height: 1.5;
+ }
+
+ .compaction.expanded .compaction-collapsed {
+   display: none;
+ }
+
+ .compaction.expanded .compaction-content {
+   display: block;
+ }
+
+ /* Branch Summary 组件样式 */
+ .branch-summary {
+   background: var(--bg-subtle);
+   border: 1px solid rgba(var(--accent-rgb), 0.15);
+   border-radius: 8px;
+   padding: 12px 16px;
+   margin: 8px 0;
+ }
+
+ .branch-summary-header {
+   font-size: 11px;
+   font-weight: 600;
+   color: var(--mdHeading);
+   text-transform: uppercase;
+   letter-spacing: 0.5px;
+   margin-bottom: 8px;
  }
 
  .tree-status {

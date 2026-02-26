@@ -388,12 +388,9 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
     entries: renderableEntries,
     rowVirtualizer,
     estimateEntrySize,
-    messagesContainerRef,
-    messagesWrapperRef,
     isMobile,
     onSelectEntry: setScrollTargetId,
     previewFallback: t('session.userMessage', 'User message'),
-    layoutDeps: [showSidebar, sidebarWidth],
   })
 
   useEffect(() => {
