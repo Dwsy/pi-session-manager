@@ -246,6 +246,7 @@ fn main() {
             pi_session_manager::rename_session,
             pi_session_manager::get_session_stats,
             pi_session_manager::get_session_stats_light,
+            pi_session_manager::get_day_stats,
             pi_session_manager::open_session_in_browser,
             pi_session_manager::open_session_in_terminal,
             pi_session_manager::scan_skills,

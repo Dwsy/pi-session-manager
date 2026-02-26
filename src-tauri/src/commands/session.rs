@@ -174,6 +174,14 @@ pub async fn get_session_stats_light(
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
+pub async fn get_day_stats(
+    date: String,
+    sessions: Vec<SessionInfo>,
+) -> Result<stats::DayStats, String> {
+    stats::get_day_stats(&date, &sessions)
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn open_session_in_terminal(
     path: String,
     cwd: String,

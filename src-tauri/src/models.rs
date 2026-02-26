@@ -12,7 +12,7 @@ pub struct SessionInfo {
     pub modified: DateTime<Utc>,
     pub message_count: usize,
     pub first_message: String,
-    #[serde(skip_serializing)]
+    #[serde(default, skip_serializing)]
     pub all_messages_text: String,
     pub user_messages_text: String,
     pub assistant_messages_text: String,
@@ -130,5 +130,31 @@ impl Default for SubagentSummary {
             runs_by_agent: HashMap::new(),
             runs_by_model: HashMap::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SessionInfo;
+
+    #[test]
+    fn session_info_deserializes_without_all_messages_text() {
+        let json = serde_json::json!({
+            "path": "/tmp/session.jsonl",
+            "id": "abc",
+            "cwd": "/Users/demo/workspace/project-a",
+            "name": "session-a",
+            "created": "2026-01-18T00:00:00Z",
+            "modified": "2026-01-18T01:00:00Z",
+            "message_count": 12,
+            "first_message": "hello",
+            "user_messages_text": "",
+            "assistant_messages_text": "",
+            "last_message": "ok",
+            "last_message_role": "assistant"
+        });
+
+        let parsed: SessionInfo = serde_json::from_value(json).expect("should deserialize");
+        assert_eq!(parsed.all_messages_text, "");
     }
 }

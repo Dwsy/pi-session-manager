@@ -56,6 +56,7 @@ pub fn run() {
             export_session,
             rename_session,
             get_session_stats,
+            get_day_stats,
             open_session_in_browser,
             open_session_in_terminal,
             scan_skills,
