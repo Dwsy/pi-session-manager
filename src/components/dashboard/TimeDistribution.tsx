@@ -49,7 +49,10 @@ export default function TimeDistribution({
       <div className="space-y-1.5">
         {hourlyData.map((item, index) => (
           <div key={index} className="flex items-center gap-2">
-            <div className="w-6 text-right text-[10px] text-muted-foreground font-medium">{item.hour}</div>
+            <div className="w-6 text-right text-[10px] text-muted-foreground font-medium flex items-center justify-end gap-0.5">
+              {item.isPeak && <span className="text-warning text-[8px]">★</span>}
+              {item.hour}
+            </div>
             <div className="flex-1 h-4 bg-background/60 rounded overflow-hidden inner-shadow relative">
               <div
                 className={`h-full rounded transition-all duration-500 ${
@@ -63,10 +66,7 @@ export default function TimeDistribution({
                 }}
               />
             </div>
-            <div className="w-6 text-right text-[10px] text-foreground font-medium">{item.value}</div>
-            {item.isPeak && (
-              <div className="text-[8px] text-warning">★</div>
-            )}
+            <div className="w-8 text-right text-[10px] text-foreground font-medium">{item.value.toLocaleString()}</div>
           </div>
         ))}
       </div>
