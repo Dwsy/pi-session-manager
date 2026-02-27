@@ -154,7 +154,7 @@ pub struct SearchResult {
 | `read_session_file` | `path: String` | `String` | Read JSONL file content |
 | `get_session_entries` | `path: String` | `SessionEntry[]` | Parse session entries |
 | `search_sessions` | `sessions, query, includeTools` | `SearchResult[]` | Full-text search |
-| `delete_session` | `path: String` | `()` | Delete a session |
+| `delete_session` | `path: String` | `()` | Delete a session (Trash/Recycling Bin first, permanent fallback only when unavailable) |
 | `export_session` | `path, format` | `String` | Export session (HTML/MD/JSON) |
 | `rename_session` | `path, newName` | `()` | Rename a session |
 | `get_session_stats` | - | `SessionStats` | Get session statistics |
@@ -393,9 +393,9 @@ for file in all_jsonl_files:
 - No manual migration needed
 
 ### Deletion Policy
-- **No deletion sync**: When a session file is deleted, the SQLite record is preserved
-- **Rationale**: Historical data remains available for search and analytics
-- **Cleanup**: Manual vacuum operation available if needed
+- **User-initiated deletion (`delete_session`)**: The session file is sent to Trash/Recycling Bin when available, with permanent delete as fallback only when recoverable delete is unavailable
+- **Cache synchronization**: Session rows and related message cache records are removed from SQLite during user-initiated deletion
+- **External filesystem deletion**: File watcher and rescans remove missing sessions from in-memory lists; SQLite cleanup may lag until explicit cleanup paths run
 
 ## Future Enhancements
 

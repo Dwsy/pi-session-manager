@@ -15,6 +15,7 @@ import ProjectList from './components/ProjectList'
 import SessionViewer from './components/SessionViewer'
 import ExportDialog from './components/ExportDialog'
 import RenameDialog from './components/RenameDialog'
+import DeleteSessionConfirmDialog from './components/DeleteSessionConfirmDialog'
 import FavoritesPanel from './components/FavoritesPanel'
 import Onboarding from './components/Onboarding'
 import SearchFilterBar from './components/SearchFilterBar'
@@ -78,6 +79,9 @@ function App() {
     loadSessions,
     patchSessions,
     handleDeleteSession,
+    pendingDeleteSession,
+    confirmDeleteSession,
+    cancelDeleteSession,
     handleRenameSession,
   } = useSessions()
 
@@ -612,6 +616,13 @@ function App() {
           session={selectedSession}
           onRename={onRenameSession}
           onClose={() => setShowRenameDialog(false)}
+        />
+      )}
+      {pendingDeleteSession && (
+        <DeleteSessionConfirmDialog
+          session={pendingDeleteSession.session}
+          onConfirm={confirmDeleteSession}
+          onCancel={cancelDeleteSession}
         />
       )}
       <Suspense fallback={null}>

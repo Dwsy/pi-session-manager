@@ -4,6 +4,11 @@ import { useTranslation } from 'react-i18next'
 import type { SessionInfo, SessionsDiff } from '../types'
 import { useDemoMode } from './useDemoMode'
 
+export interface PendingDeleteSession {
+  session: SessionInfo
+  requestedAt: number
+}
+
 export interface UseSessionsReturn {
   sessions: SessionInfo[]
   loading: boolean
@@ -12,6 +17,9 @@ export interface UseSessionsReturn {
   loadSessions: () => Promise<void>
   patchSessions: (diff: SessionsDiff) => void
   handleDeleteSession: (session: SessionInfo) => Promise<void>
+  pendingDeleteSession: PendingDeleteSession | null
+  confirmDeleteSession: () => Promise<void>
+  cancelDeleteSession: () => void
   handleRenameSession: (session: SessionInfo, newName: string) => Promise<void>
 }
 
@@ -21,6 +29,7 @@ export function useSessions(): UseSessionsReturn {
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null)
   const [loading, setLoading] = useState(true)
+  const [pendingDeleteSession, setPendingDeleteSession] = useState<PendingDeleteSession | null>(null)
   const selectedSessionRef = useRef<SessionInfo | null>(null)
 
   useEffect(() => {
@@ -131,26 +140,41 @@ export function useSessions(): UseSessionsReturn {
   }, [])
 
   const handleDeleteSession = useCallback(async (session: SessionInfo) => {
-    if (!confirm(t('app.confirm.deleteSession', { name: session.name || t('common.untitled') }))) {
+    setPendingDeleteSession({
+      session,
+      requestedAt: Date.now(),
+    })
+  }, [])
+
+  const confirmDeleteSession = useCallback(async () => {
+    if (!pendingDeleteSession) {
       return
     }
 
+    const targetSession = pendingDeleteSession.session
+
     try {
       if (isDemoMode) {
-        // In demo mode, just remove from local state
-        setSessions(prev => prev.filter(s => s.id !== session.id))
+        setSessions(prev => prev.filter(s => s.id !== targetSession.id))
       } else {
-        await invoke('delete_session', { path: session.path })
-        setSessions(prev => prev.filter(s => s.id !== session.id))
+        await invoke('delete_session', { path: targetSession.path })
+        setSessions(prev => prev.filter(s => s.id !== targetSession.id))
       }
-      if (selectedSession?.id === session.id) {
+
+      if (selectedSessionRef.current?.id === targetSession.id) {
         setSelectedSession(null)
       }
+
+      setPendingDeleteSession(null)
     } catch (error) {
       console.error('Failed to delete session:', error)
       alert(t('app.errors.deleteSession'))
     }
-  }, [selectedSession, t, isDemoMode])
+  }, [isDemoMode, pendingDeleteSession, t])
+
+  const cancelDeleteSession = useCallback(() => {
+    setPendingDeleteSession(null)
+  }, [])
 
   const handleRenameSession = useCallback(async (session: SessionInfo, newName: string) => {
     try {
@@ -186,6 +210,9 @@ export function useSessions(): UseSessionsReturn {
     loadSessions,
     patchSessions,
     handleDeleteSession,
+    pendingDeleteSession,
+    confirmDeleteSession,
+    cancelDeleteSession,
     handleRenameSession,
   }
 }
