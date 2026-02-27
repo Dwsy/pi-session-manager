@@ -103,7 +103,8 @@ pub async fn get_session_entries(path: String) -> Result<Vec<SessionEntry>, Stri
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn delete_session(path: String) -> Result<(), String> {
-    fs::remove_file(&path).map_err(|e| format!("Failed to delete session: {e}"))
+    crate::session_delete::delete_session_file_and_cache(&path)?;
+    Ok(())
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]

@@ -94,7 +94,7 @@ GET http://127.0.0.1:52131/api/events
 | `scan_sessions` | `{}` | 扫描并返回所有会话 |
 | `read_session_file` | `{ "path": "..." }` | 读取会话的 JSONL 内容 |
 | `rename_session` | `{ "path": "...", "name": "..." }` | 重命名会话 |
-| `delete_session` | `{ "path": "..." }` | 删除会话文件 |
+| `delete_session` | `{ "path": "..." }` | 优先将会话文件移动到回收站（Trash/Recycle Bin），仅在不可恢复删除不可用时才永久删除，并清理缓存记录 |
 | `export_session` | `{ "path": "...", "format": "html\|markdown\|json" }` | 导出会话 |
 
 ### 搜索

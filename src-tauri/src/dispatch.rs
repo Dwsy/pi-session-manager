@@ -86,7 +86,7 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
         }
         "delete_session" => {
             let path = extract_string(payload, "path")?;
-            std::fs::remove_file(&path).map_err(|e| format!("Failed to delete session: {e}"))?;
+            crate::session_delete::delete_session_file_and_cache(&path)?;
             Ok(Value::Null)
         }
         "export_session" => {

@@ -88,6 +88,7 @@ All notable changes to Pi Session Manager will be documented in this file.
   - Collapsed view shows token count summary by default; expanded view reveals full summary markdown
   - Also added matching styles for `BranchSummary` component (header, background, border)
   - Previously, both states displayed simultaneously due to missing CSS
+- **Session deletion safety and recoverability** — session deletion now requires explicit in-app confirmation before invoking backend deletion, and backend deletion now attempts Trash/Recycling Bin first with permanent delete fallback only when recoverable delete is unavailable
 
 - **Appearance font sizing consistency** — font size settings now apply consistently across the UI
   - Small/Medium/Large now scales session content, tool calls (commands/outputs/arguments/diffs/metadata), subagent surfaces, and related code-like rendering instead of leaving parts at hardcoded sizes

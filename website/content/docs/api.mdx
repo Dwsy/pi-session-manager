@@ -94,7 +94,7 @@ Streams the same events as WebSocket in SSE format. Used by the mobile web front
 | `scan_sessions` | `{}` | Scan and return all sessions |
 | `read_session_file` | `{ "path": "..." }` | Read a session's JSONL content |
 | `rename_session` | `{ "path": "...", "name": "..." }` | Rename a session |
-| `delete_session` | `{ "path": "..." }` | Delete a session file |
+| `delete_session` | `{ "path": "..." }` | Move a session file to Trash/Recycling Bin when available, fall back to permanent delete only if recoverable delete is unavailable, and clean up cache records |
 | `export_session` | `{ "path": "...", "format": "html\|markdown\|json" }` | Export a session |
 
 ### Search
