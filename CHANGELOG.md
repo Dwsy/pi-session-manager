@@ -6,6 +6,26 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Added
 
+- **Heatmap enhancements** — interactive day detail modal and rich tooltips
+  - Click any heatmap day to open modal with project breakdown, session list, hourly distribution
+  - Tooltips show message count, token count, session count, top project
+  - Backend `get_day_stats` API aggregates per-day metrics with local timezone conversion
+  - Activity level labels (none/low/medium/high/veryHigh) in i18n
+
+- **Subagent usage stats** — track subagent costs in Dashboard
+  - New `SubagentSummary` and `AgentStats` types mirror backend Rust structs
+  - Dashboard StatCards display combined cost (main session + subagents)
+  - Combined token count reflects work done by scout/worker/reviewer subagents
+  - Graceful degradation for cached sessions without subagent data
+
+- **Kanban preview modal FLIP animation** — smooth card-to-modal transition
+  - FLIP (First, Last, Invert, Play) animation from KanbanCard to SessionPreviewModal
+  - Close animation returns modal to original card position
+  - Focus trap with Tab/Shift+Tab cycling
+  - Mobile responsive: full-screen on small viewports
+  - Reduced motion preference support
+  - Rapid-click prevention during animation
+
 - **Embedding Service** — local GGUF model inference for shared embedding across pi processes
   - New Rust module `embedding_service.rs` manages node-llama-cpp child process
   - ES module `embedding-server.mjs` provides HTTP API for text embeddings
@@ -41,6 +61,23 @@ All notable changes to Pi Session Manager will be documented in this file.
   - Quality assurance: ✅ `cargo fmt`, ✅ `cargo clippy --no-deps`, ✅ `npm run build`
   - UI labels in `sqlite_cache.rs` preserved (conditional on user language setting)
   - Translation style: Professional, technical English matching codebase conventions
+
+- **Theme alignment for diff cards** — light theme colors now match tool card background
+  - Light theme `toolSuccessBg` changed from `#ecfdf5` to minty `#E6F0E7`
+  - `.tool-diff` background made transparent to inherit card color
+  - Custom `card-light`/`card-dark` themes registered for `@pierre/diffs` overriding `editor.background`
+  - HMR guard prevents duplicate theme registration errors
+
+- **Scroll markers enhanced** — compaction markers and glassmorphic tooltips
+  - Compaction entries (type=compaction or customType=compaction) render as purple scroll markers
+  - Tooltips upgraded to glassmorphic style: backdrop-blur, larger font, rounded corners
+  - Simplified position calculation using virtualizer `totalSize` directly
+  - Removed ResizeObserver and scroll listener overhead
+
+- **Time distribution layout** — refined peak hour display
+  - Peak hour star indicator moved inline before hour label
+  - Message values formatted with `toLocaleString` for readability
+  - Wider value column to accommodate formatted numbers
 
 ### Added
 
