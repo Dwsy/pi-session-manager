@@ -246,7 +246,7 @@ export default function EditExecution({
         <span className="tool-path">{escapeHtml(displayPath)}</span>
       </div>
 
-      {expanded && diff && (
+      {diff && (
         <div className="tool-diff-wrapper">
           <div className="tool-diff-actions">
             <span className="tool-output-label">Diff</span>
@@ -267,15 +267,21 @@ export default function EditExecution({
               )}
             </button>
           </div>
-          <div style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}>
-            {renderDiff()}
+          <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
+            <div style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}>
+              {renderDiff()}
+            </div>
           </div>
         </div>
       )}
 
-      {expanded && output && (
-        <div className="tool-output">
-          <div>{escapeHtml(output)}</div>
+      {output && (
+        <div className="tool-output-wrapper">
+          <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
+            <div className="tool-output">
+              <div>{escapeHtml(output)}</div>
+            </div>
+          </div>
         </div>
       )}
 

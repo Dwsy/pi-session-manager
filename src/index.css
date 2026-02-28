@@ -687,6 +687,31 @@ html, body {
   overflow: hidden;
 }
 
+/* Tool Expand/Collapse Animation - Universal */
+.tool-expand-content {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-8px);
+  transition: max-height 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.15s ease,
+              transform 0.15s ease;
+  will-change: max-height, opacity, transform;
+}
+
+.tool-expand-content.expanded {
+  max-height: 2000px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tool-expand-content .tool-output,
+.tool-expand-content .tool-diff,
+.tool-expand-content .tool-arguments {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
 .tool-output-header {
   display: flex;
   align-items: center;

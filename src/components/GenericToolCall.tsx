@@ -55,32 +55,36 @@ export default function GenericToolCall({
         </span>
       </div>
 
-      {expanded && hasArgs && (
+      {hasArgs && (
         <div className="tool-output-wrapper">
           <div className="tool-output-header">
             <span className="tool-output-label">Arguments</span>
           </div>
-          <div
-            className="tool-arguments"
-            style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto', margin: 0 }}
-          >
-            <pre><code>{escapeHtml(argsText)}</code></pre>
+          <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
+            <div
+              className="tool-arguments"
+              style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto', margin: 0 }}
+            >
+              <pre><code>{escapeHtml(argsText)}</code></pre>
+            </div>
           </div>
         </div>
       )}
 
-      {expanded && hasOutput && (
+      {hasOutput && (
         <div className="tool-output-wrapper">
           <div className="tool-output-header">
             <span className="tool-output-label">Output</span>
           </div>
-          <div
-            className="tool-output"
-            style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}
-          >
-            {output.split('\n').map((line, idx) => (
-              <div key={idx}>{escapeHtml(line)}</div>
-            ))}
+          <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
+            <div
+              className="tool-output"
+              style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}
+            >
+              {output.split('\n').map((line, idx) => (
+                <div key={idx}>{escapeHtml(line)}</div>
+              ))}
+            </div>
           </div>
         </div>
       )}

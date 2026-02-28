@@ -62,35 +62,35 @@ export default function ReadExecution({
         <span className="tool-path">{escapeHtml(pathWithLines)}</span>
       </div>
 
-      {expanded && (
-        <>
-          {images.length > 0 && (
-            <div className="tool-images">
-              {images.map((img, idx) => (
-                <img
-                  key={idx}
-                  src={`data:${img.mimeType};base64,${img.data}`}
-                  className="tool-image"
-                  alt={t('components.readExecution.imageAlt')}
-                />
-              ))}
-            </div>
-          )}
+      {images.length > 0 && (
+        <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
+          <div className="tool-images">
+            {images.map((img, idx) => (
+              <img
+                key={idx}
+                src={`data:${img.mimeType};base64,${img.data}`}
+                className="tool-image"
+                alt={t('components.readExecution.imageAlt')}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
-          {output && (
-            <div className="tool-output-wrapper">
-              <div className="tool-output">
-                <CodeBlock
-                  code={output}
-                  language={lang}
-                  showLineNumbers={true}
-                  scrollable
-                  maxHeight={OUTPUT_MAX_HEIGHT}
-                />
-              </div>
+      {output && (
+        <div className="tool-output-wrapper">
+          <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
+            <div className="tool-output">
+              <CodeBlock
+                code={output}
+                language={lang}
+                showLineNumbers={true}
+                scrollable
+                maxHeight={OUTPUT_MAX_HEIGHT}
+              />
             </div>
-          )}
-        </>
+          </div>
+        </div>
       )}
 
       {!hasContent && !expanded && (

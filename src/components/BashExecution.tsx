@@ -100,9 +100,9 @@ export default function BashExecution({
         </button>
       </div>
 
-      {expanded && output && (
+      {output && (
         <div className="tool-output-wrapper">
-          <div className="tool-output">
+          <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             <CodeBlock
               code={output}
               language="shell"
