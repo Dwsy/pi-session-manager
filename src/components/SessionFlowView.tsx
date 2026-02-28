@@ -19,7 +19,7 @@ import '@xyflow/react/dist/style.css'
 import '../styles/flow.css'
 import type { SessionEntry } from '../types'
 
-type FilterMode = 'default' | 'no-tools' | 'user-only' | 'labeled-only' | 'all' | 'read-tools' | 'edit-tools' | 'write-tools'
+type FilterMode = 'default' | 'no-tools' | 'user-only' | 'labeled-only' | 'all' | `tool-${string}`
 
 interface SessionFlowViewProps {
   entries: SessionEntry[]
@@ -180,22 +180,20 @@ function matchesFilter(entry: SessionEntry, filter: FilterMode): boolean {
     case 'all':
       return true
 
-    case 'read-tools':
-    case 'edit-tools':
-    case 'write-tools': {
-      if (entry.type === 'message' && entry.message?.role === 'user') return true
-      const toolName = filter.replace('-tools', '')
-      if (entry.type === 'message' && entry.message?.role === 'assistant') {
-        const content = Array.isArray(entry.message.content) ? entry.message.content : []
-        return content.some((c: any) => c.type === 'toolCall' && c.name === toolName)
-      }
-      return false
-    }
-
     case 'labeled-only':
       return entry.type === 'message' && entry.message?.role === 'user'
 
     default:
+      // Dynamic tool filter (e.g., 'tool-bash', 'tool-read', etc.)
+      if (filter.startsWith('tool-')) {
+        const toolName = filter.slice(5) // Remove 'tool-' prefix
+        if (entry.type === 'message' && entry.message?.role === 'user') return true
+        if (entry.type === 'message' && entry.message?.role === 'assistant') {
+          const content = Array.isArray(entry.message.content) ? entry.message.content : []
+          return content.some((c: any) => c.type === 'toolCall' && c.name === toolName)
+        }
+        return false
+      }
       return true
   }
 }

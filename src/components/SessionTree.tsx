@@ -72,7 +72,7 @@ interface SessionTreeProps {
   entries: SessionEntry[]
   activeLeafId?: string
   onNodeClick?: (leafId: string, targetId: string) => void
-  filter?: 'default' | 'no-tools' | 'user-only' | 'labeled-only' | 'all' | 'read-tools' | 'edit-tools' | 'write-tools'
+  filter?: 'default' | 'no-tools' | 'user-only' | 'labeled-only' | 'all' | `tool-${string}`
 }
 
 interface TreeNodeData {
@@ -142,6 +142,26 @@ ref
       .map(term => term.toLowerCase())
       .filter(Boolean)
   }, [searchQuery])
+
+  // Extract all unique tool names from current session
+  const availableTools = useMemo(() => {
+    const toolSet = new Set<string>()
+    
+    for (const entry of entries) {
+      if (entry.type === 'message' && entry.message?.role === 'assistant') {
+        const content = Array.isArray(entry.message.content) ? entry.message.content : []
+        const toolCalls = content.filter((c: any) => c.type === 'toolCall')
+        for (const toolCall of toolCalls) {
+          if (toolCall.name) {
+            toolSet.add(toolCall.name)
+          }
+        }
+      }
+    }
+    
+    // Return sorted array
+    return Array.from(toolSet).sort()
+  }, [entries])
 
   // Build tree structure
   const treeData = useMemo(() => {
@@ -394,28 +414,16 @@ ref
         case 'all':
           return true
 
-        case 'read-tools':
-          if (entry.type === 'message' && entry.message?.role === 'assistant') {
-            const content = Array.isArray(entry.message.content) ? entry.message.content : []
-            return content.some((c: any) => c.type === 'toolCall' && c.name === 'read')
-          }
-          return false
-
-        case 'edit-tools':
-          if (entry.type === 'message' && entry.message?.role === 'assistant') {
-            const content = Array.isArray(entry.message.content) ? entry.message.content : []
-            return content.some((c: any) => c.type === 'toolCall' && c.name === 'edit')
-          }
-          return false
-
-        case 'write-tools':
-          if (entry.type === 'message' && entry.message?.role === 'assistant') {
-            const content = Array.isArray(entry.message.content) ? entry.message.content : []
-            return content.some((c: any) => c.type === 'toolCall' && c.name === 'write')
-          }
-          return false
-
         default:
+          // Dynamic tool filter (e.g., 'tool-bash', 'tool-read', etc.)
+          if (currentFilter.startsWith('tool-')) {
+            const toolName = currentFilter.slice(5) // Remove 'tool-' prefix
+            if (entry.type === 'message' && entry.message?.role === 'assistant') {
+              const content = Array.isArray(entry.message.content) ? entry.message.content : []
+              return content.some((c: any) => c.type === 'toolCall' && c.name === toolName)
+            }
+            return false
+          }
           return true
       }
     })
@@ -780,25 +788,23 @@ ref
         >
           All
         </button>
-        <button
-          className={`filter-btn ${currentFilter === 'read-tools' ? 'active' : ''}`}
-          onClick={() => setCurrentFilter('read-tools')}
-        >
-          Read
-        </button>
-        <button
-          className={`filter-btn ${currentFilter === 'edit-tools' ? 'active' : ''}`}
-          onClick={() => setCurrentFilter('edit-tools')}
-        >
-          Edit
-        </button>
-        <button
-          className={`filter-btn ${currentFilter === 'write-tools' ? 'active' : ''}`}
-          onClick={() => setCurrentFilter('write-tools')}
-        >
-          Write
-        </button>
       </div>
+
+      {/* Dynamic Tool Filters */}
+      {availableTools.length > 0 && (
+        <div className="sidebar-filters sidebar-filters-tools">
+          {availableTools.map(toolName => (
+            <button
+              key={toolName}
+              className={`filter-btn ${currentFilter === `tool-${toolName}` ? 'active' : ''}`}
+              onClick={() => setCurrentFilter(`tool-${toolName}`)}
+              style={colorizeEnabled ? { color: getToolColorVar(toolName) } : undefined}
+            >
+              {toolName}
+            </button>
+          ))}
+        </div>
+      )}
 
       {viewMode === 'flow' || viewMode === 'hierarchy' ? (
         <div className="flex-1 min-h-0">
