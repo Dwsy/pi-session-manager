@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { escapeHtml } from '../utils/markdown'
+import MarkdownContent from './MarkdownContent'
 
 interface ThinkingBlockProps {
   content: string
@@ -14,7 +14,9 @@ export default function ThinkingBlock({ content }: ThinkingBlockProps) {
       onClick={() => setExpanded(!expanded)}
       style={{ cursor: 'pointer' }}
     >
-      <div className="thinking-text">{escapeHtml(content)}</div>
+      <div className="thinking-text">
+        <MarkdownContent content={content} />
+      </div>
       {!expanded && (
         <div className="thinking-collapsed">Thinking ...</div>
       )}
