@@ -553,8 +553,7 @@ html, body {
 .thinking-text {
   padding: var(--line-height);
   color: var(--thinkingText);
-  font-style: italic;
-  white-space: pre-wrap;
+  line-height: 1.4;
 }
 
 .message-timestamp + .thinking-block .thinking-text,
@@ -577,19 +576,29 @@ html, body {
   display: none;
 }
 
-/* Compact markdown styles for thinking blocks */
+/* Ultra-compact markdown styles for thinking blocks */
+.thinking-text .markdown-content {
+  font-size: 0.95em;
+}
+
+.thinking-text .markdown-content p {
+  margin: 0;
+  line-height: 1.4;
+}
+
 .thinking-text .markdown-content p + p {
-  margin-top: calc(var(--line-height) * 0.5);
+  margin-top: 0.5em;
 }
 
 .thinking-text .markdown-content ul,
 .thinking-text .markdown-content ol {
-  margin: calc(var(--line-height) * 0.5) 0;
-  padding-left: calc(var(--line-height) * 1.5);
+  margin: 0.3em 0;
+  padding-left: 1.5em;
 }
 
 .thinking-text .markdown-content li {
-  margin: calc(var(--line-height) * 0.25) 0;
+  margin: 0.1em 0;
+  line-height: 1.4;
 }
 
 .thinking-text .markdown-content h1,
@@ -598,16 +607,21 @@ html, body {
 .thinking-text .markdown-content h4,
 .thinking-text .markdown-content h5,
 .thinking-text .markdown-content h6 {
-  margin: calc(var(--line-height) * 0.5) 0 calc(var(--line-height) * 0.25) 0;
+  margin: 0.5em 0 0.2em 0;
+  line-height: 1.3;
 }
 
 .thinking-text .markdown-content pre {
-  margin: calc(var(--line-height) * 0.5) 0;
+  margin: 0.3em 0;
 }
 
 .thinking-text .markdown-content blockquote {
-  margin: calc(var(--line-height) * 0.5) 0;
-  padding-left: calc(var(--line-height) * 0.75);
+  margin: 0.3em 0;
+  padding-left: 0.75em;
+}
+
+.thinking-text .markdown-content code {
+  font-size: 0.9em;
 }
 
 .assistant-text + .tool-execution {
