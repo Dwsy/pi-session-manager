@@ -539,6 +539,7 @@ html, body {
 .assistant-text {
   padding: var(--line-height);
   padding-bottom: 0;
+  line-height: var(--line-height);
 }
 
 .message-timestamp + .assistant-text,
