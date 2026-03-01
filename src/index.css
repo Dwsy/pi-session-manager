@@ -577,6 +577,39 @@ html, body {
   display: none;
 }
 
+/* Compact markdown styles for thinking blocks */
+.thinking-text .markdown-content p + p {
+  margin-top: calc(var(--line-height) * 0.5);
+}
+
+.thinking-text .markdown-content ul,
+.thinking-text .markdown-content ol {
+  margin: calc(var(--line-height) * 0.5) 0;
+  padding-left: calc(var(--line-height) * 1.5);
+}
+
+.thinking-text .markdown-content li {
+  margin: calc(var(--line-height) * 0.25) 0;
+}
+
+.thinking-text .markdown-content h1,
+.thinking-text .markdown-content h2,
+.thinking-text .markdown-content h3,
+.thinking-text .markdown-content h4,
+.thinking-text .markdown-content h5,
+.thinking-text .markdown-content h6 {
+  margin: calc(var(--line-height) * 0.5) 0 calc(var(--line-height) * 0.25) 0;
+}
+
+.thinking-text .markdown-content pre {
+  margin: calc(var(--line-height) * 0.5) 0;
+}
+
+.thinking-text .markdown-content blockquote {
+  margin: calc(var(--line-height) * 0.5) 0;
+  padding-left: calc(var(--line-height) * 0.75);
+}
+
 .assistant-text + .tool-execution {
   margin-top: var(--line-height);
 }
