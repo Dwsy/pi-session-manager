@@ -193,21 +193,6 @@ function App() {
     mobileTab,
   ]);
 
-  const reloadTerminalConfig = useCallback(() => {
-    try {
-      const s = getCachedSettings();
-      setTerminalConfig({
-        enabled: s.terminal?.builtinTerminalEnabled !== false,
-        defaultShell:
-          s.terminal?.defaultShell || getPlatformDefaults().defaultShell,
-        fontSize: s.terminal?.terminalFontSize || 13,
-      });
-      if (s.terminal?.builtinTerminalEnabled === false) {
-        setShowTerminal(false);
-      }
-    } catch {}
-  }, []);
-
   const handleSelectSession = useCallback(
     (session: SessionInfo) => {
       setSelectedSession(session);
@@ -223,97 +208,6 @@ function App() {
     },
     [setSelectedSession],
   );
-
-  useEffect(() => {
-    registerBuiltinPlugins();
-    reloadTerminalConfig();
-
-    // Apply appearance settings from cache
-    const s = getCachedSettings();
-    const root = document.documentElement;
-    if (s.appearance) {
-      const {
-        theme,
-        customTheme,
-        fontFamily,
-        fontFamilyMono,
-        sidebarWidth,
-        fontSize,
-        messageSpacing,
-        codeBlockTheme,
-      } = s.appearance;
-      root.classList.remove("theme-dark", "theme-light");
-      if (theme === "dark") {
-        root.classList.add("theme-dark");
-      } else if (theme === "light") {
-        root.classList.add("theme-light");
-      }
-      // For custom theme, applyPiChatTheme will set the theme class automatically
-      if (sidebarWidth)
-        root.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
-      const fontMap: Record<string, string> = {
-        small: "14px",
-        medium: "16px",
-        large: "18px",
-      };
-      if (fontSize)
-        root.style.setProperty("--font-size-base", fontMap[fontSize] || "16px");
-      if (fontFamily) root.style.setProperty("--font-family", fontFamily);
-      if (fontFamilyMono)
-        root.style.setProperty("--font-family-mono", fontFamilyMono);
-      const spacingMap: Record<string, string> = {
-        compact: "8px",
-        comfortable: "16px",
-        spacious: "24px",
-      };
-      if (messageSpacing)
-        root.style.setProperty(
-          "--spacing-base",
-          spacingMap[messageSpacing] || "16px",
-        );
-      if (codeBlockTheme) root.setAttribute("data-code-theme", codeBlockTheme);
-      applyPiChatTheme(theme === "custom" ? customTheme : "app-default");
-    }
-
-    const initialize = async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      setIsInitialized(true);
-    };
-
-    initialize();
-  }, []);
-
-  // F12 to toggle devtools in production builds
-  useEffect(() => {
-    if (!isTauri()) return;
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      if (e.key === "F12") {
-        e.preventDefault();
-        try {
-          await invoke("toggle_devtools");
-        } catch (error) {
-          console.warn("Failed to toggle devtools:", error);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  useEffect(() => {
-    if (!isInitialized || hasInitializedRef.current) return;
-
-    hasInitializedRef.current = true;
-    loadSessions();
-    loadSettings();
-  }, [isInitialized, loadSessions, loadSettings]);
-
-  useFileWatcher({
-    enabled: true,
-    debounceMs: 2000,
-    onDiff: patchSessions,
-  });
 
   const buildResumeCommand = useCallback(
     (session: SessionInfo) => {
@@ -400,21 +294,6 @@ function App() {
   );
 
   useKeyboardShortcuts(shortcuts);
-
-  // Restore browser-like refresh shortcuts (Cmd+Shift+R, F5, Ctrl+Shift+R)
-  useEffect(() => {
-    const handleRefresh = (e: KeyboardEvent) => {
-      const isCmdShiftR =
-        (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "r";
-      const isF5 = e.key === "F5";
-      if (isCmdShiftR || isF5) {
-        e.preventDefault();
-        window.location.reload();
-      }
-    };
-    window.addEventListener("keydown", handleRefresh);
-    return () => window.removeEventListener("keydown", handleRefresh);
-  }, []);
 
   // Clear pending scroll entry after it's been passed to SessionViewer
   useEffect(() => {
@@ -677,6 +556,25 @@ function App() {
     />
   );
 
+  const {
+    onSelectListView: handleSidebarSelectListView,
+    onSelectProjectView: handleSidebarSelectProjectView,
+    onSelectKanbanView: handleSidebarSelectKanbanView,
+    onToggleFavorites: handleSidebarToggleFavorites,
+    onOpenCommandPalette: handleSidebarOpenCommandPalette,
+    onToggleTerminal: handleSidebarToggleTerminal,
+    onOpenSettings: handleSidebarOpenSettings,
+    onSelectKanbanFilterProject: handleSelectKanbanFilterProject,
+    onSelectFavoriteProject: handleSelectFavoriteProject,
+  } = useDesktopSidebarActions({
+    setViewMode,
+    setSelectedProject,
+    setSelectedSession,
+    setShowFavorites,
+    setShowTerminal,
+    setShowSettings,
+  });
+
   // ═══════════════════════════════════
   // Mobile layout: full-screen pages + bottom nav
   // ═══════════════════════════════════
@@ -700,53 +598,6 @@ function App() {
 
   const handleSidebarShowDashboard = () => {
     setSelectedSession(null);
-  };
-
-  const handleSidebarSelectListView = () => {
-    setViewMode("list");
-    setSelectedProject(null);
-    setShowFavorites(false);
-  };
-
-  const handleSidebarSelectProjectView = () => {
-    setViewMode("project");
-    setSelectedProject(null);
-    setShowFavorites(false);
-  };
-
-  const handleSidebarSelectKanbanView = () => {
-    setViewMode("kanban");
-    setSelectedSession(null);
-    setShowFavorites(false);
-  };
-
-  const handleSidebarToggleFavorites = () => {
-    setShowFavorites((prev) => !prev);
-  };
-
-  const handleSidebarOpenCommandPalette = () => {
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "k", metaKey: true }),
-    );
-  };
-
-  const handleSidebarToggleTerminal = () => {
-    setShowTerminal((prev) => !prev);
-  };
-
-  const handleSidebarOpenSettings = () => {
-    setShowSettings(true);
-  };
-
-  const handleSelectKanbanFilterProject = (project: string | null) => {
-    setSelectedProject(project);
-    setSelectedSession(null);
-  };
-
-  const handleSelectFavoriteProject = (path: string) => {
-    setSelectedProject(path);
-    setViewMode("project");
-    setShowFavorites(false);
   };
 
   const desktopSearchBar = (
