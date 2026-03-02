@@ -539,7 +539,7 @@ html, body {
 .assistant-text {
   padding: var(--line-height);
   padding-bottom: 0;
-  line-height: var(--line-height);
+  line-height: 1.6;
 }
 
 .message-timestamp + .assistant-text,
@@ -740,17 +740,14 @@ html, body {
   max-height: 0;
   opacity: 0;
   overflow: hidden;
-  transform: translateY(-8px);
   transition: max-height 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.15s ease,
-              transform 0.15s ease;
-  will-change: max-height, opacity, transform;
+              opacity 0.15s ease;
+  will-change: max-height, opacity;
 }
 
 .tool-expand-content.expanded {
   max-height: 2000px;
   opacity: 1;
-  transform: translateY(0);
 }
 
 .tool-expand-content .tool-output,
@@ -1047,6 +1044,11 @@ html, body {
 .markdown-content p { margin: 0; }
 .markdown-content p + p { margin-top: var(--line-height); }
 
+/* Assistant message readability tuning */
+.assistant-text .markdown-content p {
+  line-height: 1.6;
+}
+
 .markdown-content a {
   color: var(--mdLink);
   text-decoration: underline;
@@ -1226,7 +1228,6 @@ html, body {
   border-radius: 4px;
 }
 
-/* Syntax highlighting */
 .hljs { background: transparent; color: var(--text); }
 .hljs-comment, .hljs-quote { color: var(--syntaxComment); }
 .hljs-keyword, .hljs-selector-tag { color: var(--syntaxKeyword); }
@@ -1432,4 +1433,43 @@ html, body {
   padding: 0 2px;
   border-radius: 2px;
   font-weight: 600;
+}
+
+/* =========================================
+   Mobile UX Enhancements
+   ========================================= */
+
+@media (hover: none) and (pointer: coarse) {
+  /* Hide custom scrollbars visually to prevent layout bugs */
+  .custom-scrollbar {
+    scrollbar-width: none;
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Touch Feedback (:active) */
+  button:not(:disabled):active, 
+  a:not([disabled]):active,
+  .interactive:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+    transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.1s ease !important;
+  }
+}
+
+/* Viewport Stability & Touch Behavior */
+button, a {
+  /* Prevent accidental text selection on mobile buttons */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  /* Remove tap highlight color to rely entirely on :active state */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Base class for preventing body scroll when modals open on mobile */
+body.mobile-modal-open {
+  overflow: hidden;
+  touch-action: none;
 }
