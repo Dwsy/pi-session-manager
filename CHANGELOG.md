@@ -4,6 +4,24 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Atomic commit sync (latest)** — synchronized changelog entries for recent backend and frontend refactors
+  - Backend: added paginated session scanning (`scan_sessions_paginated`) with offset/limit, query, project, and tag filters
+  - Backend: added byte-offset incremental reader (`read_session_file_incremental_offset`) for large session file streaming
+  - Backend: dispatch now accepts both snake_case and camelCase pagination/filter params from frontend (`searchQuery`, `projectFilter`, `filterTagIds`)
+  - Backend: project filter matching now correctly supports parent/child path scope (cwd and session file path), with unit tests
+  - Backend: HTTP static fallback no longer masks missing API routes; `/api` and `/v1/*` now return explicit not-found JSON instead of SPA HTML
+  - Backend: CLI embedding startup changed to opt-in via `embedding_enabled` setting
+  - Backend: stats aggregation refactored to shared hour/weekday helper to reduce duplicated counting logic
+  - Frontend: App container modularized into `components/app/*` panes and extracted orchestration hooks (`useAppBootstrap`, `useDesktopSidebarActions`)
+  - Frontend: SessionViewer split into focused modules (`components/session-viewer/*`) with dedicated data/virtual-scroll/hotkey hooks
+  - Frontend: added paginated session loading hook (`usePaginatedSessions`) and integrated incremental load-more flow in session list
+  - Frontend: settings/onboarding UI unified through reusable setting field/input/select/toggle components
+  - Frontend: API test panel upgraded to schema-aware response validation and clearer troubleshooting feedback
+  - Frontend: synchronized locale keys for new settings/session options (including task navigation open position)
+  - Frontend: removed duplicated inline bootstrap/sidebar handlers in `App.tsx` after hook migration
+
 ### Added
 
 - **Heatmap enhancements** — interactive day detail modal and rich tooltips
