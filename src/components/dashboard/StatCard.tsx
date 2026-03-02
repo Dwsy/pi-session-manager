@@ -35,7 +35,7 @@ export default function StatCard({ icon: Icon, label, value, color, change, tren
     <div className={`glass-card glass-card-hover rounded-lg p-3 group cursor-pointer relative overflow-hidden ${getGlowClass()}`}>
       {/* Subtle gradient overlay */}
       <div
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 motion-opacity"
         style={{
           background: `radial-gradient(circle at top right, ${color}08 0%, transparent 70%)`
         }}
@@ -44,13 +44,13 @@ export default function StatCard({ icon: Icon, label, value, color, change, tren
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-2">
           <div
-            className="p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+            className="p-2 rounded-lg motion-transform group-hover:scale-110"
             style={{
               backgroundColor: `${color}15`,
               boxShadow: `0 2px 8px ${color}10`
             }}
           >
-            <Icon className="h-4 w-4 transition-transform duration-300 group-hover:rotate-3" style={{ color }} />
+            <Icon className="h-4 w-4 motion-transform group-hover:rotate-3" style={{ color }} />
           </div>
           {change && (
             <span className={`text-[10px] px-2 py-0.5 rounded-full bg-background/80 border border-foreground/5 ${getTrendColor()} flex items-center gap-0.5 backdrop-blur-sm`}>
@@ -64,7 +64,7 @@ export default function StatCard({ icon: Icon, label, value, color, change, tren
 
       {/* Bottom glow line */}
       <div
-        className="absolute bottom-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        className="absolute bottom-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 motion-opacity"
         style={{
           background: `linear-gradient(90deg, transparent 0%, ${color}60 50%, transparent 100%)`
         }}

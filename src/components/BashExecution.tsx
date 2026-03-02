@@ -1,15 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
-import { formatDate } from '../utils/format'
+import { useMemo, useState } from 'react'
 import { useSessionView } from '../contexts/SessionViewContext'
 import CodeBlock from './CodeBlock'
 import hljs from 'highlight.js'
+import { escapeHtml } from '../utils/markdown'
 
 interface BashExecutionProps {
   command: string
   output?: string
   exitCode?: number | null
   cancelled?: boolean
-  timestamp?: string
   entryId: string
 }
 
@@ -20,20 +19,20 @@ export default function BashExecution({
   output,
   exitCode,
   cancelled,
-  timestamp,
   entryId,
 }: BashExecutionProps) {
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const expanded = isToolExpanded(entryId)
-  const codeRef = useRef<HTMLElement>(null)
   const [commandCopied, setCommandCopied] = useState(false)
 
-  useEffect(() => {
-    if (codeRef.current && codeRef.current.dataset.highlighted !== 'yes') {
+  const highlightedCommand = useMemo(() => {
+    try {
+      return hljs.highlight(command, { language: 'bash' }).value
+    } catch {
       try {
-        hljs.highlightElement(codeRef.current)
-      } catch (e) {
-        console.warn('Failed to highlight bash code:', e)
+        return hljs.highlightAuto(command, ['bash', 'shell', 'sh']).value
+      } catch {
+        return escapeHtml(command)
       }
     }
   }, [command])
@@ -53,20 +52,17 @@ export default function BashExecution({
 
   return (
     <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
-      {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
       <div
-        className="tool-header cursor-pointer select-none"
+        className="tool-header tool-header-bash cursor-pointer select-none"
         onClick={() => toggleToolExpanded(entryId)}
       >
         <span className="tool-expand-indicator">
           {expanded ? '▾' : '▸'}
         </span>
-        <span className="tool-name">
-          <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          Bash
-        </span>
+        <pre className="bash-command-inline" title={command}>
+          <span className="bash-command-prefix" aria-hidden="true">$ </span>
+          <code className="hljs language-bash" dangerouslySetInnerHTML={{ __html: highlightedCommand }} />
+        </pre>
         {exitCode !== undefined && exitCode !== null && (
           <span className="tool-meta" style={{ color: exitCode === 0 ? 'var(--success)' : 'var(--error)' }}>
             exit {exitCode}
@@ -77,15 +73,12 @@ export default function BashExecution({
             cancelled
           </span>
         )}
-      </div>
-
-      <div className="tool-command-wrapper">
-        <pre className="tool-command-highlighted">
-          <code ref={codeRef} className="language-shell">{command}</code>
-        </pre>
         <button
-          onClick={handleCopyCommand}
-          className="tool-copy-button"
+          onClick={(event) => {
+            event.stopPropagation()
+            void handleCopyCommand()
+          }}
+          className="tool-copy-button bash-inline-copy-button"
           title={commandCopied ? 'Copied!' : 'Copy command'}
         >
           {commandCopied ? (

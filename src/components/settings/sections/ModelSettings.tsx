@@ -4,7 +4,6 @@
 
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { invoke } from '../../../transport'
 import {
   Loader2,
   Play,
@@ -16,6 +15,8 @@ import {
   Search,
   ExternalLink,
 } from 'lucide-react'
+import { invoke } from '../../../transport'
+import SettingsInput from '../SettingsInput'
 
 interface ModelInfo {
   provider: string
@@ -200,18 +201,18 @@ export default function ModelSettings() {
       <div className="flex items-center gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
+          <SettingsInput
             type="text"
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder={t('settings.models.searchPlaceholder', '搜索模型...')}
-            className="w-full pl-10 pr-4 py-2 bg-surface border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-info"
+            className="pl-10 pr-4"
           />
         </div>
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="p-2 bg-surface border border-border rounded-lg text-muted-foreground hover:text-foreground hover:border-border-hover disabled:opacity-50 transition-colors"
+          className="p-2 bg-surface border border-border rounded-lg text-muted-foreground hover:text-foreground hover:border-border-hover disabled:opacity-50 motion-surface motion-color motion-press focus-ring"
           title={t('common.refresh', '刷新')}
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -219,7 +220,7 @@ export default function ModelSettings() {
         <button
           onClick={testAllModels}
           disabled={testing || models.length === 0}
-          className="flex items-center gap-2 px-3 py-2 bg-info hover:bg-info/80 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+          className="flex items-center gap-2 px-3 py-2 bg-info hover:bg-info/80 disabled:opacity-50 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring"
         >
           {testing ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -256,7 +257,7 @@ export default function ModelSettings() {
           filteredModels.map((model) => (
             <div
               key={`${model.provider}/${model.model}`}
-              className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-border-hover transition-all cursor-pointer"
+              className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-border-hover motion-surface motion-color cursor-pointer"
               onClick={() => handleSelectModel(model)}
             >
               <div className="flex-shrink-0">{getStatusIcon(model.status)}</div>
@@ -296,7 +297,7 @@ export default function ModelSettings() {
                     testSingleModel(model.provider, model.model)
                   }}
                   disabled={testing}
-                  className="p-1.5 bg-surface border border-border rounded text-muted-foreground hover:text-foreground hover:border-border-hover disabled:opacity-50 transition-colors"
+                  className="p-1.5 bg-surface border border-border rounded text-muted-foreground hover:text-foreground hover:border-border-hover disabled:opacity-50 motion-surface motion-color motion-press focus-ring"
                   title={t('settings.models.testModel', '测试模型')}
                 >
                   {testingModel === `${model.provider}/${model.model}` ? (
@@ -350,7 +351,7 @@ export default function ModelSettings() {
               </h3>
               <button
                 onClick={() => setShowDetails(false)}
-                className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg motion-surface motion-color motion-press focus-ring"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -423,7 +424,7 @@ export default function ModelSettings() {
                     testSingleModel(selectedModel.provider, selectedModel.model)
                   }}
                   disabled={testing}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-info hover:bg-info/80 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-info hover:bg-info/80 disabled:opacity-50 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring"
                 >
                   {testingModel === `${selectedModel.provider}/${selectedModel.model}` ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -439,7 +440,7 @@ export default function ModelSettings() {
                     navigator.clipboard?.writeText(command)
                     alert(t('settings.models.commandCopied', '命令已复制到剪贴板'))
                   }}
-                  className="flex items-center gap-2 px-4 py-2 bg-surface border border-border hover:border-border-hover text-foreground text-sm font-medium rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-surface border border-border hover:border-border-hover text-foreground text-sm font-medium rounded-lg motion-surface motion-color motion-press focus-ring"
                 >
                   <ExternalLink className="h-4 w-4" />
                   {t('settings.models.openInTerminal', '打开终端')}

@@ -52,6 +52,7 @@ export const session = {
   loading: 'セッション読み込み中...',
   messages: '件のメッセージ',
   noMessages: 'メッセージなし',
+  noMessagesHint: 'このセッションはシステム記録のみで、ユーザー/アシスタントの会話はまだありません',
   messageCount: '{{count}} 件のメッセージ',
   showSidebar: 'サイドバーを表示',
   hideSidebar: 'サイドバーを非表示',

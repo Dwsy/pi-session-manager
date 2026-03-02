@@ -1,5 +1,6 @@
 import { Cpu } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import DashboardCardShell from './DashboardCardShell'
 import type { SessionStats } from '../../types'
 
 interface TopModelsChartProps {
@@ -53,10 +54,10 @@ export default function TopModelsChart({ stats, title = 'Most Used AI Models', l
   }
 
   return (
-    <div className="glass-card rounded-lg p-3 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-purple/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-      <div className="relative z-10">
+    <DashboardCardShell
+      className="rounded-lg p-3"
+      overlayClassName="bg-gradient-to-br from-purple/5 via-transparent to-transparent"
+    >
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
             <div className="p-1 rounded bg-purple/10">
@@ -82,7 +83,7 @@ export default function TopModelsChart({ stats, title = 'Most Used AI Models', l
               return (
                 <div
                   key={name}
-                  className="flex items-center justify-between p-2 bg-background/60 rounded-lg border border-foreground/5 hover:bg-background/90 hover:border-foreground/10 transition-all duration-300"
+                  className="flex items-center justify-between p-2 bg-background/60 rounded-lg border border-foreground/5 hover:bg-background/90 hover:border-foreground/10 motion-surface motion-color"
                   title={getFullModelName(name)}
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -121,7 +122,6 @@ export default function TopModelsChart({ stats, title = 'Most Used AI Models', l
             <p className="text-xs">{t('components.dashboard.noModelData')}</p>
           </div>
         )}
-      </div>
-    </div>
+    </DashboardCardShell>
   )
 }

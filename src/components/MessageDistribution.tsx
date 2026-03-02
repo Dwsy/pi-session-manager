@@ -22,7 +22,7 @@ export default function MessageDistribution({ stats, title }: MessageDistributio
 
   return (
     <div className="glass-card rounded-xl p-5 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-info/5 via-transparent to-success/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-info/5 via-transparent to-success/5 opacity-0 group-hover:opacity-100 motion-opacity pointer-events-none" />
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-4">
@@ -39,7 +39,7 @@ export default function MessageDistribution({ stats, title }: MessageDistributio
 
         <div className="relative h-10 bg-background/80 rounded-xl overflow-hidden mb-4 inner-shadow">
           <div
-            className="absolute left-0 top-0 h-full bg-gradient-to-r from-info to-[#6bb8ff] transition-all duration-500 flex items-center justify-center shadow-lg"
+            className="absolute left-0 top-0 h-full bg-gradient-to-r from-info to-[#6bb8ff] motion-width flex items-center justify-center shadow-lg"
             style={{ width: `${userPercent}%` }}
           >
             <span className="text-xs font-bold text-white drop-shadow-md">
@@ -47,7 +47,7 @@ export default function MessageDistribution({ stats, title }: MessageDistributio
             </span>
           </div>
           <div
-            className="absolute right-0 top-0 h-full bg-gradient-to-r from-success to-[#a3ff9e] transition-all duration-500 flex items-center justify-center shadow-lg"
+            className="absolute right-0 top-0 h-full bg-gradient-to-r from-success to-[#a3ff9e] motion-width flex items-center justify-center shadow-lg"
             style={{ width: `${assistantPercent}%` }}
           >
             <span className="text-xs font-bold text-white drop-shadow-md">
@@ -57,7 +57,7 @@ export default function MessageDistribution({ stats, title }: MessageDistributio
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-background/60 rounded-xl p-3 border border-foreground/5 transition-all duration-300 hover:bg-background/80 hover:border-info/20">
+          <div className="bg-background/60 rounded-xl p-3 border border-foreground/5 hover:bg-background/80 hover:border-info/20 motion-surface motion-color">
             <div className="flex items-center gap-2 mb-2">
               <div className="p-1.5 bg-info/20 rounded-lg">
                 <User className="h-3 w-3 text-info" />
@@ -70,7 +70,7 @@ export default function MessageDistribution({ stats, title }: MessageDistributio
             </div>
           </div>
 
-          <div className="bg-background/60 rounded-xl p-3 border border-foreground/5 transition-all duration-300 hover:bg-background/80 hover:border-success/20">
+          <div className="bg-background/60 rounded-xl p-3 border border-foreground/5 hover:bg-background/80 hover:border-success/20 motion-surface motion-color">
             <div className="flex items-center gap-2 mb-2">
               <div className="p-1.5 bg-success/20 rounded-lg">
                 <Bot className="h-3 w-3 text-success" />

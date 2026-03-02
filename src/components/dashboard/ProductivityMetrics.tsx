@@ -111,7 +111,7 @@ export default function ProductivityMetrics({ stats, title = 'Productivity Metri
           return (
             <div
               key={index}
-              className="bg-background rounded-lg p-3 hover:bg-surface transition-colors group cursor-pointer"
+              className="bg-background rounded-lg p-3 hover:bg-surface motion-color group cursor-pointer"
             >
               <div className="flex items-center justify-between mb-2">
                 <Icon className="h-4 w-4" style={{ color: metric.color }} />
@@ -156,7 +156,7 @@ export default function ProductivityMetrics({ stats, title = 'Productivity Metri
             {Array.from({ length: Math.min(streak, 30) }).map((_, i) => (
               <div
                 key={i}
-                className="flex-1 h-2 rounded-sm transition-all hover:scale-y-125"
+                className="flex-1 h-2 rounded-sm motion-transform hover:scale-y-125"
                 style={{
                   backgroundColor: streak >= 30
                     ? '#7ee787'

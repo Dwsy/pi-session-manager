@@ -264,7 +264,7 @@ export const settings = {
   },
   apiTest: {
     title: 'API 连接测试',
-    description: '测试与 pi-session-manager 后端服务的连接状态',
+    description: '对外会话检索 API 的真实连通性与响应结构测试',
     baseUrl: '服务地址',
     testAll: '测试全部',
     allPassed: '所有测试通过',
@@ -274,8 +274,8 @@ export const settings = {
     troubleshooting: '故障排除',
     help1: '确保 pi-session-manager CLI 正在运行',
     help2: '检查服务地址和端口是否正确',
-    help3: '首次测试 embedding 可能需要 400-500ms 加载模型',
-    help4: 'Embedding 服务会在空闲 5 分钟后自动释放内存',
+    help3: '确认接口返回 JSON，而不是前端 HTML 回退页面',
+    help4: '当前仅暴露会话检索类 API，embedding 默认关闭',
   },
   models: {
     searchPlaceholder: '搜索模型...',

@@ -64,7 +64,7 @@ export default function TagPicker({ tags, selectedTagIds, onToggle, onCreateTag,
       <div key={tag.id}>
         <button
           onClick={() => onToggle(tag.id)}
-          className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded text-left hover:bg-secondary transition-colors"
+          className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded text-left hover:bg-secondary motion-color motion-press focus-ring"
           style={{ paddingLeft: `${8 + depth * 14}px` }}
         >
           {hasChildren ? (

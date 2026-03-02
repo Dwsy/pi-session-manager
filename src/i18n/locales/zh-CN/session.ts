@@ -52,6 +52,7 @@ export const session = {
   loading: '加载会话中...',
   messages: '条消息',
   noMessages: '此会话中没有消息',
+  noMessagesHint: '当前会话只有系统记录，暂无可展示的用户/助手对话',
   messageCount: '{{count}} 条消息',
   showSidebar: '显示侧边栏',
   hideSidebar: '隐藏侧边栏',

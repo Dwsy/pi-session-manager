@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useIsMobile } from '../../hooks/useIsMobile'
@@ -20,7 +20,7 @@ import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
 import SearchFilterBar from '../SearchFilterBar'
 import SessionPreviewModal from './SessionPreviewModal'
-import { parseQuotedQuery } from '../../utils/search'
+import { filterSessions } from '../../utils/sessionFilters'
 
 interface KanbanBoardProps {
   sessions: SessionInfo[]
@@ -74,49 +74,17 @@ export default function KanbanBoard({
   const [searchQuery, setSearchQuery] = useState('')
   const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null)
   const [initialCardRect, setInitialCardRect] = useState<DOMRect | null>(null)
+  const [initialClickPoint, setInitialClickPoint] = useState<{ x: number; y: number } | null>(null)
   const [isPreviewAnimating, setIsPreviewAnimating] = useState(false)
+  const suppressReopenRef = useRef<{ sessionId: string; until: number } | null>(null)
 
   // Filter sessions by project + search query
   const filteredSessions = useMemo(() => {
-    let result = sessions
-    if (projectFilter) {
-      result = result.filter(s => s.cwd === projectFilter)
-    }
-    if (searchQuery.trim()) {
-      const parsedQuery = parseQuotedQuery(searchQuery)
-
-      if (!parsedQuery.hasPhrases) {
-        const q = parsedQuery.remainder.trim().toLowerCase()
-        if (q) {
-          result = result.filter(s =>
-            (s.name && s.name.toLowerCase().includes(q)) ||
-            (s.first_message && s.first_message.toLowerCase().includes(q)) ||
-            (s.last_message && s.last_message.toLowerCase().includes(q)) ||
-            (s.cwd && s.cwd.toLowerCase().includes(q))
-          )
-        }
-      } else {
-        const remainderTerms = parsedQuery.remainderTokens.map(term => term.toLowerCase())
-
-        result = result.filter(s => {
-          const searchableFields = [s.name || '', s.first_message || '', s.last_message || '', s.cwd || '']
-            .map(field => field.toLowerCase())
-
-          const phrasesMatched = parsedQuery.phrases.every(
-            phrase => searchableFields.some(field => field.includes(phrase.toLowerCase()))
-          )
-
-          if (!phrasesMatched) {
-            return false
-          }
-
-          return remainderTerms.every(
-            term => searchableFields.some(field => field.includes(term))
-          )
-        })
-      }
-    }
-    return result
+    return filterSessions({
+      sessions,
+      projectFilter,
+      searchQuery,
+    })
   }, [sessions, projectFilter, searchQuery])
 
   const sensors = useSensors(
@@ -246,13 +214,19 @@ export default function KanbanBoard({
   }, [columns, findColumnForSession, onMoveSession, onToggleTag])
 
   
-  const handleCardClick = useCallback((session: SessionInfo, rect?: DOMRect) => {
+  const handleCardClick = useCallback((session: SessionInfo, rect?: DOMRect, clickPoint?: { x: number; y: number }) => {
     // Prevent rapid clicks during animation
     if (isPreviewAnimating) return
 
+    // Prevent accidental reopen caused by close-click penetrating to the card
+    const suppress = suppressReopenRef.current
+    if (suppress && suppress.sessionId === session.id && Date.now() < suppress.until) {
+      return
+    }
+
     setIsPreviewAnimating(true)
 
-    // Use flushSync to ensure rect is set before modal renders
+    // Use flushSync to ensure rect and click point are set before modal renders
     flushSync(() => {
       if (rect) {
         setInitialCardRect(rect)
@@ -260,16 +234,25 @@ export default function KanbanBoard({
         const cardEl = document.querySelector(`[data-session-id="${session.id}"]`)
         setInitialCardRect(cardEl ? cardEl.getBoundingClientRect() : null)
       }
+      setInitialClickPoint(clickPoint ?? null)
     })
 
     setPreviewSession(session)
   }, [isPreviewAnimating])
 
   const handleClosePreview = useCallback(() => {
+    if (previewSession) {
+      suppressReopenRef.current = {
+        sessionId: previewSession.id,
+        until: Date.now() + 300,
+      }
+    }
+
     setPreviewSession(null)
+    setInitialClickPoint(null)
     // Allow clicks again after a short delay
     setTimeout(() => setIsPreviewAnimating(false), 100)
-  }, [])
+  }, [previewSession])
 
   const handleExpandToFull = useCallback(() => {
     if (previewSession) {
@@ -329,7 +312,7 @@ export default function KanbanBoard({
                 <button
                   key={col.id}
                   onClick={() => setMobileColIndex(i)}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] whitespace-nowrap transition-colors ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] whitespace-nowrap motion-color motion-press focus-ring ${
                     mobileColIndex === i
                       ? 'bg-secondary text-foreground font-medium'
                       : 'text-muted-foreground'
@@ -406,6 +389,7 @@ export default function KanbanBoard({
         onClose={handleClosePreview}
         onExpand={handleExpandToFull}
         initialCardRect={initialCardRect}
+        initialClickPoint={initialClickPoint}
       />
     </div>
   )

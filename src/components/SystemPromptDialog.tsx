@@ -27,6 +27,10 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
 
   // 从会话 entries 中提取工具使用情况
   const toolUsages = useMemo(() => {
+    if (!isOpen || entries.length === 0) {
+      return [];
+    }
+
     const toolMap = new Map<string, number>();
 
     for (const entry of entries) {
@@ -48,7 +52,7 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
     // 按使用次数降序排序
     usages.sort((a, b) => b.count - a.count);
     return usages;
-  }, [entries]);
+  }, [entries, isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -80,7 +84,7 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
           <div className="flex items-center gap-1">
             <button
               onClick={() => setActiveTab('prompt')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium motion-surface motion-color motion-press focus-ring ${
                 activeTab === 'prompt'
                   ? 'bg-surface text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-surface/50'
@@ -91,7 +95,7 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
             </button>
             <button
               onClick={() => setActiveTab('tools')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium motion-surface motion-color motion-press focus-ring ${
                 activeTab === 'tools'
                   ? 'bg-surface text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-surface/50'
@@ -106,7 +110,7 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
           </div>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors p-1"
+            className="text-muted-foreground hover:text-foreground motion-color motion-press focus-ring p-1"
             aria-label={t('common.close', 'Close')}
           >
             <X className="w-5 h-5" />

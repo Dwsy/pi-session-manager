@@ -288,7 +288,10 @@ function MobileSettings({
   // 移动端全屏滑动：列表左滑出，详情从右滑入（更清晰的页面切换）
   const listTransform = showDetail ? 'translateX(-100%)' : 'translateX(0)'
   const detailTransform = showDetail ? 'translateX(0)' : 'translateX(100%)'
-  const transitionStyle = { transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease' }
+  const transitionStyle = {
+    transition:
+      'transform var(--motion-duration-overlay) var(--motion-ease-standard), opacity var(--motion-duration-overlay) var(--motion-ease-standard)',
+  }
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -307,7 +310,7 @@ function MobileSettings({
             <h2 className="text-lg font-semibold text-foreground">{t('settings.title', '设置')}</h2>
             <button
               onClick={onClose}
-              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg motion-color motion-press focus-ring"
             >
               <X className="h-5 w-5" />
             </button>
@@ -319,7 +322,7 @@ function MobileSettings({
                 <button
                   key={item.id}
                   onClick={() => handleSectionClick(item.id)}
-                  className="w-full flex items-center gap-3 px-4 min-h-[44px] text-left text-sm text-foreground hover:bg-surface active:bg-secondary transition-colors"
+                  className="w-full flex items-center gap-3 px-4 min-h-[44px] text-left text-sm text-foreground hover:bg-surface active:bg-secondary motion-color motion-press focus-ring"
                 >
                   <span className="text-muted-foreground">{item.icon}</span>
                   <span className="flex-1 text-left">{item.label}</span>
@@ -331,7 +334,7 @@ function MobileSettings({
             <div className="px-4 py-4 border-t border-border">
               <button
                 onClick={onReset}
-                className="w-full flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border transition-colors"
+                className="w-full flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border motion-color motion-surface motion-press focus-ring"
               >
                 <RefreshCw className="h-4 w-4" />
                 {t('settings.reset', '重置设置')}
@@ -354,7 +357,7 @@ function MobileSettings({
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-background flex-shrink-0 safe-area-top">
             <button
               onClick={handleBack}
-              className="p-2 -ml-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+              className="p-2 -ml-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg motion-color motion-press focus-ring"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -363,7 +366,7 @@ function MobileSettings({
             </h3>
             <button
               onClick={onClose}
-              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg motion-color motion-press focus-ring"
             >
               <X className="h-5 w-5" />
             </button>
@@ -382,14 +385,14 @@ function MobileSettings({
           <div className="flex items-center gap-3 px-4 py-3 border-t border-border bg-background flex-shrink-0 safe-area-bottom">
             <button
               onClick={handleBack}
-              className="flex-1 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors flex items-center justify-center"
+              className="flex-1 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg motion-color motion-surface motion-press focus-ring flex items-center justify-center"
             >
               {t('common.cancel', '取消')}
             </button>
             <button
               onClick={onSave}
               disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 min-h-[44px] px-4 bg-info hover:bg-info/80 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-2 min-h-[44px] px-4 bg-info hover:bg-info/80 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
               {saved ? t('settings.saved', '已保存') : t('common.save', '保存')}
@@ -423,7 +426,7 @@ function SettingsSidebar({ menuItems, activeSection, onSectionChange, onReset }:
           <button
             key={item.id}
             onClick={() => onSectionChange(item.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm motion-surface motion-color motion-press focus-ring ${
               activeSection === item.id
                 ? 'bg-info/15 text-foreground ring-1 ring-info/30'
                 : 'text-muted-foreground hover:text-foreground hover:bg-surface/80'
@@ -432,7 +435,7 @@ function SettingsSidebar({ menuItems, activeSection, onSectionChange, onReset }:
             <span className={activeSection === item.id ? 'text-info' : ''}>{item.icon}</span>
             <span className="flex-1 text-left">{item.label}</span>
             <ChevronRight
-              className={`h-4 w-4 transition-transform text-muted-foreground/50 ${
+              className={`h-4 w-4 motion-transform text-muted-foreground/50 ${
                 activeSection === item.id ? 'rotate-90 text-info/70' : ''
               }`}
             />
@@ -443,7 +446,7 @@ function SettingsSidebar({ menuItems, activeSection, onSectionChange, onReset }:
       <div className="p-3 border-t border-border/80 flex-shrink-0">
         <button
           onClick={onReset}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
         >
           <RefreshCw className="h-4 w-4" />
           {t('settings.reset', '重置设置')}
@@ -486,7 +489,7 @@ function SettingsContent({
         </h3>
         <button
           onClick={onClose}
-          className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg transition-colors"
+          className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg motion-color motion-press focus-ring"
         >
           <X className="h-5 w-5" />
         </button>
@@ -517,14 +520,14 @@ function SettingsContent({
       <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border/80 bg-background/80">
         <button
           onClick={onClose}
-          className="px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg transition-colors"
+          className="px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg motion-color motion-press focus-ring"
         >
           {t('common.cancel', '取消')}
         </button>
         <button
           onClick={onSave}
           disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+          className="flex items-center gap-2 px-5 py-2.5 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring disabled:opacity-50 shadow-sm"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
           {saved ? t('settings.saved', '已保存') : t('common.save', '保存设置')}

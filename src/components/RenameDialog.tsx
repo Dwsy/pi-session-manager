@@ -40,14 +40,14 @@ export default function RenameDialog({ session, onRename, onClose }: RenameDialo
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
             >
               {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={!newName.trim()}
-              className="px-4 py-2 text-sm bg-info hover:bg-info/80 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
+              className="px-4 py-2 text-sm bg-info hover:bg-info/80 disabled:opacity-50 disabled:cursor-not-allowed rounded motion-color motion-press focus-ring"
             >
               {t('rename.confirm')}
             </button>

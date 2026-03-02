@@ -29,6 +29,12 @@ export default function SessionScrollMarkers({
   if (markers.length === 0) return null
   if (isMobile && !show) return null
 
+  const getTooltipPlacement = (top: number): 'top' | 'center' | 'bottom' => {
+    if (top <= 0.12) return 'bottom'
+    if (top >= 0.88) return 'top'
+    return 'center'
+  }
+
   return (
     <div
       className={`session-scroll-markers${isMobile ? ' mobile' : ''}`}
@@ -40,11 +46,13 @@ export default function SessionScrollMarkers({
     >
       {markers.map(({ entry, top, preview, markerType }) => {
         const isActive = activeMarkerId === entry.id
+        const tooltipPlacement = getTooltipPlacement(top)
         return (
           <button
             key={entry.id}
             className={`session-scroll-marker session-scroll-marker--${markerType}${isActive ? ' active' : ''}`}
             style={{ top: `${top * 100}%` }}
+            data-tooltip-placement={tooltipPlacement}
             onClick={() => onMarkerClick(entry.id)}
             title={preview}
           >

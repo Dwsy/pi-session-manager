@@ -5,13 +5,25 @@ export function isTauriReady(): boolean {
 }
 
 export function parseSessionEntries(jsonlContent: string): SessionEntry[] {
+  return parseSessionEntriesWithLineCount(jsonlContent).entries
+}
+
+export function parseSessionEntriesWithLineCount(jsonlContent: string): {
+  entries: SessionEntry[]
+  lineCount: number
+} {
   const entries: SessionEntry[] = []
-  const lines = jsonlContent.split('\n').filter(line => line.trim())
+  const lines = jsonlContent.split('\n')
   const seenIds = new Map<string, number>()
+  let lineCount = 0
 
   for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line.trim()) continue
+    lineCount++
+
     try {
-      const entry = JSON.parse(lines[i])
+      const entry = JSON.parse(line)
       
       // Ensure unique IDs - append suffix if duplicate
       if (entry.id) {
@@ -24,11 +36,11 @@ export function parseSessionEntries(jsonlContent: string): SessionEntry[] {
       
       entries.push(entry)
     } catch (e) {
-      console.warn('Failed to parse line:', lines[i].substring(0, 100))
+      console.warn('Failed to parse line:', line.substring(0, 100))
     }
   }
 
-  return entries
+  return { entries, lineCount }
 }
 
 export function computeStats(entries: SessionEntry[]): LegacySessionStats {

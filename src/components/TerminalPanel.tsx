@@ -370,7 +370,7 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
       {/* Resize handle */}
       {isOpen && !maximized && (
         <div
-          className="h-[3px] cursor-ns-resize hover:bg-blue-500/50 transition-colors flex-shrink-0"
+          className="h-[3px] cursor-ns-resize hover:bg-blue-500/50 motion-color flex-shrink-0"
           onMouseDown={handleResizeStart}
         />
       )}
@@ -388,7 +388,7 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
               onDragOver={(e) => handleTabDragOver(e, tab.id)}
               onDragEnd={() => { setDragTabId(null); setDragOverTabId(null) }}
               onDrop={(e) => handleTabDrop(e, tab.id)}
-              className={`group flex items-center gap-1 px-2 py-1 text-[11px] cursor-pointer shrink-0 transition-colors ${
+              className={`group flex items-center gap-1 px-2 py-1 text-[11px] cursor-pointer shrink-0 motion-color ${
                 tab.id === activeTabId ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'
               } ${dragTabId === tab.id ? 'opacity-40' : ''} ${dragOverTabId === tab.id && dragTabId !== tab.id ? 'border-l-2 border-blue-400' : ''}`}
               onClick={() => setActiveTabId(tab.id)}
@@ -409,7 +409,7 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
               )}
               <button
                 onClick={(e) => { e.stopPropagation(); closeTab(tab.id) }}
-                className="p-0.5 rounded hover:bg-secondary opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-0.5 rounded hover:bg-secondary opacity-0 group-hover:opacity-100 motion-opacity motion-color focus-ring"
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -419,26 +419,26 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
 
         {/* Actions */}
         <div className="relative flex items-center gap-0.5 ml-1 shrink-0">
-          <button onClick={() => addTab()} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" title={t('components.terminalPanel.newTerminal')}>
+          <button onClick={() => addTab()} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color motion-press focus-ring" title={t('components.terminalPanel.newTerminal')}>
             <Plus className="h-3.5 w-3.5" />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); setShowShellMenu(!showShellMenu) }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" title={t('components.terminalPanel.selectShell')}>
+          <button onClick={(e) => { e.stopPropagation(); setShowShellMenu(!showShellMenu) }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color motion-press focus-ring" title={t('components.terminalPanel.selectShell')}>
             <ChevronDown className="h-3 w-3" />
           </button>
           {showShellMenu && (
             <div className="absolute top-full right-0 mt-1 bg-popover border border-border rounded shadow-lg z-50 py-1 min-w-[120px]">
               {availableShells.map(s => (
-                <button key={s.path} onClick={(e) => { e.stopPropagation(); addTab(s.path) }} className="w-full text-left px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-secondary hover:text-foreground">
+                <button key={s.path} onClick={(e) => { e.stopPropagation(); addTab(s.path) }} className="w-full text-left px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-secondary hover:text-foreground motion-color focus-ring">
                   {s.label}
                 </button>
               ))}
             </div>
           )}
           <div className="w-px h-3.5 bg-border mx-0.5" />
-          <button onClick={toggleMaximize} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" title={maximized ? 'Restore panel' : 'Maximize panel'}>
+          <button onClick={toggleMaximize} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color motion-press focus-ring" title={maximized ? 'Restore panel' : 'Maximize panel'}>
             {maximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
           </button>
-          <button onClick={onClose} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" title={t('components.terminalPanel.hidePanel')}>
+          <button onClick={onClose} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color motion-press focus-ring" title={t('components.terminalPanel.hidePanel')}>
             <ChevronDown className="h-3 w-3" />
           </button>
         </div>

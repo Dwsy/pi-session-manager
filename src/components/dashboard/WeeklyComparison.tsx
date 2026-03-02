@@ -122,7 +122,7 @@ export default function WeeklyComparison({ stats, title }: WeeklyComparisonProps
             </div>
             <div className="flex-1 h-6 bg-background rounded-lg overflow-hidden relative">
               <div
-                className={`h-full rounded-lg transition-all duration-500 ${dayData.isToday ? 'bg-info' : 'bg-secondary'}`}
+                className={`h-full rounded-lg motion-width ${dayData.isToday ? 'bg-info' : 'bg-secondary'}`}
                 style={{ width: `${(dayData.messages / maxMessages) * 100}%` }}
               />
               <div className="absolute inset-0 flex items-center px-2">

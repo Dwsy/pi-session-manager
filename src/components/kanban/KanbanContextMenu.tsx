@@ -127,14 +127,14 @@ export default function KanbanContextMenu({
   if (showTagSubmenu) {
     return (
       <div
-        className="fixed z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] animate-in fade-in zoom-in-95 duration-100"
+        className="fixed z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] ui-enter-zoom"
         style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Back button */}
         <button
           onClick={() => setShowTagSubmenu(false)}
-          className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors border-b border-border/50"
+          className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-muted motion-color focus-ring border-b border-border/50"
         >
           <X size={12} />
           {t('common.back')}
@@ -156,7 +156,7 @@ export default function KanbanContextMenu({
                     e.stopPropagation()
                     onToggleTag(tag.id, isAssigned)
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-muted transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-muted motion-color focus-ring"
                 >
                   <div className="flex items-center gap-1.5 flex-1">
                     <TagBadge tag={tag} compact />
@@ -177,7 +177,7 @@ export default function KanbanContextMenu({
 
   return (
     <div
-      className="fixed z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] animate-in fade-in zoom-in-95 duration-100"
+      className="fixed z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] ui-enter-zoom"
       style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -192,7 +192,7 @@ export default function KanbanContextMenu({
             onClick={(e) => handleItemClick(item, e)}
             disabled={item.disabled}
             className={[
-              'w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors',
+              'w-full flex items-center gap-2 px-3 py-1.5 text-[11px] motion-color focus-ring',
               'hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed',
               item.danger ? 'text-red-500 hover:bg-red-500/10' : 'text-foreground',
             ].join(' ')}

@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { invoke } from '../../../transport'
 import {
   Loader2, Search, Puzzle, FileText, Settings2, Blocks,
   Paintbrush, X, Check, History, RotateCcw, Eye,
 } from 'lucide-react'
+import { invoke } from '../../../transport'
 import MarkdownContent from '../../MarkdownContent'
+import SettingsInput from '../SettingsInput'
+import SettingsSelect from '../SettingsSelect'
 import type { ResourceInfo, ResourceType, PiSettingsFull, ModelOption, ConfigVersionMeta } from '../../../types'
 
 type PiConfigTab = 'resources' | 'settings' | 'versions'
@@ -37,7 +39,7 @@ function PillTab({ active, onClick, icon, label }: {
 }) {
   return (
     <button onClick={onClick}
-      className={`flex-1 min-w-0 min-h-[40px] flex items-center justify-center gap-1.5 px-3 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
+      className={`flex-1 min-w-0 min-h-[40px] flex items-center justify-center gap-1.5 px-3 text-xs font-medium rounded-md motion-surface motion-color motion-press focus-ring whitespace-nowrap ${
         active ? 'bg-info text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
       }`}
     >{icon}{label}</button>
@@ -162,7 +164,7 @@ function ResourcesTab() {
           const isActive = activeType === rt.type
           return (
             <button key={rt.type} onClick={() => setActiveType(rt.type)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap motion-surface motion-color motion-press focus-ring ${
                 isActive
                   ? 'bg-secondary text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-surface'
@@ -256,11 +258,11 @@ function ScopeGroup({ label, sublabel, items, toggling, onToggle, onView }: {
           const isToggling = toggling === key
           const hasFile = item.path.endsWith('.md') || item.path.endsWith('.ts') || item.path.endsWith('.js') || item.path.endsWith('.json')
           return (
-            <div key={key} className={`flex items-center gap-2.5 px-3 py-2 rounded-md transition-all group min-w-0 ${
+            <div key={key} className={`flex items-center gap-2.5 px-3 py-2 rounded-md motion-surface motion-color group min-w-0 ${
               item.enabled ? 'hover:bg-info/5' : 'opacity-50 hover:opacity-70'
             }`}>
               <button onClick={() => onToggle(item)} disabled={isToggling}
-                className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center motion-surface motion-color motion-press focus-ring ${
                   item.enabled
                     ? 'bg-info border-info text-white'
                     : 'border-border group-hover:border-muted-foreground'
@@ -280,7 +282,7 @@ function ScopeGroup({ label, sublabel, items, toggling, onToggle, onView }: {
               </div>
               {hasFile && (
                 <button onClick={() => onView(item)}
-                  className="p-1 rounded text-muted-foreground/40 hover:text-info hover:bg-info/10 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                  className="p-1 rounded text-muted-foreground/40 hover:text-info hover:bg-info/10 opacity-0 group-hover:opacity-100 motion-color motion-opacity motion-press focus-ring flex-shrink-0"
                   title={t('components.piConfig.view')}>
                   <Eye className="h-3.5 w-3.5" />
                 </button>
@@ -493,7 +495,7 @@ function SettingRow({ def, value, saving, saved, onSave, modelData, currentProvi
   if (def.type === 'bool') {
     const checked = value !== undefined ? value === true : (def.defaultValue === true)
     return (
-      <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 transition-colors">
+      <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 motion-surface motion-color">
         <div className="min-w-0 mr-3">
           <div className="text-sm text-foreground">{label}</div>
           <div className="text-[11px] text-muted-foreground">{desc}</div>
@@ -501,8 +503,8 @@ function SettingRow({ def, value, saving, saved, onSave, modelData, currentProvi
         <div className="flex items-center gap-2 flex-shrink-0">
           {savedIndicator}
           <button onClick={() => onSave(def.key, !checked)} disabled={saving}
-            className={`relative w-9 h-5 rounded-full transition-colors ${checked ? 'bg-info' : 'bg-border'}`}>
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+            className={`relative w-9 h-5 rounded-full motion-color focus-ring ${checked ? 'bg-info' : 'bg-border'}`}>
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm motion-transform ${
               checked ? 'translate-x-4' : ''
             }`} />
           </button>
@@ -513,18 +515,18 @@ function SettingRow({ def, value, saving, saved, onSave, modelData, currentProvi
 
   if (def.type === 'enum' && def.options) {
     return (
-      <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 transition-colors">
+      <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 motion-surface motion-color">
         <div className="min-w-0 mr-3">
           <div className="text-sm text-foreground">{label}</div>
           <div className="text-[11px] text-muted-foreground">{desc}</div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {savedIndicator}
-          <select value={(value as string) ?? (def.defaultValue as string | undefined) ?? def.options[0]}
+          <SettingsSelect value={(value as string) ?? (def.defaultValue as string | undefined) ?? def.options[0]}
             onChange={e => onSave(def.key, e.target.value)} disabled={saving}
-            className="text-xs bg-surface border border-border rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-info cursor-pointer">
+            className="w-auto text-xs rounded-md px-2 py-1 focus:ring-1 focus:ring-info cursor-pointer">
             {def.options.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+          </SettingsSelect>
         </div>
       </div>
     )
@@ -539,7 +541,7 @@ function SettingRow({ def, value, saving, saved, onSave, modelData, currentProvi
       ? [current, ...providers] : providers
 
     return (
-      <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 transition-colors">
+      <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 motion-surface motion-color">
         <div className="min-w-0 mr-3">
           <div className="text-sm text-foreground">{label}</div>
           <div className="text-[11px] text-muted-foreground">
@@ -549,12 +551,12 @@ function SettingRow({ def, value, saving, saved, onSave, modelData, currentProvi
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {savedIndicator}
-          <select value={current}
+          <SettingsSelect value={current}
             onChange={e => onSave(def.key, e.target.value || null)} disabled={saving}
-            className="text-xs bg-surface border border-border rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-info cursor-pointer max-w-[180px]">
+            className="w-auto text-xs rounded-md px-2 py-1 focus:ring-1 focus:ring-info cursor-pointer max-w-[180px]">
             <option value="">—</option>
             {allProviders.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          </SettingsSelect>
         </div>
       </div>
     )
@@ -578,7 +580,7 @@ function SettingRow({ def, value, saving, saved, onSave, modelData, currentProvi
     }
 
     return (
-      <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 transition-colors">
+      <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 motion-surface motion-color">
         <div className="min-w-0 mr-3">
           <div className="text-sm text-foreground">{label}</div>
           <div className="text-[11px] text-muted-foreground">
@@ -588,9 +590,9 @@ function SettingRow({ def, value, saving, saved, onSave, modelData, currentProvi
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {savedIndicator}
-          <select value={current}
+          <SettingsSelect value={current}
             onChange={e => onSave(def.key, e.target.value || null)} disabled={saving}
-            className="text-xs bg-surface border border-border rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-info cursor-pointer max-w-[220px]">
+            className="w-auto text-xs rounded-md px-2 py-1 focus:ring-1 focus:ring-info cursor-pointer max-w-[220px]">
             <option value="">—</option>
             {currentProvider && modelsByProvider.has(currentProvider) ? (
               // Show current provider's models
@@ -605,7 +607,7 @@ function SettingRow({ def, value, saving, saved, onSave, modelData, currentProvi
                 </optgroup>
               ))
             )}
-          </select>
+          </SettingsSelect>
         </div>
       </div>
     )
@@ -614,19 +616,19 @@ function SettingRow({ def, value, saving, saved, onSave, modelData, currentProvi
   // number input
   if (def.type === 'number') {
     return (
-      <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 transition-colors">
+      <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 motion-surface motion-color">
         <div className="min-w-0 mr-3">
           <div className="text-sm text-foreground">{label}</div>
           <div className="text-[11px] text-muted-foreground">{desc}</div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {savedIndicator}
-          <input type="number" value={(value as number) ?? (def.defaultValue as number | undefined) ?? ''} placeholder="—"
+          <SettingsInput type="number" value={(value as number) ?? (def.defaultValue as number | undefined) ?? ''} placeholder="—"
             onChange={e => {
               const v = e.target.value ? parseInt(e.target.value, 10) : null
               onSave(def.key, v != null && !isNaN(v) ? v : null)
             }} disabled={saving}
-            className="w-24 text-xs bg-surface border border-border rounded-md px-2 py-1 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-info"
+            className="w-24 text-xs rounded-md px-2 py-1 placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-info"
           />
         </div>
       </div>
@@ -635,16 +637,16 @@ function SettingRow({ def, value, saving, saved, onSave, modelData, currentProvi
 
   // text fallback
   return (
-    <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 transition-colors">
+    <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface/50 motion-surface motion-color">
       <div className="min-w-0 mr-3">
         <div className="text-sm text-foreground">{label}</div>
         <div className="text-[11px] text-muted-foreground">{desc}</div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         {savedIndicator}
-        <input type="text" value={(value as string) ?? ''} placeholder="—"
+        <SettingsInput type="text" value={(value as string) ?? ''} placeholder="—"
           onChange={e => onSave(def.key, e.target.value || null)} disabled={saving}
-          className="w-32 text-xs bg-surface border border-border rounded-md px-2 py-1 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-info"
+          className="w-32 text-xs rounded-md px-2 py-1 placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-info"
         />
       </div>
     </div>
@@ -678,7 +680,7 @@ function ResourceViewerModal({ item, content, loading, onClose }: {
             <div className="text-[11px] text-muted-foreground truncate">{item.path}</div>
           </div>
           <button onClick={onClose}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface transition-colors">
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface motion-surface motion-color motion-press focus-ring">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -780,17 +782,17 @@ function ConfigVersionsTab() {
     <div className="max-h-[450px] overflow-y-auto divide-y divide-border rounded-lg border border-border">
       {versions.map(v => (
         <div key={v.id}>
-          <div className="flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-surface/30 transition-colors">
+          <div className="flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-surface/30 motion-surface motion-color">
             <span className="text-muted-foreground font-mono w-8 text-right flex-shrink-0">#{v.id}</span>
             <span className="flex-1 text-foreground">{formatTime(v.createdAt)}</span>
             <span className="text-muted-foreground flex-shrink-0">{formatSize(v.sizeBytes)}</span>
             <button onClick={() => handlePreview(v.id)}
-              className={`p-1 rounded transition-colors ${previewId === v.id ? 'text-info bg-info/10' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`p-1 rounded motion-surface motion-color motion-press focus-ring ${previewId === v.id ? 'text-info bg-info/10' : 'text-muted-foreground hover:text-foreground'}`}
               title={t('settings.piConfig.preview', 'Preview')}>
               <Eye className="h-3.5 w-3.5" />
             </button>
             <button onClick={() => handleRestore(v.id)} disabled={restoring === v.id}
-              className="p-1 rounded text-muted-foreground hover:text-warning transition-colors"
+              className="p-1 rounded text-muted-foreground hover:text-warning motion-surface motion-color motion-press focus-ring"
               title={t('settings.piConfig.restore', 'Restore')}>
               {restoring === v.id
                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />

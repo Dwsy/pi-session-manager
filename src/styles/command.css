@@ -23,7 +23,7 @@
 
 [cmdk-item] {
   @apply px-3 py-2 rounded-md cursor-pointer;
-  @apply transition-colors duration-150;
+  @apply motion-color;
   @apply hover:bg-surface;
 }
 
@@ -61,11 +61,11 @@
 }
 
 .fade-in {
-  animation: fadeIn 200ms ease-out;
+  animation: fadeIn var(--motion-duration-base) var(--motion-ease-enter);
 }
 
 .zoom-in-95 {
-  animation: zoomIn 200ms ease-out;
+  animation: zoomIn var(--motion-duration-base) var(--motion-ease-enter);
 }
 
 /* 高亮 */

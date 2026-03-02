@@ -5,66 +5,56 @@ import {
   useRef,
   useCallback,
   lazy,
-  Suspense,
 } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  FolderOpen,
-  Star,
-  Settings,
-  ArrowLeft,
-  LayoutDashboard,
-  Search,
-  Terminal,
-  Columns3,
-  Loader2,
-} from "lucide-react";
-import KbdTooltip from "./components/KbdTooltip";
-import ProjectFilterList from "./components/ProjectFilterList";
+import { Loader2 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSwipe } from "./hooks/useSwipe";
 import { triggerHaptic } from "./utils/haptics";
-import PullToRefresh from "./components/PullToRefresh";
-
-const startDragging = () => {
-  if (isTauri()) {
-    getCurrentWindow().startDragging();
-  }
-};
-import SessionList from "./components/SessionList";
-import ProjectList from "./components/ProjectList";
-import SessionViewer from "./components/SessionViewer";
-import ExportDialog from "./components/ExportDialog";
-import RenameDialog from "./components/RenameDialog";
-import DeleteSessionConfirmDialog from "./components/DeleteSessionConfirmDialog";
-import FavoritesPanel from "./components/FavoritesPanel";
-import Onboarding from "./components/Onboarding";
-import SearchFilterBar from "./components/SearchFilterBar";
-import FullTextSearch from "./components/FullTextSearch";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
-import { useFileWatcher } from "./hooks/useFileWatcher";
 import { useSessionBadges } from "./hooks/useSessionBadges";
 import { useSessions } from "./hooks/useSessions";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useSessionActions } from "./hooks/useSessionActions";
 import { useAppearance } from "./hooks/useAppearance";
 import { useIsMobile } from "./hooks/useIsMobile";
+import { useAppBootstrap } from "./hooks/app/useAppBootstrap";
+import { useDesktopSidebarActions } from "./hooks/app/useDesktopSidebarActions";
+import { useFavorites } from "./hooks/app/useFavorites";
+import { useSidebarSessions } from "./hooks/app/useSidebarSessions";
 import ConnectionBanner from "./components/ConnectionBanner";
 import { useTags } from "./hooks/useTags";
-import { registerBuiltinPlugins } from "./plugins";
-import type { SessionInfo, FavoriteItem } from "./types";
+import type { SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
 import { invoke, isTauri } from "./transport";
 import { getCachedSettings } from "./utils/settingsApi";
-import { applyPiChatTheme } from "./utils/piTheme";
-import { parseQuotedQuery } from "./utils/search";
-import { getPlatformDefaults } from "./components/settings/types";
+import AppMobileLayout, { type MobileTab } from "./components/app/AppMobileLayout";
+import AppDesktopSidebar from "./components/app/AppDesktopSidebar";
+import AppDesktopContent from "./components/app/AppDesktopContent";
+import AppDesktopSearchBar from "./components/app/AppDesktopSearchBar";
+import AppDesktopSidebarContent from "./components/app/AppDesktopSidebarContent";
+import AppOverlays from "./components/app/AppOverlays";
+import AppSessionListPane from "./components/app/AppSessionListPane";
+import AppProjectListPane from "./components/app/AppProjectListPane";
+import AppKanbanPane from "./components/app/AppKanbanPane";
+import AppDashboardPane from "./components/app/AppDashboardPane";
+import AppSessionViewerPane from "./components/app/AppSessionViewerPane";
+import AppMobileFilterBar from "./components/app/AppMobileFilterBar";
+import AppSettingsPane from "./components/app/AppSettingsPane";
+import AppTerminalPane from "./components/app/AppTerminalPane";
+
+const startDragging = () => {
+  if (isTauri()) {
+    getCurrentWindow().startDragging();
+  }
+};
 
 // Lazy load heavy components
 const Dashboard = lazy(() => import("./components/Dashboard"));
 const KanbanBoard = lazy(() => import("./components/kanban/KanbanBoard"));
 const SettingsPanel = lazy(() => import("./components/settings/SettingsPanel"));
 const TerminalPanel = lazy(() => import("./components/TerminalPanel"));
+const FullTextSearch = lazy(() => import("./components/FullTextSearch"));
 const CommandPalette = lazy(() =>
   import("./components/command").then((m) => ({ default: m.CommandPalette })),
 );
@@ -76,23 +66,11 @@ const LoadingSpinner = () => (
   </div>
 );
 
-// Define sqlite_cache types for Tauri responses
-namespace sqlite_cache {
-  export interface FavoriteItem {
-    id: string;
-    type: string;
-    name: string;
-    path: string;
-    added_at: string;
-  }
-}
-
 function App() {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  const [mobileTab, setMobileTab] = useState<
-    "list" | "projects" | "kanban" | "dashboard" | "settings"
-  >("list");
+
+  const [mobileTab, setMobileTab] = useState<MobileTab>("list");
   const listScrollRef = useRef<HTMLDivElement>(null);
   const projectScrollRef = useRef<HTMLDivElement>(null);
 
@@ -153,9 +131,6 @@ function App() {
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
-  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
-  const [loadingFavorites, setLoadingFavorites] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem("onboarding-completed");
   });
@@ -168,12 +143,23 @@ function App() {
   const [terminalPendingCommand, setTerminalPendingCommand] = useState<
     string | null
   >(null);
-  const [terminalConfig, setTerminalConfig] = useState({
-    enabled: true,
-    defaultShell: getPlatformDefaults().defaultShell,
-    fontSize: 13,
-  });
-  const hasInitializedRef = useRef(false);
+  const handleBuiltinTerminalDisabled = useCallback(() => {
+    setShowTerminal(false);
+  }, []);
+  const { isInitialized, terminalConfig, reloadTerminalConfig } =
+    useAppBootstrap({
+      loadSessions,
+      loadSettings,
+      patchSessions,
+      onBuiltinTerminalDisabled: handleBuiltinTerminalDisabled,
+    });
+  const {
+    favorites,
+    loadingFavorites,
+    loadFavorites,
+    removeFavorite,
+    toggleFavorite,
+  } = useFavorites({ enabled: isInitialized });
 
   // Apply body lock when any modal is open on mobile
   useEffect(() => {
@@ -221,57 +207,6 @@ function App() {
       }
     } catch {}
   }, []);
-
-  const loadFavorites = useCallback(async () => {
-    setLoadingFavorites(true);
-    try {
-      const result =
-        await invoke<sqlite_cache.FavoriteItem[]>("get_all_favorites");
-      const formattedFavorites: FavoriteItem[] = result.map((f) => ({
-        id: f.id,
-        type: f.type as "session" | "project",
-        name: f.name,
-        path: f.path,
-        addedAt: f.added_at,
-      }));
-      setFavorites(formattedFavorites);
-    } catch (error) {
-      console.error("[Favorites] Failed to load favorites:", error);
-      setFavorites([]);
-    } finally {
-      setLoadingFavorites(false);
-    }
-  }, []);
-
-  const removeFavorite = useCallback(
-    async (item: FavoriteItem) => {
-      try {
-        await invoke("remove_favorite", { id: item.id });
-        await loadFavorites();
-      } catch (error) {
-        console.error("Failed to remove favorite:", error);
-      }
-    },
-    [loadFavorites],
-  );
-
-  const toggleFavorite = useCallback(
-    async (item: Omit<FavoriteItem, "addedAt">) => {
-      try {
-        const params = {
-          id: item.id,
-          favoriteType: item.type,
-          name: item.name,
-          path: item.path,
-        };
-        await invoke("toggle_favorite", params);
-        await loadFavorites();
-      } catch (error) {
-        console.error("[Favorites] Failed to toggle favorite:", error);
-      }
-    },
-    [loadFavorites],
-  );
 
   const handleSelectSession = useCallback(
     (session: SessionInfo) => {
@@ -372,8 +307,7 @@ function App() {
     hasInitializedRef.current = true;
     loadSessions();
     loadSettings();
-    loadFavorites();
-  }, [isInitialized, loadSessions, loadSettings, loadFavorites]);
+  }, [isInitialized, loadSessions, loadSettings]);
 
   useFileWatcher({
     enabled: true,
@@ -504,78 +438,43 @@ function App() {
     [sessions, selectedProject, selectedSession, t, setSelectedSession],
   );
 
-  const filteredSessions = useMemo(() => {
-    let result = sessions;
-
-    // Tag filter
-    if (filterTagIds.length > 0) {
-      const allFilterIds = new Set(filterTagIds);
-      for (const id of filterTagIds) {
-        for (const descId of getDescendantIds(id)) {
-          allFilterIds.add(descId);
-        }
-      }
-      const taggedIds = new Set(
-        sessionTags
-          .filter((st) => allFilterIds.has(st.tagId))
-          .map((st) => st.sessionId),
-      );
-      result = result.filter((s) => taggedIds.has(s.id));
-    }
-
-    // Search filter
-    if (sidebarSearchQuery.trim()) {
-      const parsedQuery = parseQuotedQuery(sidebarSearchQuery);
-
-      if (!parsedQuery.hasPhrases) {
-        const q = parsedQuery.remainder.trim().toLowerCase();
-        if (q) {
-          result = result.filter(
-            (s) =>
-              (s.name && s.name.toLowerCase().includes(q)) ||
-              (s.first_message && s.first_message.toLowerCase().includes(q)) ||
-              (s.last_message && s.last_message.toLowerCase().includes(q)) ||
-              (s.cwd && s.cwd.toLowerCase().includes(q)),
-          );
-        }
-      } else {
-        const remainderTerms = parsedQuery.remainderTokens.map((term) =>
-          term.toLowerCase(),
-        );
-
-        result = result.filter((s) => {
-          const searchableFields = [
-            s.name || "",
-            s.first_message || "",
-            s.last_message || "",
-            s.cwd || "",
-          ].map((field) => field.toLowerCase());
-
-          const phrasesMatched = parsedQuery.phrases.every((phrase) =>
-            searchableFields.some((field) =>
-              field.includes(phrase.toLowerCase()),
-            ),
-          );
-
-          if (!phrasesMatched) {
-            return false;
-          }
-
-          return remainderTerms.every((term) =>
-            searchableFields.some((field) => field.includes(term)),
-          );
-        });
-      }
-    }
-
-    return result;
-  }, [
+  const {
+    filteredSessions,
+    sidebarSessions,
+    sidebarLoading,
+    sidebarLoadingMore,
+    sidebarHasMore,
+    loadMoreSidebarSessions,
+    selectedProjectSummary,
+    sessionListCommonProps,
+    handleToggleSessionTag,
+  } = useSidebarSessions({
     sessions,
-    sessionTags,
-    filterTagIds,
-    getDescendantIds,
+    loading,
+    selectedSession,
+    selectedProject,
+    isMobile,
+    mobileTab,
+    viewMode,
+    showFavorites,
     sidebarSearchQuery,
-  ]);
+    filterTagIds,
+    sessionTags,
+    getDescendantIds,
+    onSelectSession: handleSelectSession,
+    onDeleteSession: handleDeleteSession,
+    getBadgeType,
+    terminal,
+    piPath,
+    customCommand,
+    favorites,
+    onToggleFavorite: toggleFavorite,
+    tags,
+    getTagsForSession,
+    assignTag,
+    removeTagFromSession,
+    createTag,
+  });
 
   const onRenameSession = async (newName: string) => {
     if (!selectedSession) return;
@@ -592,207 +491,129 @@ function App() {
   // ─── Shared content renderers ───
 
   const renderMobileFilterBar = (placeholder?: string) => (
-    <div className="px-3 py-1.5 border-b border-border/50">
-      <SearchFilterBar
-        searchQuery={sidebarSearchQuery}
-        onSearchChange={setSidebarSearchQuery}
-        tags={tags}
-        sessionTags={sessionTags}
-        filterTagIds={filterTagIds}
-        onFilterChange={setFilterTagIds}
-        onCreateTag={(name, color, parentId) =>
-          createTag(name, color, undefined, parentId)
-        }
-        getDescendantIds={getDescendantIds}
-        placeholder={placeholder}
-        compact
-      />
-    </div>
+    <AppMobileFilterBar
+      searchQuery={sidebarSearchQuery}
+      onSearchChange={setSidebarSearchQuery}
+      tags={tags}
+      sessionTags={sessionTags}
+      filterTagIds={filterTagIds}
+      onFilterChange={setFilterTagIds}
+      onCreateTag={(name, color, parentId) => {
+        void createTag(name, color, undefined, parentId);
+      }}
+      getDescendantIds={getDescendantIds}
+      placeholder={placeholder}
+    />
   );
 
-  const renderSessionList = () => {
-    const listElement = (
-      <SessionList
-        sessions={filteredSessions}
-        selectedSession={selectedSession}
-        onSelectSession={handleSelectSession}
-        onDeleteSession={handleDeleteSession}
-        loading={loading}
-        getBadgeType={getBadgeType}
-        terminal={terminal}
-        piPath={piPath}
-        customCommand={customCommand}
-        scrollParentRef={listScrollRef}
-        favorites={favorites}
-        onToggleFavorite={toggleFavorite}
-        tags={tags}
-        getTagsForSession={getTagsForSession}
-        onToggleTag={(sessionId, tagId, assigned) =>
-          assigned
-            ? removeTagFromSession(sessionId, tagId)
-            : assignTag(sessionId, tagId)
-        }
-        onCreateTag={createTag}
-      />
-    );
-
-    return (
-      <>
-        {isMobile && renderMobileFilterBar()}
-        {isMobile ? (
-          <div className="flex-1 overflow-hidden relative">
-            <PullToRefresh
-              onRefresh={async () => {
-                await loadSessions();
-                await loadFavorites();
-              }}
-              scrollRef={listScrollRef}
-            >
-              {listElement}
-            </PullToRefresh>
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
-            {listElement}
-          </div>
-        )}
-      </>
-    );
-  };
+  const renderSessionList = () => (
+    <AppSessionListPane
+      isMobile={isMobile}
+      mobileFilterBar={isMobile ? renderMobileFilterBar() : null}
+      listScrollRef={listScrollRef}
+      sessionListCommonProps={sessionListCommonProps}
+      sidebarSessions={sidebarSessions}
+      sidebarLoading={sidebarLoading}
+      sidebarHasMore={sidebarHasMore}
+      sidebarLoadingMore={sidebarLoadingMore}
+      onLoadMoreSidebarSessions={loadMoreSidebarSessions}
+      onRefreshMobile={async () => {
+        await loadSessions();
+        await loadFavorites();
+      }}
+    />
+  );
 
   const renderProjectList = () => (
-    <>
-      {isMobile &&
-        renderMobileFilterBar(
-          selectedProject ? undefined : t("common.searchProjectsPlaceholder"),
-        )}
-      <div className="flex-1 overflow-y-auto" ref={projectScrollRef}>
-        {selectedProject ? (
-          <div className="flex flex-col h-full">
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30 flex-shrink-0 sticky top-0 z-10">
-              <button
-                onClick={() => setSelectedProject(null)}
-                className="p-1 hover:bg-accent rounded transition-colors flex-shrink-0"
-                aria-label={t("project.list.back", "Back")}
-              >
-                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <FolderOpen className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
-                <span className="text-sm font-medium truncate">
-                  {sessions
-                    .find((s) => s.cwd === selectedProject)
-                    ?.cwd.split("/")
-                    .pop() || selectedProject.split("/").pop()}
-                </span>
-                <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                  ({sessions.filter((s) => s.cwd === selectedProject).length})
-                </span>
-              </div>
-            </div>
-            <SessionList
-              sessions={filteredSessions.filter(
-                (s) => s.cwd === selectedProject,
-              )}
-              selectedSession={selectedSession}
-              onSelectSession={handleSelectSession}
-              onDeleteSession={handleDeleteSession}
-              loading={loading}
-              getBadgeType={getBadgeType}
-              terminal={terminal}
-              piPath={piPath}
-              customCommand={customCommand}
-              scrollParentRef={projectScrollRef}
-              favorites={favorites}
-              onToggleFavorite={toggleFavorite}
-              showDirectory={false}
-              tags={tags}
-              getTagsForSession={getTagsForSession}
-              onToggleTag={(sessionId, tagId, assigned) =>
-                assigned
-                  ? removeTagFromSession(sessionId, tagId)
-                  : assignTag(sessionId, tagId)
-              }
-              onCreateTag={createTag}
-            />
-          </div>
-        ) : (
-          <ProjectList
-            sessions={filteredSessions}
-            selectedSession={selectedSession}
-            selectedProject={selectedProject}
-            onSelectSession={handleSelectSession}
-            onSelectProject={setSelectedProject}
-            onDeleteSession={handleDeleteSession}
-            loading={loading}
-            terminal={terminal}
-            piPath={piPath}
-            customCommand={customCommand}
-            getBadgeType={getBadgeType}
-            scrollParentRef={projectScrollRef}
-            favorites={favorites}
-            onToggleFavorite={toggleFavorite}
-          />
-        )}
-      </div>
-    </>
+    <AppProjectListPane
+      isMobile={isMobile}
+      mobileFilterBar={
+        isMobile
+          ? renderMobileFilterBar(
+              selectedProject ? undefined : t("common.searchProjectsPlaceholder"),
+            )
+          : null
+      }
+      projectScrollRef={projectScrollRef}
+      selectedProject={selectedProject}
+      selectedProjectSummary={selectedProjectSummary}
+      onBackFromProject={() => setSelectedProject(null)}
+      backLabel={t("project.list.back", "Back")}
+      sessionListCommonProps={sessionListCommonProps}
+      sidebarSessions={sidebarSessions}
+      sidebarLoading={sidebarLoading}
+      sidebarHasMore={sidebarHasMore}
+      sidebarLoadingMore={sidebarLoadingMore}
+      onLoadMoreSidebarSessions={loadMoreSidebarSessions}
+      filteredSessions={filteredSessions}
+      selectedSession={selectedSession}
+      onSelectSession={handleSelectSession}
+      onSelectProject={setSelectedProject}
+      onDeleteSession={handleDeleteSession}
+      loading={loading}
+      terminal={terminal}
+      piPath={piPath}
+      customCommand={customCommand}
+      getBadgeType={getBadgeType}
+      favorites={favorites}
+      onToggleFavorite={toggleFavorite}
+    />
   );
 
   const renderKanban = () => (
-    <Suspense fallback={<LoadingSpinner />}>
-      <KanbanBoard
-        sessions={filteredSessions}
-        tags={tags}
-        sessionTags={sessionTags}
-        selectedSession={selectedSession}
-        onSelectSession={handleSelectSession}
-        onMoveSession={moveSession}
-        getTagsForSession={getTagsForSession}
-        onToggleTag={(sessionId, tagId, assigned) =>
-          assigned
-            ? removeTagFromSession(sessionId, tagId)
-            : assignTag(sessionId, tagId)
-        }
-        onDeleteSession={handleDeleteSession}
-        favorites={favorites}
-        onToggleFavorite={toggleFavorite}
-        terminal={terminal}
-        piPath={piPath}
-        customCommand={customCommand}
-        onCreateTag={createTag}
-        projectFilter={selectedProject}
-        filterTagIds={filterTagIds}
-        onFilterChange={setFilterTagIds}
-        getDescendantIds={getDescendantIds}
-      />
-    </Suspense>
+    <AppKanbanPane
+      fallback={<LoadingSpinner />}
+      KanbanBoardComponent={KanbanBoard}
+      sessions={filteredSessions}
+      tags={tags}
+      sessionTags={sessionTags}
+      selectedSession={selectedSession}
+      onSelectSession={handleSelectSession}
+      onMoveSession={moveSession}
+      getTagsForSession={getTagsForSession}
+      onToggleTag={handleToggleSessionTag}
+      onDeleteSession={handleDeleteSession}
+      favorites={favorites}
+      onToggleFavorite={toggleFavorite}
+      terminal={terminal}
+      piPath={piPath}
+      customCommand={customCommand}
+      onCreateTag={createTag}
+      projectFilter={selectedProject}
+      filterTagIds={filterTagIds}
+      onFilterChange={setFilterTagIds}
+      getDescendantIds={getDescendantIds}
+    />
   );
 
+  const handleDashboardProjectSelect = (path: string) => {
+    setSelectedProject(path);
+    if (isMobile) {
+      setMobileTab("projects");
+      return;
+    }
+    setViewMode("project");
+    setShowFavorites(false);
+  };
+
   const renderDashboard = () => (
-    <Suspense fallback={<LoadingSpinner />}>
-      <Dashboard
-        sessions={
-          selectedProject
-            ? sessions.filter((s) => s.cwd === selectedProject)
-            : sessions
-        }
-        onSessionSelect={setSelectedSession}
-        onProjectSelect={(path) => {
-          setSelectedProject(path);
-          if (isMobile) setMobileTab("projects");
-          else {
-            setViewMode("project");
-            setShowFavorites(false);
-          }
-        }}
-        projectName={selectedProject || undefined}
-        loading={loading}
-      />
-    </Suspense>
+    <AppDashboardPane
+      fallback={<LoadingSpinner />}
+      DashboardComponent={Dashboard}
+      sessions={
+        selectedProject
+          ? sessions.filter((s) => s.cwd === selectedProject)
+          : sessions
+      }
+      onSessionSelect={setSelectedSession}
+      onProjectSelect={handleDashboardProjectSelect}
+      projectName={selectedProject || undefined}
+      loading={loading}
+    />
   );
 
   const renderSessionViewer = () => (
-    <SessionViewer
+    <AppSessionViewerPane
       session={selectedSession!}
       onExport={() => setShowExportDialog(true)}
       onRename={() => setShowRenameDialog(true)}
@@ -810,59 +631,50 @@ function App() {
     />
   );
 
+  const renderSettings = () => (
+    <AppSettingsPane
+      isOpen={true}
+      onClose={() => {
+        setMobileTab("list");
+        reloadTerminalConfig();
+      }}
+      fallback={<LoadingSpinner />}
+      SettingsPanelComponent={SettingsPanel}
+    />
+  );
+
   // ─── Shared overlays ───
 
   const renderOverlays = () => (
-    <>
-      {showExportDialog && selectedSession && (
-        <ExportDialog
-          session={selectedSession}
-          onExport={onExportSession}
-          onClose={() => setShowExportDialog(false)}
-        />
-      )}
-      {showRenameDialog && selectedSession && (
-        <RenameDialog
-          session={selectedSession}
-          onRename={onRenameSession}
-          onClose={() => setShowRenameDialog(false)}
-        />
-      )}
-      {pendingDeleteSession && (
-        <DeleteSessionConfirmDialog
-          session={pendingDeleteSession.session}
-          onConfirm={confirmDeleteSession}
-          onCancel={cancelDeleteSession}
-        />
-      )}
-      <Suspense fallback={null}>
-        <SettingsPanel
-          isOpen={showSettings}
-          onClose={() => {
-            setShowSettings(false);
-            reloadTerminalConfig();
-          }}
-        />
-      </Suspense>
-      <Suspense fallback={null}>
-        <CommandPalette context={commandContext} />
-      </Suspense>
-      {showFullTextSearch && (
-        <FullTextSearch
-          isOpen={true}
-          onClose={() => setShowFullTextSearch(false)}
-          onSelectResult={handleFTSResultSelect}
-        />
-      )}
-      {showOnboarding && (
-        <Onboarding
-          onComplete={() => {
-            localStorage.setItem("onboarding-completed", "true");
-            setShowOnboarding(false);
-          }}
-        />
-      )}
-    </>
+    <AppOverlays
+      showExportDialog={showExportDialog}
+      showRenameDialog={showRenameDialog}
+      showSettings={showSettings}
+      showFullTextSearch={showFullTextSearch}
+      showOnboarding={showOnboarding}
+      selectedSession={selectedSession}
+      pendingDeleteSession={pendingDeleteSession}
+      commandContext={commandContext}
+      onExportSession={onExportSession}
+      onRenameSession={onRenameSession}
+      onCloseExportDialog={() => setShowExportDialog(false)}
+      onCloseRenameDialog={() => setShowRenameDialog(false)}
+      onConfirmDeleteSession={confirmDeleteSession}
+      onCancelDeleteSession={cancelDeleteSession}
+      onCloseSettings={() => {
+        setShowSettings(false);
+        reloadTerminalConfig();
+      }}
+      onCloseFullTextSearch={() => setShowFullTextSearch(false)}
+      onSelectFullTextSearchResult={handleFTSResultSelect}
+      onCompleteOnboarding={() => {
+        localStorage.setItem("onboarding-completed", "true");
+        setShowOnboarding(false);
+      }}
+      SettingsPanel={SettingsPanel}
+      CommandPalette={CommandPalette}
+      FullTextSearch={FullTextSearch}
+    />
   );
 
   // ═══════════════════════════════════
@@ -870,451 +682,182 @@ function App() {
   // ═══════════════════════════════════
   if (isMobile) {
     return (
-      <div className="relative flex flex-col h-screen-safe bg-background text-foreground safe-area-top">
-        <ConnectionBanner />
-
-        {/* Session viewer overlay — sits on top, keeps tab content mounted underneath */}
-        {selectedSession && (
-          <div
-            ref={mobileViewerRef}
-            className="absolute inset-0 z-30 flex flex-col bg-background"
-          >
-            <div className="flex-1 overflow-hidden">
-              {renderSessionViewer()}
-            </div>
-          </div>
-        )}
-
-        {/* Main content area — always mounted so virtualizer refs stay alive */}
-        <div
-          className="flex-1 overflow-hidden flex flex-col"
-          style={{ visibility: selectedSession ? "hidden" : "visible" }}
-        >
-          {mobileTab === "list" && renderSessionList()}
-          {mobileTab === "projects" && renderProjectList()}
-          {mobileTab === "kanban" && renderKanban()}
-          {mobileTab === "dashboard" && renderDashboard()}
-          {mobileTab === "settings" && (
-            <Suspense fallback={<LoadingSpinner />}>
-              <SettingsPanel
-                isOpen={true}
-                onClose={() => {
-                  setMobileTab("list");
-                  reloadTerminalConfig();
-                }}
-              />
-            </Suspense>
-          )}
-        </div>
-
-        {/* Bottom navigation bar */}
-        {!selectedSession && (
-          <nav className="flex-shrink-0 border-t border-border bg-background/95 backdrop-blur-sm flex items-center justify-around px-1 safe-area-bottom">
-            {[
-              {
-                id: "list" as const,
-                icon: (
-                  <svg
-                    className="h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                    />
-                  </svg>
-                ),
-                label: t("app.viewMode.list", "列表"),
-              },
-              {
-                id: "projects" as const,
-                icon: <FolderOpen className="h-5 w-5" />,
-                label: t("app.viewMode.project", "项目"),
-              },
-              {
-                id: "kanban" as const,
-                icon: <Columns3 className="h-5 w-5" />,
-                label: t("tags.kanban.title", "看板"),
-              },
-              {
-                id: "dashboard" as const,
-                icon: <LayoutDashboard className="h-5 w-5" />,
-                label: t("dashboard.title", "概览"),
-              },
-              {
-                id: "settings" as const,
-                icon: <Settings className="h-5 w-5" />,
-                label: t("settings.title", "设置"),
-              },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                aria-label={tab.label}
-                onClick={() => {
-                  triggerHaptic("light");
-                  setMobileTab(tab.id);
-                }}
-                className={`flex flex-col items-center gap-1 py-1 px-1 rounded-lg transition-colors flex-1 min-w-0 max-w-[76px] ${
-                  mobileTab === tab.id
-                    ? "text-primary"
-                    : "text-muted-foreground"
-                }`}
-              >
-                {tab.icon}
-                <span className="text-[10px] sm:text-[11px] leading-tight truncate w-full text-center">
-                  {tab.label}
-                </span>
-              </button>
-            ))}
-          </nav>
-        )}
-
-        {renderOverlays()}
-      </div>
+      <AppMobileLayout
+        selectedSession={selectedSession}
+        mobileViewerRef={mobileViewerRef}
+        mobileTab={mobileTab}
+        onMobileTabChange={setMobileTab}
+        renderSessionViewer={renderSessionViewer}
+        renderSessionList={renderSessionList}
+        renderProjectList={renderProjectList}
+        renderKanban={renderKanban}
+        renderDashboard={renderDashboard}
+        renderSettings={renderSettings}
+        renderOverlays={renderOverlays}
+      />
     );
   }
 
+  const handleSidebarShowDashboard = () => {
+    setSelectedSession(null);
+  };
+
+  const handleSidebarSelectListView = () => {
+    setViewMode("list");
+    setSelectedProject(null);
+    setShowFavorites(false);
+  };
+
+  const handleSidebarSelectProjectView = () => {
+    setViewMode("project");
+    setSelectedProject(null);
+    setShowFavorites(false);
+  };
+
+  const handleSidebarSelectKanbanView = () => {
+    setViewMode("kanban");
+    setSelectedSession(null);
+    setShowFavorites(false);
+  };
+
+  const handleSidebarToggleFavorites = () => {
+    setShowFavorites((prev) => !prev);
+  };
+
+  const handleSidebarOpenCommandPalette = () => {
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "k", metaKey: true }),
+    );
+  };
+
+  const handleSidebarToggleTerminal = () => {
+    setShowTerminal((prev) => !prev);
+  };
+
+  const handleSidebarOpenSettings = () => {
+    setShowSettings(true);
+  };
+
+  const handleSelectKanbanFilterProject = (project: string | null) => {
+    setSelectedProject(project);
+    setSelectedSession(null);
+  };
+
+  const handleSelectFavoriteProject = (path: string) => {
+    setSelectedProject(path);
+    setViewMode("project");
+    setShowFavorites(false);
+  };
+
+  const desktopSearchBar = (
+    <AppDesktopSearchBar
+      searchQuery={sidebarSearchQuery}
+      onSearchChange={setSidebarSearchQuery}
+      tags={tags}
+      sessionTags={sessionTags}
+      filterTagIds={filterTagIds}
+      onFilterChange={setFilterTagIds}
+      onCreateTag={(name, color, parentId) => {
+        void createTag(name, color, undefined, parentId);
+      }}
+      getDescendantIds={getDescendantIds}
+      viewMode={viewMode}
+      selectedProject={selectedProject}
+    />
+  );
+
+  const desktopSidebarContent = (
+    <AppDesktopSidebarContent
+      showFavorites={showFavorites}
+      viewMode={viewMode}
+      sessions={sessions}
+      selectedProject={selectedProject}
+      selectedSession={selectedSession}
+      selectedProjectSummary={selectedProjectSummary}
+      filteredSessions={filteredSessions}
+      sidebarSessions={sidebarSessions}
+      sidebarLoading={sidebarLoading}
+      sidebarHasMore={sidebarHasMore}
+      sidebarLoadingMore={sidebarLoadingMore}
+      loading={loading}
+      loadingFavorites={loadingFavorites}
+      favorites={favorites}
+      terminal={terminal}
+      piPath={piPath}
+      customCommand={customCommand}
+      getBadgeType={getBadgeType}
+      listScrollRef={listScrollRef}
+      sessionListCommonProps={sessionListCommonProps}
+      onLoadMoreSidebarSessions={loadMoreSidebarSessions}
+      onSelectKanbanFilterProject={handleSelectKanbanFilterProject}
+      onSelectFavoriteProject={handleSelectFavoriteProject}
+      onSelectSession={handleSelectSession}
+      onSelectProject={setSelectedProject}
+      onDeleteSession={handleDeleteSession}
+      onRemoveFavorite={removeFavorite}
+      onToggleFavorite={toggleFavorite}
+    />
+  );
+
+  const desktopMainContent = selectedSession
+    ? renderSessionViewer()
+    : viewMode === "kanban"
+      ? renderKanban()
+      : renderDashboard();
+
+  const desktopTerminalPanel = (
+    <AppTerminalPane
+      enabled={terminalConfig.enabled}
+      fallback={null}
+      TerminalPanelComponent={TerminalPanel}
+      isOpen={showTerminal}
+      onClose={() => {
+        setShowTerminal(false);
+        setTerminalMaximized(false);
+      }}
+      onMaximizedChange={setTerminalMaximized}
+      cwd={selectedSession?.cwd || selectedProject || sessions[0]?.cwd || "/"}
+      defaultShell={terminalConfig.defaultShell}
+      fontSize={terminalConfig.fontSize}
+      pendingCommand={terminalPendingCommand}
+      onCommandConsumed={() => setTerminalPendingCommand(null)}
+    />
+  );
+
   // ═══════════════════════════════════
-  // Desktop layout: sidebar + content (unchanged)
+  // Desktop layout: sidebar + content
   // ═══════════════════════════════════
   return (
     <div className="flex flex-col h-screen-safe bg-background text-foreground">
       <ConnectionBanner />
       <div className="flex flex-1 min-h-0">
-        <div className="w-80 border-r border-border flex flex-col">
-          <div
-            className={`${isTauri() ? "h-8" : ""} border-b border-border flex items-center px-3 ${isTauri() ? "py-0" : "py-1.5"} select-none`}
-            {...(isTauri()
-              ? { "data-tauri-drag-region": true, onMouseDown: startDragging }
-              : {})}
-          >
-            <div className="flex items-center gap-0.5 ml-auto no-drag">
-              <button
-                onClick={() => setSelectedSession(null)}
-                className="p-1 rounded transition-colors mr-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
-                title={t("dashboard.title")}
-              >
-                <LayoutDashboard className="h-3.5 w-3.5" />
-              </button>
-              <div className="flex items-center bg-surface rounded-lg p-0.5 mr-1">
-                <button
-                  onClick={() => {
-                    setViewMode("list");
-                    setSelectedProject(null);
-                    setShowFavorites(false);
-                  }}
-                  className={`p-1 rounded transition-colors ${viewMode === "list" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
-                  title={t("app.viewMode.list")}
-                >
-                  <svg
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                    />
-                  </svg>
-                </button>
-                <KbdTooltip shortcut="Cmd+P" label={t("app.viewMode.project")}>
-                  <button
-                    onClick={() => {
-                      setViewMode("project");
-                      setSelectedProject(null);
-                      setShowFavorites(false);
-                    }}
-                    className={`p-1 rounded transition-colors ${viewMode === "project" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
-                    title={t("app.viewMode.project")}
-                  >
-                    <svg
-                      className="h-3.5 w-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                      />
-                    </svg>
-                  </button>
-                </KbdTooltip>
-                <button
-                  onClick={() => {
-                    setViewMode("kanban");
-                    setSelectedSession(null);
-                    setShowFavorites(false);
-                  }}
-                  className={`p-1 rounded transition-colors ${viewMode === "kanban" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
-                  title={t("tags.kanban.title")}
-                >
-                  <Columns3 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <button
-                onClick={() => {
-                  if (showFavorites) {
-                    setShowFavorites(false);
-                  } else {
-                    setShowFavorites(true);
-                  }
-                }}
-                className={`p-1 rounded transition-colors ml-0.5 ${showFavorites ? "text-yellow-400 bg-secondary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
-                title={
-                  showFavorites ? t("favorites.back") : t("favorites.title")
-                }
-              >
-                <Star className="h-3.5 w-3.5" />
-              </button>
-              <KbdTooltip shortcut="Cmd+K">
-                <button
-                  onClick={() => {
-                    window.dispatchEvent(
-                      new KeyboardEvent("keydown", { key: "k", metaKey: true }),
-                    );
-                  }}
-                  className="p-1 rounded transition-colors ml-0.5 text-muted-foreground hover:text-foreground hover:bg-secondary group relative"
-                  title={
-                    t("app.shortcuts.searchAll", "搜索所有会话") + " (Cmd+K)"
-                  }
-                >
-                  <Search className="h-3.5 w-3.5" />
-                </button>
-              </KbdTooltip>
-              {terminalConfig.enabled && (
-                <KbdTooltip shortcut="Ctrl+`">
-                  <button
-                    onClick={() => setShowTerminal(!showTerminal)}
-                    className={`p-1 rounded transition-colors ml-0.5 ${
-                      showTerminal
-                        ? "text-green-400 bg-secondary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    }`}
-                    title={
-                      showTerminal
-                        ? "Close terminal (Ctrl+`)"
-                        : "Open terminal (Ctrl+`)"
-                    }
-                  >
-                    <Terminal className="h-3.5 w-3.5" />
-                  </button>
-                </KbdTooltip>
-              )}
-              <KbdTooltip shortcut="Cmd+,">
-                <button
-                  onClick={() => setShowSettings(true)}
-                  className="p-1 rounded transition-colors ml-0.5 text-muted-foreground hover:text-foreground hover:bg-secondary"
-                  title={t("settings.title")}
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                </button>
-              </KbdTooltip>
-            </div>
-          </div>
+        <AppDesktopSidebar
+          isTauriRuntime={isTauri()}
+          startDragging={startDragging}
+          viewMode={viewMode}
+          showFavorites={showFavorites}
+          terminalEnabled={terminalConfig.enabled}
+          showTerminal={showTerminal}
+          onShowDashboard={handleSidebarShowDashboard}
+          onSelectListView={handleSidebarSelectListView}
+          onSelectProjectView={handleSidebarSelectProjectView}
+          onSelectKanbanView={handleSidebarSelectKanbanView}
+          onToggleFavorites={handleSidebarToggleFavorites}
+          onOpenCommandPalette={handleSidebarOpenCommandPalette}
+          onToggleTerminal={handleSidebarToggleTerminal}
+          onOpenSettings={handleSidebarOpenSettings}
+          searchBar={desktopSearchBar}
+          content={desktopSidebarContent}
+          listScrollRef={listScrollRef}
+        />
 
-          {/* Search + Filter bar */}
-          {!showFavorites && (
-            <div className="px-3 py-1.5 border-b border-border/50">
-              <SearchFilterBar
-                searchQuery={sidebarSearchQuery}
-                onSearchChange={setSidebarSearchQuery}
-                tags={tags}
-                sessionTags={sessionTags}
-                filterTagIds={filterTagIds}
-                onFilterChange={setFilterTagIds}
-                onCreateTag={(name, color, parentId) =>
-                  createTag(name, color, undefined, parentId)
-                }
-                getDescendantIds={getDescendantIds}
-                placeholder={
-                  viewMode === "project" && !selectedProject
-                    ? t("common.searchProjectsPlaceholder")
-                    : undefined
-                }
-                compact
-              />
-            </div>
-          )}
-
-          <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
-            {!showFavorites && viewMode === "kanban" && (
-              <ProjectFilterList
-                sessions={sessions}
-                selectedProject={selectedProject}
-                onSelectProject={(project) => {
-                  setSelectedProject(project);
-                  setSelectedSession(null);
-                }}
-                scrollParentRef={listScrollRef}
-              />
-            )}
-            {showFavorites ? (
-              <FavoritesPanel
-                sessions={sessions}
-                favorites={favorites}
-                selectedSession={selectedSession}
-                onSelectSession={handleSelectSession}
-                onRemoveFavorite={removeFavorite}
-                onSelectProject={(path) => {
-                  setSelectedProject(path);
-                  setViewMode("project");
-                  setShowFavorites(false);
-                }}
-                getBadgeType={getBadgeType}
-                loading={loadingFavorites}
-              />
-            ) : viewMode === "kanban" ? null : viewMode === "project" &&
-              selectedProject ? (
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30 flex-shrink-0 sticky top-0 z-10">
-                  <button
-                    onClick={() => setSelectedProject(null)}
-                    className="p-1 hover:bg-accent rounded transition-colors flex-shrink-0"
-                    title={t("project.list.back")}
-                  >
-                    <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    <FolderOpen className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
-                    <span className="text-sm font-medium truncate">
-                      {sessions
-                        .find((s) => s.cwd === selectedProject)
-                        ?.cwd.split("/")
-                        .pop() || selectedProject.split("/").pop()}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                      (
-                      {sessions.filter((s) => s.cwd === selectedProject).length}
-                      )
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <SessionList
-                    sessions={filteredSessions.filter(
-                      (s) => s.cwd === selectedProject,
-                    )}
-                    selectedSession={selectedSession}
-                    onSelectSession={handleSelectSession}
-                    onDeleteSession={handleDeleteSession}
-                    loading={loading}
-                    getBadgeType={getBadgeType}
-                    terminal={terminal}
-                    piPath={piPath}
-                    customCommand={customCommand}
-                    scrollParentRef={listScrollRef}
-                    favorites={favorites}
-                    onToggleFavorite={toggleFavorite}
-                    showDirectory={false}
-                    tags={tags}
-                    getTagsForSession={getTagsForSession}
-                    onToggleTag={(sessionId, tagId, assigned) =>
-                      assigned
-                        ? removeTagFromSession(sessionId, tagId)
-                        : assignTag(sessionId, tagId)
-                    }
-                    onCreateTag={createTag}
-                  />
-                </div>
-              </div>
-            ) : viewMode === "project" ? (
-              <ProjectList
-                sessions={filteredSessions}
-                selectedSession={selectedSession}
-                selectedProject={selectedProject}
-                onSelectSession={handleSelectSession}
-                onSelectProject={setSelectedProject}
-                onDeleteSession={handleDeleteSession}
-                loading={loading}
-                terminal={terminal}
-                piPath={piPath}
-                customCommand={customCommand}
-                getBadgeType={getBadgeType}
-                scrollParentRef={listScrollRef}
-                favorites={favorites}
-                onToggleFavorite={toggleFavorite}
-              />
-            ) : (
-              <SessionList
-                sessions={filteredSessions}
-                selectedSession={selectedSession}
-                onSelectSession={handleSelectSession}
-                onDeleteSession={handleDeleteSession}
-                loading={loading}
-                getBadgeType={getBadgeType}
-                terminal={terminal}
-                piPath={piPath}
-                customCommand={customCommand}
-                scrollParentRef={listScrollRef}
-                favorites={favorites}
-                onToggleFavorite={toggleFavorite}
-                tags={tags}
-                getTagsForSession={getTagsForSession}
-                onToggleTag={(sessionId, tagId, assigned) =>
-                  assigned
-                    ? removeTagFromSession(sessionId, tagId)
-                    : assignTag(sessionId, tagId)
-                }
-                onCreateTag={createTag}
-              />
-            )}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-hidden flex flex-col relative">
-          {isTauri() && !(showTerminal && terminalMaximized) && (
-            <div
-              className="absolute top-0 left-0 right-0 h-8 z-10"
-              data-tauri-drag-region
-            />
-          )}
-          <div className="flex-1 overflow-hidden flex flex-col">
-            <div
-              className="flex-1 overflow-hidden"
-              style={{
-                display: showTerminal && terminalMaximized ? "none" : undefined,
-              }}
-            >
-              {selectedSession
-                ? renderSessionViewer()
-                : viewMode === "kanban"
-                  ? renderKanban()
-                  : renderDashboard()}
-            </div>
-            {terminalConfig.enabled && (
-              <Suspense fallback={null}>
-                <TerminalPanel
-                  isOpen={showTerminal}
-                  onClose={() => {
-                    setShowTerminal(false);
-                    setTerminalMaximized(false);
-                  }}
-                  onMaximizedChange={setTerminalMaximized}
-                  cwd={
-                    selectedSession?.cwd ||
-                    selectedProject ||
-                    sessions[0]?.cwd ||
-                    "/"
-                  }
-                  defaultShell={terminalConfig.defaultShell}
-                  fontSize={terminalConfig.fontSize}
-                  pendingCommand={terminalPendingCommand}
-                  onCommandConsumed={() => setTerminalPendingCommand(null)}
-                />
-              </Suspense>
-            )}
-          </div>
-        </div>
+        <AppDesktopContent
+          isTauriRuntime={isTauri()}
+          showTerminal={showTerminal}
+          terminalMaximized={terminalMaximized}
+          mainContent={desktopMainContent}
+          terminalPanel={desktopTerminalPanel}
+        />
 
         {renderOverlays()}
       </div>

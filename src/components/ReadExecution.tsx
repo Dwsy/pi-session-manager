@@ -1,6 +1,8 @@
+import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { escapeHtml, getLanguageFromPath } from '../utils/markdown'
-import { shortenPath, formatDate } from '../utils/format'
+import { shortenPath } from '../utils/format'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { useSessionView } from '../contexts/SessionViewContext'
 import CodeBlock from './CodeBlock'
 
@@ -10,7 +12,6 @@ interface ReadExecutionProps {
   limit?: number
   output?: string
   images?: Array<{ mimeType: string; data: string }>
-  timestamp?: string
   entryId: string
 }
 
@@ -22,15 +23,24 @@ export default function ReadExecution({
   limit,
   output,
   images = [],
-  timestamp,
   entryId,
 }: ReadExecutionProps) {
   const { t } = useTranslation()
+  const isMobile = useIsMobile()
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const expanded = isToolExpanded(entryId)
 
   const lang = getLanguageFromPath(filePath)
-  const displayPath = shortenPath(filePath)
+  const displayPath = isMobile ? shortenPath(filePath) : filePath
+  const desktopPathStyle: CSSProperties | undefined = isMobile
+    ? undefined
+    : {
+        overflow: 'visible',
+        textOverflow: 'clip',
+        whiteSpace: 'normal',
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-word',
+      }
 
   let pathWithLines = displayPath
   if (offset !== undefined || limit !== undefined) {
@@ -43,7 +53,6 @@ export default function ReadExecution({
 
   return (
     <div className="tool-execution success" id={`entry-${entryId}`}>
-      {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
       <div
         className={`tool-header ${hasContent ? 'cursor-pointer select-none' : ''}`}
         onClick={hasContent ? () => toggleToolExpanded(entryId) : undefined}
@@ -53,13 +62,15 @@ export default function ReadExecution({
             {expanded ? '▾' : '▸'}
           </span>
         )}
-        <span className="tool-name">
-          <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          Read
-        </span>
-        <span className="tool-path">{escapeHtml(pathWithLines)}</span>
+        <div className="tool-header-meta">
+          <span className="tool-name">
+            <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Read
+          </span>
+        </div>
+        <span className="tool-path" style={desktopPathStyle}>{escapeHtml(pathWithLines)}</span>
       </div>
 
       {images.length > 0 && (

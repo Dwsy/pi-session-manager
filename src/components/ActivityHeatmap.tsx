@@ -32,7 +32,7 @@ export default function ActivityHeatmap({
 
   return (
     <div className="glass-card rounded-xl p-5 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#46c492]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#46c492]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 motion-opacity pointer-events-none" />
 
       <div className="relative z-10">
         {displayTitle && (
@@ -70,7 +70,7 @@ export default function ActivityHeatmap({
                   return (
                     <div
                       key={weekIndex}
-                      className={`${cellSize} rounded-[3px] transition-all duration-200 hover:scale-175 hover:z-10 cursor-pointer`}
+                      className={`${cellSize} rounded-[3px] motion-transform hover:scale-175 hover:z-10 cursor-pointer`}
                       style={{
                         backgroundColor: HEATMAP_COLORS[point?.level || 0],
                         opacity: point?.level === 0 ? 0.15 : 1,

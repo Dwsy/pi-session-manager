@@ -4,8 +4,12 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { AppearanceSettingsProps } from '../types'
+import SettingsField from '../SettingsField'
+import SettingsInput from '../SettingsInput'
+import SettingsOptionGroup from '../SettingsOptionGroup'
+import SettingsSelect from '../SettingsSelect'
 import { listUserPiThemes } from '../../../utils/piTheme'
+import type { AppearanceSettingsProps } from '../types'
 
 export default function AppearanceSettings({ settings, onUpdate }: AppearanceSettingsProps) {
   const { t } = useTranslation()
@@ -35,39 +39,30 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <label className="text-sm font-medium text-foreground">
-          {t('settings.appearance.theme', '主题')}
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          {(['dark', 'light', 'system', 'custom'] as const).map((theme) => (
-            <button
-              key={theme}
-              onClick={() => handleThemeSelect(theme)}
-              className={`p-3 min-h-[44px] rounded-lg border text-sm transition-all ${
-                settings.appearance.theme === theme
-                  ? 'border-info bg-info/10 text-foreground'
-                  : 'border-border text-muted-foreground hover:border-border-hover'
-              }`}
-            >
-              {t(
-                `settings.appearance.themes.${theme}`,
-                theme === 'dark' ? '深色' : theme === 'light' ? '浅色' : theme === 'system' ? '跟随系统' : '自定义'
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
+      <SettingsField label={t('settings.appearance.theme', '主题')}>
+        <SettingsOptionGroup
+          options={['dark', 'light', 'system', 'custom'] as const}
+          value={settings.appearance.theme}
+          onChange={handleThemeSelect}
+          renderLabel={(theme) =>
+            t(
+              `settings.appearance.themes.${theme}`,
+              theme === 'dark' ? '深色' : theme === 'light' ? '浅色' : theme === 'system' ? '跟随系统' : '自定义'
+            )
+          }
+          containerClassName="grid grid-cols-1 sm:grid-cols-4 gap-3"
+          optionClassName="p-3 min-h-[44px]"
+        />
+      </SettingsField>
 
       {settings.appearance.theme === 'custom' && (
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-foreground">
-            {t('settings.appearance.customTheme', 'Custom Theme Preset')}
-          </label>
-          <select
+        <SettingsField
+          label={t('settings.appearance.customTheme', 'Custom Theme Preset')}
+          description={t('settings.appearance.customThemeHelp', 'Uses theme files from ~/.pi/agent/themes')}
+        >
+          <SettingsSelect
             value={settings.appearance.customTheme}
             onChange={(e) => onUpdate('appearance', 'customTheme', e.target.value)}
-            className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
           >
             <option value="app-default">{t('settings.appearance.appDefaultTheme', 'App default')}</option>
             {piThemes.length === 0 && (
@@ -78,96 +73,63 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
                 {themeName}
               </option>
             ))}
-          </select>
-          <p className="text-xs text-muted-foreground">
-            {t('settings.appearance.customThemeHelp', 'Uses theme files from ~/.pi/agent/themes')}
-          </p>
-        </div>
+          </SettingsSelect>
+        </SettingsField>
       )}
 
-      <div className="space-y-3">
-        <label className="text-sm font-medium text-foreground">
-          {t('settings.appearance.fontSize', '字体大小')}
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {(['small', 'medium', 'large'] as const).map((size) => (
-            <button
-              key={size}
-              onClick={() => onUpdate('appearance', 'fontSize', size)}
-              className={`flex-1 min-w-[80px] py-2 rounded-lg border text-sm transition-all ${
-                settings.appearance.fontSize === size
-                  ? 'border-info bg-info/10 text-foreground'
-                  : 'border-border text-muted-foreground hover:border-border-hover'
-              }`}
-            >
-              {t(`settings.appearance.fontSizes.${size}`, size === 'small' ? '小' : size === 'medium' ? '中' : '大')}
-            </button>
-          ))}
-        </div>
-      </div>
+      <SettingsField label={t('settings.appearance.fontSize', '字体大小')}>
+        <SettingsOptionGroup
+          options={['small', 'medium', 'large'] as const}
+          value={settings.appearance.fontSize}
+          onChange={(size) => onUpdate('appearance', 'fontSize', size)}
+          renderLabel={(size) =>
+            t(`settings.appearance.fontSizes.${size}`, size === 'small' ? '小' : size === 'medium' ? '中' : '大')
+          }
+          containerClassName="flex flex-wrap gap-2"
+          optionClassName="flex-1 min-w-[80px] py-2"
+        />
+      </SettingsField>
 
-      <div className="space-y-3">
-        <label className="text-sm font-medium text-foreground">
-          {t('settings.appearance.fontFamily', 'Font Family')}
-        </label>
-        <input
+      <SettingsField label={t('settings.appearance.fontFamily', 'Font Family')}>
+        <SettingsInput
           type="text"
           value={settings.appearance.fontFamily}
           onChange={(e) => onUpdate('appearance', 'fontFamily', e.target.value)}
           placeholder='-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-          className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
         />
-      </div>
+      </SettingsField>
 
-      <div className="space-y-3">
-        <label className="text-sm font-medium text-foreground">
-          {t('settings.appearance.fontFamilyMono', 'Monospace Font Family')}
-        </label>
-        <input
+      <SettingsField label={t('settings.appearance.fontFamilyMono', 'Monospace Font Family')}>
+        <SettingsInput
           type="text"
           value={settings.appearance.fontFamilyMono}
           onChange={(e) => onUpdate('appearance', 'fontFamilyMono', e.target.value)}
           placeholder='ui-monospace, "Cascadia Code", monospace'
-          className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
         />
-      </div>
+      </SettingsField>
 
-      <div className="space-y-3">
-        <label className="text-sm font-medium text-foreground">
-          {t('settings.appearance.codeBlockTheme', '代码块主题')}
-        </label>
-        <select
+      <SettingsField label={t('settings.appearance.codeBlockTheme', '代码块主题')}>
+        <SettingsSelect
           value={settings.appearance.codeBlockTheme}
           onChange={(e) => onUpdate('appearance', 'codeBlockTheme', e.target.value)}
-          className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-info"
         >
           <option value="github">GitHub</option>
           <option value="monokai">Monokai</option>
           <option value="dracula">Dracula</option>
           <option value="one-dark">One Dark</option>
-        </select>
-      </div>
+        </SettingsSelect>
+      </SettingsField>
 
-      <div className="space-y-3">
-        <label className="text-sm font-medium text-foreground">
-          {t('settings.appearance.messageSpacing', '消息间距')}
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {(['compact', 'comfortable', 'spacious'] as const).map((spacing) => (
-            <button
-              key={spacing}
-              onClick={() => onUpdate('appearance', 'messageSpacing', spacing)}
-              className={`flex-1 min-w-[80px] py-2 rounded-lg border text-sm transition-all ${
-                settings.appearance.messageSpacing === spacing
-                  ? 'border-info bg-info/10 text-foreground'
-                  : 'border-border text-muted-foreground hover:border-border-hover'
-              }`}
-            >
-              {t(`settings.appearance.spacing.${spacing}`)}
-            </button>
-          ))}
-        </div>
-      </div>
+      <SettingsField label={t('settings.appearance.messageSpacing', '消息间距')}>
+        <SettingsOptionGroup
+          options={['compact', 'comfortable', 'spacious'] as const}
+          value={settings.appearance.messageSpacing}
+          onChange={(spacing) => onUpdate('appearance', 'messageSpacing', spacing)}
+          renderLabel={(spacing) => t(`settings.appearance.spacing.${spacing}`)}
+          containerClassName="flex flex-wrap gap-2"
+          optionClassName="flex-1 min-w-[80px] py-2"
+        />
+      </SettingsField>
     </div>
   )
 }

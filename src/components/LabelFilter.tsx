@@ -144,7 +144,7 @@ export default function LabelFilter({
       <button
         key={tag.id}
         onClick={() => handleToggle(tag.id)}
-        className="flex w-full cursor-pointer select-none items-center gap-2.5 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] transition-colors"
+        className="flex w-full cursor-pointer select-none items-center gap-2.5 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
         style={{ paddingLeft: `${8 + depth * 14}px`, width: 'calc(100% - 8px)' }}
       >
         <LabelIcon color={tag.color} hasChildren={hasChildren} />
@@ -166,7 +166,7 @@ export default function LabelFilter({
       <button
         ref={triggerRef}
         onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-[6px] text-[12px] select-none transition-colors ${
+        className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-[6px] text-[12px] select-none motion-color motion-press focus-ring ${
           activeCount > 0
             ? 'bg-foreground/[0.08] text-foreground'
             : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
@@ -203,7 +203,7 @@ export default function LabelFilter({
             {activeCount > 0 && (
               <button
                 onClick={() => { onFilterChange([]); setFilter('') }}
-                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                className="text-[11px] text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
               >
                 {t('tags.filter.clearFilter')}
               </button>
@@ -272,7 +272,7 @@ export default function LabelFilter({
                       <button
                         type="submit"
                         disabled={!newName.trim()}
-                        className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+                        className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-30 motion-color motion-press focus-ring"
                       >
                         {t('tags.add')}
                       </button>
@@ -283,7 +283,7 @@ export default function LabelFilter({
                         setCreating(true)
                         setTimeout(() => createInputRef.current?.focus(), 0)
                       }}
-                      className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-[6px] text-[12px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
+                      className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-[6px] text-[12px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
                     >
                       <Plus className="h-3 w-3" />
                       {t('tags.createNew')}

@@ -125,7 +125,7 @@ function AuthGate({ children }: AuthGateProps) {
                   className={`
                     w-full px-3.5 py-2.5 pr-10 rounded-lg text-sm
                     bg-zinc-900 text-zinc-100 placeholder-zinc-600
-                    border transition-colors duration-150 outline-none
+                    border motion-color outline-none
                     focus:ring-1 focus:ring-blue-500/40
                     ${error
                       ? 'border-red-500/60 focus:border-red-500'
@@ -136,7 +136,7 @@ function AuthGate({ children }: AuthGateProps) {
                 <button
                   type="button"
                   onClick={() => setShowToken(!showToken)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 motion-color motion-press focus-ring"
                   tabIndex={-1}
                 >
                   {showToken
@@ -156,7 +156,7 @@ function AuthGate({ children }: AuthGateProps) {
               className="
                 w-full py-2.5 rounded-lg text-sm font-medium
                 bg-blue-600 hover:bg-blue-500 active:bg-blue-700
-                text-white transition-colors duration-150
+                text-white motion-color motion-press focus-ring
                 disabled:opacity-40 disabled:cursor-not-allowed
                 flex items-center justify-center gap-2
               "

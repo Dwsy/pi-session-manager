@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   forwardRef,
+  memo,
   useRef,
   useImperativeHandle,
   lazy,
@@ -17,6 +18,7 @@ import SessionTreeSearch, {
 } from "./SessionTreeSearch";
 import { getCachedSettings } from "../utils/settingsApi";
 import { parseQuotedQuery } from "../utils/search";
+import { useSessionTreeLookup } from "../hooks/useSessionTreeLookup";
 
 // Known tools map to CSS variable names: var(--tool-color-<name>)
 // Unknown tools use palette variables: var(--tool-palette-<N>)
@@ -133,8 +135,8 @@ interface FlatNode {
   isBranchPoint: boolean;
 }
 
-const SessionTree = forwardRef<SessionTreeRef, SessionTreeProps>(
-  function SessionTree(
+const SessionTree = memo(
+  forwardRef<SessionTreeRef, SessionTreeProps>(function SessionTree(
     {
       entries,
       activeLeafId,
@@ -192,6 +194,9 @@ const SessionTree = forwardRef<SessionTreeRef, SessionTreeProps>(
         .map((term) => term.toLowerCase())
         .filter(Boolean);
     }, [searchQuery]);
+
+    const { activePathIds, resolveScrollTarget, getToolResultMeta } =
+      useSessionTreeLookup(entries, activeLeafId);
 
     // Extract all unique tool names from current session
     const availableTools = useMemo(() => {
@@ -261,26 +266,6 @@ const SessionTree = forwardRef<SessionTreeRef, SessionTreeProps>(
 
       return roots;
     }, [entries]);
-
-    // Build active path IDs
-    const activePathIds = useMemo(() => {
-      if (!activeLeafId) return new Set<string>();
-
-      const pathIds = new Set<string>();
-      let currentId = activeLeafId;
-
-      while (currentId) {
-        pathIds.add(currentId);
-        const entry = entries.find((e) => e.id === currentId);
-        if (entry?.parentId && entry.parentId !== entry.id) {
-          currentId = entry.parentId;
-        } else {
-          break;
-        }
-      }
-
-      return pathIds;
-    }, [entries, activeLeafId]);
 
     // Flatten tree with proper indentation and connectors
     const flatNodes = useMemo(() => {
@@ -624,40 +609,13 @@ const SessionTree = forwardRef<SessionTreeRef, SessionTreeProps>(
 
             return "Assistant";
           } else if (msg.role === "toolResult") {
-            // Display relevant info for tool results
-            const content = Array.isArray(msg.content) ? msg.content : [];
-            const toolResultContent = content.find(
-              (c: any) => c.type === "toolResult",
-            );
-
-            if (toolResultContent && toolResultContent.id) {
-              // Try to find corresponding tool call
-              const toolCallEntry = entries.find(
-                (e) =>
-                  e.type === "message" &&
-                  e.message?.role === "assistant" &&
-                  Array.isArray(e.message.content) &&
-                  e.message.content.some(
-                    (c: any) =>
-                      c.type === "toolCall" && c.id === toolResultContent.id,
-                  ),
-              );
-
-              if (toolCallEntry && toolCallEntry.message) {
-                const toolCall = (toolCallEntry.message.content as any[]).find(
-                  (c: any) =>
-                    c.type === "toolCall" && c.id === toolResultContent.id,
-                );
-
-                if (toolCall) {
-                  const toolName = toolCall.name || "unknown";
-                  const hasError =
-                    msg.errorMessage ||
-                    (msg.exitCode !== undefined && msg.exitCode !== 0);
-                  const status = hasError ? " ✗" : " ✓";
-                  return `${toolName} result${status}`;
-                }
-              }
+            const toolResultMeta = getToolResultMeta(entry);
+            if (toolResultMeta) {
+              const hasError =
+                msg.errorMessage ||
+                (msg.exitCode !== undefined && msg.exitCode !== 0);
+              const status = hasError ? " ✗" : " ✓";
+              return `${toolResultMeta.toolName} result${status}`;
             }
 
             const hasError =
@@ -804,39 +762,11 @@ const SessionTree = forwardRef<SessionTreeRef, SessionTreeProps>(
       setCurrentResultIndex(0);
     }, [matchedEntryIds]);
 
-    // toolResult is not rendered separately, need to jump to corresponding assistant message (contains this toolCall)
-    const resolveScrollTarget = useCallback(
-      (entryId: string): string => {
-        const entry = entries.find((e) => e.id === entryId);
-        if (
-          !entry ||
-          entry.type !== "message" ||
-          entry.message?.role !== "toolResult"
-        ) {
-          return entryId;
-        }
-        const content = Array.isArray(entry.message.content)
-          ? entry.message.content
-          : [];
-        const toolResultContent = content.find(
-          (c: any) => c.type === "toolResult",
-        );
-        if (!toolResultContent?.id) return entryId;
-
-        const assistantEntry = entries.find(
-          (e) =>
-            e.type === "message" &&
-            e.message?.role === "assistant" &&
-            Array.isArray(e.message.content) &&
-            e.message.content.some(
-              (c: any) =>
-                c.type === "toolCall" && c.id === toolResultContent.id,
-            ),
-        );
-        return assistantEntry ? assistantEntry.id : entryId;
-      },
-      [entries],
+    const searchResultSet = useMemo(
+      () => new Set(searchResults),
+      [searchResults],
     );
+    const currentSearchResultId = searchResults[currentResultIndex];
 
     // Search navigation
     const handleSearchNext = useCallback(() => {
@@ -870,27 +800,35 @@ const SessionTree = forwardRef<SessionTreeRef, SessionTreeProps>(
       setSearchQuery(query);
     }, []);
 
+    const newestLeafById = useMemo(() => {
+      const map = new Map<string, string>();
+
+      function walk(node: TreeNodeData): string {
+        let newestLeafId = node.entry.id;
+
+        for (const child of node.children) {
+          walk(child);
+        }
+
+        if (node.children.length > 0) {
+          const lastChild = node.children[node.children.length - 1];
+          newestLeafId = map.get(lastChild.entry.id) || lastChild.entry.id;
+        }
+
+        map.set(node.entry.id, newestLeafId);
+        return newestLeafId;
+      }
+
+      treeData.forEach(walk);
+      return map;
+    }, [treeData]);
+
     // Find the newest leaf reachable from a given node (follow last child at each level)
     const findNewestLeaf = useCallback(
       (nodeId: string): string => {
-        // Build a lookup from treeData
-        const nodeMap = new Map<string, TreeNodeData>();
-        function mapNodes(node: TreeNodeData) {
-          nodeMap.set(node.entry.id, node);
-          node.children.forEach(mapNodes);
-        }
-        treeData.forEach(mapNodes);
-
-        const node = nodeMap.get(nodeId);
-        if (!node) return nodeId;
-
-        let current = node;
-        while (current.children.length > 0) {
-          current = current.children[current.children.length - 1];
-        }
-        return current.entry.id;
+        return newestLeafById.get(nodeId) || nodeId;
       },
-      [treeData],
+      [newestLeafById],
     );
 
     const handleNodeClick = (flatNode: FlatNode) => {
@@ -1030,10 +968,9 @@ const SessionTree = forwardRef<SessionTreeRef, SessionTreeProps>(
                 const roleClass = getNodeRoleClass(entry);
                 const isCollapsed = collapsedNodes.has(entry.id);
 
-                const isSearchMatch = searchResults.includes(entry.id);
+                const isSearchMatch = searchResultSet.has(entry.id);
                 const isCurrentMatch =
-                  isSearchMatch &&
-                  searchResults[currentResultIndex] === entry.id;
+                  isSearchMatch && currentSearchResultId === entry.id;
 
                 let snippet: string | null = null;
                 if (isSearchMatch && searchTerms.length > 0) {
@@ -1106,7 +1043,9 @@ const SessionTree = forwardRef<SessionTreeRef, SessionTreeProps>(
         )}
       </div>
     );
-  },
+  }),
 );
+
+SessionTree.displayName = "SessionTree";
 
 export default SessionTree;

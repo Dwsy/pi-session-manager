@@ -74,7 +74,7 @@ export default function DeleteSessionConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={isDeleting}
-            className="px-4 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
             {t('common.cancel')}
           </button>
@@ -84,7 +84,7 @@ export default function DeleteSessionConfirmDialog({
               void handleConfirm()
             }}
             disabled={isDeleting}
-            className="rounded bg-red-600 px-4 py-2 text-sm text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 motion-color motion-press focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
             {t('common.delete')}
           </button>

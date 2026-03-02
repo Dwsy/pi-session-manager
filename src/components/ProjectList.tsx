@@ -1,14 +1,15 @@
 import type { RefObject } from "react";
 import type { SessionInfo, FavoriteItem } from "../types";
-import { FolderOpen, ArrowLeft, Star } from "lucide-react";
+import { FolderOpen, Star } from "lucide-react";
 import { ProjectListSkeleton } from "./Skeleton";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import SessionList from "./SessionList";
+import SelectedProjectHeader from "./project/SelectedProjectHeader";
 import type { TerminalType } from "./settings/types";
 import { getPlatformDefaults } from "./settings/types";
+import { formatDirectory, formatShortTime, getDirectoryName } from "../utils/sessionDisplay";
 
 interface ProjectListProps {
   sessions: SessionInfo[];
@@ -150,7 +151,7 @@ export default function ProjectList({
                 key={project.dir}
                 data-index={virtualRow.index}
                 ref={projectsVirtualizer.measureElement}
-                className="px-3 py-2 hover:bg-background cursor-pointer transition-colors border-b border-border/10 group"
+                className="px-3 py-2 hover:bg-background cursor-pointer motion-surface motion-color border-b border-border/10 group"
                 style={{
                   position: "absolute",
                   top: 0,
@@ -203,7 +204,7 @@ export default function ProjectList({
                           path: project.dir,
                         });
                       }}
-                      className={`p-1 rounded transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100 ${
+                      className={`p-1 rounded motion-color motion-press focus-ring flex-shrink-0 opacity-0 group-hover:opacity-100 ${
                         isFavorite
                           ? "text-yellow-400 opacity-100"
                           : "text-muted-foreground hover:text-yellow-400"
@@ -229,24 +230,13 @@ export default function ProjectList({
   return (
     <div className="flex flex-col">
       {showHeader && (
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30">
-          <button
-            onClick={handleBackToProjects}
-            className="p-1 hover:bg-accent rounded transition-colors flex-shrink-0"
-            title={t("project.list.back")}
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            <FolderOpen className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
-            <span className="text-xs font-medium truncate">
-              {projectInfo?.dirName}
-            </span>
-            <span className="text-[11px] text-muted-foreground flex-shrink-0">
-              ({projectSessions.length})
-            </span>
-          </div>
-        </div>
+        <SelectedProjectHeader
+          projectName={projectInfo?.dirName || ""}
+          sessionCount={projectSessions.length}
+          onBack={handleBackToProjects}
+          backLabel={t("project.list.back")}
+          nameClassName="text-xs"
+        />
       )}
 
       <SessionList
@@ -266,47 +256,4 @@ export default function ProjectList({
       />
     </div>
   );
-}
-
-function formatDirectory(path: string): string {
-  if (!path) return "";
-
-  const parts = path.split("/").filter(Boolean);
-  if (parts.length <= 2) return path;
-
-  return ".../" + parts.slice(-2).join("/");
-}
-
-function getDirectoryName(cwd: string): string {
-  if (!cwd || cwd === "Unknown") {
-    return cwd || "Unknown Directory";
-  }
-
-  const parts = cwd.split(/[\\/]/);
-  const lastPart = parts[parts.length - 1];
-
-  if (lastPart && lastPart.length > 0) {
-    return lastPart;
-  }
-
-  if (parts.length >= 2) {
-    return `${parts[parts.length - 2]} / ${parts[parts.length - 1]}`;
-  }
-
-  return cwd;
-}
-
-function formatShortTime(date: string, t: TFunction): string {
-  const now = new Date();
-  const then = new Date(date);
-  const diffMs = now.getTime() - then.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return t("common.time.justNow");
-  if (diffMins < 60) return t("common.time.minutesAgo", { count: diffMins });
-  if (diffHours < 24) return t("common.time.hoursAgo", { count: diffHours });
-  if (diffDays < 30) return t("common.time.daysAgo", { count: diffDays });
-  return t("common.time.monthsAgo", { count: Math.floor(diffDays / 30) });
 }

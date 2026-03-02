@@ -91,7 +91,7 @@ export default function OpenInTerminalButton({
       onClick={handleOpenInTerminal}
       disabled={loading}
       className={`
-        rounded-md transition-all duration-200 flex items-center gap-1.5
+        rounded-md motion-surface motion-color motion-press focus-ring flex items-center gap-1.5
         disabled:opacity-50 disabled:cursor-not-allowed
         ${sizeClasses[size]}
         ${variantClasses[variant]}

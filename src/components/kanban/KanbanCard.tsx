@@ -11,7 +11,7 @@ interface KanbanCardProps {
   isSelected: boolean
   isDragging?: boolean
   isOverlay?: boolean
-  onSelect: (rect: DOMRect) => void
+  onSelect: (rect: DOMRect, clickPoint?: { x: number; y: number }) => void
   onContextMenu?: (e: React.MouseEvent) => void
 }
 
@@ -33,10 +33,10 @@ function KanbanCardInner({
     transition,
   } = useSortable({ id: session.id, disabled: isOverlay })
 
-  const handleClick = () => {
+  const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (cardRef.current) {
       const rect = cardRef.current.getBoundingClientRect()
-      onSelect(rect)
+      onSelect(rect, { x: event.clientX, y: event.clientY })
     }
   }
 
@@ -54,7 +54,7 @@ function KanbanCardInner({
   const dir = session.cwd?.split('/').filter(Boolean).slice(-2).join('/') || ''
 
   const cardClasses = [
-    'group relative rounded-md border p-2.5 cursor-pointer transition-all',
+    'group relative rounded-md border p-2.5 cursor-pointer motion-surface motion-color',
     'bg-card hover:border-border',
     isSelected ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20' : 'border-border/40',
     isDragging ? 'opacity-50 shadow-lg' : '',

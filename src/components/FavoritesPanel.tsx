@@ -69,7 +69,7 @@ export default function FavoritesPanel({
                       e.stopPropagation()
                       onRemoveFavorite(favorite)
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity flex-shrink-0"
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 motion-opacity motion-color motion-press focus-ring flex-shrink-0"
                     title={t('favorites.remove')}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -116,7 +116,7 @@ export default function FavoritesPanel({
                       e.stopPropagation()
                       onRemoveFavorite(favorite)
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity flex-shrink-0"
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 motion-opacity motion-color motion-press focus-ring flex-shrink-0"
                     title={t('favorites.remove')}
                   >
                     <Trash2 className="h-3.5 w-3.5" />

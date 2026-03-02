@@ -52,6 +52,7 @@ export const session = {
   loading: 'Sitzung wird geladen...',
   messages: 'Nachrichten',
   noMessages: 'Keine Nachrichten',
+  noMessagesHint: 'Diese Sitzung enthält nur Systemeinträge, noch keine Nutzer-/Assistenten-Nachrichten.',
   messageCount: '{{count}} Nachrichten',
   showSidebar: 'Seitenleiste anzeigen',
   hideSidebar: 'Seitenleiste ausblenden',

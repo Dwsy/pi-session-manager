@@ -36,7 +36,7 @@ export default function ExportDialog({ session, onExport, onClose }: ExportDialo
         <div className="space-y-2">
           <button
             onClick={() => handleExport('html')}
-            className={`w-full px-4 py-3 text-left rounded transition-colors flex items-start gap-3 cursor-pointer active:scale-95 ${defaultFormat === 'html' ? 'bg-info/15 ring-1 ring-info/30' : 'bg-secondary hover:bg-accent'}`}
+            className={`w-full px-4 py-3 text-left rounded motion-color motion-press focus-ring flex items-start gap-3 cursor-pointer active:scale-95 ${defaultFormat === 'html' ? 'bg-info/15 ring-1 ring-info/30' : 'bg-secondary hover:bg-accent'}`}
           >
             <FileText className="h-5 w-5 text-info mt-0.5 flex-shrink-0" />
             <div>
@@ -47,7 +47,7 @@ export default function ExportDialog({ session, onExport, onClose }: ExportDialo
 
           <button
             onClick={() => handleExport('md')}
-            className={`w-full px-4 py-3 text-left rounded transition-colors flex items-start gap-3 cursor-pointer active:scale-95 ${defaultFormat === 'md' ? 'bg-info/15 ring-1 ring-info/30' : 'bg-secondary hover:bg-accent'}`}
+            className={`w-full px-4 py-3 text-left rounded motion-color motion-press focus-ring flex items-start gap-3 cursor-pointer active:scale-95 ${defaultFormat === 'md' ? 'bg-info/15 ring-1 ring-info/30' : 'bg-secondary hover:bg-accent'}`}
           >
             <FileCode className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
             <div>
@@ -58,7 +58,7 @@ export default function ExportDialog({ session, onExport, onClose }: ExportDialo
 
           <button
             onClick={() => handleExport('json')}
-            className={`w-full px-4 py-3 text-left rounded transition-colors flex items-start gap-3 cursor-pointer active:scale-95 ${defaultFormat === 'json' ? 'bg-info/15 ring-1 ring-info/30' : 'bg-secondary hover:bg-accent'}`}
+            className={`w-full px-4 py-3 text-left rounded motion-color motion-press focus-ring flex items-start gap-3 cursor-pointer active:scale-95 ${defaultFormat === 'json' ? 'bg-info/15 ring-1 ring-info/30' : 'bg-secondary hover:bg-accent'}`}
           >
             <Database className="h-5 w-5 text-warning mt-0.5 flex-shrink-0" />
             <div>
@@ -71,7 +71,7 @@ export default function ExportDialog({ session, onExport, onClose }: ExportDialo
         <div className="mt-4 flex justify-end">
           <button
             onClick={handleClose}
-            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring cursor-pointer"
           >
             {t('cancel')}
           </button>

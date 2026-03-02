@@ -44,7 +44,7 @@ export default function TagFilter({ tags, sessionTags, filterTagIds, onFilterCha
     <div className="border-b border-border/50">
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center gap-1.5 w-full px-3 py-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+        className="flex items-center gap-1.5 w-full px-3 py-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground motion-color motion-press focus-ring"
       >
         {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         {t('tags.filter.title')}
@@ -64,7 +64,7 @@ export default function TagFilter({ tags, sessionTags, filterTagIds, onFilterCha
               <button
                 key={tag.id}
                 onClick={(e) => handleClick(tag.id, e)}
-                className={`flex items-center gap-2 w-full px-2 py-1 rounded text-left transition-colors ${
+                className={`flex items-center gap-2 w-full px-2 py-1 rounded text-left motion-color motion-press focus-ring ${
                   active ? 'bg-secondary' : 'hover:bg-secondary/50'
                 }`}
               >

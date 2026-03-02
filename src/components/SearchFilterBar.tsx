@@ -58,7 +58,7 @@ export default function SearchFilterBar({
   return (
     <div className={`flex items-center gap-1.5 ${className}`}>
       <div
-        className={`flex items-center gap-1.5 flex-1 min-w-0 rounded-md transition-colors ${
+        className={`flex items-center gap-1.5 flex-1 min-w-0 rounded-md motion-surface motion-color ${
           compact ? 'px-1.5 py-1' : 'px-2 py-1.5'
         } ${
           focused
@@ -88,7 +88,7 @@ export default function SearchFilterBar({
         {searchQuery && (
           <button
             onClick={handleClear}
-            className="p-0.5 rounded hover:bg-foreground/10 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            className="p-0.5 rounded hover:bg-foreground/10 text-muted-foreground/50 hover:text-muted-foreground motion-color motion-press focus-ring"
           >
             <X className={`${compact ? 'h-2.5 w-2.5' : 'h-3 w-3'}`} />
           </button>

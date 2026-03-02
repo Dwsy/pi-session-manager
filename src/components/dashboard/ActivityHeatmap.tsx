@@ -1,8 +1,9 @@
 import { Calendar } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getDay } from 'date-fns'
-import type { HeatmapPoint } from '../../types'
+import DashboardCardShell from './DashboardCardShell'
 import HeatmapTooltip from './HeatmapTooltip'
+import type { HeatmapPoint } from '../../types'
 
 interface ActivityHeatmapProps {
   data: HeatmapPoint[]
@@ -71,7 +72,7 @@ export default function ActivityHeatmap({
     const cell = (
       <button
         type="button"
-        className="w-full aspect-square rounded-[3px] transition-all duration-150 hover:scale-[1.12] focus:outline-none focus:ring-1 focus:ring-primary/70"
+        className="w-full aspect-square rounded-[3px] motion-transform motion-opacity hover:scale-[1.12] focus-ring focus:ring-1 focus:ring-primary/70"
         style={{
           backgroundColor: point ? HEATMAP_COLORS[point.level] : HEATMAP_COLORS[0],
           opacity: point && point.level > 0 ? 1 : 0.16,
@@ -99,10 +100,10 @@ export default function ActivityHeatmap({
   }
 
   return (
-    <div className="glass-card rounded-xl p-4 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-success/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-      <div className="relative z-10">
+    <DashboardCardShell
+      className="rounded-xl p-4"
+      overlayClassName="bg-gradient-to-br from-success/5 via-transparent to-transparent"
+    >
         {displayTitle && (
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
@@ -145,7 +146,6 @@ export default function ActivityHeatmap({
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </DashboardCardShell>
   )
 }

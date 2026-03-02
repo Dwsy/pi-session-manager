@@ -1,8 +1,13 @@
-import { useTranslation } from 'react-i18next'
-import { FolderOpen, Terminal, ChevronDown, ChevronUp } from 'lucide-react'
 import { useState } from 'react'
-import type { TerminalSettingsProps } from '../types'
+import { FolderOpen, Terminal, ChevronDown, ChevronUp } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import SettingsField from '../SettingsField'
+import SettingsInput from '../SettingsInput'
+import SettingsOptionGroup from '../SettingsOptionGroup'
+import SettingsRadioCardGroup from '../SettingsRadioCardGroup'
+import SettingsVisualSliderField from '../SettingsVisualSliderField'
 import { detectPlatform } from '../types'
+import type { TerminalSettingsProps } from '../types'
 
 const platform = detectPlatform()
 
@@ -23,6 +28,7 @@ const SHELL_OPTIONS = platform === 'windows'
 export default function TerminalSettings({ settings, onUpdate }: TerminalSettingsProps) {
   const { t } = useTranslation()
   const [isBuiltinExpanded, setIsBuiltinExpanded] = useState(settings.terminal.builtinTerminalEnabled)
+  const shellOptionsMap = new Map(SHELL_OPTIONS.map((shell) => [shell.path, shell.label] as const))
 
   const platformTerminals = (() => {
     const common = [
@@ -52,6 +58,7 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
         ]
     }
   })()
+  const terminalOptionsMap = new Map(platformTerminals.map((term) => [term.id, term] as const))
 
   const handleToggleBuiltin = (enabled: boolean) => {
     onUpdate('terminal', 'builtinTerminalEnabled', enabled)
@@ -79,84 +86,69 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
           </div>
           <button
             onClick={() => handleToggleBuiltin(!settings.terminal.builtinTerminalEnabled)}
-            className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
+            className={`relative w-12 h-6 rounded-full motion-surface motion-color ${
               settings.terminal.builtinTerminalEnabled 
                 ? 'bg-info shadow-[0_0_12px_rgba(86,156,214,0.4)]'
                 : 'bg-secondary'
             }`}
+            style={{ transitionDuration: 'var(--motion-duration-overlay)' }}
           >
-            <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transition-all duration-300 ${
-              settings.terminal.builtinTerminalEnabled ? 'translate-x-6' : ''
-            }`} />
+            <span
+              className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md motion-transform ${
+                settings.terminal.builtinTerminalEnabled ? 'translate-x-6' : ''
+              }`}
+              style={{ transitionDuration: 'var(--motion-duration-overlay)' }}
+            />
           </button>
         </div>
 
         {/* Expandable Content */}
-        <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
-          isBuiltinExpanded ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0'
-        }`}>
+        <div
+          className={`overflow-hidden ${
+            isBuiltinExpanded ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0'
+          }`}
+          style={{
+            transition:
+              'max-height var(--motion-duration-overlay) var(--motion-ease-standard), opacity var(--motion-duration-overlay) var(--motion-ease-standard)',
+          }}
+        >
           <div className="p-4 space-y-5 bg-surface/30">
             {/* Default Shell */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                {t('settings.terminal.defaultShell')}
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {SHELL_OPTIONS.map(s => (
-                  <button
-                    key={s.path}
-                    onClick={() => onUpdate('terminal', 'defaultShell', s.path)}
-                    className={`px-4 py-2 min-h-[40px] text-sm rounded-lg border transition-all duration-200 ${
-                      settings.terminal.defaultShell === s.path
-                        ? 'border-info bg-info/10 text-foreground'
-                        : 'border-border text-muted-foreground hover:border-border-hover hover:text-foreground'
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <SettingsField
+              label={t('settings.terminal.defaultShell')}
+              className="space-y-2"
+              labelClassName="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+            >
+              <SettingsOptionGroup
+                options={SHELL_OPTIONS.map((shell) => shell.path)}
+                value={settings.terminal.defaultShell}
+                onChange={(shellPath) => onUpdate('terminal', 'defaultShell', shellPath)}
+                renderLabel={(shellPath) => shellOptionsMap.get(shellPath) ?? shellPath}
+                containerClassName="flex flex-wrap gap-2"
+                optionClassName="px-4 py-2 min-h-[40px]"
+                inactiveClassName="border-border text-muted-foreground hover:border-border-hover hover:text-foreground"
+              />
+            </SettingsField>
 
             {/* Font Size Slider */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  {t('settings.terminal.fontSize')}
-                </label>
-                <span className="text-sm font-mono text-info">{settings.terminal.terminalFontSize}px</span>
-              </div>
-              <div className="relative h-6 flex items-center">
-                <div className="absolute inset-x-0 h-1.5 rounded-full bg-secondary" />
-                <div 
-                  className="absolute h-1.5 rounded-full bg-gradient-to-r from-info to-info/70"
-                  style={{ width: `${((settings.terminal.terminalFontSize - 10) / 10) * 100}%` }}
-                />
-                <input
-                  type="range"
-                  min={10}
-                  max={20}
-                  value={settings.terminal.terminalFontSize}
-                  onChange={(e) => onUpdate('terminal', 'terminalFontSize', Number(e.target.value))}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <div 
-                  className="absolute w-5 h-5 rounded-full bg-info shadow-[0_0_8px_rgba(86,156,214,0.6)] border-2 border-white/20 pointer-events-none transition-all duration-150"
-                  style={{ left: `calc(${((settings.terminal.terminalFontSize - 10) / 10) * 100}% - 10px)` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>10px</span>
-                <span>20px</span>
-              </div>
-            </div>
+            <SettingsVisualSliderField
+              label={t('settings.terminal.fontSize')}
+              value={settings.terminal.terminalFontSize}
+              min={10}
+              max={20}
+              onChange={(value) => onUpdate('terminal', 'terminalFontSize', value)}
+              valueText={`${settings.terminal.terminalFontSize}px`}
+              minText="10px"
+              maxText="20px"
+              fieldClassName="space-y-3"
+            />
           </div>
         </div>
 
         {/* Expand/Collapse hint */}
         <button
           onClick={() => setIsBuiltinExpanded(!isBuiltinExpanded)}
-          className={`w-full flex items-center justify-center gap-1 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all duration-200 ${
+          className={`w-full flex items-center justify-center gap-1 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/30 motion-color motion-press focus-ring ${
             !settings.terminal.builtinTerminalEnabled && 'opacity-50 pointer-events-none'
           }`}
         >
@@ -172,77 +164,57 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
       <div className="h-px bg-secondary" />
 
       {/* Default Terminal Selection */}
-      <div className="space-y-3">
-        <label className="text-sm font-medium text-foreground">
-          {t('settings.terminal.default', '默认终端')}
-        </label>
-        <div className="grid grid-cols-1 gap-2">
-          {platformTerminals.map((term) => (
-            <label
-              key={term.id}
-              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
-                settings.terminal.defaultTerminal === term.id
-                  ? 'border-info bg-info/10'
-                  : 'border-border hover:border-border-hover'
-              }`}
-            >
-              <input
-                type="radio"
-                name="terminal"
-                value={term.id}
-                checked={settings.terminal.defaultTerminal === term.id}
-                onChange={(e) => onUpdate('terminal', 'defaultTerminal', e.target.value)}
-                className="text-info focus:ring-info"
-              />
-              <div>
-                <div className="text-sm font-medium text-foreground">{term.name}</div>
-                <div className="text-xs text-muted-foreground">{term.description}</div>
-              </div>
-            </label>
-          ))}
-        </div>
-      </div>
+      <SettingsField label={t('settings.terminal.default', '默认终端')}>
+        <SettingsRadioCardGroup
+          options={platformTerminals.map((term) => term.id)}
+          value={settings.terminal.defaultTerminal}
+          onChange={(terminalId) => onUpdate('terminal', 'defaultTerminal', terminalId)}
+          name="terminal"
+          getLabel={(terminalId) => terminalOptionsMap.get(terminalId)?.name ?? terminalId}
+          getDescription={(terminalId) =>
+            terminalOptionsMap.get(terminalId)?.description ?? ''
+          }
+          containerClassName="grid grid-cols-1 gap-2"
+          radioClassName="text-info focus:ring-info"
+        />
+      </SettingsField>
 
       {/* Custom Terminal Command */}
       {settings.terminal.defaultTerminal === 'custom' && (
-        <div className="space-y-2 p-4 rounded-lg border border-border bg-surface/30 animate-in fade-in slide-in-from-top-2">
-          <label className="text-sm font-medium text-foreground">
-            {t('settings.terminal.customCommand', '自定义终端命令')}
-          </label>
-          <input
+        <SettingsField
+          label={t('settings.terminal.customCommand', '自定义终端命令')}
+          description={t('settings.terminal.customCommandHelp', '使用 {path} 作为会话路径占位符')}
+          className="space-y-2 p-4 rounded-lg border border-border bg-surface/30 animate-in fade-in slide-in-from-top-2"
+        >
+          <SettingsInput
             type="text"
             value={settings.terminal.customTerminalCommand || ''}
             onChange={(e) => onUpdate('terminal', 'customTerminalCommand', e.target.value)}
             placeholder={t('settings.terminal.commandExample')}
-            className="w-full px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-info transition-colors"
+            className="bg-surface-dark"
           />
-          <p className="text-xs text-muted-foreground">
-            {t('settings.terminal.customCommandHelp', '使用 {path} 作为会话路径占位符')}
-          </p>
-        </div>
+        </SettingsField>
       )}
 
       {/* Pi Command Path */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">
-          {t('settings.terminal.piCommandPath', 'Pi 命令路径')}
-        </label>
+      <SettingsField
+        label={t('settings.terminal.piCommandPath', 'Pi 命令路径')}
+        description={t('settings.terminal.piCommandPathHelp', '如果 pi 不在系统 PATH 中，请指定完整路径')}
+        className="space-y-2"
+      >
         <div className="flex flex-wrap gap-2 items-center">
-          <input
+          <SettingsInput
             type="text"
             value={settings.terminal.piCommandPath}
             onChange={(e) => onUpdate('terminal', 'piCommandPath', e.target.value)}
             placeholder="pi"
-            className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-info transition-colors"
+            className="flex-1 w-auto"
           />
-          <button className="px-3 py-2 bg-surface border border-border rounded-lg text-muted-foreground hover:text-foreground hover:border-border-hover transition-colors">
+          <button className="px-3 py-2 bg-surface border border-border rounded-lg text-muted-foreground hover:text-foreground hover:border-border-hover motion-color motion-surface motion-press focus-ring">
             <FolderOpen className="h-4 w-4" />
           </button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {t('settings.terminal.piCommandPathHelp', '如果 pi 不在系统 PATH 中，请指定完整路径')}
-        </p>
-      </div>
+      </SettingsField>
     </div>
   )
 }

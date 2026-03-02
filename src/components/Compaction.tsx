@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { escapeHtml } from '../utils/markdown'
+import MarkdownContent from './MarkdownContent'
 import { formatTokens } from '../utils/format'
 
 interface CompactionProps {
@@ -23,9 +23,10 @@ export default function Compaction({ tokensBefore, summary }: CompactionProps) {
         {t('components.compaction.collapsed', { tokens: formatTokens(tokensBefore || 0) })}
       </div>
       <div className="compaction-content">
-        <strong>{t('components.compaction.content', { tokens: formatTokens(tokensBefore || 0) })}</strong>
-        {'\n\n'}
-        {summary ? escapeHtml(summary) : ''}
+        <div className="compaction-content-header">
+          {t('components.compaction.content', { tokens: formatTokens(tokensBefore || 0) })}
+        </div>
+        {summary ? <MarkdownContent content={summary} /> : null}
       </div>
     </div>
   )

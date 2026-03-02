@@ -87,7 +87,7 @@ export default function PullToRefresh({
     <div className="relative w-full h-full flex flex-col overflow-hidden">
       {/* Refresh indicator */}
       <div
-        className="absolute top-0 left-0 right-0 flex justify-center items-center z-20 pointer-events-none transition-transform"
+        className="absolute top-0 left-0 right-0 flex justify-center items-center z-20 pointer-events-none motion-transform"
         style={{
           height: `${pullDownThreshold}px`,
           transform: `translateY(${Math.min(0, pullDownDistance - pullDownThreshold)}px)`,

@@ -13,7 +13,7 @@ interface KanbanColumnProps {
   tag: Tag | null
   sessions: SessionInfo[]
   selectedSession: SessionInfo | null
-  onSelectSession: (session: SessionInfo, rect: DOMRect) => void
+  onSelectSession: (session: SessionInfo, rect: DOMRect, clickPoint?: { x: number; y: number }) => void
   getTagsForSession: (sessionId: string) => Tag[]
   allTags: Tag[]
   favorites: FavoriteItem[]
@@ -110,7 +110,7 @@ export default function KanbanColumn({
                     session={session}
                     tags={getTagsForSession(session.id)}
                     isSelected={selectedSession?.id === session.id}
-                    onSelect={(rect) => onSelectSession(session, rect)}
+                    onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}
                     onContextMenu={(e) => handleContextMenu(session, e)}
                   />
                 </div>
@@ -130,7 +130,7 @@ export default function KanbanColumn({
             session={session}
             tags={getTagsForSession(session.id)}
             isSelected={selectedSession?.id === session.id}
-            onSelect={(rect) => onSelectSession(session, rect)}
+            onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}
             onContextMenu={(e) => handleContextMenu(session, e)}
           />
         ))}
@@ -164,7 +164,7 @@ export default function KanbanColumn({
       <div
         ref={setNodeRef}
         className={[
-          'flex-1 min-h-0 rounded-lg border p-1.5 transition-colors',
+          'flex-1 min-h-0 rounded-lg border p-1.5 motion-color',
           'bg-muted/20 border-border/30',
           isOver ? 'border-primary/50 bg-primary/5' : '',
         ].filter(Boolean).join(' ')}

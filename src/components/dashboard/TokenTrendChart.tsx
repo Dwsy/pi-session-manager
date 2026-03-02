@@ -1,8 +1,10 @@
+import { format, subDays } from 'date-fns'
 import { TrendingUp, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import DashboardCardShell from './DashboardCardShell'
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import type { SessionStats } from '../../types'
-import { format, subDays } from 'date-fns'
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 
 interface TokenTrendChartProps {
   stats: SessionStats
@@ -12,6 +14,7 @@ interface TokenTrendChartProps {
 
 export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendChartProps) {
   const { t } = useTranslation()
+  const prefersReducedMotion = usePrefersReducedMotion()
   const displayTitle = title || t('dashboard.tokenStats.title')
   // Generate daily token data from messages_by_date
   const generateDailyTokenData = () => {
@@ -51,6 +54,7 @@ export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendC
 
   // Check if there's any data
   const hasData = totalPeriodTokens > 0
+  const chartAnimationDuration = prefersReducedMotion ? 0 : 500
 
   const formatTokens = (count: number) => {
     if (count === 0) return '0'
@@ -89,11 +93,10 @@ export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendC
   }
 
   return (
-    <div className="glass-card rounded-lg p-3 relative overflow-hidden group">
-      {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-success/5 via-transparent to-info/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-      <div className="relative z-10">
+    <DashboardCardShell
+      className="rounded-lg p-3"
+      overlayClassName="bg-gradient-to-br from-success/5 via-transparent to-info/5"
+    >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
             <div className="p-1 rounded bg-success/10">
@@ -132,8 +135,8 @@ export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendC
                       <stop offset="95%" stopColor="#569cd6" stopOpacity={0.1}/>
                     </linearGradient>
                   </defs>
-                  <XAxis 
-                    dataKey="displayDate" 
+                  <XAxis
+                    dataKey="displayDate"
                     stroke="#6a6f85"
                     fontSize={9}
                     tickLine={false}
@@ -141,7 +144,7 @@ export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendC
                     interval="preserveStartEnd"
                     tick={{ fill: '#6a6f85' }}
                   />
-                  <YAxis 
+                  <YAxis
                     stroke="#6a6f85"
                     fontSize={9}
                     tickLine={false}
@@ -157,7 +160,7 @@ export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendC
                     stroke="#7ee787"
                     strokeWidth={2}
                     fill="url(#tokenGradient)"
-                    animationDuration={500}
+                    animationDuration={chartAnimationDuration}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -177,7 +180,6 @@ export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendC
             </div>
           </>
         )}
-      </div>
-    </div>
+    </DashboardCardShell>
   )
 }

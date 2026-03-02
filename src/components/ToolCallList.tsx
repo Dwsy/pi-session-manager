@@ -42,7 +42,6 @@ function ToolCallList({ toolCalls, toolResultByCallId = new Map() }: ToolCallLis
 
         const detailsWithDiff = result?.message?.details as { diff?: string } | undefined
         const diff = toolResultContent?.details?.diff || toolResultContent?.diff || detailsWithDiff?.diff
-        const timestamp = result?.timestamp
 
         const entryId = result?.id || `tool-${toolCallId || index}`
 
@@ -55,7 +54,6 @@ function ToolCallList({ toolCalls, toolResultByCallId = new Map() }: ToolCallLis
                 output={output}
                 exitCode={result?.message?.exitCode}
                 cancelled={result?.message?.cancelled}
-                timestamp={timestamp}
                 entryId={entryId}
               />
             )
@@ -69,7 +67,6 @@ function ToolCallList({ toolCalls, toolResultByCallId = new Map() }: ToolCallLis
                 limit={args.limit}
                 output={output}
                 images={toolResultContent?.content?.filter((c): c is { type: 'image'; mimeType: string; data: string } => c.type === 'image' && typeof c.mimeType === 'string' && typeof c.data === 'string') || []}
-                timestamp={timestamp}
                 entryId={entryId}
               />
             )
@@ -81,7 +78,6 @@ function ToolCallList({ toolCalls, toolResultByCallId = new Map() }: ToolCallLis
                 filePath={args.file_path || args.path || ''}
                 content={args.content || ''}
                 output={output}
-                timestamp={timestamp}
                 entryId={entryId}
               />
             )
@@ -93,7 +89,7 @@ function ToolCallList({ toolCalls, toolResultByCallId = new Map() }: ToolCallLis
                 filePath={args.file_path || args.path || ''}
                 diff={diff}
                 output={output}
-                timestamp={timestamp}
+                isError={isError}
                 entryId={entryId}
               />
             )
@@ -105,7 +101,6 @@ function ToolCallList({ toolCalls, toolResultByCallId = new Map() }: ToolCallLis
                 arguments={args}
                 details={result?.message?.details}
                 output={output}
-                timestamp={timestamp}
                 entryId={entryId}
               />
             )
@@ -118,7 +113,6 @@ function ToolCallList({ toolCalls, toolResultByCallId = new Map() }: ToolCallLis
                 arguments={args}
                 output={output}
                 isError={isError}
-                timestamp={timestamp}
                 entryId={entryId}
               />
             )

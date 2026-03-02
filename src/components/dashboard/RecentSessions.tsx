@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Clock, MessageSquare, Folder, Zap, MessageCircle, MessageCircleReply } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { useTranslation } from 'react-i18next'
+import DashboardCardShell from './DashboardCardShell'
 import type { SessionInfo } from '../../types'
 
 interface RecentSessionsProps {
@@ -63,11 +64,10 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
   }
 
   return (
-    <div className="glass-card rounded-lg p-3 relative overflow-hidden group">
-      {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-info/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-      <div className="relative z-10">
+    <DashboardCardShell
+      className="rounded-lg p-3"
+      overlayClassName="bg-gradient-to-br from-info/5 via-transparent to-transparent"
+    >
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
             <div className="p-1 rounded bg-info/10">
@@ -82,13 +82,13 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
             {/* Toggle button for first/last message */}
             <button
               onClick={() => setShowFirstMessage(!showFirstMessage)}
-              className="p-1 rounded bg-background/60 hover:bg-background/90 transition-all duration-200 group/toggle"
+              className="p-1 rounded bg-background/60 hover:bg-background/90 motion-surface motion-color motion-press focus-ring group/toggle"
               title={showFirstMessage ? 'Show last message' : 'Show first message'}
             >
               {showFirstMessage ? (
-                <MessageCircle className="h-3 w-3 text-info group-hover/toggle:text-success transition-colors" />
+                <MessageCircle className="h-3 w-3 text-info group-hover/toggle:text-success motion-color" />
               ) : (
-                <MessageCircleReply className="h-3 w-3 text-success group-hover/toggle:text-info transition-colors" />
+                <MessageCircleReply className="h-3 w-3 text-success group-hover/toggle:text-info motion-color" />
               )}
             </button>
           </div>
@@ -104,11 +104,11 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
               <div
                 key={session.id}
                 onClick={() => onSessionSelect?.(session)}
-                className="group/item flex items-center gap-2 p-2 bg-background/60 rounded-lg border border-foreground/5 hover:bg-background/90 hover:border-info/20 transition-all duration-300 cursor-pointer relative overflow-hidden"
+                className="group/item flex items-center gap-2 p-2 bg-background/60 rounded-lg border border-foreground/5 hover:bg-background/90 hover:border-info/20 motion-surface motion-color cursor-pointer relative overflow-hidden"
               >
                 {/* Hover glow effect */}
                 <div
-                  className="absolute inset-0 opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 pointer-events-none"
+                  className="absolute inset-0 opacity-0 group-hover/item:opacity-100 motion-opacity pointer-events-none"
                   style={{
                     background: `linear-gradient(90deg, ${activity.color}08 0%, transparent 50%)`
                   }}
@@ -124,7 +124,7 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
                       {displayName}
                     </span>
                     {activity.level !== 'low' && (
-                      <Zap className="h-2.5 w-2.5 flex-shrink-0 transition-transform duration-300 group-hover/item:scale-110" style={{ color: activity.color }} />
+                      <Zap className="h-2.5 w-2.5 flex-shrink-0 motion-transform group-hover/item:scale-110" style={{ color: activity.color }} />
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
@@ -157,7 +157,6 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
             )
           })}
         </div>
-      </div>
-    </div>
+    </DashboardCardShell>
   )
 }

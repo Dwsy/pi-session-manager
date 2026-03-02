@@ -23,7 +23,7 @@ export default function ProjectsChart({ stats, title, limit = 8 }: ProjectsChart
 
   return (
     <div className="glass-card rounded-xl p-5 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-purple/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-purple/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 motion-opacity pointer-events-none" />
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-4">
@@ -46,11 +46,11 @@ export default function ProjectsChart({ stats, title, limit = 8 }: ProjectsChart
             return (
               <div
                 key={project}
-                className="flex items-center justify-between p-3 bg-background/60 rounded-xl border border-foreground/5 hover:bg-background/90 hover:border-foreground/10 transition-all duration-300 group/item cursor-pointer"
+                className="flex items-center justify-between p-3 bg-background/60 rounded-xl border border-foreground/5 hover:bg-background/90 hover:border-foreground/10 motion-surface motion-color group/item cursor-pointer"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-transform duration-300 group-hover/item:scale-125"
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0 motion-transform group-hover/item:scale-125"
                     style={{
                       backgroundColor: color,
                       boxShadow: `0 0 8px ${color}60`
@@ -61,7 +61,7 @@ export default function ProjectsChart({ stats, title, limit = 8 }: ProjectsChart
                 <div className="flex items-center gap-3">
                   <div className="w-24 h-2 bg-surface-dark/80 rounded-full overflow-hidden inner-shadow">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
+                      className="h-full rounded-full motion-width"
                       style={{
                         width: `${percent}%`,
                         backgroundColor: color,

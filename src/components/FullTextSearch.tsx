@@ -6,10 +6,36 @@ import { shortenPath } from '../utils/format';
 import { parseQuotedQuery } from '../utils/search';
 import type { FullTextSearchHit, FullTextSearchResponse, SessionInfo } from '../types';
 
+const HIGHLIGHT_CACHE_MAX_ENTRIES = 500;
+const HTML_ESCAPE_MAP: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#039;',
+};
+
 function getProjectDirName(path: string): string {
   const normalized = path.replace(/\/$/, '');
   const parts = normalized.split('/');
   return parts.length >= 2 ? parts[parts.length - 2] : parts[parts.length - 1] || path;
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char]);
+}
+
+function getHighlightTerms(query: string): string[] {
+  if (!query.trim()) {
+    return [];
+  }
+
+  const parsedQuery = parseQuotedQuery(query);
+  const terms = parsedQuery.hasPhrases
+    ? [...parsedQuery.phrases, ...parsedQuery.remainderTokens]
+    : query.trim().split(/\s+/).filter(Boolean);
+
+  return [...new Set(terms.filter(Boolean))].sort((a, b) => b.length - a.length);
 }
 
 interface FullTextSearchProps {
@@ -35,6 +61,7 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const pageSize = 20;
+  const highlightTerms = useMemo(() => getHighlightTerms(query), [query]);
 
   const sortedHits = useMemo(() => {
     const sorted = [...allHits];
@@ -131,6 +158,23 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
 
   useEffect(() => setHitsPage(0), [sortMode]);
 
+  const highlightContent = useCallback((content: string): string => {
+    if (highlightTerms.length === 0) {
+      return escapeHtml(content);
+    }
+
+    let result = escapeHtml(content);
+    highlightTerms.forEach((term) => {
+      const escapedTerm = escapeHtml(term);
+      const regex = new RegExp(
+        `(${escapedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
+        'gi',
+      );
+      result = result.replace(regex, '<b>$1</b>');
+    });
+    return result;
+  }, [highlightTerms]);
+
   // Infinite scroll: load more when sentinel enters viewport
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -216,63 +260,22 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
     setSortMode(modes[(currentIndex + 1) % 3]);
   };
 
-  // Escape HTML to prevent XSS
-  const escapeHtml = (text: string): string => {
-    const map: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    };
-    return text.replace(/[&<>"']/g, (m) => map[m]);
-  };
-
-  // Highlight query terms in content by wrapping them in <b>
-  const highlightContent = (content: string, query: string): string => {
-    if (!query.trim()) {
-      return escapeHtml(content);
-    }
-
-    const parsedQuery = parseQuotedQuery(query);
-    const terms = parsedQuery.hasPhrases
-      ? [...parsedQuery.phrases, ...parsedQuery.remainderTokens]
-      : query.trim().split(/\s+/).filter(Boolean);
-
-    if (terms.length === 0) {
-      return escapeHtml(content);
-    }
-
-    const escaped = escapeHtml(content);
-    const deduplicatedTerms = [...new Set(terms.filter(Boolean))]
-      .sort((a, b) => b.length - a.length);
-
-    let result = escaped;
-    deduplicatedTerms.forEach(term => {
-      const escapedTerm = escapeHtml(term);
-      const regex = new RegExp(`(${escapedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-      result = result.replace(regex, '<b>$1</b>');
-    });
-
-    return result;
-  };
-
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center pt-[10vh] bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[60] flex items-start justify-center pt-[10vh] bg-black/40 backdrop-blur-sm animate-in fade-in"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl bg-[#1a1b26] border border-[#2a2b36] rounded-xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden animate-in zoom-in-95 duration-200"
+        className="w-full max-w-3xl bg-[#1a1b26] border border-[#2a2b36] rounded-xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden animate-in zoom-in-95"
         onClick={e => e.stopPropagation()}
       >
         <div className="p-4 border-b border-[#2a2b36] bg-[#1f2029] relative">
           {/* Close button - top right corner */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1.5 rounded-md hover:bg-[#2a2b36] transition-colors flex-shrink-0 z-10"
+            className="absolute top-4 right-4 p-1.5 rounded-md hover:bg-[#2a2b36] motion-surface motion-color motion-press focus-ring flex-shrink-0 z-10"
             aria-label={t('common.close')}
             title={t('common.close')}
           >
@@ -294,7 +297,7 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
             <div className="flex bg-[#252636]/50 p-1 rounded-lg border border-[#2a2b36]/50">
               <button
                 onClick={() => setRoleFilter('all')}
-                className={`px-3 py-1.5 text-xs rounded-md transition-all flex items-center gap-1 ${
+                className={`px-3 py-1.5 text-xs rounded-md motion-surface motion-color motion-press focus-ring flex items-center gap-1 ${
                   roleFilter === 'all'
                     ? 'bg-blue-500/90 text-white shadow-md shadow-blue-500/25'
                     : 'text-muted-foreground hover:bg-[#2a2b36] hover:text-foreground'
@@ -308,7 +311,7 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
               </button>
               <button
                 onClick={() => setRoleFilter('user')}
-                className={`px-3 py-1.5 text-xs rounded-md transition-all flex items-center gap-1 ${
+                className={`px-3 py-1.5 text-xs rounded-md motion-surface motion-color motion-press focus-ring flex items-center gap-1 ${
                   roleFilter === 'user'
                     ? 'bg-blue-500/90 text-white shadow-md shadow-blue-500/25'
                     : 'text-muted-foreground hover:bg-[#2a2b36] hover:text-foreground'
@@ -319,7 +322,7 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
               </button>
               <button
                 onClick={() => setRoleFilter('assistant')}
-                className={`px-3 py-1.5 text-xs rounded-md transition-all flex items-center gap-1 ${
+                className={`px-3 py-1.5 text-xs rounded-md motion-surface motion-color motion-press focus-ring flex items-center gap-1 ${
                   roleFilter === 'assistant'
                     ? 'bg-blue-500/90 text-white shadow-md shadow-blue-500/25'
                     : 'text-muted-foreground hover:bg-[#2a2b36] hover:text-foreground'
@@ -336,12 +339,12 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
                 value={globPattern}
                 onChange={e => setGlobPattern(e.target.value)}
                 placeholder={t('search.fullText.globPlaceholder')}
-                className="w-full pl-10 pr-4 py-2 bg-[#252636] border border-[#2a2b36]/50 rounded-lg text-sm focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/20 transition-all placeholder:text-muted-foreground/70"
+                className="w-full pl-10 pr-4 py-2 bg-[#252636] border border-[#2a2b36]/50 rounded-lg text-sm focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/20 motion-surface motion-color placeholder:text-muted-foreground/70"
               />
             </div>
             <button
               onClick={cycleSort}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border font-medium motion-surface motion-color motion-press focus-ring ${
                 sortMode === 'score'
                   ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-blue-400/30 text-blue-300 shadow-sm shadow-blue-500/10'
                   : 'bg-[#252636]/50 border-[#2a2b36]/50 text-muted-foreground hover:border-blue-400/30 hover:text-blue-300 hover:bg-blue-500/5'
@@ -410,7 +413,13 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
                   const cacheKey = `${hit.entry_id}|${query}`;
                   let highlightedHtml = highlightCache.current.get(cacheKey);
                   if (highlightedHtml === undefined) {
-                    highlightedHtml = highlightContent(hit.content, query);
+                    highlightedHtml = highlightContent(hit.content);
+                    if (highlightCache.current.size >= HIGHLIGHT_CACHE_MAX_ENTRIES) {
+                      const oldestKey = highlightCache.current.keys().next().value;
+                      if (oldestKey !== undefined) {
+                        highlightCache.current.delete(oldestKey);
+                      }
+                    }
                     highlightCache.current.set(cacheKey, highlightedHtml);
                   }
 
@@ -418,7 +427,7 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
                     <button
                       key={hit.session_id + hit.entry_id}
                       onClick={() => handleSelect(hit)}
-                      className="group relative w-full p-4 rounded-xl border border-transparent hover:border-blue-500/30 hover:bg-blue-500/5 transition-all duration-200 flex flex-col overflow-hidden shadow-sm hover:shadow-md hover:shadow-blue-500/10"
+                      className="group relative w-full p-4 rounded-xl border border-transparent hover:border-blue-500/30 hover:bg-blue-500/5 motion-surface motion-color focus-ring flex flex-col overflow-hidden shadow-sm hover:shadow-md hover:shadow-blue-500/10"
                     >
                       <div className="flex items-center justify-between p-2 bg-blue-500/5 border-b border-blue-500/20 mb-3">
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -428,7 +437,7 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 mb-0.5">
                               <h3 
-                                className="text-sm font-semibold text-foreground truncate group-hover:text-blue-300 transition-colors"
+                                className="text-sm font-semibold text-foreground truncate group-hover:text-blue-300 motion-color"
                                 title={hit.session_name ? `Session: ${hit.session_name}\nPath: ${hit.session_path}` : undefined}
                               >
                                 {projectName}
@@ -458,7 +467,7 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
                       <div className="relative pl-10 mb-3">
                         <div className="absolute left-9 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-muted/30 to-transparent group-hover:from-blue-400/30 group-hover:via-blue-400/60" />
                         <div
-                          className="text-sm/6 text-muted-foreground leading-relaxed italic line-clamp-3 bg-[#1a1b26]/50 px-3 py-2 rounded-lg backdrop-blur-sm group-hover:bg-blue-500/5 group-hover:text-foreground/90 transition-all fts-snippet"
+                          className="text-sm/6 text-muted-foreground leading-relaxed italic line-clamp-3 bg-[#1a1b26]/50 px-3 py-2 rounded-lg backdrop-blur-sm group-hover:bg-blue-500/5 group-hover:text-foreground/90 motion-surface motion-color fts-snippet"
                           dangerouslySetInnerHTML={{ __html: highlightedHtml }}
                         />
                       </div>

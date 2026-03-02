@@ -65,11 +65,11 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
   
   return (
     <div
-      className="fixed inset-0 z-[9998] flex items-start justify-center pt-[10vh] sm:pt-[20vh] bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[9998] flex items-start justify-center pt-[10vh] sm:pt-[20vh] bg-black/50 backdrop-blur-sm animate-in fade-in"
       onClick={close}
     >
       <div
-        className="w-[95%] sm:w-full max-w-2xl max-h-[70vh] sm:max-h-[60vh] bg-background border border-border rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+        className="w-[95%] sm:w-full max-w-2xl max-h-[70vh] sm:max-h-[60vh] bg-background border border-border rounded-lg shadow-2xl animate-in zoom-in-95"
         onClick={(e) => e.stopPropagation()}
       >
         <CommandMenu

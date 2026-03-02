@@ -241,9 +241,9 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
         <button
           onClick={loadStats}
           disabled={isRefreshing}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 md:gap-2 md:px-3 md:py-2 glass-card rounded-lg text-xs transition-all duration-300 hover:scale-105 active:scale-95 group flex-shrink-0"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 md:gap-2 md:px-3 md:py-2 glass-card rounded-lg text-xs motion-surface motion-color motion-press focus-ring hover:scale-105 group flex-shrink-0"
         >
-          <RefreshCw className={`h-3.5 w-3.5 transition-transform duration-500 ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180'}`} />
+          <RefreshCw className={`h-3.5 w-3.5 motion-transform ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180'}`} />
           <span className="hidden md:inline">{t('common.refresh')}</span>
         </button>
       </div>

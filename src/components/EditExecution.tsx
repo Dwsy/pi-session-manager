@@ -1,9 +1,9 @@
+import type { CSSProperties } from 'react'
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react'
 import { registerCustomTheme, RegisteredCustomThemes } from '@pierre/diffs'
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { escapeHtml } from '../utils/markdown'
-import { shortenPath, formatDate } from '../utils/format'
+import { shortenPath } from '../utils/format'
 import { useTheme } from '../hooks/useAppearance'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useSessionView } from '../contexts/SessionViewContext'
@@ -34,7 +34,7 @@ interface EditExecutionProps {
   filePath: string
   diff?: string
   output?: string
-  timestamp?: string
+  isError?: boolean
   entryId: string
 }
 
@@ -44,7 +44,7 @@ export default function EditExecution({
   filePath,
   diff,
   output,
-  timestamp,
+  isError = false,
   entryId,
 }: EditExecutionProps) {
   const { t } = useTranslation()
@@ -53,20 +53,16 @@ export default function EditExecution({
   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const expanded = isToolExpanded(entryId)
-  const [copied, setCopied] = useState(false)
-  const displayPath = shortenPath(filePath)
-
-  const copyDiffToClipboard = async () => {
-    if (!diff) return
-
-    try {
-      await navigator.clipboard.writeText(diff)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error('Failed to copy diff to clipboard', err)
-    }
-  }
+  const displayPath = isMobile ? shortenPath(filePath) : filePath
+  const desktopPathStyle: CSSProperties | undefined = isMobile
+    ? undefined
+    : {
+        overflow: 'visible',
+        textOverflow: 'clip',
+        whiteSpace: 'normal',
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-word',
+      }
 
   const parsePiDiff = (diffText: string): { oldText: string; newText: string } | null => {
     if (!diffText) return null
@@ -223,11 +219,13 @@ export default function EditExecution({
     }
   }
 
-  const hasContent = diff || output
+  const outputText = output ?? ''
+  const shouldShowOutput = Boolean(isError && outputText)
+  const hasContent = Boolean(diff || shouldShowOutput)
+  const statusClass = isError ? 'error' : 'success'
 
   return (
-    <div className="tool-execution success" id={`entry-${entryId}`}>
-      {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
+    <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
       <div
         className={`tool-header ${hasContent ? 'cursor-pointer select-none' : ''}`}
         onClick={hasContent ? () => toggleToolExpanded(entryId) : undefined}
@@ -237,36 +235,19 @@ export default function EditExecution({
             {expanded ? '▾' : '▸'}
           </span>
         )}
-        <span className="tool-name">
-          <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-          </svg>
-          Edit
-        </span>
-        <span className="tool-path">{escapeHtml(displayPath)}</span>
+        <div className="tool-header-meta">
+          <span className="tool-name">
+            <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+            Edit
+          </span>
+        </div>
+        <span className="tool-path" style={desktopPathStyle}>{escapeHtml(displayPath)}</span>
       </div>
 
       {diff && (
         <div className="tool-diff-wrapper">
-          <div className="tool-diff-actions">
-            <span className="tool-output-label">Diff</span>
-            <div style={{ flex: 1 }} />
-            <button
-              onClick={copyDiffToClipboard}
-              className="tool-action-button"
-              title={copied ? t('components.editExecution.copied') : t('components.editExecution.copyDiff')}
-            >
-              {copied ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              )}
-            </button>
-          </div>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             <div style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}>
               {renderDiff()}
@@ -275,11 +256,11 @@ export default function EditExecution({
         </div>
       )}
 
-      {output && (
+      {shouldShowOutput && (
         <div className="tool-output-wrapper">
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             <div className="tool-output">
-              <div>{escapeHtml(output)}</div>
+              <div>{escapeHtml(outputText)}</div>
             </div>
           </div>
         </div>

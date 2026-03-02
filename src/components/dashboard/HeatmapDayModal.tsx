@@ -188,7 +188,7 @@ export default function HeatmapDayModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 ui-enter-fade"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -196,7 +196,7 @@ export default function HeatmapDayModal({
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-[1040px] h-[min(86vh,780px)] overflow-hidden glass-card rounded-2xl border border-border/20 shadow-2xl animate-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-[1040px] h-[min(86vh,780px)] overflow-hidden glass-card rounded-2xl border border-border/20 shadow-2xl ui-enter-zoom">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/10">
           <div className="min-w-0 flex items-baseline gap-2.5">
             <h2 className="text-[2rem] leading-none font-semibold tracking-tight text-foreground truncate">{formattedDate}</h2>
@@ -207,7 +207,7 @@ export default function HeatmapDayModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
+            className="p-2 rounded-lg hover:bg-muted motion-color motion-press focus-ring"
             aria-label={t('common.close')}
           >
             <X className="w-5 h-5 text-muted-foreground" />
@@ -285,7 +285,7 @@ export default function HeatmapDayModal({
                           <button
                             key={`${project.project_path}-${project.project_name}`}
                             type="button"
-                            className={`w-full text-left rounded-lg px-2 py-1.5 border border-transparent ${canFilter ? 'hover:bg-muted/55 hover:border-border/20 transition-colors' : ''}`}
+                            className={`w-full text-left rounded-lg px-2 py-1.5 border border-transparent ${canFilter ? 'hover:bg-muted/55 hover:border-border/20 motion-surface motion-color focus-ring' : ''}`}
                             onClick={() => canFilter && onFilterProject?.(target)}
                             disabled={!canFilter}
                           >
@@ -295,7 +295,7 @@ export default function HeatmapDayModal({
                             </div>
                             <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
                               <div
-                                className="h-full rounded-full"
+                                className="h-full rounded-full motion-width"
                                 style={{
                                   width: `${percentage}%`,
                                   backgroundColor: projectColor,
@@ -333,7 +333,7 @@ export default function HeatmapDayModal({
                         <button
                           type="button"
                           onClick={() => setSelectedHour(null)}
-                          className="text-xs text-primary hover:text-primary/80"
+                          className="text-xs text-primary hover:text-primary/80 motion-color focus-ring"
                         >
                           {t('common.clear', 'Clear')} {selectedHour.toString().padStart(2, '0')}:00
                         </button>
@@ -437,7 +437,7 @@ export default function HeatmapDayModal({
                               key={session.path}
                               type="button"
                               onClick={() => onOpenSession?.(session.path)}
-                              className={`w-full rounded-lg border border-border/10 bg-muted/35 px-2.5 py-1.5 text-left ${onOpenSession ? 'hover:border-border/30 transition-colors' : ''}`}
+                              className={`w-full rounded-lg border border-border/10 bg-muted/35 px-2.5 py-1.5 text-left ${onOpenSession ? 'hover:border-border/30 motion-surface motion-color focus-ring' : ''}`}
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="min-w-0 flex-1">
@@ -490,7 +490,7 @@ function StatCard({ icon: Icon, label, value, color, emphasis, onClick, hint }: 
   return (
     <button
       type="button"
-      className={`p-3 rounded-xl border border-border/10 bg-muted/40 text-left w-full ${interactive ? 'hover:border-border/25 transition-colors' : 'cursor-default'}`}
+      className={`p-3 rounded-xl border border-border/10 bg-muted/40 text-left w-full ${interactive ? 'hover:border-border/25 motion-surface motion-color motion-press focus-ring' : 'cursor-default'}`}
       onClick={onClick}
       disabled={!interactive}
     >
@@ -504,7 +504,7 @@ function StatCard({ icon: Icon, label, value, color, emphasis, onClick, hint }: 
       </div>
       <div className="text-3xl font-semibold tracking-tight text-foreground tabular-nums leading-none">{value}</div>
       <div className="mt-2 h-0.5 rounded-full bg-muted overflow-hidden">
-        <div className="h-full rounded-full" style={{ width: `${Math.max(8, emphasis * 100)}%`, backgroundColor: withAlpha(tone, 0.8) }} />
+        <div className="h-full rounded-full motion-width" style={{ width: `${Math.max(8, emphasis * 100)}%`, backgroundColor: withAlpha(tone, 0.8) }} />
       </div>
       {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
     </button>

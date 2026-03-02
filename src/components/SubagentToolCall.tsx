@@ -3,14 +3,12 @@ import { useTranslation } from 'react-i18next'
 import { Bot, Clock, Cpu, Wrench, AlertCircle, CheckCircle2, ChevronRight, Users, Link2, Loader2 } from 'lucide-react'
 import type { SubagentDetails, SubagentResult } from '../types'
 import SubagentModal from './SubagentModal'
-import { formatDate } from '../utils/format'
 import '../styles/subagent.css'
 
 interface SubagentToolCallProps {
   arguments?: Record<string, any>
   details?: SubagentDetails
   output?: string
-  timestamp?: string
   entryId?: string
 }
 
@@ -95,7 +93,7 @@ function ResultCard({ result, onClick }: { result: SubagentResult; onClick: () =
   )
 }
 
-export default function SubagentToolCall({ arguments: args, details, output, timestamp }: SubagentToolCallProps) {
+export default function SubagentToolCall({ arguments: args, details, output }: SubagentToolCallProps) {
   const [modalResult, setModalResult] = useState<SubagentResult | null>(null)
 
   // Management actions (list, get, etc.) or pending — show simple view with subagent styling
@@ -106,7 +104,6 @@ export default function SubagentToolCall({ arguments: args, details, output, tim
 
     return (
       <div className={`subagent-tool-call ${isPending ? 'subagent-pending' : ''}`}>
-        {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
         <div className="subagent-header">
           <div className="subagent-title">
             {isPending
@@ -140,7 +137,6 @@ export default function SubagentToolCall({ arguments: args, details, output, tim
   return (
     <>
       <div className="subagent-tool-call">
-        {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
         <div className="subagent-header">
           <div className="subagent-title">
             {allOk

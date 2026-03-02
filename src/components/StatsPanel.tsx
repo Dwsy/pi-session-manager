@@ -118,20 +118,20 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={loadStats}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg motion-surface motion-color motion-press focus-ring"
               title={t('stats.panel.tooltips.refresh')}
             >
               <RefreshCw className="h-4 w-4" />
             </button>
-            <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors" title={t('stats.panel.tooltips.export')}>
+            <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg motion-surface motion-color motion-press focus-ring" title={t('stats.panel.tooltips.export')}>
               <Download className="h-4 w-4" />
             </button>
-            <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors" title={t('stats.panel.tooltips.settings')}>
+            <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg motion-surface motion-color motion-press focus-ring" title={t('stats.panel.tooltips.settings')}>
               <Settings className="h-4 w-4" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg motion-surface motion-color motion-press focus-ring"
               title={t('stats.panel.tooltips.close')}
             >
               <X className="h-5 w-5" />
@@ -147,7 +147,7 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium motion-surface motion-color motion-press focus-ring whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'text-info bg-info/10'
                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary'

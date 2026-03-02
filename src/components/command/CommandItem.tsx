@@ -14,7 +14,7 @@ export default function CommandItem({ result, plugin, onSelect }: CommandItemPro
       <Command.Item
         value={result.id}
         onSelect={onSelect}
-        className="px-3 py-2 rounded-md cursor-pointer hover:bg-surface data-[selected=true]:bg-surface transition-colors"
+        className="px-3 py-2 rounded-md cursor-pointer hover:bg-surface data-[selected=true]:bg-surface motion-color"
       >
         {plugin.renderItem(result)}
       </Command.Item>
@@ -26,7 +26,7 @@ export default function CommandItem({ result, plugin, onSelect }: CommandItemPro
     <Command.Item
       value={result.id}
       onSelect={onSelect}
-      className="px-3 py-2 rounded-md cursor-pointer hover:bg-surface data-[selected=true]:bg-surface transition-colors"
+      className="px-3 py-2 rounded-md cursor-pointer hover:bg-surface data-[selected=true]:bg-surface motion-color"
     >
       <div className="flex items-start gap-3">
         {/* 图标 */}

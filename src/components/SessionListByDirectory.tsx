@@ -150,7 +150,7 @@ export default function SessionListByDirectory({
               >
                 <button
                   onClick={() => toggleDir(row.dir)}
-                  className="w-full px-3 py-2 flex items-center gap-2 hover:bg-surface transition-colors text-left bg-background"
+                  className="w-full px-3 py-2 flex items-center gap-2 hover:bg-surface motion-color motion-press focus-ring text-left bg-background"
                 >
                   {row.isExpanded ? (
                     <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -184,7 +184,7 @@ export default function SessionListByDirectory({
               ref={rowVirtualizer.measureElement}
               onClick={() => onSelectSession(session)}
               title={hoverTitle}
-              className={`px-3 py-2.5 cursor-pointer transition-colors group pl-5 border-b border-border/20 ${
+              className={`px-3 py-2.5 cursor-pointer motion-color group pl-5 border-b border-border/20 ${
                 selectedSession?.id === session.id ? 'bg-surface' : 'hover:bg-surface'
               }`}
               style={{
@@ -227,7 +227,7 @@ export default function SessionListByDirectory({
                   <span className="px-2 py-0.5 rounded-md bg-surface border border-border/30 text-right">
                     {session.message_count} {t('session.list.messages')}
                   </span>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 motion-opacity">
                     <OpenInTerminalButton
                       session={session}
                       terminal={terminal}
@@ -243,7 +243,7 @@ export default function SessionListByDirectory({
                           e.stopPropagation()
                           onDeleteSession(session)
                         }}
-                        className="p-1 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
+                        className="p-1 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 rounded motion-color motion-surface motion-press focus-ring"
                         title={t('common.deleteSession')}
                       >
                         <Trash2 className="h-3.5 w-3.5" />

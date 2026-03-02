@@ -1,5 +1,4 @@
 import { escapeHtml } from '../utils/markdown'
-import { formatDate } from '../utils/format'
 import { useSessionView } from '../contexts/SessionViewContext'
 
 interface GenericToolCallProps {
@@ -7,7 +6,6 @@ interface GenericToolCallProps {
   arguments?: Record<string, any>
   output?: string
   isError?: boolean
-  timestamp?: string
   entryId: string
 }
 
@@ -18,7 +16,6 @@ export default function GenericToolCall({
   arguments: args,
   output,
   isError = false,
-  timestamp,
   entryId,
 }: GenericToolCallProps) {
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
@@ -36,7 +33,6 @@ export default function GenericToolCall({
 
   return (
     <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
-      {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
       <div
         className={`tool-header ${(hasArgs || hasOutput) ? 'cursor-pointer select-none' : ''}`}
         onClick={(hasArgs || hasOutput) ? () => toggleToolExpanded(entryId) : undefined}

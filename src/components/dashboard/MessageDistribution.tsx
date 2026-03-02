@@ -1,4 +1,5 @@
 import { MessageSquare, User, Bot } from 'lucide-react'
+import DashboardCardShell from './DashboardCardShell'
 import type { SessionStats } from '../../types'
 
 interface MessageDistributionProps {
@@ -17,11 +18,10 @@ export default function MessageDistribution({ stats, title = 'Message Distributi
   const totalMessages = stats.total_messages.toLocaleString()
 
   return (
-    <div className="glass-card rounded-lg p-3 relative overflow-hidden group">
-      {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-info/5 via-transparent to-success/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-      <div className="relative z-10">
+    <DashboardCardShell
+      className="rounded-lg p-3"
+      overlayClassName="bg-gradient-to-br from-info/5 via-transparent to-success/5"
+    >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
             <div className="p-1 rounded bg-info/10">
@@ -68,7 +68,6 @@ export default function MessageDistribution({ stats, title = 'Message Distributi
             1:{(stats.assistant_messages / Math.max(stats.user_messages, 1)).toFixed(1)}
           </span>
         </div>
-      </div>
-    </div>
+    </DashboardCardShell>
   )
 }

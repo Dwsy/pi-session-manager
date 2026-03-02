@@ -53,9 +53,33 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
 
   return (
     <div className={`user-message ${className}`} id={`entry-${id}`}>
-      <div className="flex items-center gap-2 mb-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-        {timestamp && <span className="message-timestamp user-timestamp-inline">{formatDate(timestamp)}</span>}
+      <div className="user-message-header">
+        <div className="user-message-meta">
+          <span className="user-message-role">{t('components.userMessage.you')}</span>
+          {timestamp && <span className="message-timestamp">{formatDate(timestamp)}</span>}
+        </div>
+        {text.trim() && (
+          <button
+            onClick={() => {
+              void handleCopy()
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                void handleCopy()
+              }
+            }}
+            className="tool-copy-button user-message-copy-button"
+            aria-label={copied ? (t('components.userMessage.copied') || 'Copied') : (t('components.userMessage.copyText') || 'Copy text')}
+            title={copied ? t('components.userMessage.copied') || 'Copied!' : t('components.userMessage.copyText') || 'Copy text'}
+          >
+            {copied ? (
+              <Check className="w-4 h-4" />
+            ) : (
+              <Copy className="w-4 h-4" />
+            )}
+          </button>
+        )}
       </div>
 
       {images.length > 0 && (
@@ -73,27 +97,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
 
       {text.trim() && (
         <>
-          <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />
-          <div className="flex justify-end mt-2">
-            <button
-              onClick={handleCopy}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleCopy();
-                }
-              }}
-              className="tool-copy-button"
-              aria-label={copied ? (t('components.userMessage.copied') || 'Copied') : (t('components.userMessage.copyText') || 'Copy text')}
-              title={copied ? t('components.userMessage.copied') || 'Copied!' : t('components.userMessage.copyText') || 'Copy text'}
-            >
-              {copied ? (
-                <Check className="w-4 h-4" />
-              ) : (
-                <Copy className="w-4 h-4" />
-              )}
-            </button>
-          </div>
+          <div className="markdown-content user-message-body" dangerouslySetInnerHTML={{ __html: html }} />
         </>
       )}
     </div>

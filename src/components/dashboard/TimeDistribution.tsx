@@ -1,5 +1,6 @@
 import { Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import DashboardCardShell from './DashboardCardShell'
 import type { SessionStats } from '../../types'
 
 interface TimeDistributionProps {
@@ -55,7 +56,7 @@ export default function TimeDistribution({
             </div>
             <div className="flex-1 h-4 bg-background/60 rounded overflow-hidden inner-shadow relative">
               <div
-                className={`h-full rounded transition-all duration-500 ${
+                className={`h-full rounded motion-width ${
                   item.isPeak
                     ? 'bg-gradient-to-r from-warning to-destructive'
                     : 'bg-gradient-to-r from-info/60 to-info'
@@ -88,7 +89,7 @@ export default function TimeDistribution({
             <div className="w-6 text-right text-[10px] text-muted-foreground">{item.day}</div>
             <div className="flex-1 h-4 bg-background/60 rounded overflow-hidden inner-shadow">
               <div
-                className="h-full bg-gradient-to-r from-success/60 to-success rounded transition-all duration-500"
+                className="h-full bg-gradient-to-r from-success/60 to-success rounded motion-width"
                 style={{ width: `${Math.min((item.value / maxValue) * 100, 100)}%` }}
               />
             </div>
@@ -100,10 +101,10 @@ export default function TimeDistribution({
   }
 
   return (
-    <div className="glass-card rounded-lg p-3 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-      <div className="relative z-10">
+    <DashboardCardShell
+      className="rounded-lg p-3"
+      overlayClassName="bg-gradient-to-br from-warning/5 via-transparent to-transparent"
+    >
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
             <div className="p-1 rounded bg-warning/10">
@@ -122,7 +123,6 @@ export default function TimeDistribution({
         {type === 'hourly' && renderHourly()}
         {type === 'weekly' && renderWeekly()}
         {type === 'daily' && <div className="text-center text-muted-foreground py-4 text-xs">{t('components.dashboard.dailyViewComingSoon')}</div>}
-      </div>
-    </div>
+    </DashboardCardShell>
   )
 }

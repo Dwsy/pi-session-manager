@@ -220,7 +220,7 @@ export default function HeatmapTooltip({
             {point.top_project && (
               <button
                 type="button"
-                className="mt-3 pt-2.5 border-t border-border/15 w-full text-left hover:text-primary transition-colors"
+                className="mt-3 pt-2.5 border-t border-border/15 w-full text-left hover:text-primary motion-color focus-ring"
                 onClick={handleFilterProject}
               >
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -236,7 +236,7 @@ export default function HeatmapTooltip({
             <div className="mt-3 pt-2.5 border-t border-border/15 flex items-center justify-end gap-2">
               <button
                 type="button"
-                className="text-xs px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors inline-flex items-center gap-1"
+                className="text-xs px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 motion-color motion-press focus-ring inline-flex items-center gap-1"
                 onClick={handleViewDetails}
               >
                 <ExternalLink className="w-3 h-3" />

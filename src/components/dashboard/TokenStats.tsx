@@ -1,5 +1,6 @@
 import { Bot, Coins, DollarSign, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import DashboardCardShell from './DashboardCardShell'
 import type { SessionStats } from '../../types'
 
 interface TokenStatsProps {
@@ -31,11 +32,10 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
     .slice(0, 5)
 
   return (
-    <div className="glass-card rounded-xl p-5 relative overflow-hidden group">
-      {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-destructive/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-      <div className="relative z-10">
+    <DashboardCardShell
+      className="rounded-xl p-5"
+      overlayClassName="bg-gradient-to-br from-warning/5 via-transparent to-destructive/5"
+    >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
             <div className="p-1.5 rounded-lg bg-warning/10">
@@ -50,19 +50,19 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
 
         {/* Token Overview */}
         <div className="grid grid-cols-4 gap-3 mb-4">
-          <div className="bg-background/60 rounded-xl p-3 text-center border border-info/10 hover:border-info/30 transition-all duration-300">
+          <div className="bg-background/60 rounded-xl p-3 text-center border border-info/10 hover:border-info/30 motion-surface motion-color">
             <div className="text-lg font-bold text-info">{formatTokens(token_details.total_input)}</div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Input</div>
           </div>
-          <div className="bg-background/60 rounded-xl p-3 text-center border border-success/10 hover:border-success/30 transition-all duration-300">
+          <div className="bg-background/60 rounded-xl p-3 text-center border border-success/10 hover:border-success/30 motion-surface motion-color">
             <div className="text-lg font-bold text-success">{formatTokens(token_details.total_output)}</div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Output</div>
           </div>
-          <div className="bg-background/60 rounded-xl p-3 text-center border border-warning/10 hover:border-warning/30 transition-all duration-300">
+          <div className="bg-background/60 rounded-xl p-3 text-center border border-warning/10 hover:border-warning/30 motion-surface motion-color">
             <div className="text-lg font-bold text-warning">{formatTokens(token_details.total_cache_read)}</div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Cache Read</div>
           </div>
-          <div className="bg-background/60 rounded-xl p-3 text-center border border-destructive/10 hover:border-destructive/30 transition-all duration-300">
+          <div className="bg-background/60 rounded-xl p-3 text-center border border-destructive/10 hover:border-destructive/30 motion-surface motion-color">
             <div className="text-lg font-bold text-destructive">{formatCost(totalCostIncSubagents)}</div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Cost</div>
           </div>
@@ -79,7 +79,7 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
               <div className="w-24 text-xs text-muted-foreground">Input</div>
               <div className="flex-1 h-2.5 bg-background/80 rounded-full overflow-hidden inner-shadow">
                 <div
-                  className="h-full bg-gradient-to-r from-info to-[#6bb8ff] rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-info to-[#6bb8ff] rounded-full motion-width"
                   style={{
                     width: stats.total_tokens > 0
                       ? `${(token_details.total_input / stats.total_tokens) * 100}%`
@@ -99,7 +99,7 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
               <div className="w-24 text-xs text-muted-foreground">Output</div>
               <div className="flex-1 h-2.5 bg-background/80 rounded-full overflow-hidden inner-shadow">
                 <div
-                  className="h-full bg-gradient-to-r from-success to-[#a3ff9e] rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-success to-[#a3ff9e] rounded-full motion-width"
                   style={{
                     width: stats.total_tokens > 0
                       ? `${(token_details.total_output / stats.total_tokens) * 100}%`
@@ -119,7 +119,7 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
               <div className="w-24 text-xs text-muted-foreground">Cache</div>
               <div className="flex-1 h-2.5 bg-background/80 rounded-full overflow-hidden inner-shadow">
                 <div
-                  className="h-full bg-gradient-to-r from-warning to-[#ffc48c] rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-warning to-[#ffc48c] rounded-full motion-width"
                   style={{
                     width: stats.total_tokens > 0
                       ? `${((token_details.total_cache_read / stats.total_tokens) * 100)}%`
@@ -153,7 +153,7 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
                 return (
                   <div
                     key={model}
-                    className="flex items-center justify-between p-2.5 bg-background/60 rounded-xl border border-foreground/5 hover:bg-background/90 hover:border-purple/20 transition-all duration-300"
+                    className="flex items-center justify-between p-2.5 bg-background/60 rounded-xl border border-foreground/5 hover:bg-background/90 hover:border-purple/20 motion-surface motion-color"
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <div className="text-xs font-medium text-foreground/90 truncate">{model}</div>
@@ -205,7 +205,7 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
                   return (
                     <div
                       key={agent}
-                      className="flex items-center justify-between p-2.5 bg-background/60 rounded-xl border border-foreground/5 hover:bg-background/90 hover:border-orange-500/20 transition-all duration-300"
+                      className="flex items-center justify-between p-2.5 bg-background/60 rounded-xl border border-foreground/5 hover:bg-background/90 hover:border-orange-500/20 motion-surface motion-color"
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <div className="text-xs font-medium text-foreground/90 truncate">{displayName}</div>
@@ -255,7 +255,6 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
             </span>
           </div>
         </div>
-      </div>
-    </div>
+    </DashboardCardShell>
   )
 }

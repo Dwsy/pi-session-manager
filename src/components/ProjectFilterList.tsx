@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { RefObject } from 'react'
+import { getDirectoryName } from '../utils/sessionDisplay'
 
 interface ProjectFilterListProps {
   sessions: SessionInfo[]
@@ -74,7 +75,7 @@ export default function ProjectFilterList({
       {/* "All Projects" Option */}
       <button
         onClick={() => onSelectProject(null)}
-        className={`w-full px-3 py-2.5 flex items-center gap-2.5 transition-colors border-b border-border/10 ${
+        className={`w-full px-3 py-2.5 flex items-center gap-2.5 motion-color border-b border-border/10 ${
           selectedProject === null
             ? 'bg-info/10 text-foreground'
             : 'hover:bg-background/50 text-muted-foreground'
@@ -118,7 +119,7 @@ export default function ProjectFilterList({
                 data-index={virtualRow.index}
                 ref={virtualizer.measureElement}
                 onClick={() => onSelectProject(project.dir)}
-                className={`w-full px-3 py-2 flex items-center gap-2.5 transition-colors text-left border-b border-border/5 ${
+                className={`w-full px-3 py-2 flex items-center gap-2.5 motion-surface motion-color text-left border-b border-border/5 ${
                   isSelected
                     ? 'bg-info/10'
                     : 'hover:bg-background/50'
@@ -160,23 +161,4 @@ export default function ProjectFilterList({
       </div>
     </div>
   )
-}
-
-function getDirectoryName(cwd: string): string {
-  if (!cwd || cwd === 'Unknown') {
-    return cwd || 'Unknown Directory'
-  }
-
-  const parts = cwd.split(/[\/]/)
-  const lastPart = parts[parts.length - 1]
-
-  if (lastPart && lastPart.length > 0) {
-    return lastPart
-  }
-
-  if (parts.length >= 2) {
-    return `${parts[parts.length - 2]} / ${parts[parts.length - 1]}`
-  }
-
-  return cwd
 }

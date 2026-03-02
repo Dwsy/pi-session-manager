@@ -55,7 +55,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
               <button
                 key={c.id}
                 onClick={() => { onChange(c.id); setOpen(false) }}
-                className={`absolute h-3.5 w-3.5 rounded-full transition-all duration-150 hover:scale-150 ${getColorClass(c.id)} ${value === c.id ? 'ring-2 ring-info ring-offset-1 ring-offset-background' : ''}`}
+                className={`absolute h-3.5 w-3.5 rounded-full motion-transform motion-color hover:scale-150 ${getColorClass(c.id)} ${value === c.id ? 'ring-2 ring-info ring-offset-1 ring-offset-background' : ''}`}
                 style={{ left: x - 7, top: y - 7 }}
                 title={c.label}
               />
@@ -143,13 +143,13 @@ function TagNodeContent({
           <>
             <ColorPicker value={tag.color} onChange={(c) => { onStartEdit(tag); onSetEditColor(c) }} />
             <span className="flex-1 text-sm text-foreground cursor-pointer hover:text-info" onClick={() => onStartEdit(tag)}>{tag.name}</span>
-            <button onClick={() => onCreateChild(tag.id)} className="p-1 text-muted-foreground/40 hover:text-info opacity-0 group-hover:opacity-100 transition-all" title={t('components.tagManager.addChild')}>
+            <button onClick={() => onCreateChild(tag.id)} className="p-1 text-muted-foreground/40 hover:text-info opacity-0 group-hover:opacity-100 motion-color motion-opacity motion-press focus-ring" title={t('components.tagManager.addChild')}>
               <Plus className="h-3 w-3" />
             </button>
-            <button onClick={() => onToggleRules(tag.id)} className={`p-1 rounded transition-all ${rulesExpanded ? 'text-info' : 'text-muted-foreground/40 hover:text-muted-foreground'} ${rules.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} title={t('tags.autoRules.title')}>
+            <button onClick={() => onToggleRules(tag.id)} className={`p-1 rounded motion-color motion-opacity motion-press focus-ring ${rulesExpanded ? 'text-info' : 'text-muted-foreground/40 hover:text-muted-foreground'} ${rules.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} title={t('tags.autoRules.title')}>
               <Zap className="h-3.5 w-3.5" />
             </button>
-            <button onClick={() => onDelete(tag.id)} className="p-1 text-muted-foreground/40 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all" title={t('tags.remove')}>
+            <button onClick={() => onDelete(tag.id)} className="p-1 text-muted-foreground/40 hover:text-red-500 opacity-0 group-hover:opacity-100 motion-color motion-opacity motion-press focus-ring" title={t('tags.remove')}>
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           </>
@@ -302,7 +302,7 @@ export default function TagManagerSettings() {
         <div className="flex items-center gap-2 mt-2">
           <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder={t('tags.namePlaceholder')} className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-info" />
           <ColorPicker value={newColor} onChange={setNewColor} />
-          <button onClick={handleCreate} disabled={!newName.trim()} className="flex items-center gap-1.5 px-3 py-2 bg-info hover:bg-info/80 text-white text-sm rounded-lg transition-colors disabled:opacity-40">
+          <button onClick={handleCreate} disabled={!newName.trim()} className="flex items-center gap-1.5 px-3 py-2 bg-info hover:bg-info/80 text-white text-sm rounded-lg motion-color motion-press focus-ring disabled:opacity-40">
             <Plus className="h-3.5 w-3.5" />{t('tags.add')}
           </button>
         </div>

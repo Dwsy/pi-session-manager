@@ -67,7 +67,7 @@ export default function SessionContextMenu({
             <button
               key={tag.id}
               onClick={() => onToggleTag(tag.id, assigned)}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary transition-colors"
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring"
             >
               <span
                 className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${isHex ? '' : getColorClass(tag.color)}`}
@@ -83,19 +83,19 @@ export default function SessionContextMenu({
       <div className="border-t border-border/50 my-1" />
 
       {onOpenTerminal && (
-        <button onClick={() => { onOpenTerminal(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary transition-colors">
+        <button onClick={() => { onOpenTerminal(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
           <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs text-foreground">{t('tags.contextMenu.openTerminal')}</span>
         </button>
       )}
       {onOpenBrowser && (
-        <button onClick={() => { onOpenBrowser(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary transition-colors">
+        <button onClick={() => { onOpenBrowser(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
           <Globe className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs text-foreground">{t('tags.contextMenu.openBrowser')}</span>
         </button>
       )}
       {onToggleFavorite && (
-        <button onClick={() => { onToggleFavorite(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary transition-colors">
+        <button onClick={() => { onToggleFavorite(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
           <Star className={`h-3.5 w-3.5 ${isFavorite ? 'text-yellow-400 fill-current' : 'text-muted-foreground'}`} />
           <span className="text-xs text-foreground">{t('tags.contextMenu.favorite')}</span>
         </button>
@@ -104,7 +104,7 @@ export default function SessionContextMenu({
       {onDelete && (
         <>
           <div className="border-t border-border/50 my-1" />
-          <button onClick={() => { onDelete(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-red-500/10 transition-colors">
+          <button onClick={() => { onDelete(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-red-500/10 motion-color motion-press focus-ring">
             <Trash2 className="h-3.5 w-3.5 text-red-500" />
             <span className="text-xs text-red-500">{t('tags.contextMenu.delete')}</span>
           </button>

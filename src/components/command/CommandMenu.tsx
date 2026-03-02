@@ -183,7 +183,7 @@ export default function CommandMenu({
           }}
           disabled={!currentProjectName}
           className={`
-            flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
+            flex items-center gap-1.5 px-2.5 py-1 text-xs rounded motion-color motion-press focus-ring
             ${!currentProjectName 
               ? 'bg-surface-dark text-muted-foreground/50 cursor-not-allowed border border-border'
               : searchCurrentProjectOnly
@@ -224,7 +224,7 @@ export default function CommandMenu({
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`
-                flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors
+                flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md motion-color motion-press focus-ring
                 ${isActive
                   ? 'bg-blue-500/20 text-blue-400'
                   : 'text-muted-foreground hover:text-foreground hover:bg-surface'

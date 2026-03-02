@@ -271,7 +271,7 @@ export const settings = {
   },
   apiTest: {
     title: 'API Connection Test',
-    description: 'Test connection to pi-session-manager backend service',
+    description: 'Real connectivity and schema checks for session retrieval APIs',
     baseUrl: 'Service URL',
     testAll: 'Test All',
     allPassed: 'All tests passed',
@@ -281,8 +281,8 @@ export const settings = {
     troubleshooting: 'Troubleshooting',
     help1: 'Ensure pi-session-manager CLI is running',
     help2: 'Check service address and port are correct',
-    help3: 'First embedding test may take 400-500ms to load model',
-    help4: 'Embedding service auto-releases memory after 5min idle',
+    help3: 'Ensure APIs return JSON instead of frontend HTML fallback',
+    help4: 'Only session retrieval APIs are exposed for now; embedding is disabled',
   },
   models: {
     searchPlaceholder: 'Search models...',

@@ -40,7 +40,7 @@
    bottom: 12px;
    width: 16px;
    pointer-events: none;
-   z-index: 5;
+   z-index: 48;
  }
 
  .session-scroll-markers.mobile {
@@ -94,21 +94,18 @@
    background: rgba(var(--accent-rgb), 0.95);
  }
 
- .session-scroll-marker.active .session-scroll-marker-tooltip {
-   opacity: 1;
-   transform: translateY(-50%) translateX(0);
- }
-
  .session-scroll-marker-tooltip {
    position: absolute;
    right: 20px;
    top: 50%;
-   transform: translateY(-50%) translateX(-8px);
-   background: rgba(50, 50, 60, 0.88);
+   --tooltip-shift-x: -8px;
+   --tooltip-offset-y: -50%;
+   transform: translate(var(--tooltip-shift-x), var(--tooltip-offset-y));
+   background: rgba(var(--color-card), 0.92);
    backdrop-filter: blur(20px) saturate(1.6);
    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-   color: #fff;
-   border: 1px solid rgba(255, 255, 255, 0.18);
+   color: rgb(var(--color-card-foreground));
+   border: 1px solid rgba(var(--accent-rgb), 0.28);
    border-radius: 10px;
    padding: 12px 16px;
    font-size: 14px;
@@ -127,15 +124,44 @@
    overflow: hidden;
    opacity: 0;
    pointer-events: none;
+   z-index: 3;
    box-shadow: 
-     0 4px 24px rgba(0, 0, 0, 0.5),
-     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+     0 14px 32px rgba(var(--shadow-rgb), 0.28),
+     0 4px 14px rgba(var(--shadow-rgb), 0.18),
+     inset 0 1px 0 rgba(255, 255, 255, 0.06);
    transition: opacity 0.15s ease, transform 0.15s ease;
+ }
+
+ .session-scroll-marker[data-tooltip-placement='top'] .session-scroll-marker-tooltip {
+   top: auto;
+   bottom: calc(100% + 8px);
+   --tooltip-offset-y: 0;
+ }
+
+ .session-scroll-marker[data-tooltip-placement='bottom'] .session-scroll-marker-tooltip {
+   top: calc(100% + 8px);
+   --tooltip-offset-y: 0;
+ }
+
+ .session-scroll-marker[data-tooltip-placement='center'] .session-scroll-marker-tooltip {
+   top: 50%;
+   --tooltip-offset-y: -50%;
+ }
+
+ .session-scroll-marker.active .session-scroll-marker-tooltip {
+   opacity: 1;
+   --tooltip-shift-x: 0;
  }
 
  .session-scroll-marker:hover .session-scroll-marker-tooltip {
    opacity: 1;
-   transform: translateY(-50%) translateX(0);
+   --tooltip-shift-x: 0;
+ }
+
+ .session-scroll-markers.mobile .session-scroll-marker-tooltip {
+   max-width: min(320px, calc(100vw - 110px));
+   padding: 10px 12px;
+   font-size: 13px;
  }
 
  .session-header {
@@ -600,8 +626,12 @@
    font-size: 12px;
    color: var(--text-secondary);
    margin-top: 8px;
-   white-space: pre-wrap;
    line-height: 1.5;
+ }
+
+ .compaction-content-header {
+   font-weight: 600;
+   margin-bottom: 8px;
  }
 
  .compaction.expanded .compaction-collapsed {
@@ -718,38 +748,6 @@
    padding: 0 12px 12px 12px;
  }
 
- .tool-diff-actions {
-   display: flex;
-   align-items: center;
-   gap: 6px;
-   padding: 6px 0;
-   margin-bottom: 8px;
-   transition: all 0.2s ease;
- }
-
- .tool-diff-actions:hover {
-   color: var(--text-secondary);
- }
-
- .tool-action-button {
-   padding: 6px;
-   background: var(--bg-inset-hover);
-   color: rgb(var(--color-muted-foreground));
-   border: none;
-   border-radius: 6px;
-   cursor: pointer;
-   transition: all 0.2s ease;
-   display: flex;
-   align-items: center;
-   justify-content: center;
- }
-
- .tool-action-button:hover {
-   color: var(--text-secondary);
-  
-   background: rgba(var(--accent-rgb), 0.1);
- }
-
  .tool-output-wrapper {
    margin-top: 8px;
  }
@@ -762,76 +760,90 @@
  =====================================================
  ======= */
 
-.tool-command-wrapper {
-  position: relative;
-  margin-top: 8px;
-  background: var(--bg-inset);
-  border-radius: 6px;
-  overflow: hidden;
+.tool-header-bash {
+  gap: 8px;
+  align-items: flex-start;
 }
 
-.tool-command-highlighted {
+.tool-header-bash .tool-meta,
+.tool-header-bash .bash-inline-copy-button {
+  flex-shrink: 0;
+}
+
+.bash-command-inline {
   margin: 0;
-  padding: 12px 40px 12px 16px;
-  background: transparent;
-  overflow-x: auto;
+  padding: 4px 10px;
+  min-width: 0;
+  flex: 1;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  background: var(--bg-inset);
+  border-radius: 6px;
   font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
-  font-size: calc(var(--font-size-base, 16px) * 0.8125);
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
   line-height: 1.5;
 }
 
-.tool-command-highlighted code {
+.bash-command-prefix {
+  user-select: none;
+  pointer-events: none;
+  color: var(--toolTitle, var(--accent));
+}
+
+.bash-command-inline code {
   background: transparent;
   padding: 0;
   font-family: inherit;
   color: var(--text-secondary);
+  white-space: inherit;
+  overflow-wrap: inherit;
+  word-break: inherit;
 }
 
 /* Bash syntax highlighting colors */
-.tool-command-highlighted .hljs-keyword {
+.bash-command-inline .hljs-keyword {
   color: var(--syntaxKeyword);
 }
 
-.tool-command-highlighted .hljs-string {
+.bash-command-inline .hljs-string {
   color: var(--syntaxString);
 }
 
-.tool-command-highlighted .hljs-number {
+.bash-command-inline .hljs-number {
   color: var(--syntaxNumber);
 }
 
-.tool-command-highlighted .hljs-comment {
+.bash-command-inline .hljs-comment {
   color: var(--syntaxComment);
 }
 
-.tool-command-highlighted .hljs-operator {
+.bash-command-inline .hljs-operator,
+.bash-command-inline .hljs-punctuation {
   color: var(--text-secondary);
 }
 
-.tool-command-highlighted .hljs-punctuation {
-  color: var(--text-secondary);
-}
+@media (max-width: 768px) {
+  .tool-header-bash {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    row-gap: 6px;
+  }
 
-.tool-command-wrapper .tool-copy-button {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  padding: 6px;
-  background: transparent;
-  color: rgb(var(--color-muted-foreground));
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-}
+  .tool-header-bash .bash-command-inline {
+    order: 10;
+    flex-basis: 100%;
+  }
 
-.tool-command-wrapper .tool-copy-button:hover {
-   color: var(--text-secondary);
-   background: rgba(var(--accent-rgb), 0.1);
+  .tool-header-bash .tool-meta {
+    margin-left: 0;
+  }
+
+  .tool-header-bash .bash-inline-copy-button {
+    margin-left: auto;
+  }
 }
 
 /*

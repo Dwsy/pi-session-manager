@@ -52,6 +52,7 @@ export const session = {
   loading: 'Loading session...',
   messages: 'messages',
   noMessages: 'No messages',
+  noMessagesHint: 'Only system records are present in this session; no user/assistant messages yet.',
   messageCount: '{{count}} messages',
   showSidebar: 'Show sidebar',
   hideSidebar: 'Hide sidebar',

@@ -1,5 +1,6 @@
 import { Folder } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import DashboardCardShell from './DashboardCardShell'
 import type { SessionStats, SessionInfo } from '../../types'
 
 interface ProjectsChartProps {
@@ -45,10 +46,10 @@ export default function ProjectsChart({ stats, sessions, title, limit = 8, onPro
   }
 
   return (
-    <div className="glass-card rounded-lg p-3 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-info/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-      <div className="relative z-10">
+    <DashboardCardShell
+      className="rounded-lg p-3"
+      overlayClassName="bg-gradient-to-br from-info/5 via-transparent to-transparent"
+    >
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
             <div className="p-1 rounded bg-info/10">
@@ -69,7 +70,7 @@ export default function ProjectsChart({ stats, sessions, title, limit = 8, onPro
             return (
               <div
                 key={project}
-                className={`flex items-center justify-between p-2 bg-background/60 rounded-lg border border-foreground/5 hover:bg-background/90 hover:border-foreground/10 transition-all duration-300 ${onProjectSelect ? 'cursor-pointer' : ''}`}
+                className={`flex items-center justify-between p-2 bg-background/60 rounded-lg border border-foreground/5 hover:bg-background/90 hover:border-foreground/10 motion-surface motion-color ${onProjectSelect ? 'cursor-pointer' : ''}`}
                 onClick={() => handleProjectClick(project)}
                 title={onProjectSelect ? t('dashboard.projectsChart.clickToView', { project }) : undefined}
               >
@@ -81,7 +82,7 @@ export default function ProjectsChart({ stats, sessions, title, limit = 8, onPro
                       boxShadow: `0 0 6px ${color}50`
                     }}
                   />
-                  <span className="text-xs truncate text-foreground/90 hover:text-foreground transition-colors">{project}</span>
+                  <span className="text-xs truncate text-foreground/90 hover:text-foreground motion-color">{project}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-16 h-1.5 bg-surface-dark/80 rounded-full overflow-hidden inner-shadow">
@@ -99,7 +100,6 @@ export default function ProjectsChart({ stats, sessions, title, limit = 8, onPro
             )
           })}
         </div>
-      </div>
-    </div>
+    </DashboardCardShell>
   )
 }

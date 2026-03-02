@@ -44,13 +44,14 @@ export default function ConnectionBanner() {
 
   return (
     <div
-      className={`flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium transition-colors duration-300 ${
+      className={`flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium motion-color ${
         isDisconnected
           ? 'bg-red-500/15 text-red-400 border-b border-red-500/20'
           : isConnecting
             ? 'bg-amber-500/15 text-amber-400 border-b border-amber-500/20'
             : 'bg-green-500/15 text-green-400 border-b border-green-500/20'
       }`}
+      style={{ transitionDuration: 'var(--motion-duration-overlay)' }}
     >
       {isDisconnected && (
         <>

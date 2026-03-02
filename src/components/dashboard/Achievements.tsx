@@ -148,7 +148,7 @@ export default function Achievements({ stats, title = 'Achievements' }: Achievem
         </div>
         <div className="h-2 bg-background rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-info via-success to-warning rounded-full transition-all duration-500"
+            className="h-full bg-gradient-to-r from-info via-success to-warning rounded-full motion-width"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -161,7 +161,7 @@ export default function Achievements({ stats, title = 'Achievements' }: Achievem
           return (
             <div
               key={achievement.id}
-              className={`relative p-3 rounded-lg transition-all ${
+              className={`relative p-3 rounded-lg motion-surface motion-opacity ${
                 achievement.unlocked
                   ? 'bg-background border border-border'
                   : 'bg-background/50 border border-transparent opacity-60'
@@ -191,7 +191,7 @@ export default function Achievements({ stats, title = 'Achievements' }: Achievem
                 <div>
                   <div className="h-1 bg-surface-dark rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
+                      className="h-full rounded-full motion-width"
                       style={{
                         width: `${achievement.progress}%`,
                         backgroundColor: achievement.color,
