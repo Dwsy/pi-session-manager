@@ -7,7 +7,7 @@ import type { AppSidebarViewMode } from "./useSidebarSessions";
 export interface UseDesktopSidebarActionsOptions {
   setViewMode: Dispatch<SetStateAction<AppSidebarViewMode>>;
   setSelectedProject: Dispatch<SetStateAction<string | null>>;
-  setSelectedSession: Dispatch<SetStateAction<SessionInfo | null>>;
+  setSelectedSession: (session: SessionInfo | null) => void;
   setShowFavorites: Dispatch<SetStateAction<boolean>>;
   setShowTerminal: Dispatch<SetStateAction<boolean>>;
   setShowSettings: Dispatch<SetStateAction<boolean>>;

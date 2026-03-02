@@ -1,6 +1,5 @@
 import {
   useState,
-  useEffect,
   useMemo,
   useRef,
   useCallback,
@@ -19,6 +18,7 @@ import { useSessionActions } from "./hooks/useSessionActions";
 import { useAppearance } from "./hooks/useAppearance";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useAppBootstrap } from "./hooks/app/useAppBootstrap";
+import { useAppUiEffects } from "./hooks/app/useAppUiEffects";
 import { useDesktopSidebarActions } from "./hooks/app/useDesktopSidebarActions";
 import { useFavorites } from "./hooks/app/useFavorites";
 import { useSidebarSessions } from "./hooks/app/useSidebarSessions";
@@ -139,6 +139,9 @@ function App() {
   const [pendingScrollEntryId, setPendingScrollEntryId] = useState<
     string | null
   >(null);
+  const clearPendingScrollEntryId = useCallback(() => {
+    setPendingScrollEntryId(null);
+  }, []);
   const [terminalMaximized, setTerminalMaximized] = useState(false);
   const [terminalPendingCommand, setTerminalPendingCommand] = useState<
     string | null
@@ -160,38 +163,19 @@ function App() {
     removeFavorite,
     toggleFavorite,
   } = useFavorites({ enabled: isInitialized });
-
-  // Apply body lock when any modal is open on mobile
-  useEffect(() => {
-    if (!isMobile) return;
-    const isAnyModalOpen =
-      showExportDialog ||
-      showRenameDialog ||
-      !!pendingDeleteSession ||
-      showSettings ||
-      showFullTextSearch ||
-      showOnboarding ||
-      mobileTab === "settings";
-
-    if (isAnyModalOpen) {
-      document.body.classList.add("mobile-modal-open");
-    } else {
-      document.body.classList.remove("mobile-modal-open");
-    }
-
-    return () => {
-      document.body.classList.remove("mobile-modal-open");
-    };
-  }, [
+  useAppUiEffects({
     isMobile,
     showExportDialog,
     showRenameDialog,
-    pendingDeleteSession,
+    hasPendingDeleteSession: !!pendingDeleteSession,
     showSettings,
     showFullTextSearch,
     showOnboarding,
     mobileTab,
-  ]);
+    pendingScrollEntryId,
+    selectedSession,
+    clearPendingScrollEntryId,
+  });
 
   const handleSelectSession = useCallback(
     (session: SessionInfo) => {
@@ -294,14 +278,6 @@ function App() {
   );
 
   useKeyboardShortcuts(shortcuts);
-
-  // Clear pending scroll entry after it's been passed to SessionViewer
-  useEffect(() => {
-    if (pendingScrollEntryId && selectedSession) {
-      const timer = setTimeout(() => setPendingScrollEntryId(null), 0);
-      return () => clearTimeout(timer);
-    }
-  }, [pendingScrollEntryId, selectedSession]);
 
   const commandContext = useMemo<SearchContext>(
     () => ({
