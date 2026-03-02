@@ -205,6 +205,13 @@ export const components = {
     clickToView: 'Cliquer pour voir la session du sous-agent',
     failedNoOutput: 'Le sous-agent a échoué sans produire de sortie.',
     artifactsUnavailable: 'Artefacts du sous-agent indisponibles — les fichiers ont peut-être été nettoyés.',
+    modalTitle: 'Détails de la session du sous-agent',
+    toolsCount: '{{count}} outils',
+    taskLabel: 'Tâche',
+    loadingSession: 'Chargement de la session du sous-agent…',
+    noEntries: 'Aucune entrée trouvée dans la session du sous-agent.',
+    renderingProgress: 'Rendu {{shown}} / {{total}}',
+    loadAllNow: 'Tout charger maintenant',
   },
   sessionFlow: {
     zoomIn: 'Zoom avant',

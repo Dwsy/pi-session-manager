@@ -205,6 +205,13 @@ export const components = {
     clickToView: 'Clic para ver la sesión del subagente',
     failedNoOutput: 'El subagente falló sin producir salida.',
     artifactsUnavailable: 'Artefactos del subagente no disponibles — los archivos pueden haber sido eliminados.',
+    modalTitle: 'Detalles de la sesión del subagente',
+    toolsCount: '{{count}} herramientas',
+    taskLabel: 'Tarea',
+    loadingSession: 'Cargando sesión del subagente…',
+    noEntries: 'No se encontraron entradas en la sesión del subagente.',
+    renderingProgress: 'Renderizando {{shown}} / {{total}}',
+    loadAllNow: 'Cargar todo ahora',
   },
   sessionFlow: {
     zoomIn: 'Acercar',

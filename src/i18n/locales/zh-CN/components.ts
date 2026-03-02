@@ -205,6 +205,13 @@ export const components = {
     clickToView: '点击查看子代理会话',
     failedNoOutput: '子代理执行失败，无输出内容。',
     artifactsUnavailable: '子代理产物不可用 — 文件可能已被清理。',
+    modalTitle: '子代理会话详情',
+    toolsCount: '{{count}} 个工具',
+    taskLabel: '任务',
+    loadingSession: '正在加载子代理会话…',
+    noEntries: '子代理会话中未找到条目。',
+    renderingProgress: '正在渲染 {{shown}} / {{total}}',
+    loadAllNow: '立即加载全部',
   },
   sessionFlow: {
     zoomIn: '放大',

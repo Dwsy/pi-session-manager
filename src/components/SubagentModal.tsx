@@ -35,6 +35,10 @@ function formatTokens(n: number): string {
 // Simple in-memory cache for subagent JSONL content
 const jsonlCache = new Map<string, SessionEntry[]>()
 const MAX_CACHE = 10
+const CLOSE_ANIMATION_MS = 180
+const INITIAL_ENTRY_BATCH = 24
+const ENTRY_BATCH_SIZE = 20
+const ENTRY_BATCH_INTERVAL_MS = 36
 
 function cacheKey(result: SubagentResult): string {
   return result.artifactPaths?.jsonlPath || result.sessionFile || `${result.agent}-${result.task.slice(0, 50)}`
@@ -113,9 +117,27 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(0)
+  const [progressiveRendering, setProgressiveRendering] = useState(false)
   const backdropRef = useRef<HTMLDivElement>(null)
   const depthRef = useRef(0)
+  const closeTimerRef = useRef<number | null>(null)
+  const progressiveTimerRef = useRef<number | null>(null)
   const { showThinking, toggleThinking, toolsExpanded, toggleToolsExpanded } = useSessionView()
+
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }, [])
+
+  const clearProgressiveTimer = useCallback(() => {
+    if (progressiveTimerRef.current !== null) {
+      window.clearTimeout(progressiveTimerRef.current)
+      progressiveTimerRef.current = null
+    }
+  }, [])
 
   // Track depth for z-index
   useEffect(() => {
@@ -136,6 +158,10 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
     let cancelled = false
     setLoading(true)
     setError(null)
+    setEntries([])
+    setVisibleCount(0)
+    setProgressiveRendering(false)
+    clearProgressiveTimer()
 
     loadSubagentEntries(result).then(parsed => {
       if (cancelled) return
@@ -156,12 +182,21 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
     })
 
     return () => { cancelled = true }
-  }, [result])
+  }, [clearProgressiveTimer, result, t])
 
   const handleClose = useCallback(() => {
+    if (closing) return
     setClosing(true)
-    setTimeout(onClose, 150)
-  }, [onClose])
+    clearCloseTimer()
+    closeTimerRef.current = window.setTimeout(onClose, CLOSE_ANIMATION_MS)
+  }, [clearCloseTimer, closing, onClose])
+
+  useEffect(() => {
+    return () => {
+      clearCloseTimer()
+      clearProgressiveTimer()
+    }
+  }, [clearCloseTimer, clearProgressiveTimer])
 
   // Capture-phase keyboard handler: intercept Cmd+T / Cmd+O / Escape
   // before they reach SessionViewer's listener on the parent
@@ -197,6 +232,38 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
   const ok = result.exitCode === 0
   const ps = result.progressSummary
 
+  useEffect(() => {
+    if (loading || error || entries.length === 0) {
+      setVisibleCount(0)
+      setProgressiveRendering(false)
+      clearProgressiveTimer()
+      return
+    }
+
+    const initialCount = Math.min(entries.length, INITIAL_ENTRY_BATCH)
+    setVisibleCount(initialCount)
+    setProgressiveRendering(initialCount < entries.length)
+  }, [clearProgressiveTimer, entries, error, loading])
+
+  useEffect(() => {
+    if (!progressiveRendering) return
+    if (visibleCount >= entries.length) {
+      setProgressiveRendering(false)
+      return
+    }
+
+    progressiveTimerRef.current = window.setTimeout(() => {
+      setVisibleCount((prev) => Math.min(prev + ENTRY_BATCH_SIZE, entries.length))
+    }, ENTRY_BATCH_INTERVAL_MS)
+
+    return clearProgressiveTimer
+  }, [clearProgressiveTimer, entries.length, progressiveRendering, visibleCount])
+
+  const visibleEntries = useMemo(
+    () => entries.slice(0, visibleCount),
+    [entries, visibleCount],
+  )
+
   const toolResultByCallId = useMemo(() => {
     const map = new Map<string, SessionEntry>()
     for (const entry of entries) {
@@ -220,7 +287,6 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
         if (role === 'user') {
           return (
             <UserMessage
-              key={entry.id}
               content={entry.message.content}
               timestamp={entry.timestamp}
               id={entry.id}
@@ -229,7 +295,6 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
         } else if (role === 'assistant') {
           return (
             <AssistantMessage
-              key={entry.id}
               content={entry.message.content}
               timestamp={entry.timestamp}
               entryId={entry.id}
@@ -240,18 +305,36 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
         return null
 
       case 'compaction':
-        return <Compaction key={entry.id} tokensBefore={entry.tokensBefore} summary={entry.summary} />
+        return <Compaction tokensBefore={entry.tokensBefore} summary={entry.summary} />
 
       case 'branch_summary':
-        return <BranchSummary key={entry.id} summary={entry.summary} timestamp={entry.timestamp} />
+        return <BranchSummary summary={entry.summary} timestamp={entry.timestamp} />
 
       case 'custom_message':
-        return <CustomMessage key={entry.id} customType={entry.customType} content={entry.content} timestamp={entry.timestamp} />
+        return <CustomMessage customType={entry.customType} content={entry.content} timestamp={entry.timestamp} />
 
       default:
         return null
     }
   }, [toolResultByCallId])
+
+  const renderedEntries = useMemo(
+    () => visibleEntries.flatMap((entry) => {
+      const node = renderEntry(entry)
+      return node ? [{ id: entry.id, node }] : []
+    }),
+    [renderEntry, visibleEntries],
+  )
+
+  const handleRenderAllNow = useCallback(() => {
+    clearProgressiveTimer()
+    setVisibleCount(entries.length)
+    setProgressiveRendering(false)
+  }, [clearProgressiveTimer, entries.length])
+
+  const progressRatio = entries.length > 0
+    ? Math.min(visibleCount / entries.length, 1)
+    : 0
 
   return createPortal(
     <div
@@ -260,7 +343,12 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
       onClick={handleBackdropClick}
       style={{ zIndex: 1000 + depthRef.current }}
     >
-      <div className="subagent-modal">
+      <div
+        className="subagent-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('components.subagent.modalTitle', 'Subagent Session Details')}
+      >
         {/* Header */}
         <div className="subagent-modal-header">
           <div className="subagent-modal-title">
@@ -291,7 +379,10 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
                 {ps.toolCount > 0 && (
                   <span className="subagent-meta-item">
                     <Wrench size={13} />
-                    {ps.toolCount} tools
+                    {t('components.subagent.toolsCount', {
+                      count: ps.toolCount,
+                      defaultValue: '{{count}} tools',
+                    })}
                   </span>
                 )}
               </>
@@ -312,7 +403,7 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
         {/* Toolbar */}
         <div className="subagent-modal-toolbar">
           <div className="subagent-modal-task-text">
-            <span className="subagent-modal-task-label">Task:</span>
+            <span className="subagent-modal-task-label">{t('components.subagent.taskLabel', 'Task')}:</span>
             {result.task}
           </div>
           <div className="subagent-modal-toolbar-actions">
@@ -338,9 +429,16 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
         {/* Content */}
         <div className="subagent-modal-content">
           {loading && (
-            <div className="subagent-modal-loading">
-              <div className="subagent-spinner" />
-              Loading subagent session…
+            <div className="subagent-modal-loading-block">
+              <div className="subagent-modal-loading">
+                <div className="subagent-spinner" />
+                {t('components.subagent.loadingSession', 'Loading subagent session…')}
+              </div>
+              <div className="subagent-modal-skeleton" aria-hidden="true">
+                <div className="subagent-skeleton-line wide" />
+                <div className="subagent-skeleton-line medium" />
+                <div className="subagent-skeleton-line short" />
+              </div>
             </div>
           )}
 
@@ -352,13 +450,48 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
           )}
 
           {!loading && !error && entries.length === 0 && (
-            <div className="subagent-modal-empty">No entries found in subagent session.</div>
+            <div className="subagent-modal-empty">
+              {t('components.subagent.noEntries', 'No entries found in subagent session.')}
+            </div>
           )}
 
           {!loading && !error && entries.length > 0 && (
-            <div className="subagent-modal-entries">
-              {entries.map(entry => renderEntry(entry))}
-            </div>
+            <>
+              <div className="subagent-modal-entries">
+                {renderedEntries.map(({ id, node }) => (
+                  <div key={id} className="subagent-entry-item">
+                    {node}
+                  </div>
+                ))}
+              </div>
+
+              {visibleCount < entries.length && (
+                <div className="subagent-modal-render-progress">
+                  <div className="subagent-render-progress-text">
+                    {t('components.subagent.renderingProgress', {
+                      shown: visibleCount,
+                      total: entries.length,
+                      defaultValue: 'Rendering {{shown}} / {{total}}',
+                    })}
+                  </div>
+                  <div
+                    className="subagent-render-progress-bar"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={entries.length}
+                    aria-valuenow={visibleCount}
+                  >
+                    <span style={{ width: `${progressRatio * 100}%` }} />
+                  </div>
+                  <button
+                    className="subagent-render-progress-btn"
+                    onClick={handleRenderAllNow}
+                  >
+                    {t('components.subagent.loadAllNow', 'Load all now')}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

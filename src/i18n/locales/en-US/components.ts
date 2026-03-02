@@ -212,6 +212,13 @@ export const components = {
     clickToView: 'Click to view subagent session',
     failedNoOutput: 'Subagent failed with no output.',
     artifactsUnavailable: 'Subagent artifacts not available — files may have been cleaned up.',
+    modalTitle: 'Subagent Session Details',
+    toolsCount: '{{count}} tools',
+    taskLabel: 'Task',
+    loadingSession: 'Loading subagent session…',
+    noEntries: 'No entries found in subagent session.',
+    renderingProgress: 'Rendering {{shown}} / {{total}}',
+    loadAllNow: 'Load all now',
   },
   sessionFlow: {
     zoomIn: 'Zoom In',
