@@ -205,6 +205,13 @@ export const components = {
     clickToView: 'クリックしてサブエージェントセッションを表示',
     failedNoOutput: 'サブエージェントが失敗し、出力がありません。',
     artifactsUnavailable: 'サブエージェントの成果物が利用できません — ファイルが削除された可能性があります。',
+    modalTitle: 'サブエージェントセッションの詳細',
+    toolsCount: '{{count}} ツール',
+    taskLabel: 'タスク',
+    loadingSession: 'サブエージェントセッションを読み込み中…',
+    noEntries: 'サブエージェントセッションにエントリが見つかりません。',
+    renderingProgress: '描画中 {{shown}} / {{total}}',
+    loadAllNow: 'すべて今すぐ読み込む',
   },
   sessionFlow: {
     zoomIn: 'ズームイン',

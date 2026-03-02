@@ -205,6 +205,13 @@ export const components = {
     clickToView: 'Klicken, um Subagent-Sitzung anzuzeigen',
     failedNoOutput: 'Subagent fehlgeschlagen, keine Ausgabe.',
     artifactsUnavailable: 'Subagent-Artefakte nicht verfügbar — Dateien wurden möglicherweise bereinigt.',
+    modalTitle: 'Subagent-Sitzungsdetails',
+    toolsCount: '{{count}} Tools',
+    taskLabel: 'Aufgabe',
+    loadingSession: 'Subagent-Sitzung wird geladen…',
+    noEntries: 'Keine Einträge in der Subagent-Sitzung gefunden.',
+    renderingProgress: 'Lade {{shown}} / {{total}}',
+    loadAllNow: 'Alles sofort laden',
   },
   sessionFlow: {
     zoomIn: 'Vergrößern',
