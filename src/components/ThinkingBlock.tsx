@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import MarkdownContent from './MarkdownContent'
 
 interface ThinkingBlockProps {
   content: string
 }
 
-export default function ThinkingBlock({ content }: ThinkingBlockProps) {
+function ThinkingBlock({ content }: ThinkingBlockProps) {
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -23,3 +23,5 @@ export default function ThinkingBlock({ content }: ThinkingBlockProps) {
     </div>
   )
 }
+
+export default memo(ThinkingBlock)

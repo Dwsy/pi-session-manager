@@ -1,217 +1,273 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-import { invoke, listen } from '../transport'
-import { useTranslation } from 'react-i18next'
-import { ArrowUp, ArrowDown, Loader2, Bot, Search, Eye, EyeOff, ChevronsUpDown, MoreVertical, Pencil, Download, Play, List } from 'lucide-react'
-import { useVirtualizer } from '@tanstack/react-virtual'
-import type { SessionInfo, SessionEntry, SessionsDiff } from '../types'
-import { parseSessionEntries, computeStats } from '../utils/session'
-import SessionHeader from './SessionHeader'
-import SessionScrollMarkers from './SessionScrollMarkers'
-import UserMessage from './UserMessage'
-import AssistantMessage from './AssistantMessage'
-import ModelChange from './ModelChange'
-import Compaction from './Compaction'
-import BranchSummary from './BranchSummary'
-import CustomMessage from './CustomMessage'
-import SessionTree, { type SessionTreeRef } from './SessionTree'
-import OpenInTerminalButton from './OpenInTerminalButton'
-import KbdTooltip from './KbdTooltip'
-import SystemPromptDialog from './SystemPromptDialog'
-import type { TerminalType } from './settings/types'
-import { getPlatformDefaults } from './settings/types'
-import { SessionViewProvider, useSessionView } from '../contexts/SessionViewContext'
-import { useIsMobile } from '../hooks/useIsMobile'
-import { useSessionScrollMarkers } from '../hooks/useSessionScrollMarkers'
-import '../styles/session.css'
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { invoke, listen } from "../transport";
+import { useTranslation } from "react-i18next";
+import {
+  ArrowUp,
+  ArrowDown,
+  Loader2,
+  Bot,
+  Search,
+  Eye,
+  EyeOff,
+  ChevronsUpDown,
+  MoreVertical,
+  Pencil,
+  Download,
+  Play,
+  List,
+} from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import type { SessionInfo, SessionEntry, SessionsDiff } from "../types";
+import { parseSessionEntries, computeStats } from "../utils/session";
+import SessionHeader from "./SessionHeader";
+import SessionScrollMarkers from "./SessionScrollMarkers";
+import UserMessage from "./UserMessage";
+import AssistantMessage from "./AssistantMessage";
+import ModelChange from "./ModelChange";
+import Compaction from "./Compaction";
+import BranchSummary from "./BranchSummary";
+import CustomMessage from "./CustomMessage";
+import SessionTree, { type SessionTreeRef } from "./SessionTree";
+import OpenInTerminalButton from "./OpenInTerminalButton";
+import KbdTooltip from "./KbdTooltip";
+import SystemPromptDialog from "./SystemPromptDialog";
+import type { TerminalType } from "./settings/types";
+import { getPlatformDefaults } from "./settings/types";
+import {
+  SessionViewProvider,
+  useSessionView,
+} from "../contexts/SessionViewContext";
+import { useIsMobile } from "../hooks/useIsMobile";
+import { useSessionScrollMarkers } from "../hooks/useSessionScrollMarkers";
+import "../styles/session.css";
 
 // Session content cache — avoids re-reading file when switching back
-const SESSION_CONTENT_CACHE = new Map<string, {
-  entries: SessionEntry[]
-  lineCount: number
-}>()
-const MAX_CACHE_SIZE = 5
-
-function cacheSessionContent(path: string, entries: SessionEntry[], lineCount: number) {
-  if (SESSION_CONTENT_CACHE.size >= MAX_CACHE_SIZE) {
-    const firstKey = SESSION_CONTENT_CACHE.keys().next().value
-    if (firstKey) SESSION_CONTENT_CACHE.delete(firstKey)
+const SESSION_CONTENT_CACHE = new Map<
+  string,
+  {
+    entries: SessionEntry[];
+    lineCount: number;
   }
-  SESSION_CONTENT_CACHE.set(path, { entries, lineCount })
+>();
+const MAX_CACHE_SIZE = 5;
+
+function cacheSessionContent(
+  path: string,
+  entries: SessionEntry[],
+  lineCount: number,
+) {
+  if (SESSION_CONTENT_CACHE.size >= MAX_CACHE_SIZE) {
+    const firstKey = SESSION_CONTENT_CACHE.keys().next().value;
+    if (firstKey) SESSION_CONTENT_CACHE.delete(firstKey);
+  }
+  SESSION_CONTENT_CACHE.set(path, { entries, lineCount });
 }
 
 interface SessionViewerProps {
-  session: SessionInfo
-  onExport: () => void
-  onRename: () => void
-  onBack?: () => void
-  onWebResume?: () => void
-  terminal?: TerminalType
-  piPath?: string
-  customCommand?: string
-  initialEntryId?: string
+  session: SessionInfo;
+  onExport: () => void;
+  onRename: () => void;
+  onBack?: () => void;
+  onWebResume?: () => void;
+  terminal?: TerminalType;
+  piPath?: string;
+  customCommand?: string;
+  initialEntryId?: string;
 }
 
-const SIDEBAR_MIN_WIDTH = 200
-const SIDEBAR_MAX_WIDTH = 600
-const SIDEBAR_DEFAULT_WIDTH = 400
-const SIDEBAR_WIDTH_KEY = 'pi-session-manager-sidebar-width'
-const MESSAGE_ITEM_GAP = 16
+const SIDEBAR_MIN_WIDTH = 200;
+const SIDEBAR_MAX_WIDTH = 600;
+const SIDEBAR_DEFAULT_WIDTH = 400;
+const SIDEBAR_WIDTH_KEY = "pi-session-manager-sidebar-width";
+const MESSAGE_ITEM_GAP = 16;
 
-function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume, terminal = getPlatformDefaults().defaultTerminal, piPath, customCommand, initialEntryId }: SessionViewerProps) {
-  const { t } = useTranslation()
-  const { showThinking, toggleThinking, toolsExpanded, toggleToolsExpanded, expandedToolIds } = useSessionView()
-  const isMobile = useIsMobile()
-  const [entries, setEntries] = useState<SessionEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showLoading, setShowLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [showSidebar, setShowSidebar] = useState(false)
-  const [activeEntryId, setActiveEntryId] = useState<string | null>(null)
-  const [scrollTargetId, setScrollTargetId] = useState<string | null>(null)
+// Temporary debug switch: set true to disable scroll markers for perf comparison.
+const DEBUG_DISABLE_SCROLL_MARKERS = false;
+
+function SessionViewerContent({
+  session,
+  onExport,
+  onRename,
+  onBack,
+  onWebResume,
+  terminal = getPlatformDefaults().defaultTerminal,
+  piPath,
+  customCommand,
+  initialEntryId,
+}: SessionViewerProps) {
+  const { t } = useTranslation();
+  const {
+    showThinking,
+    toggleThinking,
+    toolsExpanded,
+    toggleToolsExpanded,
+    expandedToolIds,
+  } = useSessionView();
+  const isMobile = useIsMobile();
+  const [entries, setEntries] = useState<SessionEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showLoading, setShowLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const [scrollTargetId, setScrollTargetId] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY)
-    return saved ? parseInt(saved, 10) : SIDEBAR_DEFAULT_WIDTH
-  })
-  const [isResizing, setIsResizing] = useState(false)
-  const startXRef = useRef(0)
-  const startWidthRef = useRef(0)
-  const sidebarWidthRef = useRef(sidebarWidth)
+    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    return saved ? parseInt(saved, 10) : SIDEBAR_DEFAULT_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+  const sidebarWidthRef = useRef(sidebarWidth);
 
   // 增量更新状态
-  const [lineCount, setLineCount] = useState(0)
-  const lastModifiedTimeRef = useRef(0)
+  const [lineCount, setLineCount] = useState(0);
+  const lastModifiedTimeRef = useRef(0);
 
-  const [isAtBottom, setIsAtBottom] = useState(true)
-  const [hasNewMessages, setHasNewMessages] = useState(false)
-  const [showSystemPromptDialog, setShowSystemPromptDialog] = useState(false)
-  const [showMobileMenu, setShowMobileMenu] = useState(false)
-  const mobileMenuRef = useRef<HTMLDivElement>(null)
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [showSystemPromptDialog, setShowSystemPromptDialog] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   // Close mobile menu on outside click
   useEffect(() => {
-    if (!showMobileMenu) return
+    if (!showMobileMenu) return;
     const handler = (e: MouseEvent) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
-        setShowMobileMenu(false)
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowMobileMenu(false);
       }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [showMobileMenu])
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showMobileMenu]);
 
-  const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const messagesWrapperRef = useRef<HTMLDivElement>(null)
-  const sidebarRef = useRef<HTMLDivElement>(null)
-  const resizeHandleRef = useRef<HTMLDivElement>(null)
-  const isAtBottomRef = useRef(true)
-  const treeRef = useRef<SessionTreeRef>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messagesWrapperRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const resizeHandleRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+  const treeRef = useRef<SessionTreeRef>(null);
 
-  const measuredHeightsRef = useRef<Map<number, number>>(new Map())
-  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const pendingScrollToBottomRef = useRef(false)
-  const prevEntriesLengthRef = useRef(0)
+  const measuredHeightsRef = useRef<Map<string, number>>(new Map());
+  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingScrollToBottomRef = useRef(false);
+  const prevEntriesLengthRef = useRef(0);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     // 清除之前的 loading timer
     if (loadingTimerRef.current) {
-      clearTimeout(loadingTimerRef.current)
-      loadingTimerRef.current = null
+      clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
     }
 
-    lastModifiedTimeRef.current = 0
-    setLineCount(0)
-    setEntries([])
-    setActiveEntryId(null)
-    setScrollTargetId(null)
-    setHasNewMessages(false)
-    prevEntriesLengthRef.current = 0
-    pendingScrollToBottomRef.current = false
+    lastModifiedTimeRef.current = 0;
+    setLineCount(0);
+    setEntries([]);
+    setActiveEntryId(null);
+    setScrollTargetId(null);
+    setHasNewMessages(false);
+    prevEntriesLengthRef.current = 0;
+    pendingScrollToBottomRef.current = false;
 
     const doLoad = async () => {
-      console.log('[SessionViewer] loadSession called, path:', session.path)
+      console.log("[SessionViewer] loadSession called, path:", session.path);
       try {
-        setLoading(true)
-        setShowLoading(false)
-        setError(null)
-        measuredHeightsRef.current.clear()
+        setLoading(true);
+        setShowLoading(false);
+        setError(null);
+        measuredHeightsRef.current.clear();
 
         // Check cache first — skip file read when switching back to a previously viewed session
-        const cached = SESSION_CONTENT_CACHE.get(session.path)
+        const cached = SESSION_CONTENT_CACHE.get(session.path);
         if (cached) {
-          setEntries(cached.entries)
-          setLineCount(cached.lineCount)
+          setEntries(cached.entries);
+          setLineCount(cached.lineCount);
           // Always set active entry to last message (preserves full view for linear sessions)
-          const lastMessage = cached.entries.filter(e => e.type === 'message').pop()
+          const lastMessage = cached.entries
+            .filter((e) => e.type === "message")
+            .pop();
           if (lastMessage) {
-            setActiveEntryId(lastMessage.id)
+            setActiveEntryId(lastMessage.id);
           } else if (cached.entries.length > 0) {
-            setActiveEntryId(cached.entries[0].id)
+            setActiveEntryId(cached.entries[0].id);
           }
           // If navigating from FTS, suppress auto-scroll to bottom; otherwise enable
-          pendingScrollToBottomRef.current = !initialEntryId
-          return
+          pendingScrollToBottomRef.current = !initialEntryId;
+          return;
         }
 
         loadingTimerRef.current = setTimeout(() => {
           if (!cancelled) {
-            setShowLoading(true)
+            setShowLoading(true);
           }
-        }, 300)
+        }, 300);
 
-        const jsonlContent = await invoke<string>('read_session_file', { path: session.path })
+        const jsonlContent = await invoke<string>("read_session_file", {
+          path: session.path,
+        });
 
-        const lines = jsonlContent.split('\n').filter(line => line.trim()).length
-        const parsedEntries = parseSessionEntries(jsonlContent)
+        const lines = jsonlContent
+          .split("\n")
+          .filter((line) => line.trim()).length;
+        const parsedEntries = parseSessionEntries(jsonlContent);
 
         // Always cache, even if cancelled — so StrictMode's second mount hits cache
-        cacheSessionContent(session.path, parsedEntries, lines)
+        cacheSessionContent(session.path, parsedEntries, lines);
 
-        if (cancelled) return
+        if (cancelled) return;
 
-        setLineCount(lines)
-        setEntries(parsedEntries)
+        setLineCount(lines);
+        setEntries(parsedEntries);
 
         // Always set active entry to last message (preserves full view for linear sessions)
-        const lastMessage = parsedEntries.filter(e => e.type === 'message').pop()
+        const lastMessage = parsedEntries
+          .filter((e) => e.type === "message")
+          .pop();
         if (lastMessage) {
-          setActiveEntryId(lastMessage.id)
+          setActiveEntryId(lastMessage.id);
         } else if (parsedEntries.length > 0) {
-          setActiveEntryId(parsedEntries[0].id)
+          setActiveEntryId(parsedEntries[0].id);
         }
         // If navigating from FTS, suppress auto-scroll to bottom; otherwise enable
-        pendingScrollToBottomRef.current = !initialEntryId
+        pendingScrollToBottomRef.current = !initialEntryId;
       } catch (err) {
         if (!cancelled) {
-          console.error('[SessionViewer] Failed to load session:', err)
-          setError(err instanceof Error ? err.message : t('session.loadError'))
+          console.error("[SessionViewer] Failed to load session:", err);
+          setError(err instanceof Error ? err.message : t("session.loadError"));
         }
       } finally {
         if (!cancelled) {
-          console.log('[SessionViewer] loadSession finally block, clearing loading states')
+          console.log(
+            "[SessionViewer] loadSession finally block, clearing loading states",
+          );
           if (loadingTimerRef.current) {
-            clearTimeout(loadingTimerRef.current)
-            loadingTimerRef.current = null
+            clearTimeout(loadingTimerRef.current);
+            loadingTimerRef.current = null;
           }
-          setLoading(false)
-          setShowLoading(false)
+          setLoading(false);
+          setShowLoading(false);
         }
       }
-    }
+    };
 
-    doLoad()
+    doLoad();
 
     return () => {
-      cancelled = true
+      cancelled = true;
       if (loadingTimerRef.current) {
-        clearTimeout(loadingTimerRef.current)
-        loadingTimerRef.current = null
+        clearTimeout(loadingTimerRef.current);
+        loadingTimerRef.current = null;
       }
-    }
-  // Only re-run full load when user selects a DIFFERENT session
-  // File updates while viewing are handled by the incremental listener below
-  }, [session.path, t])
+    };
+    // Only re-run full load when user selects a DIFFERENT session
+    // File updates while viewing are handled by the incremental listener below
+  }, [session.path, t]);
 
   // Handle external navigation request (e.g., from full-text search)
   useEffect(() => {
@@ -222,157 +278,159 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
 
   // Incremental update: listen for diff events, load new lines if this session was updated
   useEffect(() => {
-    if (!session.path || loading) return
+    if (!session.path || loading) return;
 
-    let unlisten: (() => void) | null = null
+    let unlisten: (() => void) | null = null;
 
     const setup = async () => {
-      unlisten = await listen<SessionsDiff>('sessions-changed', (event) => {
-        const diff = event.payload
-        if (!diff?.updated?.length) return
-        const hit = diff.updated.some(s => s.path === session.path)
+      unlisten = await listen<SessionsDiff>("sessions-changed", (event) => {
+        const diff = event.payload;
+        if (!diff?.updated?.length) return;
+        const hit = diff.updated.some((s) => s.path === session.path);
         if (hit) {
-          loadIncremental()
+          loadIncremental();
         }
-      })
-    }
+      });
+    };
 
-    setup()
+    setup();
 
     return () => {
-      if (unlisten) unlisten()
-    }
-  }, [session.path, loading])
-
-  
+      if (unlisten) unlisten();
+    };
+  }, [session.path, loading]);
 
   // 快捷键监听：ctrl+t 切换思考显示，ctrl+o 切换工具调用展开
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
-        e.preventDefault()
-        e.stopPropagation()
-        toggleThinking()
-      } else if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
-        e.preventDefault()
-        e.stopPropagation()
-        toggleToolsExpanded()
-      } else if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-        e.preventDefault()
-        e.stopPropagation()
-        setShowSidebar(prev => {
-          const newState = !prev
+      if ((e.metaKey || e.ctrlKey) && e.key === "t") {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleThinking();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "o") {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleToolsExpanded();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowSidebar((prev) => {
+          const newState = !prev;
           if (newState) {
             setTimeout(() => {
-              treeRef.current?.focusSearch()
-            }, 100)
+              treeRef.current?.focusSearch();
+            }, 100);
           }
-          return newState
-        })
+          return newState;
+        });
       }
-    }
+    };
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleThinking, toggleToolsExpanded, setShowSidebar])
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleThinking, toggleToolsExpanded, setShowSidebar]);
 
   // Compute the path from root to activeEntryId (conversation branch)
   const pathEntryIds = useMemo(() => {
-    if (!activeEntryId || entries.length === 0) return null
+    if (!activeEntryId || entries.length === 0) return null;
 
-    const byId = new Map<string, SessionEntry>()
+    const byId = new Map<string, SessionEntry>();
     for (const entry of entries) {
-      byId.set(entry.id, entry)
+      byId.set(entry.id, entry);
     }
 
-    const ids = new Set<string>()
-    let current = byId.get(activeEntryId)
+    const ids = new Set<string>();
+    let current = byId.get(activeEntryId);
     while (current) {
-      ids.add(current.id)
-      if (!current.parentId || current.parentId === current.id) break
-      current = byId.get(current.parentId)
+      ids.add(current.id);
+      if (!current.parentId || current.parentId === current.id) break;
+      current = byId.get(current.parentId);
     }
-    return ids
-  }, [entries, activeEntryId])
+    return ids;
+  }, [entries, activeEntryId]);
 
   const renderableEntries = useMemo(() => {
-    return entries.filter(entry => {
+    return entries.filter((entry) => {
       // Only filter by path for message entries
       // model_change, compaction, etc. should always show regardless of active path
-      if (entry.type === 'message') {
-        if (pathEntryIds && !pathEntryIds.has(entry.id)) return false
-        const role = entry.message?.role
-        return role === 'user' || role === 'assistant'
+      if (entry.type === "message") {
+        if (pathEntryIds && !pathEntryIds.has(entry.id)) return false;
+        const role = entry.message?.role;
+        return role === "user" || role === "assistant";
       }
       return (
-        entry.type === 'model_change' ||
-        entry.type === 'compaction' ||
-        entry.type === 'branch_summary' ||
-        entry.type === 'custom_message'
-      )
-    })
-  }, [entries, pathEntryIds])
+        entry.type === "model_change" ||
+        entry.type === "compaction" ||
+        entry.type === "branch_summary" ||
+        entry.type === "custom_message"
+      );
+    });
+  }, [entries, pathEntryIds]);
 
   const entryIndexById = useMemo(() => {
-    const map = new Map<string, number>()
+    const map = new Map<string, number>();
     renderableEntries.forEach((entry, index) => {
-      map.set(entry.id, index)
-    })
-    return map
-  }, [renderableEntries])
+      map.set(entry.id, index);
+    });
+    return map;
+  }, [renderableEntries]);
 
-  const estimateEntrySize = useCallback((index: number) => {
-    const cachedHeight = measuredHeightsRef.current.get(index)
-    if (cachedHeight) return cachedHeight + MESSAGE_ITEM_GAP
+  const estimateEntrySize = useCallback(
+    (index: number) => {
+      const entry = renderableEntries[index];
+      if (!entry) return 140 + MESSAGE_ITEM_GAP;
 
-    const entry = renderableEntries[index]
-    if (!entry) return 140 + MESSAGE_ITEM_GAP
+      const cachedHeight = measuredHeightsRef.current.get(entry.id);
+      if (cachedHeight) return cachedHeight + MESSAGE_ITEM_GAP;
 
-    let height: number
-    switch (entry.type) {
-      case 'message': {
-        const content = entry.message?.content || []
-        const textLength = content
-          .filter(c => c.type === 'text')
-          .reduce((sum, c) => sum + (c.text?.length || 0), 0)
-        const baseHeight = 100
-        const contentHeight = Math.ceil(textLength / 80) * 32
-        height = Math.min(baseHeight + contentHeight, 800)
-        break
+      let height: number;
+      switch (entry.type) {
+        case "message": {
+          const content = entry.message?.content || [];
+          const textLength = content
+            .filter((c) => c.type === "text")
+            .reduce((sum, c) => sum + (c.text?.length || 0), 0);
+          const baseHeight = 100;
+          const contentHeight = Math.ceil(textLength / 80) * 32;
+          height = Math.min(baseHeight + contentHeight, 800);
+          break;
+        }
+        case "model_change":
+          height = 64;
+          break;
+        case "compaction":
+          height = 180;
+          break;
+        case "branch_summary":
+          height = 160;
+          break;
+        case "custom_message":
+          height = 120;
+          break;
+        default:
+          height = 120;
       }
-      case 'model_change':
-        height = 64
-        break
-      case 'compaction':
-        height = 180
-        break
-      case 'branch_summary':
-        height = 160
-        break
-      case 'custom_message':
-        height = 120
-        break
-      default:
-        height = 120
-    }
-    return height + MESSAGE_ITEM_GAP
-  }, [renderableEntries])
+      return height + MESSAGE_ITEM_GAP;
+    },
+    [renderableEntries],
+  );
 
   const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: renderableEntries.length,
     getScrollElement: () => messagesContainerRef.current,
     estimateSize: estimateEntrySize,
-    overscan: 5,
+    overscan: 24,
     lanes: 1,
+    isScrollingResetDelay: 200,
     measureElement: (el) => {
-      const height = el.getBoundingClientRect().height
-      const index = Number(el.getAttribute('data-index'))
-      if (!isNaN(index)) {
-        measuredHeightsRef.current.set(index, height)
+      const height = el.getBoundingClientRect().height;
+      const entryId = el.getAttribute("data-entry-id");
+      if (entryId) {
+        measuredHeightsRef.current.set(entryId, height);
       }
-      return height
-    }
-  })
+      return height;
+    },
+  });
 
   const {
     markers: scrollMarkers,
@@ -386,295 +444,345 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
     onPointerLeave: handleMarkersPointerLeave,
   } = useSessionScrollMarkers({
     entries: renderableEntries,
-    rowVirtualizer,
-    estimateEntrySize,
     isMobile,
+    enabled: !DEBUG_DISABLE_SCROLL_MARKERS,
     onSelectEntry: setScrollTargetId,
-    previewFallback: t('session.userMessage', 'User message'),
-  })
+    previewFallback: t("session.userMessage", "User message"),
+  });
 
   useEffect(() => {
-    measuredHeightsRef.current.clear()
-  }, [expandedToolIds, toolsExpanded])
+    measuredHeightsRef.current.clear();
+  }, [expandedToolIds, toolsExpanded]);
 
   // Force scroll to bottom when entries are loaded
   useEffect(() => {
-    if (loading || error || renderableEntries.length === 0) return
-    
+    if (loading || error || renderableEntries.length === 0) return;
+
     if (pendingScrollToBottomRef.current) {
       // Wait for virtual list to render
       const rafId = requestAnimationFrame(() => {
-        const lastIndex = renderableEntries.length - 1
-        rowVirtualizer.scrollToIndex(lastIndex, { align: 'end' })
-        pendingScrollToBottomRef.current = false
-      })
-      return () => cancelAnimationFrame(rafId)
+        const lastIndex = renderableEntries.length - 1;
+        rowVirtualizer.scrollToIndex(lastIndex, { align: "end" });
+        pendingScrollToBottomRef.current = false;
+      });
+      return () => cancelAnimationFrame(rafId);
     }
-  }, [loading, error, renderableEntries.length, rowVirtualizer])
+  }, [loading, error, renderableEntries.length, rowVirtualizer]);
 
   // 滚动到顶部
   const scrollToTop = useCallback(() => {
-    if (!messagesContainerRef.current) return
-    if (renderableEntries.length === 0) return
-    rowVirtualizer.scrollToIndex(0, { align: 'start' })
-  }, [renderableEntries.length, rowVirtualizer])
+    if (!messagesContainerRef.current) return;
+    if (renderableEntries.length === 0) return;
+    rowVirtualizer.scrollToIndex(0, { align: "start" });
+  }, [renderableEntries.length, rowVirtualizer]);
 
   // 滚动到底部
-  const scrollToBottom = useCallback((_smooth = false) => {
-    if (renderableEntries.length === 0) return
-    
-    const lastIndex = renderableEntries.length - 1
-    rowVirtualizer.scrollToIndex(lastIndex, { align: 'end' })
-  }, [renderableEntries.length, rowVirtualizer])
+  const scrollToBottom = useCallback(
+    (_smooth = false) => {
+      if (renderableEntries.length === 0) return;
+
+      const lastIndex = renderableEntries.length - 1;
+      rowVirtualizer.scrollToIndex(lastIndex, { align: "end" });
+    },
+    [renderableEntries.length, rowVirtualizer],
+  );
 
   useEffect(() => {
     if (scrollTargetId && messagesContainerRef.current) {
-      const targetIndex = entryIndexById.get(scrollTargetId)
-      if (targetIndex === undefined) return
+      const targetIndex = entryIndexById.get(scrollTargetId);
+      if (targetIndex === undefined) return;
 
-      rowVirtualizer.scrollToIndex(targetIndex, { align: 'center' })
+      rowVirtualizer.scrollToIndex(targetIndex, { align: "center" });
 
       const tryHighlight = () => {
-        const element = document.getElementById(`entry-${scrollTargetId}`)
-        if (!element) return false
-        element.classList.add('highlight')
+        const element = document.getElementById(`entry-${scrollTargetId}`);
+        if (!element) return false;
+        element.classList.add("highlight");
         setTimeout(() => {
-          element.classList.remove('highlight')
-        }, 2000)
-        return true
-      }
+          element.classList.remove("highlight");
+        }, 2000);
+        return true;
+      };
 
       requestAnimationFrame(() => {
         if (!tryHighlight()) {
           setTimeout(() => {
-            tryHighlight()
-          }, 50)
+            tryHighlight();
+          }, 50);
         }
-      })
+      });
 
       // Clear scrollTargetId after handling
-      setScrollTargetId(null)
+      setScrollTargetId(null);
     }
-  }, [scrollTargetId, entryIndexById, rowVirtualizer])
+  }, [scrollTargetId, entryIndexById, rowVirtualizer]);
 
   useEffect(() => {
-    const container = messagesContainerRef.current
-    if (!container) return
+    const container = messagesContainerRef.current;
+    if (!container) return;
 
-    let rafId: number | null = null
+    let rafId: number | null = null;
     const handleScroll = () => {
-      if (rafId) return
+      if (rafId) return;
       rafId = requestAnimationFrame(() => {
-        rafId = null
-        const currentScrollTop = container.scrollTop
-        const distanceToBottom = container.scrollHeight - currentScrollTop - container.clientHeight
-        const atBottom = distanceToBottom <= 8
+        rafId = null;
+        const currentScrollTop = container.scrollTop;
+        const distanceToBottom =
+          container.scrollHeight - currentScrollTop - container.clientHeight;
+        const atBottom = distanceToBottom <= 8;
         if (isAtBottomRef.current !== atBottom) {
-          isAtBottomRef.current = atBottom
-          setIsAtBottom(atBottom)
+          isAtBottomRef.current = atBottom;
+          setIsAtBottom(atBottom);
         }
         if (atBottom) {
-          setHasNewMessages(false)
+          setHasNewMessages(false);
         }
-      })
-    }
+      });
+    };
 
-    handleScroll()
-    container.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll();
+    container.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
-      container.removeEventListener('scroll', handleScroll)
-      if (rafId) cancelAnimationFrame(rafId)
-    }
-  }, [loading, error])
+      container.removeEventListener("scroll", handleScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [loading, error]);
 
   // Track renderableEntries length changes
   useEffect(() => {
     if (!loading && !showLoading && !error) {
-      prevEntriesLengthRef.current = renderableEntries.length
+      prevEntriesLengthRef.current = renderableEntries.length;
     }
-  }, [renderableEntries.length, loading, showLoading, error])
+  }, [renderableEntries.length, loading, showLoading, error]);
 
   // 拖拽调整宽度
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    setIsResizing(true)
-    startXRef.current = e.clientX
-    startWidthRef.current = sidebarWidth
-  }, [sidebarWidth])
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizing(true);
+      startXRef.current = e.clientX;
+      startWidthRef.current = sidebarWidth;
+    },
+    [sidebarWidth],
+  );
 
   useEffect(() => {
-    if (!isResizing) return
+    if (!isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const deltaX = e.clientX - startXRef.current
-      const newWidth = startWidthRef.current + deltaX
-      
+      const deltaX = e.clientX - startXRef.current;
+      const newWidth = startWidthRef.current + deltaX;
+
       if (newWidth >= SIDEBAR_MIN_WIDTH && newWidth <= SIDEBAR_MAX_WIDTH) {
-        setSidebarWidth(newWidth)
-        sidebarWidthRef.current = newWidth
+        setSidebarWidth(newWidth);
+        sidebarWidthRef.current = newWidth;
       }
-    }
+    };
 
     const handleMouseUp = () => {
-      setIsResizing(false)
-      localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidthRef.current.toString())
-    }
+      setIsResizing(false);
+      localStorage.setItem(
+        SIDEBAR_WIDTH_KEY,
+        sidebarWidthRef.current.toString(),
+      );
+    };
 
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isResizing])
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
 
   // 增量加载新内容
-  const lineCountRef = useRef(lineCount)
-  lineCountRef.current = lineCount
+  const lineCountRef = useRef(lineCount);
+  lineCountRef.current = lineCount;
 
   const loadIncremental = useCallback(async () => {
     try {
-      const result = await invoke<[number, string]>('read_session_file_incremental', {
-        path: session.path,
-        fromLine: lineCountRef.current
-      })
+      const result = await invoke<[number, string]>(
+        "read_session_file_incremental",
+        {
+          path: session.path,
+          fromLine: lineCountRef.current,
+        },
+      );
 
-      const [newLineCount, newContent] = result
+      const [newLineCount, newContent] = result;
 
       if (newContent.trim()) {
         // 解析新增的 entries
-        const newEntries = parseSessionEntries(newContent)
+        const newEntries = parseSessionEntries(newContent);
 
         if (newEntries.length > 0) {
           // 追加到现有列表
-          setEntries(prev => {
-            const merged = [...prev, ...newEntries]
+          setEntries((prev) => {
+            const merged = [...prev, ...newEntries];
             // Update cache with merged entries
-            cacheSessionContent(session.path, merged, newLineCount)
-            return merged
-          })
+            cacheSessionContent(session.path, merged, newLineCount);
+            return merged;
+          });
 
           // 更新行数
-          setLineCount(newLineCount)
+          setLineCount(newLineCount);
 
           // 更新活动条目
-          const lastMessage = newEntries.filter(e => e.type === 'message').pop()
+          const lastMessage = newEntries
+            .filter((e) => e.type === "message")
+            .pop();
           if (lastMessage) {
-            setActiveEntryId(lastMessage.id)
+            setActiveEntryId(lastMessage.id);
           }
 
           // 自动滚动到底部
           if (isAtBottomRef.current && messagesContainerRef.current) {
-            pendingScrollToBottomRef.current = true
+            pendingScrollToBottomRef.current = true;
           } else {
-            setHasNewMessages(true)
+            setHasNewMessages(true);
           }
         }
       }
     } catch (err) {
-      console.error('Failed to load incremental session:', err)
+      console.error("Failed to load incremental session:", err);
     }
-  }, [session.path, session.modified])
+  }, [session.path, session.modified]);
 
-  const stats = useMemo(() => computeStats(entries), [entries])
-  const headerEntry = useMemo(() => entries.find(e => e.type === 'session'), [entries])
-
-  const renderEntry = useCallback((entry: SessionEntry) => {
-    switch (entry.type) {
-      case 'message':
-        if (!entry.message) return null
-        const role = entry.message.role
-
-        if (role === 'user') {
-          return (
-            <UserMessage
-              key={entry.id}
-              content={entry.message.content}
-              timestamp={entry.timestamp}
-              id={entry.id}
-            />
-          )
-        } else if (role === 'assistant') {
-          return (
-            <AssistantMessage
-              key={entry.id}
-              content={entry.message.content}
-              timestamp={entry.timestamp}
-              entryId={entry.id}
-              entries={entries}
-            />
-          )
-        }
-        return null
-
-      case 'model_change':
-        return (
-          <ModelChange
-            key={entry.id}
-            provider={entry.provider}
-            modelId={entry.modelId}
-            timestamp={entry.timestamp}
-          />
-        )
-
-      case 'compaction':
-        return (
-          <Compaction
-            key={entry.id}
-            tokensBefore={entry.tokensBefore}
-            summary={entry.summary}
-          />
-        )
-
-      case 'branch_summary':
-        return (
-          <BranchSummary
-            key={entry.id}
-            summary={entry.summary}
-            timestamp={entry.timestamp}
-          />
-        )
-
-      case 'custom_message':
-        return (
-          <CustomMessage
-            key={entry.id}
-            customType={entry.customType}
-            content={entry.content}
-            timestamp={entry.timestamp}
-          />
-        )
-
-      default:
-        return null
+  const toolResultByCallId = useMemo(() => {
+    const map = new Map<string, SessionEntry>();
+    for (const entry of entries) {
+      if (
+        entry.type === "message" &&
+        entry.message?.role === "toolResult" &&
+        entry.message.toolCallId
+      ) {
+        map.set(entry.message.toolCallId, entry);
+      }
     }
-  }, [entries])
+    return map;
+  }, [entries]);
 
-  const messageEntries = useMemo(() => entries.filter(e => e.type === 'message'), [entries])
+  const stats = useMemo(() => computeStats(entries), [entries]);
+  const headerEntry = useMemo(
+    () => entries.find((e) => e.type === "session"),
+    [entries],
+  );
 
-  const handleTreeNodeClick = useCallback((leafId: string, targetId: string) => {
-    setActiveEntryId(leafId)
-    setScrollTargetId(targetId)
-  }, [])
+  const renderEntry = useCallback(
+    (entry: SessionEntry) => {
+      switch (entry.type) {
+        case "message":
+          if (!entry.message) return null;
+          const role = entry.message.role;
+
+          if (role === "user") {
+            return (
+              <UserMessage
+                key={entry.id}
+                content={entry.message.content}
+                timestamp={entry.timestamp}
+                id={entry.id}
+              />
+            );
+          } else if (role === "assistant") {
+            return (
+              <AssistantMessage
+                key={entry.id}
+                content={entry.message.content}
+                timestamp={entry.timestamp}
+                entryId={entry.id}
+                toolResultByCallId={toolResultByCallId}
+              />
+            );
+          }
+          return null;
+
+        case "model_change":
+          return (
+            <ModelChange
+              key={entry.id}
+              provider={entry.provider}
+              modelId={entry.modelId}
+              timestamp={entry.timestamp}
+            />
+          );
+
+        case "compaction":
+          return (
+            <Compaction
+              key={entry.id}
+              tokensBefore={entry.tokensBefore}
+              summary={entry.summary}
+            />
+          );
+
+        case "branch_summary":
+          return (
+            <BranchSummary
+              key={entry.id}
+              summary={entry.summary}
+              timestamp={entry.timestamp}
+            />
+          );
+
+        case "custom_message":
+          return (
+            <CustomMessage
+              key={entry.id}
+              customType={entry.customType}
+              content={entry.content}
+              timestamp={entry.timestamp}
+            />
+          );
+
+        default:
+          return null;
+      }
+    },
+    [toolResultByCallId],
+  );
+
+  const messageEntries = useMemo(
+    () => entries.filter((e) => e.type === "message"),
+    [entries],
+  );
+
+  const handleTreeNodeClick = useCallback(
+    (leafId: string, targetId: string) => {
+      setActiveEntryId(leafId);
+      setScrollTargetId(targetId);
+    },
+    [],
+  );
 
   return (
     <div className="h-full flex relative">
       {showSidebar && (
         <>
-          <aside 
+          <aside
             ref={sidebarRef}
-            className="session-sidebar absolute left-0 top-0 bottom-0 z-20 shadow-xl" 
-            style={{ width: isMobile ? '100vw' : `${sidebarWidth}px` }}
+            className="session-sidebar absolute left-0 top-0 bottom-0 z-20 shadow-xl"
+            style={{ width: isMobile ? "100vw" : `${sidebarWidth}px` }}
           >
             {isMobile && (
               <button
                 onClick={() => setShowSidebar(false)}
                 className="absolute top-2 right-2 z-30 p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
-                title={t('session.hideSidebar')}
+                title={t("session.hideSidebar")}
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             )}
@@ -685,12 +793,12 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
               onNodeClick={handleTreeNodeClick}
             />
           </aside>
-          
+
           {/* 拖拽手柄 - 跟随侧边栏, 移动端禁用 */}
           {!isMobile && (
             <div
               ref={resizeHandleRef}
-              className={`sidebar-resize-handle absolute z-30 ${isResizing ? 'resizing' : ''}`}
+              className={`sidebar-resize-handle absolute z-30 ${isResizing ? "resizing" : ""}`}
               style={{ left: `${sidebarWidth}px` }}
               onMouseDown={handleMouseDown}
             >
@@ -700,16 +808,34 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
         </>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 transition-all duration-200" style={{ paddingLeft: showSidebar && !isMobile ? `${sidebarWidth}px` : 0 }}>
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border relative z-20" data-tauri-drag-region>
+      <div
+        className="flex-1 flex flex-col min-w-0 min-h-0 transition-all duration-200"
+        style={{
+          paddingLeft: showSidebar && !isMobile ? `${sidebarWidth}px` : 0,
+        }}
+      >
+        <div
+          className="flex items-center justify-between px-3 py-1.5 border-b border-border relative z-20"
+          data-tauri-drag-region
+        >
           <div className="flex items-center gap-1.5 min-w-0">
             {isMobile && onBack && (
               <button
                 onClick={onBack}
                 className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors flex-shrink-0"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
                 </svg>
               </button>
             )}
@@ -717,16 +843,32 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
               <button
                 onClick={() => setShowSidebar(!showSidebar)}
                 className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors flex-shrink-0"
-                title={showSidebar ? t('session.hideSidebar') : t('session.showSidebar')}
+                title={
+                  showSidebar
+                    ? t("session.hideSidebar")
+                    : t("session.showSidebar")
+                }
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
                 </svg>
               </button>
             )}
-            <span className="text-sm font-medium truncate">{session.name || t('session.title')}</span>
+            <span className="text-sm font-medium truncate">
+              {session.name || t("session.title")}
+            </span>
             <span className="text-[11px] text-muted-foreground flex-shrink-0">
-              {messageEntries.length} {t('session.messages')}
+              {messageEntries.length} {t("session.messages")}
             </span>
           </div>
 
@@ -735,88 +877,112 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
             <div className="flex items-center gap-1 flex-shrink-0">
               <button
                 onClick={() => {
-                  setShowSidebar(!showSidebar)
+                  setShowSidebar(!showSidebar);
                   if (!showSidebar) {
-                    setTimeout(() => treeRef.current?.focusSearch(), 100)
+                    setTimeout(() => treeRef.current?.focusSearch(), 100);
                   }
                 }}
                 className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
-                title={t('session.showSidebar')}
+                title={t("session.showSidebar")}
               >
                 <Search className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={toggleThinking}
-                className={`p-1.5 text-xs rounded transition-colors ${showThinking ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
+                className={`p-1.5 text-xs rounded transition-colors ${showThinking ? "bg-accent/15 text-accent" : "bg-secondary hover:bg-secondary-hover"}`}
               >
-                {showThinking ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                {showThinking ? (
+                  <Eye className="h-3.5 w-3.5" />
+                ) : (
+                  <EyeOff className="h-3.5 w-3.5" />
+                )}
               </button>
               <button
                 onClick={toggleToolsExpanded}
-                className={`p-1.5 text-xs rounded transition-colors ${toolsExpanded ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
+                className={`p-1.5 text-xs rounded transition-colors ${toolsExpanded ? "bg-accent/15 text-accent" : "bg-secondary hover:bg-secondary-hover"}`}
               >
                 <ChevronsUpDown className="h-3.5 w-3.5" />
               </button>
-              <button
-                onClick={toggleScrollMarkers}
-                className={`p-1.5 text-xs rounded transition-colors ${showScrollMarkers ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
-                title={t('session.userMarkers', '用户消息锚点')}
-              >
-                <List className="h-3.5 w-3.5" />
-              </button>
+              {!DEBUG_DISABLE_SCROLL_MARKERS && (
+                <button
+                  onClick={toggleScrollMarkers}
+                  className={`p-1.5 text-xs rounded transition-colors ${showScrollMarkers ? "bg-accent/15 text-accent" : "bg-secondary hover:bg-secondary-hover"}`}
+                  title={t("session.userMarkers", "用户消息锚点")}
+                >
+                  <List className="h-3.5 w-3.5" />
+                </button>
+              )}
               {/* Overflow menu trigger */}
               <div className="relative" ref={mobileMenuRef}>
                 <button
                   onClick={() => setShowMobileMenu(!showMobileMenu)}
-                  className={`p-1.5 text-xs rounded transition-colors ${showMobileMenu ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
+                  className={`p-1.5 text-xs rounded transition-colors ${showMobileMenu ? "bg-accent/15 text-accent" : "bg-secondary hover:bg-secondary-hover"}`}
                 >
                   <MoreVertical className="h-3.5 w-3.5" />
                 </button>
                 {showMobileMenu && (
                   <div className="absolute right-0 top-full mt-1 w-44 bg-popover border border-border rounded-lg shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
                     <button
-                      onClick={() => { setShowSystemPromptDialog(true); setShowMobileMenu(false) }}
+                      onClick={() => {
+                        setShowSystemPromptDialog(true);
+                        setShowMobileMenu(false);
+                      }}
                       className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
                     >
                       <Bot className="h-3.5 w-3.5 text-muted-foreground" />
-                      {t('session.systemPromptAndTools', '系统提示词')}
+                      {t("session.systemPromptAndTools", "系统提示词")}
                     </button>
                     <button
-                      onClick={() => { scrollToTop(); setShowMobileMenu(false) }}
+                      onClick={() => {
+                        scrollToTop();
+                        setShowMobileMenu(false);
+                      }}
                       className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
                     >
                       <ArrowUp className="h-3.5 w-3.5 text-muted-foreground" />
-                      {t('session.scrollToTop', '滚动到顶部')}
+                      {t("session.scrollToTop", "滚动到顶部")}
                     </button>
                     <button
-                      onClick={() => { scrollToBottom(); setShowMobileMenu(false) }}
+                      onClick={() => {
+                        scrollToBottom();
+                        setShowMobileMenu(false);
+                      }}
                       className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
                     >
                       <ArrowDown className="h-3.5 w-3.5 text-muted-foreground" />
-                      {t('session.scrollToBottom', '滚动到底部')}
+                      {t("session.scrollToBottom", "滚动到底部")}
                     </button>
                     <div className="border-t border-border my-1" />
                     <button
-                      onClick={() => { onRename(); setShowMobileMenu(false) }}
+                      onClick={() => {
+                        onRename();
+                        setShowMobileMenu(false);
+                      }}
                       className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
                     >
                       <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                      {t('common.rename')}
+                      {t("common.rename")}
                     </button>
                     <button
-                      onClick={() => { onExport(); setShowMobileMenu(false) }}
+                      onClick={() => {
+                        onExport();
+                        setShowMobileMenu(false);
+                      }}
                       className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
                     >
                       <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                      {t('common.export')}
+                      {t("common.export")}
                     </button>
                     {onWebResume && (
                       <button
-                        onClick={() => { onWebResume(); setShowMobileMenu(false) }}
+                        onClick={() => {
+                          onWebResume();
+                          setShowMobileMenu(false);
+                        }}
                         className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
                       >
                         <Play className="h-3.5 w-3.5 text-muted-foreground" />
-                        {t('session.resume', '恢复')}
+                        {t("session.resume", "恢复")}
                       </button>
                     )}
                   </div>
@@ -826,60 +992,64 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
           ) : (
             /* Desktop: full toolbar */
             <div className="flex items-center gap-1 flex-shrink-0">
-            <KbdTooltip shortcut="Cmd+T">
-            <button
-              onClick={toggleThinking}
-              className={`p-1.5 text-xs rounded transition-colors ${showThinking ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
-              title={`${showThinking ? 'Hide' : 'Show'} thinking (⌘T)`}
-            >
-              {showThinking ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-            </button>
-            </KbdTooltip>
-            <KbdTooltip shortcut="Cmd+O">
-            <button
-              onClick={toggleToolsExpanded}
-              className={`p-1.5 text-xs rounded transition-colors ${toolsExpanded ? 'bg-accent/15 text-accent' : 'bg-secondary hover:bg-secondary-hover'}`}
-              title={`${toolsExpanded ? 'Collapse' : 'Expand'} tools (⌘O)`}
-            >
-              <ChevronsUpDown className="h-3.5 w-3.5" />
-            </button>
-            </KbdTooltip>
-            <button
-              onClick={() => setShowSystemPromptDialog(true)}
-              className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
-              title={t('session.systemPromptAndTools', '系统提示词和工具')}
-            >
-              <Bot className="h-3.5 w-3.5" />
-            </button>
+              <KbdTooltip shortcut="Cmd+T">
                 <button
-                  onClick={scrollToTop}
-                  className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
-                  title={t('session.scrollToTop', '滚动到顶部')}
+                  onClick={toggleThinking}
+                  className={`p-1.5 text-xs rounded transition-colors ${showThinking ? "bg-accent/15 text-accent" : "bg-secondary hover:bg-secondary-hover"}`}
+                  title={`${showThinking ? "Hide" : "Show"} thinking (⌘T)`}
                 >
-                  <ArrowUp className="h-3.5 w-3.5" />
+                  {showThinking ? (
+                    <Eye className="h-3.5 w-3.5" />
+                  ) : (
+                    <EyeOff className="h-3.5 w-3.5" />
+                  )}
                 </button>
+              </KbdTooltip>
+              <KbdTooltip shortcut="Cmd+O">
                 <button
-                  onClick={() => scrollToBottom()}
-                  className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
-                  title={t('session.scrollToBottom', '滚动到底部')}
+                  onClick={toggleToolsExpanded}
+                  className={`p-1.5 text-xs rounded transition-colors ${toolsExpanded ? "bg-accent/15 text-accent" : "bg-secondary hover:bg-secondary-hover"}`}
+                  title={`${toolsExpanded ? "Collapse" : "Expand"} tools (⌘O)`}
                 >
-                  <ArrowDown className="h-3.5 w-3.5" />
+                  <ChevronsUpDown className="h-3.5 w-3.5" />
                 </button>
-                <button
-                  onClick={onRename}
-                  className="px-2.5 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
-                >
-                  {t('common.rename')}
-                </button>
-                <KbdTooltip shortcut="Cmd+E">
+              </KbdTooltip>
+              <button
+                onClick={() => setShowSystemPromptDialog(true)}
+                className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+                title={t("session.systemPromptAndTools", "系统提示词和工具")}
+              >
+                <Bot className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={scrollToTop}
+                className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+                title={t("session.scrollToTop", "滚动到顶部")}
+              >
+                <ArrowUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => scrollToBottom()}
+                className="p-1.5 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+                title={t("session.scrollToBottom", "滚动到底部")}
+              >
+                <ArrowDown className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={onRename}
+                className="px-2.5 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
+              >
+                {t("common.rename")}
+              </button>
+              <KbdTooltip shortcut="Cmd+E">
                 <button
                   onClick={onExport}
                   className="px-2.5 py-1 text-xs bg-secondary hover:bg-secondary-hover rounded transition-colors"
                 >
-                  {t('common.export')}
+                  {t("common.export")}
                 </button>
-                </KbdTooltip>
-                <KbdTooltip shortcut="Cmd+R">
+              </KbdTooltip>
+              <KbdTooltip shortcut="Cmd+R">
                 <OpenInTerminalButton
                   session={session}
                   terminal={terminal}
@@ -887,14 +1057,19 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
                   customCommand={customCommand}
                   size="sm"
                   variant="ghost"
-                  label={t('session.resume', '恢复')}
+                  label={t("session.resume", "恢复")}
                   showLabel={true}
                   className="px-3 py-1"
                   onWebResume={onWebResume}
-                  onError={(error) => console.error('[SessionViewer] Failed to open in terminal:', error)}
+                  onError={(error) =>
+                    console.error(
+                      "[SessionViewer] Failed to open in terminal:",
+                      error,
+                    )
+                  }
                 />
-                </KbdTooltip>
-          </div>
+              </KbdTooltip>
+            </div>
           )}
         </div>
 
@@ -902,13 +1077,13 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
           <div className="flex-1 flex items-center justify-center">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{t('session.loading')}</span>
+              <span>{t("session.loading")}</span>
             </div>
           </div>
         ) : error ? (
           <div className="flex-1 flex items-center justify-center text-red-400">
             <div className="text-center">
-              <p className="mb-2">{t('session.error')}</p>
+              <p className="mb-2">{t("session.error")}</p>
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
           </div>
@@ -917,65 +1092,74 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
             {!isAtBottom && hasNewMessages && (
               <button
                 onClick={() => {
-                  scrollToBottom()
-                  setHasNewMessages(false)
+                  scrollToBottom();
+                  setHasNewMessages(false);
                 }}
                 className="absolute bottom-4 right-4 z-10 flex items-center gap-1 rounded-full bg-secondary hover:bg-secondary-hover text-xs text-foreground px-3 py-2 shadow-lg transition-colors"
-                title={t('session.scrollToBottom', '滚动到底部')}
+                title={t("session.scrollToBottom", "滚动到底部")}
               >
                 <ArrowDown className="h-3.5 w-3.5" />
-                {t('session.newMessages', '有新消息')}
+                {t("session.newMessages", "有新消息")}
               </button>
             )}
-            <div className="h-full overflow-y-auto session-viewer" ref={messagesContainerRef}>
+            <div
+              className="h-full overflow-y-auto session-viewer"
+              ref={messagesContainerRef}
+            >
               <SessionHeader
                 sessionId={headerEntry?.id || session.id}
                 timestamp={headerEntry?.timestamp}
                 stats={stats}
               />
-            <div className="messages" ref={messagesWrapperRef}>
-              {renderableEntries.length > 0 ? (
-                <div
-                  className="relative w-full"
-                  style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
-                >
-                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const entry = renderableEntries[virtualRow.index]
-                    if (!entry) return null
-                    return (
-                      <div
-                        key={entry.id}
-                        data-index={virtualRow.index}
-                        ref={rowVirtualizer.measureElement}
-                        className="absolute left-0 top-0 w-full"
-                        style={{
-                          transform: `translateY(${virtualRow.start}px)`,
-                          paddingBottom: virtualRow.index === renderableEntries.length - 1 ? 0 : MESSAGE_ITEM_GAP
-                        }}
-                      >
-                        {renderEntry(entry)}
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div className="empty-state">{t('session.noMessages')}</div>
-              )}
+              <div className="messages" ref={messagesWrapperRef}>
+                {renderableEntries.length > 0 ? (
+                  <div
+                    className="relative w-full"
+                    style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+                  >
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const entry = renderableEntries[virtualRow.index];
+                      if (!entry) return null;
+                      return (
+                        <div
+                          key={entry.id}
+                          data-index={virtualRow.index}
+                          data-entry-id={entry.id}
+                          ref={rowVirtualizer.measureElement}
+                          className="absolute left-0 top-0 w-full"
+                          style={{
+                            transform: `translateY(${virtualRow.start}px)`,
+                            paddingBottom:
+                              virtualRow.index === renderableEntries.length - 1
+                                ? 0
+                                : MESSAGE_ITEM_GAP,
+                          }}
+                        >
+                          {renderEntry(entry)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="empty-state">{t("session.noMessages")}</div>
+                )}
+              </div>
             </div>
+            {!DEBUG_DISABLE_SCROLL_MARKERS && (
+              <SessionScrollMarkers
+                markers={scrollMarkers}
+                activeMarkerId={activeMarkerId}
+                isMobile={isMobile}
+                show={showScrollMarkers}
+                panelRef={markersPanelRef}
+                onMarkerClick={setScrollTargetId}
+                onPointerDown={handleMarkersPointerDown}
+                onPointerMove={handleMarkersPointerMove}
+                onPointerUp={handleMarkersPointerUp}
+                onPointerLeave={handleMarkersPointerLeave}
+              />
+            )}
           </div>
-          <SessionScrollMarkers
-            markers={scrollMarkers}
-            activeMarkerId={activeMarkerId}
-            isMobile={isMobile}
-            show={showScrollMarkers}
-            panelRef={markersPanelRef}
-            onMarkerClick={setScrollTargetId}
-            onPointerDown={handleMarkersPointerDown}
-            onPointerMove={handleMarkersPointerMove}
-            onPointerUp={handleMarkersPointerUp}
-            onPointerLeave={handleMarkersPointerLeave}
-          />
-        </div>
         )}
       </div>
       <SystemPromptDialog
@@ -985,7 +1169,7 @@ function SessionViewerContent({ session, onExport, onRename, onBack, onWebResume
         sessionPath={session.path}
       />
     </div>
-  )
+  );
 }
 
 export default function SessionViewer(props: SessionViewerProps) {
@@ -993,5 +1177,5 @@ export default function SessionViewer(props: SessionViewerProps) {
     <SessionViewProvider>
       <SessionViewerContent {...props} />
     </SessionViewProvider>
-  )
+  );
 }

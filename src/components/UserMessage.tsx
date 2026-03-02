@@ -4,7 +4,7 @@ import { parseMarkdown } from '../utils/markdown'
 import { highlightSearchInHTML } from '../utils/search'
 import { formatDate } from '../utils/format'
 import { Copy, Check } from 'lucide-react'
-import { useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 
 interface UserMessageProps {
   id: string
@@ -14,22 +14,32 @@ interface UserMessageProps {
   searchQuery?: string
 }
 
-export default function UserMessage({ id, timestamp, content, className = '', searchQuery = '' }: UserMessageProps) {
+function UserMessage({ id, timestamp, content, className = '', searchQuery = '' }: UserMessageProps) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
 
-  // Extract images
-  const images = content.filter(c => c.type === 'image' && c.data)
+  const images = useMemo(
+    () => content.filter(c => c.type === 'image' && c.data),
+    [content],
+  )
 
-  // Extract text content
-  const textItems = content.filter(c => c.type === 'text' && c.text)
-  const text = textItems.map(c => c.text).join('\n')
+  const textItems = useMemo(
+    () => content.filter(c => c.type === 'text' && c.text),
+    [content],
+  )
 
-  // 解析 Markdown 并高亮搜索结果
-  let html = parseMarkdown(text)
-  if (searchQuery) {
-    html = highlightSearchInHTML(html, searchQuery)
-  }
+  const text = useMemo(
+    () => textItems.map(c => c.text).join('\n'),
+    [textItems],
+  )
+
+  const html = useMemo(() => {
+    let parsed = parseMarkdown(text)
+    if (searchQuery) {
+      parsed = highlightSearchInHTML(parsed, searchQuery)
+    }
+    return parsed
+  }, [text, searchQuery])
 
   const handleCopy = async () => {
     try {
@@ -89,3 +99,5 @@ export default function UserMessage({ id, timestamp, content, className = '', se
     </div>
   )
 }
+
+export default memo(UserMessage)

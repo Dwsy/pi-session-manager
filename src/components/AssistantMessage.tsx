@@ -5,22 +5,38 @@ import ToolCallList from './ToolCallList'
 import { useSessionView } from '../contexts/SessionViewContext'
 import { formatDate } from '../utils/format'
 import { Copy, Check } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import { memo, useMemo, useState } from 'react'
 
 interface AssistantMessageProps {
   content: Content[]
   timestamp?: string
   entryId: string
-  entries?: SessionEntry[]
+  toolResultByCallId?: Map<string, SessionEntry>
   searchQuery?: string
 }
 
-export default function AssistantMessage({ content, timestamp, entryId, entries = [], searchQuery = '' }: AssistantMessageProps) {
+function AssistantMessage({
+  content,
+  timestamp,
+  entryId,
+  toolResultByCallId = new Map(),
+  searchQuery = '',
+}: AssistantMessageProps) {
   const { showThinking } = useSessionView()
   const [copied, setCopied] = useState(false)
-  const textBlocks = content.filter(c => c.type === 'text' && c.text)
-  const thinkingBlocks = content.filter(c => c.type === 'thinking' && c.thinking)
-  const toolCalls = content.filter(c => c.type === 'toolCall')
+
+  const textBlocks = useMemo(
+    () => content.filter(c => c.type === 'text' && c.text),
+    [content],
+  )
+  const thinkingBlocks = useMemo(
+    () => content.filter(c => c.type === 'thinking' && c.thinking),
+    [content],
+  )
+  const toolCalls = useMemo(
+    () => content.filter(c => c.type === 'toolCall'),
+    [content],
+  )
 
   // Combine all text blocks for copying
   const allText = useMemo(() => textBlocks.map(b => b.text).join('\n'), [textBlocks])
@@ -46,7 +62,7 @@ export default function AssistantMessage({ content, timestamp, entryId, entries 
 
       {/* Text content with copy button */}
       {textBlocks.map((block, index) => (
-        <div key={`text-${index}`} className="assistant-text markdown-content">
+        <div key={`text-${index}`} className="assistant-text">
           <MarkdownContent content={block.text!} searchQuery={searchQuery} />
         </div>
       ))}
@@ -74,7 +90,9 @@ export default function AssistantMessage({ content, timestamp, entryId, entries 
       )}
 
       {/* Tool calls */}
-      {toolCalls.length > 0 && <ToolCallList toolCalls={toolCalls} entries={entries} />}
+      {toolCalls.length > 0 && <ToolCallList toolCalls={toolCalls} toolResultByCallId={toolResultByCallId} />}
     </div>
   )
 }
+
+export default memo(AssistantMessage)

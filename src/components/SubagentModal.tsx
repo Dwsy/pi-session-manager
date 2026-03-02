@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { invoke } from '../transport'
@@ -197,6 +197,20 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
   const ok = result.exitCode === 0
   const ps = result.progressSummary
 
+  const toolResultByCallId = useMemo(() => {
+    const map = new Map<string, SessionEntry>()
+    for (const entry of entries) {
+      if (
+        entry.type === 'message' &&
+        entry.message?.role === 'toolResult' &&
+        entry.message.toolCallId
+      ) {
+        map.set(entry.message.toolCallId, entry)
+      }
+    }
+    return map
+  }, [entries])
+
   const renderEntry = useCallback((entry: SessionEntry) => {
     switch (entry.type) {
       case 'message':
@@ -219,7 +233,7 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
               content={entry.message.content}
               timestamp={entry.timestamp}
               entryId={entry.id}
-              entries={entries}
+              toolResultByCallId={toolResultByCallId}
             />
           )
         }
@@ -237,7 +251,7 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
       default:
         return null
     }
-  }, [entries])
+  }, [toolResultByCallId])
 
   return createPortal(
     <div

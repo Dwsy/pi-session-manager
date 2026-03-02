@@ -10,15 +10,13 @@ renderer.code = function({ text, lang }: { text: string; lang?: string }): strin
   const validLang = language && hljs.getLanguage(language) ? language : ''
   
   // Highlight code
-  let highlightedCode = text
+  let highlightedCode = escapeHtml(text)
   if (validLang) {
     try {
       highlightedCode = hljs.highlight(text, { language: validLang }).value
-    } catch (err) {
-      // Fall through
+    } catch {
+      highlightedCode = escapeHtml(text)
     }
-  } else {
-    highlightedCode = hljs.highlightAuto(text).value
   }
   
   // Calculate line count
@@ -57,8 +55,33 @@ marked.setOptions({
   renderer: renderer,
 })
 
+const PARSED_MARKDOWN_CACHE_MAX_SIZE = 600
+const parsedMarkdownCache = new Map<string, string>()
+
+function touchMarkdownCache(text: string, html: string): string {
+  if (parsedMarkdownCache.has(text)) {
+    parsedMarkdownCache.delete(text)
+  }
+  parsedMarkdownCache.set(text, html)
+
+  if (parsedMarkdownCache.size > PARSED_MARKDOWN_CACHE_MAX_SIZE) {
+    const oldestKey = parsedMarkdownCache.keys().next().value
+    if (oldestKey) {
+      parsedMarkdownCache.delete(oldestKey)
+    }
+  }
+
+  return html
+}
+
 export function parseMarkdown(text: string): string {
-  return marked.parse(text) as string
+  const cached = parsedMarkdownCache.get(text)
+  if (cached !== undefined) {
+    return touchMarkdownCache(text, cached)
+  }
+
+  const parsed = marked.parse(text) as string
+  return touchMarkdownCache(text, parsed)
 }
 
 export function escapeHtml(text: string): string {

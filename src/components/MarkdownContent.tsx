@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { parseMarkdown } from '../utils/markdown'
 import { highlightSearchInHTML } from '../utils/search'
 
@@ -13,7 +13,7 @@ interface MarkdownContentProps {
  * 使用 useMemo 缓存解析结果，避免重复计算
  * 使用 dangerouslySetInnerHTML 替代直接操作 DOM
  */
-export default function MarkdownContent({ content, className = '', searchQuery = '' }: MarkdownContentProps) {
+function MarkdownContent({ content, className = '', searchQuery = '' }: MarkdownContentProps) {
   // 使用 useMemo 缓存解析后的 HTML，避免重复计算
   const html = useMemo(() => {
     let parsed = parseMarkdown(content)
@@ -30,3 +30,5 @@ export default function MarkdownContent({ content, className = '', searchQuery =
     />
   )
 }
+
+export default memo(MarkdownContent)
