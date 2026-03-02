@@ -233,8 +233,10 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             pi_session_manager::scan_sessions,
+            pi_session_manager::scan_sessions_paginated,
             pi_session_manager::read_session_file,
             pi_session_manager::read_session_file_incremental,
+            pi_session_manager::read_session_file_incremental_offset,
             pi_session_manager::get_file_stats,
             pi_session_manager::get_session_entries,
             pi_session_manager::get_session_by_path,

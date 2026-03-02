@@ -1685,33 +1685,78 @@ async fn handle_ws_connection(
 
 // ─── Static files ────────────────────────────────────────────
 
-fn serve_embedded(path: &str) -> Response {
+fn serve_embedded(path: &str) -> Option<Response> {
     let mime = mime_guess::from_path(path).first_or_octet_stream();
-    match FrontendAssets::get(path) {
-        Some(file) => (
+    FrontendAssets::get(path).map(|file| {
+        (
             StatusCode::OK,
             [(header::CONTENT_TYPE, mime.as_ref())],
             file.data.to_vec(),
         )
-            .into_response(),
-        None => match FrontendAssets::get("index.html") {
-            Some(file) => (
-                StatusCode::OK,
-                [(header::CONTENT_TYPE, "text/html")],
-                file.data.to_vec(),
-            )
-                .into_response(),
-            None => (StatusCode::NOT_FOUND, "Not Found").into_response(),
-        },
+            .into_response()
+    })
+}
+
+fn is_api_like_path(path: &str) -> bool {
+    let normalized = path.trim_start_matches('/');
+    normalized == "api"
+        || normalized.starts_with("api/")
+        || normalized == "v1"
+        || normalized.starts_with("v1/")
+        || normalized == "ws"
+        || normalized.starts_with("ws/")
+        || normalized == "metrics"
+        || normalized.starts_with("metrics/")
+}
+
+fn should_spa_fallback(path: &str) -> bool {
+    let normalized = path.trim_start_matches('/');
+    if normalized.is_empty() || is_api_like_path(normalized) {
+        return false;
     }
+
+    // Asset files include extension, SPA routes don't.
+    !normalized.contains('.')
 }
 
 async fn serve_static(uri: Uri) -> Response {
     let path = uri.path().trim_start_matches('/');
     if path.is_empty() {
-        return serve_embedded("index.html");
+        return match serve_embedded("index.html") {
+            Some(resp) => resp,
+            None => (StatusCode::NOT_FOUND, "Not Found").into_response(),
+        };
     }
-    serve_embedded(path)
+
+    if let Some(resp) = serve_embedded(path) {
+        return resp;
+    }
+
+    if should_spa_fallback(path) {
+        return match serve_embedded("index.html") {
+            Some(resp) => resp,
+            None => (StatusCode::NOT_FOUND, "Not Found").into_response(),
+        };
+    }
+
+    if is_api_like_path(path) {
+        return (
+            StatusCode::NOT_FOUND,
+            cors_headers(),
+            Json(serde_json::json!({
+                "success": false,
+                "error": format!("API endpoint not found: /{path}")
+            })),
+        )
+            .into_response();
+    }
+
+    (
+        StatusCode::NOT_FOUND,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        format!("Not Found: /{path}"),
+    )
+        .into_response()
 }
 
 // ─── Metrics endpoint ───────────────────────────────────────────────
@@ -1981,4 +2026,30 @@ async fn v1_embedding_status_handler(
             memory_mb: None,
         }),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_api_like_path, should_spa_fallback};
+
+    #[test]
+    fn api_paths_should_not_use_spa_fallback() {
+        assert!(is_api_like_path("api"));
+        assert!(is_api_like_path("v1/sessions"));
+        assert!(is_api_like_path("ws"));
+        assert!(is_api_like_path("metrics"));
+
+        assert!(!should_spa_fallback("api"));
+        assert!(!should_spa_fallback("v1/sessions"));
+        assert!(!should_spa_fallback("ws"));
+        assert!(!should_spa_fallback("metrics"));
+    }
+
+    #[test]
+    fn spa_paths_without_extension_should_fallback() {
+        assert!(should_spa_fallback("settings/api-test"));
+        assert!(should_spa_fallback("dashboard"));
+        assert!(!should_spa_fallback("assets/index-abc123.js"));
+        assert!(!should_spa_fallback("styles/app.css"));
+    }
 }

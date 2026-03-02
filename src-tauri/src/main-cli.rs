@@ -66,12 +66,20 @@ async fn main() {
         let http_bind = server_cfg.bind_addr.clone();
         let http_bind_log = http_bind.clone();
 
-        // Initialize embedding service
-        let embedding_service = init_embedding_service();
+        // Embedding is opt-in; default disabled.
+        let embedding_service = if server_cfg.embedding_enabled {
+            let svc = init_embedding_service();
+            if svc.is_some() {
+                info!("Embedding service initialized");
+            } else {
+                info!("Embedding requested but model unavailable; embedding disabled");
+            }
+            svc
+        } else {
+            info!("Embedding service disabled by configuration");
+            None
+        };
         let embedding_enabled = embedding_service.is_some();
-        if embedding_enabled {
-            info!("Embedding service initialized");
-        }
 
         tokio::spawn(async move {
             if let Err(e) =
@@ -110,6 +118,7 @@ struct ServerConfig {
     http_port: u16,
     bind_addr: String,
     auth_enabled: bool,
+    embedding_enabled: bool,
 }
 
 /// Initialize embedding service if model is available
@@ -160,6 +169,7 @@ fn load_server_settings() -> ServerConfig {
                     .unwrap_or("127.0.0.1")
                     .to_string(),
                 auth_enabled: json["auth_enabled"].as_bool().unwrap_or(false),
+                embedding_enabled: json["embedding_enabled"].as_bool().unwrap_or(false),
             };
         }
     }
@@ -172,6 +182,7 @@ fn load_server_settings() -> ServerConfig {
         http_port: 52131,
         bind_addr: "127.0.0.1".to_string(),
         auth_enabled: false,
+        embedding_enabled: false,
     }
 }
 

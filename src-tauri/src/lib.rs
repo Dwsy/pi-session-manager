@@ -45,8 +45,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             scan_sessions,
+            scan_sessions_paginated,
             read_session_file,
             read_session_file_incremental,
+            read_session_file_incremental_offset,
             get_file_stats,
             get_session_entries,
             get_session_by_path,

@@ -223,22 +223,12 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             // Collect daily stats for heatmap
             daily_stats.add_session(&date, &project, messages_count, tokens_count as usize);
 
-            let hour = session_modified.with_timezone(&Local).hour();
-            *messages_by_hour.entry(hour.to_string()).or_insert(0) += messages_count;
-
-            let weekday = session_modified.weekday();
-            let day_name = match weekday {
-                Weekday::Mon => "Monday",
-                Weekday::Tue => "Tuesday",
-                Weekday::Wed => "Wednesday",
-                Weekday::Thu => "Thursday",
-                Weekday::Fri => "Friday",
-                Weekday::Sat => "Saturday",
-                Weekday::Sun => "Sunday",
-            };
-            *messages_by_day_of_week
-                .entry(day_name.to_string())
-                .or_insert(0) += details.user_messages + details.assistant_messages;
+            add_time_and_weekday_counts(
+                &mut messages_by_hour,
+                &mut messages_by_day_of_week,
+                session_modified,
+                details.user_messages + details.assistant_messages,
+            );
             continue;
         }
 
@@ -276,24 +266,14 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             *messages_by_date.entry(date.clone()).or_insert(0) += messages_count;
 
             // Collect daily stats for heatmap
-            daily_stats.add_session(&date, &project, messages_count, tokens_count as usize);
+            daily_stats.add_session(&date, &project, messages_count, tokens_count);
 
-            let hour = session_modified.with_timezone(&Local).hour();
-            *messages_by_hour.entry(hour.to_string()).or_insert(0) += messages_count;
-
-            let weekday = session_modified.weekday();
-            let day_name = match weekday {
-                Weekday::Mon => "Monday",
-                Weekday::Tue => "Tuesday",
-                Weekday::Wed => "Wednesday",
-                Weekday::Thu => "Thursday",
-                Weekday::Fri => "Friday",
-                Weekday::Sat => "Saturday",
-                Weekday::Sun => "Sunday",
-            };
-            *messages_by_day_of_week
-                .entry(day_name.to_string())
-                .or_insert(0) += cached.user_messages + cached.assistant_messages;
+            add_time_and_weekday_counts(
+                &mut messages_by_hour,
+                &mut messages_by_day_of_week,
+                session_modified,
+                cached.user_messages + cached.assistant_messages,
+            );
             continue;
         }
 
@@ -329,22 +309,12 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             // Collect daily stats for heatmap
             daily_stats.add_session(&date, &project, messages_count, tokens_count as usize);
 
-            let hour = session_modified.with_timezone(&Local).hour();
-            *messages_by_hour.entry(hour.to_string()).or_insert(0) += messages_count;
-
-            let weekday = session_modified.weekday();
-            let day_name = match weekday {
-                Weekday::Mon => "Monday",
-                Weekday::Tue => "Tuesday",
-                Weekday::Wed => "Wednesday",
-                Weekday::Thu => "Thursday",
-                Weekday::Fri => "Friday",
-                Weekday::Sat => "Saturday",
-                Weekday::Sun => "Sunday",
-            };
-            *messages_by_day_of_week
-                .entry(day_name.to_string())
-                .or_insert(0) += session_stats.user_messages + session_stats.assistant_messages;
+            add_time_and_weekday_counts(
+                &mut messages_by_hour,
+                &mut messages_by_day_of_week,
+                session_modified,
+                session_stats.user_messages + session_stats.assistant_messages,
+            );
         } else {
             // Fallback if parsing fails
             *sessions_by_model.entry("unknown".to_string()).or_insert(0) += 1;
@@ -361,22 +331,12 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
                 session.message_count * 100,
             );
 
-            let hour = session_modified.with_timezone(&Local).hour();
-            *messages_by_hour.entry(hour.to_string()).or_insert(0) += session.message_count;
-
-            let weekday = session_modified.weekday();
-            let day_name = match weekday {
-                Weekday::Mon => "Monday",
-                Weekday::Tue => "Tuesday",
-                Weekday::Wed => "Wednesday",
-                Weekday::Thu => "Thursday",
-                Weekday::Fri => "Friday",
-                Weekday::Sat => "Saturday",
-                Weekday::Sun => "Sunday",
-            };
-            *messages_by_day_of_week
-                .entry(day_name.to_string())
-                .or_insert(0) += session.message_count;
+            add_time_and_weekday_counts(
+                &mut messages_by_hour,
+                &mut messages_by_day_of_week,
+                session_modified,
+                session.message_count,
+            );
         }
     }
 
@@ -436,6 +396,33 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
 
 fn extract_project_name(cwd: &str) -> String {
     cwd.split('/').next_back().unwrap_or("unknown").to_string()
+}
+
+fn add_time_and_weekday_counts(
+    messages_by_hour: &mut HashMap<String, usize>,
+    messages_by_day_of_week: &mut HashMap<String, usize>,
+    session_modified: chrono::DateTime<chrono::Utc>,
+    messages_count: usize,
+) {
+    let hour = session_modified.with_timezone(&Local).hour();
+    *messages_by_hour.entry(hour.to_string()).or_insert(0) += messages_count;
+
+    let day_name = weekday_name(session_modified.weekday());
+    *messages_by_day_of_week
+        .entry(day_name.to_string())
+        .or_insert(0) += messages_count;
+}
+
+fn weekday_name(weekday: Weekday) -> &'static str {
+    match weekday {
+        Weekday::Mon => "Monday",
+        Weekday::Tue => "Tuesday",
+        Weekday::Wed => "Wednesday",
+        Weekday::Thu => "Thursday",
+        Weekday::Fri => "Friday",
+        Weekday::Sat => "Saturday",
+        Weekday::Sun => "Sunday",
+    }
 }
 
 fn generate_heatmap_data(
@@ -508,7 +495,7 @@ pub fn get_day_stats(date: &str, sessions: &[SessionInfo]) -> Result<DayStats, S
 
     let target_date = match chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
         Ok(d) => d,
-        Err(e) => return Err(format!("Invalid date format: {}", e)),
+        Err(e) => return Err(format!("Invalid date format: {e}")),
     };
 
     let conn = sqlite_cache::init_db().ok();
@@ -581,9 +568,10 @@ pub fn get_day_stats(date: &str, sessions: &[SessionInfo]) -> Result<DayStats, S
         hourly_distribution[hour] += messages;
         *models_used.entry(model.clone()).or_insert(0) += 1;
 
-        let entry = project_stats
-            .entry(project_path.clone())
-            .or_insert((project_name.clone(), 0, 0, 0));
+        let entry =
+            project_stats
+                .entry(project_path.clone())
+                .or_insert((project_name.clone(), 0, 0, 0));
         entry.1 += 1; // session count
         entry.2 += messages; // message count
         entry.3 += tokens; // token count
@@ -607,13 +595,15 @@ pub fn get_day_stats(date: &str, sessions: &[SessionInfo]) -> Result<DayStats, S
     // Build project breakdown
     let mut project_breakdown: Vec<DayProjectBreakdown> = project_stats
         .into_iter()
-        .map(|(path, (name, sessions, messages, tokens))| DayProjectBreakdown {
-            project_path: path,
-            project_name: name,
-            session_count: sessions,
-            message_count: messages,
-            token_count: tokens,
-        })
+        .map(
+            |(path, (name, sessions, messages, tokens))| DayProjectBreakdown {
+                project_path: path,
+                project_name: name,
+                session_count: sessions,
+                message_count: messages,
+                token_count: tokens,
+            },
+        )
         .collect();
 
     project_breakdown.sort_by(|a, b| b.message_count.cmp(&a.message_count));
@@ -706,7 +696,12 @@ mod tests {
         assert_eq!(stats.messages_by_hour.get(&local_hour2), Some(&3));
     }
 
-    fn make_session(path: &str, cwd: &str, modified: chrono::DateTime<chrono::Utc>, message_count: usize) -> SessionInfo {
+    fn make_session(
+        path: &str,
+        cwd: &str,
+        modified: chrono::DateTime<chrono::Utc>,
+        message_count: usize,
+    ) -> SessionInfo {
         SessionInfo {
             path: path.to_string(),
             id: format!("id-{path}"),

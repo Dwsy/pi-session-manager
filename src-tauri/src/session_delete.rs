@@ -35,11 +35,7 @@ pub fn delete_session_file_and_cache(path: &str) -> Result<DeleteSessionOutcome,
     };
 
     if let Err(error) = cleanup_session_cache(path, canonical_session_path.as_deref()) {
-        log::warn!(
-            "Session file deleted but cache cleanup failed for {}: {}",
-            path,
-            error
-        );
+        log::warn!("Session file deleted but cache cleanup failed for {path}: {error}");
     }
     scanner::invalidate_cache();
 

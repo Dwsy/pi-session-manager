@@ -33,6 +33,39 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             let result = crate::scanner::scan_sessions().await?;
             Ok(serde_json::to_value(result).unwrap())
         }
+        "scan_sessions_paginated" => {
+            let offset = payload
+                .get("offset")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+            let limit = payload
+                .get("limit")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+            let search_query = extract_optional_string(payload, "search_query")
+                .or_else(|| extract_optional_string(payload, "searchQuery"));
+            let project_filter = extract_optional_string(payload, "project_filter")
+                .or_else(|| extract_optional_string(payload, "projectFilter"));
+            let filter_tag_ids = payload
+                .get("filter_tag_ids")
+                .or_else(|| payload.get("filterTagIds"))
+                .and_then(|value| value.as_array())
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| item.as_str().map(|text| text.to_string()))
+                        .collect::<Vec<String>>()
+                });
+            let result = crate::scan_sessions_paginated(
+                offset,
+                limit,
+                search_query,
+                project_filter,
+                filter_tag_ids,
+            )
+            .await?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
         "session_digest" => {
             let (version, count) = crate::scanner::get_session_digest();
             Ok(serde_json::json!({ "version": version, "count": count }))
@@ -56,6 +89,16 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
                 lines[from_line..].join("\n")
             };
             Ok(serde_json::json!([total_lines, new_content]))
+        }
+        "read_session_file_incremental_offset" => {
+            let path = extract_string(payload, "path")?;
+            let from_offset = payload
+                .get("fromOffset")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| "Missing or invalid field: fromOffset".to_string())?;
+            let (new_offset, new_content) =
+                crate::read_session_file_incremental_offset(path, from_offset).await?;
+            Ok(serde_json::json!([new_offset, new_content]))
         }
         "get_file_stats" => {
             let path = extract_string(payload, "path")?;

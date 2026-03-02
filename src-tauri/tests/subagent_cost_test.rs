@@ -1,15 +1,22 @@
+use chrono::Utc;
 /// Subagent Cost Integration Test
 /// 验证子代理费用扫描、聚合和统计的完整流程
-
 use pi_session_manager::models::{AgentStats, SubagentRunInfo, SubagentSummary};
 use pi_session_manager::subagent::{aggregate_runs, parse_meta_json, scan_subagent_artifacts};
-use chrono::Utc;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// 创建测试用的 meta.json 文件
-fn create_meta_json(dir: &PathBuf, run_id: &str, agent: &str, model: &str, cost: f64, input: u64, output: u64) -> PathBuf {
+fn create_meta_json(
+    dir: &PathBuf,
+    run_id: &str,
+    agent: &str,
+    model: &str,
+    cost: f64,
+    input: u64,
+    output: u64,
+) -> PathBuf {
     let file_path = dir.join(format!("{}_{}_meta.json", run_id, agent));
     let content = format!(
         r#"{{
@@ -29,7 +36,13 @@ fn create_meta_json(dir: &PathBuf, run_id: &str, agent: &str, model: &str, cost:
             "toolCount": 5,
             "timestamp": {}
         }}"#,
-        run_id, agent, model, input, output, cost, Utc::now().timestamp_millis()
+        run_id,
+        agent,
+        model,
+        input,
+        output,
+        cost,
+        Utc::now().timestamp_millis()
     );
     fs::write(&file_path, content).expect("Failed to write meta.json");
     file_path
@@ -151,8 +164,24 @@ fn test_scan_subagent_artifacts() {
 
     // 创建 3 个 meta.json 文件
     create_meta_json(&artifacts_dir, "abc123", "scout", "haiku", 0.02, 2000, 1000);
-    create_meta_json(&artifacts_dir, "def456", "worker", "sonnet", 0.08, 8000, 4000);
-    create_meta_json(&artifacts_dir, "ghi789", "reviewer", "opus", 0.25, 15000, 8000);
+    create_meta_json(
+        &artifacts_dir,
+        "def456",
+        "worker",
+        "sonnet",
+        0.08,
+        8000,
+        4000,
+    );
+    create_meta_json(
+        &artifacts_dir,
+        "ghi789",
+        "reviewer",
+        "opus",
+        0.25,
+        15000,
+        8000,
+    );
 
     // 扫描 artifacts（不使用数据库缓存）
     let session_dirs = vec![session_dir.clone()];
@@ -166,7 +195,10 @@ fn test_scan_subagent_artifacts() {
     assert!(summary.runs_by_agent.contains_key("worker"));
     assert!(summary.runs_by_agent.contains_key("reviewer"));
 
-    println!("✅ Scan test passed: {} runs, ${:.4} total cost", summary.total_runs, summary.total_cost);
+    println!(
+        "✅ Scan test passed: {} runs, ${:.4} total cost",
+        summary.total_runs, summary.total_cost
+    );
 }
 
 /// 测试 4: 文件修改后重新扫描
@@ -178,7 +210,15 @@ fn test_subagent_file_modification() {
     fs::create_dir_all(&artifacts_dir).expect("Failed to create artifacts dir");
 
     // 创建 meta.json
-    let meta_path = create_meta_json(&artifacts_dir, "cache_test", "worker", "sonnet", 0.10, 5000, 2500);
+    let meta_path = create_meta_json(
+        &artifacts_dir,
+        "cache_test",
+        "worker",
+        "sonnet",
+        0.10,
+        5000,
+        2500,
+    );
 
     // 第一次扫描
     let summary1 = scan_subagent_artifacts(&vec![session_dir.clone()], None);
@@ -202,7 +242,7 @@ fn test_subagent_file_modification() {
 #[test]
 fn test_full_subagent_scanning_integration() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
-    
+
     // 创建会话目录和 subagent artifacts
     let session_dir = temp_dir.path().join("test_session");
     let artifacts_dir = session_dir.join("subagent-artifacts");
@@ -269,24 +309,59 @@ fn test_multiple_session_directories() {
     }
 
     // 每个 session 有不同的 subagent 运行
-    create_meta_json(&session1.join("subagent-artifacts"), "a1", "scout", "haiku", 0.01, 1000, 500);
-    create_meta_json(&session2.join("subagent-artifacts"), "b1", "worker", "sonnet", 0.05, 5000, 2500);
-    create_meta_json(&session3.join("subagent-artifacts"), "c1", "reviewer", "opus", 0.20, 10000, 5000);
-    create_meta_json(&session3.join("subagent-artifacts"), "c2", "worker", "sonnet", 0.08, 8000, 4000);
+    create_meta_json(
+        &session1.join("subagent-artifacts"),
+        "a1",
+        "scout",
+        "haiku",
+        0.01,
+        1000,
+        500,
+    );
+    create_meta_json(
+        &session2.join("subagent-artifacts"),
+        "b1",
+        "worker",
+        "sonnet",
+        0.05,
+        5000,
+        2500,
+    );
+    create_meta_json(
+        &session3.join("subagent-artifacts"),
+        "c1",
+        "reviewer",
+        "opus",
+        0.20,
+        10000,
+        5000,
+    );
+    create_meta_json(
+        &session3.join("subagent-artifacts"),
+        "c2",
+        "worker",
+        "sonnet",
+        0.08,
+        8000,
+        4000,
+    );
 
     let summary = scan_subagent_artifacts(&vec![session1, session2, session3], None);
 
     // 验证跨目录聚合
     assert_eq!(summary.total_runs, 4);
     assert!((summary.total_cost - 0.34).abs() < 1e-9); // 0.01 + 0.05 + 0.20 + 0.08
-    
+
     // 验证 agent 分布
     assert_eq!(summary.runs_by_agent.len(), 3);
     assert_eq!(summary.runs_by_agent["scout"].runs, 1);
     assert_eq!(summary.runs_by_agent["worker"].runs, 2);
     assert_eq!(summary.runs_by_agent["reviewer"].runs, 1);
 
-    println!("✅ Multiple directories test passed: correctly aggregates across {} sessions", summary.total_runs);
+    println!(
+        "✅ Multiple directories test passed: correctly aggregates across {} sessions",
+        summary.total_runs
+    );
 }
 
 /// 测试 8: 损坏的 meta.json 文件容错处理
@@ -301,11 +376,13 @@ fn test_malformed_meta_json_graceful_handling() {
     create_meta_json(&artifacts_dir, "good", "worker", "sonnet", 0.10, 5000, 2500);
 
     // 创建损坏的文件
-    fs::write(artifacts_dir.join("bad_meta.json"), "this is not valid json {{{")
-        .expect("Failed to write bad file");
-    
-    fs::write(artifacts_dir.join("empty_meta.json"), "")
-        .expect("Failed to write empty file");
+    fs::write(
+        artifacts_dir.join("bad_meta.json"),
+        "this is not valid json {{{",
+    )
+    .expect("Failed to write bad file");
+
+    fs::write(artifacts_dir.join("empty_meta.json"), "").expect("Failed to write empty file");
 
     // 不应该 panic，应该优雅地跳过损坏的文件
     let summary = scan_subagent_artifacts(&vec![session_dir], None);

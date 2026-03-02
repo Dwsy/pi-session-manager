@@ -1,7 +1,9 @@
 use crate::models::{SessionEntry, SessionInfo};
 use crate::{config, export, scanner, sqlite_cache, stats};
 use serde_json::Value;
+use std::collections::HashSet;
 use std::fs;
+use std::io::{Read, Seek, SeekFrom};
 use std::process::Command;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -11,9 +13,207 @@ pub struct FileStats {
     pub is_file: bool,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct PaginatedSessionsResult {
+    pub sessions: Vec<SessionInfo>,
+    pub total: usize,
+    pub offset: usize,
+    pub limit: usize,
+    pub has_more: bool,
+}
+
+fn session_matches_search_query(session: &SessionInfo, raw_query: &str) -> bool {
+    let query = raw_query.trim().to_lowercase();
+    if query.is_empty() {
+        return true;
+    }
+
+    let name = session.name.as_deref().unwrap_or_default();
+    let fields = [
+        name,
+        session.first_message.as_str(),
+        session.last_message.as_str(),
+        session.cwd.as_str(),
+    ];
+
+    fields
+        .into_iter()
+        .any(|field| field.to_lowercase().contains(&query))
+}
+
+fn normalize_path_for_match(path: &str) -> String {
+    let unified = path.trim().replace('\\', "/");
+    let trimmed = unified.trim_end_matches('/');
+
+    if trimmed.is_empty() {
+        "/".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn path_is_same_or_child(path: &str, root: &str) -> bool {
+    if path == root {
+        return true;
+    }
+
+    if root == "/" {
+        return path.starts_with('/');
+    }
+
+    path.starts_with(root) && path.as_bytes().get(root.len()) == Some(&b'/')
+}
+
+fn session_matches_project_filter(session: &SessionInfo, raw_project: &str) -> bool {
+    let project = normalize_path_for_match(raw_project);
+    if project.is_empty() {
+        return true;
+    }
+
+    let session_cwd = normalize_path_for_match(&session.cwd);
+    if path_is_same_or_child(&session_cwd, &project) {
+        return true;
+    }
+
+    let session_path = normalize_path_for_match(&session.path);
+    path_is_same_or_child(&session_path, &project)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::session_matches_project_filter;
+    use crate::models::SessionInfo;
+    use chrono::Utc;
+
+    fn build_session(cwd: &str, path: &str) -> SessionInfo {
+        SessionInfo {
+            path: path.to_string(),
+            id: "s1".to_string(),
+            cwd: cwd.to_string(),
+            name: Some("session".to_string()),
+            created: Utc::now(),
+            modified: Utc::now(),
+            message_count: 1,
+            first_message: "hello".to_string(),
+            all_messages_text: String::new(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
+            last_message: "world".to_string(),
+            last_message_role: "assistant".to_string(),
+        }
+    }
+
+    #[test]
+    fn project_filter_matches_exact_cwd() {
+        let session = build_session(
+            "/Users/dengwenyu/Dev/code/company/Jly",
+            "/Users/dengwenyu/.pi/agent/sessions/a/1.jsonl",
+        );
+        assert!(session_matches_project_filter(
+            &session,
+            "/Users/dengwenyu/Dev/code/company/Jly"
+        ));
+    }
+
+    #[test]
+    fn project_filter_matches_child_cwd() {
+        let session = build_session(
+            "/Users/dengwenyu/Dev/code/company/Jly/sfm_web",
+            "/Users/dengwenyu/.pi/agent/sessions/a/2.jsonl",
+        );
+        assert!(session_matches_project_filter(
+            &session,
+            "/Users/dengwenyu/Dev/code/company/Jly"
+        ));
+    }
+
+    #[test]
+    fn project_filter_does_not_match_sibling_path() {
+        let session = build_session(
+            "/Users/dengwenyu/Dev/code/company/Jly2/sfm_web",
+            "/Users/dengwenyu/.pi/agent/sessions/a/3.jsonl",
+        );
+        assert!(!session_matches_project_filter(
+            &session,
+            "/Users/dengwenyu/Dev/code/company/Jly"
+        ));
+    }
+
+    #[test]
+    fn project_filter_falls_back_to_session_file_path() {
+        let session = build_session(
+            "Unknown",
+            "/Users/dengwenyu/Dev/code/company/Jly/.pi/agent/sessions/a/4.jsonl",
+        );
+        assert!(session_matches_project_filter(
+            &session,
+            "/Users/dengwenyu/Dev/code/company/Jly"
+        ));
+    }
+}
+
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
     scanner::scan_sessions().await
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn scan_sessions_paginated(
+    offset: Option<usize>,
+    limit: Option<usize>,
+    search_query: Option<String>,
+    project_filter: Option<String>,
+    filter_tag_ids: Option<Vec<String>>,
+) -> Result<PaginatedSessionsResult, String> {
+    const DEFAULT_LIMIT: usize = 100;
+    const MAX_LIMIT: usize = 500;
+
+    let normalized_limit = limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+    let normalized_offset = offset.unwrap_or(0);
+    let mut sessions = scanner::scan_sessions().await?;
+
+    if let Some(project) = project_filter
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        sessions.retain(|session| session_matches_project_filter(session, project));
+    }
+
+    if let Some(query) = search_query
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        sessions.retain(|session| session_matches_search_query(session, query));
+    }
+
+    if let Some(tag_ids) = filter_tag_ids.as_ref().filter(|ids| !ids.is_empty()) {
+        let tag_filter: HashSet<&str> = tag_ids.iter().map(String::as_str).collect();
+        let config = config::load_config()?;
+        let conn = sqlite_cache::init_db_with_config(&config)?;
+        let matched_session_ids: HashSet<String> = sqlite_cache::get_all_session_tags(&conn)?
+            .into_iter()
+            .filter(|item| tag_filter.contains(item.tag_id.as_str()))
+            .map(|item| item.session_id)
+            .collect();
+        sessions.retain(|session| matched_session_ids.contains(session.id.as_str()));
+    }
+
+    sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+
+    let total = sessions.len();
+    let start = normalized_offset.min(total);
+    let end = start.saturating_add(normalized_limit).min(total);
+    let page_sessions = sessions[start..end].to_vec();
+
+    Ok(PaginatedSessionsResult {
+        sessions: page_sessions,
+        total,
+        offset: start,
+        limit: normalized_limit,
+        has_more: end < total,
+    })
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -40,6 +240,36 @@ pub async fn read_session_file_incremental(
     let new_content = new_lines.join("\n");
 
     Ok((total_lines, new_content))
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn read_session_file_incremental_offset(
+    path: String,
+    from_offset: u64,
+) -> Result<(u64, String), String> {
+    let mut file =
+        fs::File::open(&path).map_err(|e| format!("Failed to open session file: {e}"))?;
+    let file_size = file
+        .metadata()
+        .map_err(|e| format!("Failed to get session file metadata: {e}"))?
+        .len();
+
+    if from_offset >= file_size {
+        return Ok((file_size, String::new()));
+    }
+
+    file.seek(SeekFrom::Start(from_offset))
+        .map_err(|e| format!("Failed to seek session file: {e}"))?;
+
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf)
+        .map_err(|e| format!("Failed to read session file incrementally: {e}"))?;
+
+    let new_offset = from_offset + buf.len() as u64;
+    let content = String::from_utf8(buf)
+        .map_err(|e| format!("Failed to decode session content as UTF-8: {e}"))?;
+
+    Ok((new_offset, content))
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
