@@ -87,6 +87,11 @@ export const settings = {
     showMessagePreview: 'Mostrar vista previa del mensaje',
     showMessagePreviewHelp: 'Mostrar el último mensaje en la lista de sesiones',
     previewLines: 'Líneas de vista previa',
+    openPosition: 'Posición de apertura de navegación de tareas',
+    openPositions: {
+      top: 'Arriba',
+      bottom: 'Abajo',
+    },
   },
   search: {
     defaultSearchMode: 'Modo de búsqueda predeterminado',

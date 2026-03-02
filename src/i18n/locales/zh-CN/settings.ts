@@ -89,6 +89,11 @@ export const settings = {
     previewLines: '预览行数',
     colorizeToolCalls: '工具调用着色',
     colorizeToolCallsHelp: '在会话树中为不同工具调用显示不同颜色',
+    openPosition: '任务定位打开位置',
+    openPositions: {
+      top: '顶部',
+      bottom: '底部',
+    },
   },
   search: {
     defaultSearchMode: '默认搜索模式',

@@ -52,6 +52,7 @@ export interface AppSettings {
     showMessagePreview: boolean
     previewLines: number
     colorizeToolCalls: boolean
+    openPosition: 'top' | 'bottom'
   }
   search: {
     defaultSearchMode: 'content' | 'name'
@@ -113,6 +114,7 @@ export const defaultSettings: AppSettings = {
     showMessagePreview: true,
     previewLines: 2,
     colorizeToolCalls: true,
+    openPosition: 'top',
   },
   search: {
     defaultSearchMode: 'content',

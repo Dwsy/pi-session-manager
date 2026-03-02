@@ -87,6 +87,11 @@ export const settings = {
     showMessagePreview: 'メッセージプレビューを表示',
     showMessagePreviewHelp: 'セッション一覧に最後のメッセージを表示',
     previewLines: 'プレビュー行数',
+    openPosition: 'タスクナビゲーションの初期表示位置',
+    openPositions: {
+      top: '上部',
+      bottom: '下部',
+    },
   },
   search: {
     defaultSearchMode: 'デフォルト検索モード',

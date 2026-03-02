@@ -87,6 +87,11 @@ export const settings = {
     showMessagePreview: 'Nachrichtenvorschau anzeigen',
     showMessagePreviewHelp: 'Letzte Nachricht in der Sitzungsliste anzeigen',
     previewLines: 'Vorschauzeilen',
+    openPosition: 'Öffnungsposition der Aufgaben-Navigation',
+    openPositions: {
+      top: 'Oben',
+      bottom: 'Unten',
+    },
   },
   search: {
     defaultSearchMode: 'Standard-Suchmodus',

@@ -96,6 +96,11 @@ export const settings = {
     previewLines: 'Preview Lines',
     colorizeToolCalls: 'Colorize Tool Calls',
     colorizeToolCallsHelp: 'Show different colors for tool calls in session tree',
+    openPosition: 'Task navigation open position',
+    openPositions: {
+      top: 'Top',
+      bottom: 'Bottom',
+    },
   },
   search: {
     defaultSearchMode: 'Default Search Mode',

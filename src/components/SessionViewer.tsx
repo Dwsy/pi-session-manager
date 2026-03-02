@@ -39,6 +39,7 @@ import {
 } from "../contexts/SessionViewContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useSessionScrollMarkers } from "../hooks/useSessionScrollMarkers";
+import { getCachedSettings } from "../utils/settingsApi";
 import "../styles/session.css";
 
 // Session content cache — avoids re-reading file when switching back
@@ -197,8 +198,10 @@ function SessionViewerContent({
           } else if (cached.entries.length > 0) {
             setActiveEntryId(cached.entries[0].id);
           }
-          // If navigating from FTS, suppress auto-scroll to bottom; otherwise enable
-          pendingScrollToBottomRef.current = !initialEntryId;
+          const openPosition = getCachedSettings().session?.openPosition ?? "top";
+          // If navigating from FTS, suppress open-position auto scroll
+          pendingScrollToBottomRef.current =
+            !initialEntryId && openPosition === "bottom";
           return;
         }
 
@@ -234,8 +237,10 @@ function SessionViewerContent({
         } else if (parsedEntries.length > 0) {
           setActiveEntryId(parsedEntries[0].id);
         }
-        // If navigating from FTS, suppress auto-scroll to bottom; otherwise enable
-        pendingScrollToBottomRef.current = !initialEntryId;
+        const openPosition = getCachedSettings().session?.openPosition ?? "top";
+        // If navigating from FTS, suppress open-position auto scroll
+        pendingScrollToBottomRef.current =
+          !initialEntryId && openPosition === "bottom";
       } catch (err) {
         if (!cancelled) {
           console.error("[SessionViewer] Failed to load session:", err);

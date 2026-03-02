@@ -35,6 +35,8 @@ interface ServerSettings {
   bind_addr: string
 }
 
+type OpenPosition = 'top' | 'bottom'
+
 export default function Onboarding({ onComplete }: OnboardingProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -46,12 +48,20 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     bind_addr: '127.0.0.1',
   })
   const [terminalEnabled, setTerminalEnabled] = useState(true)
+  const [openPosition, setOpenPosition] = useState<OpenPosition>('top')
 
   useEffect(() => {
     invoke<ServerSettings>('load_server_settings').then(setServerSettings).catch(() => {})
     invoke<Record<string, unknown>>('load_app_settings').then((s) => {
       if (s?.terminal && typeof (s.terminal as Record<string, unknown>).builtinTerminalEnabled === 'boolean') {
         setTerminalEnabled((s.terminal as Record<string, unknown>).builtinTerminalEnabled as boolean)
+      }
+      if (
+        s?.session &&
+        ((s.session as Record<string, unknown>).openPosition === 'top' ||
+          (s.session as Record<string, unknown>).openPosition === 'bottom')
+      ) {
+        setOpenPosition((s.session as Record<string, unknown>).openPosition as OpenPosition)
       }
     }).catch(() => {})
   }, [])
@@ -108,13 +118,17 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           ...((appSettings as Record<string, unknown>)?.terminal as Record<string, unknown> || {}),
           builtinTerminalEnabled: terminalEnabled,
         },
+        session: {
+          ...((appSettings as Record<string, unknown>)?.session as Record<string, unknown> || {}),
+          openPosition,
+        },
       }
       await invoke('save_app_settings', { settings: merged })
     } catch (e) {
       console.error('Failed to save onboarding settings:', e)
     }
     onComplete()
-  }, [serverSettings, terminalEnabled, onComplete])
+  }, [serverSettings, terminalEnabled, openPosition, onComplete])
 
   const handleNext = useCallback(() => {
     if (isLast) {
@@ -210,6 +224,19 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 checked={terminalEnabled}
                 onChange={setTerminalEnabled}
               />
+              <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground">{t('settings.session.openPosition', '任务定位打开位置')}</span>
+                  <select
+                    value={openPosition}
+                    onChange={(e) => setOpenPosition(e.target.value as OpenPosition)}
+                    className="px-2 py-1 bg-background border border-border rounded text-xs text-foreground"
+                  >
+                    <option value="top">{t('settings.session.openPositions.top', '顶部')}</option>
+                    <option value="bottom">{t('settings.session.openPositions.bottom', '底部')}</option>
+                  </select>
+                </div>
+              </div>
               {serverSettings.bind_addr === '0.0.0.0' && (
                 <p className="text-[11px] text-amber-400/80 px-1">
                   {t('onboarding.steps.services.mobileHint', '移动端通过浏览器访问 http://<电脑IP>:52131 即可使用，自动切换 HTTP 模式')}

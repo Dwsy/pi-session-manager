@@ -133,6 +133,27 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
           <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
         </label>
       </div>
+
+      <div className="space-y-3">
+        <label className="text-sm font-medium text-foreground">
+          {t('settings.session.openPosition', '任务定位打开位置')}
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {(['top', 'bottom'] as const).map((position) => (
+            <button
+              key={position}
+              onClick={() => onUpdate('session', 'openPosition', position)}
+              className={`py-2 rounded-lg border text-sm transition-all ${
+                settings.session.openPosition === position
+                  ? 'border-info bg-info/10 text-foreground'
+                  : 'border-border text-muted-foreground hover:border-border-hover'
+              }`}
+            >
+              {t(`settings.session.openPositions.${position}`)}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
