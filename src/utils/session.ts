@@ -97,3 +97,20 @@ export function findToolResult(
     e.message?.content.some((c: any) => c.id === toolCallId)
   ) || null
 }
+export function getSessionSourceTag(sessionPath: string): string | null {
+  if (!sessionPath) return null;
+  // Normalize path separators
+  const normalizedPath = sessionPath.replace(/\\/g, '/');
+  const parts = normalizedPath.split('/').filter(Boolean);
+  
+  // Find the last "sessions" directory
+  const sessionsIndex = parts.lastIndexOf('sessions');
+  if (sessionsIndex > 0) {
+    const sourceDir = parts[sessionsIndex - 1];
+    // Default source is "agent"
+    if (sourceDir !== 'agent') {
+      return sourceDir;
+    }
+  }
+  return null;
+}
