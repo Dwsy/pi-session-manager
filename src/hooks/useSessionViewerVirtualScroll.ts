@@ -14,6 +14,7 @@ const MESSAGE_ITEM_GAP = 16
 const BOTTOM_THRESHOLD_PX = 8
 const HIGHLIGHT_DURATION_MS = 2000
 const HIGHLIGHT_RETRY_DELAY_MS = 50
+const ROW_OVERSCAN = 12
 
 export interface UseSessionViewerVirtualScrollOptions {
   renderableEntries: SessionEntry[]
@@ -27,6 +28,7 @@ export interface UseSessionViewerVirtualScrollOptions {
   toolsExpanded: boolean
   sessionPath: string
   isAtBottomRef?: MutableRefObject<boolean>
+  onReachBottom?: () => void
 }
 
 export interface UseSessionViewerVirtualScrollResult {
@@ -51,6 +53,7 @@ export function useSessionViewerVirtualScroll({
   toolsExpanded,
   sessionPath,
   isAtBottomRef: externalIsAtBottomRef,
+  onReachBottom,
 }: UseSessionViewerVirtualScrollOptions): UseSessionViewerVirtualScrollResult {
   const [isAtBottom, setIsAtBottom] = useState(true)
 
@@ -115,7 +118,7 @@ export function useSessionViewerVirtualScroll({
     count: renderableEntries.length,
     getScrollElement: () => messagesContainerRef.current,
     estimateSize: estimateEntrySize,
-    overscan: 24,
+    overscan: ROW_OVERSCAN,
     lanes: 1,
     isScrollingResetDelay: 200,
     measureElement: (element) => {
@@ -220,6 +223,7 @@ export function useSessionViewerVirtualScroll({
         const distanceToBottom =
           container.scrollHeight - container.scrollTop - container.clientHeight
         const atBottom = distanceToBottom <= BOTTOM_THRESHOLD_PX
+        const canScroll = container.scrollHeight > container.clientHeight + BOTTOM_THRESHOLD_PX
 
         if (isAtBottomRef.current !== atBottom) {
           isAtBottomRef.current = atBottom
@@ -228,6 +232,9 @@ export function useSessionViewerVirtualScroll({
 
         if (atBottom) {
           setHasNewMessages(false)
+          if (canScroll) {
+            onReachBottom?.()
+          }
         }
       })
     }
@@ -241,7 +248,7 @@ export function useSessionViewerVirtualScroll({
         cancelAnimationFrame(rafId)
       }
     }
-  }, [loading, error, renderableEntries.length, setHasNewMessages])
+  }, [loading, error, onReachBottom, renderableEntries.length, setHasNewMessages])
 
   return {
     messagesContainerRef,

@@ -4,7 +4,6 @@ import { computeStats } from '../utils/session'
 
 export interface SessionViewerDerivedData {
   renderableEntries: SessionEntry[]
-  entryIndexById: Map<string, number>
   toolResultByCallId: Map<string, SessionEntry>
   stats: LegacySessionStats
   headerEntry: SessionEntry | undefined
@@ -63,7 +62,6 @@ export function useSessionViewerDerivedData(
 
     const pathEntryIds = resolvePathEntryIds(activeEntryId, entryById)
     const renderableEntries: SessionEntry[] = []
-    const entryIndexById = new Map<string, number>()
     const toolResultByCallId = new Map<string, SessionEntry>()
     const messageEntries: SessionEntry[] = []
     let headerEntry: SessionEntry | undefined
@@ -84,20 +82,17 @@ export function useSessionViewerDerivedData(
           continue
         }
 
-        entryIndexById.set(entry.id, renderableEntries.length)
         renderableEntries.push(entry)
         continue
       }
 
       if (isRenderableNonMessageEntry(entry)) {
-        entryIndexById.set(entry.id, renderableEntries.length)
         renderableEntries.push(entry)
       }
     }
 
     return {
       renderableEntries,
-      entryIndexById,
       toolResultByCallId,
       stats: computeStats(entries),
       headerEntry,

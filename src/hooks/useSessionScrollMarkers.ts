@@ -61,6 +61,32 @@ function sampleMarkers(markers: ScrollMarker[], maxCount: number): ScrollMarker[
   return sampled;
 }
 
+function sampleMarkerEntries(
+  markers: MarkerEntryPosition[],
+  maxCount: number,
+): MarkerEntryPosition[] {
+  if (markers.length <= maxCount) return markers;
+  if (maxCount <= 1) return [markers[markers.length - 1]];
+
+  const sampled: MarkerEntryPosition[] = [];
+  const step = (markers.length - 1) / (maxCount - 1);
+
+  for (let i = 0; i < maxCount; i++) {
+    const index = Math.round(i * step);
+    const marker = markers[index];
+    if (!marker) continue;
+    if (sampled[sampled.length - 1]?.entry.id === marker.entry.id) continue;
+    sampled.push(marker);
+  }
+
+  const lastMarker = markers[markers.length - 1];
+  if (sampled[sampled.length - 1]?.entry.id !== lastMarker.entry.id) {
+    sampled.push(lastMarker);
+  }
+
+  return sampled;
+}
+
 export function useSessionScrollMarkers({
   entries,
   isMobile,
@@ -79,7 +105,7 @@ export function useSessionScrollMarkers({
   const shouldComputeMarkers = enabled && (!isMobile || showMarkers);
 
   const markerEntryPositions = useMemo<MarkerEntryPosition[]>(() => {
-    if (!enabled || entries.length === 0) return [];
+    if (!shouldComputeMarkers || entries.length === 0) return [];
 
     return entries
       .map((entry, index) => {
@@ -99,7 +125,7 @@ export function useSessionScrollMarkers({
         return null;
       })
       .filter((item): item is MarkerEntryPosition => Boolean(item));
-  }, [entries, enabled]);
+  }, [entries, shouldComputeMarkers]);
 
   const getMessagePreview = useCallback(
     (entry: SessionEntry) => {
@@ -137,7 +163,9 @@ export function useSessionScrollMarkers({
     if (markerEntryPositions.length === 0) return [];
 
     const indexDenominator = Math.max(entries.length - 1, 1);
-    const rawMarkers = markerEntryPositions.map(({ entry, index, markerType }) => {
+    const maxMarkers = isMobile ? MAX_MARKERS_MOBILE : MAX_MARKERS_DESKTOP;
+    const sampledEntries = sampleMarkerEntries(markerEntryPositions, maxMarkers);
+    const sampledMarkers = sampledEntries.map(({ entry, index, markerType }) => {
       const top = Math.min(Math.max(index / indexDenominator, 0), 1);
       return {
         entry,
@@ -147,8 +175,7 @@ export function useSessionScrollMarkers({
       } satisfies ScrollMarker;
     });
 
-    const maxMarkers = isMobile ? MAX_MARKERS_MOBILE : MAX_MARKERS_DESKTOP;
-    return sampleMarkers(rawMarkers, maxMarkers);
+    return sampleMarkers(sampledMarkers, maxMarkers);
   }, [
     shouldComputeMarkers,
     markerEntryPositions,

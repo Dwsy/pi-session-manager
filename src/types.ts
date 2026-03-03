@@ -8,9 +8,9 @@ export interface SessionInfo {
   modified: string
   message_count: number
   first_message: string
-  all_messages_text: string
-  user_messages_text: string
-  assistant_messages_text: string
+  all_messages_text?: string
+  user_messages_text?: string
+  assistant_messages_text?: string
   last_message: string
   last_message_role: string
   isFavorite?: boolean
@@ -138,11 +138,19 @@ export interface SessionEntry {
   message?: Message
   provider?: string
   modelId?: string
+  thinkingLevel?: string
   tokensBefore?: number
   summary?: string
   display?: boolean
   customType?: string
   content?: any
+}
+
+export interface SessionChunk {
+  content: string
+  next_offset: number
+  file_size: number
+  has_more: boolean
 }
 
 export interface Message {

@@ -24,19 +24,19 @@ export function parseSessionEntriesWithLineCount(jsonlContent: string): {
 
     try {
       const entry = JSON.parse(line)
-      
-      // Ensure unique IDs - append suffix if duplicate
+
       if (entry.id) {
-        const count = seenIds.get(entry.id) || 0
+        const originalId = entry.id as string
+        const count = seenIds.get(originalId) || 0
         if (count > 0) {
-          entry.id = `${entry.id}__dup_${count}`
+          entry.id = `${originalId}__dup_${count}`
         }
-        seenIds.set(entry.id.split('__dup_')[0], count + 1)
+        seenIds.set(originalId, count + 1)
       }
-      
+
       entries.push(entry)
-    } catch (e) {
-      console.warn('Failed to parse line:', line.substring(0, 100))
+    } catch (_error) {
+      // Skip malformed lines silently to avoid noisy console churn on large sessions.
     }
   }
 

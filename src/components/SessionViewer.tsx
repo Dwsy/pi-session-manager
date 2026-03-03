@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import KbdTooltip from "./KbdTooltip";
@@ -61,9 +61,11 @@ function SessionViewerContent({
   const {
     showThinking,
     toggleThinking,
+    showToolExpandIndicator,
     toolsExpanded,
     toggleToolsExpanded,
     expandedToolIds,
+    resetToolExpansionOverrides,
   } = useSessionView();
   const isMobile = useIsMobile();
   const [showSidebar, setShowSidebar] = useState(false);
@@ -81,6 +83,10 @@ function SessionViewerContent({
   const resizeHandleRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<SessionTreeRef>(null);
 
+  useEffect(() => {
+    resetToolExpansionOverrides();
+  }, [resetToolExpansionOverrides, session.path]);
+
   const {
     entries,
     loading,
@@ -93,6 +99,8 @@ function SessionViewerContent({
     hasNewMessages,
     setHasNewMessages,
     pendingScrollToBottomRef,
+    hasMoreHistory,
+    loadMoreHistory,
   } = useSessionViewerData({
     sessionPath: session.path,
     initialEntryId,
@@ -153,6 +161,11 @@ function SessionViewerContent({
     toolsExpanded,
     sessionPath: session.path,
     isAtBottomRef: sessionDataIsAtBottomRef,
+    onReachBottom: () => {
+      if (hasMoreHistory) {
+        void loadMoreHistory()
+      }
+    },
   });
 
   const {
@@ -182,7 +195,9 @@ function SessionViewerContent({
   );
 
   return (
-    <div className="h-full flex relative">
+    <div
+      className={`h-full flex relative ${showToolExpandIndicator ? "" : "tool-expand-indicators-hidden"}`}
+    >
       <SessionViewerSidebar
         showSidebar={showSidebar}
         isMobile={isMobile}
@@ -200,7 +215,7 @@ function SessionViewerContent({
       />
 
       <div
-        className="flex-1 flex flex-col min-w-0 min-h-0 transition-all duration-200"
+        className="flex-1 flex flex-col min-w-0 min-h-0"
         style={{
           paddingLeft: showSidebar && !isMobile ? `${sidebarWidth}px` : 0,
         }}

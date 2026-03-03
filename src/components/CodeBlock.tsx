@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import hljs from 'highlight.js'
 import { getLanguageFromPath } from '../utils/markdown'
@@ -12,7 +12,7 @@ interface CodeBlockProps {
   scrollable?: boolean
 }
 
-export default function CodeBlock({
+function CodeBlock({
   code,
   language,
   filename,
@@ -53,9 +53,13 @@ export default function CodeBlock({
     }
   }
 
-  // Calculate line numbers
-  const lines = code.split('\n')
-  const lineCount = lines.length
+  const lineCount = useMemo(() => code.split('\n').length, [code])
+  const lineNumbers = useMemo(() => {
+    if (!showLineNumbers) {
+      return []
+    }
+    return Array.from({ length: lineCount }, (_, index) => index + 1)
+  }, [lineCount, showLineNumbers])
   const wrapperClassName = scrollable ? 'code-block-wrapper code-block-scrollable' : 'code-block-wrapper'
   const wrapperStyle =
     scrollable && maxHeight !== undefined
@@ -89,9 +93,9 @@ export default function CodeBlock({
       <div className="code-block-content">
         {showLineNumbers && (
           <div className="code-line-numbers">
-            {Array.from({ length: lineCount }, (_, i) => (
-              <div key={i + 1} className="code-line-number">
-                {i + 1}
+            {lineNumbers.map((lineNumber) => (
+              <div key={lineNumber} className="code-line-number">
+                {lineNumber}
               </div>
             ))}
           </div>
@@ -105,3 +109,5 @@ export default function CodeBlock({
     </div>
   )
 }
+
+export default memo(CodeBlock)

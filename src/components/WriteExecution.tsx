@@ -63,15 +63,17 @@ export default function WriteExecution({
       {content && (
         <div className="tool-output-wrapper">
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
-            <div className="tool-output">
-              <CodeBlock
-                code={content}
-                language={lang}
-                showLineNumbers={true}
-                scrollable
-                maxHeight={OUTPUT_MAX_HEIGHT}
-              />
-            </div>
+            {expanded && (
+              <div className="tool-output">
+                <CodeBlock
+                  code={content}
+                  language={lang}
+                  showLineNumbers={true}
+                  scrollable
+                  maxHeight={OUTPUT_MAX_HEIGHT}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -79,9 +81,11 @@ export default function WriteExecution({
       {output && (
         <div className="tool-output-wrapper">
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
-            <div className="tool-output">
-              <div style={{ color: 'var(--success)' }}>{escapeHtml(output)}</div>
-            </div>
+            {expanded && (
+              <div className="tool-output">
+                <div style={{ color: 'var(--success)' }}>{escapeHtml(output)}</div>
+              </div>
+            )}
           </div>
         </div>
       )}

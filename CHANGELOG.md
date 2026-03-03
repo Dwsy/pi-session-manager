@@ -4,6 +4,16 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Session viewer open-position hydration regression** — restored deterministic full-history hydration for `top` open mode while keeping chunked incremental behavior for `bottom` mode
+  - Root cause: chunk-first loading introduced partial initial trees/anchors in top mode, causing delayed completion and missing initial scroll markers
+  - Top mode now eagerly loads all remaining chunks on session open before rendering final tree state
+  - Bottom mode remains optimized for fast first paint with incremental chunk loading on demand
+  - Added chunk merge de-duplication (`mergeEntriesWithUniqueIds`) to prevent entry ID collisions across chunk boundaries
+  - Synchronized `hasMoreHistory` state/ref updates to avoid stale closure gating and inconsistent load-more behavior
+  - Cache behavior updated: if cached session is partial and open mode is `top`, cache is invalidated and fully re-hydrated
+
 ### Changed
 
 - **Atomic commit sync (latest)** — synchronized changelog entries for recent backend and frontend refactors

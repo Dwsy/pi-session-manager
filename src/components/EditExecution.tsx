@@ -247,11 +247,13 @@ export default function EditExecution({
       </div>
 
       {diff && (
-        <div className="tool-diff-wrapper">
+        <div className={`tool-diff-wrapper ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
-            <div style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}>
-              {renderDiff()}
-            </div>
+            {expanded && (
+              <div style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}>
+                {renderDiff()}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -259,9 +261,11 @@ export default function EditExecution({
       {shouldShowOutput && (
         <div className="tool-output-wrapper">
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
-            <div className="tool-output">
-              <div>{escapeHtml(outputText)}</div>
-            </div>
+            {expanded && (
+              <div className="tool-output">
+                <div>{escapeHtml(outputText)}</div>
+              </div>
+            )}
           </div>
         </div>
       )}

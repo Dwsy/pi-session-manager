@@ -864,6 +864,10 @@ html, body {
   opacity: 1;
 }
 
+.tool-expand-indicators-hidden .tool-expand-indicator {
+  display: none;
+}
+
 .tool-path {
   color: var(--toolTitle, var(--text));
   font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
@@ -915,7 +919,6 @@ html, body {
   overflow: hidden;
   transition: max-height 0.15s cubic-bezier(0.4, 0, 0.2, 1),
               opacity 0.15s ease;
-  will-change: max-height, opacity;
 }
 
 .tool-expand-content.expanded {

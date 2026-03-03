@@ -2,31 +2,30 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 
 import { invoke, listen } from '../transport'
-import type { SessionEntry, SessionsDiff } from '../types'
+import type { SessionChunk, SessionEntry, SessionsDiff } from '../types'
+import { trimMarkdownCacheOnSessionSwitch } from '../utils/markdown'
 import { getCachedSettings } from '../utils/settingsApi'
-import { parseSessionEntries } from '../utils/session'
+import { parseSessionEntriesWithLineCount } from '../utils/session'
 
-const SESSION_CONTENT_CACHE = new Map<
-  string,
-  {
-    entries: SessionEntry[]
-    lineCount: number
-  }
->()
+interface SessionCacheItem {
+  entries: SessionEntry[]
+  lineCount: number
+  nextOffset: number
+  fileSize: number
+  hasMore: boolean
+}
+
+const SESSION_CONTENT_CACHE = new Map<string, SessionCacheItem>()
 const MAX_CACHE_SIZE = 5
 
-function cacheSessionContent(
-  path: string,
-  entries: SessionEntry[],
-  lineCount: number
-): void {
+function cacheSessionContent(path: string, cacheItem: SessionCacheItem): void {
   if (SESSION_CONTENT_CACHE.size >= MAX_CACHE_SIZE) {
     const firstKey = SESSION_CONTENT_CACHE.keys().next().value
     if (firstKey) {
       SESSION_CONTENT_CACHE.delete(firstKey)
     }
   }
-  SESSION_CONTENT_CACHE.set(path, { entries, lineCount })
+  SESSION_CONTENT_CACHE.set(path, cacheItem)
 }
 
 function getDefaultActiveEntryId(entries: SessionEntry[]): string | null {
@@ -35,6 +34,48 @@ function getDefaultActiveEntryId(entries: SessionEntry[]): string | null {
     return lastMessage.id
   }
   return entries.length > 0 ? entries[0].id : null
+}
+
+function normalizeEntryId(rawId: string): string {
+  const duplicateMarker = '__dup_'
+  const markerIndex = rawId.indexOf(duplicateMarker)
+  if (markerIndex === -1) {
+    return rawId
+  }
+  return rawId.slice(0, markerIndex)
+}
+
+function mergeEntriesWithUniqueIds(
+  prevEntries: SessionEntry[],
+  incomingEntries: SessionEntry[],
+): SessionEntry[] {
+  if (incomingEntries.length === 0) {
+    return prevEntries
+  }
+
+  const idCounts = new Map<string, number>()
+
+  for (const entry of prevEntries) {
+    const baseId = normalizeEntryId(entry.id)
+    idCounts.set(baseId, (idCounts.get(baseId) ?? 0) + 1)
+  }
+
+  const adjustedIncoming = incomingEntries.map((entry) => {
+    const baseId = normalizeEntryId(entry.id)
+    const count = idCounts.get(baseId) ?? 0
+    idCounts.set(baseId, count + 1)
+
+    if (count === 0) {
+      return entry
+    }
+
+    return {
+      ...entry,
+      id: `${baseId}__dup_${count}`,
+    }
+  })
+
+  return [...prevEntries, ...adjustedIncoming]
 }
 
 export interface UseSessionViewerDataOptions {
@@ -56,6 +97,8 @@ export interface UseSessionViewerDataResult {
   hasNewMessages: boolean
   setHasNewMessages: Dispatch<SetStateAction<boolean>>
   pendingScrollToBottomRef: MutableRefObject<boolean>
+  hasMoreHistory: boolean
+  loadMoreHistory: () => Promise<void>
 }
 
 export function useSessionViewerData({
@@ -72,63 +115,113 @@ export function useSessionViewerData({
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null)
   const [scrollTargetId, setScrollTargetId] = useState<string | null>(null)
   const [hasNewMessages, setHasNewMessages] = useState(false)
+  const [hasMoreHistory, setHasMoreHistory] = useState(false)
 
   const pendingScrollToBottomRef = useRef(false)
   const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lineCountRef = useRef(0)
   const loadErrorMessageRef = useRef(loadErrorMessage)
+  const nextOffsetRef = useRef(0)
+  const fileSizeRef = useRef(0)
+  const loadingMoreRef = useRef(false)
+  const hasMoreHistoryRef = useRef(false)
 
   lineCountRef.current = lineCount
+
+  useEffect(() => {
+    if (!sessionPath) {
+      return
+    }
+    trimMarkdownCacheOnSessionSwitch()
+  }, [sessionPath])
 
   useEffect(() => {
     loadErrorMessageRef.current = loadErrorMessage
   }, [loadErrorMessage])
 
-  const loadIncremental = useCallback(async () => {
-    if (!sessionPath) return
+  const updateHasMoreHistory = useCallback((next: boolean) => {
+    hasMoreHistoryRef.current = next
+    setHasMoreHistory(next)
+  }, [])
 
-    try {
-      const [newLineCount, newContent] = await invoke<[number, string]>(
-        'read_session_file_incremental',
-        {
+  const loadMoreHistory = useCallback(
+    async (options?: {
+      asRealtime?: boolean
+      maxBytes?: number
+      force?: boolean
+    }) => {
+      const asRealtime = Boolean(options?.asRealtime)
+      const force = Boolean(options?.force)
+      const maxBytes = options?.maxBytes ?? 384 * 1024
+
+      if (!sessionPath || loadingMoreRef.current) {
+        return
+      }
+
+      if (!force && !asRealtime && !hasMoreHistoryRef.current) {
+        return
+      }
+
+      try {
+        loadingMoreRef.current = true
+
+        const chunk = await invoke<SessionChunk>('read_session_file_chunk', {
           path: sessionPath,
-          fromLine: lineCountRef.current,
+          offset: nextOffsetRef.current,
+          maxBytes,
+        })
+
+        nextOffsetRef.current = chunk.next_offset
+        fileSizeRef.current = chunk.file_size
+        updateHasMoreHistory(chunk.has_more)
+
+        if (!chunk.content.trim()) {
+          return
         }
-      )
 
-      if (!newContent.trim()) {
-        return
+        const { entries: newEntries, lineCount: addedLines } =
+          parseSessionEntriesWithLineCount(chunk.content)
+
+        if (newEntries.length === 0) {
+          return
+        }
+
+        const nextLineCount = lineCountRef.current + addedLines
+        lineCountRef.current = nextLineCount
+        setLineCount(nextLineCount)
+
+        setEntries((prev) => {
+          const merged = mergeEntriesWithUniqueIds(prev, newEntries)
+          cacheSessionContent(sessionPath, {
+            entries: merged,
+            lineCount: nextLineCount,
+            nextOffset: chunk.next_offset,
+            fileSize: chunk.file_size,
+            hasMore: chunk.has_more,
+          })
+          return merged
+        })
+
+        if (asRealtime) {
+          const nextActiveEntryId = getDefaultActiveEntryId(newEntries)
+          if (nextActiveEntryId) {
+            setActiveEntryId(nextActiveEntryId)
+          }
+
+          if (isAtBottomRef.current) {
+            pendingScrollToBottomRef.current = true
+          } else {
+            setHasNewMessages(true)
+          }
+        }
+      } catch (loadMoreError) {
+        console.error('[useSessionViewerData] Failed to load session chunk:', loadMoreError)
+      } finally {
+        loadingMoreRef.current = false
       }
-
-      const newEntries = parseSessionEntries(newContent)
-      if (newEntries.length === 0) {
-        return
-      }
-
-      setEntries((prev) => {
-        const merged = [...prev, ...newEntries]
-        cacheSessionContent(sessionPath, merged, newLineCount)
-        return merged
-      })
-      setLineCount(newLineCount)
-
-      const nextActiveEntryId = getDefaultActiveEntryId(newEntries)
-      if (nextActiveEntryId) {
-        setActiveEntryId(nextActiveEntryId)
-      }
-
-      if (isAtBottomRef.current) {
-        pendingScrollToBottomRef.current = true
-      } else {
-        setHasNewMessages(true)
-      }
-    } catch (incrementalError) {
-      console.error(
-        '[useSessionViewerData] Failed to load incremental session:',
-        incrementalError
-      )
-    }
-  }, [isAtBottomRef, sessionPath])
+    },
+    [isAtBottomRef, sessionPath],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -143,7 +236,11 @@ export function useSessionViewerData({
     setActiveEntryId(null)
     setScrollTargetId(null)
     setHasNewMessages(false)
+    updateHasMoreHistory(false)
     pendingScrollToBottomRef.current = false
+    nextOffsetRef.current = 0
+    fileSizeRef.current = 0
+    loadingMoreRef.current = false
 
     if (!sessionPath) {
       setLoading(false)
@@ -160,16 +257,27 @@ export function useSessionViewerData({
         setShowLoading(false)
         setError(null)
 
+        const openPosition = getCachedSettings().session?.openPosition ?? 'top'
+
         const cached = SESSION_CONTENT_CACHE.get(sessionPath)
         if (cached) {
-          setEntries(cached.entries)
-          setLineCount(cached.lineCount)
-          setActiveEntryId(getDefaultActiveEntryId(cached.entries))
+          if (openPosition === 'top' && cached.hasMore) {
+            // Top mode expects full history available immediately for stable tree anchors.
+            // Force a fresh full hydration to avoid partial-cache entry mismatch.
+            SESSION_CONTENT_CACHE.delete(sessionPath)
+          } else {
+            setEntries(cached.entries)
+            setLineCount(cached.lineCount)
+            updateHasMoreHistory(cached.hasMore)
+            nextOffsetRef.current = cached.nextOffset
+            fileSizeRef.current = cached.fileSize
+            lineCountRef.current = cached.lineCount
+            setActiveEntryId(getDefaultActiveEntryId(cached.entries))
 
-          const openPosition = getCachedSettings().session?.openPosition ?? 'top'
-          pendingScrollToBottomRef.current =
-            !initialEntryId && openPosition === 'bottom'
-          return
+            pendingScrollToBottomRef.current =
+              !initialEntryId && openPosition === 'bottom'
+            return
+          }
         }
 
         loadingTimerRef.current = setTimeout(() => {
@@ -178,26 +286,62 @@ export function useSessionViewerData({
           }
         }, 300)
 
-        const jsonlContent = await invoke<string>('read_session_file', {
+        let chunk = await invoke<SessionChunk>('read_session_file_chunk', {
           path: sessionPath,
+          offset: 0,
+          maxBytes: 384 * 1024,
         })
 
-        const parsedEntries = parseSessionEntries(jsonlContent)
-        const lines = jsonlContent
-          .split('\n')
-          .filter((line) => line.trim()).length
+        let { entries: allEntries, lineCount: totalLineCount } =
+          parseSessionEntriesWithLineCount(chunk.content)
+        let nextOffset = chunk.next_offset
+        const fileSize = chunk.file_size
+        let hasMore = chunk.has_more
 
-        cacheSessionContent(sessionPath, parsedEntries, lines)
+        if (openPosition === 'top') {
+          while (hasMore) {
+            const nextChunk = await invoke<SessionChunk>('read_session_file_chunk', {
+              path: sessionPath,
+              offset: nextOffset,
+              maxBytes: 384 * 1024,
+            })
+
+            const { entries: chunkEntries, lineCount: chunkLineCount } =
+              parseSessionEntriesWithLineCount(nextChunk.content)
+
+            allEntries = mergeEntriesWithUniqueIds(allEntries, chunkEntries)
+            totalLineCount += chunkLineCount
+            nextOffset = nextChunk.next_offset
+            hasMore = nextChunk.has_more
+            chunk = nextChunk
+
+            if (cancelled) {
+              return
+            }
+          }
+        }
+
+        cacheSessionContent(sessionPath, {
+          entries: allEntries,
+          lineCount: totalLineCount,
+          nextOffset,
+          fileSize,
+          hasMore,
+        })
 
         if (cancelled) {
           return
         }
 
-        setEntries(parsedEntries)
-        setLineCount(lines)
-        setActiveEntryId(getDefaultActiveEntryId(parsedEntries))
+        nextOffsetRef.current = nextOffset
+        fileSizeRef.current = fileSize
+        lineCountRef.current = totalLineCount
 
-        const openPosition = getCachedSettings().session?.openPosition ?? 'top'
+        setEntries(allEntries)
+        setLineCount(totalLineCount)
+        updateHasMoreHistory(hasMore)
+        setActiveEntryId(getDefaultActiveEntryId(allEntries))
+
         pendingScrollToBottomRef.current =
           !initialEntryId && openPosition === 'bottom'
       } catch (loadError) {
@@ -206,7 +350,7 @@ export function useSessionViewerData({
           setError(
             loadError instanceof Error
               ? loadError.message
-              : loadErrorMessageRef.current
+              : loadErrorMessageRef.current,
           )
         }
       } finally {
@@ -230,9 +374,7 @@ export function useSessionViewerData({
         loadingTimerRef.current = null
       }
     }
-    // 仅在切换到不同 session 时执行完整加载
-    // 同一 session 的文件变更通过增量监听处理
-  }, [sessionPath])
+  }, [initialEntryId, sessionPath, updateHasMoreHistory])
 
   useEffect(() => {
     if (initialEntryId) {
@@ -253,13 +395,13 @@ export function useSessionViewerData({
 
           const hit = diff.updated.some((session) => session.path === sessionPath)
           if (hit) {
-            void loadIncremental()
+            void loadMoreHistory({ asRealtime: true })
           }
         })
       } catch (listenerError) {
         console.error(
           '[useSessionViewerData] Failed to setup sessions-changed listener:',
-          listenerError
+          listenerError,
         )
       }
     }
@@ -271,7 +413,7 @@ export function useSessionViewerData({
         unlisten()
       }
     }
-  }, [loadIncremental, loading, sessionPath])
+  }, [loadMoreHistory, loading, sessionPath])
 
   return {
     entries,
@@ -285,5 +427,9 @@ export function useSessionViewerData({
     hasNewMessages,
     setHasNewMessages,
     pendingScrollToBottomRef,
+    hasMoreHistory,
+    loadMoreHistory: async () => {
+      await loadMoreHistory()
+    },
   }
 }

@@ -31,6 +31,13 @@ const KNOWN_TOOLS = new Set([
   "web_fetch",
 ]);
 const TOOL_PALETTE_SIZE = 8;
+const TREE_SETTINGS_TYPES = new Set([
+  "session",
+  "session_info",
+  "label",
+  "model_change",
+  "thinking_level_change",
+]);
 
 function hashToolName(name: string): number {
   let hash = 0;
@@ -433,6 +440,10 @@ const SessionTree = memo(
     // Filter nodes
     const filteredNodes = useMemo(() => {
       const isSettingsEntry = (entry: SessionEntry) => {
+        if (TREE_SETTINGS_TYPES.has(entry.type)) {
+          return true;
+        }
+
         if (entry.type === "message" && entry.message?.role === "assistant") {
           const content = entry.message.content || [];
           return content.some(
@@ -627,6 +638,11 @@ const SessionTree = memo(
         }
         case "model_change":
           return `Model: ${entry.modelId}`;
+        case "thinking_level_change":
+          return `Thinking: ${entry.thinkingLevel || "default"}`;
+        case "session":
+        case "session_info":
+          return "Session";
         case "compaction":
           return "Compaction";
         case "branch_summary":

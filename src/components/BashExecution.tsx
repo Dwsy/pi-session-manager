@@ -96,13 +96,15 @@ export default function BashExecution({
       {output && (
         <div className="tool-output-wrapper">
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
-            <CodeBlock
-              code={output}
-              language="shell"
-              showLineNumbers={true}
-              scrollable
-              maxHeight={OUTPUT_MAX_HEIGHT}
-            />
+            {expanded && (
+              <CodeBlock
+                code={output}
+                language="shell"
+                showLineNumbers={true}
+                scrollable
+                maxHeight={OUTPUT_MAX_HEIGHT}
+              />
+            )}
           </div>
         </div>
       )}

@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useCallback, ReactNode } from 'rea
 interface SessionViewContextType {
   showThinking: boolean
   toggleThinking: () => void
+  showToolExpandIndicator: boolean
   toolsExpanded: boolean
   toggleToolsExpanded: () => void
   expandAllTools: () => void
@@ -10,12 +11,14 @@ interface SessionViewContextType {
   expandedToolIds: Set<string>
   toggleToolExpanded: (id: string) => void
   isToolExpanded: (id: string) => boolean
+  resetToolExpansionOverrides: () => void
 }
 
 const SessionViewContext = createContext<SessionViewContextType | undefined>(undefined)
 
 export function SessionViewProvider({ children }: { children: ReactNode }) {
   const [showThinking, setShowThinking] = useState(true)
+  const [showToolExpandIndicator] = useState(false)
   const [toolsExpanded, setToolsExpanded] = useState(false)
   // 当 toolsExpanded=true 时，这里存储"被手动折叠的工具"
   // 当 toolsExpanded=false 时，这里存储"被手动展开的工具"
@@ -34,6 +37,9 @@ export function SessionViewProvider({ children }: { children: ReactNode }) {
     setToolsExpanded(false)
     setExpandedToolIds(new Set())
   }
+  const resetToolExpansionOverrides = useCallback(() => {
+    setExpandedToolIds(new Set())
+  }, [])
 
   const toggleToolExpanded = useCallback((id: string) => {
     setExpandedToolIds(prev => {
@@ -58,6 +64,7 @@ export function SessionViewProvider({ children }: { children: ReactNode }) {
       value={{
         showThinking,
         toggleThinking,
+        showToolExpandIndicator,
         toolsExpanded,
         toggleToolsExpanded,
         expandAllTools,
@@ -65,6 +72,7 @@ export function SessionViewProvider({ children }: { children: ReactNode }) {
         expandedToolIds,
         toggleToolExpanded,
         isToolExpanded,
+        resetToolExpansionOverrides,
       }}
     >
       {children}

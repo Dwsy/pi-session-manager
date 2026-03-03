@@ -55,33 +55,134 @@ marked.setOptions({
   renderer: renderer,
 })
 
-const PARSED_MARKDOWN_CACHE_MAX_SIZE = 600
-const parsedMarkdownCache = new Map<string, string>()
+const PARSED_MARKDOWN_CACHE_MAX_ENTRIES = 120
+const PARSED_MARKDOWN_CACHE_MAX_BYTES = 12 * 1024 * 1024
+const PARSED_MARKDOWN_CACHE_TTL_MS = 5 * 60 * 1000
+const PARSED_MARKDOWN_CACHE_MAX_SOURCE_LENGTH = 8 * 1024
+const PARSED_MARKDOWN_CACHE_MAX_HTML_LENGTH = 64 * 1024
 
-function touchMarkdownCache(text: string, html: string): string {
-  if (parsedMarkdownCache.has(text)) {
-    parsedMarkdownCache.delete(text)
+const SESSION_SWITCH_KEEP_ENTRIES = 24
+const SESSION_SWITCH_KEEP_BYTES = 2 * 1024 * 1024
+
+interface MarkdownCacheEntry {
+  html: string
+  bytes: number
+  expiresAt: number
+}
+
+const parsedMarkdownCache = new Map<string, MarkdownCacheEntry>()
+let parsedMarkdownCacheBytes = 0
+
+function estimateStringBytes(text: string): number {
+  return text.length * 2
+}
+
+function createMarkdownCacheKey(text: string): string {
+  let hash1 = 5381
+  let hash2 = 52711
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i)
+    hash1 = ((hash1 << 5) + hash1) ^ code
+    hash2 = ((hash2 << 5) + hash2) ^ code
   }
-  parsedMarkdownCache.set(text, html)
+  return `${text.length}:${(hash1 >>> 0).toString(16)}:${(hash2 >>> 0).toString(16)}`
+}
 
-  if (parsedMarkdownCache.size > PARSED_MARKDOWN_CACHE_MAX_SIZE) {
-    const oldestKey = parsedMarkdownCache.keys().next().value
-    if (oldestKey) {
-      parsedMarkdownCache.delete(oldestKey)
+function estimateEntryBytes(cacheKey: string, html: string): number {
+  return estimateStringBytes(cacheKey) + estimateStringBytes(html)
+}
+
+function removeMarkdownCacheEntry(cacheKey: string): void {
+  const existing = parsedMarkdownCache.get(cacheKey)
+  if (!existing) {
+    return
+  }
+  parsedMarkdownCache.delete(cacheKey)
+  parsedMarkdownCacheBytes = Math.max(0, parsedMarkdownCacheBytes - existing.bytes)
+}
+
+function sweepExpiredMarkdownCache(now: number): void {
+  for (const [cacheKey, entry] of parsedMarkdownCache) {
+    if (entry.expiresAt <= now) {
+      removeMarkdownCacheEntry(cacheKey)
     }
   }
+}
 
+function evictMarkdownCache(now: number): void {
+  sweepExpiredMarkdownCache(now)
+  while (
+    parsedMarkdownCache.size > PARSED_MARKDOWN_CACHE_MAX_ENTRIES ||
+    parsedMarkdownCacheBytes > PARSED_MARKDOWN_CACHE_MAX_BYTES
+  ) {
+    const oldestKey = parsedMarkdownCache.keys().next().value
+    if (!oldestKey) {
+      break
+    }
+    removeMarkdownCacheEntry(oldestKey)
+  }
+}
+
+function canCacheMarkdown(text: string, html: string): boolean {
+  return (
+    text.length <= PARSED_MARKDOWN_CACHE_MAX_SOURCE_LENGTH &&
+    html.length <= PARSED_MARKDOWN_CACHE_MAX_HTML_LENGTH
+  )
+}
+
+function upsertMarkdownCache(cacheKey: string, html: string, now: number): string {
+  removeMarkdownCacheEntry(cacheKey)
+  const entry: MarkdownCacheEntry = {
+    html,
+    bytes: estimateEntryBytes(cacheKey, html),
+    expiresAt: now + PARSED_MARKDOWN_CACHE_TTL_MS,
+  }
+  parsedMarkdownCache.set(cacheKey, entry)
+  parsedMarkdownCacheBytes += entry.bytes
+  evictMarkdownCache(now)
   return html
 }
 
+function getMarkdownCache(cacheKey: string, now: number): string | null {
+  const cached = parsedMarkdownCache.get(cacheKey)
+  if (!cached) {
+    return null
+  }
+  if (cached.expiresAt <= now) {
+    removeMarkdownCacheEntry(cacheKey)
+    return null
+  }
+  return upsertMarkdownCache(cacheKey, cached.html, now)
+}
+
+export function trimMarkdownCacheOnSessionSwitch(): void {
+  const now = Date.now()
+  sweepExpiredMarkdownCache(now)
+  while (
+    parsedMarkdownCache.size > SESSION_SWITCH_KEEP_ENTRIES ||
+    parsedMarkdownCacheBytes > SESSION_SWITCH_KEEP_BYTES
+  ) {
+    const oldestKey = parsedMarkdownCache.keys().next().value
+    if (!oldestKey) {
+      break
+    }
+    removeMarkdownCacheEntry(oldestKey)
+  }
+}
+
 export function parseMarkdown(text: string): string {
-  const cached = parsedMarkdownCache.get(text)
-  if (cached !== undefined) {
-    return touchMarkdownCache(text, cached)
+  const now = Date.now()
+  const cacheKey = createMarkdownCacheKey(text)
+  const cached = getMarkdownCache(cacheKey, now)
+  if (cached !== null) {
+    return cached
   }
 
   const parsed = marked.parse(text) as string
-  return touchMarkdownCache(text, parsed)
+  if (!canCacheMarkdown(text, parsed)) {
+    return parsed
+  }
+  return upsertMarkdownCache(cacheKey, parsed, now)
 }
 
 export function escapeHtml(text: string): string {

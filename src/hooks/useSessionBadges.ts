@@ -46,7 +46,20 @@ export function useSessionBadges(sessions: SessionInfo[]) {
     }
 
     if (Object.keys(newBadges).length > 0) {
-      setBadgeStates(prev => ({ ...prev, ...newBadges }))
+      setBadgeStates(prev => {
+        let changed = false
+        const next = { ...prev }
+
+        for (const [sessionId, badge] of Object.entries(newBadges)) {
+          if (prev[sessionId]?.type === badge.type) {
+            continue
+          }
+          next[sessionId] = badge
+          changed = true
+        }
+
+        return changed ? next : prev
+      })
     }
 
     const newPreviousSessions = new Map<string, SessionInfo>()
