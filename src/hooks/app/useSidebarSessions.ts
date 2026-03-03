@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { AppDesktopSidebarSessionListCommonProps } from "../../components/app/AppDesktopSidebarContent";
 import type { MobileTab } from "../../components/app/AppMobileLayout";
 import type { TerminalType } from "../../components/settings/types";
 import type { FavoriteItem, SessionInfo, SessionTag, Tag } from "../../types";
+import type { SessionSortBy } from "../../types/sessionSort";
 import { filterSessions } from "../../utils/sessionFilters";
 import { getDirectoryName } from "../../utils/sessionDisplay";
 import { usePaginatedSessions } from "../usePaginatedSessions";
@@ -30,10 +31,12 @@ export interface UseSidebarSessionsOptions {
   getDescendantIds: (tagId: string) => string[];
   onSelectSession: (session: SessionInfo) => void;
   onDeleteSession: (session: SessionInfo) => void | Promise<void>;
+  onDeleteSessions: (sessions: SessionInfo[]) => void | Promise<void>;
   getBadgeType: (sessionId: string) => "new" | "updated" | null;
   terminal: TerminalType;
   piPath: string;
   customCommand: string;
+  sortBy: SessionSortBy;
   favorites: FavoriteItem[];
   onToggleFavorite: (item: Omit<FavoriteItem, "addedAt">) => Promise<void>;
   tags: Tag[];
@@ -79,10 +82,12 @@ export function useSidebarSessions({
   getDescendantIds,
   onSelectSession,
   onDeleteSession,
+  onDeleteSessions,
   getBadgeType,
   terminal,
   piPath,
   customCommand,
+  sortBy,
   favorites,
   onToggleFavorite,
   tags,
@@ -156,14 +161,31 @@ export function useSidebarSessions({
     searchQuery: sidebarSearchQuery,
     projectFilter: listProjectFilter,
     filterTagIds: effectiveFilterTagIds,
+    sortBy,
   });
+
+  const latestSessionsRef = useRef(sessions);
+  const latestSessionTagsRef = useRef(sessionTags);
 
   useEffect(() => {
     if (!shouldEnablePagedSidebar) {
       return;
     }
 
-    void refreshSidebarSessions();
+    const sessionsChanged = latestSessionsRef.current !== sessions;
+    const sessionTagsChanged = latestSessionTagsRef.current !== sessionTags;
+
+    if (!sessionsChanged && !sessionTagsChanged) {
+      return;
+    }
+
+    latestSessionsRef.current = sessions;
+    latestSessionTagsRef.current = sessionTags;
+
+    void refreshSidebarSessions({
+      silent: true,
+      preserveCount: true,
+    });
   }, [shouldEnablePagedSidebar, refreshSidebarSessions, sessions, sessionTags]);
 
   const selectedProjectSummary = useMemo(() => {
@@ -188,6 +210,7 @@ export function useSidebarSessions({
       selectedSession,
       onSelectSession,
       onDeleteSession,
+      onDeleteSessions,
       loading,
       getBadgeType,
       terminal,
@@ -204,6 +227,7 @@ export function useSidebarSessions({
       selectedSession,
       onSelectSession,
       onDeleteSession,
+      onDeleteSessions,
       loading,
       getBadgeType,
       terminal,

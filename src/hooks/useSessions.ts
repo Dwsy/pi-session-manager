@@ -5,8 +5,13 @@ import type { SessionInfo, SessionsDiff } from '../types'
 import { useDemoMode } from './useDemoMode'
 
 export interface PendingDeleteSession {
-  session: SessionInfo
+  sessions: SessionInfo[]
   requestedAt: number
+}
+
+interface DeleteSessionsResult {
+  deleted_count: number
+  failed: Array<{ path: string; error: string }>
 }
 
 export interface UseSessionsReturn {
@@ -17,6 +22,7 @@ export interface UseSessionsReturn {
   loadSessions: () => Promise<void>
   patchSessions: (diff: SessionsDiff) => void
   handleDeleteSession: (session: SessionInfo) => Promise<void>
+  handleDeleteSessions: (sessions: SessionInfo[]) => Promise<void>
   pendingDeleteSession: PendingDeleteSession | null
   confirmDeleteSession: () => Promise<void>
   cancelDeleteSession: () => void
@@ -139,29 +145,70 @@ export function useSessions(): UseSessionsReturn {
     }
   }, [])
 
-  const handleDeleteSession = useCallback(async (session: SessionInfo) => {
+  const handleDeleteSessions = useCallback(async (targets: SessionInfo[]) => {
+    const nextTargets: SessionInfo[] = []
+    const seen = new Set<string>()
+
+    for (const session of targets) {
+      if (!session || seen.has(session.id)) {
+        continue
+      }
+      seen.add(session.id)
+      nextTargets.push(session)
+    }
+
+    if (nextTargets.length === 0) {
+      return
+    }
+
     setPendingDeleteSession({
-      session,
+      sessions: nextTargets,
       requestedAt: Date.now(),
     })
   }, [])
+
+  const handleDeleteSession = useCallback(async (session: SessionInfo) => {
+    await handleDeleteSessions([session])
+  }, [handleDeleteSessions])
 
   const confirmDeleteSession = useCallback(async () => {
     if (!pendingDeleteSession) {
       return
     }
 
-    const targetSession = pendingDeleteSession.session
+    const targetSessions = pendingDeleteSession.sessions
+    const targetSessionIds = new Set(targetSessions.map(session => session.id))
+    let deletedSessionIds = targetSessionIds
 
     try {
       if (isDemoMode) {
-        setSessions(prev => prev.filter(s => s.id !== targetSession.id))
+        setSessions(prev => prev.filter(s => !targetSessionIds.has(s.id)))
       } else {
-        await invoke('delete_session', { path: targetSession.path })
-        setSessions(prev => prev.filter(s => s.id !== targetSession.id))
+        const result = await invoke<DeleteSessionsResult>('delete_sessions', {
+          paths: targetSessions.map(session => session.path),
+        })
+
+        const failedPaths = new Set(result.failed.map(item => item.path))
+        deletedSessionIds = new Set(
+          targetSessions
+            .filter(session => !failedPaths.has(session.path))
+            .map(session => session.id)
+        )
+
+        if (deletedSessionIds.size > 0) {
+          setSessions(prev => prev.filter(session => !deletedSessionIds.has(session.id)))
+        }
+
+        if (result.failed.length > 0) {
+          console.error('Failed to delete some sessions:', result.failed)
+          alert(t('app.errors.deleteSessionPartial', {
+            count: result.failed.length,
+            defaultValue: '{{count}} sessions failed to delete. Check the console for details.',
+          }))
+        }
       }
 
-      if (selectedSessionRef.current?.id === targetSession.id) {
+      if (selectedSessionRef.current?.id && deletedSessionIds.has(selectedSessionRef.current.id)) {
         setSelectedSession(null)
       }
 
@@ -210,6 +257,7 @@ export function useSessions(): UseSessionsReturn {
     loadSessions,
     patchSessions,
     handleDeleteSession,
+    handleDeleteSessions,
     pendingDeleteSession,
     confirmDeleteSession,
     cancelDeleteSession,

@@ -4,13 +4,13 @@ import type { SessionInfo } from '../types'
 import { useIsMobile } from '../hooks/useIsMobile'
 
 interface DeleteSessionConfirmDialogProps {
-  session: SessionInfo
+  sessions: SessionInfo[]
   onConfirm: () => Promise<void>
   onCancel: () => void
 }
 
 export default function DeleteSessionConfirmDialog({
-  session,
+  sessions,
   onConfirm,
   onCancel,
 }: DeleteSessionConfirmDialogProps) {
@@ -51,7 +51,10 @@ export default function DeleteSessionConfirmDialog({
     }
   }
 
-  const sessionName = session.name || t('common.untitled')
+  const isBatchDelete = sessions.length > 1
+  const firstSession = sessions[0]
+  const sessionName = firstSession?.name || t('common.untitled')
+  const previewSessions = sessions.slice(0, 3)
 
   return (
     <div
@@ -63,11 +66,38 @@ export default function DeleteSessionConfirmDialog({
       }}
     >
       <div className={`rounded-lg border border-border bg-background p-6 ${isMobile ? 'w-[95vw]' : 'w-[30rem]'}`}>
-        <h3 className="mb-2 text-lg font-semibold">{t('common.deleteSession')}</h3>
+        <h3 className="mb-2 text-lg font-semibold">
+          {isBatchDelete
+            ? t('common.deleteSessions', { defaultValue: 'Delete sessions' })
+            : t('common.deleteSession')}
+        </h3>
         <p className="mb-2 text-sm text-muted-foreground">
-          {t('app.confirm.deleteSession', { name: sessionName })}
+          {isBatchDelete
+            ? t('app.confirm.deleteSessions', {
+              count: sessions.length,
+              defaultValue: 'Delete {{count}} selected sessions?',
+            })
+            : t('app.confirm.deleteSession', { name: sessionName })}
         </p>
-        <p className="mb-6 break-all text-xs text-muted-foreground/80">{session.path}</p>
+        {isBatchDelete ? (
+          <div className="mb-6 space-y-1 text-xs text-muted-foreground/80">
+            {previewSessions.map((session) => (
+              <p key={session.id} className="break-all">
+                {session.name || t('common.untitled')} · {session.path}
+              </p>
+            ))}
+            {sessions.length > previewSessions.length && (
+              <p className="text-muted-foreground/70">
+                {t('common.moreItems', {
+                  count: sessions.length - previewSessions.length,
+                  defaultValue: '+{{count}} more',
+                })}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="mb-6 break-all text-xs text-muted-foreground/80">{firstSession?.path}</p>
+        )}
 
         <div className="flex justify-end gap-2">
           <button

@@ -1,5 +1,7 @@
 import SearchFilterBar from "../SearchFilterBar";
+import SessionSortSelect from "../SessionSortSelect";
 import type { SessionTag, Tag } from "../../types";
+import type { SessionSortBy } from "../../types/sessionSort";
 
 export interface AppMobileFilterBarProps {
   searchQuery: string;
@@ -11,6 +13,9 @@ export interface AppMobileFilterBarProps {
   onCreateTag: (name: string, color: string, parentId?: string) => void;
   getDescendantIds: (tagId: string) => string[];
   placeholder?: string;
+  sortBy: SessionSortBy;
+  onSortByChange: (sortBy: SessionSortBy) => void;
+  showSort?: boolean;
 }
 
 function AppMobileFilterBar({
@@ -23,9 +28,12 @@ function AppMobileFilterBar({
   onCreateTag,
   getDescendantIds,
   placeholder,
+  sortBy,
+  onSortByChange,
+  showSort = true,
 }: AppMobileFilterBarProps) {
   return (
-    <div className="px-3 py-1.5 border-b border-border/50">
+    <div className="px-3 py-1.5 border-b border-border/50 space-y-1.5">
       <SearchFilterBar
         searchQuery={searchQuery}
         onSearchChange={onSearchChange}
@@ -38,6 +46,11 @@ function AppMobileFilterBar({
         placeholder={placeholder}
         compact={true}
       />
+      {showSort && (
+        <div className="flex justify-end">
+          <SessionSortSelect value={sortBy} onChange={onSortByChange} />
+        </div>
+      )}
     </div>
   );
 }

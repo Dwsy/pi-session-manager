@@ -3,7 +3,7 @@ import type { RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
 import type { SessionInfo, FavoriteItem, Tag } from "../types";
-import { Trash2, Search, Star, Tags } from "lucide-react";
+import { CheckSquare2, Search, Square, Star, Tags, Trash2 } from "lucide-react";
 import { SessionListSkeleton } from "./Skeleton";
 import OpenInBrowserButton from "./OpenInBrowserButton";
 import OpenInTerminalButton from "./OpenInTerminalButton";
@@ -25,6 +25,7 @@ interface SessionListProps {
   selectedSession: SessionInfo | null;
   onSelectSession: (session: SessionInfo) => void;
   onDeleteSession?: (session: SessionInfo) => void;
+  onDeleteSessions?: (sessions: SessionInfo[]) => void;
   loading: boolean;
   hasMore?: boolean;
   loadingMore?: boolean;
@@ -53,6 +54,7 @@ export default function SessionList({
   selectedSession,
   onSelectSession,
   onDeleteSession,
+  onDeleteSessions,
   loading,
   hasMore = false,
   loadingMore = false,
@@ -78,6 +80,10 @@ export default function SessionList({
     null,
   );
   const [tagPickerAnchor, setTagPickerAnchor] = useState<DOMRect | null>(null);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -115,6 +121,12 @@ export default function SessionList({
     }
     return getTagsForSession(contextMenu.sessionId);
   }, [contextMenu, getTagsForSession, tags]);
+  const selectedSessions = useMemo(
+    () => sessions.filter((session) => selectedSessionIds.has(session.id)),
+    [sessions, selectedSessionIds],
+  );
+  const allSessionsSelected =
+    sessions.length > 0 && selectedSessionIds.size === sessions.length;
   const rowVirtualizer = useVirtualizer({
     count: totalBatches,
     getScrollElement: () => scrollParentRef?.current ?? null,
@@ -162,6 +174,45 @@ export default function SessionList({
   const virtualRows = rowVirtualizer.getVirtualItems();
 
   useEffect(() => {
+    setSelectedSessionIds((prev) => {
+      if (prev.size === 0) {
+        return prev;
+      }
+      const liveIds = new Set(sessions.map((session) => session.id));
+      const next = new Set<string>();
+      let changed = false;
+
+      prev.forEach((id) => {
+        if (liveIds.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [sessions]);
+
+  useEffect(() => {
+    if (onDeleteSessions) {
+      return;
+    }
+
+    setIsSelectionMode(false);
+    setSelectedSessionIds(new Set());
+  }, [onDeleteSessions]);
+
+  useEffect(() => {
+    if (!isSelectionMode) {
+      return;
+    }
+
+    setContextMenu(null);
+    setTagPickerSessionId(null);
+  }, [isSelectionMode]);
+
+  useEffect(() => {
     if (!hasMore || !onLoadMore || loadingMore || totalBatches === 0) {
       return;
     }
@@ -194,6 +245,75 @@ export default function SessionList({
 
   return (
     <div className="relative">
+      {onDeleteSessions && !isSelectionMode && (
+        <div className="pointer-events-none absolute right-2 top-2 z-20">
+          <button
+            type="button"
+            onClick={() => setIsSelectionMode(true)}
+            className="pointer-events-auto inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/40 bg-background/70 text-muted-foreground/80 backdrop-blur motion-color motion-press focus-ring hover:text-foreground"
+            aria-label={t("session.list.selectMode", { defaultValue: "Select mode" })}
+            title={t("session.list.selectMode", { defaultValue: "Select mode" })}
+          >
+            <CheckSquare2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {onDeleteSessions && isSelectionMode && (
+        <div className="sticky top-0 z-20 border-b border-border/40 bg-background/95 px-2 pb-2 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/40 px-2 py-1.5">
+            <div className="text-[11px] text-muted-foreground">
+              {t("session.list.selectedCount", {
+                count: selectedSessionIds.size,
+                defaultValue: "{{count}} selected",
+              })}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedSessionIds(
+                    allSessionsSelected
+                      ? new Set()
+                      : new Set(sessions.map((session) => session.id)),
+                  )
+                }
+                className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-foreground/5 hover:text-foreground motion-color motion-press focus-ring"
+              >
+                {allSessionsSelected
+                  ? t("common.clear", { defaultValue: "Clear" })
+                  : t("common.selectAll", { defaultValue: "Select all" })}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSelectionMode(false);
+                  setSelectedSessionIds(new Set());
+                }}
+                className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-foreground/5 hover:text-foreground motion-color motion-press focus-ring"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                disabled={selectedSessions.length === 0}
+                onClick={() => {
+                  onDeleteSessions(selectedSessions);
+                  setIsSelectionMode(false);
+                  setSelectedSessionIds(new Set());
+                }}
+                className="rounded bg-red-600 px-2 py-1 text-[11px] text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 motion-color motion-press focus-ring"
+              >
+                {t("session.list.deleteSelected", {
+                  count: selectedSessions.length,
+                  defaultValue: "Delete ({{count}})",
+                })}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div ref={masonryContainerRef} className="relative w-full">
         <div
           className="relative w-full"
@@ -226,7 +346,9 @@ export default function SessionList({
                   {batchSessions.map((session) => {
                     const isFavorite = favoriteSessionIds.has(session.id);
                     const updatedLabel = formatShortTime(session.modified, t);
-                    const isSelected = selectedSession?.id === session.id;
+                    const isSelected = isSelectionMode
+                      ? selectedSessionIds.has(session.id)
+                      : selectedSession?.id === session.id;
                     const hasPreview =
                       session.last_message || (session.first_message && !session.name);
                     const sourceTag = getSessionSourceTag(session.path);
@@ -238,8 +360,26 @@ export default function SessionList({
                     return (
                       <div
                         key={session.id}
-                        onClick={() => onSelectSession(session)}
+                        onClick={() => {
+                          if (isSelectionMode) {
+                            setSelectedSessionIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(session.id)) {
+                                next.delete(session.id);
+                              } else {
+                                next.add(session.id);
+                              }
+                              return next;
+                            });
+                            return;
+                          }
+                          onSelectSession(session);
+                        }}
                         onContextMenu={(e) => {
+                          if (isSelectionMode) {
+                            e.preventDefault();
+                            return;
+                          }
                           e.preventDefault();
                           setContextMenu({
                             x: e.clientX,
@@ -254,11 +394,40 @@ export default function SessionList({
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0">
-                            {session.name ||
-                              session.first_message ||
-                              t("session.list.untitled")}
-                          </h3>
+                          <div className="flex items-start gap-2 flex-1 min-w-0">
+                            {isSelectionMode && (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setSelectedSessionIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(session.id)) {
+                                      next.delete(session.id);
+                                    } else {
+                                      next.add(session.id);
+                                    }
+                                    return next;
+                                  });
+                                }}
+                                className="mt-0.5 text-muted-foreground/70 hover:text-foreground motion-color motion-press focus-ring rounded"
+                                aria-label={t("session.list.toggleSelection", {
+                                  defaultValue: "Toggle selection",
+                                })}
+                              >
+                                {isSelected ? (
+                                  <CheckSquare2 className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Square className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            )}
+                            <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0">
+                              {session.name ||
+                                session.first_message ||
+                                t("session.list.untitled")}
+                            </h3>
+                          </div>
                           <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-muted-foreground flex-shrink-0 pt-0.5 whitespace-nowrap">
                             {updatedLabel}
                           </div>
@@ -308,7 +477,7 @@ export default function SessionList({
                           <div
                             className={`flex items-center gap-1 flex-shrink-0 ${isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"} motion-opacity`}
                           >
-                            {onToggleFavorite && (
+                            {!isSelectionMode && onToggleFavorite && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -338,7 +507,7 @@ export default function SessionList({
                                 />
                               </button>
                             )}
-                            {onToggleTag && (
+                            {!isSelectionMode && onToggleTag && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -356,26 +525,30 @@ export default function SessionList({
                                 <Tags className="h-3 w-3" />
                               </button>
                             )}
-                            <OpenInTerminalButton
-                              session={session}
-                              terminal={terminal}
-                              piPath={piPath}
-                              customCommand={customCommand}
-                              size="sm"
-                              variant="ghost"
-                              onError={(error) =>
-                                console.error("Failed to open in terminal:", error)
-                              }
-                            />
-                            <OpenInBrowserButton
-                              session={session}
-                              size="sm"
-                              variant="ghost"
-                              onError={(error) =>
-                                console.error("Failed to open in browser:", error)
-                              }
-                            />
-                            {onDeleteSession && (
+                            {!isSelectionMode && (
+                              <OpenInTerminalButton
+                                session={session}
+                                terminal={terminal}
+                                piPath={piPath}
+                                customCommand={customCommand}
+                                size="sm"
+                                variant="ghost"
+                                onError={(error) =>
+                                  console.error("Failed to open in terminal:", error)
+                                }
+                              />
+                            )}
+                            {!isSelectionMode && (
+                              <OpenInBrowserButton
+                                session={session}
+                                size="sm"
+                                variant="ghost"
+                                onError={(error) =>
+                                  console.error("Failed to open in browser:", error)
+                                }
+                              />
+                            )}
+                            {!isSelectionMode && onDeleteSession && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();

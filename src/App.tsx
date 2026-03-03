@@ -42,6 +42,7 @@ import AppSessionViewerPane from "./components/app/AppSessionViewerPane";
 import AppMobileFilterBar from "./components/app/AppMobileFilterBar";
 import AppSettingsPane from "./components/app/AppSettingsPane";
 import AppTerminalPane from "./components/app/AppTerminalPane";
+import { DEFAULT_SESSION_SORT_BY } from "./types/sessionSort";
 
 const startDragging = () => {
   if (isTauri()) {
@@ -93,6 +94,7 @@ function App() {
     loadSessions,
     patchSessions,
     handleDeleteSession,
+    handleDeleteSessions,
     pendingDeleteSession,
     confirmDeleteSession,
     cancelDeleteSession,
@@ -131,6 +133,7 @@ function App() {
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [sessionSortBy, setSessionSortBy] = useState(DEFAULT_SESSION_SORT_BY);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem("onboarding-completed");
   });
@@ -318,10 +321,12 @@ function App() {
     getDescendantIds,
     onSelectSession: handleSelectSession,
     onDeleteSession: handleDeleteSession,
+    onDeleteSessions: handleDeleteSessions,
     getBadgeType,
     terminal,
     piPath,
     customCommand,
+    sortBy: sessionSortBy,
     favorites,
     onToggleFavorite: toggleFavorite,
     tags,
@@ -345,7 +350,7 @@ function App() {
 
   // ─── Shared content renderers ───
 
-  const renderMobileFilterBar = (placeholder?: string) => (
+  const renderMobileFilterBar = (placeholder?: string, showSort = true) => (
     <AppMobileFilterBar
       searchQuery={sidebarSearchQuery}
       onSearchChange={setSidebarSearchQuery}
@@ -358,6 +363,9 @@ function App() {
       }}
       getDescendantIds={getDescendantIds}
       placeholder={placeholder}
+      sortBy={sessionSortBy}
+      onSortByChange={setSessionSortBy}
+      showSort={showSort}
     />
   );
 
@@ -386,6 +394,7 @@ function App() {
         isMobile
           ? renderMobileFilterBar(
               selectedProject ? undefined : t("common.searchProjectsPlaceholder"),
+              !!selectedProject,
             )
           : null
       }
@@ -590,6 +599,8 @@ function App() {
       getDescendantIds={getDescendantIds}
       viewMode={viewMode}
       selectedProject={selectedProject}
+      sortBy={sessionSortBy}
+      onSortByChange={setSessionSortBy}
     />
   );
 

@@ -73,5 +73,14 @@ export const session = {
     updated: 'Updated',
     messages: 'Messages',
   },
+  sort: {
+    label: 'Sort',
+    short: {
+      modified: 'Modified',
+      created: 'Created',
+      name: 'Name',
+      size: 'Size',
+    },
+  },
   newMessages: 'New messages',
 } as const

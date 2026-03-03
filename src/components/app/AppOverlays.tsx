@@ -91,7 +91,7 @@ function AppOverlays({
       )}
       {pendingDeleteSession && (
         <DeleteSessionConfirmDialog
-          session={pendingDeleteSession.session}
+          sessions={pendingDeleteSession.sessions}
           onConfirm={onConfirmDeleteSession}
           onCancel={onCancelDeleteSession}
         />

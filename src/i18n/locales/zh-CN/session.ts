@@ -73,5 +73,14 @@ export const session = {
     updated: '更新',
     messages: '消息',
   },
+  sort: {
+    label: '排序',
+    short: {
+      modified: '修改',
+      created: '创建',
+      name: '名称',
+      size: '大小',
+    },
+  },
   newMessages: '有新消息',
 } as const
