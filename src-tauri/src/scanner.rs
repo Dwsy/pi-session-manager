@@ -41,6 +41,40 @@ pub fn get_session_digest() -> (u64, usize) {
     (version, count)
 }
 
+/// Snapshot cached sessions without forcing a rescan.
+/// Returns None when cache is not initialized yet.
+pub fn get_cached_sessions() -> Option<Vec<SessionInfo>> {
+    SCAN_CACHE.lock().ok().and_then(|g| g.as_ref().cloned())
+}
+
+fn clone_session_for_list(session: &SessionInfo) -> SessionInfo {
+    SessionInfo {
+        path: session.path.clone(),
+        id: session.id.clone(),
+        cwd: session.cwd.clone(),
+        name: session.name.clone(),
+        created: session.created,
+        modified: session.modified,
+        message_count: session.message_count,
+        first_message: session.first_message.clone(),
+        all_messages_text: String::new(),
+        user_messages_text: String::new(),
+        assistant_messages_text: String::new(),
+        last_message: session.last_message.clone(),
+        last_message_role: session.last_message_role.clone(),
+    }
+}
+
+/// Snapshot cached sessions optimized for list/pagination APIs.
+/// Drops heavy conversation blobs to reduce clone cost and memory pressure.
+pub fn get_cached_sessions_for_list() -> Option<Vec<SessionInfo>> {
+    SCAN_CACHE.lock().ok().and_then(|guard| {
+        guard
+            .as_ref()
+            .map(|sessions| sessions.iter().map(clone_session_for_list).collect())
+    })
+}
+
 pub fn get_sessions_dir() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     Ok(home.join(".pi").join("agent").join("sessions"))

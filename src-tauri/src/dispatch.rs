@@ -56,12 +56,15 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
                         .filter_map(|item| item.as_str().map(|text| text.to_string()))
                         .collect::<Vec<String>>()
                 });
+            let sort_by = extract_optional_string(payload, "sort_by")
+                .or_else(|| extract_optional_string(payload, "sortBy"));
             let result = crate::scan_sessions_paginated(
                 offset,
                 limit,
                 search_query,
                 project_filter,
                 filter_tag_ids,
+                sort_by,
             )
             .await?;
             Ok(serde_json::to_value(result).unwrap())
@@ -74,6 +77,16 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             let path = extract_string(payload, "path")?;
             let result = std::fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read session file: {e}"))?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+        "read_session_file_chunk" => {
+            let path = extract_string(payload, "path")?;
+            let offset = payload.get("offset").and_then(|v| v.as_u64());
+            let max_bytes = payload
+                .get("maxBytes")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+            let result = crate::read_session_file_chunk(path, offset, max_bytes).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "read_session_file_incremental" => {
@@ -131,6 +144,17 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             let path = extract_string(payload, "path")?;
             crate::session_delete::delete_session_file_and_cache(&path)?;
             Ok(Value::Null)
+        }
+        "delete_sessions" => {
+            let paths: Vec<String> = serde_json::from_value(
+                payload
+                    .get("paths")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
+            )
+            .map_err(|e| format!("Invalid paths: {e}"))?;
+            let result = crate::delete_sessions(paths).await?;
+            Ok(serde_json::to_value(result).unwrap())
         }
         "export_session" => {
             let path = extract_string(payload, "path")?;

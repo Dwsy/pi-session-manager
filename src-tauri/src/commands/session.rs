@@ -1,7 +1,8 @@
 use crate::models::{SessionEntry, SessionInfo};
 use crate::{config, export, scanner, sqlite_cache, stats};
 use serde_json::Value;
-use std::collections::HashSet;
+use std::cmp;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::process::Command;
@@ -20,6 +21,95 @@ pub struct PaginatedSessionsResult {
     pub offset: usize,
     pub limit: usize,
     pub has_more: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct DeleteSessionFailure {
+    pub path: String,
+    pub error: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct DeleteSessionsResult {
+    pub deleted_count: usize,
+    pub failed: Vec<DeleteSessionFailure>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SessionSortBy {
+    ModifiedDesc,
+    CreatedDesc,
+    NameAsc,
+    SizeDesc,
+}
+
+impl SessionSortBy {
+    fn from_raw(value: Option<&str>) -> Self {
+        match value
+            .map(str::trim)
+            .filter(|raw| !raw.is_empty())
+            .map(str::to_lowercase)
+            .as_deref()
+        {
+            Some("name") | Some("name_asc") => Self::NameAsc,
+            Some("created") | Some("created_desc") | Some("last_created") => Self::CreatedDesc,
+            Some("size") | Some("size_desc") => Self::SizeDesc,
+            Some("modified") | Some("modified_desc") | Some("last_modified") => Self::ModifiedDesc,
+            _ => Self::ModifiedDesc,
+        }
+    }
+}
+
+fn resolve_session_name(session: &SessionInfo) -> String {
+    session
+        .name
+        .as_deref()
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or(session.first_message.as_str())
+        .to_lowercase()
+}
+
+fn get_session_size_bytes(path: &str) -> u64 {
+    fs::metadata(path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0)
+}
+
+fn sort_sessions(sessions: &mut [SessionInfo], raw_sort_by: Option<&str>) {
+    match SessionSortBy::from_raw(raw_sort_by) {
+        SessionSortBy::ModifiedDesc => sessions.sort_by(|a, b| {
+            b.modified
+                .cmp(&a.modified)
+                .then_with(|| a.path.cmp(&b.path))
+        }),
+        SessionSortBy::CreatedDesc => sessions.sort_by(|a, b| {
+            b.created
+                .cmp(&a.created)
+                .then_with(|| b.modified.cmp(&a.modified))
+                .then_with(|| a.path.cmp(&b.path))
+        }),
+        SessionSortBy::NameAsc => sessions.sort_by(|a, b| {
+            resolve_session_name(a)
+                .cmp(&resolve_session_name(b))
+                .then_with(|| b.modified.cmp(&a.modified))
+                .then_with(|| a.path.cmp(&b.path))
+        }),
+        SessionSortBy::SizeDesc => {
+            let size_map: HashMap<String, u64> = sessions
+                .iter()
+                .map(|session| (session.path.clone(), get_session_size_bytes(&session.path)))
+                .collect();
+
+            sessions.sort_by(|a, b| {
+                let a_size = size_map.get(&a.path).copied().unwrap_or(0);
+                let b_size = size_map.get(&b.path).copied().unwrap_or(0);
+                b_size
+                    .cmp(&a_size)
+                    .then_with(|| b.modified.cmp(&a.modified))
+                    .then_with(|| a.path.cmp(&b.path))
+            });
+        }
+    }
 }
 
 fn session_matches_search_query(session: &SessionInfo, raw_query: &str) -> bool {
@@ -81,9 +171,11 @@ fn session_matches_project_filter(session: &SessionInfo, raw_project: &str) -> b
 
 #[cfg(test)]
 mod tests {
-    use super::session_matches_project_filter;
+    use super::{session_matches_project_filter, sort_sessions};
     use crate::models::SessionInfo;
-    use chrono::Utc;
+    use chrono::{DateTime, Utc};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn build_session(cwd: &str, path: &str) -> SessionInfo {
         SessionInfo {
@@ -99,6 +191,35 @@ mod tests {
             user_messages_text: String::new(),
             assistant_messages_text: String::new(),
             last_message: "world".to_string(),
+            last_message_role: "assistant".to_string(),
+        }
+    }
+
+    fn build_session_with_time(
+        id: &str,
+        name: Option<&str>,
+        first_message: &str,
+        path: &str,
+        created: &str,
+        modified: &str,
+    ) -> SessionInfo {
+        SessionInfo {
+            path: path.to_string(),
+            id: id.to_string(),
+            cwd: "/tmp/project".to_string(),
+            name: name.map(str::to_string),
+            created: DateTime::parse_from_rfc3339(created)
+                .expect("valid created timestamp")
+                .with_timezone(&Utc),
+            modified: DateTime::parse_from_rfc3339(modified)
+                .expect("valid modified timestamp")
+                .with_timezone(&Utc),
+            message_count: 1,
+            first_message: first_message.to_string(),
+            all_messages_text: String::new(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
+            last_message: "last".to_string(),
             last_message_role: "assistant".to_string(),
         }
     }
@@ -150,11 +271,134 @@ mod tests {
             "/Users/dengwenyu/Dev/code/company/Jly"
         ));
     }
+
+    #[test]
+    fn sort_by_name_orders_sessions_alphabetically() {
+        let mut sessions = vec![
+            build_session_with_time(
+                "s-2",
+                Some("zeta"),
+                "ignored",
+                "/tmp/s-2.jsonl",
+                "2026-01-02T00:00:00Z",
+                "2026-01-04T00:00:00Z",
+            ),
+            build_session_with_time(
+                "s-1",
+                Some("Alpha"),
+                "ignored",
+                "/tmp/s-1.jsonl",
+                "2026-01-03T00:00:00Z",
+                "2026-01-05T00:00:00Z",
+            ),
+            build_session_with_time(
+                "s-3",
+                None,
+                "beta message",
+                "/tmp/s-3.jsonl",
+                "2026-01-01T00:00:00Z",
+                "2026-01-06T00:00:00Z",
+            ),
+        ];
+
+        sort_sessions(&mut sessions, Some("name"));
+
+        let sorted_ids: Vec<&str> = sessions.iter().map(|session| session.id.as_str()).collect();
+        assert_eq!(sorted_ids, vec!["s-1", "s-3", "s-2"]);
+    }
+
+    #[test]
+    fn sort_by_created_orders_sessions_descending() {
+        let mut sessions = vec![
+            build_session_with_time(
+                "s-1",
+                Some("one"),
+                "one",
+                "/tmp/s-c-1.jsonl",
+                "2026-01-01T00:00:00Z",
+                "2026-01-03T00:00:00Z",
+            ),
+            build_session_with_time(
+                "s-2",
+                Some("two"),
+                "two",
+                "/tmp/s-c-2.jsonl",
+                "2026-01-04T00:00:00Z",
+                "2026-01-02T00:00:00Z",
+            ),
+        ];
+
+        sort_sessions(&mut sessions, Some("created"));
+
+        assert_eq!(sessions[0].id, "s-2");
+        assert_eq!(sessions[1].id, "s-1");
+    }
+
+    #[test]
+    fn sort_by_size_orders_sessions_descending() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time after epoch")
+            .as_nanos();
+        let base_dir = std::env::temp_dir().join(format!("ppm-sort-size-{unique}"));
+        fs::create_dir_all(&base_dir).expect("create temp dir");
+
+        let small_path = base_dir.join("small.jsonl");
+        let large_path = base_dir.join("large.jsonl");
+        fs::write(&small_path, b"abc").expect("write small file");
+        fs::write(&large_path, b"abcdefghijklmnopqrstuvwxyz").expect("write large file");
+
+        let mut sessions = vec![
+            build_session_with_time(
+                "small",
+                Some("small"),
+                "small",
+                small_path.to_str().expect("small path utf8"),
+                "2026-01-01T00:00:00Z",
+                "2026-01-01T00:00:00Z",
+            ),
+            build_session_with_time(
+                "large",
+                Some("large"),
+                "large",
+                large_path.to_str().expect("large path utf8"),
+                "2026-01-01T00:00:00Z",
+                "2026-01-01T00:00:00Z",
+            ),
+        ];
+
+        sort_sessions(&mut sessions, Some("size"));
+
+        assert_eq!(sessions[0].id, "large");
+        assert_eq!(sessions[1].id, "small");
+
+        let _ = fs::remove_file(&small_path);
+        let _ = fs::remove_file(&large_path);
+        let _ = fs::remove_dir_all(&base_dir);
+    }
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
     scanner::scan_sessions().await
+}
+
+fn strip_session_list_payload(session: &SessionInfo) -> SessionInfo {
+    SessionInfo {
+        path: session.path.clone(),
+        id: session.id.clone(),
+        cwd: session.cwd.clone(),
+        name: session.name.clone(),
+        created: session.created,
+        modified: session.modified,
+        message_count: session.message_count,
+        first_message: session.first_message.clone(),
+        all_messages_text: String::new(),
+        user_messages_text: String::new(),
+        assistant_messages_text: String::new(),
+        last_message: session.last_message.clone(),
+        last_message_role: session.last_message_role.clone(),
+    }
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -164,13 +408,21 @@ pub async fn scan_sessions_paginated(
     search_query: Option<String>,
     project_filter: Option<String>,
     filter_tag_ids: Option<Vec<String>>,
+    sort_by: Option<String>,
 ) -> Result<PaginatedSessionsResult, String> {
     const DEFAULT_LIMIT: usize = 100;
     const MAX_LIMIT: usize = 500;
 
     let normalized_limit = limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
     let normalized_offset = offset.unwrap_or(0);
-    let mut sessions = scanner::scan_sessions().await?;
+
+    // Fast path: reuse in-memory scan cache whenever available.
+    // Fallback to full scan only when cache is not initialized yet.
+    let mut sessions = if let Some(cached) = scanner::get_cached_sessions_for_list() {
+        cached
+    } else {
+        scanner::scan_sessions().await?
+    };
 
     if let Some(project) = project_filter
         .as_deref()
@@ -200,12 +452,15 @@ pub async fn scan_sessions_paginated(
         sessions.retain(|session| matched_session_ids.contains(session.id.as_str()));
     }
 
-    sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+    sort_sessions(&mut sessions, sort_by.as_deref());
 
     let total = sessions.len();
     let start = normalized_offset.min(total);
     let end = start.saturating_add(normalized_limit).min(total);
-    let page_sessions = sessions[start..end].to_vec();
+    let page_sessions = sessions[start..end]
+        .iter()
+        .map(strip_session_list_payload)
+        .collect();
 
     Ok(PaginatedSessionsResult {
         sessions: page_sessions,
@@ -213,6 +468,107 @@ pub async fn scan_sessions_paginated(
         offset: start,
         limit: normalized_limit,
         has_more: end < total,
+    })
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct SessionChunk {
+    pub content: String,
+    pub next_offset: u64,
+    pub file_size: u64,
+    pub has_more: bool,
+}
+
+fn utf8_safe_cut(buf: &[u8], mut end: usize) -> usize {
+    if end >= buf.len() {
+        return buf.len();
+    }
+
+    while end > 0 && std::str::from_utf8(&buf[..end]).is_err() {
+        end -= 1;
+    }
+
+    end
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn read_session_file_chunk(
+    path: String,
+    offset: Option<u64>,
+    max_bytes: Option<usize>,
+) -> Result<SessionChunk, String> {
+    const DEFAULT_CHUNK_BYTES: usize = 256 * 1024;
+    const MAX_CHUNK_BYTES: usize = 1024 * 1024;
+
+    let mut file = fs::File::open(&path).map_err(|e| format!("Failed to open session file: {e}"))?;
+    let file_size = file
+        .metadata()
+        .map_err(|e| format!("Failed to get session file metadata: {e}"))?
+        .len();
+
+    let start_offset = offset.unwrap_or(0).min(file_size);
+
+    if start_offset >= file_size {
+        return Ok(SessionChunk {
+            content: String::new(),
+            next_offset: file_size,
+            file_size,
+            has_more: false,
+        });
+    }
+
+    let chunk_bytes = max_bytes
+        .unwrap_or(DEFAULT_CHUNK_BYTES)
+        .clamp(1, MAX_CHUNK_BYTES);
+
+    file.seek(SeekFrom::Start(start_offset))
+        .map_err(|e| format!("Failed to seek session file: {e}"))?;
+
+    let mut buffer = vec![0u8; chunk_bytes];
+    let bytes_read = file
+        .read(&mut buffer)
+        .map_err(|e| format!("Failed to read session file chunk: {e}"))?;
+    buffer.truncate(bytes_read);
+
+    if buffer.is_empty() {
+        return Ok(SessionChunk {
+            content: String::new(),
+            next_offset: start_offset,
+            file_size,
+            has_more: start_offset < file_size,
+        });
+    }
+
+    let base_next_offset = start_offset + bytes_read as u64;
+
+    let mut cut = utf8_safe_cut(&buffer, buffer.len());
+    let mut has_more = base_next_offset < file_size;
+
+    if has_more {
+        if let Some(last_newline_idx) = buffer[..cut].iter().rposition(|b| *b == b'\n') {
+            cut = last_newline_idx + 1;
+        }
+
+        if cut == 0 {
+            let fallback_len = cmp::min(buffer.len(), 8192);
+            cut = utf8_safe_cut(&buffer, fallback_len).max(1);
+        }
+    }
+
+    let content_bytes = &buffer[..cut];
+    let content = String::from_utf8(content_bytes.to_vec())
+        .map_err(|e| format!("Failed to decode session chunk as UTF-8: {e}"))?;
+
+    let next_offset = start_offset + cut as u64;
+    if next_offset >= file_size {
+        has_more = false;
+    }
+
+    Ok(SessionChunk {
+        content,
+        next_offset,
+        file_size,
+        has_more,
     })
 }
 
@@ -335,6 +691,36 @@ pub async fn get_session_entries(path: String) -> Result<Vec<SessionEntry>, Stri
 pub async fn delete_session(path: String) -> Result<(), String> {
     crate::session_delete::delete_session_file_and_cache(&path)?;
     Ok(())
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn delete_sessions(paths: Vec<String>) -> Result<DeleteSessionsResult, String> {
+    let mut deleted_count = 0usize;
+    let mut failed = Vec::new();
+    let mut seen_paths = HashSet::new();
+
+    for path in paths {
+        let trimmed = path.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if !seen_paths.insert(trimmed.to_string()) {
+            continue;
+        }
+
+        match crate::session_delete::delete_session_file_and_cache(trimmed) {
+            Ok(_) => deleted_count += 1,
+            Err(error) => failed.push(DeleteSessionFailure {
+                path: trimmed.to_string(),
+                error,
+            }),
+        }
+    }
+
+    Ok(DeleteSessionsResult {
+        deleted_count,
+        failed,
+    })
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]

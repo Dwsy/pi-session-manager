@@ -14,7 +14,9 @@ pub struct SessionInfo {
     pub first_message: String,
     #[serde(default, skip_serializing)]
     pub all_messages_text: String,
+    #[serde(default, skip_serializing)]
     pub user_messages_text: String,
+    #[serde(default, skip_serializing)]
     pub assistant_messages_text: String,
     pub last_message: String,
     pub last_message_role: String,
@@ -156,5 +158,38 @@ mod tests {
 
         let parsed: SessionInfo = serde_json::from_value(json).expect("should deserialize");
         assert_eq!(parsed.all_messages_text, "");
+    }
+
+    #[test]
+    fn session_info_serialization_skips_large_text_fields() {
+        let created = chrono::DateTime::parse_from_rfc3339("2026-01-18T00:00:00Z")
+            .expect("valid created timestamp")
+            .with_timezone(&chrono::Utc);
+        let modified = chrono::DateTime::parse_from_rfc3339("2026-01-18T01:00:00Z")
+            .expect("valid modified timestamp")
+            .with_timezone(&chrono::Utc);
+
+        let session = SessionInfo {
+            path: "/tmp/session.jsonl".to_string(),
+            id: "abc".to_string(),
+            cwd: "/Users/demo/workspace/project-a".to_string(),
+            name: Some("session-a".to_string()),
+            created,
+            modified,
+            message_count: 12,
+            first_message: "hello".to_string(),
+            all_messages_text: "all-text".to_string(),
+            user_messages_text: "user-text".to_string(),
+            assistant_messages_text: "assistant-text".to_string(),
+            last_message: "ok".to_string(),
+            last_message_role: "assistant".to_string(),
+        };
+
+        let serialized = serde_json::to_value(&session).expect("should serialize");
+        let object = serialized.as_object().expect("serialized object");
+
+        assert!(!object.contains_key("all_messages_text"));
+        assert!(!object.contains_key("user_messages_text"));
+        assert!(!object.contains_key("assistant_messages_text"));
     }
 }
