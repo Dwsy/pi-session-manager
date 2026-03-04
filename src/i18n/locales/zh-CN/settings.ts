@@ -32,7 +32,7 @@ export const settings = {
   terminal: {
     default: '默认终端',
     customCommand: '自定义终端命令',
-    customCommandHelp: '使用 {path} 作为会话路径占位符',
+    customCommandHelp: '支持 {command} / {cwd} / {path} / {pi} 占位符',
     piCommandPath: 'Pi 命令路径',
     piCommandPathHelp: '如果 pi 不在系统 PATH 中，请指定完整路径',
     commandExample: '例如：alacritty -e',

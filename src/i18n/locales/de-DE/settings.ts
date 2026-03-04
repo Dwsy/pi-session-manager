@@ -32,7 +32,7 @@ export const settings = {
   terminal: {
     default: 'Standard-Terminal',
     customCommand: 'Benutzerdefinierter Terminal-Befehl',
-    customCommandHelp: 'Verwenden Sie {path} als Platzhalter für den Sitzungspfad',
+    customCommandHelp: 'Unterstützt Platzhalter: {command}, {cwd}, {path}, {pi}',
     piCommandPath: 'Pi-Befehlspfad',
     piCommandPathHelp: 'Vollständigen Pfad angeben, wenn Pi nicht im System-PATH ist',
     commandExample: 'z. B. alacritty -e',

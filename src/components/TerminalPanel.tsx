@@ -10,6 +10,12 @@ import { useResolvedTheme } from '../hooks/useResolvedTheme'
 
 interface ShellInfo { label: string; path: string }
 
+function getShellLabel(shellPath: string): string {
+  const normalized = shellPath.replace(/\\/g, '/')
+  const leaf = normalized.split('/').pop()
+  return leaf && leaf.length > 0 ? leaf : shellPath
+}
+
 const TERM_THEME_DARK = {
   background: '#0d0d0d',
   foreground: '#e6e6e6',
@@ -217,6 +223,7 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
   const [defaultShell, setDefaultShell] = useState(propShell || getPlatformDefaults().defaultShell)
   const [availableShells, setAvailableShells] = useState<ShellInfo[]>([])
+  const [shellsLoaded, setShellsLoaded] = useState(false)
   const [showShellMenu, setShowShellMenu] = useState(false)
   const tabCounter = useRef(0)
 
@@ -233,9 +240,15 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
 
   // Shells
   useEffect(() => {
+    setShellsLoaded(false)
     invoke<[string, string][]>('get_available_shells')
-      .then(shells => setAvailableShells(shells.map(([label, path]) => ({ label, path }))))
-      .catch(() => setAvailableShells([{ label: 'sh', path: '/bin/sh' }]))
+      .then(shells => {
+        setAvailableShells(shells.map(([label, path]) => ({ label, path })))
+      })
+      .catch(() => {
+        setAvailableShells([])
+      })
+      .finally(() => setShellsLoaded(true))
   }, [])
 
   useEffect(() => {
@@ -243,18 +256,38 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
     else invoke<string>('get_default_shell').then(setDefaultShell).catch(() => {})
   }, [propShell])
 
+  useEffect(() => {
+    if (availableShells.length === 0) return
+    if (availableShells.some(shell => shell.path === defaultShell)) return
+    setDefaultShell(availableShells[0].path)
+  }, [availableShells, defaultShell])
+
+  const resolveShellPath = useCallback((shell?: string): string | null => {
+    const preferred = shell || defaultShell
+    if (preferred && availableShells.some(item => item.path === preferred)) {
+      return preferred
+    }
+    return availableShells[0]?.path || null
+  }, [availableShells, defaultShell])
+
   // Tab management
   const addTab = useCallback((shell?: string) => {
+    const resolvedShell = resolveShellPath(shell)
+    if (!resolvedShell) {
+      setShowShellMenu(false)
+      console.warn('[TerminalPanel] Skip opening terminal: shell is unavailable')
+      return false
+    }
     const id = `term-${++tabCounter.current}`
-    const s = shell || defaultShell
-    setTabs(prev => [...prev, { id, shell: s, label: s.split('/').pop() || 'sh' }])
+    setTabs(prev => [...prev, { id, shell: resolvedShell, label: getShellLabel(resolvedShell) }])
     setActiveTabId(id)
     setShowShellMenu(false)
-  }, [defaultShell])
+    return true
+  }, [resolveShellPath])
 
   useEffect(() => {
-    if (isOpen && tabs.length === 0) addTab()
-  }, [isOpen, tabs.length, addTab])
+    if (isOpen && tabs.length === 0 && shellsLoaded) addTab()
+  }, [isOpen, tabs.length, shellsLoaded, addTab])
 
   // Write pending command to active terminal after it's ready
   useEffect(() => {

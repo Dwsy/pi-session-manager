@@ -32,7 +32,7 @@ export const settings = {
   terminal: {
     default: 'Terminal par défaut',
     customCommand: 'Commande de terminal personnalisée',
-    customCommandHelp: 'Utilisez {path} comme espace réservé pour le chemin de la session',
+    customCommandHelp: 'Prend en charge les espaces réservés {command}, {cwd}, {path} et {pi}',
     piCommandPath: 'Chemin de la commande Pi',
     piCommandPathHelp: 'Spécifiez le chemin complet si pi n\'est pas dans le PATH système',
     commandExample: 'ex. : alacritty -e',

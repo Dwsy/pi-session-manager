@@ -32,6 +32,14 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
 
   const platformTerminals = (() => {
     const common = [
+      {
+        id: 'auto',
+        name: t('settings.terminal.options.auto.name', 'Auto'),
+        description: t(
+          'settings.terminal.options.auto.description',
+          'Automatically choose an installed terminal on this system'
+        ),
+      },
       { id: 'vscode', name: t('settings.terminal.options.vscode.name'), description: t('settings.terminal.options.vscode.description') },
       { id: 'custom', name: t('settings.terminal.options.custom.name'), description: t('settings.terminal.options.custom.description') },
     ]
@@ -47,13 +55,24 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
         return [
           { id: 'gnome-terminal', name: 'GNOME Terminal', description: t('settings.terminal.options.gnomeTerminal.description', 'GNOME Terminal') },
           { id: 'konsole', name: 'Konsole', description: t('settings.terminal.options.konsole.description', 'KDE Konsole') },
+          { id: 'xfce4-terminal', name: 'Xfce Terminal', description: t('settings.terminal.options.xfce4Terminal.description', 'Xfce Terminal') },
+          { id: 'tilix', name: 'Tilix', description: t('settings.terminal.options.tilix.description', 'Tilix') },
+          { id: 'kitty', name: 'kitty', description: t('settings.terminal.options.kitty.description', 'kitty terminal') },
+          { id: 'alacritty', name: 'Alacritty', description: t('settings.terminal.options.alacritty.description', 'Alacritty terminal') },
+          { id: 'wezterm', name: 'WezTerm', description: t('settings.terminal.options.wezterm.description', 'WezTerm terminal') },
+          { id: 'mate-terminal', name: 'MATE Terminal', description: t('settings.terminal.options.mateTerminal.description', 'MATE Terminal') },
+          { id: 'lxterminal', name: 'LXTerminal', description: t('settings.terminal.options.lxterminal.description', 'LXTerminal') },
           { id: 'xterm', name: 'xterm', description: t('settings.terminal.options.xterm.description', 'xterm') },
+          { id: 'x-terminal-emulator', name: 'x-terminal-emulator', description: t('settings.terminal.options.xTerminalEmulator.description', 'System terminal launcher') },
           ...common,
         ]
       default:
         return [
           { id: 'iterm2', name: t('settings.terminal.options.iterm2.name'), description: t('settings.terminal.options.iterm2.description') },
           { id: 'terminal', name: t('settings.terminal.options.terminal.name'), description: t('settings.terminal.options.terminal.description') },
+          { id: 'wezterm', name: 'WezTerm', description: t('settings.terminal.options.wezterm.description', 'WezTerm terminal') },
+          { id: 'kitty', name: 'kitty', description: t('settings.terminal.options.kitty.description', 'kitty terminal') },
+          { id: 'alacritty', name: 'Alacritty', description: t('settings.terminal.options.alacritty.description', 'Alacritty terminal') },
           ...common,
         ]
     }
@@ -183,7 +202,7 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
       {settings.terminal.defaultTerminal === 'custom' && (
         <SettingsField
           label={t('settings.terminal.customCommand', '自定义终端命令')}
-          description={t('settings.terminal.customCommandHelp', '使用 {path} 作为会话路径占位符')}
+          description={t('settings.terminal.customCommandHelp', '支持 {command} / {cwd} / {path} / {pi} 占位符')}
           className="space-y-2 p-4 rounded-lg border border-border bg-surface/30 animate-in fade-in slide-in-from-top-2"
         >
           <SettingsInput

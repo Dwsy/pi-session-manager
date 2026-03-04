@@ -1,7 +1,10 @@
 export type TerminalType =
+  | 'auto'
   | 'iterm2' | 'terminal' | 'vscode' | 'custom'
+  | 'wezterm' | 'kitty' | 'alacritty'
   | 'powershell' | 'cmd' | 'windows-terminal'
-  | 'gnome-terminal' | 'konsole' | 'xterm'
+  | 'gnome-terminal' | 'konsole' | 'xfce4-terminal' | 'xterm' | 'x-terminal-emulator'
+  | 'tilix' | 'mate-terminal' | 'lxterminal'
 
 export type Platform = 'macos' | 'windows' | 'linux'
 
@@ -15,11 +18,11 @@ export function detectPlatform(): Platform {
 export function getPlatformDefaults(): { defaultTerminal: TerminalType; defaultShell: string } {
   switch (detectPlatform()) {
     case 'windows':
-      return { defaultTerminal: 'powershell', defaultShell: 'powershell.exe' }
+      return { defaultTerminal: 'auto', defaultShell: 'powershell.exe' }
     case 'linux':
-      return { defaultTerminal: 'gnome-terminal', defaultShell: '/bin/bash' }
+      return { defaultTerminal: 'auto', defaultShell: '/bin/bash' }
     default:
-      return { defaultTerminal: 'iterm2', defaultShell: '/bin/zsh' }
+      return { defaultTerminal: 'auto', defaultShell: '/bin/zsh' }
   }
 }
 

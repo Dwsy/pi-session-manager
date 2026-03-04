@@ -32,7 +32,7 @@ export const settings = {
   terminal: {
     default: 'Default Terminal',
     customCommand: 'Custom Terminal Command',
-    customCommandHelp: 'Use {path} as placeholder for session path',
+    customCommandHelp: 'Supports {command}, {cwd}, {path}, and {pi} placeholders',
     piCommandPath: 'Pi Command Path',
     piCommandPathHelp: 'Specify full path if pi is not in system PATH',
     commandExample: 'e.g., alacritty -e',

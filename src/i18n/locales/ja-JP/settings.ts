@@ -32,7 +32,7 @@ export const settings = {
   terminal: {
     default: 'デフォルトターミナル',
     customCommand: 'カスタムターミナルコマンド',
-    customCommandHelp: '{path} をセッションパスのプレースホルダーとして使用',
+    customCommandHelp: '{command} / {cwd} / {path} / {pi} プレースホルダーに対応',
     piCommandPath: 'Pi コマンドパス',
     piCommandPathHelp: 'pi がシステム PATH にない場合、フルパスを指定',
     commandExample: '例：alacritty -e',
