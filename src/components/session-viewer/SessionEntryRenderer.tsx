@@ -1,3 +1,4 @@
+import { memo } from "react";
 import AssistantMessage from "../AssistantMessage";
 import BranchSummary from "../BranchSummary";
 import Compaction from "../Compaction";
@@ -92,11 +93,16 @@ export function renderSessionEntry(
   }
 }
 
-export function SessionEntryRenderer({
-  entry,
-  toolResultByCallId = EMPTY_TOOL_RESULTS,
-}: SessionEntryRendererProps): JSX.Element | null {
-  return renderSessionEntry(entry, toolResultByCallId);
-}
+export const SessionEntryRenderer = memo(
+  function SessionEntryRenderer({
+    entry,
+    toolResultByCallId = EMPTY_TOOL_RESULTS,
+  }: SessionEntryRendererProps): JSX.Element | null {
+    return renderSessionEntry(entry, toolResultByCallId);
+  },
+  (prev, next) =>
+    prev.entry === next.entry &&
+    prev.toolResultByCallId === next.toolResultByCallId,
+);
 
 export default SessionEntryRenderer;

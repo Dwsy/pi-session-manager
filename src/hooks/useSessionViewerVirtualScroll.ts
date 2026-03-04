@@ -14,7 +14,7 @@ const MESSAGE_ITEM_GAP = 16
 const BOTTOM_THRESHOLD_PX = 8
 const HIGHLIGHT_DURATION_MS = 2000
 const HIGHLIGHT_RETRY_DELAY_MS = 50
-const ROW_OVERSCAN = 12
+const ROW_OVERSCAN = 8
 
 export interface UseSessionViewerVirtualScrollOptions {
   renderableEntries: SessionEntry[]

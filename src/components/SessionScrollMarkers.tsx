@@ -1,4 +1,4 @@
-import type { PointerEvent, RefObject } from 'react'
+import { memo, type PointerEvent, type RefObject } from 'react'
 import type { ScrollMarker } from '../hooks/useSessionScrollMarkers'
 
 interface SessionScrollMarkersProps {
@@ -14,7 +14,7 @@ interface SessionScrollMarkersProps {
   onPointerLeave: (event: PointerEvent) => void
 }
 
-export default function SessionScrollMarkers({
+function SessionScrollMarkers({
   markers,
   activeMarkerId,
   isMobile,
@@ -63,3 +63,5 @@ export default function SessionScrollMarkers({
     </div>
   )
 }
+
+export default memo(SessionScrollMarkers)

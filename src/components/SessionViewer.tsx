@@ -5,7 +5,9 @@ import KbdTooltip from "./KbdTooltip";
 import OpenInTerminalButton from "./OpenInTerminalButton";
 import SystemPromptDialog from "./SystemPromptDialog";
 import { type SessionTreeRef } from "./SessionTree";
-import SessionViewerMessages from "./session-viewer/SessionViewerMessages";
+import SessionViewerMessages, {
+  type SessionViewerMessagesRef,
+} from "./session-viewer/SessionViewerMessages";
 import SessionViewerSidebar from "./session-viewer/SessionViewerSidebar";
 import SessionViewerToolbar from "./session-viewer/SessionViewerToolbar";
 
@@ -19,7 +21,6 @@ import { useSessionScrollMarkers } from "../hooks/useSessionScrollMarkers";
 import { useSessionViewerData } from "../hooks/useSessionViewerData";
 import { useSessionViewerDerivedData } from "../hooks/useSessionViewerDerivedData";
 import { useSessionViewerHotkeys } from "../hooks/useSessionViewerHotkeys";
-import { useSessionViewerVirtualScroll } from "../hooks/useSessionViewerVirtualScroll";
 
 import { getPlatformDefaults } from "./settings/types";
 import type { SessionInfo } from "../types";
@@ -82,6 +83,7 @@ function SessionViewerContent({
   const sidebarRef = useRef<HTMLElement>(null);
   const resizeHandleRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<SessionTreeRef>(null);
+  const messagesRef = useRef<SessionViewerMessagesRef>(null);
 
   useEffect(() => {
     resetToolExpansionOverrides();
@@ -142,31 +144,20 @@ function SessionViewerContent({
     messageEntries,
   } = useSessionViewerDerivedData(entries, activeEntryId);
 
-  const {
-    messagesContainerRef,
-    messagesWrapperRef,
-    rowVirtualizer,
-    isAtBottom,
-    scrollToTop,
-    scrollToBottom,
-  } = useSessionViewerVirtualScroll({
-    renderableEntries,
-    loading,
-    error,
-    scrollTargetId,
-    setScrollTargetId,
-    setHasNewMessages,
-    pendingScrollToBottomRef,
-    expandedToolIds,
-    toolsExpanded,
-    sessionPath: session.path,
-    isAtBottomRef: sessionDataIsAtBottomRef,
-    onReachBottom: () => {
-      if (hasMoreHistory) {
-        void loadMoreHistory()
-      }
-    },
-  });
+  const handleReachBottom = useCallback(() => {
+    if (hasMoreHistory) {
+      void loadMoreHistory();
+    }
+  }, [hasMoreHistory, loadMoreHistory]);
+
+  const handleScrollToTop = useCallback(() => {
+    messagesRef.current?.scrollToTop();
+  }, []);
+
+  const handleScrollToBottom = useCallback(() => {
+    messagesRef.current?.scrollToBottom();
+    setHasNewMessages(false);
+  }, [setHasNewMessages]);
 
   const {
     markers: scrollMarkers,
@@ -237,8 +228,8 @@ function SessionViewerContent({
           onToggleScrollMarkers={toggleScrollMarkers}
           onMobileMenuOpenChange={setShowMobileMenu}
           onOpenSystemPromptDialog={() => setShowSystemPromptDialog(true)}
-          onScrollToTop={scrollToTop}
-          onScrollToBottom={() => scrollToBottom()}
+          onScrollToTop={handleScrollToTop}
+          onScrollToBottom={handleScrollToBottom}
           onRename={onRename}
           onExport={onExport}
           onResume={onWebResume}
@@ -267,21 +258,24 @@ function SessionViewerContent({
         />
 
         <SessionViewerMessages
+          ref={messagesRef}
+          loading={loading}
           showLoading={showLoading}
           error={error}
-          isAtBottom={isAtBottom}
           hasNewMessages={hasNewMessages}
-          onNewMessagesClick={() => {
-            scrollToBottom();
-            setHasNewMessages(false);
-          }}
           sessionId={headerEntry?.id || session.id}
           headerTimestamp={headerEntry?.timestamp}
           stats={stats}
           renderableEntries={renderableEntries}
-          rowVirtualizer={rowVirtualizer}
-          messagesContainerRef={messagesContainerRef}
-          messagesWrapperRef={messagesWrapperRef}
+          scrollTargetId={scrollTargetId}
+          setScrollTargetId={setScrollTargetId}
+          setHasNewMessages={setHasNewMessages}
+          pendingScrollToBottomRef={pendingScrollToBottomRef}
+          expandedToolIds={expandedToolIds}
+          toolsExpanded={toolsExpanded}
+          sessionPath={session.path}
+          isAtBottomRef={sessionDataIsAtBottomRef}
+          onReachBottom={handleReachBottom}
           toolResultByCallId={toolResultByCallId}
           showScrollMarkers={showScrollMarkers}
           isMobile={isMobile}

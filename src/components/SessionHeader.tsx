@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { LegacySessionStats } from '../types'
 import { formatDate, formatTokens } from '../utils/format'
 import { escapeHtml } from '../utils/markdown'
@@ -9,7 +10,7 @@ interface SessionHeaderProps {
   stats: LegacySessionStats
 }
 
-export default function SessionHeader({ sessionId, timestamp, stats }: SessionHeaderProps) {
+function SessionHeader({ sessionId, timestamp, stats }: SessionHeaderProps) {
   const { t } = useTranslation()
   const totalCost = stats.cost.input + stats.cost.output + stats.cost.cacheRead + stats.cost.cacheWrite
 
@@ -59,3 +60,5 @@ export default function SessionHeader({ sessionId, timestamp, stats }: SessionHe
     </div>
   )
 }
+
+export default memo(SessionHeader)

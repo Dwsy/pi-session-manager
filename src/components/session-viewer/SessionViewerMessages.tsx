@@ -1,29 +1,47 @@
-import type { PointerEvent as ReactPointerEvent, RefObject } from "react";
-import type { Virtualizer } from "@tanstack/react-virtual";
+import {
+  forwardRef,
+  useImperativeHandle,
+  type Dispatch,
+  type MutableRefObject,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+  type SetStateAction,
+} from "react";
 import { ArrowDown, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import SessionHeader from "../SessionHeader";
 import SessionScrollMarkers from "../SessionScrollMarkers";
+import { useSessionViewerVirtualScroll } from "../../hooks/useSessionViewerVirtualScroll";
 import type { ScrollMarker } from "../../hooks/useSessionScrollMarkers";
 import type { LegacySessionStats, SessionEntry } from "../../types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
 
 const MESSAGE_ITEM_GAP = 16;
 
+export interface SessionViewerMessagesRef {
+  scrollToTop: () => void;
+  scrollToBottom: () => void;
+}
+
 export interface SessionViewerMessagesProps {
+  loading: boolean;
   showLoading: boolean;
   error: string | null;
-  isAtBottom: boolean;
   hasNewMessages: boolean;
-  onNewMessagesClick: () => void;
   sessionId: string;
   headerTimestamp?: string;
   stats: LegacySessionStats;
   renderableEntries: SessionEntry[];
-  rowVirtualizer: Virtualizer<HTMLDivElement, HTMLDivElement>;
-  messagesContainerRef: RefObject<HTMLDivElement>;
-  messagesWrapperRef: RefObject<HTMLDivElement>;
+  scrollTargetId: string | null;
+  setScrollTargetId: Dispatch<SetStateAction<string | null>>;
+  setHasNewMessages: Dispatch<SetStateAction<boolean>>;
+  pendingScrollToBottomRef: MutableRefObject<boolean>;
+  expandedToolIds: Set<string>;
+  toolsExpanded: boolean;
+  sessionPath: string;
+  isAtBottomRef: MutableRefObject<boolean>;
+  onReachBottom?: () => void;
   toolResultByCallId: Map<string, SessionEntry>;
   showScrollMarkers: boolean;
   isMobile: boolean;
@@ -38,19 +56,27 @@ export interface SessionViewerMessagesProps {
   isScrollMarkersFeatureEnabled: boolean;
 }
 
-export default function SessionViewerMessages({
+const SessionViewerMessages = forwardRef<
+  SessionViewerMessagesRef,
+  SessionViewerMessagesProps
+>(function SessionViewerMessages({
+  loading,
   showLoading,
   error,
-  isAtBottom,
   hasNewMessages,
-  onNewMessagesClick,
   sessionId,
   headerTimestamp,
   stats,
   renderableEntries,
-  rowVirtualizer,
-  messagesContainerRef,
-  messagesWrapperRef,
+  scrollTargetId,
+  setScrollTargetId,
+  setHasNewMessages,
+  pendingScrollToBottomRef,
+  expandedToolIds,
+  toolsExpanded,
+  sessionPath,
+  isAtBottomRef,
+  onReachBottom,
   toolResultByCallId,
   showScrollMarkers,
   isMobile,
@@ -63,8 +89,42 @@ export default function SessionViewerMessages({
   onPointerUp,
   onPointerLeave,
   isScrollMarkersFeatureEnabled,
-}: SessionViewerMessagesProps) {
+}: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
+  const {
+    messagesContainerRef,
+    messagesWrapperRef,
+    rowVirtualizer,
+    isAtBottom,
+    scrollToTop,
+    scrollToBottom,
+  } = useSessionViewerVirtualScroll({
+    renderableEntries,
+    loading,
+    error,
+    scrollTargetId,
+    setScrollTargetId,
+    setHasNewMessages,
+    pendingScrollToBottomRef,
+    expandedToolIds,
+    toolsExpanded,
+    sessionPath,
+    isAtBottomRef,
+    onReachBottom,
+  });
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToTop,
+      scrollToBottom: () => {
+        scrollToBottom();
+      },
+    }),
+    [scrollToBottom, scrollToTop],
+  );
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
 
   if (showLoading) {
     return (
@@ -92,7 +152,10 @@ export default function SessionViewerMessages({
     <div className="flex-1 relative min-h-0 overflow-hidden">
       {!isAtBottom && hasNewMessages && (
         <button
-          onClick={onNewMessagesClick}
+          onClick={() => {
+            scrollToBottom();
+            setHasNewMessages(false);
+          }}
           className="absolute bottom-4 right-4 z-10 flex items-center gap-1 rounded-full bg-secondary hover:bg-secondary-hover text-xs text-foreground px-3 py-2 shadow-lg transition-colors"
           title={t("session.scrollToBottom", "滚动到底部")}
         >
@@ -115,7 +178,7 @@ export default function SessionViewerMessages({
               className="relative w-full"
               style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
             >
-              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              {virtualRows.map((virtualRow) => {
                 const entry = renderableEntries[virtualRow.index];
                 if (!entry) return null;
                 return (
@@ -162,4 +225,8 @@ export default function SessionViewerMessages({
       )}
     </div>
   );
-}
+});
+
+SessionViewerMessages.displayName = "SessionViewerMessages";
+
+export default SessionViewerMessages;
