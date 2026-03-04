@@ -111,6 +111,7 @@ function SessionViewerContent({
   });
 
   const handleToggleSidebar = useCallback(() => {
+    setShowMobileMenu(false);
     setShowSidebar((prev) => {
       const next = !prev;
       if (next && isMobile) {
@@ -121,6 +122,7 @@ function SessionViewerContent({
   }, [isMobile]);
 
   const handleToggleSidebarHotkey = useCallback(() => {
+    setShowMobileMenu(false);
     setShowSidebar((prev) => {
       const next = !prev;
       if (next) {
@@ -202,6 +204,7 @@ function SessionViewerContent({
         treeRef={treeRef}
         sidebarRef={sidebarRef}
         resizeHandleRef={resizeHandleRef}
+        outlineTitle={t("session.toolbar.outline", "大纲")}
         hideSidebarTitle={t("session.hideSidebar")}
       />
 

@@ -5,6 +5,18 @@ export const session = {
   scrollToTop: '先頭へスクロール',
   scrollToBottom: '末尾へスクロール',
   systemPromptAndTools: 'システムプロンプトとツール',
+  toolbar: {
+    outline: 'アウトライン',
+    thinking: '思考',
+    more: 'その他',
+    moreActions: 'その他の操作',
+    showThinking: '思考を表示',
+    hideThinking: '思考を非表示',
+    expandTools: 'ツールを展開',
+    collapseTools: 'ツールを折りたたむ',
+    showUserMarkers: 'メッセージマーカーを表示',
+    hideUserMarkers: 'メッセージマーカーを非表示',
+  },
   list: {
     empty: 'セッションが見つかりません',
     loading: 'セッション読み込み中...',

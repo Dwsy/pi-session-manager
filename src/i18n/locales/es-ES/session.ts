@@ -5,6 +5,18 @@ export const session = {
   scrollToTop: 'Ir al inicio',
   scrollToBottom: 'Ir al final',
   systemPromptAndTools: 'Prompt del sistema y herramientas',
+  toolbar: {
+    outline: 'Esquema',
+    thinking: 'Pensamiento',
+    more: 'Más',
+    moreActions: 'Más acciones',
+    showThinking: 'Mostrar pensamiento',
+    hideThinking: 'Ocultar pensamiento',
+    expandTools: 'Expandir herramientas',
+    collapseTools: 'Contraer herramientas',
+    showUserMarkers: 'Mostrar marcadores de mensajes',
+    hideUserMarkers: 'Ocultar marcadores de mensajes',
+  },
   list: {
     empty: 'No se encontraron sesiones',
     loading: 'Cargando sesiones...',

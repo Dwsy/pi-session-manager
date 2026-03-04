@@ -33,7 +33,7 @@ function AppMobileFilterBar({
   showSort = true,
 }: AppMobileFilterBarProps) {
   return (
-    <div className="px-3 py-1.5 border-b border-border/50 space-y-1.5">
+    <div className="flex items-center gap-1.5 border-b border-border/50 px-3 py-1.5">
       <SearchFilterBar
         searchQuery={searchQuery}
         onSearchChange={onSearchChange}
@@ -45,11 +45,16 @@ function AppMobileFilterBar({
         getDescendantIds={getDescendantIds}
         placeholder={placeholder}
         compact={true}
+        className="min-w-0 flex-1"
       />
       {showSort && (
-        <div className="flex justify-end">
-          <SessionSortSelect value={sortBy} onChange={onSortByChange} />
-        </div>
+        <SessionSortSelect
+          value={sortBy}
+          onChange={onSortByChange}
+          compact
+          showValueLabel={false}
+          className="shrink-0"
+        />
       )}
     </div>
   );

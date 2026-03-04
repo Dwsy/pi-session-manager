@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { AlertTriangle, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo } from '../types'
 import { useIsMobile } from '../hooks/useIsMobile'
@@ -55,32 +56,52 @@ export default function DeleteSessionConfirmDialog({
   const firstSession = sessions[0]
   const sessionName = firstSession?.name || t('common.untitled')
   const previewSessions = sessions.slice(0, 3)
+  const deleteActionLabel = isBatchDelete
+    ? t('session.list.deleteSelected', {
+      count: sessions.length,
+      defaultValue: 'Delete {{count}}',
+    })
+    : t('common.delete')
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px]"
       onClick={(event) => {
         if (event.target === event.currentTarget && !isDeleting) {
           onCancel()
         }
       }}
     >
-      <div className={`rounded-lg border border-border bg-background p-6 ${isMobile ? 'w-[95vw]' : 'w-[30rem]'}`}>
-        <h3 className="mb-2 text-lg font-semibold">
-          {isBatchDelete
-            ? t('common.deleteSessions', { defaultValue: 'Delete sessions' })
-            : t('common.deleteSession')}
-        </h3>
-        <p className="mb-2 text-sm text-muted-foreground">
-          {isBatchDelete
-            ? t('app.confirm.deleteSessions', {
-              count: sessions.length,
-              defaultValue: 'Delete {{count}} selected sessions?',
-            })
-            : t('app.confirm.deleteSession', { name: sessionName })}
+      <div className={`rounded-xl border border-border/70 bg-background p-6 shadow-2xl ${isMobile ? 'w-[95vw]' : 'w-[30rem]'}`}>
+        <div className="mb-3 flex items-start gap-3">
+          <div className="mt-0.5 rounded-full bg-red-500/12 p-1.5 text-red-500">
+            <AlertTriangle className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-foreground">
+              {isBatchDelete
+                ? t('common.deleteSessions', { defaultValue: 'Delete sessions' })
+                : t('common.deleteSession')}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {isBatchDelete
+                ? t('app.confirm.deleteSessions', {
+                  count: sessions.length,
+                  defaultValue: 'Delete {{count}} selected sessions?',
+                })
+                : t('app.confirm.deleteSession', { name: sessionName })}
+            </p>
+          </div>
+        </div>
+
+        <p className="mb-3 text-xs text-red-500/90">
+          {t('app.confirm.deleteIrreversible', {
+            defaultValue: 'This action cannot be undone.',
+          })}
         </p>
+
         {isBatchDelete ? (
-          <div className="mb-6 space-y-1 text-xs text-muted-foreground/80">
+          <div className="mb-5 max-h-36 space-y-1 overflow-y-auto rounded-md border border-border/60 bg-secondary/25 p-2 text-xs text-muted-foreground/85">
             {previewSessions.map((session) => (
               <p key={session.id} className="break-all">
                 {session.name || t('common.untitled')} · {session.path}
@@ -96,7 +117,9 @@ export default function DeleteSessionConfirmDialog({
             )}
           </div>
         ) : (
-          <p className="mb-6 break-all text-xs text-muted-foreground/80">{firstSession?.path}</p>
+          <p className="mb-5 break-all rounded-md border border-border/60 bg-secondary/25 p-2 text-xs text-muted-foreground/85">
+            {firstSession?.path}
+          </p>
         )}
 
         <div className="flex justify-end gap-2">
@@ -114,9 +137,10 @@ export default function DeleteSessionConfirmDialog({
               void handleConfirm()
             }}
             disabled={isDeleting}
-            className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 motion-color motion-press focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 motion-color motion-press focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {t('common.delete')}
+            {isDeleting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {deleteActionLabel}
           </button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
@@ -90,6 +90,7 @@ export default function SessionList({
     y: number;
     sessionId: string;
   } | null>(null);
+  const lastSelectedSessionIdRef = useRef<string | null>(null);
   const scrollAnchorRef = useRef<{
     sessionId: string;
     top: number;
@@ -105,6 +106,10 @@ export default function SessionList({
   );
   const sessionsById = useMemo(
     () => new Map(sessions.map((session) => [session.id, session] as const)),
+    [sessions],
+  );
+  const sessionIndexById = useMemo(
+    () => new Map(sessions.map((session, index) => [session.id, index] as const)),
     [sessions],
   );
   const totalRows = Math.ceil(sessions.length / Math.max(1, columnCount));
@@ -132,6 +137,59 @@ export default function SessionList({
   );
   const allSessionsSelected =
     sessions.length > 0 && selectedSessionIds.size === sessions.length;
+  const handleExitSelectionMode = useCallback(() => {
+    setIsSelectionMode(false);
+    setSelectedSessionIds(new Set());
+    lastSelectedSessionIdRef.current = null;
+  }, []);
+  const handleEnterSelectionMode = useCallback(() => {
+    setIsSelectionMode(true);
+    if (selectedSession && sessionsById.has(selectedSession.id)) {
+      setSelectedSessionIds(new Set([selectedSession.id]));
+      lastSelectedSessionIdRef.current = selectedSession.id;
+      return;
+    }
+    setSelectedSessionIds(new Set());
+    lastSelectedSessionIdRef.current = null;
+  }, [selectedSession, sessionsById]);
+  const toggleSessionSelection = useCallback(
+    (sessionId: string, shiftKey = false) => {
+      setSelectedSessionIds((prev) => {
+        const next = new Set(prev);
+        const currentIndex = sessionIndexById.get(sessionId);
+        const anchorSessionId = lastSelectedSessionIdRef.current;
+        const anchorIndex = anchorSessionId
+          ? sessionIndexById.get(anchorSessionId)
+          : undefined;
+
+        if (
+          shiftKey &&
+          currentIndex !== undefined &&
+          anchorIndex !== undefined &&
+          sessions.length > 0
+        ) {
+          const rangeStart = Math.min(anchorIndex, currentIndex);
+          const rangeEnd = Math.max(anchorIndex, currentIndex);
+          for (let index = rangeStart; index <= rangeEnd; index += 1) {
+            const target = sessions[index];
+            if (target) {
+              next.add(target.id);
+            }
+          }
+          return next;
+        }
+
+        if (next.has(sessionId)) {
+          next.delete(sessionId);
+        } else {
+          next.add(sessionId);
+        }
+        return next;
+      });
+      lastSelectedSessionIdRef.current = sessionId;
+    },
+    [sessionIndexById, sessions],
+  );
   const rowVirtualizer = useVirtualizer({
     count: totalRows,
     getScrollElement: () => scrollParentRef?.current ?? null,
@@ -242,11 +300,18 @@ export default function SessionList({
   }, [sessions, scrollParentRef]);
 
   useEffect(() => {
+    const liveIds = new Set(sessions.map((session) => session.id));
+    if (
+      lastSelectedSessionIdRef.current &&
+      !liveIds.has(lastSelectedSessionIdRef.current)
+    ) {
+      lastSelectedSessionIdRef.current = null;
+    }
+
     setSelectedSessionIds((prev) => {
       if (prev.size === 0) {
         return prev;
       }
-      const liveIds = new Set(sessions.map((session) => session.id));
       const next = new Set<string>();
       let changed = false;
 
@@ -267,9 +332,8 @@ export default function SessionList({
       return;
     }
 
-    setIsSelectionMode(false);
-    setSelectedSessionIds(new Set());
-  }, [onDeleteSessions]);
+    handleExitSelectionMode();
+  }, [handleExitSelectionMode, onDeleteSessions]);
 
   useEffect(() => {
     if (!isSelectionMode) {
@@ -279,6 +343,22 @@ export default function SessionList({
     setContextMenu(null);
     setTagPickerSessionId(null);
   }, [isSelectionMode]);
+
+  useEffect(() => {
+    if (!isSelectionMode) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        handleExitSelectionMode();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleExitSelectionMode, isSelectionMode]);
 
   useEffect(() => {
     if (!hasMore || !onLoadMore || loadingMore || totalRows === 0) {
@@ -314,29 +394,38 @@ export default function SessionList({
   return (
     <div className="relative">
       {onDeleteSessions && !isSelectionMode && (
-        <div className="pointer-events-none absolute right-2 top-2 z-20">
-          <button
-            type="button"
-            onClick={() => setIsSelectionMode(true)}
-            className="pointer-events-auto inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/40 bg-background/70 text-muted-foreground/80 backdrop-blur motion-color motion-press focus-ring hover:text-foreground"
-            aria-label={t("session.list.selectMode", { defaultValue: "Select mode" })}
-            title={t("session.list.selectMode", { defaultValue: "Select mode" })}
-          >
-            <CheckSquare2 className="h-3.5 w-3.5" />
-          </button>
+        <div className="px-2 pb-1 pt-1">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleEnterSelectionMode}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/60 bg-background/70 text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
+              aria-label={t("session.list.selectMode", { defaultValue: "Select mode" })}
+              title={t("session.list.selectMode", { defaultValue: "Select mode" })}
+            >
+              <CheckSquare2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       )}
 
       {onDeleteSessions && isSelectionMode && (
-        <div className="sticky top-0 z-20 border-b border-border/40 bg-background/95 px-2 pb-2 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/40 px-2 py-1.5">
-            <div className="text-[11px] text-muted-foreground">
-              {t("session.list.selectedCount", {
-                count: selectedSessionIds.size,
-                defaultValue: "{{count}} selected",
-              })}
+        <div className="sticky top-0 z-20 border-b border-border/40 bg-background/95 px-2 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="flex items-center justify-between gap-2 rounded-md border border-primary/25 bg-primary/5 px-2 py-1.5">
+            <div className="min-w-0">
+              <div className="truncate text-[11px] font-medium text-foreground/90">
+                {t("session.list.selectedCount", {
+                  count: selectedSessionIds.size,
+                  defaultValue: "{{count}} selected",
+                })}
+              </div>
+              <div className="hidden truncate text-[10px] text-muted-foreground/80 lg:block">
+                {t("session.list.selectionHint", {
+                  defaultValue: "Click cards to select, Shift+Click for range",
+                })}
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-1">
               <button
                 type="button"
                 onClick={() =>
@@ -349,15 +438,12 @@ export default function SessionList({
                 className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-foreground/5 hover:text-foreground motion-color motion-press focus-ring"
               >
                 {allSessionsSelected
-                  ? t("common.clear", { defaultValue: "Clear" })
-                  : t("common.selectAll", { defaultValue: "Select all" })}
+                  ? t("session.list.clearSelection", { defaultValue: "Clear" })
+                  : t("session.list.selectAll", { defaultValue: "Select all" })}
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setIsSelectionMode(false);
-                  setSelectedSessionIds(new Set());
-                }}
+                onClick={handleExitSelectionMode}
                 className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-foreground/5 hover:text-foreground motion-color motion-press focus-ring"
               >
                 {t("common.cancel")}
@@ -367,15 +453,16 @@ export default function SessionList({
                 disabled={selectedSessions.length === 0}
                 onClick={() => {
                   onDeleteSessions(selectedSessions);
-                  setIsSelectionMode(false);
-                  setSelectedSessionIds(new Set());
                 }}
-                className="rounded bg-red-600 px-2 py-1 text-[11px] text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 motion-color motion-press focus-ring"
+                className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-[11px] text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 motion-color motion-press focus-ring"
               >
-                {t("session.list.deleteSelected", {
-                  count: selectedSessions.length,
-                  defaultValue: "Delete ({{count}})",
-                })}
+                <Trash2 className="h-3 w-3" />
+                <span>
+                  {t("session.list.deleteSelected", {
+                    count: selectedSessions.length,
+                    defaultValue: "Delete {{count}}",
+                  })}
+                </span>
               </button>
             </div>
           </div>
@@ -428,17 +515,9 @@ export default function SessionList({
                       <div
                         key={session.id}
                         data-session-id={session.id}
-                        onClick={() => {
+                        onClick={(event) => {
                           if (isSelectionMode) {
-                            setSelectedSessionIds((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(session.id)) {
-                                next.delete(session.id);
-                              } else {
-                                next.add(session.id);
-                              }
-                              return next;
-                            });
+                            toggleSessionSelection(session.id, event.shiftKey);
                             return;
                           }
                           onSelectSession(session);
@@ -457,7 +536,7 @@ export default function SessionList({
                         }}
                         className={`relative px-3 py-2.5 cursor-pointer motion-surface motion-color group rounded-lg border ${
                           isSelected
-                            ? "border-transparent bg-surface/60"
+                            ? "border-primary/30 bg-surface/75 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]"
                             : "border-transparent hover:bg-surface/60"
                         }`}
                         style={{ contain: "layout paint" }}
@@ -469,15 +548,10 @@ export default function SessionList({
                                 type="button"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  setSelectedSessionIds((prev) => {
-                                    const next = new Set(prev);
-                                    if (next.has(session.id)) {
-                                      next.delete(session.id);
-                                    } else {
-                                      next.add(session.id);
-                                    }
-                                    return next;
-                                  });
+                                  toggleSessionSelection(
+                                    session.id,
+                                    event.shiftKey,
+                                  );
                                 }}
                                 className="mt-0.5 text-muted-foreground/70 hover:text-foreground motion-color motion-press focus-ring rounded"
                                 aria-label={t("session.list.toggleSelection", {

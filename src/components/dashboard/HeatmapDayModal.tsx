@@ -9,6 +9,7 @@ import {
   Folder,
   Clock,
   ArrowUpRight,
+  ChevronRight,
 } from 'lucide-react'
 import type { HeatmapPoint, DayStats } from '../../types'
 
@@ -65,8 +66,8 @@ function withAlpha(color: string, alpha: number): string {
 function metricColor(scale: number): string {
   const clamped = Math.max(0, Math.min(1, scale))
   const hue = 215 - clamped * 95
-  const saturation = 68
-  const lightness = 56
+  const saturation = 52
+  const lightness = 48
   return `hsl(${hue} ${saturation}% ${lightness}%)`
 }
 
@@ -188,40 +189,55 @@ export default function HeatmapDayModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 ui-enter-fade"
+      className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-3 md:p-4 ui-enter-fade"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-background/68 backdrop-blur-[1.5px]"
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-[1040px] h-[min(86vh,780px)] overflow-hidden glass-card rounded-2xl border border-border/20 shadow-2xl ui-enter-zoom">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border/10">
-          <div className="min-w-0 flex items-baseline gap-2.5">
-            <h2 className="text-[2rem] leading-none font-semibold tracking-tight text-foreground truncate">{formattedDate}</h2>
-            <span className="inline-flex items-center gap-1 text-sm font-medium whitespace-nowrap" style={{ color: activityConfig.color }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: activityConfig.color }} />
-              {t(activityConfig.label)}
-            </span>
+      <div className="relative w-full max-w-[980px] h-[min(84vh,700px)] overflow-hidden rounded-2xl border border-border/30 bg-background/95 shadow-[0_18px_40px_rgba(0,0,0,0.28)] ui-enter-zoom flex flex-col">
+        <div className="relative border-b border-border/20 px-4 py-3 sm:px-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[1.48rem] leading-[1.08] font-semibold tracking-tight text-foreground truncate sm:text-[1.72rem]">
+                {formattedDate}
+              </div>
+
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <Badge
+                  tone={activityConfig.color}
+                  label={t(activityConfig.label)}
+                  value={`${point.level}/5`}
+                />
+                <span className="inline-flex items-center rounded-full border border-border/25 bg-muted/25 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  {hasDetailedStats
+                    ? t('dashboard.heatmapModal.detailedMode', 'Detailed mode')
+                    : t('dashboard.heatmapModal.lightweightMode', 'Lightweight mode')}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="shrink-0 rounded-lg border border-border/20 bg-muted/15 p-2 text-muted-foreground hover:text-foreground hover:bg-muted/30 motion-surface motion-color motion-press focus-ring"
+              aria-label={t('common.close')}
+            >
+              <X className="w-4.5 h-4.5" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-muted motion-color motion-press focus-ring"
-            aria-label={t('common.close')}
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
         </div>
 
-        <div className="h-[calc(100%-98px)] p-4 grid grid-rows-[auto_1fr] gap-3">
+        <div className="relative flex-1 min-h-0 p-2.5 sm:p-4 grid grid-rows-[auto_1fr] gap-3">
           {loading ? (
-            <div className="h-full flex items-center justify-center">
+            <div className="h-full rounded-xl border border-border/20 bg-muted/15 flex flex-col items-center justify-center gap-2">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="text-xs text-muted-foreground">{t('dashboard.loading', 'Loading dashboard...')}</div>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
                 <StatCard
                   icon={Terminal}
                   label={t('dashboard.stats.sessions')}
@@ -256,17 +272,17 @@ export default function HeatmapDayModal({
                 />
               </div>
 
-              <div className="min-h-0 grid grid-cols-1 xl:grid-cols-12 gap-3">
+              <div className="min-h-0 grid grid-cols-1 xl:grid-cols-12 gap-2.5">
                 <section
                   ref={projectsRef}
-                  className={`xl:col-span-5 rounded-xl border bg-muted/25 border-border/15 p-4 min-h-0 flex flex-col ${focusPanel === 'projects' ? 'ring-1 ring-primary/60' : ''}`}
+                  className={`xl:col-span-5 rounded-xl border bg-muted/20 border-border/20 p-3.5 min-h-0 flex flex-col ${focusPanel === 'projects' ? 'ring-1 ring-primary/45' : ''}`}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                       <Folder className="w-4 h-4 text-muted-foreground" />
                       {t('dashboard.stats.projects')}
                     </h3>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="inline-flex items-center rounded-full border border-border/20 bg-background/25 px-2 py-0.5 text-[10px] text-muted-foreground tabular-nums">
                       {hasProjects ? `${stats.project_breakdown.length}` : '--'}
                     </span>
                   </div>
@@ -285,15 +301,15 @@ export default function HeatmapDayModal({
                           <button
                             key={`${project.project_path}-${project.project_name}`}
                             type="button"
-                            className={`w-full text-left rounded-lg px-2 py-1.5 border border-transparent ${canFilter ? 'hover:bg-muted/55 hover:border-border/20 motion-surface motion-color focus-ring' : ''}`}
+                            className={`w-full text-left rounded-lg border px-2 py-1.5 ${canFilter ? 'border-border/15 bg-background/18 hover:bg-background/28 hover:border-border/30 motion-surface motion-color focus-ring' : 'border-transparent bg-transparent'}`}
                             onClick={() => canFilter && onFilterProject?.(target)}
                             disabled={!canFilter}
                           >
-                            <div className="flex items-center justify-between text-sm leading-tight">
-                              <span className="font-medium text-foreground truncate max-w-[72%]">{project.project_name}</span>
-                              <span className="tabular-nums text-xs" style={{ color: projectColor }}>{percentage.toFixed(0)}%</span>
+                            <div className="flex items-center justify-between gap-2 text-sm leading-tight">
+                              <span className="font-medium text-foreground truncate">{project.project_name}</span>
+                              <span className="tabular-nums text-xs font-medium" style={{ color: projectColor }}>{percentage.toFixed(0)}%</span>
                             </div>
-                            <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
+                            <div className="mt-1 h-1 bg-muted/65 rounded-full overflow-hidden">
                               <div
                                 className="h-full rounded-full motion-width"
                                 style={{
@@ -302,7 +318,7 @@ export default function HeatmapDayModal({
                                 }}
                               />
                             </div>
-                            <div className="mt-1 text-[11px] text-muted-foreground flex items-center gap-2.5 tabular-nums">
+                            <div className="mt-1 text-[10px] text-muted-foreground flex items-center gap-2 tabular-nums">
                               <span>{formatCompactNumber(project.session_count)} s</span>
                               <span>{formatCompactNumber(project.message_count)} m</span>
                               <span>{formatCompactNumber(project.token_count)} t</span>
@@ -322,8 +338,8 @@ export default function HeatmapDayModal({
                   )}
                 </section>
 
-                <div className="xl:col-span-7 min-h-0 grid grid-rows-[auto_1fr] gap-4">
-                  <section className="rounded-xl border bg-muted/25 border-border/15 p-4">
+                <div className="xl:col-span-7 min-h-0 grid grid-rows-[auto_1fr] gap-2.5">
+                  <section className="rounded-xl border bg-muted/20 border-border/20 p-3.5">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                         <Clock className="w-4 h-4 text-muted-foreground" />
@@ -333,7 +349,7 @@ export default function HeatmapDayModal({
                         <button
                           type="button"
                           onClick={() => setSelectedHour(null)}
-                          className="text-xs text-primary hover:text-primary/80 motion-color focus-ring"
+                          className="inline-flex items-center rounded-full border border-border/30 bg-background/20 px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:border-border/50 motion-color focus-ring"
                         >
                           {t('common.clear', 'Clear')} {selectedHour.toString().padStart(2, '0')}:00
                         </button>
@@ -342,7 +358,7 @@ export default function HeatmapDayModal({
 
                     {hasHourlyData ? (
                       <>
-                        <div className="grid grid-cols-3 gap-2 mb-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2.5">
                           <MiniMetric
                             label={t('dashboard.hourly.peakHour', 'Peak Hour')}
                             value={`${peakHour.hour.toString().padStart(2, '0')}:00`}
@@ -360,11 +376,11 @@ export default function HeatmapDayModal({
                           />
                         </div>
 
-                        <div className="text-[11px] text-muted-foreground mb-2">
+                        <div className="text-[10px] text-muted-foreground mb-1.5">
                           {t('dashboard.hourly.clickToFilter', 'Click bars to filter sessions by hour')}
                         </div>
 
-                        <div className="grid gap-1 items-end h-16" style={{ gridTemplateColumns: 'repeat(24, minmax(0, 1fr))' }}>
+                        <div className="grid gap-[2px] items-end h-[60px] rounded-lg border border-border/15 bg-background/16 px-1.5 py-1.5" style={{ gridTemplateColumns: 'repeat(24, minmax(0, 1fr))' }}>
                           {hourlyData.map((item) => {
                             const heightPercent = (item.count / maxHourly) * 100
                             const isSelected = selectedHour === item.hour
@@ -373,7 +389,7 @@ export default function HeatmapDayModal({
                               <button
                                 key={item.hour}
                                 type="button"
-                                className={`h-full rounded-[2px] relative overflow-hidden ${isSelected ? 'ring-1 ring-primary' : ''}`}
+                                className={`h-full rounded-[2px] relative overflow-hidden motion-color ${isSelected ? 'ring-1 ring-info/65' : 'hover:bg-background/30'}`}
                                 style={{ backgroundColor: item.count === 0 ? 'rgba(148, 163, 184, 0.12)' : hexToRgba(barColor, 0.18) }}
                                 title={`${item.hour.toString().padStart(2, '0')}:00 · ${item.count}`}
                                 onClick={() => setSelectedHour((current) => (current === item.hour ? null : item.hour))}
@@ -382,7 +398,7 @@ export default function HeatmapDayModal({
                                   className="absolute bottom-0 left-0 right-0"
                                   style={{
                                     height: `${heightPercent}%`,
-                                    backgroundColor: isSelected ? '#6366f1' : barColor,
+                                    backgroundColor: isSelected ? '#569cd6' : barColor,
                                   }}
                                 />
                               </button>
@@ -390,7 +406,7 @@ export default function HeatmapDayModal({
                           })}
                         </div>
 
-                        <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground tabular-nums">
+                        <div className="flex items-center justify-between mt-1.5 px-1 text-[10px] text-muted-foreground tabular-nums">
                           <span>00</span>
                           <span>06</span>
                           <span>12</span>
@@ -409,7 +425,7 @@ export default function HeatmapDayModal({
 
                   <section
                     ref={sessionsRef}
-                    className={`rounded-xl border bg-muted/25 border-border/15 p-4 min-h-0 flex flex-col ${focusPanel === 'sessions' ? 'ring-1 ring-primary/60' : ''}`}
+                    className={`rounded-xl border bg-muted/20 border-border/20 p-3.5 min-h-0 flex flex-col ${focusPanel === 'sessions' ? 'ring-1 ring-primary/45' : ''}`}
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
@@ -437,14 +453,14 @@ export default function HeatmapDayModal({
                               key={session.path}
                               type="button"
                               onClick={() => onOpenSession?.(session.path)}
-                              className={`w-full rounded-lg border border-border/10 bg-muted/35 px-2.5 py-1.5 text-left ${onOpenSession ? 'hover:border-border/30 motion-surface motion-color focus-ring' : ''}`}
+                              className={`group relative w-full rounded-lg border bg-background/18 px-2.5 py-1.5 text-left ${onOpenSession ? 'border-border/15 hover:border-border/30 hover:bg-background/28 motion-surface motion-color focus-ring' : 'border-border/12'}`}
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="min-w-0 flex-1">
                                   <div className="text-[13px] font-medium text-foreground truncate">
                                     {session.name || session.cwd.split('/').pop()}
                                   </div>
-                                  <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-2.5 tabular-nums">
+                                  <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-2 tabular-nums">
                                     <span>{format(parseISO(session.timestamp), 'HH:mm')}</span>
                                     <span className="truncate max-w-[140px]">{session.model}</span>
                                     <span className="inline-flex items-center gap-1">
@@ -454,7 +470,7 @@ export default function HeatmapDayModal({
                                     <span>{formatCompactNumber(session.token_count)}t</span>
                                   </div>
                                 </div>
-                                {onOpenSession && <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground" />}
+                                {onOpenSession && <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground motion-color" />}
                               </div>
                             </button>
                           )
@@ -490,42 +506,66 @@ function StatCard({ icon: Icon, label, value, color, emphasis, onClick, hint }: 
   return (
     <button
       type="button"
-      className={`p-3 rounded-xl border border-border/10 bg-muted/40 text-left w-full ${interactive ? 'hover:border-border/25 motion-surface motion-color motion-press focus-ring' : 'cursor-default'}`}
+      className={`group rounded-xl border px-2.5 py-2.5 text-left w-full ${interactive ? 'border-border/18 bg-muted/15 hover:bg-muted/30 hover:border-border/35 motion-surface motion-color motion-press focus-ring' : 'border-border/14 bg-muted/10 cursor-default'}`}
       onClick={onClick}
       disabled={!interactive}
     >
-      <div className="flex items-center gap-2 mb-1">
-        <div className="p-1.5 rounded-md" style={{ backgroundColor: hexToRgba(color, 0.14) }}>
-          <span style={{ color }}>
-            <Icon className="w-4 h-4" />
-          </span>
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="p-1 rounded-md" style={{ backgroundColor: hexToRgba(color, 0.12) }}>
+            <span style={{ color }}>
+              <Icon className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <span className="text-[11px] text-muted-foreground truncate">{label}</span>
         </div>
-        <span className="text-xs text-muted-foreground">{label}</span>
+        {interactive && (
+          <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:text-foreground motion-color" />
+        )}
       </div>
-      <div className="text-3xl font-semibold tracking-tight text-foreground tabular-nums leading-none">{value}</div>
-      <div className="mt-2 h-0.5 rounded-full bg-muted overflow-hidden">
-        <div className="h-full rounded-full motion-width" style={{ width: `${Math.max(8, emphasis * 100)}%`, backgroundColor: withAlpha(tone, 0.8) }} />
+
+      <div className="text-[1.78rem] font-semibold tracking-tight text-foreground tabular-nums leading-none">{value}</div>
+      <div className="mt-2 h-[2px] rounded-full bg-muted/65 overflow-hidden">
+        <div className="h-full rounded-full motion-width" style={{ width: `${Math.max(8, emphasis * 100)}%`, backgroundColor: withAlpha(tone, 0.72) }} />
       </div>
-      {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
+
+      {hint && <div className="text-[10px] text-muted-foreground mt-1">{hint}</div>}
     </button>
+  )
+}
+
+function Badge({ tone, label, value }: { tone: string; label: string; value: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium"
+      style={{
+        color: withAlpha(tone, 0.92),
+        borderColor: withAlpha(tone, 0.24),
+        backgroundColor: withAlpha(tone, 0.08),
+      }}
+    >
+      <span className="w-1 h-1 rounded-full" style={{ backgroundColor: withAlpha(tone, 0.9) }} />
+      <span>{label}</span>
+      <span className="tabular-nums text-muted-foreground">{value}</span>
+    </span>
   )
 }
 
 function MiniMetric({ label, value, accent }: { label: string; value: string; accent: string }) {
   return (
-    <div className="rounded-lg border border-border/10 bg-muted/40 px-2.5 py-2">
+    <div className="rounded-lg border border-border/15 bg-background/18 px-2.5 py-2">
       <div className="flex items-center gap-1.5">
-        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: withAlpha(accent, 0.85) }} />
-        <div className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</div>
+        <span className="w-1 h-1 rounded-full" style={{ backgroundColor: withAlpha(accent, 0.85) }} />
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wide truncate">{label}</div>
       </div>
-      <div className="text-base font-semibold text-foreground tabular-nums mt-1">{value}</div>
+      <div className="text-[0.98rem] font-semibold text-foreground tabular-nums mt-1">{value}</div>
     </div>
   )
 }
 
 function EmptyHint({ text }: { text: string }) {
   return (
-    <div className="h-full rounded-lg border border-border/10 bg-muted/35 px-3 py-2 text-sm text-muted-foreground flex items-center">
+    <div className="h-full rounded-lg border border-border/15 bg-background/18 px-2.5 py-2 text-xs text-muted-foreground flex items-center">
       {text}
     </div>
   )

@@ -62,6 +62,8 @@ function AppDesktopSearchBar({
         <SessionSortSelect
           value={sortBy}
           onChange={onSortByChange}
+          compact
+          showValueLabel={false}
           className="shrink-0"
         />
       )}
