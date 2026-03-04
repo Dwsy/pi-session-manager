@@ -1,9 +1,22 @@
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::{HashMap, HashSet};
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SessionModelUsage {
+    pub messages: usize,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_read_tokens: u64,
+    pub cache_write_tokens: u64,
+    pub cost: f64,
+}
 
 /// Parse session file to extract detailed statistics
 pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
     let mut details = SessionDetails::default();
-    let mut model_set: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut model_set: HashSet<String> = HashSet::new();
     let mut first_message_time: Option<chrono::DateTime<chrono::Utc>> = None;
     let mut last_message_time: Option<chrono::DateTime<chrono::Utc>> = None;
 
@@ -26,39 +39,50 @@ pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
                         details.assistant_messages += 1;
 
                         // Extract model and provider
-                        if let Some(model) = message["model"].as_str() {
+                        let model_name = message["model"].as_str().map(|model| {
                             let provider = message["provider"].as_str().unwrap_or("unknown");
-                            let model_name = if provider != "unknown" {
+                            if provider != "unknown" {
                                 format!("{provider}/{model}")
                             } else {
                                 model.to_string()
-                            };
-                            model_set.insert(model_name);
-                        }
+                            }
+                        });
 
-                        // Extract token usage
-                        if let Some(usage) = message.get("usage") {
-                            let input = usage["input"].as_u64().unwrap_or(0);
-                            let output = usage["output"].as_u64().unwrap_or(0);
-                            let cache_read = usage["cacheRead"].as_u64().unwrap_or(0);
-                            let cache_write = usage["cacheWrite"].as_u64().unwrap_or(0);
+                        if let Some(model_name) = model_name {
+                            model_set.insert(model_name.clone());
 
-                            details.input_tokens += input;
-                            details.output_tokens += output;
-                            details.cache_read_tokens += cache_read;
-                            details.cache_write_tokens += cache_write;
+                            if let Some(usage) = message.get("usage") {
+                                let input = usage["input"].as_u64().unwrap_or(0);
+                                let output = usage["output"].as_u64().unwrap_or(0);
+                                let cache_read = usage["cacheRead"].as_u64().unwrap_or(0);
+                                let cache_write = usage["cacheWrite"].as_u64().unwrap_or(0);
 
-                            // Extract cost
-                            if let Some(cost) = usage.get("cost") {
-                                let input_cost = cost["input"].as_f64().unwrap_or(0.0);
-                                let output_cost = cost["output"].as_f64().unwrap_or(0.0);
-                                let cache_read_cost = cost["cacheRead"].as_f64().unwrap_or(0.0);
-                                let cache_write_cost = cost["cacheWrite"].as_f64().unwrap_or(0.0);
+                                details.input_tokens += input;
+                                details.output_tokens += output;
+                                details.cache_read_tokens += cache_read;
+                                details.cache_write_tokens += cache_write;
 
-                                details.input_cost += input_cost;
-                                details.output_cost += output_cost;
-                                details.cache_read_cost += cache_read_cost;
-                                details.cache_write_cost += cache_write_cost;
+                                let model_usage =
+                                    details.model_usage.entry(model_name).or_default();
+                                model_usage.messages += 1;
+                                model_usage.input_tokens += input;
+                                model_usage.output_tokens += output;
+                                model_usage.cache_read_tokens += cache_read;
+                                model_usage.cache_write_tokens += cache_write;
+
+                                if let Some(cost) = usage.get("cost") {
+                                    let input_cost = cost["input"].as_f64().unwrap_or(0.0);
+                                    let output_cost = cost["output"].as_f64().unwrap_or(0.0);
+                                    let cache_read_cost = cost["cacheRead"].as_f64().unwrap_or(0.0);
+                                    let cache_write_cost = cost["cacheWrite"].as_f64().unwrap_or(0.0);
+
+                                    details.input_cost += input_cost;
+                                    details.output_cost += output_cost;
+                                    details.cache_read_cost += cache_read_cost;
+                                    details.cache_write_cost += cache_write_cost;
+                                    model_usage.cost +=
+                                        input_cost + output_cost + cache_read_cost + cache_write_cost;
+                                }
                             }
                         }
                     } else if role == "toolResult" {
@@ -109,6 +133,7 @@ pub struct SessionDetails {
     pub output_cost: f64,
     pub cache_read_cost: f64,
     pub cache_write_cost: f64,
+    pub model_usage: HashMap<String, SessionModelUsage>,
     pub models: Vec<String>,
     pub first_message_time: Option<chrono::DateTime<chrono::Utc>>,
     pub last_message_time: Option<chrono::DateTime<chrono::Utc>>,

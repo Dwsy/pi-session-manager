@@ -8,6 +8,7 @@ use std::sync::Mutex;
 
 lazy_static! {
     static ref TOKENS: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
+    static ref RUNTIME_TOKENS: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
     static ref ENABLED: Mutex<bool> = Mutex::new(false);
 }
 
@@ -171,11 +172,34 @@ pub fn update_last_used(token: &str) {
 }
 
 pub fn validate(token: &str) -> bool {
-    let valid = TOKENS.lock().unwrap().contains(token);
-    if valid {
-        update_last_used(token);
+    let runtime_tokens = RUNTIME_TOKENS.lock().unwrap();
+    if !runtime_tokens.is_empty() {
+        return runtime_tokens.contains(token);
     }
-    valid
+    drop(runtime_tokens);
+
+    let persistent_valid = TOKENS.lock().unwrap().contains(token);
+    if persistent_valid {
+        update_last_used(token);
+        return true;
+    }
+    false
+}
+
+/// Set runtime-only tokens (not persisted in database).
+/// Empty vector clears previously configured runtime tokens and falls back to DB tokens.
+pub fn set_runtime_tokens(tokens: Vec<String>) -> Result<(), String> {
+    let mut normalized = HashSet::new();
+    for token in tokens {
+        let trimmed = token.trim();
+        if trimmed.is_empty() {
+            return Err("Runtime token cannot be empty".to_string());
+        }
+        normalized.insert(trimmed.to_string());
+    }
+
+    *RUNTIME_TOKENS.lock().unwrap() = normalized;
+    Ok(())
 }
 
 pub fn is_auth_required(ip: &IpAddr) -> bool {

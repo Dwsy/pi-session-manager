@@ -1,5 +1,6 @@
 use serde_json::Value;
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub async fn export_session(
@@ -16,20 +17,38 @@ pub async fn export_session(
 }
 
 fn export_using_pi_command(session_path: &str, output_path: &str) -> Result<(), String> {
-    // Use PI export command to generate HTML
-    let output = Command::new("pi")
-        .arg("--export")
-        .arg(session_path)
-        .arg(output_path)
-        .output()
-        .map_err(|e| format!("Failed to execute pi command: {e}"))?;
+    let mut attempts = Vec::new();
+    let mut tried = std::collections::HashSet::new();
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Pi export command failed: {stderr}"));
+    for command in pi_command_candidates() {
+        if !tried.insert(command.clone()) {
+            continue;
+        }
+
+        match Command::new(&command)
+            .arg("--export")
+            .arg(session_path)
+            .arg(output_path)
+            .output()
+        {
+            Ok(output) if output.status.success() => return Ok(()),
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                let detail = if stderr.is_empty() {
+                    "unknown error".to_string()
+                } else {
+                    stderr
+                };
+                attempts.push(format!("{command}: {detail}"));
+            }
+            Err(e) => attempts.push(format!("{command}: {e}")),
+        }
     }
 
-    Ok(())
+    Err(format!(
+        "Pi export command failed. attempts: {}",
+        attempts.join(" | ")
+    ))
 }
 
 /// Build the system prompt for a session by calling pi's buildSystemPrompt via node.
@@ -53,9 +72,10 @@ pub fn extract_system_prompt(session_path: &str) -> Result<String, String> {
 import {{ buildSystemPrompt }} from '{pkg_path}/dist/core/system-prompt.js';
 import {{ readFileSync, existsSync }} from 'fs';
 import {{ join }} from 'path';
+import {{ homedir }} from 'os';
 
 const cwd = {cwd_json};
-const home = process.env.HOME || '';
+const home = process.env.HOME || process.env.USERPROFILE || homedir() || '';
 const piDir = join(home, '.pi', 'agent');
 
 // Read APPEND_SYSTEM.md
@@ -111,35 +131,112 @@ process.stdout.write(prompt);
 
 /// Find the pi-coding-agent module path
 fn which_pi_module() -> Option<String> {
-    // Try `which pi` to find the binary, then resolve the package
-    let output = Command::new("which").arg("pi").output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let pi_bin = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    // pi binary is typically a symlink: .../bin/pi -> ../lib/node_modules/@mariozechner/pi-coding-agent/dist/cli.js
-    let resolved = fs::read_link(&pi_bin)
-        .map(|p| {
-            if p.is_relative() {
-                std::path::Path::new(&pi_bin)
-                    .parent()
-                    .unwrap_or(std::path::Path::new(""))
-                    .join(&p)
-            } else {
-                p
-            }
-        })
-        .unwrap_or_else(|_| std::path::PathBuf::from(&pi_bin));
+    let pi_bin = find_pi_executable()?;
+    let resolved = fs::canonicalize(&pi_bin).unwrap_or(pi_bin.clone());
 
-    // Walk up to find the package root (contains package.json)
-    let mut dir = resolved.parent()?;
-    for _ in 0..5 {
-        if dir.join("package.json").exists() {
-            return Some(dir.to_string_lossy().to_string());
+    find_pi_package_root(&resolved)
+        .or_else(|| find_pi_package_root(&pi_bin))
+        .map(|dir| dir.to_string_lossy().to_string())
+}
+
+fn pi_command_candidates() -> Vec<String> {
+    let mut candidates = Vec::new();
+
+    if let Some(path) = find_pi_executable() {
+        candidates.push(path.to_string_lossy().to_string());
+    }
+
+    candidates.push("pi".to_string());
+
+    #[cfg(target_os = "windows")]
+    {
+        candidates.push("pi.cmd".to_string());
+        candidates.push("pi.exe".to_string());
+    }
+
+    candidates
+}
+
+fn find_pi_executable() -> Option<PathBuf> {
+    find_executable_in_path("pi")
+        .or_else(|| find_executable_in_path("pi.cmd"))
+        .or_else(|| find_executable_in_path("pi.exe"))
+}
+
+fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
+    let direct = Path::new(executable);
+    if direct.is_absolute() || executable.contains('/') || executable.contains('\\') {
+        if direct.is_file() {
+            return Some(direct.to_path_buf());
+        }
+    }
+
+    let path_var = std::env::var_os("PATH")?;
+    let candidates = command_name_candidates(executable);
+
+    for dir in std::env::split_paths(&path_var) {
+        for candidate in &candidates {
+            let full = dir.join(candidate);
+            if full.is_file() {
+                return Some(full);
+            }
+        }
+    }
+
+    None
+}
+
+fn command_name_candidates(executable: &str) -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    {
+        if Path::new(executable).extension().is_some() {
+            return vec![executable.to_string()];
+        }
+
+        let mut out = Vec::new();
+        let path_ext =
+            std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_string());
+        for ext in path_ext.split(';').filter(|ext| !ext.trim().is_empty()) {
+            out.push(format!("{executable}{ext}"));
+        }
+        out.push(executable.to_string());
+        out
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        vec![executable.to_string()]
+    }
+}
+
+fn find_pi_package_root(binary_path: &Path) -> Option<PathBuf> {
+    // npm/pnpm global installs may place wrappers in bin directories.
+    let wrapper_dir = binary_path.parent()?;
+    let package_candidates = [
+        wrapper_dir.join("node_modules/@mariozechner/pi-coding-agent"),
+        wrapper_dir.join("../node_modules/@mariozechner/pi-coding-agent"),
+        wrapper_dir.join("../lib/node_modules/@mariozechner/pi-coding-agent"),
+    ];
+
+    for candidate in package_candidates {
+        if is_pi_package_root(&candidate) {
+            return Some(candidate);
+        }
+    }
+
+    let mut dir = wrapper_dir;
+    for _ in 0..8 {
+        if is_pi_package_root(dir) {
+            return Some(dir.to_path_buf());
         }
         dir = dir.parent()?;
     }
+
     None
+}
+
+fn is_pi_package_root(path: &Path) -> bool {
+    path.join("package.json").is_file() && path.join("dist/core/system-prompt.js").is_file()
 }
 
 fn export_as_json(session_path: &str, output_path: &str) -> Result<(), String> {

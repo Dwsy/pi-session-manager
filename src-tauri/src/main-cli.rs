@@ -4,7 +4,7 @@ use pi_session_manager::embedding_service::{
 };
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 // CLI-specific state (no Tauri dependencies)
 pub struct CliAppState {
@@ -33,14 +33,158 @@ impl CliAppState {
 
 pub type SharedCliState = Arc<CliAppState>;
 
+#[derive(Debug, Default)]
+struct CliArgs {
+    show_help: bool,
+    http_port: Option<u16>,
+    bind_addr: Option<String>,
+    auth_enabled: Option<bool>,
+    runtime_token: Option<String>,
+}
+
+fn parse_port_arg(value: &str, flag: &str) -> Result<u16, String> {
+    value
+        .parse::<u16>()
+        .map_err(|_| format!("Invalid value for {flag}: `{value}`"))
+}
+
+fn parse_cli_args() -> Result<CliArgs, String> {
+    let raw_args: Vec<String> = std::env::args().skip(1).collect();
+    if raw_args.iter().any(|arg| arg == "-h" || arg == "--help") {
+        return Ok(CliArgs {
+            show_help: true,
+            ..CliArgs::default()
+        });
+    }
+
+    let mut parsed = CliArgs::default();
+    let mut iter = raw_args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "-p" | "--port" => {
+                let value = iter
+                    .next()
+                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
+                parsed.http_port = Some(parse_port_arg(value, arg)?);
+            }
+            "-b" | "--bind" => {
+                let value = iter
+                    .next()
+                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
+                if value.trim().is_empty() {
+                    return Err(format!("Invalid value for `{arg}`: empty address"));
+                }
+                parsed.bind_addr = Some(value.clone());
+            }
+            "--auth" => {
+                if parsed.auth_enabled == Some(false) {
+                    return Err("Cannot use `--auth` with `--no-auth`".to_string());
+                }
+                parsed.auth_enabled = Some(true);
+            }
+            "--no-auth" => {
+                if parsed.auth_enabled == Some(true) {
+                    return Err("Cannot use `--auth` with `--no-auth`".to_string());
+                }
+                parsed.auth_enabled = Some(false);
+            }
+            "--token" => {
+                let value = iter
+                    .next()
+                    .ok_or_else(|| "Missing value for `--token`".to_string())?;
+                let token = value.trim();
+                if token.is_empty() {
+                    return Err("Invalid value for `--token`: empty token".to_string());
+                }
+                parsed.runtime_token = Some(token.to_string());
+            }
+            _ => return Err(format!("Unknown argument: `{arg}`")),
+        }
+    }
+
+    Ok(parsed)
+}
+
+fn print_help() {
+    let default_path = default_config_path();
+    println!(
+        "Pi Session Manager CLI\n\
+         \n\
+         USAGE:\n\
+           pi-session-cli [OPTIONS]\n\
+         \n\
+         OPTIONS:\n\
+           -h, --help           Show this help message\n\
+           -p, --port <PORT>    HTTP server port (overrides config http_port)\n\
+           -b, --bind <ADDR>    Bind address (overrides config bind_addr)\n\
+               --auth           Enable auth (requires token for non-local requests)\n\
+               --no-auth        Disable auth\n\
+               --token <TOKEN>  Runtime-only token, overrides DB tokens for this process\n\
+         \n\
+         NOTES:\n\
+           - Config file default: {}",
+        default_path.display()
+    );
+}
+
+fn apply_cli_overrides(server_cfg: &mut ServerConfig, cli_args: &CliArgs) {
+    if let Some(port) = cli_args.http_port {
+        server_cfg.http_port = port;
+    }
+    if let Some(bind_addr) = &cli_args.bind_addr {
+        server_cfg.bind_addr = bind_addr.clone();
+    }
+    if let Some(auth_enabled) = cli_args.auth_enabled {
+        server_cfg.auth_enabled = auth_enabled;
+    }
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
+    let cli_args = match parse_cli_args() {
+        Ok(args) => args,
+        Err(err) => {
+            eprintln!("Error: {err}");
+            eprintln!();
+            print_help();
+            std::process::exit(2);
+        }
+    };
+    if cli_args.show_help {
+        print_help();
+        return;
+    }
+
     info!("Starting Pi Session Manager - CLI Mode");
 
     // Load configuration
-    let server_cfg = load_server_settings();
+    let mut server_cfg = load_server_settings();
+    apply_cli_overrides(&mut server_cfg, &cli_args);
+    let runtime_token = cli_args.runtime_token.clone();
+
+    if server_cfg.auth_enabled {
+        match pi_session_manager::auth::init() {
+            Ok(token) => {
+                if let Some(cli_token) = runtime_token.as_ref() {
+                    if let Err(e) =
+                        pi_session_manager::auth::set_runtime_tokens(vec![cli_token.clone()])
+                    {
+                        error!("Failed to set runtime token: {}", e);
+                        std::process::exit(2);
+                    }
+                    info!("Auth enabled (runtime token loaded from CLI)");
+                } else {
+                    let _ = pi_session_manager::auth::set_runtime_tokens(Vec::new());
+                    info!("Auth enabled, token: {}", token);
+                }
+            }
+            Err(e) => error!("Failed to init auth: {}", e),
+        }
+    } else if runtime_token.is_some() {
+        warn!("`--token` is ignored because auth is disabled");
+    }
 
     // Create state
     let state = Arc::new(CliAppState::new());
@@ -151,11 +295,15 @@ fn init_embedding_service() -> Option<Arc<EmbeddingService>> {
     Some(service)
 }
 
+fn default_config_path() -> std::path::PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join("pi-session-manager.json")
+}
+
 fn load_server_settings() -> ServerConfig {
     // Load from file or use defaults
-    let config_path = dirs::config_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-        .join("pi-session-manager.json");
+    let config_path = default_config_path();
 
     if let Ok(content) = std::fs::read_to_string(&config_path) {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
@@ -168,7 +316,7 @@ fn load_server_settings() -> ServerConfig {
                     .as_str()
                     .unwrap_or("127.0.0.1")
                     .to_string(),
-                auth_enabled: json["auth_enabled"].as_bool().unwrap_or(false),
+                auth_enabled: json["auth_enabled"].as_bool().unwrap_or(true),
                 embedding_enabled: json["embedding_enabled"].as_bool().unwrap_or(false),
             };
         }
@@ -181,7 +329,7 @@ fn load_server_settings() -> ServerConfig {
         ws_port: 52130,
         http_port: 52131,
         bind_addr: "127.0.0.1".to_string(),
-        auth_enabled: false,
+        auth_enabled: true,
         embedding_enabled: false,
     }
 }
@@ -254,9 +402,9 @@ async fn init_ws_adapter(
     Ok(())
 }
 
-// CLI HTTP adapter（支持只读 v1 接口）
+// CLI HTTP adapter (supports read-only v1 APIs)
 
-// CLI HTTP 适配器（支持只读 v1 接口）
+// CLI HTTP adapter (supports read-only v1 APIs)
 
 async fn init_http_adapter(
     _state: SharedCliState,

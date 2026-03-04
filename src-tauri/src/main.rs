@@ -2,13 +2,157 @@
 
 use tauri::{Listener, Manager};
 
+#[derive(Debug, Default)]
+struct MainCliArgs {
+    show_help: bool,
+    cli_mode: bool,
+    http_port: Option<u16>,
+    bind_addr: Option<String>,
+    auth_enabled: Option<bool>,
+    runtime_token: Option<String>,
+}
+
+fn parse_port_arg(value: &str, flag: &str) -> Result<u16, String> {
+    value
+        .parse::<u16>()
+        .map_err(|_| format!("Invalid value for {flag}: `{value}`"))
+}
+
+fn parse_main_cli_args() -> Result<MainCliArgs, String> {
+    let raw_args: Vec<String> = std::env::args().skip(1).collect();
+    if raw_args.iter().any(|arg| arg == "-h" || arg == "--help") {
+        return Ok(MainCliArgs {
+            show_help: true,
+            ..MainCliArgs::default()
+        });
+    }
+
+    let cli_mode = raw_args
+        .iter()
+        .any(|arg| arg == "--cli" || arg == "--headless");
+    if !cli_mode {
+        return Ok(MainCliArgs {
+            cli_mode: false,
+            ..MainCliArgs::default()
+        });
+    }
+
+    let mut parsed = MainCliArgs {
+        cli_mode: true,
+        ..MainCliArgs::default()
+    };
+
+    let mut iter = raw_args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "--cli" | "--headless" => {}
+            "-p" | "--port" => {
+                let value = iter
+                    .next()
+                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
+                parsed.http_port = Some(parse_port_arg(value, arg)?);
+            }
+            "-b" | "--bind" => {
+                let value = iter
+                    .next()
+                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
+                if value.trim().is_empty() {
+                    return Err(format!("Invalid value for `{arg}`: empty address"));
+                }
+                parsed.bind_addr = Some(value.clone());
+            }
+            "--auth" => {
+                if parsed.auth_enabled == Some(false) {
+                    return Err("Cannot use `--auth` with `--no-auth`".to_string());
+                }
+                parsed.auth_enabled = Some(true);
+            }
+            "--no-auth" => {
+                if parsed.auth_enabled == Some(true) {
+                    return Err("Cannot use `--auth` with `--no-auth`".to_string());
+                }
+                parsed.auth_enabled = Some(false);
+            }
+            "--token" => {
+                let value = iter
+                    .next()
+                    .ok_or_else(|| "Missing value for `--token`".to_string())?;
+                let token = value.trim();
+                if token.is_empty() {
+                    return Err("Invalid value for `--token`: empty token".to_string());
+                }
+                parsed.runtime_token = Some(token.to_string());
+            }
+            _ if arg.starts_with('-') => {
+                return Err(format!("Unknown argument in CLI mode: `{arg}`"));
+            }
+            _ => {}
+        }
+    }
+
+    Ok(parsed)
+}
+
+fn print_help() {
+    println!(
+        "Pi Session Manager\n\
+         \n\
+         USAGE:\n\
+           pi-session-manager [OPTIONS]\n\
+         \n\
+         OPTIONS:\n\
+           -h, --help           Show this help message\n\
+               --cli            Run in headless CLI mode\n\
+               --headless       Alias of --cli\n\
+           -p, --port <PORT>    Shared HTTP/WS port in CLI mode\n\
+           -b, --bind <ADDR>    Bind address in CLI mode\n\
+               --auth           Enable auth (requires token for non-local requests)\n\
+               --no-auth        Disable auth\n\
+               --token <TOKEN>  Runtime-only token, overrides DB tokens for this process\n\
+         \n\
+         NOTES:\n\
+           - Without --cli/--headless, app starts in GUI mode\n\
+           - -p/-b/--auth/--no-auth/--token are effective only in CLI mode"
+    );
+}
+
+fn apply_cli_overrides(
+    server_cfg: &mut pi_session_manager::ServerSettings,
+    cli_args: &MainCliArgs,
+) {
+    if let Some(port) = cli_args.http_port {
+        server_cfg.http_port = port;
+    }
+    if let Some(bind_addr) = &cli_args.bind_addr {
+        server_cfg.bind_addr = bind_addr.clone();
+    }
+    if let Some(auth_enabled) = cli_args.auth_enabled {
+        server_cfg.auth_enabled = auth_enabled;
+    }
+}
+
 fn main() {
     tracing_subscriber::fmt::init();
 
-    let cli_mode = std::env::args().any(|a| a == "--cli" || a == "--headless");
+    let cli_args = match parse_main_cli_args() {
+        Ok(args) => args,
+        Err(err) => {
+            eprintln!("Error: {err}");
+            eprintln!();
+            print_help();
+            std::process::exit(2);
+        }
+    };
+    if cli_args.show_help {
+        print_help();
+        return;
+    }
+    let cli_mode = cli_args.cli_mode;
 
     // Load server settings before builder (sync, no runtime needed)
-    let server_cfg = pi_session_manager::load_server_settings_sync();
+    let mut server_cfg = pi_session_manager::load_server_settings_sync();
+    apply_cli_overrides(&mut server_cfg, &cli_args);
+    let runtime_token = cli_args.runtime_token.clone();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -30,12 +174,27 @@ fn main() {
             if server_cfg.auth_enabled {
                 match pi_session_manager::auth::init() {
                     Ok(token) => {
-                        if cli_mode {
-                            log::info!("Auth token: {token}");
+                        if let Some(cli_token) = runtime_token.as_ref() {
+                            if let Err(e) =
+                                pi_session_manager::auth::set_runtime_tokens(vec![cli_token.clone()])
+                            {
+                                eprintln!("Failed to set runtime token: {e}");
+                                std::process::exit(2);
+                            }
+                            if cli_mode {
+                                log::info!("Auth enabled (runtime token loaded from CLI)");
+                            }
+                        } else {
+                            let _ = pi_session_manager::auth::set_runtime_tokens(Vec::new());
+                            if cli_mode {
+                                log::info!("Auth token: {token}");
+                            }
                         }
                     }
                     Err(e) => eprintln!("Failed to init auth: {e}"),
                 }
+            } else if runtime_token.is_some() && cli_mode {
+                log::warn!("`--token` is ignored because auth is disabled");
             }
 
             // Initialize AppState and manage it
@@ -43,7 +202,7 @@ fn main() {
             app.manage(app_state.clone());
 
             // Initialize WebSocket adapter
-            if server_cfg.ws_enabled {
+            if server_cfg.ws_enabled && !cli_mode {
                 let ws_state = app_state.clone();
                 let ws_port = server_cfg.ws_port;
                 let ws_bind = server_cfg.bind_addr.clone();
@@ -55,6 +214,12 @@ fn main() {
                         eprintln!("Failed to init WebSocket adapter: {e}");
                     }
                 });
+            } else if cli_mode && server_cfg.ws_enabled {
+                log::info!(
+                    "CLI mode uses HTTP /ws on {}:{} (ws_port is ignored)",
+                    server_cfg.bind_addr,
+                    server_cfg.http_port
+                );
             }
 
             // Initialize HTTP adapter
@@ -190,17 +355,16 @@ fn main() {
 
             if cli_mode {
                 let mut info = String::from("CLI mode:");
-                if server_cfg.ws_enabled {
-                    info.push_str(&format!(
-                        " WS ws://{}:{}",
-                        server_cfg.bind_addr, server_cfg.ws_port
-                    ));
-                }
                 if server_cfg.http_enabled {
                     info.push_str(&format!(
-                        " | HTTP http://{}:{}/api",
-                        server_cfg.bind_addr, server_cfg.http_port
+                        " HTTP+WS http://{}:{}/api | ws://{}:{}/ws",
+                        server_cfg.bind_addr,
+                        server_cfg.http_port,
+                        server_cfg.bind_addr,
+                        server_cfg.http_port
                     ));
+                } else {
+                    info.push_str(" HTTP disabled");
                 }
                 log::info!("{info}");
             } else {

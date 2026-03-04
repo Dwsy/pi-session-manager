@@ -1,13 +1,13 @@
 use chrono::Utc;
 /// Subagent Cost Integration Test
-/// 验证子代理费用扫描、聚合和统计的完整流程
+/// Validate the full flow of subagent cost scanning, aggregation, and statistics
 use pi_session_manager::models::{AgentStats, SubagentRunInfo, SubagentSummary};
 use pi_session_manager::subagent::{aggregate_runs, parse_meta_json, scan_subagent_artifacts};
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
-/// 创建测试用的 meta.json 文件
+/// Create a test meta.json file
 fn create_meta_json(
     dir: &PathBuf,
     run_id: &str,
@@ -48,7 +48,7 @@ fn create_meta_json(
     file_path
 }
 
-/// 测试 1: 解析单个 meta.json 文件
+/// Test 1: Parse a single meta.json file
 #[test]
 fn test_parse_single_meta_json() {
     let json = r#"{
@@ -84,7 +84,7 @@ fn test_parse_single_meta_json() {
     assert_eq!(info.timestamp, 1234567890);
 }
 
-/// 测试 2: 聚合多个 subagent 运行记录
+/// Test 2: Aggregate multiple subagent run records
 #[test]
 fn test_aggregate_multiple_runs() {
     let runs = vec![
@@ -134,35 +134,35 @@ fn test_aggregate_multiple_runs() {
 
     let summary = aggregate_runs(&runs);
 
-    // 验证总计
+    // Verify totals
     assert_eq!(summary.total_runs, 3);
     assert!((summary.total_cost - 0.21).abs() < 1e-9); // 0.01 + 0.05 + 0.15
     assert_eq!(summary.total_tokens, 23500); // (1000+500) + (5000+2000+1000+500) + (10000+5000+2000+1000)
 
-    // 验证按 agent 分组
+    // Verify grouping by agent
     assert_eq!(summary.runs_by_agent.len(), 2);
     assert_eq!(summary.runs_by_agent["scout"].runs, 1);
     assert!((summary.runs_by_agent["scout"].cost - 0.01).abs() < 1e-9);
     assert_eq!(summary.runs_by_agent["worker"].runs, 2);
     assert!((summary.runs_by_agent["worker"].cost - 0.20).abs() < 1e-9);
 
-    // 验证按 model 分组
+    // Verify grouping by model
     assert_eq!(summary.runs_by_model.len(), 3);
     assert!((summary.runs_by_model["haiku"] - 0.01).abs() < 1e-9);
     assert!((summary.runs_by_model["sonnet"] - 0.05).abs() < 1e-9);
     assert!((summary.runs_by_model["opus"] - 0.15).abs() < 1e-9);
 }
 
-/// 测试 3: 扫描目录中的 subagent artifacts
+/// Test 3: Scan subagent artifacts in directories
 #[test]
 fn test_scan_subagent_artifacts() {
-    // 创建临时目录结构
+    // Create temporary directory structure
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let session_dir = temp_dir.path().join("session1");
     let artifacts_dir = session_dir.join("subagent-artifacts");
     fs::create_dir_all(&artifacts_dir).expect("Failed to create artifacts dir");
 
-    // 创建 3 个 meta.json 文件
+    // Create 3 meta.json files
     create_meta_json(&artifacts_dir, "abc123", "scout", "haiku", 0.02, 2000, 1000);
     create_meta_json(
         &artifacts_dir,
@@ -183,11 +183,11 @@ fn test_scan_subagent_artifacts() {
         8000,
     );
 
-    // 扫描 artifacts（不使用数据库缓存）
+    // Scan artifacts (without DB cache)
     let session_dirs = vec![session_dir.clone()];
     let summary = scan_subagent_artifacts(&session_dirs, None);
 
-    // 验证扫描结果
+    // Verify scan results
     assert_eq!(summary.total_runs, 3);
     assert!((summary.total_cost - 0.35).abs() < 1e-9); // 0.02 + 0.08 + 0.25
     assert_eq!(summary.runs_by_agent.len(), 3);
@@ -201,7 +201,7 @@ fn test_scan_subagent_artifacts() {
     );
 }
 
-/// 测试 4: 文件修改后重新扫描
+/// Test 4: Rescan after file modification
 #[test]
 fn test_subagent_file_modification() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
@@ -209,7 +209,7 @@ fn test_subagent_file_modification() {
     let artifacts_dir = session_dir.join("subagent-artifacts");
     fs::create_dir_all(&artifacts_dir).expect("Failed to create artifacts dir");
 
-    // 创建 meta.json
+    // Create meta.json
     let meta_path = create_meta_json(
         &artifacts_dir,
         "cache_test",
@@ -220,16 +220,16 @@ fn test_subagent_file_modification() {
         2500,
     );
 
-    // 第一次扫描
+    // First scan
     let summary1 = scan_subagent_artifacts(&vec![session_dir.clone()], None);
     assert_eq!(summary1.total_runs, 1);
     assert!((summary1.total_cost - 0.10).abs() < 1e-9);
 
-    // 修改文件内容
+    // Modify file content
     fs::write(&meta_path, r#"{"runId": "cache_test", "agent": "worker", "model": "opus", "exitCode": 0, "usage": {"input": 9999, "output": 9999, "cacheRead": 0, "cacheWrite": 0, "cost": 0.99, "turns": 1}, "durationMs": 9999, "toolCount": 99, "timestamp": 9999999999}"#)
         .expect("Failed to modify file");
 
-    // 第二次扫描 - 应该读取新值
+    // Second scan - should read updated values
     let summary2 = scan_subagent_artifacts(&vec![session_dir.clone()], None);
     assert_eq!(summary2.total_runs, 1);
     assert!((summary2.total_cost - 0.99).abs() < 1e-9);
@@ -238,31 +238,31 @@ fn test_subagent_file_modification() {
     println!("✅ File modification test passed: re-scanning picks up changes");
 }
 
-/// 测试 5: 完整的 subagent 扫描集成测试
+/// Test 5: Full subagent scan integration test
 #[test]
 fn test_full_subagent_scanning_integration() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
 
-    // 创建会话目录和 subagent artifacts
+    // Create session directories and subagent artifacts
     let session_dir = temp_dir.path().join("test_session");
     let artifacts_dir = session_dir.join("subagent-artifacts");
     fs::create_dir_all(&artifacts_dir).expect("Failed to create artifacts dir");
 
-    // 创建 subagent 运行记录
+    // Create subagent run records
     create_meta_json(&artifacts_dir, "s1", "scout", "haiku", 0.03, 3000, 1500);
     create_meta_json(&artifacts_dir, "w1", "worker", "sonnet", 0.12, 12000, 6000);
 
-    // 扫描 artifacts
+    // Scan artifacts
     let summary = scan_subagent_artifacts(&vec![session_dir], None);
 
-    // 验证 subagent 统计
+    // Verify subagent stats
     assert_eq!(summary.total_runs, 2);
     assert!((summary.total_cost - 0.15).abs() < 1e-9); // 0.03 + 0.12
     assert_eq!(summary.runs_by_agent.len(), 2);
     assert!(summary.runs_by_agent.contains_key("scout"));
     assert!(summary.runs_by_agent.contains_key("worker"));
 
-    // 验证 token 统计
+    // Verify token stats
     let expected_subagent_tokens = (3000 + 1500) + (12000 + 6000); // 22500
     assert_eq!(summary.total_tokens, expected_subagent_tokens);
 
@@ -272,7 +272,7 @@ fn test_full_subagent_scanning_integration() {
     println!("   - Subagent tokens: {}", summary.total_tokens);
 }
 
-/// 测试 6: 空 subagent 目录的处理
+/// Test 6: Handling empty subagent directories
 #[test]
 fn test_empty_subagent_directory() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
@@ -280,11 +280,11 @@ fn test_empty_subagent_directory() {
     let artifacts_dir = session_dir.join("subagent-artifacts");
     fs::create_dir_all(&artifacts_dir).expect("Failed to create artifacts dir");
 
-    // 不创建任何 meta.json 文件
+    // Do not create any meta.json files
 
     let summary = scan_subagent_artifacts(&vec![session_dir], None);
 
-    // 应该返回空的统计，不报错
+    // Should return empty stats without errors
     assert_eq!(summary.total_runs, 0);
     assert_eq!(summary.total_cost, 0.0);
     assert_eq!(summary.total_tokens, 0);
@@ -294,12 +294,12 @@ fn test_empty_subagent_directory() {
     println!("✅ Empty directory test passed: gracefully handles no artifacts");
 }
 
-/// 测试 7: 多个 session 目录的 subagent 聚合
+/// Test 7: Subagent aggregation across multiple session directories
 #[test]
 fn test_multiple_session_directories() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
 
-    // 创建 3 个独立的 session 目录
+    // Create 3 independent session directories
     let session1 = temp_dir.path().join("project_a");
     let session2 = temp_dir.path().join("project_b");
     let session3 = temp_dir.path().join("project_c");
@@ -308,7 +308,7 @@ fn test_multiple_session_directories() {
         fs::create_dir_all(dir.join("subagent-artifacts")).expect("Failed to create artifacts dir");
     }
 
-    // 每个 session 有不同的 subagent 运行
+    // Each session has different subagent runs
     create_meta_json(
         &session1.join("subagent-artifacts"),
         "a1",
@@ -348,11 +348,11 @@ fn test_multiple_session_directories() {
 
     let summary = scan_subagent_artifacts(&vec![session1, session2, session3], None);
 
-    // 验证跨目录聚合
+    // Verify cross-directory aggregation
     assert_eq!(summary.total_runs, 4);
     assert!((summary.total_cost - 0.34).abs() < 1e-9); // 0.01 + 0.05 + 0.20 + 0.08
 
-    // 验证 agent 分布
+    // Verify agent distribution
     assert_eq!(summary.runs_by_agent.len(), 3);
     assert_eq!(summary.runs_by_agent["scout"].runs, 1);
     assert_eq!(summary.runs_by_agent["worker"].runs, 2);
@@ -364,7 +364,7 @@ fn test_multiple_session_directories() {
     );
 }
 
-/// 测试 8: 损坏的 meta.json 文件容错处理
+/// Test 8: Fault tolerance for corrupted meta.json files
 #[test]
 fn test_malformed_meta_json_graceful_handling() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
@@ -372,10 +372,10 @@ fn test_malformed_meta_json_graceful_handling() {
     let artifacts_dir = session_dir.join("subagent-artifacts");
     fs::create_dir_all(&artifacts_dir).expect("Failed to create artifacts dir");
 
-    // 创建一个有效的文件
+    // Create one valid file
     create_meta_json(&artifacts_dir, "good", "worker", "sonnet", 0.10, 5000, 2500);
 
-    // 创建损坏的文件
+    // Create a corrupted file
     fs::write(
         artifacts_dir.join("bad_meta.json"),
         "this is not valid json {{{",
@@ -384,10 +384,10 @@ fn test_malformed_meta_json_graceful_handling() {
 
     fs::write(artifacts_dir.join("empty_meta.json"), "").expect("Failed to write empty file");
 
-    // 不应该 panic，应该优雅地跳过损坏的文件
+    // Should not panic; gracefully skip corrupted files
     let summary = scan_subagent_artifacts(&vec![session_dir], None);
 
-    // 只统计有效的文件
+    // Count only valid files
     assert_eq!(summary.total_runs, 1);
     assert!((summary.total_cost - 0.10).abs() < 1e-9);
 

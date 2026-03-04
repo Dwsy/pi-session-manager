@@ -3,7 +3,7 @@ use pi_session_manager::{models::SessionInfo, search};
 fn main() {
     println!("=== Pi Session Manager Search POC Test ===\n");
 
-    // 创建测试数据
+    // Create test data
     let test_sessions = vec![
         SessionInfo {
             id: "test-1".to_string(),
@@ -52,7 +52,7 @@ fn main() {
         },
     ];
 
-    // 测试 1: 搜索 "资产"
+    // Test 1: Search for "assets"
     println!("Test 1: 搜索 '资产'");
     let results = search::search_sessions(
         &test_sessions,
@@ -74,7 +74,7 @@ fn main() {
     }
     println!();
 
-    // 测试 2: 搜索 "用户"
+    // Test 2: Search for "users"
     println!("Test 2: 搜索 '用户'");
     let results = search::search_sessions(
         &test_sessions,
@@ -94,7 +94,7 @@ fn main() {
     }
     println!();
 
-    // 测试 3: 搜索 "数据库"
+    // Test 3: Search for "database"
     println!("Test 3: 搜索 '数据库'");
     let results = search::search_sessions(
         &test_sessions,
@@ -114,7 +114,7 @@ fn main() {
     }
     println!();
 
-    // 测试 4: 搜索不存在的内容
+    // Test 4: Search for non-existent content
     println!("Test 4: 搜索 'xyz123'");
     let results = search::search_sessions(
         &test_sessions,
@@ -126,7 +126,7 @@ fn main() {
     println!("  结果数量: {}", results.len());
     println!();
 
-    // 测试 5: 空查询
+    // Test 5: Empty query
     println!("Test 5: 空查询");
     let results = search::search_sessions(
         &test_sessions,
@@ -138,7 +138,7 @@ fn main() {
     println!("  结果数量: {}", results.len());
     println!();
 
-    // 测试 6: 名称搜索模式
+    // Test 6: Name search mode
     println!("Test 6: 名称搜索 '资产'");
     let results = search::search_sessions(
         &test_sessions,

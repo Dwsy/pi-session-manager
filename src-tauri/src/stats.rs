@@ -1,5 +1,5 @@
 use crate::models::{SessionInfo, SubagentSummary};
-use crate::session_parser::parse_session_details;
+use crate::session_parser::{parse_session_details, SessionModelUsage};
 use crate::sqlite_cache;
 use crate::subagent;
 use crate::write_buffer;
@@ -18,6 +18,7 @@ pub struct SessionStats {
     pub total_tokens: usize,
     pub sessions_by_project: HashMap<String, usize>,
     pub sessions_by_model: HashMap<String, usize>,
+    pub model_usage_by_project: HashMap<String, HashMap<String, usize>>,
     pub messages_by_date: HashMap<String, usize>,
     pub messages_by_hour: HashMap<String, usize>,
     pub messages_by_day_of_week: HashMap<String, usize>,
@@ -48,6 +49,7 @@ pub struct TokenDetails {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelTokenStats {
+    pub messages: usize,
     pub input: usize,
     pub output: usize,
     pub cache_read: usize,
@@ -158,6 +160,58 @@ impl DailyStatsCollector {
     }
 }
 
+fn bump_model_project_count(
+    model_usage_by_project: &mut HashMap<String, HashMap<String, usize>>,
+    model: &str,
+    project: &str,
+) {
+    let project_map = model_usage_by_project.entry(model.to_string()).or_default();
+    *project_map.entry(project.to_string()).or_insert(0) += 1;
+}
+
+fn merge_model_usage(
+    model_usage: &HashMap<String, SessionModelUsage>,
+    project: &str,
+    sessions_by_model: &mut HashMap<String, usize>,
+    tokens_by_model: &mut HashMap<String, ModelTokenStats>,
+    model_usage_by_project: &mut HashMap<String, HashMap<String, usize>>,
+) {
+    for (model, usage) in model_usage {
+        *sessions_by_model.entry(model.clone()).or_insert(0) += 1;
+        bump_model_project_count(model_usage_by_project, model, project);
+
+        let model_stats = tokens_by_model
+            .entry(model.clone())
+            .or_insert(ModelTokenStats {
+                messages: 0,
+                input: 0,
+                output: 0,
+                cache_read: 0,
+                cache_write: 0,
+                cost: 0.0,
+            });
+
+        model_stats.messages += usage.messages;
+        model_stats.input += usage.input_tokens as usize;
+        model_stats.output += usage.output_tokens as usize;
+        model_stats.cache_read += usage.cache_read_tokens as usize;
+        model_stats.cache_write += usage.cache_write_tokens as usize;
+        model_stats.cost += usage.cost;
+    }
+}
+
+fn record_model_presence(
+    models: &[String],
+    project: &str,
+    sessions_by_model: &mut HashMap<String, usize>,
+    model_usage_by_project: &mut HashMap<String, HashMap<String, usize>>,
+) {
+    for model in models {
+        *sessions_by_model.entry(model.clone()).or_insert(0) += 1;
+        bump_model_project_count(model_usage_by_project, model, project);
+    }
+}
+
 pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionStats {
     let total_sessions = sessions.len();
 
@@ -167,6 +221,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
 
     let mut sessions_by_project: HashMap<String, usize> = HashMap::new();
     let mut sessions_by_model: HashMap<String, usize> = HashMap::new();
+    let mut model_usage_by_project: HashMap<String, HashMap<String, usize>> = HashMap::new();
     let mut messages_by_date: HashMap<String, usize> = HashMap::new();
     let mut messages_by_hour: HashMap<String, usize> = HashMap::new();
     let mut messages_by_day_of_week: HashMap<String, usize> = HashMap::new();
@@ -182,7 +237,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
     let mut total_cache_read = 0usize;
     let mut total_cache_write = 0usize;
     let mut total_cost = 0.0f64;
-    let tokens_by_model: HashMap<String, ModelTokenStats> = HashMap::new();
+    let mut tokens_by_model: HashMap<String, ModelTokenStats> = HashMap::new();
 
     // Daily stats collector for heatmap enhancement
     let mut daily_stats = DailyStatsCollector::default();
@@ -190,7 +245,8 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
     for session in sessions {
         let session_modified = parse_modified(&session.modified);
         // Extract project from cwd
-        let project = extract_project_name(&session.cwd);
+        let project_path = session.cwd.clone();
+        let project = extract_project_name(&project_path);
         *sessions_by_project.entry(project.clone()).or_insert(0) += 1;
 
         // 1. Check memory buffer first (fastest)
@@ -198,8 +254,21 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             .filter(|(_, file_modified)| *file_modified >= session_modified);
 
         if let Some((details, _)) = memory_cached {
-            for model in &details.models {
-                *sessions_by_model.entry(model.clone()).or_insert(0) += 1;
+            if details.model_usage.is_empty() {
+                record_model_presence(
+                    &details.models,
+                    &project_path,
+                    &mut sessions_by_model,
+                    &mut model_usage_by_project,
+                );
+            } else {
+                merge_model_usage(
+                    &details.model_usage,
+                    &project_path,
+                    &mut sessions_by_model,
+                    &mut tokens_by_model,
+                    &mut model_usage_by_project,
+                );
             }
 
             total_user_messages += details.user_messages;
@@ -241,9 +310,56 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         });
 
         if let Some(cached) = cached_details {
-            if let Ok(models) = serde_json::from_str::<Vec<String>>(&cached.models_json) {
-                for model in models {
-                    *sessions_by_model.entry(model).or_insert(0) += 1;
+            match serde_json::from_str::<HashMap<String, SessionModelUsage>>(
+                &cached.model_usage_json,
+            ) {
+                Ok(model_usage) if !model_usage.is_empty() => {
+                    merge_model_usage(
+                        &model_usage,
+                        &project_path,
+                        &mut sessions_by_model,
+                        &mut tokens_by_model,
+                        &mut model_usage_by_project,
+                    );
+                }
+                _ => {
+                    // Legacy cache entries may not have per-model usage.
+                    // Parse once to warm new model_usage cache, then reuse fast path next time.
+                    if let Ok(content) = std::fs::read_to_string(&session.path) {
+                        let parsed = parse_session_details(&content);
+                        if !parsed.model_usage.is_empty() {
+                            write_buffer::buffer_details_write(
+                                &session.path,
+                                session_modified,
+                                &parsed,
+                            );
+                            merge_model_usage(
+                                &parsed.model_usage,
+                                &project_path,
+                                &mut sessions_by_model,
+                                &mut tokens_by_model,
+                                &mut model_usage_by_project,
+                            );
+                        } else if let Ok(models) =
+                            serde_json::from_str::<Vec<String>>(&cached.models_json)
+                        {
+                            record_model_presence(
+                                &models,
+                                &project_path,
+                                &mut sessions_by_model,
+                                &mut model_usage_by_project,
+                            );
+                        }
+                    } else if let Ok(models) =
+                        serde_json::from_str::<Vec<String>>(&cached.models_json)
+                    {
+                        record_model_presence(
+                            &models,
+                            &project_path,
+                            &mut sessions_by_model,
+                            &mut model_usage_by_project,
+                        );
+                    }
                 }
             }
 
@@ -284,8 +400,21 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             // Use memory buffer to reduce database write frequency
             write_buffer::buffer_details_write(&session.path, session_modified, &session_stats);
 
-            for model in &session_stats.models {
-                *sessions_by_model.entry(model.clone()).or_insert(0) += 1;
+            if session_stats.model_usage.is_empty() {
+                record_model_presence(
+                    &session_stats.models,
+                    &project_path,
+                    &mut sessions_by_model,
+                    &mut model_usage_by_project,
+                );
+            } else {
+                merge_model_usage(
+                    &session_stats.model_usage,
+                    &project_path,
+                    &mut sessions_by_model,
+                    &mut tokens_by_model,
+                    &mut model_usage_by_project,
+                );
             }
 
             total_user_messages += session_stats.user_messages;
@@ -318,6 +447,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         } else {
             // Fallback if parsing fails
             *sessions_by_model.entry("unknown".to_string()).or_insert(0) += 1;
+            bump_model_project_count(&mut model_usage_by_project, "unknown", &project_path);
             total_messages += session.message_count;
 
             let date = session_modified.format("%Y-%m-%d").to_string();
@@ -376,6 +506,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         total_tokens: total_input + total_output,
         sessions_by_project,
         sessions_by_model,
+        model_usage_by_project,
         messages_by_date,
         messages_by_hour,
         messages_by_day_of_week,
@@ -395,7 +526,10 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
 }
 
 fn extract_project_name(cwd: &str) -> String {
-    cwd.split('/').next_back().unwrap_or("unknown").to_string()
+    cwd.rsplit(['/', '\\'])
+        .find(|segment| !segment.is_empty())
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 fn add_time_and_weekday_counts(
@@ -788,5 +922,22 @@ mod tests {
             .project_breakdown
             .iter()
             .all(|project| project.project_name == "service"));
+    }
+
+    #[test]
+    fn extract_project_name_supports_windows_path_separator() {
+        assert_eq!(
+            extract_project_name(r"C:\Users\demo\workspace\alpha"),
+            "alpha"
+        );
+        assert_eq!(
+            extract_project_name(r"C:\Users\demo\workspace\beta\"),
+            "beta"
+        );
+        assert_eq!(
+            extract_project_name(r"C:/Users/demo/workspace/gamma"),
+            "gamma"
+        );
+        assert_eq!(extract_project_name(""), "unknown");
     }
 }

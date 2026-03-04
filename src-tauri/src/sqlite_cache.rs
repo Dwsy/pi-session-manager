@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use tracing::{debug, error, info, warn};
 
 /// Current schema version for migrations
-const LATEST_SCHEMA_VERSION: i64 = 2;
+const LATEST_SCHEMA_VERSION: i64 = 3;
 
 pub fn get_db_path() -> Result<PathBuf, String> {
     // Allow explicit test override
@@ -127,6 +127,7 @@ fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(), String> 
         match current {
             1 => migration_1(conn)?,
             2 => migration_2(conn)?,
+            3 => migration_3(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -199,6 +200,31 @@ fn migration_2(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
+/// Migration to version 3: persist per-model token/cost usage in session_details_cache.
+fn migration_3(conn: &Connection) -> Result<(), String> {
+    fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
+        let mut stmt = conn
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .map_err(|e| format!("Failed to prepare PRAGMA table_info for {table}: {e}"))?;
+        let column_names: Vec<String> = stmt
+            .query_map([], |row| row.get(1))
+            .map_err(|e| format!("Failed to query columns for {table}: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect columns for {table}: {e}"))?;
+        Ok(column_names.iter().any(|name| name == column))
+    }
+
+    if !column_exists(conn, "session_details_cache", "model_usage_json")? {
+        conn.execute(
+            "ALTER TABLE session_details_cache ADD COLUMN model_usage_json TEXT NOT NULL DEFAULT '{}'",
+            [],
+        )
+        .map_err(|e| format!("Migration 3 failed adding model_usage_json: {e}"))?;
+    }
+
+    Ok(())
+}
+
 fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, String> {
     let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
 
@@ -257,7 +283,8 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             output_cost REAL NOT NULL,
             cache_read_cost REAL NOT NULL,
             cache_write_cost REAL NOT NULL,
-            models_json TEXT NOT NULL
+            models_json TEXT NOT NULL,
+            model_usage_json TEXT NOT NULL DEFAULT '{}'
         )",
         [],
     )
@@ -1047,6 +1074,7 @@ pub struct SessionDetailsCache {
     pub cache_read_cost: f64,
     pub cache_write_cost: f64,
     pub models_json: String,
+    pub model_usage_json: String,
 }
 
 pub fn get_session_details_cache(
@@ -1057,7 +1085,7 @@ pub fn get_session_details_cache(
         .prepare(
             "SELECT file_modified, user_messages, assistant_messages, input_tokens, output_tokens,
                 cache_read_tokens, cache_write_tokens, input_cost, output_cost, cache_read_cost,
-                cache_write_cost, models_json
+                cache_write_cost, models_json, model_usage_json
          FROM session_details_cache
          WHERE path = ?",
         )
@@ -1078,6 +1106,7 @@ pub fn get_session_details_cache(
                 cache_read_cost: row.get::<_, f64>(9)?,
                 cache_write_cost: row.get::<_, f64>(10)?,
                 models_json: row.get::<_, String>(11)?,
+                model_usage_json: row.get::<_, String>(12)?,
             })
         })
         .ok();
@@ -1093,13 +1122,15 @@ pub fn upsert_session_details_cache(
 ) -> Result<(), String> {
     let models_json = serde_json::to_string(&details.models)
         .map_err(|e| format!("Failed to serialize models: {e}"))?;
+    let model_usage_json = serde_json::to_string(&details.model_usage)
+        .map_err(|e| format!("Failed to serialize model usage: {e}"))?;
 
     conn.execute(
         "INSERT INTO session_details_cache (
             path, file_modified, user_messages, assistant_messages, input_tokens, output_tokens,
             cache_read_tokens, cache_write_tokens, input_cost, output_cost, cache_read_cost,
-            cache_write_cost, models_json
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+            cache_write_cost, models_json, model_usage_json
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
         ON CONFLICT(path) DO UPDATE SET
             file_modified = excluded.file_modified,
             user_messages = excluded.user_messages,
@@ -1112,7 +1143,8 @@ pub fn upsert_session_details_cache(
             output_cost = excluded.output_cost,
             cache_read_cost = excluded.cache_read_cost,
             cache_write_cost = excluded.cache_write_cost,
-            models_json = excluded.models_json",
+            models_json = excluded.models_json,
+            model_usage_json = excluded.model_usage_json",
         params![
             path,
             &file_modified.to_rfc3339(),
@@ -1127,6 +1159,7 @@ pub fn upsert_session_details_cache(
             details.cache_read_cost,
             details.cache_write_cost,
             models_json,
+            model_usage_json,
         ],
     )
     .map_err(|e| format!("Failed to upsert session_details_cache: {e}"))?;

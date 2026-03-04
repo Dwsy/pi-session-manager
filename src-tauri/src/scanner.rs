@@ -103,11 +103,19 @@ pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
 
 /// Expand ~ to home directory
 fn expand_tilde(path: &str) -> String {
-    if path.starts_with("~/") || path == "~" {
-        if let Some(home) = dirs::home_dir() {
-            return path.replacen('~', &home.to_string_lossy(), 1);
-        }
+    let Some(home) = dirs::home_dir() else {
+        return path.to_string();
+    };
+
+    if path == "~" {
+        return home.to_string_lossy().to_string();
     }
+
+    if let Some(rest) = path.strip_prefix("~/").or_else(|| path.strip_prefix("~\\")) {
+        let normalized_rest = rest.replace('\\', "/");
+        return home.join(normalized_rest).to_string_lossy().to_string();
+    }
+
     path.to_string()
 }
 
@@ -537,4 +545,26 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
     );
 
     Ok(diff)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expand_tilde;
+
+    #[test]
+    fn expand_tilde_supports_windows_separator() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+
+        let expanded = expand_tilde(r"~\.pi\agent\sessions");
+        assert_eq!(
+            expanded,
+            home.join(".pi")
+                .join("agent")
+                .join("sessions")
+                .to_string_lossy()
+                .to_string()
+        );
+    }
 }

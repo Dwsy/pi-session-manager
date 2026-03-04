@@ -38,9 +38,13 @@ pub struct DeleteSessionsResult {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SessionSortBy {
+    ModifiedAsc,
     ModifiedDesc,
+    CreatedAsc,
     CreatedDesc,
     NameAsc,
+    NameDesc,
+    SizeAsc,
     SizeDesc,
 }
 
@@ -53,9 +57,13 @@ impl SessionSortBy {
             .as_deref()
         {
             Some("name") | Some("name_asc") => Self::NameAsc,
+            Some("name_desc") => Self::NameDesc,
             Some("created") | Some("created_desc") | Some("last_created") => Self::CreatedDesc,
+            Some("created_asc") => Self::CreatedAsc,
             Some("size") | Some("size_desc") => Self::SizeDesc,
+            Some("size_asc") => Self::SizeAsc,
             Some("modified") | Some("modified_desc") | Some("last_modified") => Self::ModifiedDesc,
+            Some("modified_asc") => Self::ModifiedAsc,
             _ => Self::ModifiedDesc,
         }
     }
@@ -78,9 +86,20 @@ fn get_session_size_bytes(path: &str) -> u64 {
 
 fn sort_sessions(sessions: &mut [SessionInfo], raw_sort_by: Option<&str>) {
     match SessionSortBy::from_raw(raw_sort_by) {
+        SessionSortBy::ModifiedAsc => sessions.sort_by(|a, b| {
+            a.modified
+                .cmp(&b.modified)
+                .then_with(|| a.path.cmp(&b.path))
+        }),
         SessionSortBy::ModifiedDesc => sessions.sort_by(|a, b| {
             b.modified
                 .cmp(&a.modified)
+                .then_with(|| a.path.cmp(&b.path))
+        }),
+        SessionSortBy::CreatedAsc => sessions.sort_by(|a, b| {
+            a.created
+                .cmp(&b.created)
+                .then_with(|| a.modified.cmp(&b.modified))
                 .then_with(|| a.path.cmp(&b.path))
         }),
         SessionSortBy::CreatedDesc => sessions.sort_by(|a, b| {
@@ -95,6 +114,27 @@ fn sort_sessions(sessions: &mut [SessionInfo], raw_sort_by: Option<&str>) {
                 .then_with(|| b.modified.cmp(&a.modified))
                 .then_with(|| a.path.cmp(&b.path))
         }),
+        SessionSortBy::NameDesc => sessions.sort_by(|a, b| {
+            resolve_session_name(b)
+                .cmp(&resolve_session_name(a))
+                .then_with(|| b.modified.cmp(&a.modified))
+                .then_with(|| a.path.cmp(&b.path))
+        }),
+        SessionSortBy::SizeAsc => {
+            let size_map: HashMap<String, u64> = sessions
+                .iter()
+                .map(|session| (session.path.clone(), get_session_size_bytes(&session.path)))
+                .collect();
+
+            sessions.sort_by(|a, b| {
+                let a_size = size_map.get(&a.path).copied().unwrap_or(0);
+                let b_size = size_map.get(&b.path).copied().unwrap_or(0);
+                a_size
+                    .cmp(&b_size)
+                    .then_with(|| b.modified.cmp(&a.modified))
+                    .then_with(|| a.path.cmp(&b.path))
+            });
+        }
         SessionSortBy::SizeDesc => {
             let size_map: HashMap<String, u64> = sessions
                 .iter()
@@ -135,11 +175,17 @@ fn session_matches_search_query(session: &SessionInfo, raw_query: &str) -> bool 
 fn normalize_path_for_match(path: &str) -> String {
     let unified = path.trim().replace('\\', "/");
     let trimmed = unified.trim_end_matches('/');
-
-    if trimmed.is_empty() {
-        "/".to_string()
+    #[allow(clippy::if_same_then_else)]
+    let normalized = if cfg!(target_os = "windows") {
+        trimmed.to_lowercase()
     } else {
         trimmed.to_string()
+    };
+
+    if normalized.is_empty() {
+        "/".to_string()
+    } else {
+        normalized
     }
 }
 
@@ -173,8 +219,9 @@ fn session_matches_project_filter(session: &SessionInfo, raw_project: &str) -> b
 #[cfg(test)]
 mod tests {
     use super::{
-        build_terminal_attempt_order, has_custom_terminal_placeholder,
+        build_terminal_attempt_order, has_custom_terminal_placeholder, read_session_file_chunk,
         render_custom_terminal_command, session_matches_project_filter, sort_sessions,
+        utf8_safe_cut,
     };
     use crate::models::SessionInfo;
     use chrono::{DateTime, Utc};
@@ -277,6 +324,31 @@ mod tests {
     }
 
     #[test]
+    fn project_filter_supports_windows_path_separator() {
+        let session = build_session(
+            r"C:\Users\demo\Dev\workspace\foo-app",
+            r"C:\Users\demo\.pi\agent\sessions\foo\1.jsonl",
+        );
+        assert!(session_matches_project_filter(
+            &session,
+            r"C:\Users\demo\Dev\workspace"
+        ));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn project_filter_is_case_insensitive_on_windows() {
+        let session = build_session(
+            r"C:\Users\Demo\Dev\workspace\Foo-App",
+            r"C:\Users\Demo\.pi\agent\sessions\foo\1.jsonl",
+        );
+        assert!(session_matches_project_filter(
+            &session,
+            r"c:\users\demo\dev\workspace\foo-app"
+        ));
+    }
+
+    #[test]
     fn sort_by_name_orders_sessions_alphabetically() {
         let mut sessions = vec![
             build_session_with_time(
@@ -336,6 +408,76 @@ mod tests {
 
         assert_eq!(sessions[0].id, "s-2");
         assert_eq!(sessions[1].id, "s-1");
+    }
+
+    #[test]
+    fn sort_by_modified_orders_sessions_ascending() {
+        let mut sessions = vec![
+            build_session_with_time(
+                "s-3",
+                Some("three"),
+                "three",
+                "/tmp/s-m-3.jsonl",
+                "2026-01-01T00:00:00Z",
+                "2026-01-03T00:00:00Z",
+            ),
+            build_session_with_time(
+                "s-1",
+                Some("one"),
+                "one",
+                "/tmp/s-m-1.jsonl",
+                "2026-01-01T00:00:00Z",
+                "2026-01-01T00:00:00Z",
+            ),
+            build_session_with_time(
+                "s-2",
+                Some("two"),
+                "two",
+                "/tmp/s-m-2.jsonl",
+                "2026-01-01T00:00:00Z",
+                "2026-01-02T00:00:00Z",
+            ),
+        ];
+
+        sort_sessions(&mut sessions, Some("modified_asc"));
+
+        let sorted_ids: Vec<&str> = sessions.iter().map(|session| session.id.as_str()).collect();
+        assert_eq!(sorted_ids, vec!["s-1", "s-2", "s-3"]);
+    }
+
+    #[test]
+    fn sort_by_name_orders_sessions_descending() {
+        let mut sessions = vec![
+            build_session_with_time(
+                "s-2",
+                Some("zeta"),
+                "ignored",
+                "/tmp/s-name-2.jsonl",
+                "2026-01-02T00:00:00Z",
+                "2026-01-04T00:00:00Z",
+            ),
+            build_session_with_time(
+                "s-1",
+                Some("Alpha"),
+                "ignored",
+                "/tmp/s-name-1.jsonl",
+                "2026-01-03T00:00:00Z",
+                "2026-01-05T00:00:00Z",
+            ),
+            build_session_with_time(
+                "s-3",
+                None,
+                "beta message",
+                "/tmp/s-name-3.jsonl",
+                "2026-01-01T00:00:00Z",
+                "2026-01-06T00:00:00Z",
+            ),
+        ];
+
+        sort_sessions(&mut sessions, Some("name_desc"));
+
+        let sorted_ids: Vec<&str> = sessions.iter().map(|session| session.id.as_str()).collect();
+        assert_eq!(sorted_ids, vec!["s-2", "s-3", "s-1"]);
     }
 
     #[test]
@@ -432,6 +574,45 @@ mod tests {
         assert!(rendered.contains("cmd /K"));
         #[cfg(not(target_os = "windows"))]
         assert!(rendered.contains("sh -lc"));
+    }
+
+    #[test]
+    fn utf8_safe_cut_trims_incomplete_multibyte_suffix() {
+        let mut bytes = b"hello ".to_vec();
+        bytes.extend_from_slice("你".as_bytes());
+        bytes.pop();
+        assert_eq!(utf8_safe_cut(&bytes, bytes.len()), b"hello ".len());
+    }
+
+    #[tokio::test]
+    async fn read_session_file_chunk_handles_incomplete_utf8_at_chunk_end() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time after epoch")
+            .as_nanos();
+        let base_dir = std::env::temp_dir().join(format!("psm-chunk-utf8-{unique}"));
+        fs::create_dir_all(&base_dir).expect("create temp dir");
+
+        let path = base_dir.join("session.jsonl");
+        let mut content = b"abcd".to_vec();
+        content.extend_from_slice("你".as_bytes());
+        content.extend_from_slice(b"\n{\"id\":\"next\"}\n");
+        fs::write(&path, &content).expect("write session content");
+
+        let chunk = read_session_file_chunk(
+            path.to_str().expect("path utf8").to_string(),
+            Some(0),
+            Some(5),
+        )
+        .await
+        .expect("chunk should decode");
+
+        assert_eq!(chunk.content, "abcd");
+        assert_eq!(chunk.next_offset, 4);
+        assert!(chunk.has_more);
+
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_dir_all(&base_dir);
     }
 }
 
@@ -537,9 +718,7 @@ pub struct SessionChunk {
 }
 
 fn utf8_safe_cut(buf: &[u8], mut end: usize) -> usize {
-    if end >= buf.len() {
-        return buf.len();
-    }
+    end = end.min(buf.len());
 
     while end > 0 && std::str::from_utf8(&buf[..end]).is_err() {
         end -= 1;
@@ -609,7 +788,17 @@ pub async fn read_session_file_chunk(
 
         if cut == 0 {
             let fallback_len = cmp::min(buffer.len(), 8192);
-            cut = utf8_safe_cut(&buffer, fallback_len).max(1);
+            cut = utf8_safe_cut(&buffer, fallback_len);
+        }
+
+        if cut == 0 {
+            let next_offset = (start_offset + 1).min(file_size);
+            return Ok(SessionChunk {
+                content: String::new(),
+                next_offset,
+                file_size,
+                has_more: next_offset < file_size,
+            });
         }
     }
 
