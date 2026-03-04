@@ -62,7 +62,7 @@ export function useSearchCache() {
     },
     
     /**
-     * 清空缓存
+     * Clear cache
      */
     clear: (): void => {
       cacheRef.current.clear()

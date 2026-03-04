@@ -19,7 +19,7 @@ interface SettingsSliderFieldProps {
 }
 
 /**
- * 设置页通用滑块字段：标题 + range 输入 + 右侧数值。
+ * Common slider field for settings: title + range input + right-side value.
  */
 export default function SettingsSliderField({
   label,

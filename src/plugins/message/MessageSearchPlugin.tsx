@@ -8,7 +8,9 @@ import type {
   FullTextSearchHit,
   FullTextSearchResponse,
 } from '../../types'
+import { getPathBasename, getPathParentName } from '../../utils/path'
 import { parseQuotedQuery } from '../../utils/search'
+import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '../../demo'
 
 interface MessageResultMetadata {
   sessionPath: string
@@ -244,7 +246,9 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     }
 
     try {
-      const session = await invoke<SessionInfo>('get_session_by_path', { path })
+      const session = isDemoModeEnabled()
+        ? getDemoSessionByPath(path)
+        : await invoke<SessionInfo>('get_session_by_path', { path })
       if (session) {
         this.sessionCache.set(path, session)
         return session
@@ -286,11 +290,9 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
   }
 
   private fallbackProjectName(hit: FullTextSearchHit): string {
-    const normalized = hit.session_path.replace(/\/+$/, '')
-    const parts = normalized.split('/')
-    const maybeParent = parts.length > 1 ? parts[parts.length - 2] : ''
+    const maybeParent = getPathParentName(hit.session_path)
 
-    if (maybeParent && maybeParent !== 'sessions') {
+    if (maybeParent && maybeParent !== 'sessions' && maybeParent !== hit.session_path) {
       return maybeParent
     }
 
@@ -305,14 +307,23 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     this.warmSessionCache(context.sessions)
 
     try {
-      const response = await invoke<FullTextSearchResponse>('full_text_search', {
-        query,
-        roleFilter: 'all',
-        globPattern: null,
-        page: 0,
-        pageSize: MAX_HITS_TO_FETCH,
-        matchMode: 'any',
-      })
+      const response: FullTextSearchResponse = isDemoModeEnabled()
+        ? fullTextSearchDemo({
+          query,
+          roleFilter: 'all',
+          globPattern: null,
+          page: 0,
+          pageSize: MAX_HITS_TO_FETCH,
+          matchMode: 'any',
+        })
+        : await invoke<FullTextSearchResponse>('full_text_search', {
+          query,
+          roleFilter: 'all',
+          globPattern: null,
+          page: 0,
+          pageSize: MAX_HITS_TO_FETCH,
+          matchMode: 'any',
+        })
 
       const hits = response.hits.slice(0, MAX_HITS_TO_FETCH)
       if (!hits.length) {
@@ -476,7 +487,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
   }
 
   private getProjectName(cwd: string): string {
-    return cwd.split('/').pop() || cwd
+    return getPathBasename(cwd)
   }
 
   private formatDate(date: Date | string): string {

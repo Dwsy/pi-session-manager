@@ -23,7 +23,7 @@ interface SettingsVisualSliderFieldProps {
 }
 
 /**
- * 设置页视觉增强滑块：渐变进度轨道 + 自定义 thumb + 范围刻度。
+ * Visually enhanced settings slider: gradient progress track + custom thumb + range ticks.
  */
 export default function SettingsVisualSliderField({
   label,

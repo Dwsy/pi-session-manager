@@ -20,14 +20,14 @@ export function SessionViewProvider({ children }: { children: ReactNode }) {
   const [showThinking, setShowThinking] = useState(true)
   const [showToolExpandIndicator] = useState(false)
   const [toolsExpanded, setToolsExpanded] = useState(false)
-  // 当 toolsExpanded=true 时，这里存储"被手动折叠的工具"
-  // 当 toolsExpanded=false 时，这里存储"被手动展开的工具"
+  // When toolsExpanded=true, store tools manually collapsed here
+  // When toolsExpanded=false, store tools manually expanded here
   const [expandedToolIds, setExpandedToolIds] = useState<Set<string>>(new Set())
 
   const toggleThinking = () => setShowThinking(prev => !prev)
   const toggleToolsExpanded = () => {
     setToolsExpanded(prev => !prev)
-    setExpandedToolIds(new Set()) // 切换全局状态时清空
+    setExpandedToolIds(new Set()) // Clear overrides when switching global state
   }
   const expandAllTools = () => {
     setToolsExpanded(true)
@@ -54,8 +54,8 @@ export function SessionViewProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const isToolExpanded = useCallback((id: string) => {
-    // 全局展开时：不在排除列表中 = 展开
-    // 全局折叠时：在展开列表中 = 展开
+    // When globally expanded: not in the exclusion list = expanded
+    // When globally collapsed: in the inclusion list = expanded
     return toolsExpanded ? !expandedToolIds.has(id) : expandedToolIds.has(id)
   }, [toolsExpanded, expandedToolIds])
 

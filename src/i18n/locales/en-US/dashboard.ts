@@ -58,6 +58,9 @@ export const dashboard = {
   topModels: {
     title: 'Top Models',
     sessions: 'Sessions',
+    usageByProjects: 'Model usage by projects',
+    usageByProjectsHint: 'Click a model to see which projects use it',
+    noProjectUsage: 'No project-level usage found for this model',
   },
   timeDistribution: {
     title: 'Time Distribution',

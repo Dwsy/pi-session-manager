@@ -18,6 +18,7 @@ import SessionTreeSearch, {
 } from "./SessionTreeSearch";
 import { getCachedSettings } from "../utils/settingsApi";
 import { parseQuotedQuery } from "../utils/search";
+import { getPathBasename } from "../utils/path";
 import { useSessionTreeLookup } from "../hooks/useSessionTreeLookup";
 
 // Known tools map to CSS variable names: var(--tool-color-<name>)
@@ -597,21 +598,21 @@ const SessionTree = memo(
                   firstTool.arguments?.path ||
                   firstTool.arguments?.file_path ||
                   "";
-                const fileName = path.split("/").pop() || path;
+                const fileName = getPathBasename(path);
                 return `read: ${fileName}${suffix}`;
               } else if (toolName === "write") {
                 const path =
                   firstTool.arguments?.path ||
                   firstTool.arguments?.file_path ||
                   "";
-                const fileName = path.split("/").pop() || path;
+                const fileName = getPathBasename(path);
                 return `write: ${fileName}${suffix}`;
               } else if (toolName === "edit") {
                 const path =
                   firstTool.arguments?.path ||
                   firstTool.arguments?.file_path ||
                   "";
-                const fileName = path.split("/").pop() || path;
+                const fileName = getPathBasename(path);
                 return `edit: ${fileName}${suffix}`;
               } else {
                 return `${toolName}${suffix}`;

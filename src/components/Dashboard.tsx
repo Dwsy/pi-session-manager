@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { BarChart3, Clock, RefreshCw, Activity, Zap, DollarSign } from 'lucide-react'
 
 import type { HeatmapPoint, SessionInfo, SessionStats, SessionStatsInput, DayStats } from '../types'
-import { getDemoStats } from '../hooks/useDemoMode'
+import { getDemoDayStats, getDemoStats } from '../hooks/useDemoMode'
 import StatCard from './dashboard/StatCard'
 import ActivityHeatmap from './dashboard/ActivityHeatmap'
 import HeatmapDayModal from './dashboard/HeatmapDayModal'
@@ -13,9 +13,11 @@ import ProjectsChart from './dashboard/ProjectsChart'
 import RecentSessions from './dashboard/RecentSessions'
 import TopModelsChart from './dashboard/TopModelsChart'
 import TimeDistribution from './dashboard/TimeDistribution'
+import DashboardInsightModal from './dashboard/DashboardInsightModal'
 import TokenTrendChart from './dashboard/TokenTrendChart'
 import { DashboardSkeleton } from './Skeleton'
 import { getCachedSettings } from '../utils/settingsApi'
+import { getPathBasename, hasPathSeparator } from '../utils/path'
 
 interface DashboardProps {
   sessions: SessionInfo[]
@@ -27,8 +29,7 @@ interface DashboardProps {
 
 // Helper function to extract project name from path
 function getProjectName(path: string): string {
-  const parts = path.split('/')
-  return parts[parts.length - 1] || path
+  return getPathBasename(path)
 }
 
 export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, projectName, loading: parentLoading = false }: DashboardProps) {
@@ -38,6 +39,8 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
   const [selectedDay, setSelectedDay] = useState<HeatmapPoint | null>(null)
   const [dayStats, setDayStats] = useState<DayStats | undefined>(undefined)
   const [isLoadingDayStats, setIsLoadingDayStats] = useState(false)
+  const [insightModalMode, setInsightModalMode] = useState<'token_cost' | 'model_projects' | null>(null)
+  const [selectedModel, setSelectedModel] = useState<string | null>(null)
   const isLoadingRef = useRef(false)
   const hasLoadedOnce = useRef(false)
   const prevProjectRef = useRef(projectName)
@@ -54,11 +57,11 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
     ].join('|')
   }, [projectName, sessions])
 
-  // sessions 或项目切换时重新加载统计
+  // Reload stats when sessions or project changes
   useEffect(() => {
     if (parentLoading) return
 
-    // 项目切换时重置，显示骨架屏
+    // Reset on project switch and show skeleton UI
     if (prevProjectRef.current !== projectName) {
       prevProjectRef.current = projectName
       hasLoadedOnce.current = false
@@ -76,7 +79,7 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
   const loadStats = async () => {
     if (isLoadingRef.current) return
     isLoadingRef.current = true
-    // 只在后续更新时显示刷新指示器，不替换整个 UI
+    // Show refresh indicator only on subsequent updates; do not replace entire UI
     if (hasLoadedOnce.current) {
       setIsRefreshing(true)
     }
@@ -122,11 +125,13 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
     setDayStats(undefined)
 
     try {
-      // Fetch detailed day stats from backend
-      const result = await invoke<DayStats>('get_day_stats', {
-        date: point.date,
-        sessions: sessions,
-      })
+      const isDemoMode = getCachedSettings()?.advanced?.demoMode === true
+      const result = isDemoMode
+        ? getDemoDayStats(point.date, sessions)
+        : await invoke<DayStats>('get_day_stats', {
+          date: point.date,
+          sessions: sessions,
+        })
       setDayStats(result)
     } catch (error) {
       console.log('Detailed day stats not available, using heatmap data:', error)
@@ -145,12 +150,12 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
   const resolveProjectPath = (projectPathOrName: string): string | null => {
     if (!projectPathOrName) return null
 
-    if (projectPathOrName.includes('/')) {
+    if (hasPathSeparator(projectPathOrName)) {
       return projectPathOrName
     }
 
     const matchedSession = sessions.find((session) => {
-      const nameFromPath = session.cwd.split('/').pop() || ''
+      const nameFromPath = getPathBasename(session.cwd)
       return nameFromPath === projectPathOrName
     })
 
@@ -183,12 +188,27 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
     }
   }
 
-  // 仅首次加载且无数据时显示骨架屏
+  const closeInsightModal = () => {
+    setInsightModalMode(null)
+    setSelectedModel(null)
+  }
+
+  const openTokenCostInsight = () => {
+    setInsightModalMode('token_cost')
+    setSelectedModel(null)
+  }
+
+  const openModelProjectsInsight = (model: string) => {
+    setSelectedModel(model)
+    setInsightModalMode('model_projects')
+  }
+
+  // Show skeleton only on first load with no data
   if (!hasLoadedOnce.current && stats === null && (parentLoading || sessions.length > 0)) {
     return <DashboardSkeleton />
   }
 
-  // 不显示加载状态，直接显示空数据或实际数据
+  // Do not show loading state; display empty or actual data directly
   const displayStats: SessionStats = stats || {
     total_sessions: 0,
     total_messages: 0,
@@ -197,6 +217,7 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
     total_tokens: 0,
     sessions_by_project: {},
     sessions_by_model: {},
+    model_usage_by_project: {},
     messages_by_date: {},
     messages_by_hour: {},
     messages_by_day_of_week: {},
@@ -299,6 +320,7 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
                   : combinedTokens
               }
               color="#c792ea"
+              onClick={openTokenCostInsight}
             />
             <div className="col-span-2 md:col-span-1">
               <StatCard
@@ -306,6 +328,7 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
                 label={t('components.displayStats.cards.totalCost')}
                 value={costValue}
                 color="#ff6b6b"
+                onClick={openTokenCostInsight}
               />
             </div>
           </div>
@@ -338,7 +361,11 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
         {/* Right Column - 4 cols */}
         <div className="md:col-span-4 space-y-3">
           {/* Top Models */}
-          <TopModelsChart stats={displayStats} limit={5} />
+          <TopModelsChart
+            stats={displayStats}
+            limit={5}
+            onModelClick={openModelProjectsInsight}
+          />
 
           {/* Projects */}
           <ProjectsChart stats={displayStats} sessions={sessions} limit={5} onProjectSelect={onProjectSelect} />
@@ -357,6 +384,16 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
           loading={isLoadingDayStats}
           onFilterProject={handleFilterProjectFromModal}
           onOpenSession={handleOpenSessionFromModal}
+        />
+      )}
+
+      {insightModalMode && (
+        <DashboardInsightModal
+          open={Boolean(insightModalMode)}
+          mode={insightModalMode}
+          stats={displayStats}
+          selectedModel={selectedModel}
+          onClose={closeInsightModal}
         />
       )}
     </div>

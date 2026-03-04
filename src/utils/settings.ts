@@ -53,7 +53,7 @@ export function validateSettings(settings: AppSettings): ValidationError[] {
 }
 
 /**
- * 深度合并设置
+ * Deep merge settings
  */
 export function mergeSettings(base: AppSettings, override: Partial<AppSettings>): AppSettings {
   return {
@@ -63,24 +63,25 @@ export function mergeSettings(base: AppSettings, override: Partial<AppSettings>)
     session: { ...base.session, ...override.session },
     search: { ...base.search, ...override.search },
     export: { ...base.export, ...override.export },
+    update: { ...base.update, ...override.update },
     advanced: { ...base.advanced, ...override.advanced },
   }
 }
 
 /**
- * 验证设置值
+ * Validate setting values
  */
 export function validateSettingValue(
   _section: string,
   _key: string,
   _value: unknown
 ): ValidationError | null {
-  // TODO: 实现验证逻辑
+  // TODO: Implement validation logic
   return null
 }
 
 /**
- * 格式化设置值用于显示
+ * Format setting values for display
  */
 export function formatSettingValue(_section: string, _key: string, value: unknown): string {
   if (typeof value === 'boolean') {
@@ -96,23 +97,23 @@ export function formatSettingValue(_section: string, _key: string, value: unknow
 }
 
 /**
- * 解析设置值从字符串
+ * Parse setting values from strings
  */
 export function parseSettingValue(_section: string, _key: string, value: string): unknown {
-  // TODO: 实现解析逻辑
+  // TODO: Implement parsing logic
   return value
 }
 
 /**
- * 获取设置的默认值
+ * Get default setting values
  */
 export function getSettingDefaultValue(_section: string, _key: string): unknown {
-  // TODO: 实现获取默认值逻辑
+  // TODO: Implement default value logic
   return null
 }
 
 /**
- * 检查设置是否被修改
+ * Check whether settings were modified
  */
 export function isSettingModified(
   _current: AppSettings,
@@ -120,7 +121,7 @@ export function isSettingModified(
 ): { modified: boolean; modifiedFields: string[] } {
   const modifiedFields: string[] = []
 
-  // TODO: 实现比较逻辑
+  // TODO: Implement comparison logic
 
   return {
     modified: modifiedFields.length > 0,
@@ -129,22 +130,22 @@ export function isSettingModified(
 }
 
 /**
- * 重置设置到默认值
+ * Reset settings to defaults
  */
 export function resetSectionToDefault(_section: keyof AppSettings): Partial<AppSettings> {
-  // TODO: 实现重置逻辑
+  // TODO: Implement reset logic
   return {}
 }
 
 /**
- * 导出设置为 JSON
+ * Export settings to JSON
  */
 export function exportSettingsToJson(settings: AppSettings): string {
   return JSON.stringify(settings, null, 2)
 }
 
 /**
- * 从 JSON 导入设置
+ * Import settings from JSON
  */
 export function importSettingsFromJson(json: string): AppSettings | null {
   try {
@@ -155,17 +156,17 @@ export function importSettingsFromJson(json: string): AppSettings | null {
 }
 
 /**
- * 检查设置版本兼容性
+ * Check settings version compatibility
  */
 export function checkSettingsCompatibility(_version: string): boolean {
-  // TODO: 实现版本检查
+  // TODO: Implement version compatibility check
   return true
 }
 
 /**
- * 迁移旧版本设置
+ * Migrate legacy settings
  */
 export function migrateSettings(oldSettings: any): AppSettings {
-  // TODO: 实现迁移逻辑
+  // TODO: Implement migration logic
   return oldSettings as AppSettings
 }

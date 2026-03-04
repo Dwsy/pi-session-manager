@@ -8,9 +8,10 @@ interface StatCardProps {
   color: string
   change?: string
   trend?: 'up' | 'down' | 'neutral'
+  onClick?: () => void
 }
 
-export default function StatCard({ icon: Icon, label, value, color, change, trend = 'neutral' }: StatCardProps) {
+export default function StatCard({ icon: Icon, label, value, color, change, trend = 'neutral', onClick }: StatCardProps) {
   const getTrendColor = () => {
     if (trend === 'up') return 'text-success'
     if (trend === 'down') return 'text-destructive'
@@ -31,8 +32,8 @@ export default function StatCard({ icon: Icon, label, value, color, change, tren
     return ''
   }
 
-  return (
-    <div className={`glass-card glass-card-hover rounded-lg p-3 group cursor-pointer relative overflow-hidden ${getGlowClass()}`}>
+  const content = (
+    <>
       {/* Subtle gradient overlay */}
       <div
         className="absolute inset-0 opacity-0 group-hover:opacity-100 motion-opacity"
@@ -69,6 +70,24 @@ export default function StatCard({ icon: Icon, label, value, color, change, tren
           background: `linear-gradient(90deg, transparent 0%, ${color}60 50%, transparent 100%)`
         }}
       />
+    </>
+  )
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`glass-card glass-card-hover rounded-lg p-3 group cursor-pointer relative overflow-hidden w-full text-left motion-press focus-ring ${getGlowClass()}`}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <div className={`glass-card glass-card-hover rounded-lg p-3 group relative overflow-hidden ${getGlowClass()}`}>
+      {content}
     </div>
   )
 }

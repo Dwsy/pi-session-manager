@@ -3,8 +3,10 @@ import { Search, X, Loader2, User, Bot, FileText, Globe, ArrowUpDown } from 'luc
 import { useTranslation } from 'react-i18next';
 import { invoke } from '../transport';
 import { shortenPath } from '../utils/format';
+import { getPathParentName } from '../utils/path';
 import { parseQuotedQuery } from '../utils/search';
 import type { FullTextSearchHit, FullTextSearchResponse, SessionInfo } from '../types';
+import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '../demo';
 
 const HIGHLIGHT_CACHE_MAX_ENTRIES = 500;
 const HTML_ESCAPE_MAP: Record<string, string> = {
@@ -16,9 +18,7 @@ const HTML_ESCAPE_MAP: Record<string, string> = {
 };
 
 function getProjectDirName(path: string): string {
-  const normalized = path.replace(/\/$/, '');
-  const parts = normalized.split('/');
-  return parts.length >= 2 ? parts[parts.length - 2] : parts[parts.length - 1] || path;
+  return getPathParentName(path);
 }
 
 function escapeHtml(text: string): string {
@@ -117,14 +117,23 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
     setIsSearching(true);
     setError(null);
     try {
-      const response = await invoke<FullTextSearchResponse>('full_text_search', {
-        query: searchQuery,
-        roleFilter: role,
-        globPattern: glob || null,
-        page: pageNum,
-        pageSize: pageSize,
-        matchMode: 'any', // default mode; could be made configurable
-      });
+      const response = isDemoModeEnabled()
+        ? fullTextSearchDemo({
+          query: searchQuery,
+          roleFilter: role as 'all' | 'user' | 'assistant',
+          globPattern: glob || null,
+          page: pageNum,
+          pageSize: pageSize,
+          matchMode: 'any',
+        })
+        : await invoke<FullTextSearchResponse>('full_text_search', {
+          query: searchQuery,
+          roleFilter: role,
+          globPattern: glob || null,
+          page: pageNum,
+          pageSize: pageSize,
+          matchMode: 'any', // default mode; could be made configurable
+        });
       setAllHits(prev => append ? [...prev, ...response.hits] : response.hits);
       setTotalHitsCount(response.total_hits);
       setHitsPage(pageNum);
@@ -233,7 +242,9 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
 
   const handleSelect = async (hit: FullTextSearchHit) => {
     try {
-      const session = await invoke<SessionInfo>('get_session_by_path', { path: hit.session_path });
+      const session = isDemoModeEnabled()
+        ? getDemoSessionByPath(hit.session_path)
+        : await invoke<SessionInfo>('get_session_by_path', { path: hit.session_path });
       if (session) {
         onSelectResult(session, hit.entry_id);
         onClose();

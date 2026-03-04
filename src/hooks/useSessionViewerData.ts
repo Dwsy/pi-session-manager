@@ -6,6 +6,7 @@ import type { SessionChunk, SessionEntry, SessionsDiff } from '../types'
 import { trimMarkdownCacheOnSessionSwitch } from '../utils/markdown'
 import { getCachedSettings } from '../utils/settingsApi'
 import { parseSessionEntriesWithLineCount } from '../utils/session'
+import { isDemoModeEnabled, readDemoSessionChunk } from '../demo'
 
 interface SessionCacheItem {
   entries: SessionEntry[]
@@ -165,11 +166,13 @@ export function useSessionViewerData({
       try {
         loadingMoreRef.current = true
 
-        const chunk = await invoke<SessionChunk>('read_session_file_chunk', {
-          path: sessionPath,
-          offset: nextOffsetRef.current,
-          maxBytes,
-        })
+        const chunk = isDemoModeEnabled()
+          ? readDemoSessionChunk(sessionPath, nextOffsetRef.current, maxBytes)
+          : await invoke<SessionChunk>('read_session_file_chunk', {
+            path: sessionPath,
+            offset: nextOffsetRef.current,
+            maxBytes,
+          })
 
         nextOffsetRef.current = chunk.next_offset
         fileSizeRef.current = chunk.file_size
@@ -286,11 +289,13 @@ export function useSessionViewerData({
           }
         }, 300)
 
-        let chunk = await invoke<SessionChunk>('read_session_file_chunk', {
-          path: sessionPath,
-          offset: 0,
-          maxBytes: 384 * 1024,
-        })
+        let chunk = isDemoModeEnabled()
+          ? readDemoSessionChunk(sessionPath, 0, 384 * 1024)
+          : await invoke<SessionChunk>('read_session_file_chunk', {
+            path: sessionPath,
+            offset: 0,
+            maxBytes: 384 * 1024,
+          })
 
         let { entries: allEntries, lineCount: totalLineCount } =
           parseSessionEntriesWithLineCount(chunk.content)
@@ -300,11 +305,13 @@ export function useSessionViewerData({
 
         if (openPosition === 'top') {
           while (hasMore) {
-            const nextChunk = await invoke<SessionChunk>('read_session_file_chunk', {
-              path: sessionPath,
-              offset: nextOffset,
-              maxBytes: 384 * 1024,
-            })
+            const nextChunk = isDemoModeEnabled()
+              ? readDemoSessionChunk(sessionPath, nextOffset, 384 * 1024)
+              : await invoke<SessionChunk>('read_session_file_chunk', {
+                path: sessionPath,
+                offset: nextOffset,
+                maxBytes: 384 * 1024,
+              })
 
             const { entries: chunkEntries, lineCount: chunkLineCount } =
               parseSessionEntriesWithLineCount(nextChunk.content)
@@ -384,6 +391,7 @@ export function useSessionViewerData({
 
   useEffect(() => {
     if (!sessionPath || loading) return
+    if (isDemoModeEnabled()) return
 
     let unlisten: (() => void) | null = null
 

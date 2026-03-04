@@ -6,8 +6,8 @@ import { SessionSearchPlugin } from './session/SessionSearchPlugin'
 let registered = false
 
 /**
- * 注册所有内置插件
- * 防止在 React Strict Mode 下重复注册
+ * Register all built-in plugins
+ * Prevent duplicate registration in React Strict Mode
  */
 export function registerBuiltinPlugins() {
   if (registered) {

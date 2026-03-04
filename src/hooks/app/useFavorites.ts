@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '../../transport'
 import type { FavoriteItem } from '../../types'
+import { getDemoFavorites, isDemoModeEnabled, removeDemoFavorite, toggleDemoFavorite } from '../../demo'
 
 interface SqliteFavoriteItem {
   id: string
@@ -32,15 +33,19 @@ export function useFavorites(
   const loadFavorites = useCallback(async () => {
     setLoadingFavorites(true)
     try {
-      const result = await invoke<SqliteFavoriteItem[]>('get_all_favorites')
-      const formattedFavorites: FavoriteItem[] = result.map((favorite) => ({
-        id: favorite.id,
-        type: favorite.type as FavoriteItem['type'],
-        name: favorite.name,
-        path: favorite.path,
-        addedAt: favorite.added_at,
-      }))
-      setFavorites(formattedFavorites)
+      if (isDemoModeEnabled()) {
+        setFavorites(getDemoFavorites())
+      } else {
+        const result = await invoke<SqliteFavoriteItem[]>('get_all_favorites')
+        const formattedFavorites: FavoriteItem[] = result.map((favorite) => ({
+          id: favorite.id,
+          type: favorite.type as FavoriteItem['type'],
+          name: favorite.name,
+          path: favorite.path,
+          addedAt: favorite.added_at,
+        }))
+        setFavorites(formattedFavorites)
+      }
     } catch (error) {
       console.error('[Favorites] Failed to load favorites:', error)
       setFavorites([])
@@ -52,7 +57,11 @@ export function useFavorites(
   const removeFavorite = useCallback(
     async (item: FavoriteItem) => {
       try {
-        await invoke<void>('remove_favorite', { id: item.id })
+        if (isDemoModeEnabled()) {
+          removeDemoFavorite(item.id)
+        } else {
+          await invoke<void>('remove_favorite', { id: item.id })
+        }
         await loadFavorites()
       } catch (error) {
         console.error('Failed to remove favorite:', error)
@@ -64,13 +73,17 @@ export function useFavorites(
   const toggleFavorite = useCallback(
     async (item: Omit<FavoriteItem, 'addedAt'>) => {
       try {
-        const params = {
-          id: item.id,
-          favoriteType: item.type,
-          name: item.name,
-          path: item.path,
+        if (isDemoModeEnabled()) {
+          toggleDemoFavorite(item)
+        } else {
+          const params = {
+            id: item.id,
+            favoriteType: item.type,
+            name: item.name,
+            path: item.path,
+          }
+          await invoke<void>('toggle_favorite', params)
         }
-        await invoke<void>('toggle_favorite', params)
         await loadFavorites()
       } catch (error) {
         console.error('[Favorites] Failed to toggle favorite:', error)

@@ -1,6 +1,7 @@
 import { FolderOpen } from 'lucide-react'
 import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '../types'
+import { getPathBasename } from '../../utils/path'
 import { parseQuotedQuery } from '../../utils/search'
 
 /**
@@ -127,7 +128,6 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
    * Get project name (last part of path)
    */
   private getProjectName(path: string): string {
-    const parts = path.split('/')
-    return parts[parts.length - 1] || path
+    return getPathBasename(path)
   }
 }

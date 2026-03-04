@@ -7,13 +7,12 @@ import { invoke, listen } from '../transport'
 import { X, Plus, ChevronDown, Maximize2, Minimize2 } from 'lucide-react'
 import { getPlatformDefaults } from './settings/types'
 import { useResolvedTheme } from '../hooks/useResolvedTheme'
+import { getPathBasename } from '../utils/path'
 
 interface ShellInfo { label: string; path: string }
 
 function getShellLabel(shellPath: string): string {
-  const normalized = shellPath.replace(/\\/g, '/')
-  const leaf = normalized.split('/').pop()
-  return leaf && leaf.length > 0 ? leaf : shellPath
+  return getPathBasename(shellPath)
 }
 
 const TERM_THEME_DARK = {

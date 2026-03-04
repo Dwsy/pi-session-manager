@@ -10,7 +10,7 @@ interface SettingsFieldProps {
 }
 
 /**
- * 设置页通用字段容器：标题 + 控件 + 可选说明。
+ * Common field container for settings: title + control + optional description.
  */
 export default function SettingsField({
   label,

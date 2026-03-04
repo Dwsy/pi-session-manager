@@ -1,5 +1,5 @@
 /**
- * 搜索设置组件
+ * Search settings component
  */
 
 import { useTranslation } from 'react-i18next'

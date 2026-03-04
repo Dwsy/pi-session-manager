@@ -6,7 +6,7 @@ interface SettingsSelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 /**
- * 设置页通用下拉框样式。
+ * Common dropdown style for settings pages.
  */
 export default function SettingsSelect({
   children,

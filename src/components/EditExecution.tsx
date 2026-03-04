@@ -4,6 +4,7 @@ import { registerCustomTheme, RegisteredCustomThemes } from '@pierre/diffs'
 import { useTranslation } from 'react-i18next'
 import { escapeHtml } from '../utils/markdown'
 import { shortenPath } from '../utils/format'
+import { getPathBasename } from '../utils/path'
 import { useTheme } from '../hooks/useAppearance'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useSessionView } from '../contexts/SessionViewContext'
@@ -142,7 +143,7 @@ export default function EditExecution({
     }
 
     try {
-      const fileName = filePath.split('/').pop() || 'file'
+      const fileName = getPathBasename(filePath) || 'file'
 
       const oldFile: FileContents = {
         name: fileName,

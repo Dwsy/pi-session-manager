@@ -52,7 +52,7 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
     { id: 'achievements' as TabType, label: t('stats.tabs.achievements'), icon: Award },
   ]
 
-  // sessions 变化时重新加载统计
+  // Reload stats when sessions change
   useEffect(() => {
     if (sessions.length === 0) {
       setStats(null)

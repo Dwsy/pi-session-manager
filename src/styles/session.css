@@ -287,7 +287,7 @@
    cursor: not-allowed;
  }
 
- /* 搜索高亮 */
+ /* Search highlight */
  .search-highlight {
    background: rgba(255, 215, 0, 0.3);
    color: inherit;
@@ -300,7 +300,7 @@
    box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.3);
  }
 
- /* 拖拽手柄 - 优雅版本 */
+ /* Drag handle - refined version */
  .sidebar-resize-handle {
    width: 4px;
    height: 100%;
@@ -350,7 +350,7 @@
    width: 2px;
  }
 
- /* 高亮效果 */
+ /* Highlight effect */
  .user-message.highlight,
  .assistant-message.highlight {
    animation: highlight-pulse 2s ease-out;
@@ -404,7 +404,7 @@
   flex-shrink: 0;
 }
 
-/* Tree/Flow 与下方过滤器之间的间距 */
+/* Spacing between Tree/Flow and filters below */
 .sidebar-filters-view-mode {
   padding-bottom: 6px;
   margin-bottom: 2px;
@@ -442,7 +442,7 @@
    padding: 8px 0;
  }
 
- /* 美化滚动条 */
+ /* Styled scrollbar */
  .tree-container::-webkit-scrollbar {
    width: 8px;
  }
@@ -593,7 +593,7 @@
    color: var(--customMessageLabel);
  }
 
- /* Compaction 组件样式 */
+ /* Compaction component styles */
  .compaction {
    background: var(--bg-subtle);
    border: 1px solid rgba(var(--accent-rgb), 0.15);
@@ -642,7 +642,7 @@
    display: block;
  }
 
- /* Branch Summary 组件样式 */
+ /* Branch Summary component styles */
  .branch-summary {
    background: var(--bg-subtle);
    border: 1px solid rgba(var(--accent-rgb), 0.15);
@@ -985,7 +985,7 @@
   background: rgba(var(--destructive-rgb), 0.05);
 }
 
-/* 搜索结果匹配 - 极客风格 */
+/* Search result match - geek style */
 .tree-node.search-match {
   flex-wrap: wrap;
 }
@@ -1002,7 +1002,7 @@
   background: rgba(34, 211, 238, 0.15);
 }
 
-/* 搜索摘要 - 第二行 */
+/* Search summary - second line */
 .tree-snippet {
   width: 100%;
   padding-left: 1.5em;
@@ -1014,7 +1014,7 @@
   text-overflow: ellipsis;
 }
 
-/* 搜索关键词高亮 - 青色极客风 */
+/* Search keyword highlight - cyan geek style */
 .search-keyword {
   background: transparent;
   color: var(--accent);

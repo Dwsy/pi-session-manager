@@ -4,7 +4,7 @@ import type { AppDesktopSidebarSessionListCommonProps } from "../../components/a
 import type { MobileTab } from "../../components/app/AppMobileLayout";
 import type { TerminalType } from "../../components/settings/types";
 import type { FavoriteItem, SessionInfo, SessionTag, Tag } from "../../types";
-import type { SessionSortBy } from "../../types/sessionSort";
+import type { SessionSortBy, SessionSortOrder } from "../../types/sessionSort";
 import { filterSessions } from "../../utils/sessionFilters";
 import { getDirectoryName } from "../../utils/sessionDisplay";
 import { usePaginatedSessions } from "../usePaginatedSessions";
@@ -37,6 +37,7 @@ export interface UseSidebarSessionsOptions {
   piPath: string;
   customCommand: string;
   sortBy: SessionSortBy;
+  sortOrder: SessionSortOrder;
   favorites: FavoriteItem[];
   onToggleFavorite: (item: Omit<FavoriteItem, "addedAt">) => Promise<void>;
   tags: Tag[];
@@ -89,6 +90,7 @@ export function useSidebarSessions({
   piPath,
   customCommand,
   sortBy,
+  sortOrder,
   favorites,
   onToggleFavorite,
   tags,
@@ -165,6 +167,7 @@ export function useSidebarSessions({
     projectFilter: listProjectFilter,
     filterTagIds: effectiveFilterTagIds,
     sortBy,
+    sortOrder,
   });
 
   const latestSessionsRef = useRef(sessions);

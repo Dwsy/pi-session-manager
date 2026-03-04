@@ -372,10 +372,16 @@ export default function SessionList({
     }
 
     lastSelectionModeTriggerRef.current = selectionModeTrigger;
-    if (!isSelectionMode && onDeleteSessions) {
-      handleEnterSelectionMode();
+    if (!onDeleteSessions) {
+      return;
     }
+    if (isSelectionMode) {
+      handleExitSelectionMode();
+      return;
+    }
+    handleEnterSelectionMode();
   }, [
+    handleExitSelectionMode,
     handleEnterSelectionMode,
     isSelectionMode,
     onDeleteSessions,

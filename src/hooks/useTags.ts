@@ -1,6 +1,20 @@
 import { useState, useCallback, useEffect } from 'react'
 import { invoke } from '../transport'
 import type { Tag, SessionTag } from '../types'
+import {
+  assignDemoTag,
+  createDemoTag,
+  deleteDemoTag,
+  evaluateDemoAutoRules,
+  getDemoSessionTags,
+  getDemoTags,
+  isDemoModeEnabled,
+  moveDemoSessionTag,
+  removeDemoTagFromSession,
+  reorderDemoTags,
+  updateDemoTag,
+  updateDemoTagAutoRules,
+} from '../demo'
 
 export function useTags() {
   const [tags, setTags] = useState<Tag[]>([])
@@ -9,10 +23,12 @@ export function useTags() {
 
   const loadTags = useCallback(async () => {
     try {
-      const [allTags, allST] = await Promise.all([
-        invoke<Tag[]>('get_all_tags'),
-        invoke<SessionTag[]>('get_all_session_tags'),
-      ])
+      const [allTags, allST] = isDemoModeEnabled()
+        ? [getDemoTags(), getDemoSessionTags()]
+        : await Promise.all([
+          invoke<Tag[]>('get_all_tags'),
+          invoke<SessionTag[]>('get_all_session_tags'),
+        ])
       setTags(allTags)
       setSessionTags(allST)
     } catch (err) {
@@ -25,24 +41,38 @@ export function useTags() {
   useEffect(() => { loadTags() }, [loadTags])
 
   const createTag = useCallback(async (name: string, color: string, icon?: string, parentId?: string) => {
-    const tag = await invoke<Tag>('create_tag', { name, color, icon, parentId })
+    const tag = isDemoModeEnabled()
+      ? createDemoTag(name, color, icon, parentId)
+      : await invoke<Tag>('create_tag', { name, color, icon, parentId })
     setTags(prev => [...prev, tag])
     return tag
   }, [])
 
   const updateTag = useCallback(async (id: string, updates: Partial<Pick<Tag, 'name' | 'color' | 'icon'>>) => {
-    await invoke('update_tag', { id, ...updates })
+    if (isDemoModeEnabled()) {
+      updateDemoTag(id, updates)
+    } else {
+      await invoke('update_tag', { id, ...updates })
+    }
     setTags(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
   }, [])
 
   const deleteTag = useCallback(async (id: string) => {
-    await invoke('delete_tag', { id })
+    if (isDemoModeEnabled()) {
+      deleteDemoTag(id)
+    } else {
+      await invoke('delete_tag', { id })
+    }
     setTags(prev => prev.filter(t => t.id !== id))
     setSessionTags(prev => prev.filter(st => st.tagId !== id))
   }, [])
 
   const assignTag = useCallback(async (sessionId: string, tagId: string) => {
-    await invoke('assign_tag', { sessionId, tagId })
+    if (isDemoModeEnabled()) {
+      assignDemoTag(sessionId, tagId)
+    } else {
+      await invoke('assign_tag', { sessionId, tagId })
+    }
     setSessionTags(prev => [
       ...prev.filter(st => !(st.sessionId === sessionId && st.tagId === tagId)),
       { sessionId, tagId, position: 0, assignedAt: new Date().toISOString() },
@@ -50,7 +80,11 @@ export function useTags() {
   }, [])
 
   const removeTagFromSession = useCallback(async (sessionId: string, tagId: string) => {
-    await invoke('remove_tag_from_session', { sessionId, tagId })
+    if (isDemoModeEnabled()) {
+      removeDemoTagFromSession(sessionId, tagId)
+    } else {
+      await invoke('remove_tag_from_session', { sessionId, tagId })
+    }
     setSessionTags(prev => prev.filter(st => !(st.sessionId === sessionId && st.tagId === tagId)))
   }, [])
 
@@ -70,7 +104,11 @@ export function useTags() {
       ]
     })
     try {
-      await invoke('move_session_tag', { sessionId, fromTagId, toTagId, position })
+      if (isDemoModeEnabled()) {
+        moveDemoSessionTag(sessionId, fromTagId, toTagId, position)
+      } else {
+        await invoke('move_session_tag', { sessionId, fromTagId, toTagId, position })
+      }
     } catch {
       await loadTags()
     }
@@ -81,7 +119,11 @@ export function useTags() {
       const map = new Map(prev.map(t => [t.id, t]))
       return tagIds.filter(id => map.has(id)).map((id, i) => ({ ...map.get(id)!, sortOrder: i }))
     })
-    await invoke('reorder_tags', { tagIds })
+    if (isDemoModeEnabled()) {
+      reorderDemoTags(tagIds)
+    } else {
+      await invoke('reorder_tags', { tagIds })
+    }
   }, [])
 
   const getTagsForSession = useCallback((sessionId: string): Tag[] => {
@@ -94,12 +136,18 @@ export function useTags() {
   }, [sessionTags])
 
   const updateTagAutoRules = useCallback(async (id: string, rules: string | null) => {
-    await invoke('update_tag_auto_rules', { id, autoRules: rules })
+    if (isDemoModeEnabled()) {
+      updateDemoTagAutoRules(id, rules)
+    } else {
+      await invoke('update_tag_auto_rules', { id, autoRules: rules })
+    }
     setTags(prev => prev.map(t => t.id === id ? { ...t, autoRules: rules ?? undefined } : t))
   }, [])
 
   const evaluateAutoRules = useCallback(async (sessionId: string, text: string) => {
-    const matched = await invoke<string[]>('evaluate_auto_rules', { sessionId, text })
+    const matched = isDemoModeEnabled()
+      ? evaluateDemoAutoRules(sessionId, text)
+      : await invoke<string[]>('evaluate_auto_rules', { sessionId, text })
     if (matched.length > 0) await loadTags()
     return matched
   }, [loadTags])

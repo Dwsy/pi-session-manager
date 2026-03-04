@@ -48,6 +48,7 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
     session: { ...defaultSettings.session, ...raw.session },
     search: { ...defaultSettings.search, ...raw.search },
     export: { ...defaultSettings.export, ...raw.export },
+    update: { ...defaultSettings.update, ...raw.update },
     advanced,
   }
 }

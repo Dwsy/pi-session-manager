@@ -100,7 +100,7 @@ export function highlightSearchInHTML(html: string, searchQuery: string): string
 
   const regex = new RegExp(`(${escapedTerms.join('|')})`, 'gi')
 
-  // 临时替换 HTML 标签，避免在标签内搜索
+  // Temporarily replace HTML tags to avoid searching inside tags
   const tagPlaceholders: string[] = []
   let processedHtml = html.replace(/<[^>]+>/g, (tagMatch) => {
     const placeholder = `__TAG_${tagPlaceholders.length}__`
@@ -108,10 +108,10 @@ export function highlightSearchInHTML(html: string, searchQuery: string): string
     return placeholder
   })
 
-  // 高亮搜索关键词
+  // Highlight search keywords
   processedHtml = processedHtml.replace(regex, '<mark class="search-highlight">$1</mark>')
 
-  // 恢复 HTML 标签
+  // Restore HTML tags
   tagPlaceholders.forEach((tag, index) => {
     processedHtml = processedHtml.replace(`__TAG_${index}__`, tag)
   })
@@ -120,10 +120,10 @@ export function highlightSearchInHTML(html: string, searchQuery: string): string
 }
 
 /**
- * 在纯文本中搜索关键词
- * @param text - 纯文本
- * @param searchQuery - 搜索关键词
- * @returns 是否包含关键词
+ * Search keywords in plain text
+ * @param text - Plain text
+ * @param searchQuery - Search keywords
+ * @returns Whether keywords are included
  */
 export function containsSearchQuery(text: string, searchQuery: string): boolean {
   if (!searchQuery.trim()) {
@@ -145,14 +145,14 @@ export function containsSearchQuery(text: string, searchQuery: string): boolean 
 }
 
 /**
- * 提取消息的纯文本内容（用于搜索）
- * @param html - HTML 字符串
- * @returns 纯文本
+ * Extract plain-text message content (for search)
+ * @param html - HTML string
+ * @returns Plain text
  */
 export function extractTextFromHTML(html: string): string {
-  // 移除 HTML 标签
+  // Remove HTML tags
   const text = html.replace(/<[^>]+>/g, ' ')
-  // 解码 HTML 实体
+  // Decode HTML entities
   const textarea = document.createElement('textarea')
   textarea.innerHTML = text
   return textarea.value

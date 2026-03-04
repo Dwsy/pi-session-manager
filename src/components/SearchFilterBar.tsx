@@ -75,7 +75,7 @@ export default function SearchFilterBar({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder || t('common.searchPlaceholder')}
-          className={`flex-1 min-w-0 bg-transparent outline-none placeholder:text-muted-foreground/40 ${
+          className={`flex-1 min-w-0 max-w-[100px] bg-transparent outline-none placeholder:text-muted-foreground/40 ${
             compact ? 'text-[11px]' : 'text-[12px]'
           }`}
           onKeyDown={(e) => {

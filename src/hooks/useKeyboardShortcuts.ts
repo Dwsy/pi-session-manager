@@ -5,11 +5,11 @@ interface Shortcuts {
 }
 
 /**
- * 键盘快捷键 Hook
- * 优化：使用 ref 存储 shortcuts，避免每次渲染都重新绑定事件
+ * Keyboard shortcuts hook
+ * Optimization: store shortcuts in refs to avoid rebinding on each render
  * 
- * 注意：终端内使用 attachCustomKeyEventHandler 拦截快捷键，
- * 因此全局快捷键不会与终端快捷键冲突
+ * Note: the terminal intercepts shortcuts with attachCustomKeyEventHandler,
+ * Therefore global shortcuts do not conflict with terminal shortcuts
  */
 export function useKeyboardShortcuts(shortcuts: Shortcuts) {
   // Use ref to store shortcuts, avoid rebinding events on every render

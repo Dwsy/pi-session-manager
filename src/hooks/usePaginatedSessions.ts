@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '../transport'
 import type { SessionInfo } from '../types'
-import { DEFAULT_SESSION_SORT_BY } from '../types/sessionSort'
-import type { SessionSortBy } from '../types/sessionSort'
+import {
+  DEFAULT_SESSION_SORT_BY,
+  DEFAULT_SESSION_SORT_ORDER,
+} from '../types/sessionSort'
+import type { SessionSortBy, SessionSortOrder } from '../types/sessionSort'
+import { isDemoModeEnabled, listDemoSessionsPaginated } from '../demo'
 
 const DEFAULT_PAGE_SIZE = 100
 
@@ -21,6 +25,7 @@ interface UsePaginatedSessionsOptions {
   projectFilter?: string | null
   filterTagIds?: string[]
   sortBy?: SessionSortBy
+  sortOrder?: SessionSortOrder
 }
 
 interface UsePaginatedSessionsReturn {
@@ -135,6 +140,7 @@ export function usePaginatedSessions({
   projectFilter = null,
   filterTagIds = [],
   sortBy = DEFAULT_SESSION_SORT_BY,
+  sortOrder = DEFAULT_SESSION_SORT_ORDER,
 }: UsePaginatedSessionsOptions): UsePaginatedSessionsReturn {
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [total, setTotal] = useState(0)
@@ -152,7 +158,7 @@ export function usePaginatedSessions({
     sessionsRef.current = sessions
   }, [sessions])
 
-  const shouldUseBackend = enabled
+  const shouldUseBackend = enabled && !isDemoModeEnabled()
 
   const normalizedSearchQuery = useMemo(() => searchQuery.trim(), [searchQuery])
   const normalizedProjectFilter = useMemo(
@@ -164,10 +170,15 @@ export function usePaginatedSessions({
     [filterTagIds],
   )
   const normalizedSortBy = useMemo(() => sortBy, [sortBy])
+  const normalizedSortOrder = useMemo(() => sortOrder, [sortOrder])
+  const normalizedSortKey = useMemo(
+    () => `${normalizedSortBy}_${normalizedSortOrder}`,
+    [normalizedSortBy, normalizedSortOrder],
+  )
 
   const requestPage = useCallback(
     async (offset: number, options: RequestPageOptions) => {
-      if (!shouldUseBackend) {
+      if (!enabled) {
         return
       }
 
@@ -178,7 +189,7 @@ export function usePaginatedSessions({
         append ? 'append' : 'replace',
         normalizedSearchQuery || '__empty__',
         normalizedProjectFilter || '__all__',
-        normalizedSortBy,
+        normalizedSortKey,
         normalizedTagIds.join(',') || '__no_tags__',
       ].join('|')
 
@@ -199,18 +210,28 @@ export function usePaginatedSessions({
       }
 
       try {
-        const response = await invoke<ScanSessionsPaginatedResponse>(
-          'scan_sessions_paginated',
-          {
+        const response = shouldUseBackend
+          ? await invoke<ScanSessionsPaginatedResponse>(
+            'scan_sessions_paginated',
+            {
+              offset,
+              limit,
+              searchQuery: normalizedSearchQuery || null,
+              projectFilter: normalizedProjectFilter,
+              filterTagIds: normalizedTagIds.length > 0 ? normalizedTagIds : null,
+              sortBy: normalizedSortKey,
+              sort_by: normalizedSortKey,
+            },
+          )
+          : listDemoSessionsPaginated({
             offset,
             limit,
             searchQuery: normalizedSearchQuery || null,
             projectFilter: normalizedProjectFilter,
             filterTagIds: normalizedTagIds.length > 0 ? normalizedTagIds : null,
             sortBy: normalizedSortBy,
-            sort_by: normalizedSortBy,
-          },
-        )
+            sortOrder: normalizedSortOrder,
+          })
 
         if (requestId !== requestIdRef.current) {
           return
@@ -245,9 +266,11 @@ export function usePaginatedSessions({
     [
       normalizedProjectFilter,
       normalizedSearchQuery,
-      normalizedSortBy,
+      normalizedSortKey,
+      normalizedSortOrder,
       normalizedTagIds,
       pageSize,
+      enabled,
       shouldUseBackend,
     ],
   )
@@ -271,15 +294,15 @@ export function usePaginatedSessions({
   )
 
   const loadMore = useCallback(async () => {
-    if (!shouldUseBackend || loading || loadingMore || !hasMore) {
+    if (!enabled || loading || loadingMore || !hasMore) {
       return
     }
 
     await requestPage(sessionsRef.current.length, { append: true })
-  }, [hasMore, loading, loadingMore, requestPage, shouldUseBackend])
+  }, [enabled, hasMore, loading, loadingMore, requestPage])
 
   useEffect(() => {
-    if (!shouldUseBackend) {
+    if (!enabled) {
       setSessions([])
       setTotal(0)
       setHasMore(false)
@@ -290,7 +313,7 @@ export function usePaginatedSessions({
     }
 
     void requestPage(0, { append: false })
-  }, [requestPage, shouldUseBackend])
+  }, [enabled, requestPage])
 
   return {
     sessions,

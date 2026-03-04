@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { invoke } from '../transport'
 import { getCachedSettings } from '../utils/settingsApi'
 import type { SessionInfo, SearchResult } from '../types'
+import { isDemoModeEnabled, searchDemoSessions } from '../demo'
 
 export interface UseSearchReturn {
   searchResults: SearchResult[]
@@ -26,13 +27,15 @@ export function useSearch(
       setIsSearching(true)
       const searchPrefs = getCachedSettings().search
 
-      const results = await invoke<SearchResult[]>('search_sessions', {
-        sessions,
-        query,
-        search_mode: searchPrefs.defaultSearchMode || 'content',
-        role_filter: 'all',
-        include_tools: searchPrefs.includeToolCalls ?? false,
-      })
+      const results = isDemoModeEnabled()
+        ? searchDemoSessions({ query, sessions })
+        : await invoke<SearchResult[]>('search_sessions', {
+          sessions,
+          query,
+          search_mode: searchPrefs.defaultSearchMode || 'content',
+          role_filter: 'all',
+          include_tools: searchPrefs.includeToolCalls ?? false,
+        })
 
       setSearchResults(results)
     } catch (error) {

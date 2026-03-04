@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpDown, Check, ChevronDown } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import {
+  ArrowDownWideNarrow,
+  ArrowUpDown,
+  ArrowUpNarrowWide,
+  Check,
+  ChevronDown,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { SessionSortBy } from '../types/sessionSort'
+import type { SessionSortBy, SessionSortOrder } from '../types/sessionSort'
 
 interface SessionSortSelectProps {
   value: SessionSortBy
+  order: SessionSortOrder
   onChange: (value: SessionSortBy) => void
+  onOrderChange: (order: SessionSortOrder) => void
   className?: string
   compact?: boolean
   showValueLabel?: boolean
@@ -22,9 +31,18 @@ const SORT_OPTIONS: Array<{
   { value: 'size', labelKey: 'session.sort.short.size', fallback: 'Size' },
 ]
 
+type MenuPosition = {
+  top: number
+  left: number
+  transform: string
+  transformOrigin: 'top right' | 'bottom right'
+}
+
 export default function SessionSortSelect({
   value,
+  order,
   onChange,
+  onOrderChange,
   className = '',
   compact = true,
   showValueLabel = true,
@@ -32,6 +50,12 @@ export default function SessionSortSelect({
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(0)
+  const [menuPosition, setMenuPosition] = useState<MenuPosition>({
+    top: 0,
+    left: 0,
+    transform: 'translateY(0)',
+    transformOrigin: 'top right',
+  })
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
@@ -40,6 +64,13 @@ export default function SessionSortSelect({
     return index >= 0 ? index : 0
   }, [value])
   const currentOption = SORT_OPTIONS[currentOptionIndex]
+  const isDescending = order === 'desc'
+  const directionLabel = isDescending
+    ? t('session.sort.order.desc', { defaultValue: 'Descending' })
+    : t('session.sort.order.asc', { defaultValue: 'Ascending' })
+  const directionActionLabel = isDescending
+    ? t('session.sort.order.switchToAsc', { defaultValue: 'Switch to ascending' })
+    : t('session.sort.order.switchToDesc', { defaultValue: 'Switch to descending' })
 
   const closeMenu = useCallback(() => {
     setOpen(false)
@@ -56,6 +87,43 @@ export default function SessionSortSelect({
     setOpen(false)
     triggerRef.current?.focus()
   }, [onChange])
+
+  const handleToggleOrder = useCallback(() => {
+    onOrderChange(isDescending ? 'asc' : 'desc')
+  }, [isDescending, onOrderChange])
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current
+    if (!trigger) {
+      return
+    }
+
+    const viewportPadding = 8
+    const gap = 6
+    const menuWidth = menuRef.current?.offsetWidth ?? 164
+    const menuHeight = menuRef.current?.offsetHeight ?? 220
+    const triggerRect = trigger.getBoundingClientRect()
+    const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2)
+    const boundedMenuWidth = Math.min(menuWidth, availableWidth || menuWidth)
+    const spaceBelow = window.innerHeight - triggerRect.bottom - gap - viewportPadding
+    const spaceAbove = triggerRect.top - gap - viewportPadding
+    const openUpward = spaceBelow < menuHeight && spaceAbove > spaceBelow
+
+    let left = triggerRect.right - boundedMenuWidth
+    left = Math.max(
+      viewportPadding,
+      Math.min(left, window.innerWidth - boundedMenuWidth - viewportPadding),
+    )
+
+    const top = openUpward ? triggerRect.top - gap : triggerRect.bottom + gap
+
+    setMenuPosition({
+      top,
+      left,
+      transform: openUpward ? 'translateY(-100%)' : 'translateY(0)',
+      transformOrigin: openUpward ? 'bottom right' : 'top right',
+    })
+  }, [])
 
   useEffect(() => {
     if (!open) {
@@ -81,19 +149,13 @@ export default function SessionSortSelect({
       }
     }
 
-    const handleDismiss = () => closeMenu()
-
     document.addEventListener('mousedown', handlePointerDown)
     document.addEventListener('touchstart', handlePointerDown)
     document.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('resize', handleDismiss)
-    window.addEventListener('scroll', handleDismiss, true)
     return () => {
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('touchstart', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('resize', handleDismiss)
-      window.removeEventListener('scroll', handleDismiss, true)
     }
   }, [closeMenu, open])
 
@@ -102,13 +164,31 @@ export default function SessionSortSelect({
       return
     }
     setHighlightedIndex(currentOptionIndex)
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       optionRefs.current[currentOptionIndex]?.focus()
+      updateMenuPosition()
     })
-  }, [open, currentOptionIndex])
+    return () => cancelAnimationFrame(rafId)
+  }, [open, currentOptionIndex, updateMenuPosition])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    updateMenuPosition()
+    const rafId = requestAnimationFrame(updateMenuPosition)
+    window.addEventListener('resize', updateMenuPosition)
+    window.addEventListener('scroll', updateMenuPosition, true)
+    return () => {
+      cancelAnimationFrame(rafId)
+      window.removeEventListener('resize', updateMenuPosition)
+      window.removeEventListener('scroll', updateMenuPosition, true)
+    }
+  }, [open, updateMenuPosition])
 
   return (
-    <div className={`relative inline-flex items-center ${className}`}>
+    <div className={`relative inline-flex items-center gap-1 ${className}`}>
       <button
         ref={triggerRef}
         type="button"
@@ -129,7 +209,7 @@ export default function SessionSortSelect({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t('session.sort.label', { defaultValue: 'Sort sessions' })}
-        title={`${t('session.sort.label', { defaultValue: 'Sort sessions' })}: ${t(currentOption.labelKey, { defaultValue: currentOption.fallback })}`}
+        title={`${t('session.sort.label', { defaultValue: 'Sort sessions' })}: ${t(currentOption.labelKey, { defaultValue: currentOption.fallback })} (${directionLabel})`}
       >
         <ArrowUpDown className={compact ? 'h-3.5 w-3.5 shrink-0' : 'h-4 w-4 shrink-0'} />
         {showValueLabel && (
@@ -141,8 +221,21 @@ export default function SessionSortSelect({
           </>
         )}
       </button>
+      <button
+        type="button"
+        onClick={handleToggleOrder}
+        className={`${compact ? 'h-7 w-7' : 'h-8 w-8'} inline-flex items-center justify-center rounded-md border border-border/60 bg-secondary/40 text-muted-foreground outline-none transition-colors hover:border-border/80 hover:bg-secondary/70 hover:text-foreground focus:ring-1 focus:ring-border/70`}
+        aria-label={directionActionLabel}
+        title={directionActionLabel}
+      >
+        {isDescending ? (
+          <ArrowDownWideNarrow className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+        ) : (
+          <ArrowUpNarrowWide className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+        )}
+      </button>
 
-      {open && (
+      {open && createPortal(
         <div
           ref={menuRef}
           role="menu"
@@ -182,7 +275,14 @@ export default function SessionSortSelect({
               triggerRef.current?.focus()
             }
           }}
-          className="absolute right-0 top-[calc(100%+6px)] z-50 min-w-[164px] rounded-lg border border-border/70 bg-popover p-1 shadow-xl"
+          style={{
+            position: 'fixed',
+            top: menuPosition.top,
+            left: menuPosition.left,
+            transform: menuPosition.transform,
+            transformOrigin: menuPosition.transformOrigin,
+          }}
+          className="z-[70] w-[164px] max-w-[calc(100vw-16px)] rounded-lg border border-border/70 bg-popover p-1 shadow-xl"
         >
           <div className="px-2 pb-1 pt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/75">
             {t('session.sort.label', { defaultValue: 'Sort sessions' })}
@@ -212,7 +312,8 @@ export default function SessionSortSelect({
               </button>
             )
           })}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

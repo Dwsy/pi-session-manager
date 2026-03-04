@@ -1,4 +1,4 @@
-/* cmdk 自定义样式 */
+/* cmdk custom styles */
 
 [cmdk-root] {
   @apply w-full;
@@ -35,7 +35,7 @@
   @apply flex flex-col items-center justify-center py-12 text-center;
 }
 
-/* 动画 */
+/* Animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -68,7 +68,7 @@
   animation: zoomIn var(--motion-duration-base) var(--motion-ease-enter);
 }
 
-/* 高亮 */
+/* Highlights */
 mark {
   @apply bg-yellow-400/20 text-yellow-400 rounded px-0.5;
 }

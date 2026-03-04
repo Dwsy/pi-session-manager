@@ -6,6 +6,8 @@ import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import type { TerminalType } from '../settings/types'
 import SessionViewer from '../SessionViewer'
 
+export type SessionPreviewAnimationMode = 'stable' | 'origin-point'
+
 export interface SessionPreviewModalProps {
   session: SessionInfo | null
   isOpen: boolean
@@ -16,13 +18,24 @@ export interface SessionPreviewModalProps {
   terminal?: TerminalType
   piPath?: string
   customCommand?: string
-  initialCardRect?: DOMRect | null
   initialClickPoint?: { x: number; y: number } | null
+  animationMode?: SessionPreviewAnimationMode
   onCloseAnimationComplete?: () => void
 }
 
-const MODAL_ANIMATION_DURATION_MS = 300
-const POINT_ANIMATION_SCALE = 0.06
+const MODAL_OPEN_ANIMATION_DURATION_MS = 180
+const MODAL_CLOSE_ANIMATION_DURATION_MS = 140
+
+function resolveAnimationMode(
+  explicitMode: SessionPreviewAnimationMode,
+  prefersReducedMotion: boolean,
+): SessionPreviewAnimationMode {
+  if (prefersReducedMotion) {
+    return 'stable'
+  }
+
+  return explicitMode
+}
 
 export default function SessionPreviewModal({
   session,
@@ -34,94 +47,79 @@ export default function SessionPreviewModal({
   terminal,
   piPath,
   customCommand,
-  initialCardRect,
   initialClickPoint,
+  animationMode = 'stable',
   onCloseAnimationComplete,
 }: SessionPreviewModalProps) {
   const { t } = useTranslation()
   const prefersReducedMotion = usePrefersReducedMotion()
   const [, setIsAnimating] = useState(false)
-  const [isClosing, setIsClosing] = useState(false)
   const [animationStyles, setAnimationStyles] = useState<React.CSSProperties>({})
   const modalRef = useRef<HTMLDivElement>(null)
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const animationDuration = prefersReducedMotion ? 1 : MODAL_ANIMATION_DURATION_MS
-  const animationTransition = `transform ${animationDuration}ms var(--motion-ease-standard), opacity ${animationDuration}ms var(--motion-ease-standard)`
+  const closeInFlightRef = useRef(false)
+  const resolvedAnimationMode = resolveAnimationMode(animationMode, prefersReducedMotion)
+  const openAnimationDuration = prefersReducedMotion ? 1 : MODAL_OPEN_ANIMATION_DURATION_MS
+  const closeAnimationDuration = prefersReducedMotion ? 1 : MODAL_CLOSE_ANIMATION_DURATION_MS
+  const openAnimationTransition = `transform ${openAnimationDuration}ms cubic-bezier(0.16, 1, 0.3, 1), opacity ${openAnimationDuration}ms cubic-bezier(0.16, 1, 0.3, 1)`
+  const closeAnimationTransition = `transform ${closeAnimationDuration}ms cubic-bezier(0.4, 0, 1, 1), opacity ${closeAnimationDuration}ms cubic-bezier(0.4, 0, 1, 1)`
+
+  const getTransformOrigin = useCallback(() => {
+    if (resolvedAnimationMode !== 'origin-point' || !initialClickPoint) {
+      return 'center center'
+    }
+
+    const rect = modalRef.current?.getBoundingClientRect()
+    if (!rect) {
+      return 'center center'
+    }
+
+    const x = Math.min(Math.max(initialClickPoint.x - rect.left, 0), rect.width)
+    const y = Math.min(Math.max(initialClickPoint.y - rect.top, 0), rect.height)
+    return `${x}px ${y}px`
+  }, [initialClickPoint, resolvedAnimationMode])
 
   const handleCloseWithAnimation = useCallback(() => {
-    if (isClosing || !session) {
+    if (closeInFlightRef.current) {
+      return
+    }
+
+    if (!session) {
       onClose()
       return
     }
+
+    closeInFlightRef.current = true
 
     if (prefersReducedMotion) {
       onClose()
       onCloseAnimationComplete?.()
+      closeInFlightRef.current = false
       return
     }
 
-    setIsClosing(true)
+    const transformOrigin = getTransformOrigin()
 
-    const cardEl = document.querySelector(`[data-session-id="${session.id}"]`)
-    const currentCardRect = cardEl ? cardEl.getBoundingClientRect() : null
-
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-    const modalWidth = viewportWidth * 0.9
-    const modalHeight = viewportHeight * 0.9
-    const modalCenterX = (viewportWidth - modalWidth) / 2
-    const modalCenterY = (viewportHeight - modalHeight) / 2
-
-    if (initialClickPoint) {
-      const targetX = initialClickPoint.x - modalCenterX
-      const targetY = initialClickPoint.y - modalCenterY
-
-      setAnimationStyles({
-        transform: `translate(${targetX}px, ${targetY}px) scale(${POINT_ANIMATION_SCALE})`,
-        opacity: 0,
-        transition: animationTransition,
-      })
-    } else {
-      const isCardVisible = currentCardRect && (
-        currentCardRect.top >= 0 &&
-        currentCardRect.left >= 0 &&
-        currentCardRect.bottom <= window.innerHeight &&
-        currentCardRect.right <= window.innerWidth
-      )
-
-      if (isCardVisible && currentCardRect) {
-        const targetX = currentCardRect.left - modalCenterX
-        const targetY = currentCardRect.top - modalCenterY
-        const targetScaleX = currentCardRect.width / modalWidth
-        const targetScaleY = currentCardRect.height / modalHeight
-
-        setAnimationStyles({
-          transform: `translate(${targetX}px, ${targetY}px) scale(${targetScaleX}, ${targetScaleY})`,
-          opacity: 0,
-          transition: animationTransition,
-        })
-      } else {
-        setAnimationStyles({
-          transform: 'translate(0, 0) scale(0.95)',
-          opacity: 0,
-          transition: animationTransition,
-        })
-      }
-    }
+    setAnimationStyles({
+      transformOrigin,
+      transform: 'scale(0.92)',
+      opacity: 0,
+      transition: closeAnimationTransition,
+    })
 
     animationTimeoutRef.current = setTimeout(() => {
-      setIsClosing(false)
       setAnimationStyles({})
       onClose()
       onCloseAnimationComplete?.()
-    }, animationDuration)
+      closeInFlightRef.current = false
+    }, closeAnimationDuration)
   }, [
-    animationDuration,
-    animationTransition,
-    isClosing,
-    initialClickPoint,
+    closeAnimationDuration,
+    closeAnimationTransition,
+    getTransformOrigin,
     onClose,
+    resolvedAnimationMode,
     onCloseAnimationComplete,
     prefersReducedMotion,
     session,
@@ -155,6 +153,7 @@ export default function SessionPreviewModal({
 
   useLayoutEffect(() => {
     if (isOpen) {
+      closeInFlightRef.current = false
       document.addEventListener('keydown', handleKeyDown)
       document.body.style.overflow = 'hidden'
 
@@ -170,47 +169,33 @@ export default function SessionPreviewModal({
       if (!prefersReducedMotion) {
         setIsAnimating(true)
 
-        const viewportWidth = window.innerWidth
-        const viewportHeight = window.innerHeight
-        const modalWidth = viewportWidth * 0.9
-        const modalHeight = viewportHeight * 0.9
-        const modalCenterX = (viewportWidth - modalWidth) / 2
-        const modalCenterY = (viewportHeight - modalHeight) / 2
-
-        let startTransform = 'translate(0, 0) scale(0.95)'
-
-        if (initialClickPoint) {
-          const initialX = initialClickPoint.x - modalCenterX
-          const initialY = initialClickPoint.y - modalCenterY
-          startTransform = `translate(${initialX}px, ${initialY}px) scale(${POINT_ANIMATION_SCALE})`
-        } else if (initialCardRect) {
-          const initialX = initialCardRect.left - modalCenterX
-          const initialY = initialCardRect.top - modalCenterY
-          const initialScaleX = initialCardRect.width / modalWidth
-          const initialScaleY = initialCardRect.height / modalHeight
-          startTransform = `translate(${initialX}px, ${initialY}px) scale(${initialScaleX}, ${initialScaleY})`
-        }
-
-        setAnimationStyles({
-          transform: startTransform,
-          opacity: 0,
-          transition: 'none',
-        })
-
         requestAnimationFrame(() => {
+          const transformOrigin = getTransformOrigin()
+
           setAnimationStyles({
-            transform: 'translate(0, 0) scale(1)',
-            opacity: 1,
-            transition: animationTransition,
+            transformOrigin,
+            transform: resolvedAnimationMode === 'origin-point' ? 'scale(0.92)' : 'scale(0.97)',
+            opacity: 0,
+            transition: 'none',
           })
 
-          animationTimeoutRef.current = setTimeout(() => {
-            setIsAnimating(false)
-            setAnimationStyles({})
-          }, animationDuration)
+          requestAnimationFrame(() => {
+            setAnimationStyles({
+              transformOrigin,
+              transform: 'scale(1)',
+              opacity: 1,
+              transition: openAnimationTransition,
+            })
+
+            animationTimeoutRef.current = setTimeout(() => {
+              setIsAnimating(false)
+              setAnimationStyles({})
+            }, openAnimationDuration)
+          })
         })
       }
     } else {
+      closeInFlightRef.current = false
       setAnimationStyles({})
       setIsAnimating(false)
     }
@@ -226,13 +211,13 @@ export default function SessionPreviewModal({
       }
     }
   }, [
-    animationDuration,
-    animationTransition,
+    getTransformOrigin,
     handleKeyDown,
-    initialCardRect,
-    initialClickPoint,
     isOpen,
+    openAnimationDuration,
+    openAnimationTransition,
     prefersReducedMotion,
+    resolvedAnimationMode,
   ])
 
   const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {

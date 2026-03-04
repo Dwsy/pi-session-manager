@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Clock, MessageSquare } from 'lucide-react'
 import type { SessionInfo, Tag } from '../../types'
 import TagBadge from '../TagBadge'
+import { getLastPathSegments } from '../../utils/path'
 
 interface KanbanCardProps {
   session: SessionInfo
@@ -51,7 +52,7 @@ function KanbanCardInner({
   const timeLabel = mins < 60 ? `${mins}m` : mins < 1440 ? `${Math.floor(mins / 60)}h` : `${Math.floor(mins / 1440)}d`
 
   // Directory path (last 2 segments)
-  const dir = session.cwd?.split('/').filter(Boolean).slice(-2).join('/') || ''
+  const dir = session.cwd ? getLastPathSegments(session.cwd, 2) : ''
 
   const cardClasses = [
     'group relative rounded-md border p-2.5 cursor-pointer motion-surface motion-color',

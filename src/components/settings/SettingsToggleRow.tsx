@@ -15,7 +15,7 @@ interface SettingsToggleRowProps {
 }
 
 /**
- * 设置页开关行统一布局：左侧文案，右侧 Toggle。
+ * Unified toggle-row layout for settings: text on left, toggle on right.
  */
 export default function SettingsToggleRow({
   title,

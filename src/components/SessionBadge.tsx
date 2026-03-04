@@ -4,8 +4,8 @@ interface SessionBadgeProps {
 }
 
 /**
- * 会话状态 Badge 组件
- * 显示 NEW 或 UPDATED 标签
+ * Session status badge component
+ * Displays NEW or UPDATED labels
  */
 export function SessionBadge({ type, className = '' }: SessionBadgeProps) {
   const isNew = type === 'new'

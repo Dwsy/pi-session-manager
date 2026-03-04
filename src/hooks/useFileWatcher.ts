@@ -9,8 +9,8 @@ interface UseFileWatcherOptions {
 }
 
 /**
- * 文件监听 Hook
- * 后端 file_watcher 增量 rescan 后推送 diff，前端直接 merge，不再调 scan_sessions
+ * File watcher hook
+ * Backend file_watcher pushes diffs after incremental rescans; frontend merges directly without calling scan_sessions
  */
 export function useFileWatcher({
   enabled = true,

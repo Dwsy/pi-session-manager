@@ -1,5 +1,5 @@
 /**
- * 统一的开关切换组件
+ * Unified toggle switch component
  */
 
 interface ToggleProps {

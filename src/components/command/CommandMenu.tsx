@@ -9,6 +9,7 @@ import CommandEmpty from './CommandEmpty'
 import CommandLoading from './CommandLoading'
 import CommandHints from './CommandHints'
 import CommandError from './CommandError'
+import { getPathBasename } from '../../utils/path'
 
 interface CommandMenuProps {
   query: string
@@ -53,7 +54,7 @@ export default function CommandMenu({
   const [activeTab, setActiveTab] = useState<TabType>('all')
 
   const currentProjectName = context.selectedProject
-    ? context.selectedProject.split('/').pop() || context.selectedProject
+    ? getPathBasename(context.selectedProject)
     : null
 
   const scopedPluginIds = useMemo(() => {

@@ -1,5 +1,5 @@
 /**
- * 高级设置组件
+ * Advanced settings component
  */
 
 import { useState, useEffect, useCallback } from 'react'

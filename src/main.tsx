@@ -48,7 +48,7 @@ window.copyCode = async (button: HTMLButtonElement) => {
       svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />'
     }
     
-    // 2秒后恢复
+    // Restore after 2 seconds
     setTimeout(() => {
       if (textSpan) {
         textSpan.textContent = 'Copy'

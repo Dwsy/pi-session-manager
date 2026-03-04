@@ -13,7 +13,7 @@ interface SettingsOptionGroupProps<T extends string> {
 }
 
 /**
- * 设置页通用选项按钮组：统一映射与选中状态逻辑。
+ * Common option-button group for settings: unified mapping and selection logic.
  */
 export default function SettingsOptionGroup<T extends string>({
   options,

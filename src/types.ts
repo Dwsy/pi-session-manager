@@ -65,6 +65,7 @@ export interface SessionStats {
   total_tokens: number
   sessions_by_project: Record<string, number>
   sessions_by_model: Record<string, number>
+  model_usage_by_project: Record<string, Record<string, number>>
   messages_by_date: Record<string, number>
   messages_by_hour: Record<string, number>
   messages_by_day_of_week: Record<string, number>
@@ -85,6 +86,7 @@ export interface TokenDetails {
 }
 
 export interface ModelTokenStats {
+  messages: number
   input: number
   output: number
   cache_read: number

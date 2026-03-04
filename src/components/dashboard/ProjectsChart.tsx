@@ -2,6 +2,7 @@ import { Folder } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import DashboardCardShell from './DashboardCardShell'
 import type { SessionStats, SessionInfo } from '../../types'
+import { getPathBasename } from '../../utils/path'
 
 interface ProjectsChartProps {
   stats: SessionStats
@@ -24,7 +25,7 @@ export default function ProjectsChart({ stats, sessions, title, limit = 8, onPro
   const projectPathMap = new Map<string, string>()
   sessions?.forEach(session => {
     if (session.cwd) {
-      const projectName = session.cwd.split('/').pop() || session.cwd
+      const projectName = getPathBasename(session.cwd)
       if (!projectPathMap.has(projectName)) {
         projectPathMap.set(projectName, session.cwd)
       }

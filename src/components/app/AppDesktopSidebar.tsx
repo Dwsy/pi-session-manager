@@ -71,25 +71,27 @@ function AppDesktopSidebar({
             <LayoutDashboard className="h-3.5 w-3.5" />
           </button>
           <div className="flex items-center bg-surface rounded-lg p-0.5 mr-1">
-            <button
-              onClick={onSelectListView}
-              className={`p-1 rounded motion-color motion-press focus-ring ${viewMode === "list" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
-              title={t("app.viewMode.list")}
-            >
-              <svg
-                className="h-3.5 w-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <KbdTooltip shortcut="Cmd+L" label={t("app.viewMode.list")}>
+              <button
+                onClick={onSelectListView}
+                className={`p-1 rounded motion-color motion-press focus-ring ${viewMode === "list" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
+                title={t("app.viewMode.list")}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                />
-              </svg>
-            </button>
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                  />
+                </svg>
+              </button>
+            </KbdTooltip>
             <KbdTooltip shortcut="Cmd+P" label={t("app.viewMode.project")}>
               <button
                 onClick={onSelectProjectView}
@@ -111,13 +113,15 @@ function AppDesktopSidebar({
                 </svg>
               </button>
             </KbdTooltip>
-            <button
-              onClick={onSelectKanbanView}
-              className={`p-1 rounded motion-color motion-press focus-ring ${viewMode === "kanban" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
-              title={t("tags.kanban.title")}
-            >
-              <Columns3 className="h-3.5 w-3.5" />
-            </button>
+            <KbdTooltip shortcut="Cmd+B" label={t("tags.kanban.title")}>
+              <button
+                onClick={onSelectKanbanView}
+                className={`p-1 rounded motion-color motion-press focus-ring ${viewMode === "kanban" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
+                title={t("tags.kanban.title")}
+              >
+                <Columns3 className="h-3.5 w-3.5" />
+              </button>
+            </KbdTooltip>
           </div>
           <button
             onClick={onToggleFavorites}

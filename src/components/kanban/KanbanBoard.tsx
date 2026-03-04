@@ -21,6 +21,7 @@ import KanbanCard from './KanbanCard'
 import SearchFilterBar from '../SearchFilterBar'
 import SessionPreviewModal from './SessionPreviewModal'
 import { filterSessions } from '../../utils/sessionFilters'
+import { getPathBasename } from '../../utils/path'
 
 interface KanbanBoardProps {
   sessions: SessionInfo[]
@@ -50,6 +51,8 @@ interface ColumnData {
   sessions: SessionInfo[]
 }
 
+const PREVIEW_CLICK_THROUGH_GUARD_MS = 120
+
 export default function KanbanBoard({
   sessions,
   tags,
@@ -73,7 +76,6 @@ export default function KanbanBoard({
   const [mobileColIndex, setMobileColIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null)
-  const [initialCardRect, setInitialCardRect] = useState<DOMRect | null>(null)
   const [initialClickPoint, setInitialClickPoint] = useState<{ x: number; y: number } | null>(null)
   const [isPreviewAnimating, setIsPreviewAnimating] = useState(false)
   const suppressReopenRef = useRef<{ sessionId: string; until: number } | null>(null)
@@ -214,13 +216,24 @@ export default function KanbanBoard({
   }, [columns, findColumnForSession, onMoveSession, onToggleTag])
 
   
-  const handleCardClick = useCallback((session: SessionInfo, rect?: DOMRect, clickPoint?: { x: number; y: number }) => {
-    // Prevent rapid clicks during animation
-    if (isPreviewAnimating) return
+  const setReopenGuard = useCallback((sessionId: string) => {
+    const until = Date.now() + PREVIEW_CLICK_THROUGH_GUARD_MS
+    suppressReopenRef.current = {
+      sessionId,
+      until,
+    }
+  }, [])
 
-    // Prevent accidental reopen caused by close-click penetrating to the card
+  const handleCardClick = useCallback((session: SessionInfo, _rect?: DOMRect, clickPoint?: { x: number; y: number }) => {
+    const now = Date.now()
     const suppress = suppressReopenRef.current
-    if (suppress && suppress.sessionId === session.id && Date.now() < suppress.until) {
+
+
+    if (isPreviewAnimating) {
+      return
+    }
+
+    if (suppress && suppress.sessionId === session.id && now < suppress.until) {
       return
     }
 
@@ -228,39 +241,33 @@ export default function KanbanBoard({
 
     // Use flushSync to ensure rect and click point are set before modal renders
     flushSync(() => {
-      if (rect) {
-        setInitialCardRect(rect)
-      } else {
-        const cardEl = document.querySelector(`[data-session-id="${session.id}"]`)
-        setInitialCardRect(cardEl ? cardEl.getBoundingClientRect() : null)
-      }
       setInitialClickPoint(clickPoint ?? null)
     })
 
     setPreviewSession(session)
+
   }, [isPreviewAnimating])
 
   const handleClosePreview = useCallback(() => {
     if (previewSession) {
-      suppressReopenRef.current = {
-        sessionId: previewSession.id,
-        until: Date.now() + 300,
-      }
+      setReopenGuard(previewSession.id)
     }
 
     setPreviewSession(null)
     setInitialClickPoint(null)
-    // Allow clicks again after a short delay
-    setTimeout(() => setIsPreviewAnimating(false), 100)
-  }, [previewSession])
+    setIsPreviewAnimating(false)
+  }, [previewSession, setReopenGuard])
 
   const handleExpandToFull = useCallback(() => {
-    if (previewSession) {
-      onSelectSession(previewSession)
-      setPreviewSession(null)
-      setIsPreviewAnimating(false)
+    if (!previewSession) {
+      return
     }
-  }, [previewSession, onSelectSession])
+
+    setReopenGuard(previewSession.id)
+    onSelectSession(previewSession)
+    setPreviewSession(null)
+    setIsPreviewAnimating(false)
+  }, [onSelectSession, previewSession, setReopenGuard])
 
   return (
     <div className="h-full flex flex-col">
@@ -271,7 +278,7 @@ export default function KanbanBoard({
         </h2>
         {projectFilter ? (
           <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 text-[11px] shrink-0">
-            {projectFilter.split('/').pop()}
+            {getPathBasename(projectFilter)}
           </span>
         ) : (
           <span className="text-[10px] text-muted-foreground shrink-0">
@@ -388,8 +395,8 @@ export default function KanbanBoard({
         isOpen={!!previewSession}
         onClose={handleClosePreview}
         onExpand={handleExpandToFull}
-        initialCardRect={initialCardRect}
         initialClickPoint={initialClickPoint}
+        animationMode="origin-point"
       />
     </div>
   )

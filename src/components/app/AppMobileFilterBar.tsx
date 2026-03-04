@@ -2,7 +2,7 @@ import SearchFilterBar from "../SearchFilterBar";
 import SessionSortSelect from "../SessionSortSelect";
 import { CheckSquare2 } from "lucide-react";
 import type { SessionTag, Tag } from "../../types";
-import type { SessionSortBy } from "../../types/sessionSort";
+import type { SessionSortBy, SessionSortOrder } from "../../types/sessionSort";
 import { useTranslation } from "react-i18next";
 
 export interface AppMobileFilterBarProps {
@@ -16,7 +16,9 @@ export interface AppMobileFilterBarProps {
   getDescendantIds: (tagId: string) => string[];
   placeholder?: string;
   sortBy: SessionSortBy;
+  sortOrder: SessionSortOrder;
   onSortByChange: (sortBy: SessionSortBy) => void;
+  onSortOrderChange: (sortOrder: SessionSortOrder) => void;
   showSort?: boolean;
   onSelectModeTrigger?: () => void;
 }
@@ -32,7 +34,9 @@ function AppMobileFilterBar({
   getDescendantIds,
   placeholder,
   sortBy,
+  sortOrder,
   onSortByChange,
+  onSortOrderChange,
   showSort = true,
   onSelectModeTrigger,
 }: AppMobileFilterBarProps) {
@@ -57,7 +61,9 @@ function AppMobileFilterBar({
         <>
           <SessionSortSelect
             value={sortBy}
+            order={sortOrder}
             onChange={onSortByChange}
+            onOrderChange={onSortOrderChange}
             compact
             showValueLabel={false}
             className="shrink-0"

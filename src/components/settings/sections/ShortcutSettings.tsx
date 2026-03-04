@@ -10,7 +10,9 @@ interface ShortcutItem {
 const shortcuts: ShortcutItem[] = [
   { keys: 'Cmd+K', labelKey: 'app.shortcuts.searchAll', fallback: '搜索所有会话', category: 'search' },
   { keys: 'Cmd+F', labelKey: 'app.shortcuts.search', fallback: '聚焦搜索框', category: 'search' },
+  { keys: 'Cmd+L', labelKey: 'app.viewMode.list', fallback: '列表视图', category: 'navigation' },
   { keys: 'Cmd+P', labelKey: 'app.shortcuts.projectView', fallback: '项目视图', category: 'navigation' },
+  { keys: 'Cmd+B', labelKey: 'tags.kanban.title', fallback: '看板视图', category: 'navigation' },
   { keys: 'Cmd+R', labelKey: 'app.shortcuts.resume', fallback: '恢复会话', category: 'session' },
   { keys: 'Cmd+E', labelKey: 'app.shortcuts.exportHtml', fallback: '导出并打开', category: 'session' },
   { keys: 'Cmd+,', labelKey: 'app.shortcuts.settings', fallback: '打开设置', category: 'general' },

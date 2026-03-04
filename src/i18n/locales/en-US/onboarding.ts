@@ -35,7 +35,7 @@ export const onboarding = {
       terminalHint: 'Use terminal directly in the app',
       bindLocal: 'Local access only',
       bindRemote: 'Allow LAN devices (phone/tablet) to connect',
-      mobileHint: 'Access from mobile via http://<your-PC-IP>:52131 in a browser — HTTP mode is auto-selected',
+      mobileHint: 'Access from mobile via http://<your-PC-IP>:{{port}} in a browser — HTTP mode is auto-selected',
       websocket: 'WebSocket',
       httpApi: 'HTTP API',
     },

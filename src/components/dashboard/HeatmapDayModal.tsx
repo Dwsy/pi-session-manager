@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { format, parseISO } from 'date-fns'
 import {
@@ -12,6 +13,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import type { HeatmapPoint, DayStats } from '../../types'
+import { getPathBasename } from '../../utils/path'
 
 interface HeatmapDayModalProps {
   point: HeatmapPoint
@@ -103,6 +105,15 @@ export default function HeatmapDayModal({
     setFocusPanel(null)
   }, [point.date])
 
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = originalOverflow
+    }
+  }, [])
+
   const formattedDate = format(parseISO(point.date), 'EEEE, MMMM dd, yyyy')
   const activityConfig = ACTIVITY_CONFIG[point.level] || ACTIVITY_CONFIG[0]
 
@@ -187,7 +198,7 @@ export default function HeatmapDayModal({
     sessionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-3 md:p-4 ui-enter-fade"
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -458,7 +469,7 @@ export default function HeatmapDayModal({
                               <div className="flex items-center justify-between gap-2">
                                 <div className="min-w-0 flex-1">
                                   <div className="text-[13px] font-medium text-foreground truncate">
-                                    {session.name || session.cwd.split('/').pop()}
+                                    {session.name || getPathBasename(session.cwd)}
                                   </div>
                                   <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-2 tabular-nums">
                                     <span>{format(parseISO(session.timestamp), 'HH:mm')}</span>
@@ -486,7 +497,8 @@ export default function HeatmapDayModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

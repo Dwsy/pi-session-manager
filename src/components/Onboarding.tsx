@@ -239,7 +239,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               </div>
               {serverSettings.bind_addr === '0.0.0.0' && (
                 <p className="text-[11px] text-amber-400/80 px-1">
-                  {t('onboarding.steps.services.mobileHint', '移动端通过浏览器访问 http://<电脑IP>:52131 即可使用，自动切换 HTTP 模式')}
+                  {t('onboarding.steps.services.mobileHint', {
+                    port: serverSettings.http_port,
+                    defaultValue: '移动端通过浏览器访问 http://<电脑IP>:{{port}} 即可使用，自动切换 HTTP 模式',
+                  })}
                 </p>
               )}
             </div>

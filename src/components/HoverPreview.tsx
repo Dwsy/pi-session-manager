@@ -24,23 +24,23 @@ export default function HoverPreview({
   const handleMouseEnter = (e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     
-    // 计算预览框的位置
+    // Calculate preview position
     let x = rect.left
     let y = rect.bottom + 8
     
-    // 如果右侧空间不足，向左对齐
+    // If there is not enough space on the right, align left
     if (x + maxWidth > window.innerWidth) {
       x = window.innerWidth - maxWidth - 16
     }
     
-    // 如果下方空间不足，显示在上方
+    // If there is not enough space below, show above
     if (y + maxHeight > window.innerHeight) {
       y = rect.top - maxHeight - 8
     }
     
     setPosition({ x, y })
     
-    // 延迟显示
+    // Show with delay
     timeoutRef.current = setTimeout(() => {
       setIsVisible(true)
     }, delay)

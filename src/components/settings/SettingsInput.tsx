@@ -5,7 +5,7 @@ interface SettingsInputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 /**
- * 设置页通用输入框样式。
+ * Common input style for settings pages.
  */
 export default function SettingsInput({ className = '', ...props }: SettingsInputProps) {
   return (

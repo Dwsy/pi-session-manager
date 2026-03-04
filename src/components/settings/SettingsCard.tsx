@@ -1,5 +1,5 @@
 /**
- * 设置区块卡片容器，统一视觉分组
+ * Settings section card container for consistent visual grouping
  */
 
 interface SettingsCardProps {

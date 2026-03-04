@@ -1,5 +1,5 @@
 /**
- * 外观设置组件
+ * Appearance settings component
  */
 
 import { useEffect, useState } from 'react'

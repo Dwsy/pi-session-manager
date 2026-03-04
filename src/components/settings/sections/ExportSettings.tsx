@@ -1,5 +1,5 @@
 /**
- * 导出设置组件
+ * Export settings component
  */
 
 import { useTranslation } from 'react-i18next'

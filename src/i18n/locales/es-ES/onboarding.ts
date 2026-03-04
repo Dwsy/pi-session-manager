@@ -35,7 +35,7 @@ export const onboarding = {
       terminalHint: 'Usa el terminal directamente en la aplicación',
       bindLocal: 'Solo acceso local',
       bindRemote: 'Permitir dispositivos de la red local (móvil/tablet)',
-      mobileHint: 'Accede desde el móvil vía http://<IP-de-tu-PC>:52131 en un navegador — el modo HTTP se selecciona automáticamente',
+      mobileHint: 'Accede desde el móvil vía http://<IP-de-tu-PC>:{{port}} en un navegador — el modo HTTP se selecciona automáticamente',
       websocket: 'WebSocket',
       httpApi: 'HTTP API',
     },

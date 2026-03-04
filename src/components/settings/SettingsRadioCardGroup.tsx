@@ -19,7 +19,7 @@ interface SettingsRadioCardGroupProps<T extends string> {
 }
 
 /**
- * 设置页通用单选卡片组：统一卡片样式、选中态与辅助内容布局。
+ * Common radio-card group for settings: unified card style, selected state, and helper-content layout.
  */
 export default function SettingsRadioCardGroup<T extends string>({
   options,

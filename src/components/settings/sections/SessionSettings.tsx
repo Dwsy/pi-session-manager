@@ -1,5 +1,5 @@
 /**
- * 会话设置组件
+ * Session settings component
  */
 
 import { useTranslation } from 'react-i18next'

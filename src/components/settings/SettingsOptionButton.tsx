@@ -9,7 +9,7 @@ interface SettingsOptionButtonProps
 }
 
 /**
- * 设置页可选按钮统一样式：选中/未选中状态与动效 token。
+ * Unified optional button styles for settings: selected/unselected states and motion tokens.
  */
 export default function SettingsOptionButton({
   active,

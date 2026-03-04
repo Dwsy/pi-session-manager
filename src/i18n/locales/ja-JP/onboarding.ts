@@ -35,7 +35,7 @@ export const onboarding = {
       terminalHint: 'アプリ内でターミナルを直接使用',
       bindLocal: 'ローカルアクセスのみ',
       bindRemote: 'LAN デバイス（スマホ/タブレット）の接続を許可',
-      mobileHint: 'モバイルからブラウザで http://<PC の IP>:52131 にアクセス — HTTP モードが自動選択されます',
+      mobileHint: 'モバイルからブラウザで http://<PC の IP>:{{port}} にアクセス — HTTP モードが自動選択されます',
       websocket: 'WebSocket',
       httpApi: 'HTTP API',
     },

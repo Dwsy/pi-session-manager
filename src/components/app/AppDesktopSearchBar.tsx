@@ -4,7 +4,7 @@ import { CheckSquare2 } from "lucide-react";
 import SearchFilterBar from "../SearchFilterBar";
 import SessionSortSelect from "../SessionSortSelect";
 import type { SessionTag, Tag } from "../../types";
-import type { SessionSortBy } from "../../types/sessionSort";
+import type { SessionSortBy, SessionSortOrder } from "../../types/sessionSort";
 
 export type AppDesktopSearchBarViewMode = "list" | "project" | "kanban";
 
@@ -20,7 +20,9 @@ export interface AppDesktopSearchBarProps {
   viewMode: AppDesktopSearchBarViewMode;
   selectedProject: string | null;
   sortBy: SessionSortBy;
+  sortOrder: SessionSortOrder;
   onSortByChange: (sortBy: SessionSortBy) => void;
+  onSortOrderChange: (sortOrder: SessionSortOrder) => void;
   onSelectModeTrigger?: () => void;
 }
 
@@ -36,7 +38,9 @@ function AppDesktopSearchBar({
   viewMode,
   selectedProject,
   sortBy,
+  sortOrder,
   onSortByChange,
+  onSortOrderChange,
   onSelectModeTrigger,
 }: AppDesktopSearchBarProps) {
   const { t } = useTranslation();
@@ -65,7 +69,9 @@ function AppDesktopSearchBar({
         <>
           <SessionSortSelect
             value={sortBy}
+            order={sortOrder}
             onChange={onSortByChange}
+            onOrderChange={onSortOrderChange}
             compact
             showValueLabel={false}
             className="shrink-0"

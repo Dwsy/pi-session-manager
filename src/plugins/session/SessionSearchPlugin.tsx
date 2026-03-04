@@ -1,6 +1,7 @@
 import { FileText } from 'lucide-react'
 import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '../types'
+import { getPathBasename } from '../../utils/path'
 import { parseQuotedQuery } from '../../utils/search'
 
 /**
@@ -215,7 +216,6 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
    * Get project name
    */
   private getProjectName(path: string): string {
-    const parts = path.split('/')
-    return parts[parts.length - 1] || path
+    return getPathBasename(path)
   }
 }

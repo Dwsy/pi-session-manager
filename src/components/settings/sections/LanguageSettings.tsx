@@ -1,5 +1,5 @@
 /**
- * 语言设置组件
+ * Language settings component
  */
 
 import { useTranslation } from 'react-i18next'

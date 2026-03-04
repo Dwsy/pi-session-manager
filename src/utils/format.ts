@@ -1,3 +1,5 @@
+import { splitPathSegments } from './path'
+
 export function formatTokens(tokens: number): string {
   if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(1)}M`
   if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`
@@ -30,7 +32,7 @@ export function formatDate(timestamp: string): string {
 
 export function shortenPath(path: string, maxLength: number = 50): string {
   if (path.length <= maxLength) return path
-  const parts = path.split('/')
+  const parts = splitPathSegments(path)
   if (parts.length <= 2) return path
   return `.../${parts.slice(-2).join('/')}`
 }

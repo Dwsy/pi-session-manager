@@ -46,10 +46,10 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
   }
   
   /**
-   * 工具方法：模糊匹配
-   * @param query 查询字符串
-   * @param text 目标文本
-   * @returns 匹配分数（0-1）
+   * Utility method: fuzzy match
+   * @param query Query string
+   * @param text Target text
+   * @returns Match score (0-1)
    */
   protected fuzzyMatch(query: string, text: string): number {
     const lowerQuery = query.toLowerCase()
@@ -58,14 +58,14 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
     // Exact match
     if (lowerText === lowerQuery) return 1.0
     
-    // 包含匹配
+    // Contains match
     if (lowerText.includes(lowerQuery)) {
       const position = lowerText.indexOf(lowerQuery)
       const positionScore = 1 - (position / lowerText.length)
       return 0.8 * positionScore
     }
     
-    // 模糊匹配（字符顺序）
+    // Fuzzy match (character order)
     let queryIndex = 0
     let textIndex = 0
     let matches = 0
@@ -86,11 +86,11 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
   }
   
   /**
-   * 工具方法：计算高亮范围
-   * @param query 查询字符串
-   * @param text 目标文本
-   * @param field 字段名称
-   * @returns 高亮范围数组
+   * Utility method: calculate highlight ranges
+   * @param query Query string
+   * @param text Target text
+   * @param field Field name
+   * @returns Highlight range array
    */
   protected calculateHighlights(
     query: string,

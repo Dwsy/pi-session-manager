@@ -98,7 +98,7 @@ export default function SessionViewerSidebar({
             </button>
           </div>
         ) : null}
-        <div className={`${isMobile ? "flex-1 min-h-0" : ""}`}>
+        <div className="flex-1 min-h-0">
           <SessionTree
             ref={treeRef}
             entries={entries}

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { SessionInfo, FavoriteItem } from '../types'
 import { SessionBadge } from './SessionBadge'
 import { FavoritesSkeleton } from './Skeleton'
+import { getPathBasename } from '../utils/path'
 
 interface FavoritesPanelProps {
   sessions: SessionInfo[]
@@ -108,7 +109,7 @@ export default function FavoritesPanel({
                       {badgeType && <SessionBadge type={badgeType} />}
                     </div>
                     <div className="text-xs text-muted-foreground truncate mt-0.5">
-                      {session.cwd.split('/').pop()}
+                      {getPathBasename(session.cwd)}
                     </div>
                   </div>
                   <button

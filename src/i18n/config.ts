@@ -18,8 +18,8 @@ const resources = {
 }
 
 /**
- * 检测系统语言，优先使用用户已保存的偏好
- * 中文系统自动切换为中文，其余默认英文
+ * Detect system language, preferring user-saved preference
+ * Chinese systems automatically switch to Chinese; otherwise default to English
  */
 export function detectSystemLocale(): string {
   const saved = localStorage.getItem('app-language')

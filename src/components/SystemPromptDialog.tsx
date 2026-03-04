@@ -25,7 +25,7 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
   const [systemPrompt, setSystemPrompt] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
-  // 从会话 entries 中提取工具使用情况
+  // Extract tool usage from session entries
   const toolUsages = useMemo(() => {
     if (!isOpen || entries.length === 0) {
       return [];
@@ -49,7 +49,7 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
       usages.push({ name, count });
     }
 
-    // 按使用次数降序排序
+    // Sort by usage count in descending order
     usages.sort((a, b) => b.count - a.count);
     return usages;
   }, [entries, isOpen]);

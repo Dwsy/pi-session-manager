@@ -9,12 +9,12 @@ interface MarkdownContentProps {
 }
 
 /**
- * Markdown 内容渲染组件
- * 使用 useMemo 缓存解析结果，避免重复计算
- * 使用 dangerouslySetInnerHTML 替代直接操作 DOM
+ * Markdown content rendering component
+ * Uses useMemo to cache parsed results and avoid repeated computation
+ * Uses dangerouslySetInnerHTML instead of direct DOM manipulation
  */
 function MarkdownContent({ content, className = '', searchQuery = '' }: MarkdownContentProps) {
-  // 使用 useMemo 缓存解析后的 HTML，避免重复计算
+  // Cache parsed HTML with useMemo to avoid recalculation
   const html = useMemo(() => {
     let parsed = parseMarkdown(content)
     if (searchQuery) {

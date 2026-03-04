@@ -1,5 +1,5 @@
 /**
- * 模型管理组件
+ * Model management component
  */
 
 import { useState, useEffect } from 'react'
@@ -87,7 +87,7 @@ export default function ModelSettings() {
         prompt: t('settings.models.testPrompt'),
       })
 
-      // 更新模型信息
+      // Update model info
       setModels((prev) =>
         prev.map((m) => {
           if (m.provider === provider && m.model === model) {
@@ -103,7 +103,7 @@ export default function ModelSettings() {
         })
       )
 
-      // 添加到测试结果
+      // Add to test results
       setTestResults((prev) => [...prev, result])
     } catch (error) {
       console.error('Failed to test model:', error)
@@ -125,7 +125,7 @@ export default function ModelSettings() {
           prompt: t('settings.models.testPrompt'),
         })
 
-        // 更新模型信息
+        // Update model info
         setModels((prev) =>
           prev.map((m) => {
             if (m.provider === model.provider && m.model === model.model) {
@@ -197,7 +197,7 @@ export default function ModelSettings() {
 
   return (
     <div className="space-y-6">
-      {/* 搜索和操作栏 */}
+      {/* Search and action bar */}
       <div className="flex items-center gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -231,7 +231,7 @@ export default function ModelSettings() {
         </button>
       </div>
 
-      {/* 统计信息 */}
+      {/* Statistics */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-surface border border-border rounded-lg p-3">
           <div className="text-2xl font-semibold text-foreground">{models.length}</div>
@@ -247,7 +247,7 @@ export default function ModelSettings() {
         </div>
       </div>
 
-      {/* 模型列表 */}
+      {/* Model list */}
       <div className="space-y-2 max-h-[500px] overflow-y-auto">
         {filteredModels.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
@@ -312,7 +312,7 @@ export default function ModelSettings() {
         )}
       </div>
 
-      {/* 测试结果 */}
+      {/* Test results */}
       {testResults.length > 0 && (
         <div className="mt-4">
           <h4 className="text-sm font-medium text-foreground mb-3">
@@ -340,11 +340,11 @@ export default function ModelSettings() {
         </div>
       )}
 
-      {/* 模型详情弹窗 */}
+      {/* Model details modal */}
       {showDetails && selectedModel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="w-[700px] max-h-[80vh] bg-surface-dark rounded-xl border border-border shadow-2xl overflow-hidden">
-            {/* 头部 */}
+            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h3 className="text-base font-medium text-foreground">
                 {selectedModel.provider}/{selectedModel.model}
@@ -357,7 +357,7 @@ export default function ModelSettings() {
               </button>
             </div>
 
-            {/* 内容 */}
+            {/* Content */}
             <div className="p-6 space-y-4 overflow-y-auto max-h-[65vh]">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -401,7 +401,7 @@ export default function ModelSettings() {
                 )}
               </div>
 
-              {/* 测试结果 */}
+              {/* Test results */}
               {selectedModel.tested && testResults.find(
                 (r) => r.provider === selectedModel.provider && r.model === selectedModel.model
               ) && (
@@ -417,7 +417,7 @@ export default function ModelSettings() {
                 </div>
               )}
 
-              {/* 操作按钮 */}
+              {/* Action buttons */}
               <div className="flex gap-3 pt-4 border-t border-border">
                 <button
                   onClick={() => {
@@ -435,7 +435,7 @@ export default function ModelSettings() {
                 </button>
                 <button
                   onClick={() => {
-                    // 在终端中打开 pi 命令
+                    // Open the pi command in terminal
                     const command = `pi --provider ${selectedModel.provider} --model ${selectedModel.model}`
                     navigator.clipboard?.writeText(command)
                     alert(t('settings.models.commandCopied', '命令已复制到剪贴板'))
@@ -451,7 +451,7 @@ export default function ModelSettings() {
         </div>
       )}
 
-      {/* 说明文字 */}
+      {/* Helper text */}
       <div className="text-xs text-muted-foreground bg-surface p-3 rounded-lg">
         <p>{t('settings.models.help', '点击模型查看详情，点击播放按钮测试模型响应速度。')}</p>
       </div>

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ListFilter, Check, Plus, X, Search } from 'lucide-react'
 import type { Tag as TagType, SessionTag } from '../types'
@@ -35,6 +36,14 @@ interface LabelFilterProps {
   getDescendantIds: (tagId: string) => string[]
 }
 
+type MenuPosition = {
+  top: number
+  left: number
+  maxHeight: number
+  transform: string
+  transformOrigin: 'top right' | 'bottom right'
+}
+
 export default function LabelFilter({
   tags, sessionTags, filterTagIds, onFilterChange, onCreateTag, getDescendantIds,
 }: LabelFilterProps) {
@@ -47,6 +56,13 @@ export default function LabelFilter({
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const createInputRef = useRef<HTMLInputElement>(null)
+  const [menuPosition, setMenuPosition] = useState<MenuPosition>({
+    top: 0,
+    left: 0,
+    maxHeight: 360,
+    transform: 'translateY(0)',
+    transformOrigin: 'top right',
+  })
 
   const activeCount = filterTagIds.length
   const activeRootTags = useMemo(() => {
@@ -55,7 +71,7 @@ export default function LabelFilter({
 
   useEffect(() => {
     if (!open) return
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent | TouchEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
           triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
         setOpen(false)
@@ -65,7 +81,11 @@ export default function LabelFilter({
       }
     }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
   }, [open])
 
   useEffect(() => {
@@ -78,8 +98,59 @@ export default function LabelFilter({
   }, [open])
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 0)
+    if (!open) return
+    const rafId = requestAnimationFrame(() => inputRef.current?.focus())
+    return () => cancelAnimationFrame(rafId)
   }, [open])
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+
+    const viewportPadding = 8
+    const gap = 6
+    const menuWidth = menuRef.current?.offsetWidth ??
+      Math.min(280, Math.max(180, window.innerWidth - viewportPadding * 2))
+    const menuHeight = menuRef.current?.offsetHeight ?? 360
+    const triggerRect = trigger.getBoundingClientRect()
+    const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2)
+    const boundedMenuWidth = Math.min(menuWidth, availableWidth || menuWidth)
+    const spaceBelow = window.innerHeight - triggerRect.bottom - gap - viewportPadding
+    const spaceAbove = triggerRect.top - gap - viewportPadding
+    const openUpward = spaceBelow < menuHeight && spaceAbove > spaceBelow
+    const maxHeight = Math.max(120, Math.floor(openUpward ? spaceAbove : spaceBelow))
+
+    let left = triggerRect.right - boundedMenuWidth
+    left = Math.max(
+      viewportPadding,
+      Math.min(left, window.innerWidth - boundedMenuWidth - viewportPadding),
+    )
+
+    const top = openUpward ? triggerRect.top - gap : triggerRect.bottom + gap
+
+    setMenuPosition({
+      top,
+      left,
+      maxHeight,
+      transform: openUpward ? 'translateY(-100%)' : 'translateY(0)',
+      transformOrigin: openUpward ? 'bottom right' : 'top right',
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+
+    updateMenuPosition()
+    const rafId = requestAnimationFrame(updateMenuPosition)
+    window.addEventListener('resize', updateMenuPosition)
+    window.addEventListener('scroll', updateMenuPosition, true)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      window.removeEventListener('resize', updateMenuPosition)
+      window.removeEventListener('scroll', updateMenuPosition, true)
+    }
+  }, [open, updateMenuPosition])
 
   const countMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -188,14 +259,22 @@ export default function LabelFilter({
             </span>
           </>
         ) : (
-          <span>{t('tags.filter.title')}</span>
+          <span className="hidden">{t('tags.filter.title')}</span>
         )}
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           ref={menuRef}
-          className="absolute right-0 top-full mt-1 z-50 min-w-[220px] max-w-[280px] overflow-hidden rounded-[8px] bg-popover text-popover-foreground shadow-lg border border-border/50"
+          style={{
+            position: 'fixed',
+            top: menuPosition.top,
+            left: menuPosition.left,
+            maxHeight: menuPosition.maxHeight,
+            transform: menuPosition.transform,
+            transformOrigin: menuPosition.transformOrigin,
+          }}
+          className="z-[70] flex w-[280px] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-[8px] border border-border/50 bg-popover text-popover-foreground shadow-lg"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
@@ -224,7 +303,7 @@ export default function LabelFilter({
           </div>
 
           {/* Grouped list */}
-          <div className="max-h-[320px] overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {/* Statuses */}
             <div className="py-1">
               <div className="px-3 pt-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
@@ -293,7 +372,8 @@ export default function LabelFilter({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

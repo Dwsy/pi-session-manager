@@ -3,6 +3,7 @@ import { invoke } from '../transport'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo, SessionsDiff } from '../types'
 import { useDemoMode } from './useDemoMode'
+import { deleteDemoSessions, renameDemoSession } from '../demo'
 
 export interface PendingDeleteSession {
   sessions: SessionInfo[]
@@ -182,6 +183,7 @@ export function useSessions(): UseSessionsReturn {
 
     try {
       if (isDemoMode) {
+        deleteDemoSessions(targetSessions.map(session => session.path))
         setSessions(prev => prev.filter(s => !targetSessionIds.has(s.id)))
       } else {
         const result = await invoke<DeleteSessionsResult>('delete_sessions', {
@@ -226,9 +228,11 @@ export function useSessions(): UseSessionsReturn {
   const handleRenameSession = useCallback(async (session: SessionInfo, newName: string) => {
     try {
       if (isDemoMode) {
-        // In demo mode, just update local state
+        const updated = renameDemoSession(session.path, newName)
         setSessions(prev => prev.map(s =>
-          s.id === session.id ? { ...s, name: newName } : s
+          s.id === session.id
+            ? { ...s, name: newName, modified: updated?.modified || s.modified }
+            : s
         ))
       } else {
         await invoke('rename_session', {

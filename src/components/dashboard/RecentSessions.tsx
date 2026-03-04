@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { useTranslation } from 'react-i18next'
 import DashboardCardShell from './DashboardCardShell'
 import type { SessionInfo } from '../../types'
+import { getPathBasename } from '../../utils/path'
 
 interface RecentSessionsProps {
   sessions: SessionInfo[]
@@ -22,8 +23,7 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
     .slice(0, limit)
 
   const getProjectName = (cwd: string) => {
-    const parts = cwd.split('/')
-    return parts[parts.length - 1] || t('common.unknown')
+    return getPathBasename(cwd) || t('common.unknown')
   }
 
   const getActivityLevel = (messageCount: number) => {

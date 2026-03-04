@@ -11,6 +11,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import SettingsCard from '../SettingsCard'
+import { invoke } from '../../../transport'
 
 type TestStatus = 'success' | 'error' | 'warning' | 'pending'
 
@@ -33,6 +34,25 @@ interface EndpointStatus {
   method: 'GET' | 'POST'
   body?: Record<string, unknown>
   validate: (payload: unknown) => ValidationResult
+}
+
+interface ServerSettings {
+  http_port: number
+  bind_addr: string
+}
+
+const DEFAULT_API_TEST_BASE_URL = 'http://127.0.0.1:52131'
+
+function toApiBaseUrl(settings: ServerSettings): string {
+  const host = settings.bind_addr === '0.0.0.0' ? '127.0.0.1' : settings.bind_addr
+  return `http://${host}:${settings.http_port}`
+}
+
+function getHttpOriginBaseUrl(): string | null {
+  if (typeof window === 'undefined') return null
+  const protocol = window.location.protocol
+  if (protocol !== 'http:' && protocol !== 'https:') return null
+  return `${protocol}//${window.location.host}`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -169,7 +189,8 @@ const ENDPOINTS: EndpointStatus[] = [
 
 export default function APITestSettings() {
   const { t } = useTranslation()
-  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:52131')
+  const [baseUrl, setBaseUrl] = useState(getHttpOriginBaseUrl() || DEFAULT_API_TEST_BASE_URL)
+  const [baseUrlBootstrapped, setBaseUrlBootstrapped] = useState(false)
   const [results, setResults] = useState<TestResult[]>([])
   const [isTesting, setIsTesting] = useState(false)
   const [overallStatus, setOverallStatus] = useState<'idle' | 'running' | 'completed'>('idle')
@@ -280,8 +301,34 @@ export default function APITestSettings() {
   }
 
   useEffect(() => {
-    runAllTests()
+    const originBase = getHttpOriginBaseUrl()
+    if (originBase) {
+      setBaseUrl(originBase)
+      setBaseUrlBootstrapped(true)
+      return
+    }
+
+    let active = true
+    invoke<ServerSettings>('load_server_settings')
+      .then((settings) => {
+        if (!active) return
+        setBaseUrl(toApiBaseUrl(settings))
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!active) return
+        setBaseUrlBootstrapped(true)
+      })
+
+    return () => {
+      active = false
+    }
   }, [])
+
+  useEffect(() => {
+    if (!baseUrlBootstrapped) return
+    runAllTests()
+  }, [baseUrlBootstrapped])
 
   const successCount = results.filter((r) => r.status === 'success').length
   const warningCount = results.filter((r) => r.status === 'warning').length
@@ -305,7 +352,7 @@ export default function APITestSettings() {
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
                 className="flex-1 px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-info/50"
-                placeholder="http://127.0.0.1:52131"
+                placeholder={DEFAULT_API_TEST_BASE_URL}
               />
               <button
                 onClick={runAllTests}

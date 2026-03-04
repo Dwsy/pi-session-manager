@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 /**
- * 获取当前实际使用的主题（解析 system 主题）
+ * Get the currently effective theme (resolve `system` theme)
  * @returns 'dark' | 'light'
  */
 export function useResolvedTheme(): 'dark' | 'light' {
