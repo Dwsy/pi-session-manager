@@ -43,7 +43,27 @@ All notable changes to Pi Session Manager will be documented in this file.
   - Fixed cached height estimation bug that double-counted message gaps and could cause layout drift
   - Reverted an over-aggressive “skip measure while scrolling” optimization that caused text overlap artifacts under fast scroll
 
+- **Command Palette readability and tag contrast**
+  - Increased tab count badge readability with stronger contrast, larger numeric text, and clearer selected state
+  - Refined message result role chip from point-like `AI` tag to icon+label pill for faster scanning
+  - Improved focus ring contrast for command palette keyboard navigation
+
 ### Changed
+
+- **Command Palette search UX and interaction architecture**
+  - Expanded the `Cmd/Ctrl + K` panel size and result viewport for better long-list browsing
+  - Tabs now work as true search scopes (plugin-scoped search), not just post-render filtering
+  - Added request sequencing guard to prevent stale async search responses from overriding newer queries
+  - Updated search cache key composition to include tab scope and project filter state, preventing cross-scope cache pollution
+  - Added inline result summary and tab-switch hint (`Alt + 1/2/3/4`)
+  - Message search now renders message-level highlighted snippets with multi-line context
+  - Selecting a message hit now jumps directly to the matched entry in Session Viewer
+
+- **Command Palette message-search performance optimization**
+  - Reduced default FTS fetch window from `48` to `40` hits per query
+  - Added in-memory session metadata cache to reduce repeated `get_session_by_path` calls
+  - Limited eager session prefetch for missing metadata (bounded prefetch in global mode; full prefetch only when current-project-only filter is enabled)
+  - Deferred expensive per-path session resolution to selection-time fallback when necessary
 
 - **Session Viewer mobile toolbar UX and readability refresh**
   - Reworked mobile top actions into clear primary controls (Outline / Thinking / More) with larger touch targets and stronger visual hierarchy
