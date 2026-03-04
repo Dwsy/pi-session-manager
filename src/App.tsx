@@ -293,10 +293,18 @@ function App() {
       setSelectedSession,
       setSelectedProject,
       closeCommandMenu: () => {},
+      setPendingScrollEntryId,
       searchCurrentProjectOnly: false,
       t,
     }),
-    [sessions, selectedProject, selectedSession, t, setSelectedSession],
+    [
+      sessions,
+      selectedProject,
+      selectedSession,
+      t,
+      setSelectedSession,
+      setPendingScrollEntryId,
+    ],
   );
 
   const {

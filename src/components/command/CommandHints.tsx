@@ -61,9 +61,13 @@ export default function CommandHints() {
       </div>
       
       <div className="mt-4 pt-4 border-t border-border">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>{t('command.hints.navigate', '使用 ↑↓ 导航')}</span>
           <span>{t('command.hints.select', '按 Enter 选择')}</span>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground/80">
+          <span>{t('command.hints.switchTab', 'Alt + 1/2/3/4 切换分类')}</span>
+          <span>{t('command.hints.scopeToggle', '点击项目按钮切换搜索范围')}</span>
         </div>
       </div>
     </div>

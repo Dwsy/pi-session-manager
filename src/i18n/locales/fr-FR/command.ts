@@ -20,6 +20,10 @@ export const command = {
     close: 'Fermer',
     navigate: 'Naviguer',
     select: 'Sélectionner',
+    switchTab: 'Changer d’onglet',
+  },
+  summary: {
+    results: '{{count}} résultats',
   },
   plugins: {
     messageSearch: 'Recherche de messages',
@@ -39,5 +43,7 @@ export const command = {
     sessionExample2: '"today" - Rechercher les sessions récentes',
     navigate: 'Utilisez ↑↓ pour naviguer',
     select: 'Appuyez sur Enter pour sélectionner',
+    switchTab: 'Alt + 1/2/3/4 pour changer d’onglet',
+    scopeToggle: 'Cliquez sur le bouton projet pour changer la portée',
   },
 } as const

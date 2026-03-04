@@ -22,22 +22,23 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
   
   const [searchCurrentProjectOnly, setSearchCurrentProjectOnly] = useState(false)
   
-  // 创建增强的 context，包含搜索范围状态
+  // Create enhanced context including search-scope state
   const enhancedContext: SearchContext = {
     ...context,
+    closeCommandMenu: close,
     searchCurrentProjectOnly
   }
   
-  // 全局快捷键
+  // Global shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+K (Mac) 或 Ctrl+K (Windows/Linux) - 切换面板
+      // Cmd+K (Mac) or Ctrl+K (Windows/Linux) - Toggle panel
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         isOpen ? close() : open()
       }
       
-      // ESC 关闭
+      // ESC closes the palette
       if (e.key === 'Escape' && isOpen) {
         e.preventDefault()
         close()
@@ -48,10 +49,10 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open, close, isOpen])
   
-  // 打开时自动聚焦
+  // Auto-focus when opened
   useEffect(() => {
     if (isOpen) {
-      // 延迟聚焦，等待 DOM 渲染
+      // Delay focus until DOM is rendered
       setTimeout(() => {
         const input = document.querySelector('[cmdk-input]') as HTMLInputElement
         if (input) {
@@ -65,11 +66,11 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
   
   return (
     <div
-      className="fixed inset-0 z-[9998] flex items-start justify-center pt-[10vh] sm:pt-[20vh] bg-black/50 backdrop-blur-sm animate-in fade-in"
+      className="fixed inset-0 z-[9998] flex items-start justify-center px-3 pt-[6vh] sm:px-6 sm:pt-[9vh] bg-black/50 backdrop-blur-sm animate-in fade-in"
       onClick={close}
     >
       <div
-        className="w-[95%] sm:w-full max-w-2xl max-h-[70vh] sm:max-h-[60vh] bg-background border border-border rounded-lg shadow-2xl animate-in zoom-in-95"
+        className="w-full max-w-5xl max-h-[84vh] sm:max-h-[82vh] bg-background/95 border border-border rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95"
         onClick={(e) => e.stopPropagation()}
       >
         <CommandMenu

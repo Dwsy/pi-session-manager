@@ -1,7 +1,7 @@
 import { Command } from 'cmdk'
 import { Search, Loader2, FolderOpen, MessageSquare, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { SearchPluginResult, SearchContext } from '../../plugins/types'
 import { useSearchPlugins } from '../../hooks/useSearchPlugins'
 import CommandItem from './CommandItem'
@@ -23,15 +23,13 @@ interface CommandMenuProps {
   setSearchCurrentProjectOnly: (value: boolean) => void
 }
 
-// Tab 类型定义
 type TabType = 'all' | 'message' | 'session' | 'project'
 
-// Tab 配置（会在组件中使用 i18n）
-const TABS: { id: TabType; key: string; pluginId?: string }[] = [
-  { id: 'all', key: 'tabs.all' },
-  { id: 'message', key: 'tabs.message', pluginId: 'message-search' },
-  { id: 'session', key: 'tabs.session', pluginId: 'session-search' },
-  { id: 'project', key: 'tabs.project', pluginId: 'project-search' },
+const TABS: { id: TabType; key: string; pluginId?: string; shortcut: string }[] = [
+  { id: 'all', key: 'tabs.all', shortcut: '1' },
+  { id: 'message', key: 'tabs.message', pluginId: 'message-search', shortcut: '2' },
+  { id: 'session', key: 'tabs.session', pluginId: 'session-search', shortcut: '3' },
+  { id: 'project', key: 'tabs.project', pluginId: 'project-search', shortcut: '4' },
 ]
 
 export default function CommandMenu({
@@ -50,73 +48,98 @@ export default function CommandMenu({
   const { registry, search } = useSearchPlugins(context)
   const debounceRef = useRef<NodeJS.Timeout>()
   const abortControllerRef = useRef<AbortController>()
+  const requestIdRef = useRef(0)
   const [searchError, setSearchError] = useState<string | undefined>()
   const [activeTab, setActiveTab] = useState<TabType>('all')
-  
-  // 获取当前项目名称
-  const currentProjectName = context.selectedProject 
+
+  const currentProjectName = context.selectedProject
     ? context.selectedProject.split('/').pop() || context.selectedProject
     : null
-  
-  // 防抖搜索
+
+  const scopedPluginIds = useMemo(() => {
+    const currentTab = TABS.find(tab => tab.id === activeTab)
+    if (!currentTab?.pluginId) {
+      return undefined
+    }
+    return [currentTab.pluginId]
+  }, [activeTab])
+
   useEffect(() => {
-    // 取消之前的搜索
+    requestIdRef.current += 1
+    const currentRequestId = requestIdRef.current
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
-    
+
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
     }
-    
+
     if (!query.trim()) {
       setResults([])
       setIsSearching(false)
       setSearchError(undefined)
       return
     }
-    
+
     setIsSearching(true)
     setSearchError(undefined)
-    
+
     debounceRef.current = setTimeout(async () => {
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+
       try {
-        abortControllerRef.current = new AbortController()
-        
-        // 添加超时保护
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(new Error('Search timeout after 15 seconds'))
-          }, 15000) // 15秒总超时
+          }, 15000)
         })
-        
-        const searchPromise = search(query)
+
+        const searchPromise = search(query, {
+          pluginIds: scopedPluginIds,
+          cacheKeyParts: [activeTab]
+        })
+
         const searchResults = await Promise.race([searchPromise, timeoutPromise])
-        
-        if (!abortControllerRef.current.signal.aborted) {
-          setResults(searchResults)
-          setIsSearching(false)
+
+        if (controller.signal.aborted || currentRequestId !== requestIdRef.current) {
+          return
         }
+
+        setResults(searchResults)
+        setIsSearching(false)
       } catch (error) {
+        if (controller.signal.aborted || currentRequestId !== requestIdRef.current) {
+          return
+        }
+
         console.error('[CommandMenu] Search error:', error)
         if (error instanceof Error && error.name !== 'AbortError') {
           setSearchError(error.message)
-          // 显示错误状态
           setResults([])
         }
         setIsSearching(false)
       }
-    }, 300)
-    
+    }, 220)
+
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current)
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, search]) // 只依赖 query 和 search
-  
-  // 清理
+  }, [
+    query,
+    search,
+    setIsSearching,
+    setResults,
+    context.selectedProject,
+    context.searchCurrentProjectOnly,
+    activeTab,
+    scopedPluginIds,
+  ])
+
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -125,56 +148,75 @@ export default function CommandMenu({
     }
   }, [])
 
-  // Tab 键切换标签页
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Tab') {
+      const isModifierPressed = e.altKey || e.metaKey || e.ctrlKey
+      if (!isModifierPressed) {
+        return
+      }
+
+      const tabIndex = Number(e.key)
+      if (!Number.isNaN(tabIndex) && tabIndex >= 1 && tabIndex <= TABS.length) {
         e.preventDefault()
-        setActiveTab(prev => {
-          const currentIndex = TABS.findIndex(tab => tab.id === prev)
-          if (e.shiftKey) {
-            // Shift+Tab: 向前切换
-            return TABS[(currentIndex - 1 + TABS.length) % TABS.length].id
-          } else {
-            // Tab: 向后切换
-            return TABS[(currentIndex + 1) % TABS.length].id
-          }
-        })
+        setActiveTab(TABS[tabIndex - 1].id)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
-  
-  // 按插件分组结果
-  const groupedResults = results.reduce((acc, result) => {
-    if (!acc[result.pluginId]) {
-      acc[result.pluginId] = []
+
+  const groupedResults = useMemo(() => {
+    return results.reduce((acc, result) => {
+      if (!acc[result.pluginId]) {
+        acc[result.pluginId] = []
+      }
+      acc[result.pluginId].push(result)
+      return acc
+    }, {} as Record<string, SearchPluginResult[]>)
+  }, [results])
+
+  const tabCounts = useMemo(() => {
+    return TABS.reduce((acc, tab) => {
+      if (!tab.pluginId) {
+        acc[tab.id] = results.length
+      } else {
+        acc[tab.id] = groupedResults[tab.pluginId]?.length || 0
+      }
+      return acc
+    }, {} as Record<TabType, number>)
+  }, [groupedResults, results.length])
+
+  const visibleResultsCount = useMemo(() => {
+    if (activeTab === 'all') {
+      return results.length
     }
-    acc[result.pluginId].push(result)
-    return acc
-  }, {} as Record<string, SearchPluginResult[]>)
-  
+
+    const pluginId = TABS.find(tab => tab.id === activeTab)?.pluginId
+    if (!pluginId) {
+      return 0
+    }
+
+    return groupedResults[pluginId]?.length || 0
+  }, [activeTab, groupedResults, results.length])
+
   return (
     <Command
       className="w-full"
-      shouldFilter={false} // 我们自己处理过滤
+      shouldFilter={false}
     >
-      {/* 搜索框 */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
         <Search className="w-5 h-5 text-muted-foreground" />
         <Command.Input
           value={query}
           onValueChange={setQuery}
           placeholder={t('command.placeholder', '搜索会话、项目、消息...')}
-          className="flex-1 bg-transparent border-0 outline-none text-sm text-foreground placeholder:text-muted-foreground"
+          className="flex-1 bg-transparent border-0 outline-none text-[15px] text-foreground placeholder:text-muted-foreground"
         />
         {isSearching && (
           <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
         )}
-        
-        {/* 当前项目过滤按钮 - 始终显示 */}
+
         <button
           onClick={() => {
             if (currentProjectName) {
@@ -182,36 +224,34 @@ export default function CommandMenu({
             }
           }}
           disabled={!currentProjectName}
-          className={`
-            flex items-center gap-1.5 px-2.5 py-1 text-xs rounded motion-color motion-press focus-ring
-            ${!currentProjectName 
-              ? 'bg-surface-dark text-muted-foreground/50 cursor-not-allowed border border-border'
+          className={[
+            'flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border motion-color motion-press focus-ring',
+            !currentProjectName
+              ? 'bg-surface-dark text-muted-foreground/60 cursor-not-allowed border-border'
               : searchCurrentProjectOnly
-                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30'
-                : 'bg-surface text-muted-foreground hover:bg-surface border border-transparent'
-            }
-          `}
+                ? 'bg-foreground text-background border-foreground/80 hover:opacity-90'
+                : 'bg-surface text-foreground border-border hover:border-border-hover hover:bg-surface-dark'
+          ].join(' ')}
           title={
             !currentProjectName
               ? t('command.noProjectSelected', '请先选择项目')
-              : searchCurrentProjectOnly 
-                ? t('command.searchAllProjects', '搜索所有项目') 
+              : searchCurrentProjectOnly
+                ? t('command.searchAllProjects', '搜索所有项目')
                 : t('command.searchCurrentProject', '只搜索当前项目')
           }
         >
           <FolderOpen className="w-3.5 h-3.5" />
-          <span className="max-w-[100px] truncate">
+          <span className="max-w-[140px] truncate">
             {currentProjectName || t('command.allProjects', '所有项目')}
           </span>
         </button>
-        
-        <kbd className="px-2 py-1 text-xs text-muted-foreground bg-surface rounded">
+
+        <kbd className="px-2 py-1 text-xs text-muted-foreground bg-surface rounded border border-border/70">
           ESC
         </kbd>
       </div>
-      
-      {/* Tabs */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-background">
+
+      <div className="flex items-center gap-1.5 px-5 py-2.5 border-b border-border bg-background" role="tablist" aria-label="search tabs">
         {TABS.map(tab => {
           const isActive = activeTab === tab.id
           let Icon = null
@@ -223,59 +263,73 @@ export default function CommandMenu({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`
-                flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md motion-color motion-press focus-ring
-                ${isActive
-                  ? 'bg-blue-500/20 text-blue-400'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-surface'
-                }
-              `}
+              role="tab"
+              aria-selected={isActive}
+              className={[
+                'flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border motion-surface motion-color motion-press focus-ring',
+                isActive
+                  ? 'bg-foreground/10 text-foreground border-border-hover shadow-sm'
+                  : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-surface hover:border-border/70'
+              ].join(' ')}
+              title={t('command.shortcuts.switchTab', '切换分类') + ` (Alt+${tab.shortcut})`}
             >
               {Icon && <Icon className="w-3.5 h-3.5" />}
               <span>{t(`command.${tab.key}`)}</span>
-              {tab.pluginId && groupedResults[tab.pluginId] && (
-                <span className={`
-                  px-1.5 py-0.5 rounded text-[10px]
-                  ${isActive ? 'bg-blue-500/30 text-blue-300' : 'bg-surface text-muted-foreground'}
-                `}>
-                  {groupedResults[tab.pluginId]?.length || 0}
-                </span>
-              )}
+              <span className={[
+                'min-w-[20px] h-[18px] px-1.5 rounded-full text-[11px] leading-[18px] font-semibold text-center tabular-nums',
+                isActive
+                  ? 'bg-foreground text-background'
+                  : 'bg-surface-dark text-foreground/80 border border-border/80'
+              ].join(' ')}>
+                {tabCounts[tab.id] || 0}
+              </span>
             </button>
           )
         })}
       </div>
 
-      {/* 结果列表 */}
-      <Command.List className="max-h-[50vh] overflow-y-auto p-2">
+      {!!query && !isSearching && !searchError && (
+        <div className="px-5 py-2 border-b border-border/70 text-xs text-muted-foreground flex items-center justify-between">
+          <span>
+            {t('command.summary.results', {
+              count: visibleResultsCount,
+              defaultValue: `${visibleResultsCount} 条结果`
+            })}
+          </span>
+          <span className="text-muted-foreground/80">
+            {t('command.shortcuts.switchTab', '切换分类')} Alt + 1/2/3/4
+          </span>
+        </div>
+      )}
+
+      <Command.List className="max-h-[60vh] overflow-y-auto p-3 motion-transform-opacity">
         {isSearching && <CommandLoading />}
-        
+
         {!isSearching && searchError && (
           <CommandError error={searchError} />
         )}
-        
+
         {!isSearching && !searchError && results.length === 0 && query && (
           <CommandEmpty query={query} />
         )}
-        
+
         {!isSearching && !searchError && !query && (
           <CommandHints />
         )}
-        
+
         {!isSearching && !searchError && Object.entries(groupedResults).map(([pluginId, pluginResults]) => {
-          // 根据 activeTab 过滤结果
-          if (activeTab !== 'all' && activeTab !== TABS.find(t => t.pluginId === pluginId)?.id) {
+          if (activeTab !== 'all' && activeTab !== TABS.find(tab => tab.pluginId === pluginId)?.id) {
             return null
           }
 
           const plugin = registry.get(pluginId)
           if (!plugin) return null
-          
+
           return (
             <Command.Group
               key={pluginId}
               heading={activeTab === 'all' ? plugin.name : undefined}
-              className="mb-2"
+              className="mb-3"
             >
               {pluginResults.map(result => (
                 <CommandItem

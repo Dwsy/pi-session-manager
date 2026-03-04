@@ -20,6 +20,10 @@ export const command = {
     close: '閉じる',
     navigate: 'ナビゲート',
     select: '選択',
+    switchTab: 'タブ切り替え',
+  },
+  summary: {
+    results: '{{count}} 件',
   },
   plugins: {
     messageSearch: 'メッセージ検索',
@@ -39,5 +43,7 @@ export const command = {
     sessionExample2: '"今日" - 最近のセッションを検索',
     navigate: '↑↓ でナビゲート',
     select: 'Enter で選択',
+    switchTab: 'Alt + 1/2/3/4 でタブ切り替え',
+    scopeToggle: 'プロジェクトボタンで検索範囲を切り替え',
   },
 } as const

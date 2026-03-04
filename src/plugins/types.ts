@@ -1,37 +1,37 @@
 import type { SessionInfo } from '../types'
 
 /**
- * 搜索插件接口
- * 所有搜索插件必须实现此接口
+ * Search plugin interface
+ * All search plugins must implement this interface
  */
 export interface SearchPlugin {
-  // ========== 元数据 ==========
+  // ========== Metadata ==========
   
-  /** 插件唯一标识 */
+  /** Unique plugin ID */
   id: string
   
-  /** 插件显示名称 */
+  /** Plugin display name */
   name: string
   
-  /** 插件图标组件 */
+  /** Plugin icon component */
   icon: React.ComponentType<{ className?: string }>
   
-  /** 插件描述 */
+  /** Plugin description */
   description: string
   
-  /** 搜索关键词（用于插件匹配） */
+  /** Search keywords (for plugin matching) */
   keywords: string[]
   
-  /** 优先级（0-100，越高越优先显示） */
+  /** Priority (0-100, higher appears first) */
   priority: number
   
-  // ========== 核心方法 ==========
+  // ========== Core Methods ==========
   
   /**
-   * 执行搜索
-   * @param query 搜索查询
-   * @param context 搜索上下文
-   * @returns 搜索结果数组
+   * Execute search
+   * @param query Search query
+   * @param context Search context
+   * @returns Search result array
    */
   search(
     query: string,
@@ -39,112 +39,115 @@ export interface SearchPlugin {
   ): Promise<SearchPluginResult[]>
   
   /**
-   * 处理结果选中
-   * @param result 选中的结果
-   * @param context 搜索上下文
+   * Handle result selection
+   * @param result Selected result
+   * @param context Search context
    */
   onSelect(
     result: SearchPluginResult,
     context: SearchContext
   ): void
   
-  // ========== 可选方法 ==========
+  // ========== Optional Methods ==========
   
   /**
-   * 自定义结果项渲染
-   * @param result 搜索结果
-   * @returns 自定义 React 节点
+   * Custom result item rendering
+   * @param result Search result
+   * @returns Custom React node
    */
   renderItem?(result: SearchPluginResult): React.ReactNode
   
   /**
-   * 插件挂载时调用
+   * Called when plugin is mounted
    */
   onMount?(): void
   
   /**
-   * 插件卸载时调用
+   * Called when plugin is unmounted
    */
   onUnmount?(): void
   
   /**
-   * 判断插件是否可用
-   * @param context 搜索上下文
-   * @returns 是否可用
+   * Determine whether plugin is available
+   * @param context Search context
+   * @returns Whether available
    */
   isEnabled?(context: SearchContext): boolean
 }
 
 /**
- * 搜索上下文
- * 提供给插件的全局状态和方法
+ * Search context
+ * Global state and methods provided to plugins
  */
 export interface SearchContext {
-  // ========== 数据 ==========
+  // ========== Data ==========
   
-  /** 所有会话列表 */
+  /** Full session list */
   sessions: SessionInfo[]
   
-  /** 当前选中的项目 */
+  /** Currently selected project */
   selectedProject: string | null
   
-  /** 当前选中的会话 */
+  /** Currently selected session */
   selectedSession: SessionInfo | null
   
-  /** 是否只搜索当前项目 */
+  /** Whether to search current project only */
   searchCurrentProjectOnly: boolean
   
-  // ========== 方法 ==========
+  // ========== Methods ==========
   
-  /** 设置选中的会话 */
+  /** Set selected session */
   setSelectedSession: (session: SessionInfo | null) => void
   
-  /** 设置选中的项目 */
+  /** Set selected project */
   setSelectedProject: (project: string | null) => void
   
-  /** 关闭命令面板 */
+  /** Close command palette */
   closeCommandMenu: () => void
+
+  /** Set pending entry to scroll in viewer (optional) */
+  setPendingScrollEntryId?: (entryId: string | null) => void
   
-  // ========== 工具 ==========
+  // ========== Utilities ==========
   
-  /** 国际化翻译函数 */
+  /** i18n translation function */
   t: (key: string, options?: any) => string
 }
 
 /**
- * 搜索结果
+ * Search result
  */
 export interface SearchPluginResult {
-  /** 结果唯一标识 */
+  /** Unique result ID */
   id: string
   
-  /** 所属插件 ID */
+  /** Owning plugin ID */
   pluginId: string
   
-  /** 主标题 */
+  /** Primary title */
   title: string
   
-  /** 副标题 */
+  /** Subtitle */
   subtitle?: string
   
-  /** 描述 */
+  /** Description */
   description?: string
   
-  /** 图标 */
+  /** Icon */
   icon?: React.ReactNode
   
-  /** 元数据（插件自定义） */
+  /** Metadata (plugin-defined) */
   metadata?: Record<string, any>
   
-  /** 匹配分数（0-1） */
+  /** Match score (0-1) */
   score: number
   
-  /** 高亮范围 */
+  /** Highlight range */
   highlights?: HighlightRange[]
 }
 
 /**
- * 高亮范围
+ * Highlight range
  */
 export interface HighlightRange {
   start: number

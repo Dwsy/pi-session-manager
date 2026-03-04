@@ -3,8 +3,13 @@ import { pluginRegistry } from '../plugins/registry'
 import type { SearchPluginResult, SearchContext } from '../plugins/types'
 import { useSearchCache } from './useSearchCache'
 
+interface SearchPluginOptions {
+  pluginIds?: string[]
+  cacheKeyParts?: string[]
+}
+
 /**
- * 搜索插件管理 Hook
+ * Search plugin management hook
  */
 export function useSearchPlugins(context: SearchContext) {
   const cache = useSearchCache()
@@ -14,26 +19,45 @@ export function useSearchPlugins(context: SearchContext) {
   contextRef.current = context
   
   /**
-   * 执行搜索
-   * @param query 查询字符串
-   * @returns 搜索结果数组
+   * Execute search
+   * @param query Query string
+   * @returns Search result array
    */
-  const search = useCallback(async (query: string): Promise<SearchPluginResult[]> => {
+  const search = useCallback(async (
+    query: string,
+    options?: SearchPluginOptions
+  ): Promise<SearchPluginResult[]> => {
     if (!query.trim()) {
       return []
     }
+
+    const scopedPluginIds = options?.pluginIds?.length
+      ? Array.from(new Set(options.pluginIds)).sort()
+      : undefined
+    const extraParts = options?.cacheKeyParts ?? []
+    const cacheKey = [
+      query.trim().toLowerCase(),
+      scopedPluginIds?.join(',') || 'all',
+      contextRef.current.selectedProject ?? '__all_projects__',
+      contextRef.current.searchCurrentProjectOnly ? 'project_only' : 'project_all',
+      ...extraParts,
+    ].join('::')
     
     // Check cache
-    const cached = cache.get(query)
+    const cached = cache.get(cacheKey)
     if (cached) {
       return cached
     }
     
     // Execute search
-    const results = await pluginRegistry.search(query, contextRef.current)
+    const results = await pluginRegistry.search(
+      query,
+      contextRef.current,
+      scopedPluginIds,
+    )
     
     // Cache results
-    cache.set(query, results)
+    cache.set(cacheKey, results)
     
     return results
   }, [cache])

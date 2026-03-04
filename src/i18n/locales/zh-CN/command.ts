@@ -20,6 +20,10 @@ export const command = {
     close: '关闭',
     navigate: '导航',
     select: '选择',
+    switchTab: '切换分类',
+  },
+  summary: {
+    results: '{{count}} 条结果',
   },
   plugins: {
     messageSearch: '消息搜索',
@@ -39,5 +43,7 @@ export const command = {
     sessionExample2: '"今天" - 搜索最近会话',
     navigate: '使用 ↑↓ 导航',
     select: '按 Enter 选择',
+    switchTab: 'Alt + 1/2/3/4 切换分类',
+    scopeToggle: '点击项目按钮切换搜索范围',
   },
 } as const

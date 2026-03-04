@@ -1,24 +1,49 @@
-import { MessageSquare } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { MessageSquare, Bot, User } from 'lucide-react'
 import { invoke } from '../../transport'
 import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '../types'
-import type { SessionInfo } from '../../types'
+import type {
+  SessionInfo,
+  FullTextSearchHit,
+  FullTextSearchResponse,
+} from '../../types'
 import { parseQuotedQuery } from '../../utils/search'
 
+interface MessageResultMetadata {
+  sessionPath: string
+  session?: SessionInfo
+  sessionName?: string
+  entryId: string
+  snippetLines: string[]
+  queryTerms: string[]
+  truncatedHead: boolean
+  truncatedTail: boolean
+  role: string
+  timestamp: string
+}
+
+const MAX_RESULTS = 24
+const MAX_HITS_TO_FETCH = 40
+const MAX_SESSION_PREFETCH = 12
+const MAX_SNIPPET_LINES = 3
+const MAX_SNIPPET_LINE_LENGTH = 180
+
 /**
- * 消息搜索插件
- * 使用 SQLite FTS5 全文搜索，快速高效
+ * Message search plugin
+ * Uses full-text message search and returns message-level hits with context snippets
  */
 export class MessageSearchPlugin extends BaseSearchPlugin {
   id = 'message-search'
   icon = MessageSquare
   keywords = ['message', 'content', 'text', 'conversation', '消息', '内容', '对话']
   priority = 80
-  
+  private readonly sessionCache = new Map<string, SessionInfo>()
+
   get name(): string {
     return this.context?.t('plugins.message.name', '消息搜索') || '消息搜索'
   }
-  
+
   get description(): string {
     return this.context?.t('plugins.message.description', '搜索用户消息和助手回复') || '搜索用户消息和助手回复'
   }
@@ -26,95 +51,442 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
   private truncateText(text: string, maxLength: number): string {
     if (!text) return ''
     if (text.length <= maxLength) return text
-    return text.slice(0, maxLength) + '...'
+    return `${text.slice(0, maxLength)}…`
   }
-  
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
+
+  private getHighlightTerms(query: string): string[] {
+    if (!query.trim()) {
+      return []
+    }
+
+    const parsed = parseQuotedQuery(query)
+    const terms = parsed.hasPhrases
+      ? [...parsed.phrases, ...parsed.remainderTokens]
+      : parsed.remainderTokens
+
+    return Array.from(new Set(terms.filter(Boolean)))
+      .map(term => term.trim())
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length)
+  }
+
+  private findFirstMatchIndex(text: string, terms: string[]): number {
+    const lowerText = text.toLowerCase()
+    let firstIndex = -1
+
+    for (const term of terms) {
+      const index = lowerText.indexOf(term.toLowerCase())
+      if (index !== -1 && (firstIndex === -1 || index < firstIndex)) {
+        firstIndex = index
+      }
+    }
+
+    return firstIndex
+  }
+
+  private trimSnippetLine(line: string, terms: string[]): string {
+    const normalizedLine = line.trim()
+    if (!normalizedLine) {
+      return ' '
+    }
+
+    if (normalizedLine.length <= MAX_SNIPPET_LINE_LENGTH) {
+      return normalizedLine
+    }
+
+    const firstMatch = this.findFirstMatchIndex(normalizedLine, terms)
+    if (firstMatch < 0) {
+      return `${normalizedLine.slice(0, MAX_SNIPPET_LINE_LENGTH)}…`
+    }
+
+    const halfWindow = Math.floor(MAX_SNIPPET_LINE_LENGTH / 2)
+    let start = Math.max(0, firstMatch - halfWindow)
+    let end = Math.min(normalizedLine.length, start + MAX_SNIPPET_LINE_LENGTH)
+
+    if (end - start < MAX_SNIPPET_LINE_LENGTH) {
+      start = Math.max(0, end - MAX_SNIPPET_LINE_LENGTH)
+    }
+
+    const prefix = start > 0 ? '…' : ''
+    const suffix = end < normalizedLine.length ? '…' : ''
+
+    return `${prefix}${normalizedLine.slice(start, end)}${suffix}`
+  }
+
+  private buildSnippet(content: string, terms: string[]): {
+    lines: string[]
+    truncatedHead: boolean
+    truncatedTail: boolean
+  } {
+    const normalized = (content || '').replace(/\r\n/g, '\n')
+    const lines = normalized.split('\n')
+
+    if (lines.length === 0) {
+      return {
+        lines: [''],
+        truncatedHead: false,
+        truncatedTail: false,
+      }
+    }
+
+    let targetLineIndex = lines.findIndex(line => this.findFirstMatchIndex(line, terms) >= 0)
+    if (targetLineIndex < 0) {
+      targetLineIndex = 0
+    }
+
+    let start = Math.max(0, targetLineIndex - 1)
+    let end = Math.min(lines.length, targetLineIndex + 2)
+
+    if (end - start < MAX_SNIPPET_LINES) {
+      const shortBy = MAX_SNIPPET_LINES - (end - start)
+      start = Math.max(0, start - shortBy)
+      end = Math.min(lines.length, end + shortBy)
+    }
+
+    const snippetLines = lines
+      .slice(start, end)
+      .map(line => this.trimSnippetLine(line, terms))
+
+    return {
+      lines: snippetLines,
+      truncatedHead: start > 0,
+      truncatedTail: end < lines.length,
+    }
+  }
+
+  private highlightText(text: string, terms: string[]): ReactNode {
+    if (!text || !terms.length) {
+      return text || ' '
+    }
+
+    const uniqueTerms = Array.from(new Set(terms.map(term => term.toLowerCase())))
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length)
+
+    if (!uniqueTerms.length) {
+      return text
+    }
+
+    const pattern = new RegExp(`(${uniqueTerms.map(term => this.escapeRegExp(term)).join('|')})`, 'gi')
+    const parts = text.split(pattern)
+
+    return parts.map((part, index) => {
+      const isMatch = uniqueTerms.includes(part.toLowerCase())
+      if (!isMatch) {
+        return <span key={`${part}-${index}`}>{part}</span>
+      }
+
+      return (
+        <mark
+          key={`${part}-${index}`}
+          className="rounded bg-warning/35 text-foreground px-0.5 font-semibold"
+        >
+          {part}
+        </mark>
+      )
+    })
+  }
+
+  private getRoleLabel(role: string): string {
+    if (!this.context) {
+      return role
+    }
+
+    if (role === 'assistant') {
+      return this.context.t('search.fullText.role.assistant', 'AI')
+    }
+
+    if (role === 'user') {
+      return this.context.t('search.fullText.role.user', '用户')
+    }
+
+    return role
+  }
+
+  private getRoleBadgeClass(role: string): string {
+    if (role === 'assistant') {
+      return 'bg-info/12 text-info border-info/30'
+    }
+
+    if (role === 'user') {
+      return 'bg-surface-dark/90 text-foreground/90 border-border'
+    }
+
+    return 'bg-surface-dark/80 text-foreground/85 border-border/80'
+  }
+
+  private getRoleIcon(role: string): ReactNode {
+    if (role === 'assistant') {
+      return <Bot className="w-3 h-3 opacity-90" />
+    }
+
+    if (role === 'user') {
+      return <User className="w-3 h-3 opacity-85" />
+    }
+
+    return <MessageSquare className="w-3 h-3 opacity-80" />
+  }
+
+  private warmSessionCache(sessions: SessionInfo[]): void {
+    for (const session of sessions) {
+      this.sessionCache.set(session.path, session)
+    }
+  }
+
+  private async resolveSessionByPath(path: string): Promise<SessionInfo | null> {
+    const cached = this.sessionCache.get(path)
+    if (cached) {
+      return cached
+    }
+
+    try {
+      const session = await invoke<SessionInfo>('get_session_by_path', { path })
+      if (session) {
+        this.sessionCache.set(path, session)
+        return session
+      }
+    } catch {
+      // Ignore per-item resolution failure
+    }
+
+    return null
+  }
+
+  private async prefetchSessionsByPath(paths: string[]): Promise<void> {
+    if (!paths.length) {
+      return
+    }
+
+    const uniquePaths = Array.from(new Set(paths)).filter(path => !this.sessionCache.has(path))
+    if (!uniquePaths.length) {
+      return
+    }
+
+    await Promise.all(
+      uniquePaths.map(async (path) => {
+        const session = await this.resolveSessionByPath(path)
+        if (session) {
+          this.sessionCache.set(path, session)
+        }
+      })
+    )
+  }
+
+  private fallbackSessionTitle(hit: FullTextSearchHit): string {
+    if (hit.session_name?.trim()) {
+      return hit.session_name.trim()
+    }
+
+    const firstLine = hit.content?.split('\n')[0]?.trim() || ''
+    return firstLine ? this.truncateText(firstLine, 60) : this.truncateText(hit.session_path, 60)
+  }
+
+  private fallbackProjectName(hit: FullTextSearchHit): string {
+    const normalized = hit.session_path.replace(/\/+$/, '')
+    const parts = normalized.split('/')
+    const maybeParent = parts.length > 1 ? parts[parts.length - 2] : ''
+
+    if (maybeParent && maybeParent !== 'sessions') {
+      return maybeParent
+    }
+
+    return this.context?.t('command.allProjects', '所有项目') || 'Project'
+  }
+
   async search(
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]> {
-    // 保存 context 以便访问 i18n
     this.setContext(context)
-    
+    this.warmSessionCache(context.sessions)
+
     try {
-      // 使用 SQLite FTS5 搜索，快速且高效
-      const sessions = await invoke<SessionInfo[]>('search_sessions_fts', {
+      const response = await invoke<FullTextSearchResponse>('full_text_search', {
         query,
-        limit: 50 // 最多返回 50 个会话
+        roleFilter: 'all',
+        globPattern: null,
+        page: 0,
+        pageSize: MAX_HITS_TO_FETCH,
+        matchMode: 'any',
       })
-      
-      // 如果启用了"只搜索当前项目"，过滤结果
-      const filteredSessions = context.searchCurrentProjectOnly && context.selectedProject
-        ? sessions.filter(s => s.cwd === context.selectedProject)
-        : sessions
-      
-      const parsedQuery = parseQuotedQuery(query)
-      const phraseTerms = parsedQuery.phrases.map(phrase => phrase.toLowerCase())
-      const remainderTerms = parsedQuery.remainderTokens.map(term => term.toLowerCase())
-      const hasPhraseMode = parsedQuery.hasPhrases
-      const queryTerms = hasPhraseMode ? [...phraseTerms, ...remainderTerms] : [query.toLowerCase()]
 
-      // 转换为插件结果格式
-      const pluginResults = filteredSessions.map(session => {
-        const score = hasPhraseMode
-          ? Math.max(
-              ...queryTerms.map(term => Math.max(
-                this.fuzzyMatch(term, session.name || ''),
-                this.fuzzyMatch(term, session.first_message)
-              ))
-            )
-          : this.fuzzyMatch(query, session.first_message)
+      const hits = response.hits.slice(0, MAX_HITS_TO_FETCH)
+      if (!hits.length) {
+        return []
+      }
 
-        return {
-          id: `session-${session.id}`,
-          pluginId: this.id,
-          title: session.name || this.truncateText(session.first_message, 60),
-          subtitle: this.getProjectName(session.cwd),
-          description: `${context.t('session.messageCount', { count: session.message_count, defaultValue: `${session.message_count} 条消息` })} • ${this.formatDate(session.modified)}`,
-          icon: <MessageSquare className="w-4 h-4 text-blue-400" />,
-          metadata: {
-            sessionId: session.id,
-            sessionPath: session.path,
-            session
-          },
-          score,
-          highlights: queryTerms.flatMap(term => [
-            ...this.calculateHighlights(term, session.name || '', 'title'),
-            ...this.calculateHighlights(term, session.first_message, 'title')
-          ])
+      const missingPaths = hits
+        .map(hit => hit.session_path)
+        .filter(path => !this.sessionCache.has(path))
+      const pathsToPrefetch = (context.searchCurrentProjectOnly && context.selectedProject)
+        ? missingPaths
+        : missingPaths.slice(0, MAX_SESSION_PREFETCH)
+      await this.prefetchSessionsByPath(pathsToPrefetch)
+
+      const queryTerms = this.getHighlightTerms(query)
+      const results: SearchPluginResult[] = []
+
+      for (let index = 0; index < hits.length; index++) {
+        const hit = hits[index]
+        const session = this.sessionCache.get(hit.session_path)
+
+        if (
+          context.searchCurrentProjectOnly
+          && context.selectedProject
+          && (!session || session.cwd !== context.selectedProject)
+        ) {
+          continue
         }
-      }).slice(0, 20) // 最多显示 20 条结果
-      
-      return pluginResults
+
+        const snippet = this.buildSnippet(hit.content, queryTerms)
+        const metadata: MessageResultMetadata = {
+          sessionPath: hit.session_path,
+          session,
+          sessionName: hit.session_name,
+          entryId: hit.entry_id,
+          snippetLines: snippet.lines,
+          queryTerms,
+          truncatedHead: snippet.truncatedHead,
+          truncatedTail: snippet.truncatedTail,
+          role: hit.role,
+          timestamp: hit.timestamp,
+        }
+
+        results.push(this.createSearchResult(hit, index, hits.length, metadata))
+      }
+
+      return results.slice(0, MAX_RESULTS)
     } catch (error) {
-      console.error('[MessageSearchPlugin] FTS5 search failed:', error)
+      console.error('[MessageSearchPlugin] full_text_search failed:', error)
       return []
     }
   }
-  
+
+  private createSearchResult(
+    hit: FullTextSearchHit,
+    index: number,
+    total: number,
+    metadata: MessageResultMetadata,
+  ): SearchPluginResult {
+    const session = metadata.session
+    const projectName = session
+      ? this.getProjectName(session.cwd)
+      : this.fallbackProjectName(hit)
+    const title = session?.name || this.fallbackSessionTitle(hit)
+    const relativePositionScore = 1 - index / Math.max(total, 1)
+
+    return {
+      id: `${hit.session_id}-${hit.entry_id}`,
+      pluginId: this.id,
+      title,
+      subtitle: `${projectName} · ${this.truncateText(hit.session_path, 60)}`,
+      description: `${this.getRoleLabel(hit.role)} · ${this.formatDate(hit.timestamp)}`,
+      icon: <MessageSquare className="w-4 h-4 text-info" />,
+      metadata,
+      score: Math.max(0.05, relativePositionScore),
+      highlights: [],
+    }
+  }
+
   onSelect(result: SearchPluginResult, context: SearchContext): void {
-    if (!result.metadata?.session) {
+    void this.handleSelect(result, context)
+  }
+
+  private async handleSelect(result: SearchPluginResult, context: SearchContext): Promise<void> {
+    const metadata = result.metadata as MessageResultMetadata | undefined
+    if (!metadata) {
       console.warn('[MessageSearchPlugin] Result metadata is missing')
       return
     }
-    const session = result.metadata.session as SessionInfo
+
+    let session: SessionInfo | null | undefined = metadata.session || this.sessionCache.get(metadata.sessionPath)
+    if (!session) {
+      session = await this.resolveSessionByPath(metadata.sessionPath)
+    }
+    if (!session) {
+      console.warn('[MessageSearchPlugin] Failed to resolve session by path:', metadata.sessionPath)
+      return
+    }
+
+    this.sessionCache.set(session.path, session)
     context.setSelectedSession(session)
     context.setSelectedProject(session.cwd)
+
+    if (metadata.entryId && context.setPendingScrollEntryId) {
+      context.setPendingScrollEntryId(metadata.entryId)
+    }
+
     context.closeCommandMenu()
   }
-  
+
+  renderItem(result: SearchPluginResult): ReactNode {
+    const metadata = result.metadata as MessageResultMetadata | undefined
+    if (!metadata) {
+      return null
+    }
+
+    const roleLabel = this.getRoleLabel(metadata.role)
+
+    return (
+      <div className="w-full min-w-0">
+        <div className="flex items-start gap-2.5">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-foreground truncate">
+              {result.title}
+            </div>
+            {result.subtitle && (
+              <div className="text-[11px] text-muted-foreground truncate mt-0.5">
+                {result.subtitle}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            <span className={`inline-flex items-center gap-1.5 h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border ${this.getRoleBadgeClass(metadata.role)}`}>
+              {this.getRoleIcon(metadata.role)}
+              <span>{roleLabel}</span>
+            </span>
+            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+              {this.formatDate(metadata.timestamp)}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-2 rounded-lg border border-border/70 bg-surface/70 px-3 py-2">
+          {metadata.truncatedHead && (
+            <p className="text-[11px] leading-5 text-muted-foreground/80">...</p>
+          )}
+          {metadata.snippetLines.map((line, lineIndex) => (
+            <p
+              key={`${metadata.entryId}-${lineIndex}`}
+              className="text-xs leading-5 text-foreground/90 break-words"
+            >
+              {this.highlightText(line, metadata.queryTerms)}
+            </p>
+          ))}
+          {metadata.truncatedTail && (
+            <p className="text-[11px] leading-5 text-muted-foreground/80">...</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   private getProjectName(cwd: string): string {
     return cwd.split('/').pop() || cwd
   }
-  
+
   private formatDate(date: Date | string): string {
     if (!this.context) return String(date)
-    
+
     const dateObj = typeof date === 'string' ? new Date(date) : date
     const now = new Date()
     const diff = now.getTime() - dateObj.getTime()
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    
+
     if (days === 0) return this.context.t('time.today')
     if (days === 1) return this.context.t('time.yesterday')
     if (days < 7) return this.context.t('time.daysAgo', { count: days })

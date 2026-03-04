@@ -20,6 +20,10 @@ export const command = {
     close: 'Close',
     navigate: 'Navigate',
     select: 'Select',
+    switchTab: 'Switch tab',
+  },
+  summary: {
+    results: '{{count}} results',
   },
   plugins: {
     messageSearch: 'Message Search',
@@ -39,5 +43,7 @@ export const command = {
     sessionExample2: '"today" - Search recent sessions',
     navigate: 'Use ↑↓ to navigate',
     select: 'Press Enter to select',
+    switchTab: 'Alt + 1/2/3/4 to switch tabs',
+    scopeToggle: 'Click project button to toggle search scope',
   },
 } as const

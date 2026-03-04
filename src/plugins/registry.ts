@@ -1,16 +1,16 @@
 import type { SearchPlugin, SearchContext, SearchPluginResult } from './types'
 
 /**
- * 插件注册表
- * 管理所有搜索插件的注册、查询和执行
+ * Plugin registry
+ * Manage registration, lookup, and execution of all search plugins
  */
 export class PluginRegistry {
   private plugins: Map<string, SearchPlugin> = new Map()
   
   /**
-   * 注册插件
-   * @param plugin 搜索插件
-   * @throws 如果插件 ID 已存在
+   * Register plugin
+   * @param plugin Search plugin
+   * @throws If plugin ID already exists
    */
   register(plugin: SearchPlugin): void {
     if (this.plugins.has(plugin.id)) {
@@ -22,8 +22,8 @@ export class PluginRegistry {
   }
   
   /**
-   * 注销插件
-   * @param pluginId 插件 ID
+   * Unregister plugin
+   * @param pluginId Plugin ID
    */
   unregister(pluginId: string): void {
     const plugin = this.plugins.get(pluginId)
@@ -34,17 +34,17 @@ export class PluginRegistry {
   }
   
   /**
-   * 获取插件
-   * @param pluginId 插件 ID
-   * @returns 插件实例或 undefined
+   * Get plugin
+   * @param pluginId Plugin ID
+   * @returns Plugin instance or undefined
    */
   get(pluginId: string): SearchPlugin | undefined {
     return this.plugins.get(pluginId)
   }
   
   /**
-   * 获取所有插件
-   * @returns 插件数组（按优先级排序）
+   * Get all plugins
+   * @returns Plugin array (sorted by priority)
    */
   getAll(): SearchPlugin[] {
     return Array.from(this.plugins.values())
@@ -52,9 +52,9 @@ export class PluginRegistry {
   }
   
   /**
-   * 获取可用插件
-   * @param context 搜索上下文
-   * @returns 可用插件数组
+   * Get available plugins
+   * @param context Search context
+   * @returns Available plugin array
    */
   getEnabled(context: SearchContext): SearchPlugin[] {
     return this.getAll().filter(plugin => 
@@ -63,30 +63,37 @@ export class PluginRegistry {
   }
   
   /**
-   * 执行搜索
-   * @param query 搜索查询
-   * @param context 搜索上下文
-   * @returns 合并后的搜索结果
+   * Execute search
+   * @param query Search query
+   * @param context Search context
+   * @returns Merged search results
    */
   async search(
     query: string,
-    context: SearchContext
+    context: SearchContext,
+    scopedPluginIds?: string[]
   ): Promise<SearchPluginResult[]> {
     if (!query.trim()) {
       return []
     }
     
     const enabledPlugins = this.getEnabled(context)
+    const scopedSet = scopedPluginIds?.length
+      ? new Set(scopedPluginIds)
+      : null
+    const pluginsToSearch = scopedSet
+      ? enabledPlugins.filter(plugin => scopedSet.has(plugin.id))
+      : enabledPlugins
     
-    // 并行执行所有插件的搜索
+    // Run searches for all plugins in parallel
     const results = await Promise.all(
-      enabledPlugins.map(async plugin => {
+      pluginsToSearch.map(async plugin => {
         try {
           const pluginResults = await plugin.search(query, context)
           return pluginResults.map(result => ({
             ...result,
             pluginId: plugin.id,
-            // 综合分数 = 结果分数 × 插件优先级权重
+            // Combined score = result score × plugin priority weight
             score: result.score * (plugin.priority / 100)
           }))
         } catch (error) {
@@ -96,12 +103,12 @@ export class PluginRegistry {
       })
     )
     
-    // 合并并排序结果
+    // Merge and sort results
     return results
       .flat()
       .sort((a, b) => b.score - a.score)
   }
 }
 
-// 全局单例
+// Global singleton
 export const pluginRegistry = new PluginRegistry()
