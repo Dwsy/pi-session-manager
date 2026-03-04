@@ -9,6 +9,13 @@ For the full changelog, see [CHANGELOG.md on GitHub](https://github.com/Dwsy/pi-
 
 ## Unreleased
 
+### Session Viewer Scroll Performance & Stability
+- Moved virtual-scroll state updates into the message panel to avoid parent-level re-renders during scroll
+- Kept toolbar scroll actions with a ref bridge (`scrollToTop` / `scrollToBottom`) after refactor
+- Tuned message virtualizer overscan from `12` to `8` and memoized key viewer components
+- Improved dynamic measurement and bottom-edge load-more behavior for smoother long-session scrolling
+- Fixed a cached-height gap double-count issue and reverted an over-aggressive scroll-time measurement skip that could cause text overlap
+
 ### Subagent Session Viewer
 - View full subagent conversations inline with clickable cards showing agent name, model, duration, tokens
 - Modal with scale+fade animation renders complete subagent JSONL sessions

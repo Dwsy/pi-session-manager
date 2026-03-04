@@ -6,6 +6,20 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Fixed
 
+- **External terminal launch is now production-usable across macOS/Linux/Windows** — replaced hardcoded launcher paths with runtime availability detection and fallback chaining
+  - `open_session_in_terminal` now validates session file existence, resolves invalid `cwd` to a safe fallback directory, and reports detailed per-attempt failures
+  - Added platform-specific installed-terminal probing and ordered fallback attempts (user-selected terminal first, then known available candidates)
+  - Custom terminal command now works as an actual launcher path/template with placeholders: `{command}`, `{cwd}`, `{path}`, `{pi}`
+  - Added support for additional real-world terminal IDs used in settings and launch routing (`auto`, `wezterm`, `kitty`, `alacritty`, `xfce4-terminal`, `tilix`, `mate-terminal`, `lxterminal`, `x-terminal-emulator`)
+  - External terminal default changed to `auto`, so new installs prefer an actually installed terminal instead of a platform hardcoded guess
+  - Added unit tests for fallback order and custom command placeholder rendering
+
+- **Sidebar paginated sessions loading regression** — fixed duplicate `scan_sessions_paginated` calls and skeleton lock after successful responses
+  - Prevented `silent` refresh requests from hijacking foreground loading lifecycle, so `loading` always clears correctly after the active foreground request completes
+  - Added in-flight request de-duplication for identical pagination/filter parameters to avoid concurrent duplicate scans
+  - Delayed sidebar `silent` refresh until the first paginated load has completed, removing startup-time duplicate requests triggered by upstream session/tag updates
+  - Updated sidebar loading source selection in paged mode to rely on paginated loading state, preventing unrelated full-scan loading from blocking rendered list data
+
 - **Session viewer open-position hydration regression** — restored deterministic full-history hydration for `top` open mode while keeping chunked incremental behavior for `bottom` mode
   - Root cause: chunk-first loading introduced partial initial trees/anchors in top mode, causing delayed completion and missing initial scroll markers
   - Top mode now eagerly loads all remaining chunks on session open before rendering final tree state
@@ -13,6 +27,15 @@ All notable changes to Pi Session Manager will be documented in this file.
   - Added chunk merge de-duplication (`mergeEntriesWithUniqueIds`) to prevent entry ID collisions across chunk boundaries
   - Synchronized `hasMoreHistory` state/ref updates to avoid stale closure gating and inconsistent load-more behavior
   - Cache behavior updated: if cached session is partial and open mode is `top`, cache is invalidated and fully re-hydrated
+
+- **Session viewer scroll performance and virtualization stability**
+  - Moved virtual-scroll state updates from `SessionViewer` to `SessionViewerMessages` to reduce parent-level re-renders while scrolling
+  - Kept toolbar scroll actions via ref-based `scrollToTop`/`scrollToBottom` bridge after the refactor
+  - Tuned message virtualizer overscan from `12` to `8` for lighter per-frame rendering cost
+  - Added memoization for `SessionHeader`, `SessionScrollMarkers`, and `SessionEntryRenderer` to reduce avoidable re-renders
+  - Improved dynamic row measurement stability with `useAnimationFrameWithResizeObserver` and edge-triggered `onReachBottom` load-more behavior
+  - Fixed cached height estimation bug that double-counted message gaps and could cause layout drift
+  - Reverted an over-aggressive “skip measure while scrolling” optimization that caused text overlap artifacts under fast scroll
 
 ### Changed
 

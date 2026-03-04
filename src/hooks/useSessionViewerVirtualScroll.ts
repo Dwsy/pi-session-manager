@@ -5,7 +5,7 @@ import type {
   RefObject,
   SetStateAction,
 } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { measureElement, useVirtualizer } from '@tanstack/react-virtual'
 import type { Virtualizer } from '@tanstack/react-virtual'
 
 import type { SessionEntry } from '../types'
@@ -62,6 +62,7 @@ export function useSessionViewerVirtualScroll({
   const internalIsAtBottomRef = useRef(true)
   const isAtBottomRef = externalIsAtBottomRef ?? internalIsAtBottomRef
   const measuredHeightsRef = useRef<Map<string, number>>(new Map())
+  const hasTriggeredReachBottomRef = useRef(false)
 
   const entryIndexById = useMemo(() => {
     const indexById = new Map<string, number>()
@@ -79,7 +80,7 @@ export function useSessionViewerVirtualScroll({
       if (!entry) return 140 + MESSAGE_ITEM_GAP
 
       const cachedHeight = measuredHeightsRef.current.get(entry.id)
-      if (cachedHeight) return cachedHeight + MESSAGE_ITEM_GAP
+      if (cachedHeight) return cachedHeight
 
       let height: number
       switch (entry.type) {
@@ -121,8 +122,9 @@ export function useSessionViewerVirtualScroll({
     overscan: ROW_OVERSCAN,
     lanes: 1,
     isScrollingResetDelay: 200,
-    measureElement: (element) => {
-      const height = element.getBoundingClientRect().height
+    useAnimationFrameWithResizeObserver: true,
+    measureElement: (element, entry, instance) => {
+      const height = measureElement(element, entry, instance)
       const entryId = element.getAttribute('data-entry-id')
       if (entryId) {
         measuredHeightsRef.current.set(entryId, height)
@@ -133,6 +135,7 @@ export function useSessionViewerVirtualScroll({
 
   useEffect(() => {
     measuredHeightsRef.current.clear()
+    hasTriggeredReachBottomRef.current = false
   }, [expandedToolIds, sessionPath, toolsExpanded])
 
   useEffect(() => {
@@ -224,18 +227,25 @@ export function useSessionViewerVirtualScroll({
           container.scrollHeight - container.scrollTop - container.clientHeight
         const atBottom = distanceToBottom <= BOTTOM_THRESHOLD_PX
         const canScroll = container.scrollHeight > container.clientHeight + BOTTOM_THRESHOLD_PX
+        const wasAtBottom = isAtBottomRef.current
 
-        if (isAtBottomRef.current !== atBottom) {
+        if (wasAtBottom !== atBottom) {
           isAtBottomRef.current = atBottom
           setIsAtBottom(atBottom)
         }
 
         if (atBottom) {
-          setHasNewMessages(false)
-          if (canScroll) {
+          if (!wasAtBottom) {
+            setHasNewMessages(false)
+          }
+          if (canScroll && !hasTriggeredReachBottomRef.current) {
+            hasTriggeredReachBottomRef.current = true
             onReachBottom?.()
           }
+          return
         }
+
+        hasTriggeredReachBottomRef.current = false
       })
     }
 
