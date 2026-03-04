@@ -153,6 +153,7 @@ export function useSidebarSessions({
     loading: pagedSidebarLoading,
     loadingMore: pagedSidebarLoadingMore,
     hasMore: pagedSidebarHasMore,
+    hasLoadedOnce: pagedSidebarLoadedOnce,
     loadMore: loadMoreSidebarSessions,
     refresh: refreshSidebarSessions,
   } = usePaginatedSessions({
@@ -172,6 +173,12 @@ export function useSidebarSessions({
       return;
     }
 
+    if (!pagedSidebarLoadedOnce) {
+      latestSessionsRef.current = sessions;
+      latestSessionTagsRef.current = sessionTags;
+      return;
+    }
+
     const sessionsChanged = latestSessionsRef.current !== sessions;
     const sessionTagsChanged = latestSessionTagsRef.current !== sessionTags;
 
@@ -186,7 +193,13 @@ export function useSidebarSessions({
       silent: true,
       preserveCount: true,
     });
-  }, [shouldEnablePagedSidebar, refreshSidebarSessions, sessions, sessionTags]);
+  }, [
+    shouldEnablePagedSidebar,
+    pagedSidebarLoadedOnce,
+    refreshSidebarSessions,
+    sessions,
+    sessionTags,
+  ]);
 
   const selectedProjectSummary = useMemo(() => {
     if (!selectedProject) {
@@ -245,7 +258,7 @@ export function useSidebarSessions({
   return {
     filteredSessions,
     sidebarSessions: pagedSidebarSessions,
-    sidebarLoading: loading || pagedSidebarLoading,
+    sidebarLoading: shouldEnablePagedSidebar ? pagedSidebarLoading : loading,
     sidebarLoadingMore: pagedSidebarLoadingMore,
     sidebarHasMore: pagedSidebarHasMore,
     loadMoreSidebarSessions,

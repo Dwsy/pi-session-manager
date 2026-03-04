@@ -29,6 +29,7 @@ interface UsePaginatedSessionsReturn {
   loading: boolean
   loadingMore: boolean
   hasMore: boolean
+  hasLoadedOnce: boolean
   refresh: (options?: RefreshOptions) => Promise<void>
   loadMore: () => Promise<void>
 }
@@ -44,6 +45,89 @@ interface RequestPageOptions {
   limit?: number
 }
 
+function isSameSessionInfo(left: SessionInfo, right: SessionInfo): boolean {
+  return (
+    left.id === right.id &&
+    left.path === right.path &&
+    left.cwd === right.cwd &&
+    left.name === right.name &&
+    left.isDraft === right.isDraft &&
+    left.created === right.created &&
+    left.modified === right.modified &&
+    left.message_count === right.message_count &&
+    left.first_message === right.first_message &&
+    left.last_message === right.last_message &&
+    left.last_message_role === right.last_message_role &&
+    left.isFavorite === right.isFavorite
+  )
+}
+
+function mergePaginatedSessions(
+  prev: SessionInfo[],
+  incoming: SessionInfo[],
+  append: boolean,
+): SessionInfo[] {
+  // Reuse previous references whenever possible to avoid unnecessary list re-renders.
+  if (append) {
+    if (incoming.length === 0) {
+      return prev
+    }
+
+    const next = [...prev]
+    const indexByPath = new Map<string, number>()
+
+    for (let i = 0; i < next.length; i += 1) {
+      indexByPath.set(next[i].path, i)
+    }
+
+    let changed = false
+    for (const session of incoming) {
+      const existingIndex = indexByPath.get(session.path)
+      if (existingIndex === undefined) {
+        indexByPath.set(session.path, next.length)
+        next.push(session)
+        changed = true
+        continue
+      }
+
+      const existing = next[existingIndex]
+      if (!isSameSessionInfo(existing, session)) {
+        next[existingIndex] = session
+        changed = true
+      }
+    }
+
+    return changed ? next : prev
+  }
+
+  if (prev.length === 0 && incoming.length === 0) {
+    return prev
+  }
+
+  const prevByPath = new Map(prev.map((session) => [session.path, session]))
+  let changed = prev.length !== incoming.length
+
+  const next = incoming.map((session) => {
+    const existing = prevByPath.get(session.path)
+    if (existing && isSameSessionInfo(existing, session)) {
+      return existing
+    }
+    changed = true
+    return session
+  })
+
+  if (!changed) {
+    for (let i = 0; i < next.length; i += 1) {
+      if (next[i] !== prev[i]) {
+        changed = true
+        break
+      }
+    }
+  }
+
+  return changed ? next : prev
+}
+
 export function usePaginatedSessions({
   enabled = true,
   pageSize = DEFAULT_PAGE_SIZE,
@@ -57,9 +141,12 @@ export function usePaginatedSessions({
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
 
   const requestIdRef = useRef(0)
+  const latestForegroundRequestIdRef = useRef(0)
   const sessionsRef = useRef<SessionInfo[]>([])
+  const inFlightRequestKeysRef = useRef(new Set<string>())
 
   useEffect(() => {
     sessionsRef.current = sessions
@@ -85,9 +172,25 @@ export function usePaginatedSessions({
       }
 
       const { append, silent = false, limit = pageSize } = options
+      const requestKey = [
+        offset,
+        limit,
+        append ? 'append' : 'replace',
+        normalizedSearchQuery || '__empty__',
+        normalizedProjectFilter || '__all__',
+        normalizedSortBy,
+        normalizedTagIds.join(',') || '__no_tags__',
+      ].join('|')
+
+      if (inFlightRequestKeysRef.current.has(requestKey)) {
+        return
+      }
+
+      inFlightRequestKeysRef.current.add(requestKey)
       const requestId = ++requestIdRef.current
 
       if (!silent) {
+        latestForegroundRequestIdRef.current = requestId
         if (append) {
           setLoadingMore(true)
         } else {
@@ -114,30 +217,29 @@ export function usePaginatedSessions({
         }
 
         setSessions((prev) =>
-          append ? [...prev, ...response.sessions] : response.sessions,
+          mergePaginatedSessions(prev, response.sessions, append),
         )
         setTotal(response.total)
         setHasMore(response.has_more)
+        setHasLoadedOnce(true)
       } catch (error) {
         if (requestId !== requestIdRef.current) {
           return
         }
 
         console.error('[usePaginatedSessions] Failed to load paginated sessions:', error)
+        setHasLoadedOnce(true)
         if (!append && !silent) {
-          setSessions([])
+          setSessions((prev) => (prev.length === 0 ? prev : []))
           setTotal(0)
           setHasMore(false)
         }
       } finally {
-        if (requestId !== requestIdRef.current) {
-          return
-        }
-
-        if (!silent) {
+        if (!silent && requestId === latestForegroundRequestIdRef.current) {
           setLoading(false)
           setLoadingMore(false)
         }
+        inFlightRequestKeysRef.current.delete(requestKey)
       }
     },
     [
@@ -181,6 +283,7 @@ export function usePaginatedSessions({
       setSessions([])
       setTotal(0)
       setHasMore(false)
+      setHasLoadedOnce(false)
       setLoading(false)
       setLoadingMore(false)
       return
@@ -195,6 +298,7 @@ export function usePaginatedSessions({
     loading,
     loadingMore,
     hasMore,
+    hasLoadedOnce,
     refresh,
     loadMore,
   }

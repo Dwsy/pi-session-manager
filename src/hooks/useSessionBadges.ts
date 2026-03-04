@@ -9,7 +9,10 @@ interface BadgeState {
  * Badge state management hook
  * Tracks new and updated sessions since app startup
  */
-export function useSessionBadges(sessions: SessionInfo[]) {
+export function useSessionBadges(
+  sessions: SessionInfo[],
+  activeSessionId: string | null = null,
+) {
   const [badgeStates, setBadgeStates] = useState<Record<string, BadgeState>>({})
   const baselineRef = useRef<Map<string, SessionInfo> | null>(null)
   const previousSessionsRef = useRef<Map<string, SessionInfo>>(new Map())
@@ -40,12 +43,16 @@ export function useSessionBadges(sessions: SessionInfo[]) {
 
       if (!baselineSession) {
         newBadges[session.id] = { type: 'new' }
-      } else if (prevSession && session.message_count > prevSession.message_count) {
+      } else if (
+        prevSession &&
+        session.message_count > prevSession.message_count &&
+        session.id !== activeSessionId
+      ) {
         newBadges[session.id] = { type: 'updated' }
       }
     }
 
-    if (Object.keys(newBadges).length > 0) {
+    if (Object.keys(newBadges).length > 0 || activeSessionId) {
       setBadgeStates(prev => {
         let changed = false
         const next = { ...prev }
@@ -58,6 +65,11 @@ export function useSessionBadges(sessions: SessionInfo[]) {
           changed = true
         }
 
+        if (activeSessionId && next[activeSessionId]?.type === 'updated') {
+          delete next[activeSessionId]
+          changed = true
+        }
+
         return changed ? next : prev
       })
     }
@@ -67,7 +79,7 @@ export function useSessionBadges(sessions: SessionInfo[]) {
       newPreviousSessions.set(session.id, session)
     }
     previousSessionsRef.current = newPreviousSessions
-  }, [sessions])
+  }, [activeSessionId, sessions])
 
   const clearBadge = useCallback((sessionId: string) => {
     setBadgeStates(prev => {

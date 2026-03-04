@@ -103,7 +103,10 @@ function App() {
 
   const { terminal, piPath, customCommand, loadSettings } = useAppSettings();
   const { handleExportSession } = useSessionActions();
-  const { getBadgeType, clearBadge } = useSessionBadges(sessions);
+  const { getBadgeType, clearBadge } = useSessionBadges(
+    sessions,
+    selectedSession?.id ?? null,
+  );
   const {
     tags,
     sessionTags,

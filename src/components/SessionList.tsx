@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
@@ -18,7 +18,8 @@ import { getPlatformDefaults } from "./settings/types";
 import { invoke, isTauri } from "../transport";
 import { useIsMobile } from "../hooks/useIsMobile";
 
-const LOAD_BATCH_SIZE = 100;
+const ESTIMATED_ROW_HEIGHT = 122;
+const STICKY_SCROLL_TOP_THRESHOLD = 48;
 
 interface SessionListProps {
   sessions: SessionInfo[];
@@ -74,7 +75,7 @@ export default function SessionList({
 }: SessionListProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  const masonryContainerRef = useRef<HTMLDivElement>(null);
+  const listContainerRef = useRef<HTMLDivElement>(null);
   const [columnCount, setColumnCount] = useState(1);
   const [tagPickerSessionId, setTagPickerSessionId] = useState<string | null>(
     null,
@@ -89,6 +90,10 @@ export default function SessionList({
     y: number;
     sessionId: string;
   } | null>(null);
+  const scrollAnchorRef = useRef<{
+    sessionId: string;
+    top: number;
+  } | null>(null);
   const favoriteSessionIds = useMemo(
     () =>
       new Set(
@@ -102,7 +107,7 @@ export default function SessionList({
     () => new Map(sessions.map((session) => [session.id, session] as const)),
     [sessions],
   );
-  const totalBatches = Math.ceil(sessions.length / LOAD_BATCH_SIZE);
+  const totalRows = Math.ceil(sessions.length / Math.max(1, columnCount));
   const tagPickerSessionTags = useMemo(() => {
     if (!tagPickerSessionId || !getTagsForSession) {
       return [] as Tag[];
@@ -128,10 +133,10 @@ export default function SessionList({
   const allSessionsSelected =
     sessions.length > 0 && selectedSessionIds.size === sessions.length;
   const rowVirtualizer = useVirtualizer({
-    count: totalBatches,
+    count: totalRows,
     getScrollElement: () => scrollParentRef?.current ?? null,
-    estimateSize: () => Math.ceil(LOAD_BATCH_SIZE / Math.max(1, columnCount)) * 94,
-    overscan: 2,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: 4,
   });
 
   useEffect(() => {
@@ -140,7 +145,7 @@ export default function SessionList({
       return;
     }
 
-    const container = masonryContainerRef.current;
+    const container = listContainerRef.current;
     if (!container) {
       return;
     }
@@ -170,8 +175,71 @@ export default function SessionList({
 
   useEffect(() => {
     rowVirtualizer.measure();
-  }, [columnCount, rowVirtualizer, sessions.length]);
+  }, [columnCount, isSelectionMode, rowVirtualizer, sessions.length, showDirectory]);
   const virtualRows = rowVirtualizer.getVirtualItems();
+
+  useLayoutEffect(() => {
+    // Keep the first visible card visually anchored across incremental refreshes.
+    const scrollElement = scrollParentRef?.current;
+    const anchor = scrollAnchorRef.current;
+
+    if (
+      scrollElement &&
+      anchor &&
+      scrollElement.scrollTop > STICKY_SCROLL_TOP_THRESHOLD
+    ) {
+      const renderedCards = scrollElement.querySelectorAll<HTMLElement>(
+        "[data-session-id]",
+      );
+      const anchorElement = Array.from(renderedCards).find(
+        (element) => element.dataset.sessionId === anchor.sessionId,
+      );
+
+      if (anchorElement) {
+        const delta = anchorElement.getBoundingClientRect().top - anchor.top;
+        if (Math.abs(delta) > 0.5) {
+          scrollElement.scrollTop += delta;
+        }
+      }
+    }
+
+    scrollAnchorRef.current = null;
+
+    return () => {
+      const container = scrollParentRef?.current;
+      if (
+        !container ||
+        container.scrollTop <= STICKY_SCROLL_TOP_THRESHOLD
+      ) {
+        scrollAnchorRef.current = null;
+        return;
+      }
+
+      const containerTop = container.getBoundingClientRect().top;
+      const renderedCards =
+        container.querySelectorAll<HTMLElement>("[data-session-id]");
+      let firstVisibleCard: HTMLElement | null = null;
+
+      for (const card of renderedCards) {
+        const rect = card.getBoundingClientRect();
+        if (rect.bottom >= containerTop + 1) {
+          firstVisibleCard = card;
+          break;
+        }
+      }
+
+      const sessionId = firstVisibleCard?.dataset.sessionId;
+      if (!sessionId || !firstVisibleCard) {
+        scrollAnchorRef.current = null;
+        return;
+      }
+
+      scrollAnchorRef.current = {
+        sessionId,
+        top: firstVisibleCard.getBoundingClientRect().top,
+      };
+    };
+  }, [sessions, scrollParentRef]);
 
   useEffect(() => {
     setSelectedSessionIds((prev) => {
@@ -213,7 +281,7 @@ export default function SessionList({
   }, [isSelectionMode]);
 
   useEffect(() => {
-    if (!hasMore || !onLoadMore || loadingMore || totalBatches === 0) {
+    if (!hasMore || !onLoadMore || loadingMore || totalRows === 0) {
       return;
     }
 
@@ -222,11 +290,11 @@ export default function SessionList({
       return;
     }
 
-    const prefetchThreshold = Math.max(0, totalBatches - 2);
+    const prefetchThreshold = Math.max(0, totalRows - 2);
     if (lastVisibleRow.index >= prefetchThreshold) {
       void onLoadMore();
     }
-  }, [hasMore, loadingMore, onLoadMore, totalBatches, virtualRows]);
+  }, [hasMore, loadingMore, onLoadMore, totalRows, virtualRows]);
 
   if (loading) {
     return <SessionListSkeleton showDirectory={showDirectory} />;
@@ -314,17 +382,14 @@ export default function SessionList({
         </div>
       )}
 
-      <div ref={masonryContainerRef} className="relative w-full">
+      <div ref={listContainerRef} className="relative w-full">
         <div
           className="relative w-full"
           style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
         >
           {virtualRows.map((virtualRow) => {
-            const startIndex = virtualRow.index * LOAD_BATCH_SIZE;
-            const batchSessions = sessions.slice(
-              startIndex,
-              startIndex + LOAD_BATCH_SIZE,
-            );
+            const startIndex = virtualRow.index * columnCount;
+            const rowSessions = sessions.slice(startIndex, startIndex + columnCount);
 
             return (
               <div
@@ -340,10 +405,12 @@ export default function SessionList({
                 }}
               >
                 <div
-                  className="px-2 py-2 motion-opacity"
-                  style={{ columnCount, columnGap: "10px" }}
+                  className="grid px-2 py-1.5 gap-2.5"
+                  style={{
+                    gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+                  }}
                 >
-                  {batchSessions.map((session) => {
+                  {rowSessions.map((session) => {
                     const isFavorite = favoriteSessionIds.has(session.id);
                     const updatedLabel = formatShortTime(session.modified, t);
                     const isSelected = isSelectionMode
@@ -360,6 +427,7 @@ export default function SessionList({
                     return (
                       <div
                         key={session.id}
+                        data-session-id={session.id}
                         onClick={() => {
                           if (isSelectionMode) {
                             setSelectedSessionIds((prev) => {
@@ -387,11 +455,12 @@ export default function SessionList({
                             sessionId: session.id,
                           });
                         }}
-                        className={`relative mb-2 break-inside-avoid px-3 py-2.5 cursor-pointer motion-surface motion-color group rounded-lg border ${
+                        className={`relative px-3 py-2.5 cursor-pointer motion-surface motion-color group rounded-lg border ${
                           isSelected
                             ? "border-transparent bg-surface/60"
                             : "border-transparent hover:bg-surface/60"
                         }`}
+                        style={{ contain: "layout paint" }}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <div className="flex items-start gap-2 flex-1 min-w-0">
