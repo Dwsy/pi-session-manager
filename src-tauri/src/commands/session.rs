@@ -1175,7 +1175,7 @@ fn try_launch_known_terminal(
     #[cfg(target_os = "macos")]
     {
         let resume_cmd = build_unix_resume_command(cwd, path, pi_cmd);
-        return match terminal_id {
+        match terminal_id {
             "iterm2" => {
                 if !macos_app_exists("iTerm") {
                     return Ok(false);
@@ -1268,14 +1268,14 @@ end tell"#,
                 Ok(true)
             }
             _ => Ok(false),
-        };
+        }
     }
 
     #[cfg(target_os = "windows")]
     {
         let cmd_resume = build_windows_cmd_resume_command(cwd, path, pi_cmd);
         let ps_resume = build_windows_powershell_resume_command(cwd, path, pi_cmd);
-        return match terminal_id {
+        match terminal_id {
             "windows-terminal" => {
                 if !command_exists("wt") {
                     return Ok(false);
@@ -1341,13 +1341,13 @@ end tell"#,
                 Ok(true)
             }
             _ => Ok(false),
-        };
+        }
     }
 
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
     {
         let resume_cmd = build_unix_resume_command(cwd, path, pi_cmd);
-        return match terminal_id {
+        match terminal_id {
             "gnome-terminal" => {
                 if !command_exists("gnome-terminal") {
                     return Ok(false);
@@ -1529,7 +1529,7 @@ end tell"#,
                 Ok(true)
             }
             _ => Ok(false),
-        };
+        }
     }
 }
 
