@@ -6,6 +6,12 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Fixed
 
+- **Mobile Outline layering and overlap regression**: fixed severe header/toolbar overlap when opening Outline in Session Viewer
+  - Root cause: mobile sidebar used absolute positioning in the same stacking context as the main toolbar, causing top-area content collisions after toolbar height/layout updates
+  - Mobile Outline now renders as a true left side drawer (`fixed`, constrained width) with dedicated overlay and independent header/close controls
+  - Opening Outline now closes the mobile "More actions" sheet first to avoid multi-layer interaction conflicts
+  - Result: no more duplicated top bars, clipped filters, or unreadable stacked controls in mobile session view
+
 - **External terminal launch is now production-usable across macOS/Linux/Windows** — replaced hardcoded launcher paths with runtime availability detection and fallback chaining
   - `open_session_in_terminal` now validates session file existence, resolves invalid `cwd` to a safe fallback directory, and reports detailed per-attempt failures
   - Added platform-specific installed-terminal probing and ordered fallback attempts (user-selected terminal first, then known available candidates)
@@ -38,6 +44,12 @@ All notable changes to Pi Session Manager will be documented in this file.
   - Reverted an over-aggressive “skip measure while scrolling” optimization that caused text overlap artifacts under fast scroll
 
 ### Changed
+
+- **Session Viewer mobile toolbar UX and readability refresh**
+  - Reworked mobile top actions into clear primary controls (Outline / Thinking / More) with larger touch targets and stronger visual hierarchy
+  - Thinking toggle icon semantics updated from eye visibility metaphor to brain thinking metaphor for clearer intent
+  - Improved active/inactive state contrast and consistency across mobile and desktop toolbar buttons
+  - Upgraded mobile more-actions panel readability with clearer grouping and action rows
 
 - **Atomic commit sync (latest)** — synchronized changelog entries for recent backend and frontend refactors
   - Backend: added paginated session scanning (`scan_sessions_paginated`) with offset/limit, query, project, and tag filters
