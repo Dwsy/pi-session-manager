@@ -181,10 +181,10 @@ A: 目前不支持多关键词搜索，但可以搜索包含空格的短语。
 如果你在使用搜索功能时遇到问题或有改进建议，请：
 
 1. 查看详细文档: `SEARCH_FEATURE.md`
-2. 运行测试脚本: `./test-search.sh`
+2. 运行测试脚本: `node ./scripts/test-search.mjs`
 3. 提交 Issue 或 Pull Request
 
 ## 相关文档
 
 - [SEARCH_FEATURE.md](SEARCH_FEATURE.md) - 完整的技术文档
-- [test-search.sh](test-search.sh) - 功能测试脚本
+- [test-search.mjs](../scripts/test-search.mjs) - 功能测试脚本

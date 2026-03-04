@@ -9,6 +9,30 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 ## 未发布
 
+### Windows 适配与脚本跨平台化
+- 前后端补强 Windows 兼容性：
+  - 路径分隔符统一支持 `/` 与 `\`（会话树、看板/仪表板项目显示、搜索插件等）
+  - 项目过滤和路径匹配支持 Windows 大小写不敏感语义
+  - 终端检测支持 PATH/PATHEXT 下的 `powershell.exe` / `pwsh.exe` / `cmd.exe` / `bash.exe`
+  - 导出命令支持 `pi` / `pi.cmd` / `pi.exe` 的跨平台查找
+- 构建与测试脚本全面去 Bash：
+  - 仓库内 `.sh` 脚本全部迁移为 `.mjs`
+  - 新增 `scripts/script-utils.mjs` 统一脚本工具能力
+  - 文档站后处理脚本迁移为 `website/scripts/postbuild.mjs`
+  - `build:cli` 保持 Node 跨平台入口（`scripts/build-cli.mjs`）
+
+### 更新检查
+- 新增基于 GitHub Releases 的更新检测流程
+- 默认每天自动检测一次（无干扰）
+- 新增 **设置 → 更新**，支持手动“立即检查更新”
+- 新增右下角可关闭更新提示弹窗
+- 新增更新说明弹窗，支持 Markdown 渲染
+
+### 版本来源准确性
+- 更新比较使用的应用版本改为构建期注入的 `__APP_VERSION__`
+- 构建优先从 CI/tag 上下文与 `git tag --points-at HEAD` 获取版本，并提供 package 版本兜底
+- 避免源码 `package.json` 与实际发布 tag 不一致导致的误报
+
 ### 会话视图滚动性能与稳定性
 - 将虚拟滚动状态更新下沉到消息面板，避免滚动时触发父层级频繁重渲染
 - 重构后通过 ref 桥接保留工具栏滚动能力（`scrollToTop` / `scrollToBottom`）

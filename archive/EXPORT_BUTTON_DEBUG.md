@@ -142,7 +142,7 @@ export default function ExportDialog({ session, onExport, onClose }: ExportDialo
 运行完整测试：
 
 ```bash
-./test-export-full.sh
+node ./scripts/test-export-full.mjs
 ```
 
 ## 相关文件

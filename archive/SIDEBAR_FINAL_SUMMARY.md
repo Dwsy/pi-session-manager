@@ -119,8 +119,8 @@ SIDEBAR_FINAL_SUMMARY.md              # 本文档
 
 ### 测试脚本
 ```
-test-sidebar.sh                       # 基础测试
-test-fixes.sh                         # 修复测试
+test-sidebar.mjs                      # 基础测试
+test-fixes.mjs                        # 修复测试
 ```
 
 ## 使用指南

@@ -160,7 +160,7 @@ useFileWatcher({
 
 ### 自动化测试
 ```bash
-./test-file-watcher.sh
+node ./scripts/test-file-watcher.mjs
 ```
 
 ### 手动测试

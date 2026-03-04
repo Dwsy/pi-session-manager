@@ -131,7 +131,7 @@
 ### Quick Test
 ```bash
 # Run all subagent cost tests
-./scripts/test-subagent-cost.sh
+node ./scripts/test-subagent-cost.mjs
 ```
 
 ### Individual Test Commands

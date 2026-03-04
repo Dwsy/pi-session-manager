@@ -4,6 +4,39 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Platform & Tooling
+
+- **Windows compatibility hardening (frontend + backend)**
+  - Unified path-separator handling (`/` and `\`) in key UI surfaces (dashboard, session tree/tool labels, search plugins, command surfaces)
+  - Improved Rust-side path normalization for project/session matching, including Windows case-insensitive matching behavior
+  - Expanded Windows shell detection to support PATH/PATHEXT discovery (`powershell.exe`, `pwsh.exe`, `cmd.exe`, `bash.exe`)
+  - Updated export command resolution to support `pi`/`pi.cmd`/`pi.exe` discovery without Unix-only assumptions
+  - Updated CLI build command flow to cross-platform Node entry (`npm run build:cli` -> `scripts/build-cli.mjs`)
+- **Cross-platform script runtime (`.mjs`)**
+  - Added shared helper module `scripts/script-utils.mjs` for command execution, file checks, path handling, and cross-platform open behavior
+  - Replaced former `scripts/*.sh` and `website/scripts/postbuild.sh` with Node-based `.mjs` scripts
+
+### Added
+
+- **GitHub Releases update checker** — added a built-in update detection flow based on repository releases
+  - Automatic check runs once per day by default (non-intrusive)
+  - New **Settings → Updates** section supports manual "Check Now"
+  - New bottom-right update toast can be dismissed per version to avoid repeated interruption
+  - Release notes now support Markdown rendering in a dedicated modal opened from the toast
+- **Demo mock full-capability data engine** — expanded demo mode to support end-to-end realistic rendering flows
+  - Refactored demo data into modular providers under `src/demo/*` (`seed`, `content`, `search`, `stats`, `store`, `mode`, `types`)
+  - Demo mode now drives paginated sessions, session chunk reads, favorites/tags operations, search/FTS, and dashboard/day stats without backend dependency
+  - Added render-ready JSONL conversation coverage for specialized tool cards (`bash`, `read`, `write`, `edit`, `subagent`) in addition to generic tool calls
+  - Added tool-result payload variants required by UI branches (e.g. `exitCode`, image content for `read`, and `diff/details.diff` for `edit`)
+  - Added kanban/tag mappings for new demo sessions to keep board rendering coherent with list/search/detail views
+
+### Changed
+
+- **App version source for update comparison** — switched from runtime `package.json` reads to build-time injected version
+  - Vite now injects `__APP_VERSION__` at build time
+  - Version resolution prefers CI/tag context and `git tag --points-at HEAD`, then falls back to package version
+  - Prevents false update prompts caused by source `package.json` version drifting from release tag
+
 ### Fixed
 
 - **Mobile Outline layering and overlap regression**: fixed severe header/toolbar overlap when opening Outline in Session Viewer

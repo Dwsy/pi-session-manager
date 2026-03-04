@@ -141,7 +141,7 @@ npm run tauri:build
 ### CLI 构建
 ```bash
 npm run build:cli
-# 实际执行 scripts/build-cli.sh：先前端 build，再 cargo build -p pi-session-cli
+# 实际执行 scripts/build-cli.mjs：先前端 build，再 cargo build -p pi-session-cli
 ```
 
 > 注意：仓库脚本既有 npm 也有 pnpm；CI 使用 pnpm（`pnpm install --frozen-lockfile`）。
@@ -195,7 +195,7 @@ cd src-tauri && cargo test
 - `file_watcher.rs`：监听会话目录变化，触发增量重扫并广播 `sessions-changed`
 - `write_buffer.rs` + 定时 flush：减少数据库写压力
 - `sqlite_cache.rs`：
-  - 建表、索引、schema migration（当前 `LATEST_SCHEMA_VERSION = 2`）
+  - 建表、索引、schema migration（当前 `LATEST_SCHEMA_VERSION = 3`）
   - 损坏恢复（备份后重建）
 
 ## 6.4 网络服务端口（代码默认）

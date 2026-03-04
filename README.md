@@ -40,7 +40,7 @@
 - **Built-in Terminal** — xterm.js + PTY backend (`Cmd/Ctrl+J`)
 - **Dashboard** — Activity heatmap, project distribution, model usage, token consumption stats
 - **Skill Management** — Scan and manage `~/.pi/agent/skills` and prompts, system prompt editor
-- **Multi-Protocol API** — Tauri IPC + WebSocket (`ws://:52130`) + HTTP (`http://:52131`)
+- **Multi-Protocol API** — Desktop defaults: WebSocket (`ws://127.0.0.1:52130`) + HTTP (`http://127.0.0.1:52131/api`); `pi-session-cli` serves HTTP + WebSocket (`/ws`) on one port (`52131` by default)
 - **CLI Mode** — Headless backend service (`--cli` / `--headless`)
 
 ---
@@ -68,12 +68,35 @@ Get the latest version from [**Releases**](../../releases):
 ./pi-session-manager
 ```
 
-### Server Mode
+### Server Mode (`pi-session-manager --cli`)
 
 ```bash
 ./pi-session-manager --cli
-# Access http://localhost:52131
+# defaults: WS=52130, HTTP=52131
+
+# custom HTTP host/port (WS still uses configured ws_port, default 52130)
+./pi-session-manager --cli -p 18080 -b 0.0.0.0
+# Access UI at http://localhost:18080
 ```
+
+### Standalone CLI Binary (`pi-session-cli`)
+
+```bash
+./pi-session-cli
+# single-port server: HTTP + WebSocket (/ws) on 52131 by default
+./pi-session-cli -p 18080 -b 0.0.0.0
+```
+
+CLI flags (`pi-session-manager --cli`):
+- `-h`, `--help`: show help
+- `-p`, `--port <PORT>`: set HTTP port only
+- `-b`, `--bind <ADDR>`: set bind address
+- `--auth` / `--no-auth`: temporarily enable/disable auth (CLI overrides config)
+- `--token <TOKEN>`: runtime-only token for current process (not persisted, overrides DB tokens)
+
+`pi-session-cli` also supports `-p`, but there it controls the single shared HTTP+WS port (`/ws`).
+
+Default behavior: auth is enabled in CLI mode; loopback (`localhost`/`127.0.0.1`) is exempt, non-loopback requests require a token.
 
 ### Build from Source
 

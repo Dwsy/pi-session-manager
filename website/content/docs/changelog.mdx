@@ -9,6 +9,30 @@ For the full changelog, see [CHANGELOG.md on GitHub](https://github.com/Dwsy/pi-
 
 ## Unreleased
 
+### Windows Compatibility & Cross-Platform Scripts
+- Strengthened Windows support across frontend and backend:
+  - Path separator handling now consistently supports both `/` and `\` (session tree labels, dashboard/kanban project views, search plugins)
+  - Project/path matching now aligns with Windows case-insensitive behavior where needed
+  - Shell discovery now supports PATH/PATHEXT candidates (`powershell.exe`, `pwsh.exe`, `cmd.exe`, `bash.exe`)
+  - Export command resolution supports cross-platform `pi` / `pi.cmd` / `pi.exe` lookup
+- Migrated repository scripts away from Bash:
+  - All former `.sh` scripts replaced by `.mjs` equivalents
+  - Added shared script helper `scripts/script-utils.mjs`
+  - Website postbuild script migrated to `website/scripts/postbuild.mjs`
+  - `build:cli` remains a Node-based cross-platform entry (`scripts/build-cli.mjs`)
+
+### Update Checker
+- Added GitHub Releases-based update detection flow
+- Default behavior: auto-check once per day (non-intrusive)
+- Added **Settings → Updates** with manual **Check Now**
+- Added dismissible bottom-right update toast
+- Added release-notes modal with Markdown rendering
+
+### Version Source Accuracy
+- App version used for update comparison now comes from build-time injected `__APP_VERSION__`
+- Build resolves version from CI/tag context and `git tag --points-at HEAD` first, with package version fallback
+- This avoids mismatches between source `package.json` and actual release tags
+
 ### Session Viewer Scroll Performance & Stability
 - Moved virtual-scroll state updates into the message panel to avoid parent-level re-renders during scroll
 - Kept toolbar scroll actions with a ref bridge (`scrollToTop` / `scrollToBottom`) after refactor

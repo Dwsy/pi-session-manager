@@ -56,7 +56,7 @@
 
 ```
 src-tauri/tests/subagent_cost_test.rs    # 集成测试（14KB, 8 个测试）
-scripts/test-subagent-cost.sh            # 测试运行脚本
+scripts/test-subagent-cost.mjs           # 测试运行脚本
 docs/pr/SUBAGENT_COST_TESTS.md           # 测试报告文档
 ```
 
@@ -66,7 +66,7 @@ docs/pr/SUBAGENT_COST_TESTS.md           # 测试报告文档
 
 ### 快速运行
 ```bash
-./scripts/test-subagent-cost.sh
+node ./scripts/test-subagent-cost.mjs
 ```
 
 ### 单独运行

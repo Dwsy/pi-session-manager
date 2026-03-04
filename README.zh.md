@@ -50,7 +50,7 @@
 - **Web 访问** — 通过 HTTP 提供嵌入式前端，可从任何浏览器或移动设备访问
 - **主题** — 深色/浅色/系统，通过 CSS 自定义属性完全可定制
 - **国际化** — 英文和简体中文
-- **多协议 API** — Tauri IPC + WebSocket (`ws://:52130`) + HTTP (`http://:52131`)
+- **多协议 API** — 桌面端默认 WebSocket (`ws://127.0.0.1:52130`) + HTTP (`http://127.0.0.1:52131/api`)；`pi-session-cli` 默认单端口提供 HTTP + WebSocket (`/ws`)
 - **CLI 模式** — 通过 `--cli` / `--headless` 运行无头后端服务
 - **移动端优化** — 触摸友好的 UI，手机端底部导航栏
 
@@ -92,7 +92,7 @@
 
 三种协议共享同一个命令路由器 —— `dispatch()`。添加新命令只需在 Rust 中添加一个 `match` 分支；WebSocket 和 HTTP 自动继承。
 
-HTTP 服务器通过 `rust-embed` 嵌入前端，因此打包后的二进制文件在 `http://localhost:52131` 提供完整的 UI —— 无需外部 `dist/` 目录。前端自动检测运行环境并在以下模式间切换：
+HTTP 服务器通过 `rust-embed` 嵌入前端。在 CLI 模式（`--cli`/`--headless`）或独立 `pi-session-cli` 运行时，可通过 `http://localhost:<http_port>` 提供完整 UI —— 无需外部 `dist/` 目录。前端自动检测运行环境并在以下模式间切换：
 - **Tauri IPC** — 桌面应用运行时 (window.__TAURI__ 可用)
 - **WebSocket/HTTP** — 浏览器或移动端运行时
 
@@ -182,7 +182,7 @@ npm run tauri:build      # 生产构建
 ./pi-session-manager
 ```
 
-### 服务器 (CLI / 无头模式)
+### 服务器 (CLI / 无头模式，`pi-session-manager --cli`)
 
 作为后端服务运行，暴露 WebSocket + HTTP API，可从网络上任何设备访问：
 
@@ -190,13 +190,37 @@ npm run tauri:build      # 生产构建
 ./pi-session-manager --cli
 # 或
 ./pi-session-manager --headless
+
+# 默认：WS=52130，HTTP=52131
+
+# 指定 HTTP 端口与监听地址（WS 仍使用 ws_port，默认 52130）
+./pi-session-manager --cli -p 18080 -b 0.0.0.0
 ```
 
-然后在任何浏览器中打开 `http://localhost:52131`，或连接移动应用。
+然后在任何浏览器中打开 `http://localhost:<http_port>`，或连接移动应用。
+
+### 独立 CLI 二进制 (`pi-session-cli`)
+
+```bash
+./pi-session-cli
+# 默认单端口：HTTP + WebSocket(/ws) 在 52131
+./pi-session-cli -p 18080 -b 0.0.0.0
+```
+
+`pi-session-manager --cli` 支持的参数：
+- `-h`, `--help`：显示帮助
+- `-p`, `--port <PORT>`：设置 HTTP 端口
+- `-b`, `--bind <ADDR>`：设置监听地址
+- `--auth` / `--no-auth`：临时开启/关闭鉴权（命令行优先级高于配置）
+- `--token <TOKEN>`：仅本次进程有效的临时 token（不写入数据库，且优先覆盖数据库 token）
+
+`pi-session-cli` 也支持 `-p`，但该参数控制单端口 HTTP+WebSocket（`/ws`）。
+
+默认行为：CLI 下默认开启鉴权；仅 `localhost/127.0.0.1` 回环地址免 token，其他来源都需要 token。
 
 ### Web / 移动端访问
 
-应用运行时 (GUI 或 CLI 模式) 在任何浏览器中打开 `http://localhost:52131`。前端功能：
+CLI 模式下，可在任何浏览器中打开 `http://localhost:<http_port>`。前端功能：
 - 自动检测移动设备并显示触摸优化界面
 - 手机端使用底部导航栏
 - 支持平板响应式布局
@@ -214,6 +238,8 @@ curl -s -X POST http://127.0.0.1:52131/api \
 wscat -c ws://127.0.0.1:52130
 > {"command":"scan_sessions","payload":{}}
 ```
+
+`pi-session-cli` 使用同端口 WebSocket 路径：`ws://127.0.0.1:52131/ws`（端口随 `-p` 变化）。
 
 ---
 

@@ -52,7 +52,7 @@
 
 ### 自动化测试
 ```bash
-./test-dashboard-optimization.sh
+node ./scripts/test-dashboard-optimization.mjs
 ```
 
 **结果**：
@@ -77,7 +77,7 @@
 
 ### 新增的文档
 - `docs/pr/20260131-dashboard-performance-optimization.md` - 详细优化文档
-- `test-dashboard-optimization.sh` - 自动化测试脚本
+- `test-dashboard-optimization.mjs` - 自动化测试脚本
 - `test-dashboard-performance.md` - 性能测试指南
 
 ## 🎯 技术亮点

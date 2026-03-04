@@ -211,7 +211,7 @@ const handleSelectSession = useCallback((session: SessionInfo) => {
 
 ### 自动化测试
 ```bash
-./test-badge-functionality.sh
+node ./scripts/test-badge-functionality.mjs
 ```
 
 ### 手动测试
@@ -238,7 +238,7 @@ const handleSelectSession = useCallback((session: SessionInfo) => {
 ### 新增文件
 - `src/hooks/useSessionBadges.ts` - Badge 状态管理 Hook
 - `src/components/SessionBadge.tsx` - Badge 组件
-- `test-badge-functionality.sh` - 测试脚本
+- `test-badge-functionality.mjs` - 测试脚本
 
 ### 修改文件
 - `src/App.tsx` - 集成 Badge 管理

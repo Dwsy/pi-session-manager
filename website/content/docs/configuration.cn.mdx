@@ -80,27 +80,46 @@ curl -X POST http://127.0.0.1:52131/api \
 
 ## 服务器配置
 
-CLI/无头模式下，在 `~/.config/pi-session-manager.json` 中配置服务器：
+Pi Session Manager 目前有两套服务配置模型：
+
+### 桌面应用 / `pi-session-manager --cli`
+
+在 **设置 → 高级** 中配置（持久化在数据库键 `server_settings`）：
 
 ```json
 {
   "ws_enabled": true,
+  "ws_port": 52130,
   "http_enabled": true,
-  "ws_port": 52131,
   "http_port": 52131,
   "bind_addr": "127.0.0.1",
-  "auth_enabled": false
+  "auth_enabled": true
 }
 ```
 
 | 字段 | 默认值 | 说明 |
 |------|--------|------|
-| `ws_enabled` | `true` | 启用 WebSocket 服务器 |
-| `http_enabled` | `true` | 启用 HTTP 服务器 |
-| `ws_port` | `52131` | WebSocket 端口（与 HTTP 共享） |
-| `http_port` | `52131` | HTTP 端口 |
+| `ws_enabled` | `true` | 启用独立 WebSocket 服务 |
+| `ws_port` | `52130` | 独立 WebSocket 端口 |
+| `http_enabled` | `true` | 启用 HTTP API 服务 |
+| `http_port` | `52131` | HTTP API 端口 |
 | `bind_addr` | `127.0.0.1` | 绑定地址（`0.0.0.0` 开放网络访问） |
-| `auth_enabled` | `false` | 非本地访问时要求 API Token |
+| `auth_enabled` | `true` | 非本地访问时要求 API Token |
+
+### 独立 CLI 二进制 `pi-session-cli`
+
+通过 `~/.config/pi-session-manager.json` 配置：
+
+```json
+{
+  "http_enabled": true,
+  "http_port": 52131,
+  "bind_addr": "0.0.0.0",
+  "auth_enabled": true
+}
+```
+
+在 `pi-session-cli` 中，WebSocket 走同一个 HTTP 端口的 `/ws` 路径（例如：`ws://127.0.0.1:52131/ws`）。
 
 ## Pi Agent 设置
 

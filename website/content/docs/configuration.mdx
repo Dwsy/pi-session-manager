@@ -80,27 +80,46 @@ The file watcher monitors all configured directories. When you add a new path, t
 
 ## Server Configuration
 
-For CLI/headless mode, configure the server in `~/.config/pi-session-manager.json`:
+Pi Session Manager currently has two server configuration models:
+
+### Desktop app / `pi-session-manager --cli`
+
+Configured in **Settings → Advanced** (persisted in DB key `server_settings`):
 
 ```json
 {
   "ws_enabled": true,
+  "ws_port": 52130,
   "http_enabled": true,
-  "ws_port": 52131,
   "http_port": 52131,
   "bind_addr": "127.0.0.1",
-  "auth_enabled": false
+  "auth_enabled": true
 }
 ```
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `ws_enabled` | `true` | Enable WebSocket server |
-| `http_enabled` | `true` | Enable HTTP server |
-| `ws_port` | `52131` | WebSocket port (shared with HTTP) |
-| `http_port` | `52131` | HTTP port |
+| `ws_enabled` | `true` | Enable standalone WebSocket server |
+| `ws_port` | `52130` | Standalone WebSocket port |
+| `http_enabled` | `true` | Enable HTTP API server |
+| `http_port` | `52131` | HTTP API port |
 | `bind_addr` | `127.0.0.1` | Bind address (`0.0.0.0` for network access) |
-| `auth_enabled` | `false` | Require API token for non-local access |
+| `auth_enabled` | `true` | Require API token for non-local access |
+
+### Standalone CLI binary `pi-session-cli`
+
+Configured via `~/.config/pi-session-manager.json`:
+
+```json
+{
+  "http_enabled": true,
+  "http_port": 52131,
+  "bind_addr": "0.0.0.0",
+  "auth_enabled": true
+}
+```
+
+In `pi-session-cli`, WebSocket is exposed on the same HTTP port at `/ws` (for example: `ws://127.0.0.1:52131/ws`).
 
 ## Pi Agent Settings
 
