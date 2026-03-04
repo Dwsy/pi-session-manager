@@ -10,7 +10,7 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "build:cli": "bash scripts/build-cli.sh",
+    "build:cli": "node scripts/build-cli.mjs",
     "prepare": "husky"
   },
   "dependencies": {

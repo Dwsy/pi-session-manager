@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 /**
- * 生产级文件移动工具 - 基于 ts-morph
+ * Production-grade file moving tool based on ts-morph
  * 
- * 功能：
- * - 移动文件并自动更新所有引用
- * - 支持批量操作
- * - 显示影响范围
- * - 支持 dry-run 预览
- * - 自动创建目标目录
+ * Features:
+ * - Moves files and auto-updates all references
+ * - Supports batch operations
+ * - Shows affected scope
+ * - Supports dry-run preview
+ * - Automatically creates target directories
  */
 
 import { Project } from "ts-morph";
@@ -29,7 +29,7 @@ class Refactor {
   }
 
   /**
-   * 移动单个文件
+   * Move a single file
    */
   move(oldPath: string, newPath: string, options: Options = {}) {
     const { dryRun = false, verbose = false } = options;
@@ -40,7 +40,7 @@ class Refactor {
       throw new Error(`文件不存在: ${oldPath}`);
     }
 
-    // 获取受影响的文件
+    // Get affected files
     const referencingFiles = sourceFile
       .getReferencingSourceFiles()
       .map((f) => f.getFilePath());
@@ -61,14 +61,14 @@ class Refactor {
       return;
     }
 
-    // 确保目标目录存在
+    // Ensure target directory exists
     const targetDir = path.dirname(newPath);
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
       console.log(`📁 创建目录: ${targetDir}`);
     }
 
-    // 执行移动
+    // Move file
     sourceFile.move(newPath);
     this.project.saveSync();
 
@@ -76,7 +76,7 @@ class Refactor {
   }
 
   /**
-   * 批量移动
+   * Batch move
    */
   batchMove(rules: Array<{ from: string; to: string }>, options: Options = {}) {
     console.log(`🚀 批量移动 ${rules.length} 个文件\n`);
@@ -92,7 +92,7 @@ class Refactor {
   }
 
   /**
-   * 重命名目录下所有文件
+   * Rename all files in a directory
    */
   renameDirectory(oldDir: string, newDir: string, options: Options = {}) {
     const files = this.project
@@ -109,7 +109,7 @@ class Refactor {
   }
 }
 
-// CLI 入口
+// CLI entry point
 function main() {
   const args = process.argv.slice(2);
 
@@ -130,16 +130,16 @@ function main() {
   --verbose                     显示详细信息
 
 示例:
-  # 移动单个文件
+  # Move a single file
   bun scripts/refactor.ts move src/utils/old.ts src/lib/new.ts
 
-  # 预览模式
+  # Preview mode
   bun scripts/refactor.ts move src/utils/old.ts src/lib/new.ts --dry-run
 
-  # 批量移动
+  # Batch move
   bun scripts/refactor.ts batch refactor.json
 
-  # 重命名目录
+  # Rename directory
   bun scripts/refactor.ts rename-dir src/components/old src/components/new
 `);
     process.exit(0);

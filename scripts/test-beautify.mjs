@@ -1,0 +1,50 @@
+#!/usr/bin/env node
+
+import { log, runChecked } from './script-utils.mjs'
+
+log('✨ Pi Session Manager - 侧边栏美化测试')
+log('========================================')
+log()
+
+log('🎨 美化内容:')
+log()
+log('  1. 拖拽手柄优化')
+log('     ✅ 默认隐藏，悬停显示')
+log('     ✅ 更细（1px）、更短（32px）')
+log('     ✅ 颜色更柔和')
+log()
+log('  2. 间距优化')
+log('     ✅ 增加垂直间距（行高 16px）')
+log('     ✅ 增加留白')
+log('     ✅ 节点间距 1px')
+log()
+log('  3. 颜色优化')
+log('     ✅ 背景色更亮（#2a2b36）')
+log('     ✅ 文字更清晰（#d4d4d8）')
+log('     ✅ 高亮更柔和（rgba）')
+log()
+log('  4. 细节打磨')
+log('     ✅ 圆角（6px / 4px）')
+log('     ✅ 阴影（focus 时）')
+log('     ✅ 滚动条美化')
+log('     ✅ 字体渲染优化')
+log()
+
+log('🧪 测试重点:')
+log('  1. 拖拽手柄是否默认隐藏')
+log('  2. 悬停时手柄是否渐显')
+log('  3. 间距是否舒适')
+log('  4. 颜色是否柔和')
+log('  5. 圆角是否流畅')
+log('  6. 滚动条是否美观')
+log()
+
+log('📚 参考文档:')
+log('  - SIDEBAR_BEAUTIFY_COMPLETE.md - 美化完成文档')
+log('  - SIDEBAR_FINAL_SUMMARY.md - 完整总结')
+log()
+
+log('🎬 启动应用...')
+log()
+
+runChecked('npm', ['run', 'tauri:dev'])
