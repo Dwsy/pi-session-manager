@@ -68,6 +68,9 @@ export interface AppSettings {
     includeMetadata: boolean
     includeTimestamps: boolean
   }
+  update: {
+    autoCheck: boolean
+  }
   advanced: {
     sessionDirs: string[]
     cacheEnabled: boolean
@@ -78,7 +81,7 @@ export interface AppSettings {
 }
 
 /**
- * 检测系统语言，优先使用用户已保存的偏好
+ * Detect system language, preferring user-saved preference
  */
 function getDefaultLocale(): string {
   const saved = localStorage.getItem('app-language')
@@ -130,6 +133,9 @@ export const defaultSettings: AppSettings = {
     includeMetadata: true,
     includeTimestamps: true,
   },
+  update: {
+    autoCheck: true,
+  },
   advanced: {
     sessionDirs: ['~/.pi/agent/sessions'],
     cacheEnabled: true,
@@ -147,6 +153,7 @@ export type SettingsSection =
   | 'tags'
   | 'search'
   | 'export'
+  | 'updates'
   | 'pi-config'
   | 'models'
   | 'shortcuts'
@@ -164,4 +171,5 @@ export interface LanguageSettingsProps extends SettingsProps<'language'> {}
 export interface SessionSettingsProps extends SettingsProps<'session'> {}
 export interface SearchSettingsProps extends SettingsProps<'search'> {}
 export interface ExportSettingsProps extends SettingsProps<'export'> {}
+export interface UpdateSettingsProps extends SettingsProps<'update'> {}
 export interface AdvancedSettingsProps extends SettingsProps<'advanced'> {}

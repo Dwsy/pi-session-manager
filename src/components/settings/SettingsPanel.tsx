@@ -19,6 +19,7 @@ import {
   Keyboard,
   Tags,
   Activity,
+  Download,
 } from 'lucide-react'
 import type { AppSettings, SettingsSection } from './types'
 import { defaultSettings } from './types'
@@ -30,6 +31,7 @@ import LanguageSettings from './sections/LanguageSettings'
 import SessionSettings from './sections/SessionSettings'
 import SearchSettings from './sections/SearchSettings'
 import ExportSettings from './sections/ExportSettings'
+import UpdateSettings from './sections/UpdateSettings'
 import PiConfigSettings from './sections/PiConfigSettings'
 import ModelSettings from './sections/ModelSettings'
 import AdvancedSettings from './sections/AdvancedSettings'
@@ -164,6 +166,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     { id: 'tags', icon: <Tags className="h-4 w-4" />, label: t('settings.sections.tags', '标签') },
     { id: 'search', icon: <Code className="h-4 w-4" />, label: t('settings.sections.search', '搜索') },
     { id: 'export', icon: <ChevronRight className="h-4 w-4" />, label: t('settings.sections.export', '导出') },
+    { id: 'updates', icon: <Download className="h-4 w-4" />, label: t('settings.sections.updates', '更新') },
     { id: 'pi-config', icon: <Puzzle className="h-4 w-4" />, label: t('settings.sections.piConfig', 'Pi 配置') },
     { id: 'models', icon: <Cpu className="h-4 w-4" />, label: t('settings.sections.models', '模型') },
     { id: 'shortcuts', icon: <Keyboard className="h-4 w-4" />, label: t('settings.sections.shortcuts', '快捷键') },
@@ -173,7 +176,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className={`${isMobile ? 'w-full h-full rounded-none' : 'w-[1200px] h-[700px] rounded-xl'} bg-surface-dark border border-border shadow-2xl flex ${isMobile ? 'flex-col' : ''} overflow-hidden`}>
+      <div className={`${isMobile ? 'w-full h-full rounded-none' : 'w-[1320px] h-[780px] max-w-[96vw] max-h-[92vh] rounded-xl'} bg-surface-dark border border-border shadow-2xl flex ${isMobile ? 'flex-col' : ''} overflow-hidden`}>
         {isMobile ? (
           <MobileSettings
             menuItems={menuItems}
@@ -273,6 +276,7 @@ function MobileSettings({
       case 'tags': return <TagManagerSettings />
       case 'search': return <SearchSettings settings={settings} onUpdate={onUpdate} />
       case 'export': return <ExportSettings settings={settings} onUpdate={onUpdate} />
+      case 'updates': return <UpdateSettings settings={settings} onUpdate={onUpdate} />
       case 'pi-config': return <PiConfigSettings />
       case 'models': return <ModelSettings />
       case 'shortcuts': return <ShortcutSettings />
@@ -285,7 +289,7 @@ function MobileSettings({
   const shouldRenderDetail = showDetail || animating
   const shouldRenderList = !showDetail || animating
 
-  // 移动端全屏滑动：列表左滑出，详情从右滑入（更清晰的页面切换）
+  // Mobile full-screen slide: list exits left, detail enters right (clearer page transition)
   const listTransform = showDetail ? 'translateX(-100%)' : 'translateX(0)'
   const detailTransform = showDetail ? 'translateX(0)' : 'translateX(100%)'
   const transitionStyle = {
@@ -509,10 +513,12 @@ function SettingsContent({
             {activeSection === 'tags' && <TagManagerSettings />}
             {activeSection === 'search' && <SearchSettings settings={settings} onUpdate={onUpdate} />}
             {activeSection === 'export' && <ExportSettings settings={settings} onUpdate={onUpdate} />}
+            {activeSection === 'updates' && <UpdateSettings settings={settings} onUpdate={onUpdate} />}
             {activeSection === 'pi-config' && <PiConfigSettings />}
             {activeSection === 'models' && <ModelSettings />}
             {activeSection === 'shortcuts' && <ShortcutSettings />}
             {activeSection === 'advanced' && <AdvancedSettings settings={settings} onUpdate={onUpdate} />}
+            {activeSection === 'api-test' && <APITestSettings />}
           </div>
         )}
       </div>

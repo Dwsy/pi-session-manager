@@ -2,8 +2,63 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { codeInspectorPlugin } from 'code-inspector-plugin'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execSync } from 'node:child_process'
+
+function normalizeVersionTag(value: string): string {
+  return value.trim().replace(/^refs\/tags\//, '').replace(/^v/i, '')
+}
+
+function isVersionLike(value: string): boolean {
+  return /^[vV]?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(value.trim())
+}
+
+function pickVersionFromMultiline(output: string): string | null {
+  const lines = output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+  for (const line of lines) {
+    if (isVersionLike(line)) {
+      return normalizeVersionTag(line)
+    }
+  }
+  return null
+}
+
+function safeExec(command: string): string | null {
+  try {
+    return execSync(command, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    return null
+  }
+}
+
+function resolveBuildVersion(): string {
+  const explicitVersion =
+    process.env.VITE_APP_VERSION ||
+    process.env.GITHUB_REF_NAME ||
+    (process.env.GITHUB_REF || '').replace(/^refs\/tags\//, '')
+
+  if (explicitVersion && isVersionLike(explicitVersion)) {
+    return normalizeVersionTag(explicitVersion)
+  }
+
+  const headTags = safeExec('git tag --points-at HEAD')
+  if (headTags) {
+    const headVersion = pickVersionFromMultiline(headTags)
+    if (headVersion) return headVersion
+  }
+
+  const packageVersion = process.env.npm_package_version || '0.0.0'
+  return normalizeVersionTag(packageVersion)
+}
+
+const buildVersion = resolveBuildVersion()
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(buildVersion),
+  },
   plugins: [
     codeInspectorPlugin({ bundler: 'vite' }),
     react(),

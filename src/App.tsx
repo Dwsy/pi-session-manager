@@ -19,10 +19,12 @@ import { useAppearance } from "./hooks/useAppearance";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useAppBootstrap } from "./hooks/app/useAppBootstrap";
 import { useAppUiEffects } from "./hooks/app/useAppUiEffects";
+import { useUpdateChecker } from "./hooks/app/useUpdateChecker";
 import { useDesktopSidebarActions } from "./hooks/app/useDesktopSidebarActions";
 import { useFavorites } from "./hooks/app/useFavorites";
 import { useSidebarSessions } from "./hooks/app/useSidebarSessions";
 import ConnectionBanner from "./components/ConnectionBanner";
+import UpdateNoticeToast from "./components/UpdateNoticeToast";
 import { useTags } from "./hooks/useTags";
 import type { SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
@@ -42,7 +44,10 @@ import AppSessionViewerPane from "./components/app/AppSessionViewerPane";
 import AppMobileFilterBar from "./components/app/AppMobileFilterBar";
 import AppSettingsPane from "./components/app/AppSettingsPane";
 import AppTerminalPane from "./components/app/AppTerminalPane";
-import { DEFAULT_SESSION_SORT_BY } from "./types/sessionSort";
+import {
+  DEFAULT_SESSION_SORT_BY,
+  DEFAULT_SESSION_SORT_ORDER,
+} from "./types/sessionSort";
 
 const startDragging = () => {
   if (isTauri()) {
@@ -137,6 +142,9 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [sessionSortBy, setSessionSortBy] = useState(DEFAULT_SESSION_SORT_BY);
+  const [sessionSortOrder, setSessionSortOrder] = useState(
+    DEFAULT_SESSION_SORT_ORDER,
+  );
   const [selectionModeTrigger, setSelectionModeTrigger] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem("onboarding-completed");
@@ -173,6 +181,8 @@ function App() {
     removeFavorite,
     toggleFavorite,
   } = useFavorites({ enabled: isInitialized });
+  const { updateInfo, closeUpdateNotice, openUpdateReleasePage } =
+    useUpdateChecker();
   useAppUiEffects({
     isMobile,
     showExportDialog,
@@ -243,9 +253,19 @@ function App() {
     () => ({
       "cmd+r": handleResumeSession,
       "cmd+e": handleExportAndOpen,
+      "cmd+l": () => {
+        setViewMode("list");
+        setSelectedProject(null);
+        setShowFavorites(false);
+      },
       "cmd+p": () => {
         setViewMode("project");
         setSelectedProject(null);
+        setShowFavorites(false);
+      },
+      "cmd+b": () => {
+        setViewMode("kanban");
+        setSelectedSession(null);
         setShowFavorites(false);
       },
       "cmd+,": () => setShowSettings(true),
@@ -342,6 +362,7 @@ function App() {
     piPath,
     customCommand,
     sortBy: sessionSortBy,
+    sortOrder: sessionSortOrder,
     favorites,
     onToggleFavorite: toggleFavorite,
     tags,
@@ -380,7 +401,9 @@ function App() {
       getDescendantIds={getDescendantIds}
       placeholder={placeholder}
       sortBy={sessionSortBy}
+      sortOrder={sessionSortOrder}
       onSortByChange={setSessionSortBy}
+      onSortOrderChange={setSessionSortOrder}
       showSort={showSort}
       onSelectModeTrigger={showSort ? triggerSelectionMode : undefined}
     />
@@ -582,19 +605,26 @@ function App() {
   // ═══════════════════════════════════
   if (isMobile) {
     return (
-      <AppMobileLayout
-        selectedSession={selectedSession}
-        mobileViewerRef={mobileViewerRef}
-        mobileTab={mobileTab}
-        onMobileTabChange={setMobileTab}
-        renderSessionViewer={renderSessionViewer}
-        renderSessionList={renderSessionList}
-        renderProjectList={renderProjectList}
-        renderKanban={renderKanban}
-        renderDashboard={renderDashboard}
-        renderSettings={renderSettings}
-        renderOverlays={renderOverlays}
-      />
+      <>
+        <AppMobileLayout
+          selectedSession={selectedSession}
+          mobileViewerRef={mobileViewerRef}
+          mobileTab={mobileTab}
+          onMobileTabChange={setMobileTab}
+          renderSessionViewer={renderSessionViewer}
+          renderSessionList={renderSessionList}
+          renderProjectList={renderProjectList}
+          renderKanban={renderKanban}
+          renderDashboard={renderDashboard}
+          renderSettings={renderSettings}
+          renderOverlays={renderOverlays}
+        />
+        <UpdateNoticeToast
+          update={updateInfo}
+          onClose={closeUpdateNotice}
+          onOpenRelease={openUpdateReleasePage}
+        />
+      </>
     );
   }
 
@@ -617,7 +647,9 @@ function App() {
       viewMode={viewMode}
       selectedProject={selectedProject}
       sortBy={sessionSortBy}
+      sortOrder={sessionSortOrder}
       onSortByChange={setSessionSortBy}
+      onSortOrderChange={setSessionSortOrder}
       onSelectModeTrigger={triggerSelectionMode}
     />
   );
@@ -717,6 +749,11 @@ function App() {
 
         {renderOverlays()}
       </div>
+      <UpdateNoticeToast
+        update={updateInfo}
+        onClose={closeUpdateNotice}
+        onOpenRelease={openUpdateReleasePage}
+      />
     </div>
   );
 }
