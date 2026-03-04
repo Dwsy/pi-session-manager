@@ -48,6 +48,7 @@ interface SessionListProps {
     currentlyAssigned: boolean,
   ) => void;
   onCreateTag?: (name: string, color: string) => void;
+  selectionModeTrigger?: number;
 }
 
 export default function SessionList({
@@ -72,6 +73,7 @@ export default function SessionList({
   getTagsForSession,
   onToggleTag,
   onCreateTag,
+  selectionModeTrigger,
 }: SessionListProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -91,6 +93,7 @@ export default function SessionList({
     sessionId: string;
   } | null>(null);
   const lastSelectedSessionIdRef = useRef<string | null>(null);
+  const lastSelectionModeTriggerRef = useRef(selectionModeTrigger);
   const scrollAnchorRef = useRef<{
     sessionId: string;
     top: number;
@@ -361,6 +364,25 @@ export default function SessionList({
   }, [handleExitSelectionMode, isSelectionMode]);
 
   useEffect(() => {
+    if (selectionModeTrigger === undefined) {
+      return;
+    }
+    if (selectionModeTrigger === lastSelectionModeTriggerRef.current) {
+      return;
+    }
+
+    lastSelectionModeTriggerRef.current = selectionModeTrigger;
+    if (!isSelectionMode && onDeleteSessions) {
+      handleEnterSelectionMode();
+    }
+  }, [
+    handleEnterSelectionMode,
+    isSelectionMode,
+    onDeleteSessions,
+    selectionModeTrigger,
+  ]);
+
+  useEffect(() => {
     if (!hasMore || !onLoadMore || loadingMore || totalRows === 0) {
       return;
     }
@@ -393,22 +415,6 @@ export default function SessionList({
 
   return (
     <div className="relative">
-      {onDeleteSessions && !isSelectionMode && (
-        <div className="px-2 pb-1 pt-1">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handleEnterSelectionMode}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/60 bg-background/70 text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
-              aria-label={t("session.list.selectMode", { defaultValue: "Select mode" })}
-              title={t("session.list.selectMode", { defaultValue: "Select mode" })}
-            >
-              <CheckSquare2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
-
       {onDeleteSessions && isSelectionMode && (
         <div className="sticky top-0 z-20 border-b border-border/40 bg-background/95 px-2 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           <div className="flex items-center justify-between gap-2 rounded-md border border-primary/25 bg-primary/5 px-2 py-1.5">

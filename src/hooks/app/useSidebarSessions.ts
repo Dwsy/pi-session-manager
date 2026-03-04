@@ -49,6 +49,7 @@ export interface UseSidebarSessionsOptions {
     icon?: string,
     parentId?: string,
   ) => Promise<Tag>;
+  selectionModeTrigger?: number;
 }
 
 export interface UseSidebarSessionsReturn {
@@ -95,6 +96,7 @@ export function useSidebarSessions({
   assignTag,
   removeTagFromSession,
   createTag,
+  selectionModeTrigger,
 }: UseSidebarSessionsOptions): UseSidebarSessionsReturn {
   const handleToggleSessionTag = useCallback(
     (sessionId: string, tagId: string, assigned: boolean) => {
@@ -235,6 +237,7 @@ export function useSidebarSessions({
       getTagsForSession,
       onToggleTag: handleToggleSessionTag,
       onCreateTag: createTag,
+      selectionModeTrigger,
     }),
     [
       selectedSession,
@@ -252,6 +255,7 @@ export function useSidebarSessions({
       getTagsForSession,
       handleToggleSessionTag,
       createTag,
+      selectionModeTrigger,
     ],
   );
 

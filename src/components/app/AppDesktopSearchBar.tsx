@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { CheckSquare2 } from "lucide-react";
 
 import SearchFilterBar from "../SearchFilterBar";
 import SessionSortSelect from "../SessionSortSelect";
@@ -20,6 +21,7 @@ export interface AppDesktopSearchBarProps {
   selectedProject: string | null;
   sortBy: SessionSortBy;
   onSortByChange: (sortBy: SessionSortBy) => void;
+  onSelectModeTrigger?: () => void;
 }
 
 function AppDesktopSearchBar({
@@ -35,6 +37,7 @@ function AppDesktopSearchBar({
   selectedProject,
   sortBy,
   onSortByChange,
+  onSelectModeTrigger,
 }: AppDesktopSearchBarProps) {
   const { t } = useTranslation();
   const showSortSelect = viewMode === "list" || (viewMode === "project" && !!selectedProject);
@@ -59,13 +62,26 @@ function AppDesktopSearchBar({
         className="flex-1"
       />
       {showSortSelect && (
-        <SessionSortSelect
-          value={sortBy}
-          onChange={onSortByChange}
-          compact
-          showValueLabel={false}
-          className="shrink-0"
-        />
+        <>
+          <SessionSortSelect
+            value={sortBy}
+            onChange={onSortByChange}
+            compact
+            showValueLabel={false}
+            className="shrink-0"
+          />
+          {onSelectModeTrigger && (
+            <button
+              type="button"
+              onClick={onSelectModeTrigger}
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-secondary/40 text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
+              aria-label={t("session.list.selectMode", { defaultValue: "Select mode" })}
+              title={t("session.list.selectMode", { defaultValue: "Select mode" })}
+            >
+              <CheckSquare2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </>
       )}
     </div>
   );

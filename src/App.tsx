@@ -137,6 +137,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [sessionSortBy, setSessionSortBy] = useState(DEFAULT_SESSION_SORT_BY);
+  const [selectionModeTrigger, setSelectionModeTrigger] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem("onboarding-completed");
   });
@@ -147,6 +148,9 @@ function App() {
   >(null);
   const clearPendingScrollEntryId = useCallback(() => {
     setPendingScrollEntryId(null);
+  }, []);
+  const triggerSelectionMode = useCallback(() => {
+    setSelectionModeTrigger((value) => value + 1);
   }, []);
   const [terminalMaximized, setTerminalMaximized] = useState(false);
   const [terminalPendingCommand, setTerminalPendingCommand] = useState<
@@ -345,6 +349,7 @@ function App() {
     assignTag,
     removeTagFromSession,
     createTag,
+    selectionModeTrigger,
   });
 
   const onRenameSession = async (newName: string) => {
@@ -377,6 +382,7 @@ function App() {
       sortBy={sessionSortBy}
       onSortByChange={setSessionSortBy}
       showSort={showSort}
+      onSelectModeTrigger={showSort ? triggerSelectionMode : undefined}
     />
   );
 
@@ -612,6 +618,7 @@ function App() {
       selectedProject={selectedProject}
       sortBy={sessionSortBy}
       onSortByChange={setSessionSortBy}
+      onSelectModeTrigger={triggerSelectionMode}
     />
   );
 
