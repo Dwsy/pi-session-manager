@@ -3,14 +3,6 @@
 
 set -e
 
-echo "[husky] TypeScript check"
-pnpm exec tsc --noEmit
-
-echo "[husky] Rust format check"
-cargo fmt --all --check
-
-echo "[husky] Rust clippy (desktop)"
-(cd src-tauri && cargo clippy -- -D warnings)
-
-echo "[husky] Rust clippy (CLI)"
-cargo clippy -p pi-session-cli -- -D warnings
+echo "[husky] pre-commit quick checks"
+# 快速检查：拦截冲突标记与空白问题，保持高频提交流畅
+git diff --cached --check

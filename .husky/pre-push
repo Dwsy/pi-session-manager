@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/h"
+
+set -e
+
+echo "[husky] pre-push full checks"
+
+echo "[husky] TypeScript check"
+pnpm exec tsc --noEmit
+
+echo "[husky] Rust format check"
+cargo fmt --all --check
+
+echo "[husky] Rust clippy (desktop)"
+(cd src-tauri && cargo clippy -- -D warnings)
+
+echo "[husky] Rust clippy (CLI)"
+cargo clippy -p pi-session-cli -- -D warnings
