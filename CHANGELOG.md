@@ -4,6 +4,22 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Demo & Docs
+
+- **Demo mode defaults are now deterministic**
+  - Added a dedicated static demo entry (`demo.html`) and demo build output (`dist-demo`)
+  - Added demo scripts: `dev:demo`, `build:demo`, `preview:demo`
+  - Runtime now force-enables demo mode when using `mode=demo` or `demo.html`
+  - Demo bootstrap now hardens localStorage parsing and clears stale service-worker/cache state
+- **Demo onboarding behavior aligned with presentation mode**
+  - Demo mode now sets `onboarding-completed=true` during bootstrap
+  - App startup now suppresses initialization onboarding in demo mode
+- **Demo data set upgraded**
+  - Replaced demo content with richer English session data and expanded sample coverage
+- **README accuracy rewrite**
+  - Rewrote `README.md` and `README.zh.md` to align with current code behavior
+  - Corrected runtime paths/ports, language pack list, and demo build usage
+
 ### Platform & Tooling
 
 - **Windows compatibility hardening (frontend + backend)**

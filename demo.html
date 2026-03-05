@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" sizes="128x128" href="/icon-128.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+    <meta name="theme-color" content="#1a1b26" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f5f5f5" media="(prefers-color-scheme: light)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Pi Sessions Demo" />
+    <link rel="apple-touch-icon" href="/icon-512.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>Pi Session Manager Demo</title>
+    <script>
+      (() => {
+        const CACHE_KEY = 'pi-session-manager-settings'
+        const LANGUAGE_KEY = 'app-language'
+        const ONBOARDING_COMPLETED_KEY = 'onboarding-completed'
+        const asRecord = (value) => {
+          if (value && typeof value === 'object' && !Array.isArray(value)) {
+            return value
+          }
+          return {}
+        }
+        const parseCachedSettings = (raw) => {
+          if (!raw) {
+            return {}
+          }
+          try {
+            return asRecord(JSON.parse(raw))
+          } catch {
+            return {}
+          }
+        }
+        try {
+          const existing = parseCachedSettings(localStorage.getItem(CACHE_KEY))
+          const next = {
+            ...existing,
+            language: {
+              ...asRecord(existing.language),
+              locale: 'en-US',
+            },
+            advanced: {
+              ...asRecord(existing.advanced),
+              demoMode: true,
+            },
+          }
+          localStorage.setItem(CACHE_KEY, JSON.stringify(next))
+          localStorage.setItem(LANGUAGE_KEY, 'en-US')
+          localStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true')
+
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker
+              .getRegistrations()
+              .then((registrations) => {
+                registrations.forEach((registration) => {
+                  registration.unregister()
+                })
+              })
+              .catch(() => {})
+          }
+          if ('caches' in window) {
+            caches
+              .keys()
+              .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+              .catch(() => {})
+          }
+        } catch {
+          // Ignore storage failures and continue with runtime defaults.
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="portal-root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

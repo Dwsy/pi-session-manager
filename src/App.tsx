@@ -29,6 +29,7 @@ import { useTags } from "./hooks/useTags";
 import type { SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
 import { invoke, isTauri } from "./transport";
+import { isDemoModeEnabled } from "./demo";
 import { getCachedSettings } from "./utils/settingsApi";
 import AppMobileLayout, { type MobileTab } from "./components/app/AppMobileLayout";
 import AppDesktopSidebar from "./components/app/AppDesktopSidebar";
@@ -147,7 +148,17 @@ function App() {
   );
   const [selectionModeTrigger, setSelectionModeTrigger] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(() => {
-    return !localStorage.getItem("onboarding-completed");
+    if (isDemoModeEnabled()) {
+      try {
+        localStorage.setItem("onboarding-completed", "true");
+      } catch {}
+      return false;
+    }
+    try {
+      return !localStorage.getItem("onboarding-completed");
+    } catch {
+      return false;
+    }
   });
   const [showTerminal, setShowTerminal] = useState(false);
   const [showFullTextSearch, setShowFullTextSearch] = useState(false);

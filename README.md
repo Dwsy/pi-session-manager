@@ -1,166 +1,156 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Pi Session Manager">
+  <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Pi Session Manager" />
 </p>
 
 <h1 align="center">Pi Session Manager</h1>
 
 <p align="center">
-  Cross-platform Pi AI session management tool — Browse, search, and manage <a href="https://github.com/badlogic/pi-mono">Pi</a> programming sessions
+  Manage <a href="https://github.com/badlogic/pi-mono">Pi</a> coding sessions with a Tauri desktop app, browser-accessible server mode, and a standalone static demo page.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue?style=flat-square" alt="Platform">
-  <img src="https://img.shields.io/badge/Tauri-2.x-orange?style=flat-square" alt="Tauri 2">
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License">
+  <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">Releases</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/">Documentation</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/cn/">中文文档</a>
 </p>
 
-<p align="center">
-  <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">⬇️ Download</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/">📖 Documentation</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/cn/">📖 中文文档</a>
-</p>
+## Highlights
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/4cb92d95-f50e-48d2-8c5e-4bb814d45b8f" />
-    <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/screenshot-light.png" />
-    <img width="1800" alt="Pi Session Manager" src=".github/screenshots/screenshot-light.png" />
-  </picture>
-</p>
+- Session browser with list/project/kanban views, favorites, tags, rename, delete, and export.
+- Full-text search via SQLite FTS + Tantivy-backed indexing/search flows.
+- Built-in terminal (PTY) and one-click resume of Pi sessions.
+- Multi-protocol runtime: Tauri IPC, WebSocket, HTTP, SSE.
+- Rich **demo data engine** and dedicated static demo page build mode.
+- i18n packs: `en-US`, `zh-CN`, `ja-JP`, `de-DE`, `fr-FR`, `es-ES`.
 
----
+## Runtime Modes
 
-## Features
-
-- **Cross-Platform** — Desktop app (macOS/Windows/Linux) + Mobile Web + Headless server mode
-- **Session Browser** — List/Project/Kanban views, favorites, rename, batch export
-- **Full-Text Search** — SQLite FTS5 powered, role filtering, path matching, relevance ranking
-- **Session Viewer** — Tree view, collapsible tool calls, chain-of-thought display, flow visualization
-- **Appearance Customization** — Dark/Light/System + Custom Pi theme preset mode, with separate UI and monospace font controls
-- **Built-in Terminal** — xterm.js + PTY backend (`Cmd/Ctrl+J`)
-- **Dashboard** — Activity heatmap, project distribution, model usage, token consumption stats
-- **Skill Management** — Scan and manage `~/.pi/agent/skills` and prompts, system prompt editor
-- **Multi-Protocol API** — Desktop defaults: WebSocket (`ws://127.0.0.1:52130`) + HTTP (`http://127.0.0.1:52131/api`); `pi-session-cli` serves HTTP + WebSocket (`/ws`) on one port (`52131` by default)
-- **CLI Mode** — Headless backend service (`--cli` / `--headless`)
-
----
-
-## Download
-
-Get the latest version from [**Releases**](../../releases):
-
-| Platform | File |
-|------|------|
-| macOS (Apple Silicon) | `Pi.Session.Manager_*_aarch64.dmg` |
-| macOS (Intel) | `Pi.Session.Manager_*_x64.dmg` |
-| Windows (x64) | `Pi.Session.Manager_*_x64-setup.exe` |
-| Linux (deb) | `pi-session-manager_*_amd64.deb` |
-
-> **Prerequisites**: [Pi](https://github.com/badlogic/pi-mono) must be installed for session restoration and terminal integration
-
----
+| Mode | Entry | Network behavior |
+| --- | --- | --- |
+| Desktop GUI | `pi-session-manager` | GUI + backend services; default settings include WS `52130`, HTTP `52131` |
+| Headless in main binary | `pi-session-manager --cli` / `--headless` | Single-port HTTP + WS(`/ws`) on `http_port` (default `52131`) |
+| Standalone CLI crate | `pi-session-cli` | Single-port HTTP + WS(`/ws`) (default `52131`) |
+| Static demo page | `dist-demo/index.html` | No backend required, forced demo data |
 
 ## Quick Start
 
-### Desktop App
+### Prerequisites
+
+- Node.js 20+
+- Rust stable (via `rustup`)
+- Platform toolchains for Tauri (Xcode / WebView2 / WebKitGTK)
+
+### Install
+
+```bash
+git clone https://github.com/Dwsy/pi-session-manager.git
+cd pi-session-manager
+pnpm install
+# or: npm install
+```
+
+### Common Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Frontend dev server |
+| `npm run dev:demo` | Frontend dev server in demo mode context |
+| `npm run build` | Production frontend build to `dist/` |
+| `npm run build:demo` | Static demo build to `dist-demo/` (default page is demo mode) |
+| `npm run tauri:dev` | Full desktop dev (frontend + Rust) |
+| `npm run tauri:build` | Desktop production bundle |
+| `npm run build:cli` | Build standalone `pi-session-cli` binary |
+
+## Run Binaries
+
+### Desktop GUI
 
 ```bash
 ./pi-session-manager
 ```
 
-### Server Mode (`pi-session-manager --cli`)
+### Headless service in main binary
 
 ```bash
 ./pi-session-manager --cli
-# defaults: WS=52130, HTTP=52131
+# or
+./pi-session-manager --headless
 
-# custom HTTP host/port (WS still uses configured ws_port, default 52130)
+# Override port/bind
 ./pi-session-manager --cli -p 18080 -b 0.0.0.0
-# Access UI at http://localhost:18080
 ```
 
-### Standalone CLI Binary (`pi-session-cli`)
+CLI flags:
+
+- `-p, --port <PORT>`: shared HTTP+WS port in CLI mode
+- `-b, --bind <ADDR>`: bind address
+- `--auth` / `--no-auth`: enable/disable auth
+- `--token <TOKEN>`: runtime-only token for current process
+
+### Standalone CLI binary
 
 ```bash
 ./pi-session-cli
-# single-port server: HTTP + WebSocket (/ws) on 52131 by default
 ./pi-session-cli -p 18080 -b 0.0.0.0
 ```
 
-CLI flags (`pi-session-manager --cli`):
-- `-h`, `--help`: show help
-- `-p`, `--port <PORT>`: set HTTP port only
-- `-b`, `--bind <ADDR>`: set bind address
-- `--auth` / `--no-auth`: temporarily enable/disable auth (CLI overrides config)
-- `--token <TOKEN>`: runtime-only token for current process (not persisted, overrides DB tokens)
+Default auth behavior:
 
-`pi-session-cli` also supports `-p`, but there it controls the single shared HTTP+WS port (`/ws`).
+- Auth is enabled by default.
+- Loopback clients are exempt.
+- Non-loopback clients must provide a valid token.
 
-Default behavior: auth is enabled in CLI mode; loopback (`localhost`/`127.0.0.1`) is exempt, non-loopback requests require a token.
+## API Surface (Server/CLI)
 
-### Build from Source
+- `POST /api` command endpoint
+- `GET /ws` WebSocket endpoint
+- `GET /api/events` and `/v1/events` SSE events
+- `GET /health` health check
+- `GET /` embedded frontend (server modes)
+
+## Demo Page Mode
+
+### Dev preview
 
 ```bash
-git clone https://github.com/Dwsy/pi-session-manager.git
-cd pi-session-manager
-
-npm install
-npm run tauri:dev        # Development
-npm run tauri:build      # Production build
+npm run dev
+# open http://localhost:1420/demo.html
 ```
 
-**System Dependencies**:
-- **macOS**: `xcode-select --install`
-- **Ubuntu/Debian**: `sudo apt-get install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev`
-- **Windows**: Visual Studio Build Tools + WebView2
+### Static demo bundle
 
----
+```bash
+npm run build:demo
+# output: dist-demo/index.html
+```
 
-## Keyboard Shortcuts
+`dist-demo/index.html` bootstraps app settings with:
 
-| Shortcut | Action |
-|--------|------|
-| `Cmd/Ctrl + K` | Command Palette |
-| `Cmd/Ctrl + J` | Toggle Terminal |
-| `Cmd/Ctrl + F` | Session Search |
-| `Cmd/Ctrl + Shift + F` | Full-Text Search |
-| `Cmd/Ctrl + R` | Restore Session in Terminal |
-| `Cmd/Ctrl + E` | Export and Open |
-| `Cmd/Ctrl + ,` | Settings |
+- `advanced.demoMode = true`
+- `language.locale = en-US`
 
----
+So it always opens with rich English demo data and does not require backend services.
 
-## Tech Stack
-
-| Layer | Technology |
-|------|------|
-| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, xterm.js, Recharts, React Flow |
-| **Backend** | Tauri 2, Rust, Tokio, Axum, SQLite, Tantivy, portable-pty |
-| **Communication** | Tauri IPC, WebSocket, HTTP |
-
----
-
-## Configuration Paths
+## Paths and Storage
 
 | Path | Description |
-|------|------|
-| `~/.pi/agent/sessions/` | Pi session directory |
-| `~/.pi/agent/session-manager.db` | SQLite cache |
-| `~/.pi/agent/session-manager-config.toml` | Configuration file |
-| `~/.pi/agent/themes/` | Custom Pi theme presets |
+| --- | --- |
+| `~/.pi/agent/sessions/` | Session directory |
+| `~/.pi/agent/sessions/sessions.db` | SQLite DB (sessions, settings, tags, favorites, auth tokens) |
+| `~/.pi/agent/session-manager-config.toml` | Scanner config (`session_paths`, FTS, intervals, etc.) |
+| `~/.pi/agent/skills/` | Pi skills |
+| `~/.pi/agent/prompts/` | Pi prompts |
+| `~/.pi/agent/settings.json` | Pi settings |
+| `~/.config/pi-session-manager.json` | Standalone `pi-session-cli` config |
 
----
-
-## Contributing
+## Development Checks
 
 ```bash
-cd src-tauri && cargo fmt && cargo clippy
+cargo fmt --all --check
+cd src-tauri && cargo clippy -- -D warnings
+cargo clippy -p pi-session-cli -- -D warnings
 cd src-tauri && cargo test
 ```
-
-Please follow [Conventional Commits](https://www.conventionalcommits.org/) for PR submissions.
-
----
 
 ## License
 

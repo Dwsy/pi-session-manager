@@ -118,7 +118,7 @@ function buildSubagentToolResult(seed: DemoSessionSeed): SessionEntry | null {
       content: [
         {
           type: 'text',
-          text: `${seed.subagent.agent} 完成分析，建议优先修复检索相关参数。`,
+          text: `${seed.subagent.agent} finished the analysis. Prioritize retrieval parameter fixes first.`,
         },
       ],
       details: {
@@ -126,7 +126,7 @@ function buildSubagentToolResult(seed: DemoSessionSeed): SessionEntry | null {
         results: [
           {
             agent: seed.subagent.agent,
-            task: '对召回样本进行误差聚类，输出优化建议',
+            task: 'Cluster retrieval errors on sampled misses and output tuning suggestions',
             exitCode: 0,
             model: seed.subagent.model,
             usage: {
@@ -145,12 +145,12 @@ function buildSubagentToolResult(seed: DemoSessionSeed): SessionEntry | null {
             messages: [
               {
                 role: 'assistant',
-                content: [{ type: 'text', text: '先采样误判案例，再做聚类分析。' }],
+                content: [{ type: 'text', text: 'Sample false-positive cases first, then run cluster analysis.' }],
                 timestamp: toIsoWithOffset(seed.created, 11),
               },
               {
                 role: 'assistant',
-                content: [{ type: 'text', text: '聚类完成，已输出参数建议。' }],
+                content: [{ type: 'text', text: 'Clustering finished. Parameter suggestions are ready.' }],
                 timestamp: toIsoWithOffset(seed.created, 12),
               },
             ],
@@ -258,11 +258,11 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
         content: [
           {
             type: 'thinking',
-            thinking: `先确认 ${seed.name} 的关键链路，再对症下药，避免一次性大改。`,
+            thinking: `Map the critical path in ${seed.name} first, then make focused changes instead of a broad rewrite.`,
           },
           {
             type: 'text',
-            text: '我先收集上下文并验证主要假设，然后给你一个可灰度的修复路径。',
+            text: 'I will gather context and validate the main assumptions first, then propose a canary-safe fix path.',
           },
           {
             type: 'toolCall',
@@ -298,7 +298,7 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
         content: [
           {
             type: 'text',
-            text: `${seed.assistantSummary}\n\n建议按“定位 -> 灰度 -> 观察”三步执行，关键指标我会一起标注。`,
+            text: `${seed.assistantSummary}\n\nRecommend a three-step rollout: isolate -> canary -> observe. I will annotate the key metrics.`,
           },
         ],
       },
@@ -320,7 +320,7 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
         content: [
           {
             type: 'text',
-            text: '我会并行拉一个子代理审查方案，避免漏掉边界条件。',
+            text: 'I will run a subagent review in parallel to avoid missing edge cases.',
           },
           {
             type: 'toolCall',
@@ -328,7 +328,7 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
             name: 'subagent',
             arguments: {
               agent: seed.subagent.agent,
-              task: '审查参数变更风险并给出回滚策略',
+              task: 'Review parameter-change risks and provide rollback conditions',
             },
           },
         ],
@@ -347,7 +347,7 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
       parentId: seed.subagent ? `${seed.id}-tool-result-subagent` : `${seed.id}-assistant-2`,
       timestamp: toIsoWithOffset(seed.created, 13),
       tokensBefore: Math.floor(seed.tokenUsage.input * 1.6),
-      summary: `- 保留了关键证据与阈值\n- 压缩历史上下文以控制 token 成本\n- 下一步执行灰度验证`,
+      summary: `- Preserved key evidence and thresholds\n- Compressed historical context to control token cost\n- Next step: run canary verification`,
     })
   }
 
@@ -361,7 +361,7 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
           ? `${seed.id}-tool-result-subagent`
           : `${seed.id}-assistant-2`,
       timestamp: toIsoWithOffset(seed.created, 15),
-      summary: `### 分支结论\n- 主要风险点已识别\n- 建议分两批灰度发布\n- 回滚条件：错误率 > 1.2%`,
+      summary: `### Branch Conclusion\n- Primary risk points identified\n- Recommend two-stage canary rollout\n- Rollback condition: error rate > 1.2%`,
     })
   }
 
@@ -381,7 +381,7 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
       content: {
         owner: 'qa-bot',
         status: 'pass',
-        notes: '关键回归用例通过，允许进入灰度。',
+        notes: 'Critical regression cases passed. Approved for canary rollout.',
       },
     })
   }
@@ -405,7 +405,7 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
         content: [
           {
             type: 'text',
-            text: '好的，按你的方案推进。请给我一个可以直接抄的执行清单。',
+            text: 'Sounds good. Proceed with your plan and give me a copy-paste execution checklist.',
           },
         ],
       },
@@ -428,7 +428,7 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
         content: [
           {
             type: 'text',
-            text: `执行清单：\n1. 在低峰期灰度 10% 流量\n2. 监控错误率与延迟指标\n3. 指标稳定后放量到 50%\n4. 全量发布并回收临时开关\n\n${seed.lastMessage}`,
+            text: `Execution checklist:\n1. Canary 10% traffic during off-peak hours\n2. Monitor error-rate and latency SLOs\n3. Expand to 50% after stable metrics\n4. Full rollout and clean up temporary flags\n\n${seed.lastMessage}`,
           },
         ],
       },

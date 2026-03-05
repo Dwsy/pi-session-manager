@@ -16,7 +16,7 @@ import TimeDistribution from './dashboard/TimeDistribution'
 import DashboardInsightModal from './dashboard/DashboardInsightModal'
 import TokenTrendChart from './dashboard/TokenTrendChart'
 import { DashboardSkeleton } from './Skeleton'
-import { getCachedSettings } from '../utils/settingsApi'
+import { isDemoModeEnabled } from '../demo'
 import { getPathBasename, hasPathSeparator } from '../utils/path'
 
 interface DashboardProps {
@@ -85,7 +85,7 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
     }
 
     try {
-      const isDemoMode = getCachedSettings()?.advanced?.demoMode === true
+      const isDemoMode = isDemoModeEnabled()
 
       if (isDemoMode) {
         const result = getDemoStats()
@@ -125,7 +125,7 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
     setDayStats(undefined)
 
     try {
-      const isDemoMode = getCachedSettings()?.advanced?.demoMode === true
+      const isDemoMode = isDemoModeEnabled()
       const result = isDemoMode
         ? getDemoDayStats(point.date, sessions)
         : await invoke<DayStats>('get_day_stats', {
