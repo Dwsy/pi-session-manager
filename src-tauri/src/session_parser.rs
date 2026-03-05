@@ -74,14 +74,17 @@ pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
                                     let input_cost = cost["input"].as_f64().unwrap_or(0.0);
                                     let output_cost = cost["output"].as_f64().unwrap_or(0.0);
                                     let cache_read_cost = cost["cacheRead"].as_f64().unwrap_or(0.0);
-                                    let cache_write_cost = cost["cacheWrite"].as_f64().unwrap_or(0.0);
+                                    let cache_write_cost =
+                                        cost["cacheWrite"].as_f64().unwrap_or(0.0);
 
                                     details.input_cost += input_cost;
                                     details.output_cost += output_cost;
                                     details.cache_read_cost += cache_read_cost;
                                     details.cache_write_cost += cache_write_cost;
-                                    model_usage.cost +=
-                                        input_cost + output_cost + cache_read_cost + cache_write_cost;
+                                    model_usage.cost += input_cost
+                                        + output_cost
+                                        + cache_read_cost
+                                        + cache_write_cost;
                                 }
                             }
                         }
