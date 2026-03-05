@@ -11,7 +11,8 @@
 <p align="center">
   <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">Releases</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/">Documentation</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/cn/">中文文档</a>
+  <a href="https://dwsy.github.io/pi-session-manager/cn/">中文文档</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/demo/">Preview</a>
 </p>
 
 ## Highlights
@@ -22,6 +23,14 @@
 - Multi-protocol runtime: Tauri IPC, WebSocket, HTTP, SSE.
 - Rich **demo data engine** and dedicated static demo page build mode.
 - i18n packs: `en-US`, `zh-CN`, `ja-JP`, `de-DE`, `fr-FR`, `es-ES`.
+
+## UI Preview
+
+| Home | Session Page |
+| --- | --- |
+| ![Home](website/public/screenshots/home.png) | ![Session Page](website/public/screenshots/session-page.png) |
+| Session Tree | Kanban |
+| ![Session Tree](website/public/screenshots/session-tree.png) | ![Kanban](website/public/screenshots/kanban.png) |
 
 ## Runtime Modes
 
@@ -109,6 +118,10 @@ Default auth behavior:
 - `GET /` embedded frontend (server modes)
 
 ## Demo Page Mode
+
+### Public preview
+
+- https://dwsy.github.io/pi-session-manager/demo/
 
 ### Dev preview
 

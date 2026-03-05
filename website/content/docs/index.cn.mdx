@@ -25,6 +25,14 @@ Pi Session Manager 是一款跨平台应用，用于浏览、搜索和管理 [Pi
 - **多平台** — 桌面端、移动端 Web 和无头 CLI 模式
 - **多协议 API** — Tauri IPC、WebSocket 和 HTTP 共享同一命令路由
 
+## 界面预览
+
+| 首页 | 会话页 |
+| --- | --- |
+| ![首页](/screenshots/home.png) | ![会话页](/screenshots/session-page.png) |
+| 会话树 | 看板 |
+| ![会话树](/screenshots/session-tree.png) | ![看板](/screenshots/kanban.png) |
+
 ## 快速安装
 
 ### 桌面应用
@@ -48,6 +56,10 @@ docker cp $(docker create pi-session-cli):/pi-session-cli ./pi-session-cli
 chmod +x pi-session-cli
 ./pi-session-cli
 ```
+
+<Callout type="tip">
+在线 Demo 预览：[https://dwsy.github.io/pi-session-manager/demo/](https://dwsy.github.io/pi-session-manager/demo/)
+</Callout>
 
 <Callout type="info">
 会话恢复和终端集成需要安装 Pi。请从 [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono) 安装。

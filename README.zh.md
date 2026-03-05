@@ -11,7 +11,8 @@
 <p align="center">
   <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">Releases</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/cn/">中文文档</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/">Documentation</a>
+  <a href="https://dwsy.github.io/pi-session-manager/">Documentation</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/demo/">预览</a>
 </p>
 
 ## 核心能力
@@ -22,6 +23,14 @@
 - 多协议访问：Tauri IPC、WebSocket、HTTP、SSE。
 - 完整 Demo 数据引擎 + 独立静态 Demo 页面构建模式。
 - 内置多语言包：`en-US`、`zh-CN`、`ja-JP`、`de-DE`、`fr-FR`、`es-ES`。
+
+## 界面预览
+
+| 首页 | 会话页 |
+| --- | --- |
+| ![首页](website/public/screenshots/home.png) | ![会话页](website/public/screenshots/session-page.png) |
+| 会话树 | 看板 |
+| ![会话树](website/public/screenshots/session-tree.png) | ![看板](website/public/screenshots/kanban.png) |
 
 ## 运行模式
 
@@ -109,6 +118,10 @@ pnpm install
 - `GET /`：嵌入式前端（服务模式）
 
 ## Demo 页面模式
+
+### 在线预览
+
+- https://dwsy.github.io/pi-session-manager/demo/
 
 ### 开发预览
 
