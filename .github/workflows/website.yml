@@ -51,7 +51,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build static demo page
-        run: pnpm run build:demo -- --base /pi-session-manager/demo/
+        run: pnpm run build:demo --base /pi-session-manager/demo/
 
       - name: Merge demo into website artifact
         run: |
