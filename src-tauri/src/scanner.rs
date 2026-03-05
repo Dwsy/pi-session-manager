@@ -112,8 +112,14 @@ fn expand_tilde(path: &str) -> String {
     }
 
     if let Some(rest) = path.strip_prefix("~/").or_else(|| path.strip_prefix("~\\")) {
-        let normalized_rest = rest.replace('\\', "/");
-        return home.join(normalized_rest).to_string_lossy().to_string();
+        let mut expanded = home;
+        for part in rest
+            .split(['/', '\\'])
+            .filter(|segment| !segment.is_empty())
+        {
+            expanded = expanded.join(part);
+        }
+        return expanded.to_string_lossy().to_string();
     }
 
     path.to_string()
