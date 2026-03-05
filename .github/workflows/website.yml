@@ -5,6 +5,13 @@ on:
     branches: [main]
     paths:
       - 'website/**'
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'demo.html'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/website.yml'
   workflow_dispatch:
 
@@ -34,6 +41,17 @@ jobs:
       - name: Build
         working-directory: website
         run: npm run build
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Build static demo page
+        run: npm run build:demo -- --base /pi-session-manager/demo/
+
+      - name: Merge demo into website artifact
+        run: |
+          mkdir -p website/out/demo
+          cp -R dist-demo/* website/out/demo/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
