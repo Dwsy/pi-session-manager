@@ -576,6 +576,16 @@ html, body {
   app-region: no-drag !important;
 }
 
+.tauri-drag-handle {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.tauri-drag-handle * {
+  -webkit-app-region: inherit;
+  app-region: inherit;
+}
+
 #root {
   width: 100%;
   height: 100%;

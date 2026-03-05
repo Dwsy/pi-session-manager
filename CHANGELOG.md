@@ -55,6 +55,11 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Fixed
 
+- **Session Viewer desktop toolbar dragging regression** — restored window dragging in Tauri desktop mode
+  - Root cause: drag-region cascading (`[data-tauri-drag-region] *`) made toolbar descendants effectively non-draggable in practice
+  - Added explicit desktop drag fallback on toolbar `mousedown` via `getCurrentWindow().startDragging()` when clicking non-interactive areas
+  - Preserved normal interactions for buttons/inputs/links so toolbar actions are not affected
+
 - **Mobile Outline layering and overlap regression**: fixed severe header/toolbar overlap when opening Outline in Session Viewer
   - Root cause: mobile sidebar used absolute positioning in the same stacking context as the main toolbar, causing top-area content collisions after toolbar height/layout updates
   - Mobile Outline now renders as a true left side drawer (`fixed`, constrained width) with dedicated overlay and independent header/close controls

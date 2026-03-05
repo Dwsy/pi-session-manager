@@ -1,4 +1,6 @@
+import type { MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   ArrowDown,
   ArrowUp,
@@ -17,6 +19,7 @@ import {
 } from "lucide-react";
 
 import KbdTooltip from "../KbdTooltip";
+import { isTauri } from "../../transport";
 import type { SessionViewerToolbarProps } from "./SessionViewerToolbarTypes";
 
 export default function SessionViewerToolbar({
@@ -75,11 +78,29 @@ export default function SessionViewerToolbar({
     onMobileMenuOpenChange(false);
   };
 
+  const handleToolbarMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    if (isMobile || !isTauri()) {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    if (
+      target?.closest(
+        "button, a, input, textarea, select, [role='button'], .no-drag, [data-no-window-drag]",
+      )
+    ) {
+      return;
+    }
+
+    void getCurrentWindow().startDragging();
+  };
+
   return (
     <>
       <div
         className={`border-b border-border relative z-20 ${isMobile ? "px-2.5 py-2" : "px-3 py-1.5"}`}
         data-tauri-drag-region
+        onMouseDown={handleToolbarMouseDown}
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -107,12 +128,16 @@ export default function SessionViewerToolbar({
                 )}
               </button>
             )}
-            <span className="text-base font-semibold tracking-tight truncate">
-              {title}
-            </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-border/60 bg-background text-[11px] text-muted-foreground flex-shrink-0">
-              {messageCount} {t("session.messages")}
-            </span>
+            <div
+              className={`flex items-center gap-1.5 min-w-0 ${!isMobile ? "tauri-drag-handle" : ""}`}
+            >
+              <span className="text-base font-semibold tracking-tight truncate">
+                {title}
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-border/60 bg-background text-[11px] text-muted-foreground flex-shrink-0">
+                {messageCount} {t("session.messages")}
+              </span>
+            </div>
           </div>
 
           {!isMobile && (
