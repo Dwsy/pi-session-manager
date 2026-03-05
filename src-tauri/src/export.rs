@@ -165,10 +165,10 @@ fn find_pi_executable() -> Option<PathBuf> {
 
 fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     let direct = Path::new(executable);
-    if direct.is_absolute() || executable.contains('/') || executable.contains('\\') {
-        if direct.is_file() {
-            return Some(direct.to_path_buf());
-        }
+    if (direct.is_absolute() || executable.contains('/') || executable.contains('\\'))
+        && direct.is_file()
+    {
+        return Some(direct.to_path_buf());
     }
 
     let path_var = std::env::var_os("PATH")?;
