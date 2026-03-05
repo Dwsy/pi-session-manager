@@ -660,6 +660,33 @@
    margin-bottom: 8px;
  }
 
+ /* Model Change component styles */
+ .model-change {
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   padding: 6px 12px;
+   margin: 4px 0;
+   font-size: 12px;
+   color: rgb(var(--color-muted-foreground));
+   opacity: 0.75;
+ }
+
+ .model-change-icon {
+   flex-shrink: 0;
+   opacity: 0.6;
+ }
+
+ .model-change-text {
+   line-height: 1.4;
+ }
+
+ .model-change-name {
+   font-weight: 600;
+   color: var(--borderAccent);
+   font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', monospace);
+ }
+
  .tree-status {
    padding: 8px 12px;
    font-size: 10px;

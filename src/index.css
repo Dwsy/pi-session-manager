@@ -231,7 +231,7 @@ pre,
   --muted: #808080;
   --dim: #666666;
   --text: #e5e5e7;
-  --thinkingText: #808080;
+  --thinkingText: #9ca3af;
   --selectedBg: #3a3a4a;
   --userMessageBg: #343541;
   --userMessageText: #e5e5e7;
@@ -349,7 +349,7 @@ pre,
   --muted: #9ca3af;
   --dim: #6b7280;
   --text: #1a1b2e;
-  --thinkingText: #9ca3af;
+  --thinkingText: #6b7280;
   --selectedBg: #e2e3e8;
   --userMessageBg: #e8e9f0;
   --userMessageText: #1a1b2e;
@@ -462,7 +462,7 @@ pre,
     --muted: #9ca3af;
     --dim: #6b7280;
     --text: #1a1b2e;
-    --thinkingText: #9ca3af;
+    --thinkingText: #6b7280;
     --selectedBg: #e2e3e8;
     --userMessageBg: #e8e9f0;
     --userMessageText: #1a1b2e;
@@ -720,11 +720,18 @@ html, body {
 /* Ultra-compact markdown styles for thinking blocks */
 .thinking-text .markdown-content {
   font-size: 0.95em;
+  color: var(--thinkingText);
+}
+
+.thinking-text .markdown-content strong,
+.thinking-text .markdown-content b {
+  color: var(--thinkingText);
 }
 
 .thinking-text .markdown-content p {
   margin: 0;
   line-height: 1.4;
+  color: inherit;
 }
 
 .thinking-text .markdown-content p + p {
@@ -740,6 +747,7 @@ html, body {
 .thinking-text .markdown-content li {
   margin: 0.1em 0;
   line-height: 1.4;
+  color: inherit;
 }
 
 .thinking-text .markdown-content h1,
@@ -750,6 +758,7 @@ html, body {
 .thinking-text .markdown-content h6 {
   margin: 0.5em 0 0.2em 0;
   line-height: 1.3;
+  color: var(--thinkingText);
 }
 
 .thinking-text .markdown-content pre {
@@ -778,14 +787,23 @@ html, body {
 .thinking-text .markdown-content blockquote {
   margin: 0.3em 0;
   padding-left: 0.75em;
+  color: inherit;
+}
+
+.thinking-text .markdown-content a {
+  color: var(--thinkingText);
+  text-decoration: underline;
+  opacity: 0.9;
 }
 
 .thinking-text .markdown-content code {
   font-size: 0.9em;
+  color: inherit;
 }
 
 .thinking-text .markdown-content :not(pre) > code {
   background: rgba(var(--accent-rgb), 0.14);
+  color: inherit;
 }
 
 .assistant-text + .tool-execution {

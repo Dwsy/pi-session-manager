@@ -1,5 +1,4 @@
 import { useMemo, useState, useCallback, useRef } from 'react'
-import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import {
@@ -65,6 +64,9 @@ export default function KanbanBoard({
   onDeleteSession,
   favorites,
   onToggleFavorite,
+  terminal,
+  piPath,
+  customCommand,
   projectFilter,
   filterTagIds = [],
   onFilterChange,
@@ -77,8 +79,7 @@ export default function KanbanBoard({
   const [searchQuery, setSearchQuery] = useState('')
   const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null)
   const [initialClickPoint, setInitialClickPoint] = useState<{ x: number; y: number } | null>(null)
-  const [isPreviewAnimating, setIsPreviewAnimating] = useState(false)
-  const suppressReopenRef = useRef<{ sessionId: string; until: number } | null>(null)
+  const suppressPreviewOpenUntilRef = useRef(0)
 
   // Filter sessions by project + search query
   const filteredSessions = useMemo(() => {
@@ -216,58 +217,38 @@ export default function KanbanBoard({
   }, [columns, findColumnForSession, onMoveSession, onToggleTag])
 
   
-  const setReopenGuard = useCallback((sessionId: string) => {
-    const until = Date.now() + PREVIEW_CLICK_THROUGH_GUARD_MS
-    suppressReopenRef.current = {
-      sessionId,
-      until,
-    }
+  const blockPreviewOpen = useCallback(() => {
+    suppressPreviewOpenUntilRef.current = Date.now() + PREVIEW_CLICK_THROUGH_GUARD_MS
   }, [])
 
   const handleCardClick = useCallback((session: SessionInfo, _rect?: DOMRect, clickPoint?: { x: number; y: number }) => {
-    const now = Date.now()
-    const suppress = suppressReopenRef.current
-
-
-    if (isPreviewAnimating) {
+    if (Date.now() < suppressPreviewOpenUntilRef.current) {
       return
     }
 
-    if (suppress && suppress.sessionId === session.id && now < suppress.until) {
-      return
-    }
-
-    setIsPreviewAnimating(true)
-
-    // Use flushSync to ensure rect and click point are set before modal renders
-    flushSync(() => {
-      setInitialClickPoint(clickPoint ?? null)
-    })
-
+    setInitialClickPoint(clickPoint ?? null)
     setPreviewSession(session)
+  }, [])
 
-  }, [isPreviewAnimating])
+  const handleClosePreviewStart = useCallback(() => {
+    blockPreviewOpen()
+  }, [blockPreviewOpen])
 
   const handleClosePreview = useCallback(() => {
-    if (previewSession) {
-      setReopenGuard(previewSession.id)
-    }
-
     setPreviewSession(null)
     setInitialClickPoint(null)
-    setIsPreviewAnimating(false)
-  }, [previewSession, setReopenGuard])
+  }, [])
 
   const handleExpandToFull = useCallback(() => {
     if (!previewSession) {
       return
     }
 
-    setReopenGuard(previewSession.id)
+    blockPreviewOpen()
     onSelectSession(previewSession)
     setPreviewSession(null)
-    setIsPreviewAnimating(false)
-  }, [onSelectSession, previewSession, setReopenGuard])
+    setInitialClickPoint(null)
+  }, [blockPreviewOpen, onSelectSession, previewSession])
 
   return (
     <div className="h-full flex flex-col">
@@ -394,7 +375,11 @@ export default function KanbanBoard({
         session={previewSession}
         isOpen={!!previewSession}
         onClose={handleClosePreview}
+        onCloseStart={handleClosePreviewStart}
         onExpand={handleExpandToFull}
+        terminal={terminal}
+        piPath={piPath}
+        customCommand={customCommand}
         initialClickPoint={initialClickPoint}
         animationMode="origin-point"
       />

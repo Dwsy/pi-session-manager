@@ -12,6 +12,7 @@ export interface SessionPreviewModalProps {
   session: SessionInfo | null
   isOpen: boolean
   onClose: () => void
+  onCloseStart?: () => void
   onExpand: () => void
   onExport?: () => void
   onRename?: () => void
@@ -41,6 +42,7 @@ export default function SessionPreviewModal({
   session,
   isOpen,
   onClose,
+  onCloseStart,
   onExpand,
   onExport = () => {},
   onRename = () => {},
@@ -85,12 +87,15 @@ export default function SessionPreviewModal({
       return
     }
 
+    closeInFlightRef.current = true
+    onCloseStart?.()
+
     if (!session) {
       onClose()
+      onCloseAnimationComplete?.()
+      closeInFlightRef.current = false
       return
     }
-
-    closeInFlightRef.current = true
 
     if (prefersReducedMotion) {
       onClose()
@@ -119,6 +124,7 @@ export default function SessionPreviewModal({
     closeAnimationTransition,
     getTransformOrigin,
     onClose,
+    onCloseStart,
     resolvedAnimationMode,
     onCloseAnimationComplete,
     prefersReducedMotion,
@@ -281,7 +287,7 @@ export default function SessionPreviewModal({
             session={session}
             onExport={onExport}
             onRename={onRename}
-            onBack={onClose}
+            onBack={handleCloseWithAnimation}
             terminal={terminal}
             piPath={piPath}
             customCommand={customCommand}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { WifiOff, Loader2 } from 'lucide-react'
 import { useConnectionStatus } from '../hooks/useConnectionStatus'
+import { isDemoModeEnabled } from '../demo'
 
 /**
  * Shows a top banner when transport is disconnected or connecting.
@@ -10,10 +11,17 @@ import { useConnectionStatus } from '../hooks/useConnectionStatus'
 export default function ConnectionBanner() {
   const { t } = useTranslation()
   const status = useConnectionStatus()
+  const demoMode = isDemoModeEnabled()
   const [visible, setVisible] = useState(false)
   const [wasDisconnected, setWasDisconnected] = useState(false)
 
   useEffect(() => {
+    if (demoMode) {
+      setVisible(false)
+      setWasDisconnected(false)
+      return
+    }
+
     if (status === 'disconnected') {
       setVisible(true)
       setWasDisconnected(true)
@@ -34,8 +42,9 @@ export default function ConnectionBanner() {
         setVisible(false)
       }
     }
-  }, [status, wasDisconnected])
+  }, [status, wasDisconnected, demoMode])
 
+  if (demoMode) return null
   if (!visible) return null
 
   const isDisconnected = status === 'disconnected'
