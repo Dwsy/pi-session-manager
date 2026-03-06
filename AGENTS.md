@@ -163,6 +163,17 @@ cd src-tauri && cargo test
   - CLI 二进制压缩包 + sha256
 - 最终由 workflow 自动生成 release notes 并发布
 
+### 5.3.1 版本号同步规则（必须遵循）
+
+- 当前版本号来源以 `package.json` 为唯一前端注入来源（`vite.config.ts` 通过 `npm_package_version` 注入 `__APP_VERSION__`）。
+- 发布前必须保证以下文件版本一致：
+  - `package.json`
+  - `src-tauri/Cargo.toml`
+  - `src-tauri-cli/Cargo.toml`
+  - （若使用 npm）`package-lock.json`
+- `git tag` 必须与上述版本一致（建议使用 `vX.Y.Z`）。
+- 给 agent/LLM 的发布提醒：**push new tag 前，先同步修改以上版本号；push new tag 后不要再改版本号**，否则会出现更新提示版本不一致。
+
 ## 5.4 文档站部署
 
 - `website.yml` 在 `website/**` 变更时触发
