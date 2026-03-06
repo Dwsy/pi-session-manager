@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { invoke } from '../../../transport'
 import SettingsInput from '../SettingsInput'
+import { useClipboard } from '../../../hooks/useClipboard'
 
 interface ModelInfo {
   provider: string
@@ -39,6 +40,7 @@ interface ModelTestResult {
 
 export default function ModelSettings() {
   const { t } = useTranslation()
+  const { copyText } = useClipboard()
   const [models, setModels] = useState<ModelInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -437,7 +439,7 @@ export default function ModelSettings() {
                   onClick={() => {
                     // Open the pi command in terminal
                     const command = `pi --provider ${selectedModel.provider} --model ${selectedModel.model}`
-                    navigator.clipboard?.writeText(command)
+                    void copyText(command).catch(console.error)
                     alert(t('settings.models.commandCopied', '命令已复制到剪贴板'))
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-surface border border-border hover:border-border-hover text-foreground text-sm font-medium rounded-lg motion-surface motion-color motion-press focus-ring"
