@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::models::{SessionEntry, SessionInfo, SubagentRunInfo};
+use crate::scanner::extract_index_segments;
 use crate::session_parser::SessionDetails;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Result as SqliteResult};
@@ -12,7 +13,7 @@ use std::path::{Path, PathBuf};
 use tracing::{debug, error, info, warn};
 
 /// Current schema version for migrations
-const LATEST_SCHEMA_VERSION: i64 = 3;
+const LATEST_SCHEMA_VERSION: i64 = 4;
 
 pub fn get_db_path() -> Result<PathBuf, String> {
     // Allow explicit test override
@@ -128,6 +129,7 @@ fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(), String> 
             1 => migration_1(conn)?,
             2 => migration_2(conn)?,
             3 => migration_3(conn)?,
+            4 => migration_4(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -222,6 +224,39 @@ fn migration_3(conn: &Connection) -> Result<(), String> {
         .map_err(|e| format!("Migration 3 failed adding model_usage_json: {e}"))?;
     }
 
+    Ok(())
+}
+
+/// Migration to version 4: rebuild message search tables with normalized segment rows.
+fn migration_4(conn: &Connection) -> Result<(), String> {
+    conn.execute("DROP TABLE IF EXISTS message_fts", [])
+        .map_err(|e| format!("Migration 4 failed dropping message_fts: {e}"))?;
+    conn.execute("DROP TABLE IF EXISTS message_entries", [])
+        .map_err(|e| format!("Migration 4 failed dropping message_entries: {e}"))?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS message_entries (
+            id TEXT PRIMARY KEY,
+            entry_id TEXT NOT NULL,
+            session_path TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking')),
+            content TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
+        )",
+        [],
+    )
+    .map_err(|e| format!("Migration 4 failed creating message_entries: {e}"))?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)",
+        [],
+    )
+    .map_err(|e| format!("Migration 4 failed creating session index: {e}"))?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id)",
+        [],
+    )
+    .map_err(|e| format!("Migration 4 failed creating entry index: {e}"))?;
     Ok(())
 }
 
@@ -403,12 +438,16 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         ).ok();
     }
 
-    // Create message_entries table for per-message FTS (avoids re-reading files)
+    // Create message_entries table for fresh installs.
+    // Existing databases may still be on the old schema, so defer new-column index creation
+    // until after versioned migrations and schema reconciliation complete.
     conn.execute(
         "CREATE TABLE IF NOT EXISTS message_entries (
             id TEXT PRIMARY KEY,
+            entry_id TEXT NOT NULL,
             session_path TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking')),
             content TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
@@ -417,43 +456,23 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
     )
     .map_err(|e| format!("Failed to create message_entries table: {e}"))?;
 
+    // Apply versioned schema migrations if needed
+    let current_version = get_current_version(&conn)?;
+    if current_version < LATEST_SCHEMA_VERSION {
+        apply_migrations(&conn, current_version)?;
+    }
+
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)",
         [],
     )
     .map_err(|e| format!("Failed to create index on message_entries: {e}"))?;
 
-    // Migrate message_entries schema: add missing columns (non-destructive)
-    {
-        let mut stmt = conn
-            .prepare("PRAGMA table_info(message_entries)")
-            .map_err(|e| e.to_string())?;
-        let me_columns: Vec<String> = stmt
-            .query_map([], |row| row.get(1))
-            .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?;
-        let required_me_columns = ["id", "session_path", "role", "content", "timestamp"];
-        let mut migrated = false;
-        for &col in &required_me_columns {
-            if !me_columns.contains(&col.to_string()) {
-                eprintln!("[Migration] Adding missing column '{col}' to message_entries");
-                let sql = format!("ALTER TABLE message_entries ADD COLUMN {col}");
-                conn.execute(&sql, [])
-                    .map_err(|e| format!("Failed to add column {col}: {e}"))?;
-                migrated = true;
-            }
-        }
-        if migrated {
-            info!("[Migration] message_entries schema updated with missing columns");
-        }
-    }
-
-    // Apply versioned schema migrations if needed
-    let current_version = get_current_version(&conn)?;
-    if current_version < LATEST_SCHEMA_VERSION {
-        apply_migrations(&conn, current_version)?;
-    }
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id)",
+        [],
+    )
+    .map_err(|e| format!("Failed to create entry_id index on message_entries: {e}"))?;
 
     if config.enable_fts5 {
         // init_fts5(&conn)?; // DISABLED: sessions_fts incompatible with sessions schema (TEXT PRIMARY KEY)
@@ -516,7 +535,7 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
         .map_err(|e| format!("Failed to read message_entries columns: {e}"))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect message_entries columns: {e}"))?;
-    let required_me_columns = ["id", "session_path", "role", "content", "timestamp"];
+    let required_me_columns = ["id", "entry_id", "session_path", "role", "source_type", "content", "timestamp"];
     let mut migrated = false;
     for &col in &required_me_columns {
         if !me_columns.contains(&col.to_string()) {
@@ -562,7 +581,7 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
         .map_err(|e| format!("Failed to read message_fts columns: {e}"))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect message_fts columns: {e}"))?;
-    let required_fts_columns = ["session_path", "role", "content"];
+    let required_fts_columns = ["session_path", "role", "source_type", "content"];
     let fts_has_all = required_fts_columns
         .iter()
         .all(|&col| fts_columns.contains(&col.to_string()));
@@ -715,8 +734,8 @@ fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
     // Insert trigger
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS message_entries_ai AFTER INSERT ON message_entries BEGIN
-         INSERT INTO message_fts(rowid, session_path, role, content)
-         VALUES (new.rowid, new.session_path, new.role, new.content); END;",
+         INSERT INTO message_fts(rowid, session_path, role, source_type, content)
+         VALUES (new.rowid, new.session_path, new.role, new.source_type, new.content); END;",
         [],
     )
     .map_err(|e| format!("Failed to create trigger message_entries_ai: {e}"))?;
@@ -724,8 +743,8 @@ fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
     // Delete trigger (use 'delete' command)
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS message_entries_ad AFTER DELETE ON message_entries BEGIN
-         INSERT INTO message_fts(message_fts, rowid, session_path, role, content)
-         VALUES('delete', old.rowid, old.session_path, old.role, old.content); END;",
+         INSERT INTO message_fts(message_fts, rowid, session_path, role, source_type, content)
+         VALUES('delete', old.rowid, old.session_path, old.role, old.source_type, old.content); END;",
         [],
     )
     .map_err(|e| format!("Failed to create trigger message_entries_ad: {e}"))?;
@@ -733,10 +752,10 @@ fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
     // Update trigger (delete old, insert new)
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS message_entries_au AFTER UPDATE ON message_entries BEGIN
-         INSERT INTO message_fts(message_fts, rowid, session_path, role, content)
-         VALUES('delete', old.rowid, old.session_path, old.role, old.content);
-         INSERT INTO message_fts(rowid, session_path, role, content)
-         VALUES (new.rowid, new.session_path, new.role, new.content); END;",
+         INSERT INTO message_fts(message_fts, rowid, session_path, role, source_type, content)
+         VALUES('delete', old.rowid, old.session_path, old.role, old.source_type, old.content);
+         INSERT INTO message_fts(rowid, session_path, role, source_type, content)
+         VALUES (new.rowid, new.session_path, new.role, new.source_type, new.content); END;",
         [],
     )
     .map_err(|e| format!("Failed to create trigger message_entries_au: {e}"))?;
@@ -786,6 +805,7 @@ fn create_message_fts5(conn: &Connection) -> Result<(), String> {
         "CREATE VIRTUAL TABLE IF NOT EXISTS message_fts USING fts5(
             session_path UNINDEXED,
             role,
+            source_type,
             content,
             content='message_entries',
             content_rowid='rowid',
@@ -1454,12 +1474,70 @@ pub fn delete_message_entries_for_session(
     Ok(())
 }
 
+fn load_include_thinking_in_search() -> bool {
+    crate::settings_store::get::<Value>("app_settings")
+        .ok()
+        .flatten()
+        .and_then(|settings| settings.get("search").cloned())
+        .and_then(|search| search.get("includeThinkingInSearch").and_then(Value::as_bool))
+        .unwrap_or(false)
+}
+
+fn build_message_index_rows(
+    entry: &Value,
+    session_path: &str,
+    include_thinking: bool,
+) -> Vec<(String, String, String, String, String, String, String)> {
+    let Some(message) = entry.get("message") else {
+        return vec![];
+    };
+
+    let role = message
+        .get("role")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    if role != "user" && role != "assistant" {
+        return vec![];
+    }
+
+    let entry_id = entry
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if entry_id.is_empty() {
+        return vec![];
+    }
+
+    let timestamp = entry
+        .get("timestamp")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+
+    extract_index_segments(entry, include_thinking)
+        .into_iter()
+        .map(|(source_type, content)| {
+            (
+                format!("{entry_id}:{source_type}"),
+                entry_id.clone(),
+                session_path.to_string(),
+                role.clone(),
+                source_type,
+                content,
+                timestamp.clone(),
+            )
+        })
+        .collect()
+}
+
 /// Insert message entries from a session file into message_entries table
 pub fn insert_message_entries(conn: &Connection, session: &SessionInfo) -> Result<(), String> {
     use serde_json::Value;
     use std::io::BufReader;
 
-    // Check if message_entries table exists (FTS may be disabled)
     let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'")
         .map_err(|e| format!("Failed to check message_entries existence: {e}"))?;
@@ -1468,10 +1546,10 @@ pub fn insert_message_entries(conn: &Connection, session: &SessionInfo) -> Resul
         .unwrap_or(false);
 
     if !exists {
-        // FTS is disabled or table not created yet - skip
         return Ok(());
     }
 
+    let include_thinking = load_include_thinking_in_search();
     let file = fs::File::open(&session.path)
         .map_err(|e| format!("Failed to open file for message entries: {e}"))?;
     let reader = BufReader::new(file);
@@ -1484,44 +1562,15 @@ pub fn insert_message_entries(conn: &Connection, session: &SessionInfo) -> Resul
         }
 
         if let Ok(entry) = serde_json::from_str::<Value>(&line) {
-            if entry["type"] == "message" {
-                if let Some(message) = entry.get("message") {
-                    let role = message["role"].as_str().unwrap_or("");
-                    if role == "user" || role == "assistant" {
-                        let entry_id = entry["id"].as_str().unwrap_or("").to_string();
-                        if entry_id.is_empty() {
-                            continue;
-                        }
-
-                        let timestamp = entry["timestamp"].as_str().unwrap_or("").to_string();
-
-                        // Extract text content (exclude thinking)
-                        let mut content = String::new();
-                        if let Some(content_arr) = message["content"].as_array() {
-                            for item in content_arr {
-                                if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
-                                    content.push_str(text);
-                                }
-                            }
-                        }
-
-                        if !content.is_empty() {
-                            // Insert into message_entries
-                            conn.execute(
-                                "INSERT OR REPLACE INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-                                params![
-                                    &entry_id,
-                                    &session.path,
-                                    role,
-                                    &content,
-                                    &timestamp,
-                                ],
-                            ).map_err(|e| format!("Failed to insert message entry (session: {}, entry: {}): {}", 
-                                session.path, entry_id, e))?;
-                            inserted_count += 1;
-                        }
-                    }
-                }
+            for (id, entry_id, session_path, role, source_type, content, timestamp) in
+                build_message_index_rows(&entry, &session.path, include_thinking)
+            {
+                conn.execute(
+                    "INSERT OR REPLACE INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![id, entry_id, session_path, role, source_type, content, timestamp],
+                )
+                .map_err(|e| format!("Failed to insert message entry (session: {}, row: {}): {}", session.path, id, e))?;
+                inserted_count += 1;
             }
         }
     }
@@ -1540,9 +1589,6 @@ pub fn upsert_message_entries(
     session_path: &str,
     entries: &[SessionEntry],
 ) -> Result<(), String> {
-    use rusqlite::OptionalExtension;
-
-    // Check if message_entries table exists (FTS may be disabled)
     let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'")
         .map_err(|e| format!("Failed to check message_entries existence: {e}"))?;
@@ -1551,41 +1597,68 @@ pub fn upsert_message_entries(
         .unwrap_or(false);
 
     if !exists {
-        // FTS is disabled or table not created yet - skip
         return Ok(());
     }
 
-    // Drop the statement to release borrow
     drop(stmt);
 
-    // Delete existing entries for this session (non-transactional, each execute is auto-committed)
     conn.execute(
         "DELETE FROM message_entries WHERE session_path = ?",
         params![session_path],
     )
     .map_err(|e| format!("Failed to delete existing message entries for {session_path}: {e}"))?;
 
-    // Insert each entry (could be batched but ok)
+    let include_thinking = load_include_thinking_in_search();
+
     for entry in entries {
-        if let Some(ref msg) = entry.message {
-            // Concatenate all text content parts into a single string
-            let content = msg
-                .content
-                .iter()
-                .filter_map(|c| c.text.as_deref())
-                .collect::<String>();
+        let Some(ref msg) = entry.message else {
+            continue;
+        };
 
-            if content.is_empty() {
-                continue;
+        let mut visible_parts = Vec::new();
+        let mut thinking_parts = Vec::new();
+        for item in &msg.content {
+            match item.content_type.as_str() {
+                "thinking" => {
+                    if include_thinking {
+                        if let Some(text) = item.text.as_deref() {
+                            let trimmed = text.trim();
+                            if !trimmed.is_empty() {
+                                thinking_parts.push(trimmed.to_string());
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    if let Some(text) = item.text.as_deref() {
+                        let trimmed = text.trim();
+                        if !trimmed.is_empty() {
+                            visible_parts.push(trimmed.to_string());
+                        }
+                    }
+                }
             }
+        }
 
+        let mut segments = Vec::new();
+        if !visible_parts.is_empty() {
+            segments.push((msg.role.clone(), visible_parts.join("\n")));
+        }
+        if include_thinking && !thinking_parts.is_empty() {
+            segments.push(("thinking".to_string(), thinking_parts.join("\n")));
+        }
+
+        for (source_type, content) in segments {
+            let row_id = format!("{}:{}", entry.id, source_type);
             conn.execute(
-                "INSERT OR REPLACE INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT OR REPLACE INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 params![
+                    row_id,
                     &entry.id,
                     session_path,
                     &msg.role,
-                    &content,
+                    source_type,
+                    content,
                     &entry.timestamp.to_rfc3339(),
                 ],
             )
@@ -1636,12 +1709,12 @@ pub fn search_message_fts(
 
     let sql = format!(
         "SELECT \
-            m.id, \
+            m.entry_id, \
             m.session_path, \
             m.role, \
-            snippet(message_fts, 2, '<b>', '</b>', '...', 80) as snippet, \
+            snippet(message_fts, 3, '<b>', '</b>', '...', 80) as snippet, \
             m.timestamp, \
-            m.rowid as rank \
+            bm25(message_fts) as rank \
          FROM message_entries m \
          JOIN message_fts ON m.rowid = message_fts.rowid \
          WHERE message_fts MATCH ? \

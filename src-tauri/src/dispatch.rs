@@ -231,6 +231,11 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
                 .or_else(|| payload.get("globPattern"))
                 .and_then(|v| v.as_str())
                 .map(String::from);
+            let project_path = payload
+                .get("project_path")
+                .or_else(|| payload.get("projectPath"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
             let page = payload.get("page").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
             let page_size = payload
                 .get("page_size")
@@ -246,6 +251,7 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
                 query,
                 role_filter,
                 glob_pattern,
+                project_path,
                 page,
                 page_size,
                 match_mode,

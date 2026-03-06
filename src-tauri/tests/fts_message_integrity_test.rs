@@ -647,8 +647,10 @@ fn test_fts_escaping_and_snippet_tags() {
     conn.execute(
         "CREATE TABLE message_entries (
             id TEXT PRIMARY KEY,
+            entry_id TEXT NOT NULL,
             session_path TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking')),
             content TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
@@ -662,10 +664,12 @@ fn test_fts_escaping_and_snippet_tags() {
 
     // Insert a message entry with special characters: quotes and backslash
     conn.execute(
-        "INSERT INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
+            "m1:user",
             "m1",
             "/test/session.jsonl",
+            "user",
             "user",
             "This contains \"double quotes\" and \\ backslash in the text",
             "2025-01-01T00:00:00Z"
@@ -748,8 +752,8 @@ fn test_database_recovery_from_message_fts_corruption() {
             ],
         ).unwrap();
         conn.execute(
-            "INSERT INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params!["m1", &session_path, "user", "Hello world", "2025-01-01T00:00:00Z"]
+            "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params!["m1:user", "m1", &session_path, "user", "user", "Hello world", "2025-01-01T00:00:00Z"]
         ).unwrap();
 
         // Verify FTS works
@@ -793,8 +797,8 @@ fn test_database_recovery_from_message_fts_corruption() {
         ],
     ).unwrap();
     conn2.execute(
-        "INSERT INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params!["m1", &session_path, "user", "Hello world", "2025-01-01T00:00:00Z"]
+        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params!["m1:user", "m1", &session_path, "user", "user", "Hello world", "2025-01-01T00:00:00Z"]
     ).unwrap();
 
     // Verify FTS works after recovery

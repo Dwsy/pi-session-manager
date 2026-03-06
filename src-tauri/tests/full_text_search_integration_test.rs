@@ -37,6 +37,43 @@ fn make_session_file(id: &str, cwd: &str, messages: &[(&str, &str)]) -> String {
     lines.join("\n")
 }
 
+fn write_app_settings(include_thinking_in_search: bool) {
+    pi_session_manager::settings_store::set(
+        "app_settings",
+        &serde_json::json!({
+            "search": {
+                "includeThinkingInSearch": include_thinking_in_search,
+            }
+        }),
+    )
+    .unwrap();
+}
+
+fn make_session_file_with_thinking(id: &str, cwd: &str, messages: &[(&str, &str, Option<&str>)]) -> String {
+    let header = format!(
+        r#"{{"type":"session","version":3,"id":"{id}","timestamp":"2026-02-10T22:00:00Z","cwd":"{cwd}"}}"#
+    );
+    let mut lines = vec![header];
+    for (i, (role, text, thinking)) in messages.iter().enumerate() {
+        let entry_id = format!("{id}-msg{i}");
+        let timestamp = format!("2026-02-10T22:00:{i:02}Z");
+        let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
+        let content = if let Some(thinking_text) = thinking {
+            let escaped_thinking = thinking_text.replace('\\', "\\\\").replace('"', "\\\"");
+            format!(
+                r#"[{{"type":"text","text":"{escaped}"}},{{"type":"thinking","thinking":"{escaped_thinking}"}}]"#
+            )
+        } else {
+            format!(r#"[{{"type":"text","text":"{escaped}"}}]"#)
+        };
+        let msg = format!(
+            r#"{{"type":"message","id":"{entry_id}","parentId":null,"timestamp":"{timestamp}","message":{{"role":"{role}","content":{content}}}}}"#
+        );
+        lines.push(msg);
+    }
+    lines.join("\n")
+}
+
 /// Set up a test database with sessions and message entries
 fn setup_test_db(sessions: &[(&str, &str, &[(&str, &str)])]) -> tempfile::TempDir {
     let temp_dir = tempdir().unwrap();
@@ -113,7 +150,7 @@ async fn test_full_text_search_command_basic() {
 
     // Test 1: Search for "banana"
     let response: FullTextSearchResponse =
-        full_text_search("banana".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("banana".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
 
@@ -130,7 +167,7 @@ async fn test_full_text_search_command_basic() {
 
     // Test 2: Search for "rust"
     let response: FullTextSearchResponse =
-        full_text_search("rust".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("rust".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
 
@@ -141,7 +178,7 @@ async fn test_full_text_search_command_basic() {
 
     // Test 3: Role filter - user only on "banana"
     let response: FullTextSearchResponse =
-        full_text_search("banana".to_string(), "user".to_string(), None, 0, 10, None)
+        full_text_search("banana".to_string(), "user".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
 
@@ -153,6 +190,7 @@ async fn test_full_text_search_command_basic() {
     let response: FullTextSearchResponse = full_text_search(
         "banana".to_string(),
         "assistant".to_string(),
+        None,
         None,
         0,
         10,
@@ -166,7 +204,7 @@ async fn test_full_text_search_command_basic() {
 
     // Test 5: Empty query
     let response: FullTextSearchResponse =
-        full_text_search("".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
     assert_eq!(response.total_hits, 0);
@@ -176,6 +214,7 @@ async fn test_full_text_search_command_basic() {
     let response: FullTextSearchResponse = full_text_search(
         "xyznonexistent".to_string(),
         "all".to_string(),
+        None,
         None,
         0,
         10,
@@ -188,14 +227,14 @@ async fn test_full_text_search_command_basic() {
 
     // Test 7: Pagination
     let page0: FullTextSearchResponse =
-        full_text_search("rust".to_string(), "all".to_string(), None, 0, 2, None)
+        full_text_search("rust".to_string(), "all".to_string(), None, None, 0, 2, None)
             .await
             .unwrap();
     assert!(page0.total_hits >= 2);
     assert!(page0.hits.len() <= 2);
 
     let page1: FullTextSearchResponse =
-        full_text_search("rust".to_string(), "all".to_string(), None, 1, 2, None)
+        full_text_search("rust".to_string(), "all".to_string(), None, None, 1, 2, None)
             .await
             .unwrap();
     let total_from_pages = page0.hits.len() + page1.hits.len();
@@ -206,6 +245,7 @@ async fn test_full_text_search_command_basic() {
         "banana".to_string(),
         "all".to_string(),
         Some("/cwd1/*".to_string()),
+        None,
         0,
         10,
         None,
@@ -219,7 +259,7 @@ async fn test_full_text_search_command_basic() {
 
     // Test 9: Score is positive
     let response: FullTextSearchResponse =
-        full_text_search("banana".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("banana".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
     for hit in &response.hits {
@@ -241,7 +281,7 @@ async fn test_full_text_search_pagination_across_sessions() {
 
     // Query "banana" with page size 3, per-session limit 3
     let page0: FullTextSearchResponse =
-        full_text_search("banana".to_string(), "all".to_string(), None, 0, 3, None)
+        full_text_search("banana".to_string(), "all".to_string(), None, None, 0, 3, None)
             .await
             .unwrap();
 
@@ -252,7 +292,7 @@ async fn test_full_text_search_pagination_across_sessions() {
 
     // Query "apple" with page size 10
     let page0: FullTextSearchResponse =
-        full_text_search("apple".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("apple".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
     assert_eq!(page0.total_hits, 3);
@@ -272,7 +312,7 @@ async fn test_full_text_search_result_structure() {
     )]);
 
     let response: FullTextSearchResponse =
-        full_text_search("hello".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("hello".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
 
@@ -316,6 +356,7 @@ async fn test_full_text_search_escaping_special_chars() {
         r#"double quotes"#.to_string(),
         "all".to_string(),
         None,
+        None,
         0,
         10,
         None,
@@ -329,6 +370,7 @@ async fn test_full_text_search_escaping_special_chars() {
         "backslash".to_string(),
         "all".to_string(),
         None,
+        None,
         0,
         10,
         None,
@@ -341,6 +383,7 @@ async fn test_full_text_search_escaping_special_chars() {
     let response: FullTextSearchResponse = full_text_search(
         r#""double""#.to_string(),
         "all".to_string(),
+        None,
         None,
         0,
         10,
@@ -370,7 +413,7 @@ async fn test_full_text_search_after_session_update() {
 
     // Verify initial search
     let resp1: FullTextSearchResponse =
-        full_text_search("Initial".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("Initial".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
     assert!(!resp1.hits.is_empty());
@@ -391,7 +434,7 @@ async fn test_full_text_search_after_session_update() {
 
     // Search for "Updated"
     let resp2: FullTextSearchResponse =
-        full_text_search("Updated".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("Updated".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
     assert!(!resp2.hits.is_empty());
@@ -399,7 +442,7 @@ async fn test_full_text_search_after_session_update() {
 
     // Original "Initial" should still be there
     let resp3: FullTextSearchResponse =
-        full_text_search("Initial".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("Initial".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
     assert!(!resp3.hits.is_empty());
@@ -425,7 +468,7 @@ async fn test_full_text_search_cascade_delete() {
 
     // Verify both searchable
     let resp_before: FullTextSearchResponse =
-        full_text_search("deleteme".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("deleteme".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
     assert!(!resp_before.hits.is_empty());
@@ -458,14 +501,14 @@ async fn test_full_text_search_cascade_delete() {
 
     // Search for "deleteme" should not find anything
     let resp_after: FullTextSearchResponse =
-        full_text_search("deleteme".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("deleteme".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
     assert!(resp_after.hits.is_empty());
 
     // Search for "keepme" should still work
     let resp_keep: FullTextSearchResponse =
-        full_text_search("keepme".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("keepme".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
     assert!(!resp_keep.hits.is_empty());
@@ -491,7 +534,7 @@ async fn test_full_text_search_per_session_limit_uses_recent() {
 
     // Search for "test" with page size 10 to retrieve all hits (per-session limit applies)
     let response: FullTextSearchResponse =
-        full_text_search("test".to_string(), "all".to_string(), None, 0, 10, None)
+        full_text_search("test".to_string(), "all".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
 
@@ -529,6 +572,7 @@ async fn test_full_text_search_role_filter_case_insensitive() {
         "Hello".to_string(),
         "USER".to_string(), // case-insensitive
         None,
+        None,
         0,
         10,
         None,
@@ -540,7 +584,7 @@ async fn test_full_text_search_role_filter_case_insensitive() {
 
     // Mixed case "AssIstant" should return only assistant messages for "Hi"
     let response: FullTextSearchResponse =
-        full_text_search("Hi".to_string(), "AssIstant".to_string(), None, 0, 10, None)
+        full_text_search("Hi".to_string(), "AssIstant".to_string(), None, None, 0, 10, None)
             .await
             .unwrap();
     assert!(!response.hits.is_empty());
@@ -569,6 +613,7 @@ async fn test_full_text_search_match_modes() {
         "love Rust".to_string(),
         "all".to_string(),
         None,
+        None,
         0,
         10,
         Some("any".to_string()),
@@ -588,6 +633,7 @@ async fn test_full_text_search_match_modes() {
         "love Rust".to_string(),
         "all".to_string(),
         None,
+        None,
         0,
         10,
         Some("all".to_string()),
@@ -606,6 +652,7 @@ async fn test_full_text_search_match_modes() {
     let resp_phrase: FullTextSearchResponse = full_text_search(
         "love Rust".to_string(),
         "all".to_string(),
+        None,
         None,
         0,
         10,
@@ -641,6 +688,7 @@ async fn test_full_text_search_any_mode_honors_quoted_phrase() {
         "\"foo bar\"".to_string(),
         "all".to_string(),
         None,
+        None,
         0,
         10,
         None,
@@ -657,4 +705,120 @@ async fn test_full_text_search_any_mode_honors_quoted_phrase() {
         .hits
         .iter()
         .any(|hit| hit.content.to_lowercase().contains("foo middle bar")));
+}
+
+#[tokio::test]
+async fn test_full_text_search_project_path_filter() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+    let _temp_dir = setup_test_db(&[
+        ("proj1", "/workspace/project-a", &[("user", "shared keyword")]),
+        ("proj2", "/workspace/project-b", &[("user", "shared keyword")]),
+    ]);
+
+    let response = full_text_search(
+        "shared keyword".to_string(),
+        "all".to_string(),
+        None,
+        Some("/workspace/project-a".to_string()),
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(response.total_hits, 1);
+    assert_eq!(response.hits.len(), 1);
+    assert!(response.hits.iter().all(|hit| hit.session_id == "proj1"));
+}
+
+#[tokio::test]
+async fn test_full_text_search_thinking_toggle() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+    let temp_dir = tempdir().unwrap();
+    let sessions_dir = temp_dir.path().join("sessions");
+    fs::create_dir_all(&sessions_dir).unwrap();
+    env::set_var("HOME", temp_dir.path());
+
+    write_app_settings(false);
+    let config = Config::default();
+    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+
+    let path = sessions_dir.join("thinking.jsonl");
+    fs::write(
+        &path,
+        make_session_file_with_thinking(
+            "thinking",
+            "/workspace/project-thinking",
+            &[("assistant", "visible answer", Some("hidden chain of thought"))],
+        ),
+    )
+    .unwrap();
+
+    let (session, entries) = scanner::parse_session_info(&path).unwrap();
+    sqlite_cache::upsert_session(&conn, &session, Utc::now(), Some(&entries)).unwrap();
+    drop(conn);
+
+    let disabled = full_text_search(
+        "hidden chain of thought".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(disabled.total_hits, 0);
+
+    write_app_settings(true);
+    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+    let (session, entries) = scanner::parse_session_info(&path).unwrap();
+    sqlite_cache::upsert_session(&conn, &session, Utc::now(), Some(&entries)).unwrap();
+    drop(conn);
+
+    let enabled = full_text_search(
+        "hidden chain of thought".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(enabled.total_hits, 1);
+    assert_eq!(enabled.hits[0].source_type, "thinking");
+    assert_eq!(enabled.hits[0].entry_id, "thinking-msg0");
+}
+
+
+#[tokio::test]
+async fn test_full_text_search_cjk_substring_query() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+
+    let _temp_dir = setup_test_db(&[(
+        "cjk1",
+        "/workspace/project-cjk",
+        &[("user", "你这人真弱智吗")],
+    )]);
+
+    let response = full_text_search(
+        "弱智".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(response.total_hits, 1);
+    assert_eq!(response.hits.len(), 1);
+    assert_eq!(response.hits[0].entry_id, "cjk1-msg0");
+    assert!(response.hits[0].content.contains("弱智"));
 }

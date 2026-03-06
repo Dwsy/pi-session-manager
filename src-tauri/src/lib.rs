@@ -10,6 +10,7 @@ pub mod models;
 pub mod scanner;
 pub mod scanner_scheduler;
 pub mod search;
+pub mod search_index;
 pub mod session_delete;
 pub mod session_intel;
 pub mod session_parser;
