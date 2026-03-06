@@ -20,6 +20,11 @@ export function baseOptions(lang?: string): BaseLayoutProps {
       { text: lang === 'cn' ? '文档' : 'Docs', url: `${prefix}/docs` },
       { text: lang === 'cn' ? '下载' : 'Download', url: `${prefix}/#download` },
       {
+        text: lang === 'cn' ? '预览' : 'Preview',
+        url: 'https://dwsy.github.io/pi-session-manager/demo/',
+        external: true,
+      },
+      {
         text: 'GitHub',
         url: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
         external: true,
