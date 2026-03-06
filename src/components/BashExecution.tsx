@@ -3,6 +3,7 @@ import { useSessionView } from '../contexts/SessionViewContext'
 import CodeBlock from './CodeBlock'
 import hljs from 'highlight.js'
 import { escapeHtml } from '../utils/markdown'
+import { useClipboard } from '../hooks/useClipboard'
 
 interface BashExecutionProps {
   command: string
@@ -24,6 +25,7 @@ export default function BashExecution({
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const expanded = isToolExpanded(entryId)
   const [commandCopied, setCommandCopied] = useState(false)
+  const { copyText } = useClipboard()
 
   const highlightedCommand = useMemo(() => {
     try {
@@ -42,7 +44,7 @@ export default function BashExecution({
 
   const handleCopyCommand = async () => {
     try {
-      await navigator.clipboard.writeText(command)
+      await copyText(command)
       setCommandCopied(true)
       setTimeout(() => setCommandCopied(false), 2000)
     } catch (err) {

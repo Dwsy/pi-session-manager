@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import hljs from 'highlight.js'
 import { getLanguageFromPath } from '../utils/markdown'
+import { useClipboard } from '../hooks/useClipboard'
 
 interface CodeBlockProps {
   code: string
@@ -23,6 +24,7 @@ function CodeBlock({
   const { t } = useTranslation()
   const codeRef = useRef<HTMLElement>(null)
   const [copied, setCopied] = useState(false)
+  const { copyText } = useClipboard()
 
   useEffect(() => {
     if (codeRef.current) {
@@ -45,7 +47,7 @@ function CodeBlock({
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(code)
+      await copyText(code)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

@@ -6,6 +6,7 @@ import { useSessionView } from '../contexts/SessionViewContext'
 import { formatDate } from '../utils/format'
 import { Copy, Check } from 'lucide-react'
 import { memo, useMemo, useState } from 'react'
+import { useClipboard } from '../hooks/useClipboard'
 
 interface AssistantMessageProps {
   content: Content[]
@@ -120,6 +121,7 @@ function AssistantMessage({
 }: AssistantMessageProps) {
   const { showThinking } = useSessionView()
   const [copied, setCopied] = useState(false)
+  const { copyText } = useClipboard()
 
   const textBlocks = useMemo(
     () => content.filter(c => c.type === 'text' && c.text),
@@ -164,7 +166,7 @@ function AssistantMessage({
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(allText)
+      await copyText(allText)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

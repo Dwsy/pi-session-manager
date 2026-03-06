@@ -8,6 +8,7 @@ import { X, Plus, ChevronDown, Maximize2, Minimize2 } from 'lucide-react'
 import { getPlatformDefaults } from './settings/types'
 import { useResolvedTheme } from '../hooks/useResolvedTheme'
 import { getPathBasename } from '../utils/path'
+import { useClipboard } from '../hooks/useClipboard'
 
 interface ShellInfo { label: string; path: string }
 
@@ -77,6 +78,7 @@ interface TerminalPanelProps {
 function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme }: {
   id: string; shell: string; cwd: string; isVisible: boolean; fontSize: number; resolvedTheme: 'dark' | 'light'
 }) {
+  const { copyText, readText } = useClipboard()
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
@@ -126,14 +128,14 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c' && term.hasSelection()) {
         e.preventDefault()
         const selectedText = term.getSelection()
-        navigator.clipboard.writeText(selectedText).catch(() => {})
+        copyText(selectedText).catch(() => {})
         return false
       }
       
       // Cmd/Ctrl+V - Paste
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'v') {
         e.preventDefault()
-        navigator.clipboard.readText().then(text => {
+        readText().then(text => {
           term.input(text)
         }).catch(() => {})
         return false
@@ -185,7 +187,7 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
       invoke('terminal_close', { id }).catch(() => {})
       term.dispose()
     }
-  }, [id, cwd, shell, fontSize, termTheme])
+  }, [id, cwd, shell, fontSize, termTheme, copyText, readText])
 
   useEffect(() => {
     if (termRef.current) {
