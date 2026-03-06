@@ -38,6 +38,13 @@ export default function SearchSettings({ settings, onUpdate }: SearchSettingsPro
       />
 
       <SettingsToggleRow
+        title={t('settings.search.includeThinkingInSearch', '搜索思考文本')}
+        description={t('settings.search.includeThinkingInSearchHelp', '将模型思考文本纳入消息搜索索引，关闭时只索引用户输入和模型回复')}
+        checked={settings.search.includeThinkingInSearch}
+        onChange={(checked) => onUpdate('search', 'includeThinkingInSearch', checked)}
+      />
+
+      <SettingsToggleRow
         title={t('settings.search.highlightMatches', '高亮匹配')}
         description={t('settings.search.highlightMatchesHelp', '在搜索结果中高亮显示匹配文本')}
         checked={settings.search.highlightMatches}

@@ -5,6 +5,7 @@ import { invoke } from '../transport';
 import { shortenPath } from '../utils/format';
 import { getPathParentName } from '../utils/path';
 import { parseQuotedQuery } from '../utils/search';
+import { getCachedSettings } from '../utils/settingsApi';
 import type { FullTextSearchHit, FullTextSearchResponse, SessionInfo } from '../types';
 import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '../demo';
 
@@ -122,6 +123,8 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
           query: searchQuery,
           roleFilter: role as 'all' | 'user' | 'assistant',
           globPattern: glob || null,
+          projectPath: null,
+          includeThinking: getCachedSettings().search.includeThinkingInSearch,
           page: pageNum,
           pageSize: pageSize,
           matchMode: 'any',
@@ -130,6 +133,8 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
           query: searchQuery,
           roleFilter: role,
           globPattern: glob || null,
+          projectPath: null,
+          includeThinking: getCachedSettings().search.includeThinkingInSearch,
           page: pageNum,
           pageSize: pageSize,
           matchMode: 'any', // default mode; could be made configurable

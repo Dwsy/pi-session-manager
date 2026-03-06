@@ -82,7 +82,7 @@ function matchPathWithGlob(path: string, globPattern: string | null | undefined)
   return regex.test(normalizedPath)
 }
 
-function extractMessageText(entry: SessionEntry): string {
+function extractMessageText(entry: SessionEntry, includeThinking = true): string {
   if (entry.type !== 'message' || !entry.message?.content) {
     return ''
   }
@@ -95,7 +95,7 @@ function extractMessageText(entry: SessionEntry): string {
       continue
     }
 
-    if (item.type === 'thinking' && item.thinking) {
+    if (includeThinking && item.type === 'thinking' && item.thinking) {
       pieces.push(item.thinking)
       continue
     }
@@ -249,6 +249,10 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
       continue
     }
 
+    if (options.projectPath && session.cwd !== options.projectPath) {
+      continue
+    }
+
     const entries = state.entriesByPath.get(session.path)
     if (!entries) continue
 
@@ -258,7 +262,7 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
       if (role !== 'user' && role !== 'assistant') continue
       if (roleFilter !== 'all' && role !== roleFilter) continue
 
-      const content = extractMessageText(entry)
+      const content = extractMessageText(entry, options.includeThinking === true)
       if (!content) continue
       if (!matchMessageByTerms(content, terms, matchMode)) continue
 
@@ -270,6 +274,7 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
         session_name: session.name,
         entry_id: entry.id,
         role,
+        source_type: role,
         content,
         timestamp: entry.timestamp,
         score,

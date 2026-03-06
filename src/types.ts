@@ -235,6 +235,7 @@ export interface FullTextSearchHit {
   session_name?: string
   entry_id: string
   role: string
+  source_type: 'user' | 'assistant' | 'thinking'
   content: string
   timestamp: string
   score: number

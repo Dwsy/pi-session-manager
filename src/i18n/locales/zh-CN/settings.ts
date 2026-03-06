@@ -107,6 +107,8 @@ export const settings = {
     includeToolCallsHelp: '在搜索结果中包含工具调用内容',
     highlightMatches: '高亮匹配',
     highlightMatchesHelp: '在搜索结果中高亮显示匹配文本',
+    includeThinkingInSearch: '搜索思考文本',
+    includeThinkingInSearchHelp: '将模型思考文本纳入消息搜索索引，关闭时只索引用户输入和模型回复',
   },
   export: {
     defaultFormat: '默认导出格式',

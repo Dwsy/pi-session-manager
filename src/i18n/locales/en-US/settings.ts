@@ -114,6 +114,8 @@ export const settings = {
     includeToolCallsHelp: 'Include tool call content in search results',
     highlightMatches: 'Highlight Matches',
     highlightMatchesHelp: 'Highlight matching text in search results',
+    includeThinkingInSearch: 'Search thinking text',
+    includeThinkingInSearchHelp: 'Include model thinking text in the message search index. When disabled, only user input and assistant replies are indexed',
   },
   export: {
     defaultFormat: 'Default Export Format',

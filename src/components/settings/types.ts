@@ -61,6 +61,7 @@ export interface AppSettings {
     defaultSearchMode: 'content' | 'name'
     caseSensitive: boolean
     includeToolCalls: boolean
+    includeThinkingInSearch: boolean
     highlightMatches: boolean
   }
   export: {
@@ -126,6 +127,7 @@ export const defaultSettings: AppSettings = {
     defaultSearchMode: 'content',
     caseSensitive: false,
     includeToolCalls: false,
+    includeThinkingInSearch: false,
     highlightMatches: true,
   },
   export: {
