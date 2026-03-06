@@ -37,6 +37,7 @@ export type AppDesktopSidebarSessionListCommonProps = Pick<
   | "onToggleTag"
   | "onCreateTag"
   | "selectionModeTrigger"
+  | "selectionModeDismissTrigger"
 >;
 
 export interface AppDesktopSidebarContentProps {

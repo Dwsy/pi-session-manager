@@ -24,7 +24,9 @@ export const common = {
   untitled: 'Sans titre',
   unknown: 'Inconnu',
   deleteSession: 'Supprimer la session',
+  deleteSessions: 'Supprimer les sessions',
   confirmDelete: 'Êtes-vous sûr de vouloir supprimer la session « {name} » ?',
+  moreItems: '+{{count}} de plus',
   enabled: 'Activé',
   disabled: 'Désactivé',
   yes: 'Oui',
@@ -32,7 +34,7 @@ export const common = {
   created: 'Créé',
   updated: 'Mis à jour',
   time: {
-    justNow: 'À l\'instant',
+    justNow: "À l'instant",
     minutesAgo: 'il y a {{count}} min',
     hoursAgo: 'il y a {{count}} h',
     daysAgo: 'il y a {{count}} jours',

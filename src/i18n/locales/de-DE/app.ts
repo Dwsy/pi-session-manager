@@ -11,6 +11,7 @@ export const app = {
   shortcuts: {
     resume: 'Sitzung fortsetzen (Cmd+R)',
     exportHtml: 'Exportieren & öffnen (Cmd+E)',
+    deleteSelected: 'Ausgewählte Sitzung(en) löschen (Cmd+Backspace)',
     projectView: 'Projektansicht (Cmd+P)',
     searchAll: 'Alle Sitzungen durchsuchen (Cmd+K)',
     search: 'Suche fokussieren (Cmd+F)',
@@ -20,11 +21,14 @@ export const app = {
   errors: {
     loadSessions: 'Sitzungen konnten nicht geladen werden',
     deleteSession: 'Sitzung konnte nicht gelöscht werden',
+    deleteSessionPartial: '{{count}} Sitzungen konnten nicht gelöscht werden. Details stehen in der Konsole.',
     renameSession: 'Sitzung konnte nicht umbenannt werden',
     exportFailed: 'Export fehlgeschlagen',
     exportSuccess: 'Export erfolgreich!',
   },
   confirm: {
     deleteSession: 'Sitzung „{name}" löschen?',
+    deleteSessions: '{{count}} ausgewählte Sitzungen löschen?',
+    deleteIrreversible: 'Diese Aktion kann nicht rückgängig gemacht werden.',
   },
 } as const

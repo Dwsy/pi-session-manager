@@ -8,56 +8,122 @@ interface ShortcutItem {
 }
 
 const shortcuts: ShortcutItem[] = [
-  { keys: 'Cmd+K', labelKey: 'app.shortcuts.searchAll', fallback: '搜索所有会话', category: 'search' },
-  { keys: 'Cmd+F', labelKey: 'app.shortcuts.search', fallback: '聚焦搜索框', category: 'search' },
-  { keys: 'Cmd+L', labelKey: 'app.viewMode.list', fallback: '列表视图', category: 'navigation' },
-  { keys: 'Cmd+P', labelKey: 'app.shortcuts.projectView', fallback: '项目视图', category: 'navigation' },
-  { keys: 'Cmd+B', labelKey: 'tags.kanban.title', fallback: '看板视图', category: 'navigation' },
-  { keys: 'Cmd+R', labelKey: 'app.shortcuts.resume', fallback: '恢复会话', category: 'session' },
-  { keys: 'Cmd+E', labelKey: 'app.shortcuts.exportHtml', fallback: '导出并打开', category: 'session' },
-  { keys: 'Cmd+,', labelKey: 'app.shortcuts.settings', fallback: '打开设置', category: 'general' },
-  { keys: 'Esc', labelKey: 'app.shortcuts.close', fallback: '关闭', category: 'general' },
-  { keys: 'F12', labelKey: 'settings.shortcuts.devtools', fallback: '开发者工具', category: 'general' },
+  {
+    keys: 'Cmd+K',
+    labelKey: 'app.shortcuts.searchAll',
+    fallback: 'Search all sessions',
+    category: 'search',
+  },
+  {
+    keys: 'Cmd+F',
+    labelKey: 'app.shortcuts.search',
+    fallback: 'Focus search',
+    category: 'search',
+  },
+  {
+    keys: 'Cmd+L',
+    labelKey: 'app.viewMode.list',
+    fallback: 'List view',
+    category: 'navigation',
+  },
+  {
+    keys: 'Cmd+P',
+    labelKey: 'app.shortcuts.projectView',
+    fallback: 'Project view',
+    category: 'navigation',
+  },
+  {
+    keys: 'Cmd+B',
+    labelKey: 'tags.kanban.title',
+    fallback: 'Kanban view',
+    category: 'navigation',
+  },
+  {
+    keys: 'Cmd+R',
+    labelKey: 'app.shortcuts.resume',
+    fallback: 'Resume session',
+    category: 'session',
+  },
+  {
+    keys: 'Cmd+E',
+    labelKey: 'app.shortcuts.exportHtml',
+    fallback: 'Export and open',
+    category: 'session',
+  },
+  {
+    keys: 'Cmd+Backspace',
+    labelKey: 'app.shortcuts.deleteSelected',
+    fallback: 'Delete selected sessions',
+    category: 'session',
+  },
+  {
+    keys: 'Cmd+,',
+    labelKey: 'app.shortcuts.settings',
+    fallback: 'Open settings',
+    category: 'general',
+  },
+  {
+    keys: 'Esc',
+    labelKey: 'app.shortcuts.close',
+    fallback: 'Close',
+    category: 'general',
+  },
+  {
+    keys: 'F12',
+    labelKey: 'settings.shortcuts.devtools',
+    fallback: 'Developer tools',
+    category: 'general',
+  },
 ]
 
 const categoryOrder: ShortcutItem['category'][] = ['search', 'navigation', 'session', 'general']
 
 const categoryLabels: Record<ShortcutItem['category'], { key: string; fallback: string }> = {
   search: { key: 'settings.shortcuts.categories.search', fallback: 'Search' },
-  navigation: { key: 'settings.shortcuts.categories.navigation', fallback: 'Navigation' },
-  session: { key: 'settings.shortcuts.categories.session', fallback: 'Session' },
-  general: { key: 'settings.shortcuts.categories.general', fallback: 'General' },
+  navigation: {
+    key: 'settings.shortcuts.categories.navigation',
+    fallback: 'Navigation',
+  },
+  session: {
+    key: 'settings.shortcuts.categories.session',
+    fallback: 'Session',
+  },
+  general: {
+    key: 'settings.shortcuts.categories.general',
+    fallback: 'General',
+  },
 }
 
 export default function ShortcutSettings() {
   const { t } = useTranslation()
 
-  const grouped = categoryOrder.map(cat => ({
+  const grouped = categoryOrder.map((cat) => ({
     category: cat,
     label: categoryLabels[cat],
-    items: shortcuts.filter(s => s.category === cat),
+    items: shortcuts.filter((s) => s.category === cat),
   }))
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        {t('settings.shortcuts.description', '查看所有可用的键盘快捷键。在 macOS 上使用 Cmd，在 Windows/Linux 上使用 Ctrl。')}
+        {t(
+          'settings.shortcuts.description',
+          'View all available keyboard shortcuts. Use Cmd on macOS and Ctrl on Windows/Linux.',
+        )}
       </p>
 
-      {grouped.map(group => (
+      {grouped.map((group) => (
         <div key={group.category} className="space-y-2">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             {t(group.label.key, group.label.fallback)}
           </h4>
           <div className="bg-surface rounded-lg divide-y divide-border">
-            {group.items.map(item => (
+            {group.items.map((item) => (
               <div
                 key={item.keys}
                 className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 px-4 py-3 min-h-[44px]"
               >
-                <span className="text-sm text-foreground min-w-0">
-                  {t(item.labelKey, item.fallback)}
-                </span>
+                <span className="text-sm text-foreground min-w-0">{t(item.labelKey, item.fallback)}</span>
                 <kbd className="inline-flex items-center gap-1 px-2 py-1 bg-surface-dark border border-border-hover rounded text-xs font-mono text-foreground shadow-sm flex-shrink-0 w-fit">
                   {item.keys}
                 </kbd>

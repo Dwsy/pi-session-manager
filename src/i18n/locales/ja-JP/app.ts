@@ -11,6 +11,7 @@ export const app = {
   shortcuts: {
     resume: 'セッション再開 (Cmd+R)',
     exportHtml: 'エクスポート＆開く (Cmd+E)',
+    deleteSelected: '選択したセッションを削除 (Cmd+Backspace)',
     projectView: 'プロジェクト表示 (Cmd+P)',
     searchAll: '全セッション検索 (Cmd+K)',
     search: '検索にフォーカス (Cmd+F)',
@@ -20,11 +21,14 @@ export const app = {
   errors: {
     loadSessions: 'セッションの読み込みに失敗',
     deleteSession: 'セッションの削除に失敗',
+    deleteSessionPartial: '{{count}} 件のセッションを削除できませんでした。詳細はコンソールを確認してください。',
     renameSession: 'セッションの名前変更に失敗',
     exportFailed: 'エクスポートに失敗',
     exportSuccess: 'エクスポート成功！',
   },
   confirm: {
     deleteSession: 'セッション「{name}」を削除しますか？',
+    deleteSessions: '選択した {{count}} 件のセッションを削除しますか？',
+    deleteIrreversible: 'この操作は元に戻せません。',
   },
 } as const

@@ -27,6 +27,7 @@ export const session = {
     path: 'Path',
     selectMode: 'Select',
     selectedCount: '{{count}} selected',
+    selectedBadge: 'Selected',
     toggleSelection: 'Toggle selection',
     deleteSelected: 'Delete {{count}}',
     totalCount: '{{count}} sessions',

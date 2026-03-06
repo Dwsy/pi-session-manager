@@ -147,6 +147,8 @@ function App() {
     DEFAULT_SESSION_SORT_ORDER,
   );
   const [selectionModeTrigger, setSelectionModeTrigger] = useState(0);
+  const [selectionModeDismissTrigger, setSelectionModeDismissTrigger] =
+    useState(0);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     if (isDemoModeEnabled()) {
       try {
@@ -170,6 +172,9 @@ function App() {
   }, []);
   const triggerSelectionMode = useCallback(() => {
     setSelectionModeTrigger((value) => value + 1);
+  }, []);
+  const dismissSelectionMode = useCallback(() => {
+    setSelectionModeDismissTrigger((value) => value + 1);
   }, []);
   const [terminalMaximized, setTerminalMaximized] = useState(false);
   const [terminalPendingCommand, setTerminalPendingCommand] = useState<
@@ -260,10 +265,26 @@ function App() {
     }
   }, [selectedSession]);
 
+  const isBlockingShortcutOverlayOpen =
+    showSettings ||
+    showExportDialog ||
+    showRenameDialog ||
+    showFullTextSearch ||
+    showOnboarding ||
+    showTerminal ||
+    pendingDeleteSession !== null;
+
   const shortcuts = useMemo(
     () => ({
       "cmd+r": handleResumeSession,
       "cmd+e": handleExportAndOpen,
+      "cmd+backspace": () => {
+        if (!selectedSession || isBlockingShortcutOverlayOpen) {
+          return;
+        }
+
+        void handleDeleteSession(selectedSession);
+      },
       "cmd+l": () => {
         setViewMode("list");
         setSelectedProject(null);
@@ -285,7 +306,9 @@ function App() {
       },
       "cmd+shift+f": () => setShowFullTextSearch(true),
       escape: () => {
-        if (showSettings) {
+        if (pendingDeleteSession) {
+          cancelDeleteSession();
+        } else if (showSettings) {
           setShowSettings(false);
         } else if (showExportDialog) {
           setShowExportDialog(false);
@@ -305,20 +328,38 @@ function App() {
       },
     }),
     [
+      pendingDeleteSession,
+      cancelDeleteSession,
       showSettings,
       showExportDialog,
       showRenameDialog,
       showTerminal,
       terminalMaximized,
       selectedProject,
+      selectedSession,
       setSelectedSession,
       handleResumeSession,
       handleExportAndOpen,
+      handleDeleteSession,
+      isBlockingShortcutOverlayOpen,
       terminalConfig.enabled,
     ],
   );
 
-  useKeyboardShortcuts(shortcuts);
+  const shouldHandleGlobalShortcutEvent = useCallback(
+    (event: KeyboardEvent) => {
+      if (pendingDeleteSession) {
+        return event.key === "Escape";
+      }
+
+      return true;
+    },
+    [pendingDeleteSession],
+  );
+
+  useKeyboardShortcuts(shortcuts, {
+    shouldHandleEvent: shouldHandleGlobalShortcutEvent,
+  });
 
   const commandContext = useMemo<SearchContext>(
     () => ({
@@ -382,6 +423,7 @@ function App() {
     removeTagFromSession,
     createTag,
     selectionModeTrigger,
+    selectionModeDismissTrigger,
   });
 
   const onRenameSession = async (newName: string) => {
@@ -576,6 +618,7 @@ function App() {
       onCloseRenameDialog={() => setShowRenameDialog(false)}
       onConfirmDeleteSession={confirmDeleteSession}
       onCancelDeleteSession={cancelDeleteSession}
+      onDeleteSessionConfirmStart={dismissSelectionMode}
       onCloseSettings={() => {
         setShowSettings(false);
         reloadTerminalConfig();

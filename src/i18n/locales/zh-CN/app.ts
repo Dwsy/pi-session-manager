@@ -11,6 +11,7 @@ export const app = {
   shortcuts: {
     resume: '恢复会话 (Cmd+R)',
     exportHtml: '导出并打开 (Cmd+E)',
+    deleteSelected: '删除所选会话 (Cmd+Backspace)',
     projectView: '项目视图 (Cmd+P)',
     searchAll: '搜索所有会话 (Cmd+K)',
     search: '聚焦搜索框 (Cmd+F)',
@@ -20,11 +21,14 @@ export const app = {
   errors: {
     loadSessions: '加载会话失败',
     deleteSession: '删除会话失败',
+    deleteSessionPartial: '{{count}} 个会话删除失败，请查看控制台了解详情。',
     renameSession: '重命名会话失败',
     exportFailed: '导出失败',
     exportSuccess: '导出成功！',
   },
   confirm: {
     deleteSession: '确定要删除会话 "{name}" 吗？',
+    deleteSessions: '确定要删除选中的 {{count}} 个会话吗？',
+    deleteIrreversible: '此操作无法撤销。',
   },
 } as const

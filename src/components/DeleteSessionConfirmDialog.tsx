@@ -8,12 +8,14 @@ interface DeleteSessionConfirmDialogProps {
   sessions: SessionInfo[]
   onConfirm: () => Promise<void>
   onCancel: () => void
+  onConfirmStart?: () => void
 }
 
 export default function DeleteSessionConfirmDialog({
   sessions,
   onConfirm,
   onCancel,
+  onConfirmStart,
 }: DeleteSessionConfirmDialogProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -26,23 +28,13 @@ export default function DeleteSessionConfirmDialog({
     }
   }, [])
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isDeleting) {
-        onCancel()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isDeleting, onCancel])
-
   const handleConfirm = async () => {
     if (isDeleting) {
       return
     }
 
     setIsDeleting(true)
+    onConfirmStart?.()
     try {
       await onConfirm()
     } finally {
@@ -52,19 +44,47 @@ export default function DeleteSessionConfirmDialog({
     }
   }
 
+  const shouldConfirmOnEnter = (event: KeyboardEvent): boolean => {
+    const target = event.target
+    return !(target instanceof HTMLElement && target.dataset.deleteDialogAction === 'cancel')
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isDeleting) {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+        onCancel()
+        return
+      }
+
+      if (event.key === 'Enter' && !isDeleting && shouldConfirmOnEnter(event)) {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+        void handleConfirm()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true })
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true })
+  }, [handleConfirm, isDeleting, onCancel])
+
   const isBatchDelete = sessions.length > 1
   const firstSession = sessions[0]
   const sessionName = firstSession?.name || t('common.untitled')
   const previewSessions = sessions.slice(0, 3)
   const deleteActionLabel = isBatchDelete
     ? t('session.list.deleteSelected', {
-      count: sessions.length,
-      defaultValue: 'Delete {{count}}',
-    })
+        count: sessions.length,
+        defaultValue: 'Delete {{count}}',
+      })
     : t('common.delete')
 
   return (
     <div
+      data-delete-session-dialog="true"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px]"
       onClick={(event) => {
         if (event.target === event.currentTarget && !isDeleting) {
@@ -72,7 +92,9 @@ export default function DeleteSessionConfirmDialog({
         }
       }}
     >
-      <div className={`rounded-xl border border-border/70 bg-background p-6 shadow-2xl ${isMobile ? 'w-[95vw]' : 'w-[30rem]'}`}>
+      <div
+        className={`rounded-xl border border-border/70 bg-background p-6 shadow-2xl ${isMobile ? 'w-[95vw]' : 'w-[30rem]'}`}
+      >
         <div className="mb-3 flex items-start gap-3">
           <div className="mt-0.5 rounded-full bg-red-500/12 p-1.5 text-red-500">
             <AlertTriangle className="h-4 w-4" />
@@ -80,15 +102,17 @@ export default function DeleteSessionConfirmDialog({
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-foreground">
               {isBatchDelete
-                ? t('common.deleteSessions', { defaultValue: 'Delete sessions' })
+                ? t('common.deleteSessions', {
+                    defaultValue: 'Delete sessions',
+                  })
                 : t('common.deleteSession')}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {isBatchDelete
                 ? t('app.confirm.deleteSessions', {
-                  count: sessions.length,
-                  defaultValue: 'Delete {{count}} selected sessions?',
-                })
+                    count: sessions.length,
+                    defaultValue: 'Delete {{count}} selected sessions?',
+                  })
                 : t('app.confirm.deleteSession', { name: sessionName })}
             </p>
           </div>
@@ -125,6 +149,7 @@ export default function DeleteSessionConfirmDialog({
         <div className="flex justify-end gap-2">
           <button
             type="button"
+            data-delete-dialog-action="cancel"
             onClick={onCancel}
             disabled={isDeleting}
             className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring disabled:cursor-not-allowed disabled:opacity-60"
