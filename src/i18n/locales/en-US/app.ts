@@ -11,6 +11,7 @@ export const app = {
   shortcuts: {
     resume: 'Resume session (Cmd+R)',
     exportHtml: 'Export & open (Cmd+E)',
+    deleteSelected: 'Delete selected session(s) (Cmd+Backspace)',
     projectView: 'Project view (Cmd+P)',
     searchAll: 'Search all sessions (Cmd+K)',
     search: 'Focus search (Cmd+F)',
@@ -20,11 +21,14 @@ export const app = {
   errors: {
     loadSessions: 'Failed to load sessions',
     deleteSession: 'Failed to delete session',
+    deleteSessionPartial: '{{count}} sessions failed to delete. Check the console for details.',
     renameSession: 'Failed to rename session',
     exportFailed: 'Export failed',
     exportSuccess: 'Export successful!',
   },
   confirm: {
     deleteSession: 'Delete session "{name}"?',
+    deleteSessions: 'Delete {{count}} selected sessions?',
+    deleteIrreversible: 'This action cannot be undone.',
   },
 } as const

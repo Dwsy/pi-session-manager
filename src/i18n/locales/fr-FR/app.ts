@@ -11,6 +11,7 @@ export const app = {
   shortcuts: {
     resume: 'Reprendre la session (Cmd+R)',
     exportHtml: 'Exporter et ouvrir (Cmd+E)',
+    deleteSelected: 'Supprimer les sessions sélectionnées (Cmd+Backspace)',
     projectView: 'Vue projet (Cmd+P)',
     searchAll: 'Rechercher dans toutes les sessions (Cmd+K)',
     search: 'Recherche (Cmd+F)',
@@ -20,11 +21,14 @@ export const app = {
   errors: {
     loadSessions: 'Échec du chargement des sessions',
     deleteSession: 'Échec de la suppression de la session',
+    deleteSessionPartial: "{{count}} sessions n'ont pas pu être supprimées. Consultez la console pour plus de détails.",
     renameSession: 'Échec du renommage de la session',
-    exportFailed: 'Échec de l\'exportation',
+    exportFailed: "Échec de l'exportation",
     exportSuccess: 'Exportation réussie !',
   },
   confirm: {
     deleteSession: 'Supprimer la session « {name} » ?',
+    deleteSessions: 'Supprimer les {{count}} sessions sélectionnées ?',
+    deleteIrreversible: 'Cette action est irréversible.',
   },
 } as const

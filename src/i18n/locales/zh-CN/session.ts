@@ -27,6 +27,7 @@ export const session = {
     path: '路径',
     selectMode: '多选',
     selectedCount: '已选择 {{count}} 项',
+    selectedBadge: '已选择',
     toggleSelection: '切换选择',
     deleteSelected: '删除 {{count}} 项',
     totalCount: '{{count}} 个会话',

@@ -41,6 +41,7 @@ export interface AppOverlaysProps {
   onCloseRenameDialog: () => void;
   onConfirmDeleteSession: () => Promise<void>;
   onCancelDeleteSession: () => void;
+  onDeleteSessionConfirmStart?: () => void;
   onCloseSettings: () => void;
   onCloseFullTextSearch: () => void;
   onSelectFullTextSearchResult: (session: SessionInfo, entryId: string) => void;
@@ -65,6 +66,7 @@ function AppOverlays({
   onCloseRenameDialog,
   onConfirmDeleteSession,
   onCancelDeleteSession,
+  onDeleteSessionConfirmStart,
   onCloseSettings,
   onCloseFullTextSearch,
   onSelectFullTextSearchResult,
@@ -94,6 +96,7 @@ function AppOverlays({
           sessions={pendingDeleteSession.sessions}
           onConfirm={onConfirmDeleteSession}
           onCancel={onCancelDeleteSession}
+          onConfirmStart={onDeleteSessionConfirmStart}
         />
       )}
       <Suspense fallback={null}>

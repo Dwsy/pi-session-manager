@@ -30,6 +30,8 @@ export type AppProjectListPaneSessionListCommonProps = Pick<
   | "getTagsForSession"
   | "onToggleTag"
   | "onCreateTag"
+  | "selectionModeTrigger"
+  | "selectionModeDismissTrigger"
 >;
 
 export interface AppProjectListPaneProps {

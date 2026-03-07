@@ -17,6 +17,7 @@ import type { TerminalType } from "./settings/types";
 import { getPlatformDefaults } from "./settings/types";
 import { invoke, isTauri } from "../transport";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { isTextEntryTarget } from "../hooks/useKeyboardShortcuts";
 
 const ESTIMATED_ROW_HEIGHT = 122;
 const STICKY_SCROLL_TOP_THRESHOLD = 48;
@@ -49,6 +50,7 @@ interface SessionListProps {
   ) => void;
   onCreateTag?: (name: string, color: string) => void;
   selectionModeTrigger?: number;
+  selectionModeDismissTrigger?: number;
 }
 
 export default function SessionList({
@@ -74,6 +76,7 @@ export default function SessionList({
   onToggleTag,
   onCreateTag,
   selectionModeTrigger,
+  selectionModeDismissTrigger,
 }: SessionListProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -93,7 +96,12 @@ export default function SessionList({
     sessionId: string;
   } | null>(null);
   const lastSelectedSessionIdRef = useRef<string | null>(null);
+  const selectionAnchorSessionIdRef = useRef<string | null>(null);
+  const selectedSessionsRef = useRef<SessionInfo[]>([]);
   const lastSelectionModeTriggerRef = useRef(selectionModeTrigger);
+  const lastSelectionModeDismissTriggerRef = useRef(
+    selectionModeDismissTrigger,
+  );
   const scrollAnchorRef = useRef<{
     sessionId: string;
     top: number;
@@ -138,29 +146,101 @@ export default function SessionList({
     () => sessions.filter((session) => selectedSessionIds.has(session.id)),
     [sessions, selectedSessionIds],
   );
+
+  useEffect(() => {
+    selectedSessionsRef.current = selectedSessions;
+  }, [selectedSessions]);
   const allSessionsSelected =
     sessions.length > 0 && selectedSessionIds.size === sessions.length;
   const handleExitSelectionMode = useCallback(() => {
     setIsSelectionMode(false);
     setSelectedSessionIds(new Set());
     lastSelectedSessionIdRef.current = null;
+    selectionAnchorSessionIdRef.current = null;
   }, []);
   const handleEnterSelectionMode = useCallback(() => {
     setIsSelectionMode(true);
     if (selectedSession && sessionsById.has(selectedSession.id)) {
       setSelectedSessionIds(new Set([selectedSession.id]));
       lastSelectedSessionIdRef.current = selectedSession.id;
+      selectionAnchorSessionIdRef.current = selectedSession.id;
       return;
     }
     setSelectedSessionIds(new Set());
     lastSelectedSessionIdRef.current = null;
+    selectionAnchorSessionIdRef.current = null;
   }, [selectedSession, sessionsById]);
+  const handleStartSelectionMode = useCallback(
+    (sessionId: string, shiftKey: boolean) => {
+      if (!onDeleteSessions) {
+        return;
+      }
+
+      setIsSelectionMode(true);
+      setSelectedSessionIds((prev) => {
+        const next = new Set(prev);
+        const existingAnchorSessionId =
+          selectionAnchorSessionIdRef.current ??
+          lastSelectedSessionIdRef.current ??
+          (selectedSession && sessionsById.has(selectedSession.id)
+            ? selectedSession.id
+            : null);
+        const anchorSessionId = shiftKey
+          ? prev.size === 0
+            ? sessionId
+            : existingAnchorSessionId
+          : existingAnchorSessionId;
+        const currentIndex = sessionIndexById.get(sessionId);
+        const anchorIndex = anchorSessionId
+          ? sessionIndexById.get(anchorSessionId)
+          : undefined;
+
+        if (
+          shiftKey &&
+          currentIndex !== undefined &&
+          anchorIndex !== undefined &&
+          sessions.length > 0
+        ) {
+          if (anchorSessionId) {
+            next.add(anchorSessionId);
+          }
+          const rangeStart = Math.min(anchorIndex, currentIndex);
+          const rangeEnd = Math.max(anchorIndex, currentIndex);
+          for (let index = rangeStart; index <= rangeEnd; index += 1) {
+            const target = sessions[index];
+            if (target) {
+              next.add(target.id);
+            }
+          }
+          selectionAnchorSessionIdRef.current = anchorSessionId;
+          return next;
+        }
+
+        if (existingAnchorSessionId) {
+          next.add(existingAnchorSessionId);
+        }
+        next.add(sessionId);
+        selectionAnchorSessionIdRef.current = sessionId;
+        return next;
+      });
+      lastSelectedSessionIdRef.current = sessionId;
+    },
+    [
+      onDeleteSessions,
+      selectedSession,
+      sessionIndexById,
+      sessions,
+      sessionsById,
+    ],
+  );
   const toggleSessionSelection = useCallback(
     (sessionId: string, shiftKey = false) => {
       setSelectedSessionIds((prev) => {
         const next = new Set(prev);
         const currentIndex = sessionIndexById.get(sessionId);
-        const anchorSessionId = lastSelectedSessionIdRef.current;
+        const anchorSessionId =
+          selectionAnchorSessionIdRef.current ??
+          lastSelectedSessionIdRef.current;
         const anchorIndex = anchorSessionId
           ? sessionIndexById.get(anchorSessionId)
           : undefined;
@@ -179,6 +259,9 @@ export default function SessionList({
               next.add(target.id);
             }
           }
+          if (anchorSessionId) {
+            selectionAnchorSessionIdRef.current = anchorSessionId;
+          }
           return next;
         }
 
@@ -187,6 +270,7 @@ export default function SessionList({
         } else {
           next.add(sessionId);
         }
+        selectionAnchorSessionIdRef.current = sessionId;
         return next;
       });
       lastSelectedSessionIdRef.current = sessionId;
@@ -268,10 +352,7 @@ export default function SessionList({
 
     return () => {
       const container = scrollParentRef?.current;
-      if (
-        !container ||
-        container.scrollTop <= STICKY_SCROLL_TOP_THRESHOLD
-      ) {
+      if (!container || container.scrollTop <= STICKY_SCROLL_TOP_THRESHOLD) {
         scrollAnchorRef.current = null;
         return;
       }
@@ -309,6 +390,12 @@ export default function SessionList({
       !liveIds.has(lastSelectedSessionIdRef.current)
     ) {
       lastSelectedSessionIdRef.current = null;
+    }
+    if (
+      selectionAnchorSessionIdRef.current &&
+      !liveIds.has(selectionAnchorSessionIdRef.current)
+    ) {
+      selectionAnchorSessionIdRef.current = null;
     }
 
     setSelectedSessionIds((prev) => {
@@ -353,15 +440,42 @@ export default function SessionList({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isTextEntryTarget(event.target)) {
+        return;
+      }
+
+      if (document.querySelector('[data-delete-session-dialog="true"]')) {
+        return;
+      }
+
+      const isDeleteShortcut =
+        (event.metaKey || event.ctrlKey) && event.key === "Backspace";
+
+      if (isDeleteShortcut) {
+        const sessionsToDelete = selectedSessionsRef.current;
+        if (!onDeleteSessions || sessionsToDelete.length === 0) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        void onDeleteSessions(sessionsToDelete);
+        return;
+      }
+
       if (event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
         handleExitSelectionMode();
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleExitSelectionMode, isSelectionMode]);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, [handleExitSelectionMode, isSelectionMode, onDeleteSessions]);
 
   useEffect(() => {
     if (selectionModeTrigger === undefined) {
@@ -387,6 +501,20 @@ export default function SessionList({
     onDeleteSessions,
     selectionModeTrigger,
   ]);
+
+  useEffect(() => {
+    if (selectionModeDismissTrigger === undefined) {
+      return;
+    }
+    if (
+      selectionModeDismissTrigger === lastSelectionModeDismissTriggerRef.current
+    ) {
+      return;
+    }
+
+    lastSelectionModeDismissTriggerRef.current = selectionModeDismissTrigger;
+    handleExitSelectionMode();
+  }, [handleExitSelectionMode, selectionModeDismissTrigger]);
 
   useEffect(() => {
     if (!hasMore || !onLoadMore || loadingMore || totalRows === 0) {
@@ -512,8 +640,11 @@ export default function SessionList({
                   {rowSessions.map((session) => {
                     const isFavorite = favoriteSessionIds.has(session.id);
                     const updatedLabel = formatShortTime(session.modified, t);
+                    const isSelectionMarked = selectedSessionIds.has(
+                      session.id,
+                    );
                     const isSelected = isSelectionMode
-                      ? selectedSessionIds.has(session.id)
+                      ? isSelectionMarked
                       : selectedSession?.id === session.id;
                     const hasPreview =
                       session.last_message || (session.first_message && !session.name);
@@ -528,6 +659,18 @@ export default function SessionList({
                         key={session.id}
                         data-session-id={session.id}
                         onClick={(event) => {
+                          const wantsMultiSelect =
+                            !!onDeleteSessions &&
+                            (event.metaKey || event.ctrlKey || event.shiftKey);
+
+                          if (!isSelectionMode && wantsMultiSelect) {
+                            handleStartSelectionMode(
+                              session.id,
+                              event.shiftKey,
+                            );
+                            return;
+                          }
+
                           if (isSelectionMode) {
                             toggleSessionSelection(session.id, event.shiftKey);
                             return;
@@ -548,8 +691,12 @@ export default function SessionList({
                         }}
                         className={`relative px-3 py-2.5 cursor-pointer motion-surface motion-color group rounded-lg border ${
                           isSelected
-                            ? "border-primary/30 bg-surface/75 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]"
-                            : "border-transparent hover:bg-surface/60"
+                            ? isSelectionMode
+                              ? "border-primary/60 bg-primary/10 shadow-[0_0_0_1px_rgba(59,130,246,0.22)] ring-1 ring-primary/30"
+                              : "border-primary/30 bg-surface/75 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]"
+                            : isSelectionMode
+                              ? "border-border/70 hover:bg-surface/70"
+                              : "border-transparent hover:bg-surface/60"
                         }`}
                         style={{ contain: "layout paint" }}
                       >
@@ -565,23 +712,39 @@ export default function SessionList({
                                     event.shiftKey,
                                   );
                                 }}
-                                className="mt-0.5 text-muted-foreground/70 hover:text-foreground motion-color motion-press focus-ring rounded"
+                                className={`mt-0.5 rounded-md p-1 motion-color motion-press focus-ring ${
+                                  isSelected
+                                    ? "bg-primary/15 text-primary"
+                                    : "text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                                }`}
                                 aria-label={t("session.list.toggleSelection", {
                                   defaultValue: "Toggle selection",
                                 })}
+                                aria-pressed={isSelected}
                               >
                                 {isSelected ? (
-                                  <CheckSquare2 className="h-3.5 w-3.5" />
+                                  <CheckSquare2 className="h-4 w-4" />
                                 ) : (
-                                  <Square className="h-3.5 w-3.5" />
+                                  <Square className="h-4 w-4" />
                                 )}
                               </button>
                             )}
-                            <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0">
-                              {session.name ||
-                                session.first_message ||
-                                t("session.list.untitled")}
-                            </h3>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0">
+                                  {session.name ||
+                                    session.first_message ||
+                                    t("session.list.untitled")}
+                                </h3>
+                                {isSelectionMode && isSelectionMarked && (
+                                  <span className="rounded-full bg-primary/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-primary">
+                                    {t("session.list.selectedBadge", {
+                                      defaultValue: "Selected",
+                                    })}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
                           <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-muted-foreground flex-shrink-0 pt-0.5 whitespace-nowrap">
                             {updatedLabel}

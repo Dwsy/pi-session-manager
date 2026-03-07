@@ -11,6 +11,7 @@ export const app = {
   shortcuts: {
     resume: 'Reanudar sesión (Cmd+R)',
     exportHtml: 'Exportar y abrir (Cmd+E)',
+    deleteSelected: 'Eliminar las sesiones seleccionadas (Cmd+Backspace)',
     projectView: 'Vista de proyecto (Cmd+P)',
     searchAll: 'Buscar en todas las sesiones (Cmd+K)',
     search: 'Enfocar búsqueda (Cmd+F)',
@@ -20,11 +21,14 @@ export const app = {
   errors: {
     loadSessions: 'Error al cargar las sesiones',
     deleteSession: 'Error al eliminar la sesión',
+    deleteSessionPartial: '{{count}} sesiones no se pudieron eliminar. Revisa la consola para más detalles.',
     renameSession: 'Error al renombrar la sesión',
     exportFailed: 'Error en la exportación',
     exportSuccess: '¡Exportación completada!',
   },
   confirm: {
     deleteSession: '¿Eliminar la sesión "{name}"?',
+    deleteSessions: '¿Eliminar las {{count}} sesiones seleccionadas?',
+    deleteIrreversible: 'Esta acción no se puede deshacer.',
   },
 } as const
