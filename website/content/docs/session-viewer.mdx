@@ -64,6 +64,18 @@ Each tool call shows:
 
 AI thinking/reasoning blocks are collapsible by default. Toggle with `Cmd/Ctrl + T`.
 
+## In-message Search
+
+When a session is open, press `Cmd/Ctrl + F` or use the toolbar search button to open the inline message search bar.
+
+The search bar provides:
+
+- a compact scope filter with `All`, `User + Assistant Messages`, and `User Messages` modes; the message-only scope still includes visible thinking blocks when thinking is shown
+- inline highlighting for every match in the currently rendered user/assistant message history, including generic/custom tool result output shown inside assistant turns when scope is `All`
+- previous/next navigation with a live `current / total` counter (`Enter` / `Shift+Enter` and `Cmd/Ctrl + G` / `Shift + Cmd/Ctrl + G`)
+- exact scrolling to the active match, even when the message list is virtualized
+- full reset via the close button or `Esc`, which clears the query, restores the default scope, and removes highlights
+
 ## Subagent Sessions
 
 When a session uses subagents (via Pi's `subagent` tool), the viewer renders clickable cards for each subagent run showing:
@@ -92,6 +104,8 @@ An LRU cache (5 entries) keyed by file path + modification timestamp speeds up b
 |----------|--------|
 | `Cmd/Ctrl + T` | Toggle thinking blocks |
 | `Cmd/Ctrl + O` | Toggle tool call expansion |
-| `Cmd/Ctrl + F` | Focus search |
+| `Cmd/Ctrl + F` | Search messages in the open session |
+| `Cmd/Ctrl + G` | Next in-session search result |
+| `Shift + Cmd/Ctrl + G` | Previous in-session search result |
 | `Cmd/Ctrl + E` | Export & open in browser |
 | `Cmd/Ctrl + R` | Resume session in terminal |

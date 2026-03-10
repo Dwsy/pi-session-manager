@@ -10,6 +10,7 @@ export const session = {
     thinking: '思考',
     more: '更多',
     moreActions: '更多操作',
+    searchMessages: '搜索消息',
     showThinking: '显示思考',
     hideThinking: '隐藏思考',
     expandTools: '展开工具',

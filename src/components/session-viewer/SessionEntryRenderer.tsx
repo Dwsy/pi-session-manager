@@ -13,11 +13,13 @@ const EMPTY_TOOL_RESULTS = new Map<string, SessionEntry>();
 export interface SessionEntryRendererProps {
   entry: SessionEntry;
   toolResultByCallId?: Map<string, SessionEntry>;
+  searchQuery?: string;
 }
 
 export function renderSessionEntry(
   entry: SessionEntry,
   toolResultByCallId: Map<string, SessionEntry> = EMPTY_TOOL_RESULTS,
+  searchQuery = "",
 ): JSX.Element | null {
   switch (entry.type) {
     case "message": {
@@ -31,6 +33,7 @@ export function renderSessionEntry(
             content={entry.message.content}
             timestamp={entry.timestamp}
             id={entry.id}
+            searchQuery={searchQuery}
           />
         );
       }
@@ -43,6 +46,7 @@ export function renderSessionEntry(
             timestamp={entry.timestamp}
             entryId={entry.id}
             toolResultByCallId={toolResultByCallId}
+            searchQuery={searchQuery}
           />
         );
       }
@@ -97,12 +101,14 @@ export const SessionEntryRenderer = memo(
   function SessionEntryRenderer({
     entry,
     toolResultByCallId = EMPTY_TOOL_RESULTS,
+    searchQuery = "",
   }: SessionEntryRendererProps): JSX.Element | null {
-    return renderSessionEntry(entry, toolResultByCallId);
+    return renderSessionEntry(entry, toolResultByCallId, searchQuery);
   },
   (prev, next) =>
     prev.entry === next.entry &&
-    prev.toolResultByCallId === next.toolResultByCallId,
+    prev.toolResultByCallId === next.toolResultByCallId &&
+    prev.searchQuery === next.searchQuery,
 );
 
 export default SessionEntryRenderer;

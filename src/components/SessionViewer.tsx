@@ -8,6 +8,7 @@ import { type SessionTreeRef } from "./SessionTree";
 import SessionViewerMessages, {
   type SessionViewerMessagesRef,
 } from "./session-viewer/SessionViewerMessages";
+import SessionViewerSearchBar from "./session-viewer/SessionViewerSearchBar";
 import SessionViewerSidebar from "./session-viewer/SessionViewerSidebar";
 import SessionViewerToolbar from "./session-viewer/SessionViewerToolbar";
 
@@ -21,6 +22,7 @@ import { useSessionScrollMarkers } from "../hooks/useSessionScrollMarkers";
 import { useSessionViewerData } from "../hooks/useSessionViewerData";
 import { useSessionViewerDerivedData } from "../hooks/useSessionViewerDerivedData";
 import { useSessionViewerHotkeys } from "../hooks/useSessionViewerHotkeys";
+import { useSessionViewerInMessageSearch } from "../hooks/useSessionViewerInMessageSearch";
 
 import { getPlatformDefaults } from "./settings/types";
 import type { SessionInfo } from "../types";
@@ -67,9 +69,11 @@ function SessionViewerContent({
     toggleToolsExpanded,
     expandedToolIds,
     resetToolExpansionOverrides,
+    restoreSearchExpandedTools,
   } = useSessionView();
   const isMobile = useIsMobile();
   const [showSidebar, setShowSidebar] = useState(false);
+  const [searchFocusKey, setSearchFocusKey] = useState(0);
   const { sidebarWidth, isResizing, handleMouseDown } = useResizableSidebar({
     storageKey: SIDEBAR_WIDTH_KEY,
     defaultWidth: SIDEBAR_DEFAULT_WIDTH,
@@ -121,23 +125,6 @@ function SessionViewerContent({
     });
   }, [isMobile]);
 
-  const handleToggleSidebarHotkey = useCallback(() => {
-    setShowMobileMenu(false);
-    setShowSidebar((prev) => {
-      const next = !prev;
-      if (next) {
-        setTimeout(() => treeRef.current?.focusSearch(), 100);
-      }
-      return next;
-    });
-  }, []);
-
-  useSessionViewerHotkeys({
-    onToggleThinking: toggleThinking,
-    onToggleToolsExpanded: toggleToolsExpanded,
-    onToggleSidebar: handleToggleSidebarHotkey,
-  });
-
   const {
     renderableEntries,
     toolResultByCallId,
@@ -145,6 +132,48 @@ function SessionViewerContent({
     headerEntry,
     messageEntries,
   } = useSessionViewerDerivedData(entries, activeEntryId);
+
+  const {
+    isSearchOpen,
+    searchQuery,
+    searchScope,
+    totalMatches,
+    currentMatchNumber,
+    currentTarget,
+    openSearch,
+    closeSearch,
+    setSearchQuery,
+    setSearchScope,
+    goToNextMatch,
+    goToPreviousMatch,
+  } = useSessionViewerInMessageSearch({
+    renderableEntries,
+    toolResultByCallId,
+    showThinking,
+    sessionPath: session.path,
+  });
+
+  const handleOpenSearch = useCallback(() => {
+    setShowMobileMenu(false);
+    openSearch();
+    setSearchFocusKey((value) => value + 1);
+  }, [openSearch]);
+
+  const handleCloseSearch = useCallback(() => {
+    restoreSearchExpandedTools();
+    closeSearch();
+  }, [closeSearch, restoreSearchExpandedTools]);
+
+  useSessionViewerHotkeys({
+    enabled: !showSystemPromptDialog && !showMobileMenu,
+    isSearchOpen,
+    onToggleThinking: toggleThinking,
+    onToggleToolsExpanded: toggleToolsExpanded,
+    onOpenSearch: handleOpenSearch,
+    onCloseSearch: handleCloseSearch,
+    onNextSearchMatch: goToNextMatch,
+    onPreviousSearchMatch: goToPreviousMatch,
+  });
 
   const handleReachBottom = useCallback(() => {
     if (hasMoreHistory) {
@@ -224,11 +253,13 @@ function SessionViewerContent({
           showScrollMarkers={showScrollMarkers}
           isMobileMenuOpen={showMobileMenu}
           isScrollMarkersFeatureEnabled={!DEBUG_DISABLE_SCROLL_MARKERS}
+          isSearchOpen={isSearchOpen}
           onBack={onBack}
           onToggleSidebar={handleToggleSidebar}
           onToggleThinking={toggleThinking}
           onToggleToolsExpanded={toggleToolsExpanded}
           onToggleScrollMarkers={toggleScrollMarkers}
+          onOpenSearch={handleOpenSearch}
           onMobileMenuOpenChange={setShowMobileMenu}
           onOpenSystemPromptDialog={() => setShowSystemPromptDialog(true)}
           onScrollToTop={handleScrollToTop}
@@ -260,6 +291,21 @@ function SessionViewerContent({
           }
         />
 
+        {isSearchOpen && (
+          <SessionViewerSearchBar
+            searchQuery={searchQuery}
+            searchScope={searchScope}
+            totalMatches={totalMatches}
+            currentMatchNumber={currentMatchNumber}
+            focusKey={searchFocusKey}
+            onSearchChange={setSearchQuery}
+            onSearchScopeChange={setSearchScope}
+            onPrevious={goToPreviousMatch}
+            onNext={goToNextMatch}
+            onClose={handleCloseSearch}
+          />
+        )}
+
         <SessionViewerMessages
           ref={messagesRef}
           loading={loading}
@@ -270,6 +316,8 @@ function SessionViewerContent({
           headerTimestamp={headerEntry?.timestamp}
           stats={stats}
           renderableEntries={renderableEntries}
+          searchQuery={searchQuery}
+          currentSearchTarget={currentTarget}
           scrollTargetId={scrollTargetId}
           setScrollTargetId={setScrollTargetId}
           setHasNewMessages={setHasNewMessages}

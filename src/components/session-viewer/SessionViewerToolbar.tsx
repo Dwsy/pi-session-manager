@@ -16,6 +16,7 @@ import {
   PanelLeftOpen,
   Pencil,
   Play,
+  Search,
 } from "lucide-react";
 
 import KbdTooltip from "../KbdTooltip";
@@ -32,11 +33,13 @@ export default function SessionViewerToolbar({
   showScrollMarkers,
   isMobileMenuOpen,
   isScrollMarkersFeatureEnabled,
+  isSearchOpen,
   onBack,
   onToggleSidebar,
   onToggleThinking,
   onToggleToolsExpanded,
   onToggleScrollMarkers,
+  onOpenSearch,
   onMobileMenuOpenChange,
   onOpenSystemPromptDialog,
   onScrollToTop,
@@ -56,6 +59,10 @@ export default function SessionViewerToolbar({
   const toolsToggleLabel = toolsExpanded
     ? t("session.toolbar.collapseTools", "收起工具")
     : t("session.toolbar.expandTools", "展开工具");
+  const searchToggleLabel = t(
+    "session.toolbar.searchMessages",
+    "Search messages",
+  );
   const scrollMarkersToggleLabel = showScrollMarkers
     ? t("session.toolbar.hideUserMarkers", "隐藏消息锚点")
     : t("session.toolbar.showUserMarkers", "显示消息锚点");
@@ -142,6 +149,17 @@ export default function SessionViewerToolbar({
 
           {!isMobile && (
             <div className="flex items-center gap-1 flex-shrink-0">
+              <KbdTooltip shortcut="Cmd+F">
+                <button
+                  onClick={onOpenSearch}
+                  className={`p-1.5 text-xs ${toggleButtonBase} ${isSearchOpen ? toggleButtonActive : toggleButtonInactive}`}
+                  title={`${searchToggleLabel} (⌘F)`}
+                  aria-label={searchToggleLabel}
+                  aria-pressed={isSearchOpen}
+                >
+                  <Search className="h-3.5 w-3.5" />
+                </button>
+              </KbdTooltip>
               <KbdTooltip shortcut="Cmd+T">
                 <button
                   onClick={onToggleThinking}
@@ -288,6 +306,16 @@ export default function SessionViewerToolbar({
             <div className="px-1 pb-2 text-xs font-medium text-muted-foreground">
               {t("session.toolbar.moreActions", "更多操作")}
             </div>
+            <button
+              onClick={() => {
+                onOpenSearch();
+                closeMobileMenu();
+              }}
+              className={mobileSheetItemClass}
+            >
+              <Search className="h-4 w-4 text-muted-foreground" />
+              {searchToggleLabel}
+            </button>
             <button
               onClick={() => {
                 onToggleToolsExpanded();

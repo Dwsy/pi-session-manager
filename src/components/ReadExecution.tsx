@@ -13,6 +13,7 @@ interface ReadExecutionProps {
   output?: string
   images?: Array<{ mimeType: string; data: string }>
   entryId: string
+  searchQuery?: string
 }
 
 const OUTPUT_MAX_HEIGHT = 300
@@ -24,6 +25,7 @@ export default function ReadExecution({
   output,
   images = [],
   entryId,
+  searchQuery = '',
 }: ReadExecutionProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -101,6 +103,7 @@ export default function ReadExecution({
                   showLineNumbers={true}
                   scrollable
                   maxHeight={OUTPUT_MAX_HEIGHT}
+                  searchQuery={searchQuery}
                 />
               </div>
             )}

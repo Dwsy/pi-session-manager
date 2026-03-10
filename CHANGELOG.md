@@ -4,6 +4,15 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Session viewer in-message search navigation**
+  - Added inline search UI for the open session with match highlighting across rendered user/assistant message content and generic/custom tool result output
+  - Added a compact in-search scope filter with `All`, `User + Assistant Messages`, and `User Messages` modes so tool-heavy sessions can be narrowed back to conversation text while still respecting visible thinking blocks
+  - Added previous/next result paging with a current/total counter, exact current-match scrolling inside the virtualized message list, and `Cmd/Ctrl + G` / `Shift + Cmd/Ctrl + G` navigation alongside `Enter` / `Shift+Enter`
+  - Added close/reset behavior via toolbar action, close button, and `Esc`, so leaving search returns the viewer to its normal unhighlighted state and default scope
+  - Updated shortcut copy/docs to reflect `Cmd/Ctrl + F` as the viewer search entry point and `Cmd/Ctrl + Shift + F` as global full-text search
+
 ### Demo & Docs
 
 - **Demo mode defaults are now deterministic**

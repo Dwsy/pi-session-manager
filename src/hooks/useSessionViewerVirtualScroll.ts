@@ -10,6 +10,8 @@ import type { Virtualizer } from '@tanstack/react-virtual'
 
 import type { SessionEntry } from '../types'
 
+type ScrollAlignment = 'auto' | 'center' | 'end' | 'start'
+
 const MESSAGE_ITEM_GAP = 16
 const BOTTOM_THRESHOLD_PX = 8
 const HIGHLIGHT_DURATION_MS = 2000
@@ -39,6 +41,7 @@ export interface UseSessionViewerVirtualScrollResult {
   isAtBottomRef: MutableRefObject<boolean>
   scrollToTop: () => void
   scrollToBottom: (smooth?: boolean) => void
+  scrollToEntryId: (entryId: string, align?: ScrollAlignment) => boolean
 }
 
 export function useSessionViewerVirtualScroll({
@@ -172,13 +175,22 @@ export function useSessionViewerVirtualScroll({
     [renderableEntries.length, rowVirtualizer],
   )
 
+  const scrollToEntryId = useCallback(
+    (entryId: string, align: ScrollAlignment = 'center') => {
+      const targetIndex = entryIndexById.get(entryId)
+      if (targetIndex === undefined) {
+        return false
+      }
+
+      rowVirtualizer.scrollToIndex(targetIndex, { align })
+      return true
+    },
+    [entryIndexById, rowVirtualizer],
+  )
+
   useEffect(() => {
     if (!scrollTargetId || !messagesContainerRef.current) return
-
-    const targetIndex = entryIndexById.get(scrollTargetId)
-    if (targetIndex === undefined) return
-
-    rowVirtualizer.scrollToIndex(targetIndex, { align: 'center' })
+    if (!scrollToEntryId(scrollTargetId, 'center')) return
 
     const highlightTimeoutIds: number[] = []
     const tryHighlight = () => {
@@ -210,7 +222,7 @@ export function useSessionViewerVirtualScroll({
         window.clearTimeout(timeoutId)
       }
     }
-  }, [scrollTargetId, entryIndexById, rowVirtualizer, setScrollTargetId])
+  }, [scrollTargetId, scrollToEntryId, setScrollTargetId])
 
   useEffect(() => {
     const container = messagesContainerRef.current
@@ -226,7 +238,8 @@ export function useSessionViewerVirtualScroll({
         const distanceToBottom =
           container.scrollHeight - container.scrollTop - container.clientHeight
         const atBottom = distanceToBottom <= BOTTOM_THRESHOLD_PX
-        const canScroll = container.scrollHeight > container.clientHeight + BOTTOM_THRESHOLD_PX
+        const canScroll =
+          container.scrollHeight > container.clientHeight + BOTTOM_THRESHOLD_PX
         const wasAtBottom = isAtBottomRef.current
 
         if (wasAtBottom !== atBottom) {
@@ -268,5 +281,6 @@ export function useSessionViewerVirtualScroll({
     isAtBottomRef,
     scrollToTop,
     scrollToBottom,
+    scrollToEntryId,
   }
 }

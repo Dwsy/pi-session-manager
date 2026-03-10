@@ -10,6 +10,7 @@ export const session = {
     thinking: '思考',
     more: 'その他',
     moreActions: 'その他の操作',
+    searchMessages: 'メッセージを検索',
     showThinking: '思考を表示',
     hideThinking: '思考を非表示',
     expandTools: 'ツールを展開',

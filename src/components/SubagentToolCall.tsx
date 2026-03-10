@@ -1,8 +1,14 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Bot, Clock, Cpu, Wrench, AlertCircle, CheckCircle2, ChevronRight, Users, Link2, Loader2 } from 'lucide-react'
 import type { SubagentDetails, SubagentResult } from '../types'
 import SubagentModal from './SubagentModal'
+import { escapeHtml } from '../utils/markdown'
+import { highlightSearchInHTML } from '../utils/search'
+import {
+  getSubagentResultErrorPreview,
+  getSubagentResultTaskPreview,
+} from '../utils/toolCallDisplay'
 import '../styles/subagent.css'
 
 interface SubagentToolCallProps {
@@ -10,6 +16,7 @@ interface SubagentToolCallProps {
   details?: SubagentDetails
   output?: string
   entryId?: string
+  searchQuery?: string
 }
 
 function formatDuration(ms: number): string {
@@ -31,17 +38,27 @@ function isResultOk(r: SubagentResult): boolean {
   return r.exitCode === 0
 }
 
-/** Only show error text if it's a real failure, not just "terminated" */
-function getDisplayError(r: SubagentResult): string | null {
-  if (r.exitCode === 0) return null
-  return r.error || null
+function getHighlightedPlainTextHtml(text: string, searchQuery: string): string {
+  const escapedText = escapeHtml(text)
+  return searchQuery
+    ? highlightSearchInHTML(escapedText, searchQuery)
+    : escapedText
 }
 
-function ResultCard({ result, onClick }: { result: SubagentResult; onClick: () => void }) {
+function ResultCard({
+  result,
+  onClick,
+  searchQuery,
+}: {
+  result: SubagentResult
+  onClick: () => void
+  searchQuery: string
+}) {
   const { t } = useTranslation()
   const ok = isResultOk(result)
   const ps = result.progressSummary
-  const displayError = getDisplayError(result)
+  const displayError = getSubagentResultErrorPreview(result)
+  const taskPreview = getSubagentResultTaskPreview(result)
 
   return (
     <button
@@ -51,8 +68,20 @@ function ResultCard({ result, onClick }: { result: SubagentResult; onClick: () =
     >
       <div className="subagent-result-header">
         <span className={`subagent-status-dot ${ok ? 'success' : 'error'}`} />
-        <span className="subagent-agent-name">{result.agent}</span>
-        {result.model && <span className="subagent-model">{result.model}</span>}
+        <span
+          className="subagent-agent-name"
+          dangerouslySetInnerHTML={{
+            __html: getHighlightedPlainTextHtml(result.agent, searchQuery),
+          }}
+        />
+        {result.model && (
+          <span
+            className="subagent-model"
+            dangerouslySetInnerHTML={{
+              __html: getHighlightedPlainTextHtml(result.model, searchQuery),
+            }}
+          />
+        )}
         <ChevronRight size={14} className="subagent-chevron" />
       </div>
 
@@ -82,19 +111,42 @@ function ResultCard({ result, onClick }: { result: SubagentResult; onClick: () =
       {displayError && (
         <div className="subagent-error-hint">
           <AlertCircle size={12} />
-          <span>{displayError.length > 80 ? displayError.slice(0, 80) + '…' : displayError}</span>
+          <span
+            dangerouslySetInnerHTML={{
+              __html: getHighlightedPlainTextHtml(displayError, searchQuery),
+            }}
+          />
         </div>
       )}
 
-      <div className="subagent-task-preview">
-        {result.task.length > 120 ? result.task.slice(0, 120) + '…' : result.task}
-      </div>
+      <div
+        className="subagent-task-preview"
+        dangerouslySetInnerHTML={{
+          __html: getHighlightedPlainTextHtml(taskPreview, searchQuery),
+        }}
+      />
     </button>
   )
 }
 
-export default function SubagentToolCall({ arguments: args, details, output }: SubagentToolCallProps) {
+export default function SubagentToolCall({
+  arguments: args,
+  details,
+  output,
+  entryId,
+  searchQuery = '',
+}: SubagentToolCallProps) {
   const [modalResult, setModalResult] = useState<SubagentResult | null>(null)
+  const highlightedOutput = useMemo(() => {
+    if (!output) {
+      return ''
+    }
+
+    const escapedOutput = escapeHtml(output)
+    return searchQuery
+      ? highlightSearchInHTML(escapedOutput, searchQuery)
+      : escapedOutput
+  }, [output, searchQuery])
 
   // Management actions (list, get, etc.) or pending — show simple view with subagent styling
   if (!details || details.mode === 'management' || !details.results?.length) {
@@ -103,7 +155,10 @@ export default function SubagentToolCall({ arguments: args, details, output }: S
     const isPending = !details && !output && agentName
 
     return (
-      <div className={`subagent-tool-call ${isPending ? 'subagent-pending' : ''}`}>
+      <div
+        className={`subagent-tool-call ${isPending ? 'subagent-pending' : ''}`}
+        id={entryId ? `entry-${entryId}` : undefined}
+      >
         <div className="subagent-header">
           <div className="subagent-title">
             {isPending
@@ -121,9 +176,10 @@ export default function SubagentToolCall({ arguments: args, details, output }: S
           </div>
         )}
         {output && (
-          <div className="subagent-management-output">
-            {output.split('\n').map((line, i) => <div key={i}>{line}</div>)}
-          </div>
+          <div
+            className="subagent-management-output whitespace-pre-wrap"
+            dangerouslySetInnerHTML={{ __html: highlightedOutput }}
+          />
         )}
       </div>
     )
@@ -136,7 +192,7 @@ export default function SubagentToolCall({ arguments: args, details, output }: S
 
   return (
     <>
-      <div className="subagent-tool-call">
+      <div className="subagent-tool-call" id={entryId ? `entry-${entryId}` : undefined}>
         <div className="subagent-header">
           <div className="subagent-title">
             {allOk
@@ -159,6 +215,7 @@ export default function SubagentToolCall({ arguments: args, details, output }: S
               key={`${result.agent}-${i}`}
               result={result}
               onClick={() => setModalResult(result)}
+              searchQuery={searchQuery}
             />
           ))}
         </div>

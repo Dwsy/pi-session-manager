@@ -1,7 +1,7 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import hljs from 'highlight.js'
-import { getLanguageFromPath } from '../utils/markdown'
+import { getLanguageFromPath, renderCodeHtml } from '../utils/markdown'
+import { highlightSearchInHTML } from '../utils/search'
 
 interface CodeBlockProps {
   code: string
@@ -10,6 +10,7 @@ interface CodeBlockProps {
   showLineNumbers?: boolean
   maxHeight?: number | string
   scrollable?: boolean
+  searchQuery?: string
 }
 
 function CodeBlock({
@@ -19,29 +20,22 @@ function CodeBlock({
   showLineNumbers = true,
   maxHeight,
   scrollable = false,
+  searchQuery = '',
 }: CodeBlockProps) {
   const { t } = useTranslation()
-  const codeRef = useRef<HTMLElement>(null)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    if (codeRef.current) {
-      // Skip if already highlighted
-      if (codeRef.current.dataset.highlighted === 'yes') {
-        return
-      }
+  const resolvedLanguage = useMemo(
+    () => language || (filename ? getLanguageFromPath(filename) : undefined),
+    [filename, language],
+  )
 
-      const lang = language || (filename ? getLanguageFromPath(filename) : undefined)
-
-      if (lang) {
-        try {
-          hljs.highlightElement(codeRef.current)
-        } catch (e) {
-          console.warn('Failed to highlight code:', e)
-        }
-      }
-    }
-  }, [code, language, filename])
+  const highlightedCode = useMemo(() => {
+    const highlighted = renderCodeHtml(code, resolvedLanguage)
+    return searchQuery
+      ? highlightSearchInHTML(highlighted, searchQuery)
+      : highlighted
+  }, [code, resolvedLanguage, searchQuery])
 
   const handleCopy = async () => {
     try {
@@ -60,7 +54,9 @@ function CodeBlock({
     }
     return Array.from({ length: lineCount }, (_, index) => index + 1)
   }, [lineCount, showLineNumbers])
-  const wrapperClassName = scrollable ? 'code-block-wrapper code-block-scrollable' : 'code-block-wrapper'
+  const wrapperClassName = scrollable
+    ? 'code-block-wrapper code-block-scrollable'
+    : 'code-block-wrapper'
   const wrapperStyle =
     scrollable && maxHeight !== undefined
       ? { maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight }
@@ -70,7 +66,9 @@ function CodeBlock({
     <div className={wrapperClassName} style={wrapperStyle}>
       <div className="code-block-header">
         {filename && <div className="code-filename">{filename}</div>}
-        {language && !filename && <div className="code-language">{language}</div>}
+        {resolvedLanguage && !filename && (
+          <div className="code-language">{resolvedLanguage}</div>
+        )}
         <button
           onClick={handleCopy}
           className="code-copy-button"
@@ -101,9 +99,10 @@ function CodeBlock({
           </div>
         )}
         <pre className="code-block">
-          <code ref={codeRef} className={language || ''}>
-            {code}
-          </code>
+          <code
+            className={`hljs ${resolvedLanguage || ''}`.trim()}
+            dangerouslySetInnerHTML={{ __html: highlightedCode }}
+          />
         </pre>
       </div>
     </div>

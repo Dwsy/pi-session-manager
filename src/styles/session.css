@@ -293,11 +293,13 @@
    color: inherit;
    padding: 2px 0;
    border-radius: 2px;
+   transition: background-color 0.15s ease, box-shadow 0.15s ease;
  }
 
  .search-highlight.current {
-   background: rgba(255, 165, 0, 0.5);
-   box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.3);
+   background: rgba(255, 165, 0, 0.6);
+   box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.35);
+   scroll-margin-block: 120px;
  }
 
  /* Drag handle - refined version */
