@@ -446,7 +446,6 @@ fn test_fts_rebuild_after_recreate() {
     // Cleanup: temp_dir is dropped automatically
 }
 
-
 #[test]
 fn test_init_db_upgrades_legacy_message_entries_before_new_indexes() {
     use pi_session_manager::config::Config;
