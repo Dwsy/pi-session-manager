@@ -10,6 +10,8 @@ export const session = {
     thinking: 'Thinking',
     more: 'More',
     moreActions: 'More actions',
+    top: 'Top',
+    bottom: 'Bottom',
     showThinking: 'Show thinking',
     hideThinking: 'Hide thinking',
     expandTools: 'Expand tools',
