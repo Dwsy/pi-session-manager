@@ -277,9 +277,17 @@ fn is_openai_reasoning_model(model: &str) -> bool {
         || normalized.starts_with("gpt-5")
 }
 
-fn build_openai_chat_attempts(base_url: &str, model: &str, prompt_text: &str) -> Vec<HttpTestAttempt> {
+fn build_openai_chat_attempts(
+    base_url: &str,
+    model: &str,
+    prompt_text: &str,
+) -> Vec<HttpTestAttempt> {
     let mut attempts = Vec::with_capacity(2);
-    let max_completion_tokens = if is_openai_reasoning_model(model) { 256 } else { 128 };
+    let max_completion_tokens = if is_openai_reasoning_model(model) {
+        256
+    } else {
+        128
+    };
 
     attempts.push(HttpTestAttempt {
         request_style: "chat-completions:max_completion_tokens",
@@ -308,7 +316,11 @@ fn build_openai_chat_attempts(base_url: &str, model: &str, prompt_text: &str) ->
     attempts
 }
 
-fn build_openai_responses_attempts(base_url: &str, model: &str, prompt_text: &str) -> Vec<HttpTestAttempt> {
+fn build_openai_responses_attempts(
+    base_url: &str,
+    model: &str,
+    prompt_text: &str,
+) -> Vec<HttpTestAttempt> {
     vec![
         HttpTestAttempt {
             request_style: "responses:input_string",
@@ -339,7 +351,11 @@ fn build_openai_responses_attempts(base_url: &str, model: &str, prompt_text: &st
     ]
 }
 
-fn build_anthropic_messages_attempts(base_url: &str, model: &str, prompt_text: &str) -> Vec<HttpTestAttempt> {
+fn build_anthropic_messages_attempts(
+    base_url: &str,
+    model: &str,
+    prompt_text: &str,
+) -> Vec<HttpTestAttempt> {
     let version_header = (
         HeaderName::from_static("anthropic-version"),
         HeaderValue::from_static("2023-06-01"),
@@ -414,18 +430,20 @@ fn extract_response_preview(api: &str, response_text: &str) -> Option<String> {
                         })
                     })
             }),
-        "anthropic-messages" => parsed
-            .get("content")
-            .and_then(|v| v.as_array())
-            .and_then(|items| {
-                items.iter().find_map(|item| {
-                    item.get("text")
-                        .and_then(|v| v.as_str())
-                        .map(str::trim)
-                        .filter(|value| !value.is_empty())
-                        .map(str::to_string)
+        "anthropic-messages" => {
+            parsed
+                .get("content")
+                .and_then(|v| v.as_array())
+                .and_then(|items| {
+                    items.iter().find_map(|item| {
+                        item.get("text")
+                            .and_then(|v| v.as_str())
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty())
+                            .map(str::to_string)
+                    })
                 })
-            }),
+        }
         _ => None,
     }
 }
@@ -450,8 +468,11 @@ fn extract_error_message(response_text: &str) -> Option<String> {
 
 fn truncate_response_body(response_text: &str) -> String {
     if response_text.len() > 10_000 {
-        format!("{}
-...[truncated]", &response_text[..10_000])
+        format!(
+            "{}
+...[truncated]",
+            &response_text[..10_000]
+        )
     } else {
         response_text.to_string()
     }
@@ -961,8 +982,14 @@ mod tests {
     fn openai_reasoning_models_prefer_max_completion_tokens() {
         let attempts = build_openai_chat_attempts("https://api.openai.com/v1", "gpt-5", "hello");
         assert_eq!(attempts.len(), 2);
-        assert_eq!(attempts[0].request_style, "chat-completions:max_completion_tokens");
-        assert_eq!(attempts[0].body_value["max_completion_tokens"], Value::from(256));
+        assert_eq!(
+            attempts[0].request_style,
+            "chat-completions:max_completion_tokens"
+        );
+        assert_eq!(
+            attempts[0].body_value["max_completion_tokens"],
+            Value::from(256)
+        );
         assert!(attempts[0].body_value.get("max_tokens").is_none());
         assert_eq!(attempts[1].request_style, "chat-completions:max_tokens");
         assert_eq!(attempts[1].body_value["max_tokens"], Value::from(128));
@@ -970,31 +997,69 @@ mod tests {
 
     #[test]
     fn openai_responses_uses_input_text_payload() {
-        let attempts = build_openai_responses_attempts("https://api.openai.com/v1", "gpt-5", "ping");
+        let attempts =
+            build_openai_responses_attempts("https://api.openai.com/v1", "gpt-5", "ping");
         assert_eq!(attempts.len(), 2);
         assert_eq!(attempts[0].request_style, "responses:input_string");
         assert_eq!(attempts[0].url, "https://api.openai.com/v1/responses");
         assert_eq!(attempts[0].body_value["input"], Value::from("ping"));
         assert_eq!(attempts[1].request_style, "responses:input_message_items");
-        assert_eq!(attempts[1].body_value["input"][0]["role"], Value::from("user"));
-        assert_eq!(attempts[1].body_value["input"][0]["content"][0]["type"], Value::from("input_text"));
-        assert_eq!(attempts[1].body_value["input"][0]["content"][0]["text"], Value::from("ping"));
+        assert_eq!(
+            attempts[1].body_value["input"][0]["role"],
+            Value::from("user")
+        );
+        assert_eq!(
+            attempts[1].body_value["input"][0]["content"][0]["type"],
+            Value::from("input_text")
+        );
+        assert_eq!(
+            attempts[1].body_value["input"][0]["content"][0]["text"],
+            Value::from("ping")
+        );
     }
 
     #[test]
     fn anthropic_attempt_sets_messages_shape_and_header() {
-        let attempts = build_anthropic_messages_attempts("https://api.anthropic.com/v1", "claude-sonnet-4", "ping");
+        let attempts = build_anthropic_messages_attempts(
+            "https://api.anthropic.com/v1",
+            "claude-sonnet-4",
+            "ping",
+        );
         assert_eq!(attempts.len(), 2);
-        assert_eq!(attempts[0].request_style, "anthropic-messages:string_content");
+        assert_eq!(
+            attempts[0].request_style,
+            "anthropic-messages:string_content"
+        );
         assert_eq!(attempts[0].url, "https://api.anthropic.com/v1/messages");
-        assert_eq!(attempts[0].body_value["messages"][0]["role"], Value::from("user"));
-        assert_eq!(attempts[0].body_value["messages"][0]["content"], Value::from("ping"));
-        assert_eq!(attempts[1].request_style, "anthropic-messages:content_blocks");
-        assert_eq!(attempts[1].body_value["messages"][0]["content"][0]["type"], Value::from("text"));
-        assert_eq!(attempts[1].body_value["messages"][0]["content"][0]["text"], Value::from("ping"));
+        assert_eq!(
+            attempts[0].body_value["messages"][0]["role"],
+            Value::from("user")
+        );
+        assert_eq!(
+            attempts[0].body_value["messages"][0]["content"],
+            Value::from("ping")
+        );
+        assert_eq!(
+            attempts[1].request_style,
+            "anthropic-messages:content_blocks"
+        );
+        assert_eq!(
+            attempts[1].body_value["messages"][0]["content"][0]["type"],
+            Value::from("text")
+        );
+        assert_eq!(
+            attempts[1].body_value["messages"][0]["content"][0]["text"],
+            Value::from("ping")
+        );
         assert_eq!(attempts[0].extra_headers.len(), 1);
-        assert_eq!(attempts[0].extra_headers[0].0, HeaderName::from_static("anthropic-version"));
-        assert_eq!(attempts[0].extra_headers[0].1, HeaderValue::from_static("2023-06-01"));
+        assert_eq!(
+            attempts[0].extra_headers[0].0,
+            HeaderName::from_static("anthropic-version")
+        );
+        assert_eq!(
+            attempts[0].extra_headers[0].1,
+            HeaderValue::from_static("2023-06-01")
+        );
     }
 
     #[test]
