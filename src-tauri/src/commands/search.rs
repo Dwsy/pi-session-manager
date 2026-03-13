@@ -234,7 +234,7 @@ pub async fn full_text_search(
                 format!("WHERE message_fts MATCH ? AND {role_condition}")
             };
             let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
-            let like_content_pattern = format!("%{}%", content_like_query);
+            let like_content_pattern = format!("%{content_like_query}%");
             if use_content_like {
                 params.push(&like_content_pattern);
             } else {

@@ -696,7 +696,7 @@ fn try_launch_known_terminal(
 ) -> Result<bool, String> {
     #[cfg(target_os = "macos")]
     {
-        return try_launch_known_terminal_macos(terminal_id, cwd, path, pi_cmd);
+        try_launch_known_terminal_macos(terminal_id, cwd, path, pi_cmd)
     }
 
     #[cfg(target_os = "windows")]

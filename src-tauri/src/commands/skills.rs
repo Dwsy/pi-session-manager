@@ -132,7 +132,7 @@ pub async fn scan_prompts_internal() -> Result<Vec<PromptInfo>, String> {
     if let Ok(entries) = fs::read_dir(&prompts_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if !path.extension().is_some_and(|ext| ext == "md") {
+            if path.extension().is_none_or(|ext| ext != "md") {
                 continue;
             }
 

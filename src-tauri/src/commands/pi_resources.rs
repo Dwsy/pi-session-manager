@@ -87,9 +87,7 @@ fn extract_frontmatter_field(content: &str, field: &str) -> Option<String> {
             }
         } else if let Some(rest) = trimmed.strip_prefix(&format!("{field}:")) {
             let rest = rest.trim();
-            if rest == ">" || rest == "|" {
-                in_target = true;
-            } else if rest.is_empty() {
+            if rest == ">" || rest == "|" || rest.is_empty() {
                 in_target = true;
             } else {
                 let val = rest.trim_matches('"').trim_matches('\'');

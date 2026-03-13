@@ -23,17 +23,9 @@ pub struct SearchSegment {
     pub text: String,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct SearchIndexOptions {
     pub include_thinking: bool,
-}
-
-impl Default for SearchIndexOptions {
-    fn default() -> Self {
-        Self {
-            include_thinking: false,
-        }
-    }
 }
 
 pub fn extract_search_segments(entry: &Value, options: SearchIndexOptions) -> Vec<SearchSegment> {

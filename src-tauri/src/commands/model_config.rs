@@ -761,6 +761,7 @@ pub async fn list_model_config_versions() -> Result<Vec<ConfigVersionMeta>, Stri
     list_model_config_versions_internal().await
 }
 
+#[allow(clippy::type_complexity)]
 fn extract_provider_and_model<'a>(
     config: &'a Value,
     provider: &str,
