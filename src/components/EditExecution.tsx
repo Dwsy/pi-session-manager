@@ -248,7 +248,7 @@ export default function EditExecution({
       </div>
 
       {diff && (
-        <div className={`tool-diff-wrapper ${expanded ? 'expanded' : ''}`}>
+        <div className={`tool-diff-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded && (
               <div style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}>
@@ -260,7 +260,7 @@ export default function EditExecution({
       )}
 
       {shouldShowOutput && (
-        <div className="tool-output-wrapper">
+        <div className={`tool-output-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded && (
               <div className="tool-output">

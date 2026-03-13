@@ -61,7 +61,7 @@ export default function BashExecution({
         <span className="tool-expand-indicator">
           {expanded ? '▾' : '▸'}
         </span>
-        <pre className="bash-command-inline" title={command}>
+        <pre className="bash-command-inline">
           <span className="bash-command-prefix" aria-hidden="true">$ </span>
           <code className="hljs language-bash" dangerouslySetInnerHTML={{ __html: highlightedCommand }} />
         </pre>
@@ -81,7 +81,7 @@ export default function BashExecution({
             void handleCopyCommand()
           }}
           className="tool-copy-button bash-inline-copy-button"
-          title={commandCopied ? 'Copied!' : 'Copy command'}
+          aria-label={commandCopied ? 'Copied!' : 'Copy command'}
         >
           {commandCopied ? (
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,7 +96,7 @@ export default function BashExecution({
       </div>
 
       {output && (
-        <div className="tool-output-wrapper">
+        <div className={`tool-output-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded && (
               <CodeBlock

@@ -61,7 +61,7 @@ export default function WriteExecution({
       </div>
 
       {content && (
-        <div className="tool-output-wrapper">
+        <div className={`tool-output-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded && (
               <div className="tool-output">
@@ -79,7 +79,7 @@ export default function WriteExecution({
       )}
 
       {output && (
-        <div className="tool-output-wrapper">
+        <div className={`tool-output-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded && (
               <div className="tool-output">

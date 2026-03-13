@@ -33,7 +33,7 @@ renderer.code = function({ text, lang }: { text: string; lang?: string }): strin
     <div class="code-block-wrapper">
       <div class="code-block-header">
         ${language ? `<div class="code-language">${language}</div>` : '<div class="code-language">code</div>'}
-        <button class="code-copy-button" data-code-copy="true" title="Copy code">
+        <button class="code-copy-button" data-code-copy="true" aria-label="Copy code">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>

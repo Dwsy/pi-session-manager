@@ -942,6 +942,16 @@ html, body {
   overflow: hidden;
 }
 
+.tool-output-wrapper.collapsible {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.tool-output-wrapper.collapsible.expanded {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
 /* Tool Expand/Collapse Animation - Universal */
 .tool-expand-content {
   max-height: 0;

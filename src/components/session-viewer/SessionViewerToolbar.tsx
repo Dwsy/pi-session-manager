@@ -66,7 +66,7 @@ export default function SessionViewerToolbar({
   const toggleButtonInactive =
     "border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover";
   const mobileQuickActionBase =
-    "h-10 w-full px-2 inline-flex items-center justify-center gap-1.5 rounded-xl border text-xs font-medium transition-colors touch-manipulation min-w-0";
+    "h-9 w-full px-1.5 inline-flex items-center justify-center gap-1 rounded-xl border text-[11px] font-medium transition-colors touch-manipulation min-w-0";
   const mobileQuickActionActive =
     "border-primary/45 bg-primary/14 text-foreground hover:bg-primary/18 active:bg-primary/18";
   const mobileQuickActionInactive =
@@ -225,7 +225,7 @@ export default function SessionViewerToolbar({
 
         {isMobile && (
           <div className="mt-2 rounded-2xl border border-border/60 bg-background/90 p-1.5 shadow-sm">
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-5 gap-1">
               <button
                 onClick={onToggleSidebar}
                 className={`${mobileQuickActionBase} ${showSidebar ? mobileQuickActionActive : mobileQuickActionInactive}`}
@@ -234,9 +234,9 @@ export default function SessionViewerToolbar({
                 aria-pressed={showSidebar}
               >
                 {showSidebar ? (
-                  <PanelLeftClose className="h-4 w-4 flex-shrink-0" />
+                  <PanelLeftClose className="h-3.5 w-3.5 flex-shrink-0" />
                 ) : (
-                  <PanelLeftOpen className="h-4 w-4 flex-shrink-0" />
+                  <PanelLeftOpen className="h-3.5 w-3.5 flex-shrink-0" />
                 )}
                 <span className="truncate">
                   {t("session.toolbar.outline", "大纲")}
@@ -250,12 +250,34 @@ export default function SessionViewerToolbar({
                 aria-pressed={showThinking}
               >
                 {showThinking ? (
-                  <BrainCircuit className="h-4 w-4 flex-shrink-0" />
+                  <BrainCircuit className="h-3.5 w-3.5 flex-shrink-0" />
                 ) : (
-                  <Brain className="h-4 w-4 flex-shrink-0" />
+                  <Brain className="h-3.5 w-3.5 flex-shrink-0" />
                 )}
                 <span className="truncate">
                   {t("session.toolbar.thinking", "思考")}
+                </span>
+              </button>
+              <button
+                onClick={onScrollToTop}
+                className={`${mobileQuickActionBase} ${mobileQuickActionInactive}`}
+                title={t("session.scrollToTop", "滚动到顶部")}
+                aria-label={t("session.scrollToTop", "滚动到顶部")}
+              >
+                <ArrowUp className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">
+                  {t("session.toolbar.top", "顶部")}
+                </span>
+              </button>
+              <button
+                onClick={onScrollToBottom}
+                className={`${mobileQuickActionBase} ${mobileQuickActionInactive}`}
+                title={t("session.scrollToBottom", "滚动到底部")}
+                aria-label={t("session.scrollToBottom", "滚动到底部")}
+              >
+                <ArrowDown className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">
+                  {t("session.toolbar.bottom", "底部")}
                 </span>
               </button>
               <button
@@ -265,7 +287,7 @@ export default function SessionViewerToolbar({
                 aria-label={t("session.toolbar.moreActions", "更多操作")}
                 aria-expanded={isMobileMenuOpen}
               >
-                <MoreVertical className="h-4 w-4 flex-shrink-0" />
+                <MoreVertical className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="truncate">
                   {t("session.toolbar.more", "更多")}
                 </span>
