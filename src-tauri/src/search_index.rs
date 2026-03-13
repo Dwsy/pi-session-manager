@@ -93,15 +93,10 @@ pub fn extract_search_segments(entry: &Value, options: SearchIndexOptions) -> Ve
 }
 
 pub fn extract_message_contents(entry: &Value, include_thinking: bool) -> Vec<(String, String)> {
-    extract_search_segments(
-        entry,
-        SearchIndexOptions {
-            include_thinking,
-        },
-    )
-    .into_iter()
-    .map(|segment| (segment.source.as_str().to_string(), segment.text))
-    .collect()
+    extract_search_segments(entry, SearchIndexOptions { include_thinking })
+        .into_iter()
+        .map(|segment| (segment.source.as_str().to_string(), segment.text))
+        .collect()
 }
 
 pub fn extract_primary_message_text(entry: &Value) -> String {
@@ -132,7 +127,9 @@ mod tests {
 
         let without_thinking = extract_search_segments(
             &entry,
-            SearchIndexOptions { include_thinking: false },
+            SearchIndexOptions {
+                include_thinking: false,
+            },
         );
         assert_eq!(without_thinking.len(), 1);
         assert_eq!(without_thinking[0].source, SearchSegmentSource::Assistant);
@@ -140,7 +137,9 @@ mod tests {
 
         let with_thinking = extract_search_segments(
             &entry,
-            SearchIndexOptions { include_thinking: true },
+            SearchIndexOptions {
+                include_thinking: true,
+            },
         );
         assert_eq!(with_thinking.len(), 2);
         assert_eq!(with_thinking[1].source, SearchSegmentSource::Thinking);

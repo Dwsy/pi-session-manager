@@ -1,3 +1,4 @@
+pub mod api_readonly;
 pub mod auth;
 pub mod commands;
 pub mod compression;
@@ -116,6 +117,18 @@ pub fn run() {
             toggle_resource,
             list_model_options_fast,
             list_model_options_full,
+            load_model_config,
+            save_model_config,
+            export_model_config_content,
+            export_model_config_to_path,
+            import_model_config_content,
+            import_model_config_from_path,
+            create_model_config_backup,
+            list_model_config_backups,
+            restore_model_config_backup,
+            delete_model_config_backup,
+            list_model_config_versions,
+            test_model_http,
             read_resource_file,
             list_config_versions,
             get_config_version,

@@ -373,6 +373,79 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             let result = crate::list_model_options_full_internal().await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
+        "load_model_config" => {
+            let result = crate::load_model_config_internal().await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "save_model_config" => {
+            let content = payload.get("content").cloned().ok_or("Missing content")?;
+            let create_backup = payload
+                .get("create_backup")
+                .or_else(|| payload.get("createBackup"))
+                .and_then(|v| v.as_bool());
+            crate::save_model_config_internal(content, create_backup).await?;
+            Ok(Value::Null)
+        }
+        "export_model_config_content" => {
+            let result = crate::export_model_config_content_internal().await?;
+            Ok(Value::String(result))
+        }
+        "export_model_config_to_path" => {
+            let path = extract_string(payload, "path")?;
+            let result = crate::export_model_config_to_path_internal(path).await?;
+            Ok(Value::String(result))
+        }
+        "import_model_config_content" => {
+            let content = payload
+                .get("content")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing content")?
+                .to_string();
+            let mode = extract_optional_string(payload, "mode");
+            let result = crate::import_model_config_content_internal(content, mode).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "import_model_config_from_path" => {
+            let path = extract_string(payload, "path")?;
+            let mode = extract_optional_string(payload, "mode");
+            let result = crate::import_model_config_from_path_internal(path, mode).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "create_model_config_backup" => {
+            let note = extract_optional_string(payload, "note");
+            let result = crate::create_model_config_backup(note).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "list_model_config_backups" => {
+            let result = crate::list_model_config_backups().await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "restore_model_config_backup" => {
+            let id = extract_string(payload, "id")?;
+            crate::restore_model_config_backup(id).await?;
+            Ok(Value::Null)
+        }
+        "delete_model_config_backup" => {
+            let id = extract_string(payload, "id")?;
+            crate::delete_model_config_backup(id).await?;
+            Ok(Value::Null)
+        }
+        "list_model_config_versions" => {
+            let result = crate::list_model_config_versions_internal().await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "test_model_http" => {
+            let provider = extract_string(payload, "provider")?;
+            let model = extract_string(payload, "model")?;
+            let prompt = extract_optional_string(payload, "prompt");
+            let timeout_ms = payload
+                .get("timeout_ms")
+                .or_else(|| payload.get("timeoutMs"))
+                .and_then(|v| v.as_u64());
+            let result =
+                crate::test_model_http_internal(provider, model, prompt, timeout_ms).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
         "read_resource_file" => {
             let path = extract_string(payload, "path")?;
             let scope = extract_string(payload, "scope").unwrap_or_else(|_| "user".to_string());
