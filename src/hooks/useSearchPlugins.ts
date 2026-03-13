@@ -14,9 +14,16 @@ interface SearchPluginOptions {
 export function useSearchPlugins(context: SearchContext) {
   const cache = useSearchCache()
   const contextRef = useRef(context)
+  const sessionsRef = useRef(context.sessions)
+  const sessionsVersionRef = useRef(0)
   
   // Update context ref
   contextRef.current = context
+
+  if (sessionsRef.current !== context.sessions) {
+    sessionsRef.current = context.sessions
+    sessionsVersionRef.current += 1
+  }
   
   /**
    * Execute search
@@ -40,6 +47,7 @@ export function useSearchPlugins(context: SearchContext) {
       scopedPluginIds?.join(',') || 'all',
       contextRef.current.selectedProject ?? '__all_projects__',
       contextRef.current.searchCurrentProjectOnly ? 'project_only' : 'project_all',
+      `sessions_v${sessionsVersionRef.current}`,
       ...extraParts,
     ].join('::')
     

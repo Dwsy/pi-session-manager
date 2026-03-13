@@ -47,6 +47,11 @@ export function useSearchCache() {
      * @param results Search results
      */
     set: (query: string, results: SearchPluginResult[]): void => {
+      if (results.length === 0) {
+        cacheRef.current.delete(query)
+        return
+      }
+
       // LRU: If cache is full, remove oldest
       if (cacheRef.current.size >= CACHE_SIZE) {
         const firstKey = cacheRef.current.keys().next().value
