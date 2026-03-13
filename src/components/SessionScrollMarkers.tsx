@@ -30,33 +30,44 @@ function SessionScrollMarkers({
   if (isMobile && !show) return null
 
   const getTooltipPlacement = (top: number): 'top' | 'center' | 'bottom' => {
-    if (top <= 0.12) return 'bottom'
-    if (top >= 0.88) return 'top'
+    const edgeThreshold = isMobile ? 0.18 : 0.12
+    if (top <= edgeThreshold) return 'bottom'
+    if (top >= 1 - edgeThreshold) return 'top'
     return 'center'
   }
 
   return (
     <div
-      className={`session-scroll-markers${isMobile ? ' mobile' : ''}`}
+      className={`session-scroll-markers${isMobile ? ' mobile' : ''}${activeMarkerId ? ' has-active-marker' : ''}`}
       ref={panelRef}
       onPointerDown={isMobile ? onPointerDown : undefined}
       onPointerMove={isMobile ? onPointerMove : undefined}
       onPointerUp={isMobile ? onPointerUp : undefined}
       onPointerLeave={isMobile ? onPointerLeave : undefined}
+      role={isMobile ? 'navigation' : undefined}
+      aria-label={isMobile ? 'Session message markers' : undefined}
     >
       {markers.map(({ entry, top, preview, markerType }) => {
         const isActive = activeMarkerId === entry.id
         const tooltipPlacement = getTooltipPlacement(top)
         return (
           <button
+            type="button"
             key={entry.id}
             className={`session-scroll-marker session-scroll-marker--${markerType}${isActive ? ' active' : ''}`}
             style={{ top: `${top * 100}%` }}
             data-tooltip-placement={tooltipPlacement}
-            onClick={() => onMarkerClick(entry.id)}
-            title={preview}
+            onClick={isMobile ? undefined : () => onMarkerClick(entry.id)}
+            title={isMobile ? undefined : preview}
+            aria-label={preview}
           >
-            <span className="session-scroll-marker-tooltip">{preview}</span>
+            <span className="session-scroll-marker-dot" aria-hidden="true" />
+            {!isMobile && (
+              <span className="session-scroll-marker-tooltip">
+                <span className="session-scroll-marker-tooltip-accent" aria-hidden="true" />
+                <span className="session-scroll-marker-tooltip-text">{preview}</span>
+              </span>
+            )}
           </button>
         )
       })}
