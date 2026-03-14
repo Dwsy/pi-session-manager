@@ -54,7 +54,7 @@ fn test_search_integration() {
             assistant_messages_text: String::new(),
             last_message: "How to implement search in Rust?".to_string(),
             last_message_role: "user".to_string(),
-parent_session_path: None,
+            parent_session_path: None,
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -74,7 +74,7 @@ parent_session_path: None,
             assistant_messages_text: String::new(),
             last_message: "I want to learn React".to_string(),
             last_message_role: "user".to_string(),
-parent_session_path: None,
+            parent_session_path: None,
         },
         SessionInfo {
             path: session3_path.clone(),
@@ -94,7 +94,7 @@ parent_session_path: None,
             assistant_messages_text: String::new(),
             last_message: "Here is how you implement search in Rust...".to_string(),
             last_message_role: "user".to_string(),
-parent_session_path: None,
+            parent_session_path: None,
         },
     ];
 
@@ -249,7 +249,7 @@ fn test_search_results_mapping() {
         assistant_messages_text: String::new(),
         last_message: "Test search functionality".to_string(),
         last_message_role: "user".to_string(),
-parent_session_path: None,
+        parent_session_path: None,
     }];
 
     let results = search_sessions(
@@ -289,7 +289,7 @@ parent_session_path: None,
             assistant_messages_text: String::new(),
             last_message: result.first_message.clone(),
             last_message_role: "user".to_string(),
-parent_session_path: None,
+            parent_session_path: None,
         };
 
         println!("Mapped session cwd: {}", mapped.cwd);
