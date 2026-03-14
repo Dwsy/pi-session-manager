@@ -74,7 +74,7 @@ function SessionViewerContent({
   } = useSessionView();
   const isMobile = useIsMobile();
   const { getSessionSetting } = useSettings();
-  const cmdFBehavior = getSessionSetting('cmdFBehavior');
+  const cmdFBehavior = getSessionSetting('cmdFBehavior') ?? 'inSessionSearch';
   const [showSidebar, setShowSidebar] = useState(false);
   const [searchFocusKey, setSearchFocusKey] = useState(0);
   const { sidebarWidth, isResizing, handleMouseDown } = useResizableSidebar({

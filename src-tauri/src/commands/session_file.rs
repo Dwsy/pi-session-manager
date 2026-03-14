@@ -307,6 +307,17 @@ pub(super) async fn rename_session_impl(path: String, new_name: String) -> Resul
     }
 
     fs::write(&path, lines.join("\n")).map_err(|e| format!("Failed to write session file: {e}"))?;
+
+    // Sync update to database cache to avoid waiting for file watcher
+    let config = config::load_config().map_err(|e| format!("Failed to load config: {e}"))?;
+    let conn = sqlite_cache::init_db_with_config(&config)?;
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE sessions SET name = ?1, modified = ?2 WHERE path = ?3",
+        rusqlite::params![&new_name, &now, &path],
+    )
+    .map_err(|e| format!("Failed to update session name in cache: {e}"))?;
+
     Ok(())
 }
 

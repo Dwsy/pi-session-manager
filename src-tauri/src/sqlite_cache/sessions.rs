@@ -14,6 +14,7 @@ pub fn upsert_session(
         "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at, access_count, last_accessed)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 0, NULL)
          ON CONFLICT(path) DO UPDATE SET
+            name = excluded.name,
             modified = excluded.modified,
             file_modified = excluded.file_modified,
             message_count = excluded.message_count,
