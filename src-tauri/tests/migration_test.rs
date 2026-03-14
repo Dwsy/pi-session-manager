@@ -266,8 +266,8 @@ fn test_fts_vtable_corruption_triggers_database_recreation() {
 
         // Insert message entry to populate message_entries and message_fts via auto-sync
         conn.execute(
-            "INSERT INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params!["m1", &session_path, "user", "hello world", "2025-01-01T00:00:00Z"]
+            "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params!["m1:user", "m1", &session_path, "user", "user", "hello world", "2025-01-01T00:00:00Z"]
         ).unwrap();
 
         // Verify FTS works before corruption
@@ -349,8 +349,8 @@ fn test_fts_vtable_corruption_triggers_database_recreation() {
     ).unwrap();
 
     conn2.execute(
-        "INSERT INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params!["m2", &new_session_path, "user", "new hello world", "2025-01-01T00:00:00Z"]
+        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params!["m2:user", "m2", &new_session_path, "user", "user", "new hello world", "2025-01-01T00:00:00Z"]
     ).unwrap();
 
     // Verify FTS works on the new data
@@ -411,8 +411,8 @@ fn test_fts_rebuild_after_recreate() {
     ).unwrap();
 
     conn.execute(
-        "INSERT INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params!["m_rebuild1", &session_path, "user", "rebuild test message", "2025-01-01T00:00:00Z"]
+        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params!["m_rebuild1:user", "m_rebuild1", &session_path, "user", "user", "rebuild test message", "2025-01-01T00:00:00Z"]
     ).unwrap();
 
     // Verify FTS works before dropping
@@ -444,4 +444,86 @@ fn test_fts_rebuild_after_recreate() {
     assert_eq!(results_after[0].1, session_path);
 
     // Cleanup: temp_dir is dropped automatically
+}
+
+#[test]
+fn test_init_db_upgrades_legacy_message_entries_before_new_indexes() {
+    use pi_session_manager::config::Config;
+    use pi_session_manager::sqlite_cache;
+    use rusqlite::Connection;
+    use tempfile::tempdir;
+
+    let _guard = MIGRATION_LOCK.lock().unwrap();
+    let temp_dir = tempdir().unwrap();
+    let original_home = std::env::var("HOME").ok();
+    std::env::set_var("HOME", temp_dir.path());
+
+    let db_path = sqlite_cache::get_db_path().unwrap();
+    let conn = Connection::open(&db_path).unwrap();
+    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)", [])
+        .unwrap();
+    conn.execute("INSERT INTO schema_version (version) VALUES (3)", [])
+        .unwrap();
+    conn.execute(
+        "CREATE TABLE sessions (
+            id TEXT PRIMARY KEY,
+            path TEXT NOT NULL UNIQUE,
+            cwd TEXT NOT NULL,
+            name TEXT,
+            created TEXT NOT NULL,
+            modified TEXT NOT NULL,
+            file_modified TEXT NOT NULL,
+            message_count INTEGER NOT NULL,
+            first_message TEXT,
+            all_messages_text TEXT,
+            user_messages_text TEXT,
+            assistant_messages_text TEXT,
+            last_message TEXT,
+            last_message_role TEXT,
+            cached_at TEXT NOT NULL,
+            access_count INTEGER DEFAULT 0,
+            last_accessed TEXT
+        )",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "CREATE TABLE message_entries (
+            id TEXT PRIMARY KEY,
+            session_path TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+
+    let config = Config::default();
+    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+
+    let mut stmt = conn.prepare("PRAGMA table_info(message_entries)").unwrap();
+    let columns: Vec<String> = stmt
+        .query_map([], |row| row.get(1))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    assert!(columns.contains(&"entry_id".to_string()));
+    assert!(columns.contains(&"source_type".to_string()));
+
+    let index_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_message_entries_entry_id'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(index_count, 1);
+
+    if let Some(home) = original_home {
+        std::env::set_var("HOME", home);
+    } else {
+        std::env::remove_var("HOME");
+    }
 }

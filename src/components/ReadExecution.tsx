@@ -93,7 +93,7 @@ export default function ReadExecution({
       )}
 
       {output && (
-        <div className="tool-output-wrapper">
+        <div className={`tool-output-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded && (
               <div className="tool-output">

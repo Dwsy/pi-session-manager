@@ -13,6 +13,7 @@ import SettingsSelect from '../SettingsSelect'
 import SettingsSliderField from '../SettingsSliderField'
 import SettingsToggleRow from '../SettingsToggleRow'
 import type { AdvancedSettingsProps } from '../types'
+import { useClipboard } from '../../../hooks/useClipboard'
 
 interface ClearCacheResult {
   sessions_deleted: number
@@ -46,6 +47,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
   const [manualValue, setManualValue] = useState('')
   const [newKeyValue, setNewKeyValue] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const { copyText } = useClipboard()
 
   useEffect(() => {
     invoke<ServerSettings>('load_server_settings').then(setServerSettings).catch(console.error)
@@ -119,7 +121,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
   }
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).catch(console.error)
+    copyText(text).catch(console.error)
   }
 
   const handleClearCache = async () => {

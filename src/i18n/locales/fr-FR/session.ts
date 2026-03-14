@@ -11,6 +11,8 @@ export const session = {
     more: 'Plus',
     moreActions: "Plus d'actions",
     searchMessages: 'Rechercher dans les messages',
+    top: 'Haut',
+    bottom: 'Bas',
     showThinking: 'Afficher la réflexion',
     hideThinking: 'Masquer la réflexion',
     expandTools: 'Développer les outils',

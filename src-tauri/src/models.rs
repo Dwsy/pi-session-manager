@@ -76,6 +76,7 @@ pub struct FullTextSearchHit {
     pub session_name: Option<String>,
     pub entry_id: String,
     pub role: String,
+    pub source_type: String,
     pub content: String,
     pub timestamp: DateTime<Utc>,
     pub score: f32,

@@ -10,6 +10,7 @@ import type {
 } from '../../types'
 import { getPathBasename, getPathParentName } from '../../utils/path'
 import { parseQuotedQuery } from '../../utils/search'
+import { getCachedSettings } from '../../utils/settingsApi'
 import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '../../demo'
 
 interface MessageResultMetadata {
@@ -312,6 +313,8 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
           query,
           roleFilter: 'all',
           globPattern: null,
+          projectPath: context.searchCurrentProjectOnly ? context.selectedProject : null,
+          includeThinking: getCachedSettings().search.includeThinkingInSearch,
           page: 0,
           pageSize: MAX_HITS_TO_FETCH,
           matchMode: 'any',
@@ -320,6 +323,8 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
           query,
           roleFilter: 'all',
           globPattern: null,
+          projectPath: context.searchCurrentProjectOnly ? context.selectedProject : null,
+          includeThinking: getCachedSettings().search.includeThinkingInSearch,
           page: 0,
           pageSize: MAX_HITS_TO_FETCH,
           matchMode: 'any',
@@ -333,10 +338,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       const missingPaths = hits
         .map(hit => hit.session_path)
         .filter(path => !this.sessionCache.has(path))
-      const pathsToPrefetch = (context.searchCurrentProjectOnly && context.selectedProject)
-        ? missingPaths
-        : missingPaths.slice(0, MAX_SESSION_PREFETCH)
-      await this.prefetchSessionsByPath(pathsToPrefetch)
+      await this.prefetchSessionsByPath(missingPaths.slice(0, MAX_SESSION_PREFETCH))
 
       const queryTerms = this.getHighlightTerms(query)
       const results: SearchPluginResult[] = []
@@ -344,14 +346,6 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       for (let index = 0; index < hits.length; index++) {
         const hit = hits[index]
         const session = this.sessionCache.get(hit.session_path)
-
-        if (
-          context.searchCurrentProjectOnly
-          && context.selectedProject
-          && (!session || session.cwd !== context.selectedProject)
-        ) {
-          continue
-        }
 
         const snippet = this.buildSnippet(hit.content, queryTerms)
         const metadata: MessageResultMetadata = {

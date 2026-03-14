@@ -37,6 +37,8 @@ export interface DemoFullTextSearchOptions {
   query: string
   roleFilter?: 'all' | 'user' | 'assistant'
   globPattern?: string | null
+  projectPath?: string | null
+  includeThinking?: boolean
   page?: number
   pageSize?: number
   matchMode?: 'any' | 'all'

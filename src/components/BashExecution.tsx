@@ -3,6 +3,7 @@ import { useSessionView } from '../contexts/SessionViewContext'
 import CodeBlock from './CodeBlock'
 import { renderCodeHtml } from '../utils/markdown'
 import { highlightSearchInHTML } from '../utils/search'
+import { useClipboard } from '../hooks/useClipboard'
 
 interface BashExecutionProps {
   command: string
@@ -26,6 +27,7 @@ export default function BashExecution({
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const expanded = isToolExpanded(entryId)
   const [commandCopied, setCommandCopied] = useState(false)
+  const { copyText } = useClipboard()
 
   const highlightedCommand = useMemo(() => {
     const highlighted = renderCodeHtml(command, 'bash')
@@ -39,7 +41,7 @@ export default function BashExecution({
 
   const handleCopyCommand = async () => {
     try {
-      await navigator.clipboard.writeText(command)
+      await copyText(command)
       setCommandCopied(true)
       setTimeout(() => setCommandCopied(false), 2000)
     } catch (err) {
@@ -56,7 +58,7 @@ export default function BashExecution({
         <span className="tool-expand-indicator">
           {expanded ? '▾' : '▸'}
         </span>
-        <pre className="bash-command-inline" title={command}>
+        <pre className="bash-command-inline">
           <span className="bash-command-prefix" aria-hidden="true">$ </span>
           <code className="hljs language-bash" dangerouslySetInnerHTML={{ __html: highlightedCommand }} />
         </pre>
@@ -76,7 +78,7 @@ export default function BashExecution({
             void handleCopyCommand()
           }}
           className="tool-copy-button bash-inline-copy-button"
-          title={commandCopied ? 'Copied!' : 'Copy command'}
+          aria-label={commandCopied ? 'Copied!' : 'Copy command'}
         >
           {commandCopied ? (
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -91,7 +93,7 @@ export default function BashExecution({
       </div>
 
       {output && (
-        <div className="tool-output-wrapper">
+        <div className={`tool-output-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded && (
               <CodeBlock

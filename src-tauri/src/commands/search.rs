@@ -57,6 +57,7 @@ pub async fn full_text_search(
     query: String,
     role_filter: String,
     glob_pattern: Option<String>,
+    project_path: Option<String>,
     page: usize,
     page_size: usize,
     match_mode: Option<String>,
@@ -167,6 +168,10 @@ pub async fn full_text_search(
                 (phrases, words, true)
             }
 
+            fn contains_cjk(value: &str) -> bool {
+                value.chars().any(|ch| matches!(ch as u32, 0x4E00..=0x9FFF | 0x3400..=0x4DBF | 0xF900..=0xFAFF))
+            }
+
             fn build_fts_query(trimmed_query: &str, mode: &str) -> String {
                 let (phrases, words, has_phrases) = parse_quoted_terms(trimmed_query);
 
@@ -212,21 +217,36 @@ pub async fn full_text_search(
                 }
             }
 
-            // Build the FTS query string
+            // Build the query string. CJK terms fall back to substring matching because unicode61 tokenization is unreliable for Chinese words.
+            let use_content_like = contains_cjk(trimmed);
             let fts_query = build_fts_query(trimmed, mode);
+            let content_like_query = trimmed.to_lowercase();
 
-            // Build the base WHERE clause for FTS and role filter
+            // Build the base WHERE clause for search and role filter
             let role_condition = match role_opt {
                 Some("user") => "m.role = 'user'",
                 Some("assistant") => "m.role = 'assistant'",
                 _ => "1=1",
             };
-            let mut where_clause = format!("WHERE message_fts MATCH ? AND {role_condition}");
+            let mut where_clause = if use_content_like {
+                format!("WHERE lower(m.content) LIKE ? AND {role_condition}")
+            } else {
+                format!("WHERE message_fts MATCH ? AND {role_condition}")
+            };
             let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
-            params.push(&fts_query);
+            let like_content_pattern = format!("%{content_like_query}%");
+            if use_content_like {
+                params.push(&like_content_pattern);
+            } else {
+                params.push(&fts_query);
+            }
 
             // Include glob pattern if provided: convert to LIKE with escaping
-            let mut like_pattern = String::new(); // allocate early to extend lifetime
+            let mut like_pattern = String::new();
+            let project_path_owned: Option<String> = project_path
+                .as_ref()
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty());
             if let Some(pattern_str) = &glob_pattern {
                 if !pattern_str.is_empty() {
                     // Convert glob pattern (* and ?) to LIKE patterns (% and _) and escape LIKE wildcards (% and _) and backslash
@@ -251,15 +271,37 @@ pub async fn full_text_search(
                 }
             }
 
+            if let Some(project_path) = project_path_owned.as_ref() {
+                where_clause = format!("{where_clause} AND EXISTS (SELECT 1 FROM sessions s WHERE s.path = m.session_path AND s.cwd = ?)");
+                params.push(project_path);
+            }
+
             // --- Count total hits after per-session limit (max 3 per session) ---
             let count_sql = format!(
                 "SELECT COUNT(*) FROM (
-                    SELECT 1 FROM (
+                    WITH ranked AS (
                         SELECT
-                            ROW_NUMBER() OVER (PARTITION BY m.session_path ORDER BY m.timestamp DESC) as rn_in_session
-                        FROM message_entries m JOIN message_fts ON m.rowid = message_fts.rowid
+                            m.entry_id,
+                            m.session_path,
+                            m.timestamp,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY m.session_path, m.entry_id
+                                ORDER BY CASE m.source_type WHEN 'user' THEN 0 WHEN 'assistant' THEN 1 ELSE 2 END, m.timestamp DESC
+                            ) as rn_in_entry
+                        FROM message_entries m
+                        JOIN message_fts ON m.rowid = message_fts.rowid
                         {where_clause}
-                    ) WHERE rn_in_session <= 3
+                    ),
+                    deduped AS (
+                        SELECT
+                            entry_id,
+                            session_path,
+                            timestamp,
+                            ROW_NUMBER() OVER (PARTITION BY session_path ORDER BY timestamp DESC, entry_id DESC) as rn_in_session
+                        FROM ranked
+                        WHERE rn_in_entry = 1
+                    )
+                    SELECT 1 FROM deduped WHERE rn_in_session <= 3
                 )"
             );
 
@@ -275,31 +317,43 @@ pub async fn full_text_search(
             };
 
             // --- Fetch the page of hits with global ordering and per-session limit ---
+            let rank_expr = if use_content_like { "-1.0" } else { "message_fts.rank" };
             let offset = page * page_size;
             let limit = page_size;
             let data_sql = format!(
                 "WITH ranked AS (
                     SELECT
-                        m.id,
+                        m.entry_id,
                         m.session_path,
                         m.role,
+                        m.source_type,
                         m.timestamp,
-                        message_fts.rank as rank,
-                        ROW_NUMBER() OVER (PARTITION BY m.session_path ORDER BY m.timestamp DESC) as rn_in_session
+                        {rank_expr} as rank,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY m.session_path, m.entry_id
+                            ORDER BY CASE m.source_type WHEN 'user' THEN 0 WHEN 'assistant' THEN 1 ELSE 2 END, m.timestamp DESC
+                        ) as rn_in_entry
                     FROM message_entries m
                     JOIN message_fts ON m.rowid = message_fts.rowid
                     {where_clause}
                 ),
+                deduped AS (
+                    SELECT
+                        entry_id, session_path, role, source_type, timestamp, rank,
+                        ROW_NUMBER() OVER (PARTITION BY session_path ORDER BY timestamp DESC, entry_id DESC) as rn_in_session
+                    FROM ranked
+                    WHERE rn_in_entry = 1
+                ),
                 filtered AS (
                     SELECT
-                        id, session_path, role, timestamp, rank,
+                        entry_id, session_path, role, source_type, timestamp, rank,
                         ROW_NUMBER() OVER (ORDER BY rank) as global_rn
-                    FROM ranked
+                    FROM deduped
                     WHERE rn_in_session <= 3
                 )
-                SELECT f.id, f.session_path, f.role, m.content, f.timestamp, f.rank
+                SELECT f.entry_id, f.session_path, f.role, f.source_type, m.content, f.timestamp, f.rank
                 FROM filtered f
-                JOIN message_entries m ON f.id = m.id
+                JOIN message_entries m ON f.entry_id = m.entry_id AND f.session_path = m.session_path AND f.source_type = m.source_type
                 WHERE f.global_rn > ? AND f.global_rn <= ?
                 ORDER BY f.rank"
             );
@@ -321,9 +375,10 @@ pub async fn full_text_search(
                         row.get::<_, String>(0)?, // entry_id
                         row.get::<_, String>(1)?, // session_path
                         row.get::<_, String>(2)?, // role
-                        row.get::<_, String>(3)?, // content
-                        row.get::<_, String>(4)?, // timestamp
-                        row.get::<_, f32>(5)?,    // rank
+                        row.get::<_, String>(3)?, // source_type
+                        row.get::<_, String>(4)?, // content
+                        row.get::<_, String>(5)?, // timestamp
+                        row.get::<_, f32>(6)?,    // rank
                     ))
                 })
                 .map_err(|e| format!("Failed to query message FTS: {e}"))?
@@ -334,7 +389,7 @@ pub async fn full_text_search(
             let mut all_hits = Vec::new();
             let mut sessions_cache: HashMap<String, SessionInfo> = HashMap::new();
 
-            for (entry_id, session_path, role, content, timestamp_str, rank) in rows {
+            for (entry_id, session_path, role, source_type, content, timestamp_str, rank) in rows {
                 // Get session from cache or DB
                 let session = if let Some(sess) = sessions_cache.get(&session_path) {
                     sess.clone()
@@ -362,6 +417,7 @@ pub async fn full_text_search(
                     session_name: session.name.clone(),
                     entry_id,
                     role,
+                    source_type,
                     content,
                     timestamp,
                     score: rank,

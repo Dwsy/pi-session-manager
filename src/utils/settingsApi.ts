@@ -63,7 +63,29 @@ function writeCache(settings: AppSettings) {
   } catch {}
 }
 
+function isDemoRuntime(): boolean {
+  if (import.meta.env.MODE === 'demo') {
+    return true
+  }
+
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  const pathname = window.location.pathname
+  return (
+    pathname.endsWith('/demo.html') ||
+    pathname.endsWith('/demo') ||
+    pathname.endsWith('/demo/') ||
+    pathname.endsWith('/demo/index.html')
+  )
+}
+
 export async function loadAppSettings(): Promise<AppSettings> {
+  if (isDemoRuntime()) {
+    return getCachedSettings()
+  }
+
   try {
     const raw = await invoke<Partial<AppSettings>>('load_app_settings')
     const settings = mergeDefaults(raw ?? {})
@@ -76,6 +98,11 @@ export async function loadAppSettings(): Promise<AppSettings> {
 }
 
 export async function saveAppSettings(settings: AppSettings): Promise<void> {
+  if (isDemoRuntime()) {
+    writeCache(settings)
+    return
+  }
+
   await invoke('save_app_settings', { settings })
   writeCache(settings)
 

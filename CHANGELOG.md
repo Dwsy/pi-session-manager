@@ -13,6 +13,47 @@ All notable changes to Pi Session Manager will be documented in this file.
   - Added close/reset behavior via toolbar action, close button, and `Esc`, so leaving search returns the viewer to its normal unhighlighted state and default scope
   - Updated shortcut copy/docs to reflect `Cmd/Ctrl + F` as the viewer search entry point and `Cmd/Ctrl + Shift + F` as global full-text search
 
+### Refactor
+
+- **HTTP adapter decomposition and readonly API deduplication**
+  - Split the former monolithic `src-tauri/src/http_adapter.rs` into a facade + modular implementation:
+    - facade: `src-tauri/src/http_adapter.rs`
+    - aggregator: `src-tauri/src/http_adapter_impl.rs`
+    - extracted modules under `src-tauri/src/http_adapter/`: `common`, `readonly_routes`, `sessions`, `realtime`, `static_assets`, `embedding`
+  - Added shared readonly service layer `src-tauri/src/api_readonly.rs` for full-text search, memory recall, unified memory, experience extraction, workflow suggestion, analytics, observability, and embedding helpers
+  - Rewired `src-tauri/src/main-cli.rs` to reuse the shared readonly service and removed duplicated read-only HTTP handler logic
+  - Kept existing route paths, auth semantics, CORS behavior, and `http_adapter -> ws_adapter::dispatch` behavior unchanged while reducing file size and maintenance overhead
+  - Verified with `cargo fmt`, `cargo check --workspace`, `cargo check -p pi-session-manager --features gui --all-targets`, and focused regression suites:
+    - `migration_test`
+    - `fts_message_integrity_test`
+    - `full_text_search_integration_test`
+
+- **SQLite cache module decomposition for maintainability**
+  - Split the former monolithic `src-tauri/src/sqlite_cache.rs` into a facade + modular implementation:
+    - facade: `src-tauri/src/sqlite_cache.rs`
+    - aggregator: `src-tauri/src/sqlite_cache_impl.rs`
+    - extracted modules under `src-tauri/src/sqlite_cache/`: `bootstrap`, `schema`, `migrations`, `sessions`, `message_index`, `details_cache`, `subagent_meta`, `favorites`, `tags`, `maintenance`, `legacy_fts`, `types`, `util`, `deps`
+  - Kept public API compatibility (`crate::sqlite_cache::*`) and preserved existing database schema/behavior
+  - Preserved message FTS backfill guard semantics (`MESSAGE_ENTRIES_BACKFILL_ONCE`) and `upsert_session` orchestration behavior
+  - Verified with `cargo check` and focused regression suites:
+    - `migration_test`
+    - `fts_message_integrity_test`
+    - `full_text_search_integration_test`
+    - `full_text_search_pagination_test`
+    - `delete_session_recoverable_test`
+- **Command skills module decomposition for maintainability**
+  - Split the former multi-responsibility `src-tauri/src/commands/skills.rs` into focused command modules:
+    - `src-tauri/src/commands/skills.rs` now keeps only skills/prompt-related commands
+    - `src-tauri/src/commands/pi_resources.rs` handles resource scanning and resource file reads
+    - `src-tauri/src/commands/pi_settings.rs` handles `~/.pi/agent/settings.json` reads and writes
+    - `src-tauri/src/commands/model_config.rs` handles `models.json`, backups, import/export, and HTTP model tests
+    - `src-tauri/src/commands/config_versions.rs` handles config version history and restore flows
+  - Kept existing Tauri command names, dispatch `_internal` entry points, and serialized payload shapes unchanged
+  - Verified with `cargo check` and focused regression suites:
+    - `migration_test`
+    - `fts_message_integrity_test`
+    - `full_text_search_integration_test`
+
 ### Demo & Docs
 
 - **Demo mode defaults are now deterministic**

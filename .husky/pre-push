@@ -2,6 +2,47 @@
 
 set -e
 
+HEAD_SHA=$(git rev-parse HEAD)
+
+sync_package_version_from_tag() {
+  tag_version="$1"
+  current_version=$(node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));process.stdout.write(pkg.version||'');")
+
+  if [ "$current_version" = "$tag_version" ]; then
+    return 0
+  fi
+
+  echo "[husky] detected release tag v$tag_version"
+  echo "[husky] syncing package.json version: $current_version -> $tag_version"
+
+  TAG_VERSION="$tag_version" node -e "const fs=require('fs');const file='package.json';const pkg=JSON.parse(fs.readFileSync(file,'utf8'));pkg.version=process.env.TAG_VERSION;fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');"
+
+  git add package.json
+
+  echo "[husky] package.json has been updated and staged."
+  echo "[husky] commit this change, move/create tag on the new commit, then push again."
+  exit 1
+}
+
+while IFS=' ' read -r local_ref local_sha _remote_ref _remote_sha; do
+  case "$local_ref" in
+    refs/tags/v*)
+      # Ignore tag deletion.
+      if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        continue
+      fi
+
+      tag_commit=$(git rev-parse -q --verify "${local_ref}^{}" 2>/dev/null || true)
+      if [ -n "$tag_commit" ] && [ "$tag_commit" != "$HEAD_SHA" ]; then
+        echo "[husky] skip version sync for $local_ref (tag is not on HEAD)"
+        continue
+      fi
+
+      sync_package_version_from_tag "${local_ref#refs/tags/v}"
+      ;;
+  esac
+done
+
 echo "[husky] pre-push full checks"
 
 echo "[husky] TypeScript check"

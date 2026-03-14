@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getLanguageFromPath, renderCodeHtml } from '../utils/markdown'
 import { highlightSearchInHTML } from '../utils/search'
+import { useClipboard } from '../hooks/useClipboard'
 
 interface CodeBlockProps {
   code: string
@@ -24,6 +25,7 @@ function CodeBlock({
 }: CodeBlockProps) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
+  const { copyText } = useClipboard()
 
   const resolvedLanguage = useMemo(
     () => language || (filename ? getLanguageFromPath(filename) : undefined),
@@ -39,7 +41,7 @@ function CodeBlock({
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(code)
+      await copyText(code)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
@@ -72,7 +74,7 @@ function CodeBlock({
         <button
           onClick={handleCopy}
           className="code-copy-button"
-          title={copied ? t('components.codeBlock.copied') : t('components.codeBlock.copy')}
+          aria-label={copied ? t('components.codeBlock.copied') : t('components.codeBlock.copy')}
         >
           {copied ? (
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

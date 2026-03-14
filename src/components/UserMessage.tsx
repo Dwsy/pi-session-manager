@@ -5,6 +5,7 @@ import { highlightSearchInHTML } from '../utils/search'
 import { formatDate } from '../utils/format'
 import { Copy, Check } from 'lucide-react'
 import { memo, useMemo, useState } from 'react'
+import { useClipboard } from '../hooks/useClipboard'
 
 interface UserMessageProps {
   id: string
@@ -17,6 +18,7 @@ interface UserMessageProps {
 function UserMessage({ id, timestamp, content, className = '', searchQuery = '' }: UserMessageProps) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
+  const { copyText } = useClipboard()
 
   const images = useMemo(
     () => content.filter(c => c.type === 'image' && c.data),
@@ -43,7 +45,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(text)
+      await copyText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

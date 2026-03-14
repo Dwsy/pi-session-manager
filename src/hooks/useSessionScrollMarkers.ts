@@ -4,6 +4,9 @@ import type { SessionEntry } from "../types";
 
 const MAX_MARKERS_DESKTOP = 180;
 const MAX_MARKERS_MOBILE = 120;
+const SCRUB_START_DELAY_MS = 110;
+const SCRUB_START_DISTANCE_PX = 10;
+const ACTIVE_MARKER_VISIBILITY_MS = 680;
 
 export interface ScrollMarker {
   entry: SessionEntry;
@@ -36,6 +39,10 @@ interface MarkerEntryPosition {
   entry: SessionEntry;
   index: number;
   markerType: "user" | "compaction";
+}
+
+interface PointerStartState {
+  clientY: number;
 }
 
 function sampleMarkers(markers: ScrollMarker[], maxCount: number): ScrollMarker[] {
@@ -99,7 +106,9 @@ export function useSessionScrollMarkers({
 
   const markersPanelRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearActiveMarkerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeMarkerRef = useRef<string | null>(null);
+  const pointerStartRef = useRef<PointerStartState | null>(null);
   const isScrubbingRef = useRef(false);
 
   const shouldComputeMarkers = enabled && (!isMobile || showMarkers);
@@ -138,7 +147,7 @@ export function useSessionScrollMarkers({
           entry.summary ||
           (typeof entry.content === "string" ? entry.content : "") ||
           previewFallback;
-        const summary = rawSummary.replace(/\s+/g, " ").trim();
+        const summary = rawSummary.replace(/\s+/g, " " ).trim();
         return summary.length > 80
           ? `📦 ${summary.slice(0, 80)}…`
           : `📦 ${summary}`;
@@ -149,7 +158,7 @@ export function useSessionScrollMarkers({
         .filter((item) => item.type === "text" && item.text)
         .map((item) => item.text)
         .join(" ")
-        .replace(/\s+/g, " ")
+        .replace(/\s+/g, " " )
         .trim();
 
       if (!text) return previewFallback;
@@ -184,6 +193,28 @@ export function useSessionScrollMarkers({
     isMobile,
   ]);
 
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const clearActiveMarkerReset = useCallback(() => {
+    if (clearActiveMarkerTimerRef.current) {
+      clearTimeout(clearActiveMarkerTimerRef.current);
+      clearActiveMarkerTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleActiveMarkerReset = useCallback(() => {
+    clearActiveMarkerReset();
+    clearActiveMarkerTimerRef.current = setTimeout(() => {
+      activeMarkerRef.current = null;
+      setActiveMarkerId(null);
+    }, ACTIVE_MARKER_VISIBILITY_MS);
+  }, [clearActiveMarkerReset]);
+
   const triggerHaptic = useCallback((duration = 8) => {
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
       navigator.vibrate(duration);
@@ -201,20 +232,21 @@ export function useSessionScrollMarkers({
 
   useEffect(() => {
     if (!enabled || !showMarkers) {
+      clearLongPressTimer();
+      clearActiveMarkerReset();
       activeMarkerRef.current = null;
+      pointerStartRef.current = null;
       setActiveMarkerId(null);
       isScrubbingRef.current = false;
     }
-  }, [enabled, showMarkers]);
+  }, [enabled, showMarkers, clearActiveMarkerReset, clearLongPressTimer]);
 
   useEffect(
     () => () => {
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-      }
+      clearLongPressTimer();
+      clearActiveMarkerReset();
     },
-    [],
+    [clearActiveMarkerReset, clearLongPressTimer],
   );
 
   const getNearestMarker = useCallback(
@@ -222,7 +254,7 @@ export function useSessionScrollMarkers({
       if (!markersPanelRef.current || markers.length === 0) return null;
       const rect = markersPanelRef.current.getBoundingClientRect();
       if (rect.height <= 0) return null;
-      const ratio = (clientY - rect.top) / rect.height;
+      const ratio = Math.min(Math.max((clientY - rect.top) / rect.height, 0), 1);
 
       let nearest = markers[0];
       let minDistance = Math.abs(nearest.top - ratio);
@@ -243,6 +275,8 @@ export function useSessionScrollMarkers({
   const activateMarker = useCallback(
     (marker: ScrollMarker | null, shouldScroll: boolean) => {
       if (!marker || !enabled) return;
+
+      clearActiveMarkerReset();
       if (activeMarkerRef.current === marker.entry.id) return;
 
       activeMarkerRef.current = marker.entry.id;
@@ -252,65 +286,113 @@ export function useSessionScrollMarkers({
       }
       triggerHaptic(6);
     },
-    [enabled, onSelectEntry, triggerHaptic],
+    [enabled, clearActiveMarkerReset, onSelectEntry, triggerHaptic],
   );
 
   const handleMarkersPointerDown = useCallback(
     (event: PointerEvent) => {
-      if (!enabled || !isMobile) return;
+      if (!enabled || !isMobile || !event.isPrimary) return;
       event.preventDefault();
 
-      const startY = event.clientY;
-      const marker = getNearestMarker(startY);
+      clearLongPressTimer();
+      clearActiveMarkerReset();
+      pointerStartRef.current = { clientY: event.clientY };
+      event.currentTarget.setPointerCapture(event.pointerId);
+
+      const marker = getNearestMarker(event.clientY);
       if (marker) {
         setActiveMarkerId(marker.entry.id);
       }
 
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-      }
-
+      const startY = event.clientY;
       longPressTimerRef.current = setTimeout(() => {
         isScrubbingRef.current = true;
         triggerHaptic(10);
         activateMarker(getNearestMarker(startY), true);
-      }, 140);
+      }, SCRUB_START_DELAY_MS);
     },
-    [enabled, isMobile, getNearestMarker, activateMarker, triggerHaptic],
+    [
+      enabled,
+      isMobile,
+      clearActiveMarkerReset,
+      clearLongPressTimer,
+      getNearestMarker,
+      triggerHaptic,
+      activateMarker,
+    ],
   );
 
   const handleMarkersPointerMove = useCallback(
     (event: PointerEvent) => {
-      if (!enabled || !isMobile || !isScrubbingRef.current) return;
+      if (!enabled || !isMobile || !event.isPrimary) return;
+
+      const start = pointerStartRef.current;
+      if (!start) return;
+
+      if (!isScrubbingRef.current) {
+        if (Math.abs(event.clientY - start.clientY) < SCRUB_START_DISTANCE_PX) {
+          return;
+        }
+
+        clearLongPressTimer();
+        isScrubbingRef.current = true;
+        triggerHaptic(10);
+      }
+
       event.preventDefault();
       activateMarker(getNearestMarker(event.clientY), true);
     },
-    [enabled, isMobile, getNearestMarker, activateMarker],
+    [
+      enabled,
+      isMobile,
+      clearLongPressTimer,
+      triggerHaptic,
+      activateMarker,
+      getNearestMarker,
+    ],
   );
 
   const handleMarkersPointerUp = useCallback(
     (event: PointerEvent) => {
-      if (!enabled || !isMobile) return;
+      if (!enabled || !isMobile || !event.isPrimary) return;
 
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
+      clearLongPressTimer();
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
       }
 
-      if (!isScrubbingRef.current) {
-        const marker = getNearestMarker(event.clientY);
-        if (marker) {
-          onSelectEntry(marker.entry.id);
-          setActiveMarkerId(marker.entry.id);
-          triggerHaptic(6);
-        }
+      const marker = getNearestMarker(event.clientY);
+      const wasScrubbing = isScrubbingRef.current;
+
+      if (!wasScrubbing && marker) {
+        clearActiveMarkerReset();
+        onSelectEntry(marker.entry.id);
+        setActiveMarkerId(marker.entry.id);
+        triggerHaptic(6);
       }
 
       isScrubbingRef.current = false;
+      pointerStartRef.current = null;
       activeMarkerRef.current = null;
-      setActiveMarkerId(null);
+
+      if (marker || activeMarkerId) {
+        scheduleActiveMarkerReset();
+      } else {
+        clearActiveMarkerReset();
+        setActiveMarkerId(null);
+      }
     },
-    [enabled, isMobile, getNearestMarker, onSelectEntry, triggerHaptic],
+    [
+      enabled,
+      isMobile,
+      activeMarkerId,
+      clearLongPressTimer,
+      clearActiveMarkerReset,
+      getNearestMarker,
+      onSelectEntry,
+      triggerHaptic,
+      scheduleActiveMarkerReset,
+    ],
   );
 
   return {

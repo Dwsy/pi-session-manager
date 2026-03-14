@@ -647,8 +647,10 @@ fn test_fts_escaping_and_snippet_tags() {
     conn.execute(
         "CREATE TABLE message_entries (
             id TEXT PRIMARY KEY,
+            entry_id TEXT NOT NULL,
             session_path TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking')),
             content TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
@@ -662,10 +664,12 @@ fn test_fts_escaping_and_snippet_tags() {
 
     // Insert a message entry with special characters: quotes and backslash
     conn.execute(
-        "INSERT INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
+            "m1:user",
             "m1",
             "/test/session.jsonl",
+            "user",
             "user",
             "This contains \"double quotes\" and \\ backslash in the text",
             "2025-01-01T00:00:00Z"
@@ -748,8 +752,8 @@ fn test_database_recovery_from_message_fts_corruption() {
             ],
         ).unwrap();
         conn.execute(
-            "INSERT INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params!["m1", &session_path, "user", "Hello world", "2025-01-01T00:00:00Z"]
+            "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params!["m1:user", "m1", &session_path, "user", "user", "Hello world", "2025-01-01T00:00:00Z"]
         ).unwrap();
 
         // Verify FTS works
@@ -793,8 +797,8 @@ fn test_database_recovery_from_message_fts_corruption() {
         ],
     ).unwrap();
     conn2.execute(
-        "INSERT INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params!["m1", &session_path, "user", "Hello world", "2025-01-01T00:00:00Z"]
+        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params!["m1:user", "m1", &session_path, "user", "user", "Hello world", "2025-01-01T00:00:00Z"]
     ).unwrap();
 
     // Verify FTS works after recovery
@@ -808,4 +812,202 @@ fn test_database_recovery_from_message_fts_corruption() {
     } else {
         env::remove_var("HOME");
     }
+}
+
+#[test]
+fn test_backfill_when_message_entries_partially_missing() {
+    let temp_dir = tempdir().unwrap();
+    let sessions_dir = temp_dir.path().join("sessions");
+    fs::create_dir_all(&sessions_dir).unwrap();
+
+    let sess1_path = sessions_dir.join("session1.jsonl");
+    let sess1_content = make_session_file("sess1", "/cwd1", &[("user", "hello one")]);
+    fs::write(&sess1_path, sess1_content).unwrap();
+
+    let sess2_path = sessions_dir.join("session2.jsonl");
+    let sess2_content = make_session_file("sess2", "/cwd2", &[("user", "hello two 弱智")]);
+    fs::write(&sess2_path, sess2_content).unwrap();
+
+    let temp_db = tempdir().unwrap();
+    let db_file = temp_db.path().join("test.db");
+    let conn = Connection::open(&db_file).unwrap();
+    let _: String = conn
+        .query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0))
+        .unwrap();
+    conn.execute("PRAGMA synchronous=NORMAL;", []).unwrap();
+    conn.execute("PRAGMA foreign_keys=ON;", []).unwrap();
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS sessions (
+            id TEXT PRIMARY KEY,
+            path TEXT NOT NULL UNIQUE,
+            cwd TEXT NOT NULL,
+            name TEXT,
+            created TEXT NOT NULL,
+            modified TEXT NOT NULL,
+            file_modified TEXT NOT NULL,
+            message_count INTEGER NOT NULL,
+            first_message TEXT,
+            all_messages_text TEXT,
+            user_messages_text TEXT,
+            assistant_messages_text TEXT,
+            last_message TEXT,
+            last_message_role TEXT,
+            cached_at TEXT NOT NULL,
+            access_count INTEGER DEFAULT 0,
+            last_accessed TEXT
+        )",
+        [],
+    )
+    .unwrap();
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS message_entries (
+            id TEXT PRIMARY KEY,
+            entry_id TEXT NOT NULL,
+            session_path TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking')),
+            content TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
+        )",
+        [],
+    )
+    .unwrap();
+
+    let file_modified = Utc::now();
+    for path in [&sess1_path, &sess2_path] {
+        let (session, _entries) = scanner::parse_session_info(path).unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            params![
+                &session.id,
+                &session.path,
+                &session.cwd,
+                &session.name,
+                &session.created.to_rfc3339(),
+                &session.modified.to_rfc3339(),
+                &file_modified.to_rfc3339(),
+                session.message_count as i64,
+                &session.first_message,
+                &session.all_messages_text,
+                &session.user_messages_text,
+                &session.assistant_messages_text,
+                &session.last_message,
+                &session.last_message_role,
+                &Utc::now().to_rfc3339(),
+            ],
+        )
+        .unwrap();
+    }
+
+    // Only index the first session to simulate partial coverage.
+    let (session1, _) = scanner::parse_session_info(&sess1_path).unwrap();
+    sqlite_cache::insert_message_entries(&conn, &session1).unwrap();
+
+    sqlite_cache::ensure_message_fts_schema(&conn).unwrap();
+
+    let count_second: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM message_entries WHERE session_path = ?",
+            params![sess2_path.to_string_lossy().to_string()],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(
+        count_second > 0,
+        "second session should be backfilled into message_entries"
+    );
+
+    let results = sqlite_cache::search_message_fts(&conn, "弱智", None, 10).unwrap();
+    assert_eq!(results.len(), 1);
+    assert!(results[0].1.contains("session2.jsonl"));
+}
+
+#[test]
+fn test_backfill_removes_stale_missing_session() {
+    let temp_db = tempdir().unwrap();
+    let db_file = temp_db.path().join("test.db");
+    let conn = Connection::open(&db_file).unwrap();
+    let _: String = conn
+        .query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0))
+        .unwrap();
+    conn.execute("PRAGMA synchronous=NORMAL;", []).unwrap();
+    conn.execute("PRAGMA foreign_keys=ON;", []).unwrap();
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS sessions (
+            id TEXT PRIMARY KEY,
+            path TEXT NOT NULL UNIQUE,
+            cwd TEXT NOT NULL,
+            name TEXT,
+            created TEXT NOT NULL,
+            modified TEXT NOT NULL,
+            file_modified TEXT NOT NULL,
+            message_count INTEGER NOT NULL,
+            first_message TEXT,
+            all_messages_text TEXT,
+            user_messages_text TEXT,
+            assistant_messages_text TEXT,
+            last_message TEXT,
+            last_message_role TEXT,
+            cached_at TEXT NOT NULL,
+            access_count INTEGER DEFAULT 0,
+            last_accessed TEXT
+        )",
+        [],
+    )
+    .unwrap();
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS message_entries (
+            id TEXT PRIMARY KEY,
+            entry_id TEXT NOT NULL,
+            session_path TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking')),
+            content TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
+        )",
+        [],
+    )
+    .unwrap();
+
+    let stale_path = "/tmp/does-not-exist-session.jsonl";
+    conn.execute(
+        "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+        params![
+            "stale1",
+            stale_path,
+            "/cwd",
+            "2025-01-01T00:00:00Z",
+            "2025-01-01T00:00:00Z",
+            "2025-01-01T00:00:00Z",
+            1i64,
+            "missing file",
+            "missing file",
+            "missing file",
+            "",
+            "missing file",
+            "user",
+            Utc::now().to_rfc3339(),
+        ],
+    )
+    .unwrap();
+
+    sqlite_cache::ensure_message_fts_schema(&conn).unwrap();
+
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sessions WHERE path = ?",
+            params![stale_path],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        count, 0,
+        "stale session row should be removed during backfill cleanup"
+    );
 }

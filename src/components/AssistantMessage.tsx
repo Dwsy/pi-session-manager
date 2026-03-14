@@ -7,6 +7,7 @@ import { formatDate } from '../utils/format'
 import { getAssistantDisplayedBlocks } from '../utils/assistantContent'
 import { Copy, Check } from 'lucide-react'
 import { memo, useMemo, useState } from 'react'
+import { useClipboard } from '../hooks/useClipboard'
 
 interface AssistantMessageProps {
   content: Content[]
@@ -25,6 +26,7 @@ function AssistantMessage({
 }: AssistantMessageProps) {
   const { showThinking } = useSessionView()
   const [copied, setCopied] = useState(false)
+  const { copyText } = useClipboard()
 
   const { thinkingBlocks, textBlocks } = useMemo(
     () => getAssistantDisplayedBlocks(content),
@@ -40,7 +42,7 @@ function AssistantMessage({
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(allText)
+      await copyText(allText)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

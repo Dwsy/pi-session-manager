@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::models::{Content, Message, SessionEntry, SessionInfo, SessionsDiff};
+use crate::search_index::{extract_message_contents, extract_primary_message_text};
 use crate::sqlite_cache;
 use crate::write_buffer;
 use chrono::{DateTime, Duration, Utc};
@@ -383,7 +384,7 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
                 if role == "user" || role == "assistant" {
                     message_count += 1;
 
-                    let text = extract_message_text(&entry);
+                    let text = extract_primary_message_text(&entry);
                     if !text.is_empty() {
                         all_messages.push(text.clone());
                         if first_message.is_empty() && role == "user" {
@@ -405,6 +406,14 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
                         let timestamp_str = entry["timestamp"].as_str().unwrap_or("");
                         let timestamp = parse_timestamp(timestamp_str)?;
 
+                        let normalized_content = extract_message_contents(&entry, true)
+                            .into_iter()
+                            .map(|(content_type, value)| Content {
+                                content_type,
+                                text: Some(value),
+                            })
+                            .collect();
+
                         let session_entry = SessionEntry {
                             entry_type: "message".to_string(),
                             id: entry_id,
@@ -412,10 +421,7 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
                             timestamp,
                             message: Some(Message {
                                 role: role.to_string(),
-                                content: vec![Content {
-                                    content_type: "text".to_string(),
-                                    text: Some(text),
-                                }],
+                                content: normalized_content,
                             }),
                         };
                         entries.push(session_entry);
@@ -449,21 +455,12 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
     ))
 }
 
-fn extract_message_text(entry: &Value) -> String {
-    if let Some(message) = entry.get("message") {
-        if let Some(content) = message.get("content") {
-            if content.is_array() {
-                for item in content.as_array().unwrap() {
-                    if let Some(text) = item.get("text") {
-                        if let Some(s) = text.as_str() {
-                            return s.to_string();
-                        }
-                    }
-                }
-            }
-        }
-    }
-    String::new()
+pub fn extract_message_text(entry: &Value) -> String {
+    extract_primary_message_text(entry)
+}
+
+pub fn extract_index_segments(entry: &Value, include_thinking: bool) -> Vec<(String, String)> {
+    extract_message_contents(entry, include_thinking)
 }
 
 fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, String> {

@@ -137,6 +137,7 @@ export default function CommandMenu({
     setResults,
     context.selectedProject,
     context.searchCurrentProjectOnly,
+    context.sessions,
     activeTab,
     scopedPluginIds,
   ])
