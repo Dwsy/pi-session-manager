@@ -76,6 +76,17 @@ The search bar provides:
 - exact scrolling to the active match, even when the message list is virtualized
 - full reset via the close button or `Esc`, which clears the query, restores the default scope, and removes highlights
 
+### Configurable Cmd+F Behavior
+
+The `Cmd/Ctrl + F` shortcut behavior can be customized in **Settings → Session → Cmd+F Behavior**:
+
+| Mode | `Cmd/Ctrl + F` | `Cmd/Ctrl + Shift + F` |
+|------|----------------|------------------------|
+| **Search in session** (default) | Open in-session search | Toggle session tree sidebar |
+| **Toggle session tree** | Toggle session tree sidebar | Open in-session search |
+
+This allows users who prefer the previous `Cmd/Ctrl + F` = toggle sidebar behavior to restore it.
+
 ## Subagent Sessions
 
 When a session uses subagents (via Pi's `subagent` tool), the viewer renders clickable cards for each subagent run showing:
@@ -104,7 +115,8 @@ An LRU cache (5 entries) keyed by file path + modification timestamp speeds up b
 |----------|--------|
 | `Cmd/Ctrl + T` | Toggle thinking blocks |
 | `Cmd/Ctrl + O` | Toggle tool call expansion |
-| `Cmd/Ctrl + F` | Search messages in the open session |
+| `Cmd/Ctrl + F` | Search messages in the open session (or toggle sidebar, configurable) |
+| `Cmd/Ctrl + Shift + F` | Toggle session tree sidebar (or search messages, configurable) |
 | `Cmd/Ctrl + G` | Next in-session search result |
 | `Shift + Cmd/Ctrl + G` | Previous in-session search result |
 | `Cmd/Ctrl + E` | Export & open in browser |
