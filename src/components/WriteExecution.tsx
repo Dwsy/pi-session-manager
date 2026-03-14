@@ -1,9 +1,11 @@
 import type { CSSProperties } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { escapeHtml, getLanguageFromPath } from '../utils/markdown'
 import { shortenPath } from '../utils/format'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useSessionView } from '../contexts/SessionViewContext'
+import { highlightSearchInHTML } from '../utils/search'
 import CodeBlock from './CodeBlock'
 
 interface WriteExecutionProps {
@@ -11,6 +13,7 @@ interface WriteExecutionProps {
   content: string
   output?: string
   entryId: string
+  searchQuery?: string
 }
 
 const OUTPUT_MAX_HEIGHT = 300
@@ -20,6 +23,7 @@ export default function WriteExecution({
   content,
   output,
   entryId,
+  searchQuery = '',
 }: WriteExecutionProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -38,6 +42,16 @@ export default function WriteExecution({
         wordBreak: 'break-word',
       }
   const lines = content.split('\n')
+  const highlightedOutput = useMemo(() => {
+    if (!output) {
+      return ''
+    }
+
+    const escapedOutput = escapeHtml(output)
+    return searchQuery
+      ? highlightSearchInHTML(escapedOutput, searchQuery)
+      : escapedOutput
+  }, [output, searchQuery])
 
   return (
     <div className="tool-execution success" id={`entry-${entryId}`}>
@@ -71,6 +85,7 @@ export default function WriteExecution({
                   showLineNumbers={true}
                   scrollable
                   maxHeight={OUTPUT_MAX_HEIGHT}
+                  searchQuery={searchQuery}
                 />
               </div>
             )}
@@ -83,7 +98,7 @@ export default function WriteExecution({
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded && (
               <div className="tool-output">
-                <div style={{ color: 'var(--success)' }}>{escapeHtml(output)}</div>
+                <div dangerouslySetInnerHTML={{ __html: highlightedOutput }} />
               </div>
             )}
           </div>

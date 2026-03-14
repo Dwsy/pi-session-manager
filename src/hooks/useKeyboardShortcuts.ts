@@ -40,6 +40,10 @@ export function useKeyboardShortcuts(shortcuts: Shortcuts, options?: UseKeyboard
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) {
+        return
+      }
+
       if (isTextEntryTarget(e.target)) {
         return
       }

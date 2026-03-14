@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { useMemo } from 'react'
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react'
 import { registerCustomTheme, RegisteredCustomThemes } from '@pierre/diffs'
 import { useTranslation } from 'react-i18next'
@@ -8,6 +9,7 @@ import { getPathBasename } from '../utils/path'
 import { useTheme } from '../hooks/useAppearance'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useSessionView } from '../contexts/SessionViewContext'
+import { highlightSearchInHTML } from '../utils/search'
 
 // Custom themes: inherit pierre themes but override editor.background to match tool card bg
 let themesRegistered = false
@@ -37,6 +39,7 @@ interface EditExecutionProps {
   output?: string
   isError?: boolean
   entryId: string
+  searchQuery?: string
 }
 
 const OUTPUT_MAX_HEIGHT = 300
@@ -47,6 +50,7 @@ export default function EditExecution({
   output,
   isError = false,
   entryId,
+  searchQuery = '',
 }: EditExecutionProps) {
   const { t } = useTranslation()
   const { theme } = useTheme()
@@ -64,6 +68,28 @@ export default function EditExecution({
         overflowWrap: 'anywhere',
         wordBreak: 'break-word',
       }
+
+  const highlightedDiff = useMemo(() => {
+    if (!diff) {
+      return ''
+    }
+
+    const escapedDiff = escapeHtml(diff)
+    return searchQuery
+      ? highlightSearchInHTML(escapedDiff, searchQuery)
+      : escapedDiff
+  }, [diff, searchQuery])
+
+  const highlightedOutput = useMemo(() => {
+    if (!output) {
+      return ''
+    }
+
+    const escapedOutput = escapeHtml(output)
+    return searchQuery
+      ? highlightSearchInHTML(escapedOutput, searchQuery)
+      : escapedOutput
+  }, [output, searchQuery])
 
   const parsePiDiff = (diffText: string): { oldText: string; newText: string } | null => {
     if (!diffText) return null
@@ -115,6 +141,28 @@ export default function EditExecution({
 
   const renderDiff = () => {
     if (!diff) return null
+
+    if (searchQuery.trim()) {
+      return (
+        <div className="tool-output">
+          <div style={{
+            backgroundColor: 'var(--code-bg, #1e1e1e)',
+            padding: '12px',
+            borderRadius: '6px',
+            overflow: 'auto'
+          }}>
+            <pre style={{
+              margin: 0,
+              whiteSpace: 'pre-wrap',
+              fontFamily: 'var(--font-family-mono, ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace)',
+              fontSize: '0.875rem',
+              lineHeight: '1.5',
+              color: 'var(--code-fg, #d4d4d4)'
+            }} dangerouslySetInnerHTML={{ __html: highlightedDiff }} />
+          </div>
+        </div>
+      )
+    }
 
     const parsed = parsePiDiff(diff)
 
@@ -264,7 +312,7 @@ export default function EditExecution({
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded && (
               <div className="tool-output">
-                <div>{escapeHtml(outputText)}</div>
+                <div dangerouslySetInnerHTML={{ __html: highlightedOutput }} />
               </div>
             )}
           </div>

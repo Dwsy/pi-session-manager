@@ -19,6 +19,7 @@
 
 - Session browser with list/project/kanban views, favorites, tags, rename, delete, and export.
 - Full-text search via SQLite FTS + Tantivy-backed indexing/search flows.
+- In-session message search with inline highlights, current-match navigation, and keyboard-friendly close/reset behavior.
 - Built-in terminal (PTY) and one-click resume of Pi sessions.
 - Multi-protocol runtime: Tauri IPC, WebSocket, HTTP, SSE.
 - Rich **demo data engine** and dedicated static demo page build mode.

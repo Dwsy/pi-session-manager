@@ -1,3 +1,5 @@
+import { escapeHtml } from './markdown'
+
 /**
  * Parsed query with support for exact phrases wrapped in double quotes
  */
@@ -6,6 +8,35 @@ export interface ParsedQuotedQuery {
   remainder: string
   remainderTokens: string[]
   hasPhrases: boolean
+}
+
+export interface SearchMatchRange {
+  start: number
+  end: number
+  text: string
+}
+
+const SEARCH_HIGHLIGHT_MARKUP = '<mark class="search-highlight">'
+
+function escapeRegex(term: string): string {
+  return term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function getSearchRegex(searchQuery: string): RegExp | null {
+  const terms = getQueryTerms(searchQuery)
+  if (!terms.length) {
+    return null
+  }
+
+  const escapedTerms = [...new Set(terms)]
+    .sort((a, b) => b.length - a.length)
+    .map((term) => escapeRegex(term))
+
+  if (!escapedTerms.length) {
+    return null
+  }
+
+  return new RegExp(`(${escapedTerms.join('|')})`, 'gi')
 }
 
 /**
@@ -74,8 +105,43 @@ export function getQueryTerms(searchQuery: string): string[] {
   }
 
   return [...parsed.phrases, ...parsed.remainderTokens]
-    .map(term => term.toLowerCase())
+    .map((term) => term.toLowerCase())
     .filter(Boolean)
+}
+
+/**
+ * Collect search match ranges from plain text using the same semantics as highlighting
+ */
+export function collectSearchMatches(
+  text: string,
+  searchQuery: string,
+): SearchMatchRange[] {
+  if (!text || !containsSearchQuery(text, searchQuery)) {
+    return []
+  }
+
+  const regex = getSearchRegex(searchQuery)
+  if (!regex) {
+    return []
+  }
+
+  const matches: SearchMatchRange[] = []
+  let match: RegExpExecArray | null = null
+
+  while ((match = regex.exec(text)) !== null) {
+    const matchedText = match[0] || ''
+    if (!matchedText) {
+      break
+    }
+
+    matches.push({
+      start: match.index,
+      end: match.index + matchedText.length,
+      text: matchedText,
+    })
+  }
+
+  return matches
 }
 
 /**
@@ -85,20 +151,15 @@ export function getQueryTerms(searchQuery: string): string[] {
  * @returns Highlighted HTML string
  */
 export function highlightSearchInHTML(html: string, searchQuery: string): string {
-  const terms = getQueryTerms(searchQuery)
-  if (!terms.length) {
+  const regex = getSearchRegex(searchQuery)
+  if (!regex) {
     return html
   }
 
-  const escapedTerms = [...new Set(terms)]
-    .sort((a, b) => b.length - a.length)
-    .map(term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-
-  if (!escapedTerms.length) {
+  const searchableText = extractTextFromHTML(html)
+  if (!containsSearchQuery(searchableText, searchQuery)) {
     return html
   }
-
-  const regex = new RegExp(`(${escapedTerms.join('|')})`, 'gi')
 
   // Temporarily replace HTML tags to avoid searching inside tags
   const tagPlaceholders: string[] = []
@@ -117,6 +178,15 @@ export function highlightSearchInHTML(html: string, searchQuery: string): string
   })
 
   return processedHtml
+}
+
+export function countSearchHighlightsInHTML(html: string, searchQuery: string): number {
+  const highlightedHtml = highlightSearchInHTML(html, searchQuery)
+  return highlightedHtml.split(SEARCH_HIGHLIGHT_MARKUP).length - 1
+}
+
+export function countSearchHighlightsInText(text: string, searchQuery: string): number {
+  return countSearchHighlightsInHTML(escapeHtml(text), searchQuery)
 }
 
 /**
@@ -138,8 +208,12 @@ export function containsSearchQuery(text: string, searchQuery: string): boolean 
     return trimmed ? textLower.includes(trimmed) : false
   }
 
-  const phraseMatched = parsed.phrases.every(phrase => textLower.includes(phrase.toLowerCase()))
-  const remainderMatched = parsed.remainderTokens.every(token => textLower.includes(token.toLowerCase()))
+  const phraseMatched = parsed.phrases.every((phrase) =>
+    textLower.includes(phrase.toLowerCase()),
+  )
+  const remainderMatched = parsed.remainderTokens.every((token) =>
+    textLower.includes(token.toLowerCase()),
+  )
 
   return phraseMatched && remainderMatched
 }
@@ -150,9 +224,7 @@ export function containsSearchQuery(text: string, searchQuery: string): boolean 
  * @returns Plain text
  */
 export function extractTextFromHTML(html: string): string {
-  // Remove HTML tags
   const text = html.replace(/<[^>]+>/g, ' ')
-  // Decode HTML entities
   const textarea = document.createElement('textarea')
   textarea.innerHTML = text
   return textarea.value

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useSessionView } from '../contexts/SessionViewContext'
 import CodeBlock from './CodeBlock'
-import hljs from 'highlight.js'
-import { escapeHtml } from '../utils/markdown'
+import { renderCodeHtml } from '../utils/markdown'
+import { highlightSearchInHTML } from '../utils/search'
 import { useClipboard } from '../hooks/useClipboard'
 
 interface BashExecutionProps {
@@ -11,6 +11,7 @@ interface BashExecutionProps {
   exitCode?: number | null
   cancelled?: boolean
   entryId: string
+  searchQuery?: string
 }
 
 const OUTPUT_MAX_HEIGHT = 300
@@ -21,6 +22,7 @@ export default function BashExecution({
   exitCode,
   cancelled,
   entryId,
+  searchQuery = '',
 }: BashExecutionProps) {
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const expanded = isToolExpanded(entryId)
@@ -28,16 +30,11 @@ export default function BashExecution({
   const { copyText } = useClipboard()
 
   const highlightedCommand = useMemo(() => {
-    try {
-      return hljs.highlight(command, { language: 'bash' }).value
-    } catch {
-      try {
-        return hljs.highlightAuto(command, ['bash', 'shell', 'sh']).value
-      } catch {
-        return escapeHtml(command)
-      }
-    }
-  }, [command])
+    const highlighted = renderCodeHtml(command, 'bash')
+    return searchQuery
+      ? highlightSearchInHTML(highlighted, searchQuery)
+      : highlighted
+  }, [command, searchQuery])
 
   const isError = cancelled || (exitCode !== undefined && exitCode !== null && exitCode !== 0)
   const statusClass = isError ? 'error' : 'success'
@@ -105,6 +102,7 @@ export default function BashExecution({
                 showLineNumbers={true}
                 scrollable
                 maxHeight={OUTPUT_MAX_HEIGHT}
+                searchQuery={searchQuery}
               />
             )}
           </div>

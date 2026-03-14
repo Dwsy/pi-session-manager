@@ -9,7 +9,7 @@ interface ShortcutItem {
 
 const shortcuts: ShortcutItem[] = [
   {
-    keys: 'Cmd+K',
+    keys: 'Cmd+Shift+F',
     labelKey: 'app.shortcuts.searchAll',
     fallback: 'Search all sessions',
     category: 'search',
@@ -17,7 +17,19 @@ const shortcuts: ShortcutItem[] = [
   {
     keys: 'Cmd+F',
     labelKey: 'app.shortcuts.search',
-    fallback: 'Focus search',
+    fallback: 'Search current view',
+    category: 'search',
+  },
+  {
+    keys: 'Cmd+G',
+    labelKey: 'search.nextAction',
+    fallback: 'Next search result',
+    category: 'search',
+  },
+  {
+    keys: 'Shift+Cmd+G',
+    labelKey: 'search.previousAction',
+    fallback: 'Previous search result',
     category: 'search',
   },
   {

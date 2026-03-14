@@ -10,11 +10,13 @@ export interface SessionViewerToolbarProps {
   showScrollMarkers: boolean;
   isMobileMenuOpen: boolean;
   isScrollMarkersFeatureEnabled: boolean;
+  isSearchOpen: boolean;
   onBack?: () => void;
   onToggleSidebar: () => void;
   onToggleThinking: () => void;
   onToggleToolsExpanded: () => void;
   onToggleScrollMarkers?: () => void;
+  onOpenSearch: () => void;
   onMobileMenuOpenChange: (open: boolean) => void;
   onOpenSystemPromptDialog: () => void;
   onScrollToTop: () => void;

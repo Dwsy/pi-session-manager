@@ -1,5 +1,13 @@
+import { useMemo } from 'react'
 import { useSessionView } from '../contexts/SessionViewContext'
 import MarkdownContent from './MarkdownContent'
+import { escapeHtml } from '../utils/markdown'
+import { highlightSearchInHTML } from '../utils/search'
+import {
+  formatToolValue,
+  looksLikeMarkdownByFirstChars,
+  normalizeToolArguments,
+} from '../utils/toolCallDisplay'
 
 interface GenericToolCallProps {
   name: string
@@ -7,6 +15,7 @@ interface GenericToolCallProps {
   output?: string
   isError?: boolean
   entryId: string
+  searchQuery?: string
 }
 
 const OUTPUT_MAX_HEIGHT = 300
@@ -14,35 +23,6 @@ const SMALL_ARGUMENT_FIELD_THRESHOLD = 5
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function normalizeArguments(args: unknown): unknown {
-  if (typeof args !== 'string') return args
-
-  const trimmed = args.trim()
-  if (!trimmed) return args
-
-  const looksLikeJson =
-    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-    (trimmed.startsWith('[') && trimmed.endsWith(']'))
-
-  if (!looksLikeJson) return args
-
-  try {
-    return JSON.parse(trimmed)
-  } catch {
-    return args
-  }
-}
-
-function formatValue(value: unknown): string {
-  if (typeof value === 'string') return value
-
-  try {
-    return JSON.stringify(value, null, 2)
-  } catch {
-    return String(value)
-  }
 }
 
 function hasMeaningfulValue(value: unknown): boolean {
@@ -53,31 +33,45 @@ function hasMeaningfulValue(value: unknown): boolean {
   return true
 }
 
-function looksLikeMarkdownByFirstChars(value: string): boolean {
-  const prefix = value.trimStart().slice(0, 10)
-  return /^(#{1,6}\s|>\s|[-*+]\s|```|~~~|\d+\.\s)/.test(prefix)
-}
-
 export default function GenericToolCall({
   name,
   arguments: rawArgs,
   output,
   isError = false,
   entryId,
+  searchQuery = '',
 }: GenericToolCallProps) {
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const expanded = isToolExpanded(entryId)
 
   const statusClass = isError ? 'error' : 'success'
 
-  const args = normalizeArguments(rawArgs)
-  const argsText = formatValue(args)
+  const args = normalizeToolArguments(rawArgs)
+  const argsText = formatToolValue(args)
   const hasArgs = hasMeaningfulValue(args)
   const hasOutput = Boolean(output && output.length > 0)
   const canRenderStructuredArgs =
     isPlainObject(args) &&
     Object.keys(args).length > 0 &&
     Object.keys(args).length <= SMALL_ARGUMENT_FIELD_THRESHOLD
+
+  const highlightedOutput = useMemo(() => {
+    if (!output) {
+      return ''
+    }
+
+    const escapedOutput = escapeHtml(output)
+    return searchQuery
+      ? highlightSearchInHTML(escapedOutput, searchQuery)
+      : escapedOutput
+  }, [output, searchQuery])
+
+  const getHighlightedArgumentHtml = (value: unknown): string => {
+    const escapedValue = escapeHtml(formatToolValue(value))
+    return searchQuery
+      ? highlightSearchInHTML(escapedValue, searchQuery)
+      : escapedValue
+  }
 
   return (
     <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
@@ -120,17 +114,21 @@ export default function GenericToolCall({
                       </div>
                       {shouldRenderMarkdown ? (
                         <div style={{ fontFamily: 'var(--font-family, inherit)' }}>
-                          <MarkdownContent content={value} />
+                          <MarkdownContent content={value} searchQuery={searchQuery} />
                         </div>
                       ) : (
-                        <pre><code>{formatValue(value)}</code></pre>
+                        <pre>
+                          <code dangerouslySetInnerHTML={{ __html: getHighlightedArgumentHtml(value) }} />
+                        </pre>
                       )}
                     </div>
                   )
                 })}
               </div>
             ) : (
-              <pre><code>{argsText}</code></pre>
+              <pre>
+                <code dangerouslySetInnerHTML={{ __html: getHighlightedArgumentHtml(argsText) }} />
+              </pre>
             )}
           </div>
         </div>
@@ -145,9 +143,7 @@ export default function GenericToolCall({
             className="tool-output"
             style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}
           >
-            {output!.split('\n').map((line, idx) => (
-              <div key={idx}>{line}</div>
-            ))}
+            <pre className="whitespace-pre-wrap m-0" dangerouslySetInnerHTML={{ __html: highlightedOutput }} />
           </div>
         </div>
       )}

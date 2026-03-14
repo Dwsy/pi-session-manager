@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
   type Dispatch,
   type MutableRefObject,
@@ -12,12 +13,16 @@ import { useTranslation } from "react-i18next";
 
 import SessionHeader from "../SessionHeader";
 import SessionScrollMarkers from "../SessionScrollMarkers";
+import { useSessionView } from "../../contexts/SessionViewContext";
+import type { SessionSearchTarget } from "../../hooks/useSessionViewerInMessageSearch";
 import { useSessionViewerVirtualScroll } from "../../hooks/useSessionViewerVirtualScroll";
 import type { ScrollMarker } from "../../hooks/useSessionScrollMarkers";
 import type { LegacySessionStats, SessionEntry } from "../../types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
 
 const MESSAGE_ITEM_GAP = 16;
+const SEARCH_MATCH_RETRY_COUNT = 8;
+const SEARCH_MATCH_RETRY_DELAY_MS = 50;
 
 export interface SessionViewerMessagesRef {
   scrollToTop: () => void;
@@ -33,6 +38,8 @@ export interface SessionViewerMessagesProps {
   headerTimestamp?: string;
   stats: LegacySessionStats;
   renderableEntries: SessionEntry[];
+  searchQuery: string;
+  currentSearchTarget: SessionSearchTarget | null;
   scrollTargetId: string | null;
   setScrollTargetId: Dispatch<SetStateAction<string | null>>;
   setHasNewMessages: Dispatch<SetStateAction<boolean>>;
@@ -68,6 +75,8 @@ const SessionViewerMessages = forwardRef<
   headerTimestamp,
   stats,
   renderableEntries,
+  searchQuery,
+  currentSearchTarget,
   scrollTargetId,
   setScrollTargetId,
   setHasNewMessages,
@@ -91,6 +100,7 @@ const SessionViewerMessages = forwardRef<
   isScrollMarkersFeatureEnabled,
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
+  const { ensureToolExpandedForSearch } = useSessionView();
   const {
     messagesContainerRef,
     messagesWrapperRef,
@@ -98,6 +108,7 @@ const SessionViewerMessages = forwardRef<
     isAtBottom,
     scrollToTop,
     scrollToBottom,
+    scrollToEntryId,
   } = useSessionViewerVirtualScroll({
     renderableEntries,
     loading,
@@ -112,6 +123,82 @@ const SessionViewerMessages = forwardRef<
     isAtBottomRef,
     onReachBottom,
   });
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const clearCurrentHighlight = () => {
+      container
+        .querySelectorAll<HTMLElement>(".search-highlight.current")
+        .forEach((element) => element.classList.remove("current"));
+    };
+
+    clearCurrentHighlight();
+
+    if (!searchQuery.trim() || !currentSearchTarget) {
+      return;
+    }
+
+    scrollToEntryId(currentSearchTarget.rowEntryId, "center");
+    if (currentSearchTarget.matchElementId !== currentSearchTarget.rowEntryId) {
+      ensureToolExpandedForSearch(currentSearchTarget.matchElementId);
+    }
+
+    let animationFrameId = 0;
+    let retryTimeoutId: number | null = null;
+    let retryCount = 0;
+
+    const tryActivateCurrentMatch = () => {
+      const entryElement = container.querySelector<HTMLElement>(
+        `#entry-${currentSearchTarget.matchElementId}`,
+      );
+      const highlights = entryElement?.querySelectorAll<HTMLElement>(
+        ".search-highlight",
+      );
+      const currentHighlight = highlights?.[
+        currentSearchTarget.occurrenceIndexInElement
+      ];
+
+      if (currentHighlight) {
+        clearCurrentHighlight();
+        currentHighlight.classList.add("current");
+        currentHighlight.scrollIntoView({
+          block: "center",
+          inline: "nearest",
+        });
+        return;
+      }
+
+      if (retryCount >= SEARCH_MATCH_RETRY_COUNT) {
+        return;
+      }
+
+      retryCount += 1;
+      retryTimeoutId = window.setTimeout(() => {
+        animationFrameId = requestAnimationFrame(tryActivateCurrentMatch);
+      }, SEARCH_MATCH_RETRY_DELAY_MS);
+    };
+
+    animationFrameId = requestAnimationFrame(tryActivateCurrentMatch);
+
+    return () => {
+      clearCurrentHighlight();
+      cancelAnimationFrame(animationFrameId);
+      if (retryTimeoutId !== null) {
+        window.clearTimeout(retryTimeoutId);
+      }
+    };
+  }, [
+    currentSearchTarget,
+    messagesContainerRef,
+    renderableEntries,
+    searchQuery,
+    scrollToEntryId,
+    ensureToolExpandedForSearch,
+  ]);
 
   useImperativeHandle(
     ref,
@@ -199,6 +286,7 @@ const SessionViewerMessages = forwardRef<
                     <SessionEntryRenderer
                       entry={entry}
                       toolResultByCallId={toolResultByCallId}
+                      searchQuery={searchQuery}
                     />
                   </div>
                 );

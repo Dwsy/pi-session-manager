@@ -202,6 +202,21 @@ export function highlightCode(code: string, language?: string): string {
   }
 }
 
+export function renderCodeHtml(code: string, language?: string): string {
+  try {
+    if (language) {
+      return hljs.highlight(code, { language }).value
+    }
+    return hljs.highlightAuto(code).value
+  } catch {
+    try {
+      return hljs.highlightAuto(code, []).value
+    } catch {
+      return escapeHtml(code)
+    }
+  }
+}
+
 export function getLanguageFromPath(filePath: string): string | undefined {
   const ext = filePath.split('.').pop()?.toLowerCase()
   const langMap: Record<string, string> = {

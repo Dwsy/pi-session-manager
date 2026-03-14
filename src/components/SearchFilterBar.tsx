@@ -42,8 +42,11 @@ export default function SearchFilterBar({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Cmd/Ctrl+F to focus search when not in an input
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+      if (e.defaultPrevented) {
+        return
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
         const active = document.activeElement
         if (active?.tagName !== 'INPUT' && active?.tagName !== 'TEXTAREA') {
           e.preventDefault()
