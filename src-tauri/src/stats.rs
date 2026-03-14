@@ -850,6 +850,7 @@ mod tests {
             assistant_messages_text: String::new(),
             last_message: String::new(),
             last_message_role: "user".to_string(),
+            parent_session_path: None,
         }
     }
 

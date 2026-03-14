@@ -14,6 +14,7 @@ export interface SessionInfo {
   last_message: string
   last_message_role: string
   isFavorite?: boolean
+  parent_session_path?: string
 }
 
 export interface SessionsDiff {
@@ -146,6 +147,9 @@ export interface SessionEntry {
   display?: boolean
   customType?: string
   content?: any
+  name?: string
+  label?: string
+  targetId?: string
 }
 
 export interface SessionChunk {

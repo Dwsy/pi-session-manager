@@ -128,6 +128,14 @@ pub async fn rename_session(path: String, new_name: String) -> Result<(), String
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
+pub async fn fork_session(
+    source_path: String,
+    target_name: Option<String>,
+) -> Result<SessionInfo, String> {
+    super::session_file::fork_session_impl(source_path, target_name).await
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_stats(sessions: Vec<SessionInfo>) -> Result<stats::SessionStats, String> {
     Ok(stats::calculate_stats(&sessions))
 }

@@ -23,6 +23,7 @@ fn test_write_buffer_eviction() {
             assistant_messages_text: "".to_string(),
             last_message: "test".to_string(),
             last_message_role: "user".to_string(),
+parent_session_path: None,
         }
     }
 

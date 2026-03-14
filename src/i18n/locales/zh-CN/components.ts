@@ -98,6 +98,18 @@ export const components = {
     switchedTo: '切换到模型',
     switchedToModel: '切换到模型：',
   },
+  sessionInfo: {
+    renamedTo: '会话重命名为"{{name}}"',
+  },
+  thinkingLevel: {
+    low: '低',
+    medium: '中',
+    high: '高',
+    changed: '思考级别：{{level}}',
+  },
+  labelEntry: {
+    bookmark: '书签',
+  },
   sessionTree: {
     searchPlaceholder: '搜索...',
     search: '搜索...',

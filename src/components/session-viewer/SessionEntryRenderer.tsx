@@ -3,7 +3,10 @@ import AssistantMessage from "../AssistantMessage";
 import BranchSummary from "../BranchSummary";
 import Compaction from "../Compaction";
 import CustomMessage from "../CustomMessage";
+import LabelEntry from "../LabelEntry";
 import ModelChange from "../ModelChange";
+import SessionInfoEntry from "../SessionInfoEntry";
+import ThinkingLevelChange from "../ThinkingLevelChange";
 import UserMessage from "../UserMessage";
 
 import type { SessionEntry } from "../../types";
@@ -53,6 +56,33 @@ export function renderSessionEntry(
 
       return null;
     }
+
+    case "session_info":
+      return (
+        <SessionInfoEntry
+          key={entry.id}
+          name={entry.name}
+          timestamp={entry.timestamp}
+        />
+      );
+
+    case "label":
+      return (
+        <LabelEntry
+          key={entry.id}
+          label={entry.label}
+          timestamp={entry.timestamp}
+        />
+      );
+
+    case "thinking_level_change":
+      return (
+        <ThinkingLevelChange
+          key={entry.id}
+          thinkingLevel={entry.thinkingLevel}
+          timestamp={entry.timestamp}
+        />
+      );
 
     case "model_change":
       return (

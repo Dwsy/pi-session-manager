@@ -63,6 +63,7 @@ fn clone_session_for_list(session: &SessionInfo) -> SessionInfo {
         assistant_messages_text: String::new(),
         last_message: session.last_message.clone(),
         last_message_role: session.last_message_role.clone(),
+        parent_session_path: session.parent_session_path.clone(),
     }
 }
 
@@ -343,6 +344,7 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
     let cwd = header["cwd"].as_str().unwrap_or("").to_string();
     let timestamp_str = header["timestamp"].as_str().unwrap_or("");
     let created = parse_timestamp(timestamp_str)?;
+    let parent_session_path = header["parentSession"].as_str().map(|s| s.to_string());
 
     let metadata = fs::metadata(path).map_err(|e| format!("Failed to get metadata: {e}"))?;
     let modified = DateTime::from(
@@ -450,6 +452,7 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
             assistant_messages_text,
             last_message,
             last_message_role,
+            parent_session_path,
         },
         entries,
     ))

@@ -105,6 +105,7 @@ function App() {
     confirmDeleteSession,
     cancelDeleteSession,
     handleRenameSession,
+    forkSession,
   } = useSessions();
 
   const { terminal, piPath, customCommand, loadSettings } = useAppSettings();
@@ -140,6 +141,7 @@ function App() {
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [showForkDialog, setShowForkDialog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [sessionSortBy, setSessionSortBy] = useState(DEFAULT_SESSION_SORT_BY);
@@ -203,6 +205,7 @@ function App() {
     isMobile,
     showExportDialog,
     showRenameDialog,
+    showForkDialog,
     hasPendingDeleteSession: !!pendingDeleteSession,
     showSettings,
     showFullTextSearch,
@@ -269,6 +272,7 @@ function App() {
     showSettings ||
     showExportDialog ||
     showRenameDialog ||
+    showForkDialog ||
     showFullTextSearch ||
     showOnboarding ||
     showTerminal ||
@@ -314,6 +318,8 @@ function App() {
           setShowExportDialog(false);
         } else if (showRenameDialog) {
           setShowRenameDialog(false);
+        } else if (showForkDialog) {
+          setShowForkDialog(false);
         } else if (showTerminal) {
           if (terminalMaximized) {
             setTerminalMaximized(false);
@@ -333,6 +339,7 @@ function App() {
       showSettings,
       showExportDialog,
       showRenameDialog,
+      showForkDialog,
       showTerminal,
       terminalMaximized,
       selectedProject,
@@ -430,6 +437,15 @@ function App() {
     if (!selectedSession) return;
     await handleRenameSession(selectedSession, newName);
     setShowRenameDialog(false);
+  };
+
+  const onForkSession = async (targetName?: string) => {
+    if (!selectedSession) return;
+    const newSession = await forkSession(selectedSession.path, targetName);
+    if (newSession) {
+      setSelectedSession(newSession);
+      setShowForkDialog(false);
+    }
   };
 
   const onExportSession = async (format: "html" | "md" | "json") => {
@@ -574,6 +590,7 @@ function App() {
       session={selectedSession!}
       onExport={() => setShowExportDialog(true)}
       onRename={() => setShowRenameDialog(true)}
+      onFork={() => setShowForkDialog(true)}
       onBack={() => setSelectedSession(null)}
       onWebResume={() => {
         if (selectedSession) {
@@ -606,6 +623,7 @@ function App() {
     <AppOverlays
       showExportDialog={showExportDialog}
       showRenameDialog={showRenameDialog}
+      showForkDialog={showForkDialog}
       showSettings={showSettings}
       showFullTextSearch={showFullTextSearch}
       showOnboarding={showOnboarding}
@@ -614,8 +632,10 @@ function App() {
       commandContext={commandContext}
       onExportSession={onExportSession}
       onRenameSession={onRenameSession}
+      onForkSession={onForkSession}
       onCloseExportDialog={() => setShowExportDialog(false)}
       onCloseRenameDialog={() => setShowRenameDialog(false)}
+      onCloseForkDialog={() => setShowForkDialog(false)}
       onConfirmDeleteSession={confirmDeleteSession}
       onCancelDeleteSession={cancelDeleteSession}
       onDeleteSessionConfirmStart={dismissSelectionMode}

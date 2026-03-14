@@ -200,6 +200,7 @@ fn strip_session_list_payload(session: &SessionInfo) -> SessionInfo {
         assistant_messages_text: String::new(),
         last_message: session.last_message.clone(),
         last_message_role: session.last_message_role.clone(),
+        parent_session_path: session.parent_session_path.clone(),
     }
 }
 
@@ -301,6 +302,7 @@ mod tests {
             assistant_messages_text: String::new(),
             last_message: "world".to_string(),
             last_message_role: "assistant".to_string(),
+            parent_session_path: None,
         }
     }
 
@@ -330,6 +332,7 @@ mod tests {
             assistant_messages_text: "assistant messages".to_string(),
             last_message: "last".to_string(),
             last_message_role: "assistant".to_string(),
+            parent_session_path: None,
         }
     }
 

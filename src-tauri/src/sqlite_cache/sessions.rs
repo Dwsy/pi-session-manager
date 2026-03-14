@@ -11,8 +11,8 @@ pub fn upsert_session(
     entries: Option<&[SessionEntry]>,
 ) -> Result<(), String> {
     conn.execute(
-        "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at, access_count, last_accessed)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 0, NULL)
+        "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, 0, NULL)
          ON CONFLICT(path) DO UPDATE SET
             name = excluded.name,
             modified = excluded.modified,
@@ -24,6 +24,7 @@ pub fn upsert_session(
             assistant_messages_text = excluded.assistant_messages_text,
             last_message = excluded.last_message,
             last_message_role = excluded.last_message_role,
+            parent_session_path = excluded.parent_session_path,
             cached_at = excluded.cached_at",
         params![
             &session.id,
@@ -40,6 +41,7 @@ pub fn upsert_session(
             &session.assistant_messages_text,
             &session.last_message,
             &session.last_message_role,
+            &session.parent_session_path,
             &Utc::now().to_rfc3339(),
         ],
     ).map_err(|e| format!("Failed to upsert session: {e}"))?;
@@ -79,7 +81,7 @@ pub fn upsert_session(
 
 pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>, String> {
     let mut stmt = conn.prepare(
-        "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role
+        "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
          FROM sessions WHERE path = ?"
     ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
@@ -99,6 +101,7 @@ pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>,
                 assistant_messages_text: row.get(10).unwrap_or_default(),
                 last_message: row.get(11).unwrap_or_default(),
                 last_message_role: row.get(12).unwrap_or_default(),
+                parent_session_path: row.get(13)?,
             })
         })
         .ok();
@@ -116,7 +119,7 @@ pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>,
 
 pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
     let mut stmt = conn.prepare(
-        "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role
+        "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
          FROM sessions ORDER BY modified DESC, path ASC"
     ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
@@ -136,6 +139,7 @@ pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
                 assistant_messages_text: row.get(10).unwrap_or_default(),
                 last_message: row.get(11).unwrap_or_default(),
                 last_message_role: row.get(12).unwrap_or_default(),
+                parent_session_path: row.get(13)?,
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?
@@ -150,7 +154,7 @@ pub fn get_sessions_modified_after(
     cutoff: DateTime<Utc>,
 ) -> Result<Vec<SessionInfo>, String> {
     let mut stmt = conn.prepare(
-        "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role
+        "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
          FROM sessions WHERE modified > ? ORDER BY modified DESC, path ASC"
     ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
@@ -170,6 +174,7 @@ pub fn get_sessions_modified_after(
                 assistant_messages_text: row.get(10).unwrap_or_default(),
                 last_message: row.get(11).unwrap_or_default(),
                 last_message_role: row.get(12).unwrap_or_default(),
+                parent_session_path: row.get(13)?,
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?
@@ -184,7 +189,7 @@ pub fn get_sessions_modified_before(
     cutoff: DateTime<Utc>,
 ) -> Result<Vec<SessionInfo>, String> {
     let mut stmt = conn.prepare(
-        "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role
+        "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
          FROM sessions WHERE modified <= ? ORDER BY modified DESC, path ASC"
     ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
@@ -204,6 +209,7 @@ pub fn get_sessions_modified_before(
                 assistant_messages_text: row.get(10).unwrap_or_default(),
                 last_message: row.get(11).unwrap_or_default(),
                 last_message_role: row.get(12).unwrap_or_default(),
+                parent_session_path: row.get(13)?,
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?

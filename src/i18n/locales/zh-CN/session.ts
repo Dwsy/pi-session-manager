@@ -55,6 +55,14 @@ export const session = {
     placeholder: '输入会话名称...',
     confirm: '确认',
   },
+  fork: {
+    title: '复制会话',
+    placeholder: '输入新会话名称（可选）...',
+    confirm: '复制',
+    success: '会话复制成功',
+    error: '复制会话失败',
+  },
+  forkedFrom: '复制自',
   header: {
     date: '日期',
     models: '模型',

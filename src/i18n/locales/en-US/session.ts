@@ -55,6 +55,14 @@ export const session = {
     placeholder: 'Enter session name...',
     confirm: 'Confirm',
   },
+  fork: {
+    title: 'Fork Session',
+    placeholder: 'Enter new session name (optional)...',
+    confirm: 'Fork',
+    success: 'Session forked successfully',
+    error: 'Failed to fork session',
+  },
+  forkedFrom: 'Forked from',
   header: {
     date: 'Date',
     models: 'Models',

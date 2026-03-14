@@ -321,6 +321,111 @@ pub(super) async fn rename_session_impl(path: String, new_name: String) -> Resul
     Ok(())
 }
 
+pub async fn fork_session_impl(
+    source_path: String,
+    target_name: Option<String>,
+) -> Result<crate::models::SessionInfo, String> {
+    // Read source session file
+    let content = fs::read_to_string(&source_path)
+        .map_err(|e| format!("Failed to read source session: {e}"))?;
+
+    let mut lines: Vec<&str> = content.lines().collect();
+    if lines.is_empty() {
+        return Err("Source session is empty".to_string());
+    }
+
+    // Parse header to get source info
+    let header: Value = serde_json::from_str(lines[0])
+        .map_err(|e| format!("Failed to parse source session header: {e}"))?;
+
+    if header["type"] != "session" {
+        return Err("Invalid source session: missing session header".to_string());
+    }
+
+    let _source_id = header["id"].as_str().unwrap_or("unknown");
+    let source_cwd = header["cwd"].as_str().unwrap_or("").to_string();
+
+    // Generate new session ID and file name
+    let new_id = format!(
+        "{:x}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let now = chrono::Utc::now();
+    let timestamp = now.format("%Y-%m-%dT%H-%M-%S%.3f").to_string();
+    let filename = format!("{}_{}.jsonl", timestamp, &new_id[..8]);
+
+    // Determine target directory (same as source)
+    let source_path_buf = std::path::PathBuf::from(&source_path);
+    let target_dir = source_path_buf
+        .parent()
+        .ok_or("Failed to get parent directory of source session")?;
+    let target_path = target_dir.join(&filename);
+
+    // Build new header with parentSession
+    let new_header = serde_json::json!({
+        "type": "session",
+        "version": 3,
+        "id": new_id.clone(),
+        "timestamp": now.to_rfc3339(),
+        "cwd": source_cwd,
+        "parentSession": source_path
+    });
+
+    // Write new session file
+    let mut output_lines = vec![serde_json::to_string(&new_header)
+        .map_err(|e| format!("Failed to serialize new header: {e}"))?];
+
+    // Copy all non-header entries
+    for line in lines.iter().skip(1) {
+        if !line.trim().is_empty() {
+            output_lines.push(line.to_string());
+        }
+    }
+
+    // Add session_info if target_name is provided
+    if let Some(name) = &target_name {
+        let entry_id = format!(
+            "{:x}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let session_info = serde_json::json!({
+            "type": "session_info",
+            "id": &entry_id[..8],
+            "parentId": null,
+            "timestamp": now.to_rfc3339(),
+            "name": name
+        });
+        output_lines.push(
+            serde_json::to_string(&session_info)
+                .map_err(|e| format!("Failed to serialize session_info: {e}"))?,
+        );
+    }
+
+    // Write to file
+    fs::write(&target_path, output_lines.join("\n"))
+        .map_err(|e| format!("Failed to write forked session: {e}"))?;
+
+    // Parse the new session info
+    let (session_info, _) = crate::scanner::parse_session_info(&target_path)?;
+
+    // Update cache
+    let config = config::load_config().map_err(|e| format!("Failed to load config: {e}"))?;
+    let conn = sqlite_cache::init_db_with_config(&config)?;
+    let file_modified = now;
+    sqlite_cache::upsert_session(&conn, &session_info, file_modified, None)?;
+
+    // Invalidate scanner cache so next scan picks up the new session
+    crate::scanner::invalidate_cache();
+
+    Ok(session_info)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

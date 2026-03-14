@@ -42,6 +42,7 @@ fn test_empty_query_returns_empty_results() {
         assistant_messages_text: String::new(),
         last_message: "Hello world".to_string(),
         last_message_role: "user".to_string(),
+parent_session_path: None,
     }];
 
     // Test empty query
@@ -98,6 +99,7 @@ fn test_single_word_search() {
         assistant_messages_text: String::new(),
         last_message: "Hello world, this is a test".to_string(),
         last_message_role: "user".to_string(),
+parent_session_path: None,
     }];
 
     // Test matching word
@@ -158,6 +160,7 @@ fn test_multiple_word_search() {
         assistant_messages_text: String::new(),
         last_message: "Hello world, this is a test of search functionality".to_string(),
         last_message_role: "user".to_string(),
+parent_session_path: None,
     }];
 
     // Test OR logic: any word matches should return results
@@ -231,6 +234,7 @@ fn test_name_search_mode() {
         assistant_messages_text: String::new(),
         last_message: "Some content here".to_string(),
         last_message_role: "user".to_string(),
+parent_session_path: None,
     }];
 
     // Test searching by name
@@ -301,6 +305,7 @@ fn test_role_filter() {
         assistant_messages_text: String::new(),
         last_message: "User message with keyword Assistant message with keyword".to_string(),
         last_message_role: "user".to_string(),
+parent_session_path: None,
     }];
 
     // Test user role filter
@@ -383,6 +388,7 @@ fn test_multiple_sessions() {
             assistant_messages_text: String::new(),
             last_message: "Session about Rust programming".to_string(),
             last_message_role: "user".to_string(),
+parent_session_path: None,
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -402,6 +408,7 @@ fn test_multiple_sessions() {
             assistant_messages_text: String::new(),
             last_message: "Session about Python programming".to_string(),
             last_message_role: "user".to_string(),
+parent_session_path: None,
         },
         SessionInfo {
             path: session3_path.clone(),
@@ -421,6 +428,7 @@ fn test_multiple_sessions() {
             assistant_messages_text: String::new(),
             last_message: "Session about JavaScript".to_string(),
             last_message_role: "user".to_string(),
+parent_session_path: None,
         },
     ];
 
@@ -494,6 +502,7 @@ fn test_snippet_generation() {
         assistant_messages_text: String::new(),
         last_message: long_text[..150].to_string(),
         last_message_role: "user".to_string(),
+parent_session_path: None,
     }];
 
     let results = search_sessions(
@@ -547,6 +556,7 @@ fn test_score_calculation() {
             assistant_messages_text: String::new(),
             last_message: "test test test".to_string(),
             last_message_role: "user".to_string(),
+parent_session_path: None,
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -566,6 +576,7 @@ fn test_score_calculation() {
             assistant_messages_text: String::new(),
             last_message: "test".to_string(),
             last_message_role: "user".to_string(),
+parent_session_path: None,
         },
     ];
 
@@ -612,6 +623,7 @@ fn test_thinking_content() {
         assistant_messages_text: String::new(),
         last_message: "This is thinking content with keyword".to_string(),
         last_message_role: "user".to_string(),
+parent_session_path: None,
     }];
 
     // Test with include_tools = true (should search thinking content)
@@ -689,6 +701,7 @@ fn test_special_characters() {
         assistant_messages_text: String::new(),
         last_message: "Test with symbols: @#$%^&*()_+-=[]{}|;':\",./<>?".to_string(),
         last_message_role: "user".to_string(),
+parent_session_path: None,
     }];
 
     // Test searching for text without special characters
@@ -738,6 +751,7 @@ fn test_unicode_search() {
         assistant_messages_text: String::new(),
         last_message: "这是一个中文测试".to_string(),
         last_message_role: "user".to_string(),
+parent_session_path: None,
     }];
 
     // Test Chinese search
@@ -797,6 +811,7 @@ fn test_quoted_phrase_content_search_requires_contiguous_match() {
             assistant_messages_text: String::new(),
             last_message: "foo something bar".to_string(),
             last_message_role: "user".to_string(),
+parent_session_path: None,
         },
         SessionInfo {
             path: session_path_2,
@@ -816,6 +831,7 @@ fn test_quoted_phrase_content_search_requires_contiguous_match() {
             assistant_messages_text: String::new(),
             last_message: "prefix foo bar suffix".to_string(),
             last_message_role: "user".to_string(),
+parent_session_path: None,
         },
     ];
 
@@ -862,6 +878,7 @@ fn test_quoted_phrase_name_search_requires_phrase_and_remainder_terms() {
             assistant_messages_text: String::new(),
             last_message: "contains baz".to_string(),
             last_message_role: "user".to_string(),
+parent_session_path: None,
         },
         SessionInfo {
             path: session_path_2,
@@ -881,6 +898,7 @@ fn test_quoted_phrase_name_search_requires_phrase_and_remainder_terms() {
             assistant_messages_text: String::new(),
             last_message: "no additional term".to_string(),
             last_message_role: "user".to_string(),
+parent_session_path: None,
         },
     ];
 

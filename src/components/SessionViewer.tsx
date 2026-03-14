@@ -34,6 +34,7 @@ interface SessionViewerProps {
   session: SessionInfo;
   onExport: () => void;
   onRename: () => void;
+  onFork?: () => void;
   onBack?: () => void;
   onWebResume?: () => void;
   terminal?: TerminalType;
@@ -54,6 +55,7 @@ function SessionViewerContent({
   session,
   onExport,
   onRename,
+  onFork,
   onBack,
   onWebResume,
   terminal = getPlatformDefaults().defaultTerminal,
@@ -270,6 +272,7 @@ function SessionViewerContent({
           onScrollToTop={handleScrollToTop}
           onScrollToBottom={handleScrollToBottom}
           onRename={onRename}
+          onFork={onFork}
           onExport={onExport}
           onResume={onWebResume}
           desktopResumeButton={
@@ -295,6 +298,16 @@ function SessionViewerContent({
             </KbdTooltip>
           }
         />
+
+        {session.parent_session_path && (
+          <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border bg-secondary/30 flex items-center gap-1.5">
+            <span className="text-muted-foreground/60">↩️</span>
+            <span>{t("session.forkedFrom")}:</span>
+            <span className="truncate max-w-[200px]" title={session.parent_session_path}>
+              {session.parent_session_path.split("/").pop()?.replace(/\.jsonl$/, "") || session.parent_session_path}
+            </span>
+          </div>
+        )}
 
         {isSearchOpen && (
           <SessionViewerSearchBar

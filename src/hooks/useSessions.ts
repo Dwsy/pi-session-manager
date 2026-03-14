@@ -28,6 +28,7 @@ export interface UseSessionsReturn {
   confirmDeleteSession: () => Promise<void>
   cancelDeleteSession: () => void
   handleRenameSession: (session: SessionInfo, newName: string) => Promise<void>
+  forkSession: (sourcePath: string, targetName?: string) => Promise<SessionInfo | null>
 }
 
 export function useSessions(): UseSessionsReturn {
@@ -253,6 +254,34 @@ export function useSessions(): UseSessionsReturn {
     }
   }, [selectedSession, t, isDemoMode])
 
+  const forkSession = useCallback(async (sourcePath: string, targetName?: string): Promise<SessionInfo | null> => {
+    try {
+      if (isDemoMode) {
+        // Demo mode doesn't support fork
+        console.warn('Fork is not supported in demo mode')
+        return null
+      }
+
+      const newSession = await invoke<SessionInfo>('fork_session', {
+        source_path: sourcePath,
+        target_name: targetName || null
+      })
+
+      // Add the new session to the list
+      setSessions(prev => {
+        const updated = [newSession, ...prev]
+        updated.sort((a, b) => b.modified.localeCompare(a.modified))
+        return updated
+      })
+
+      return newSession
+    } catch (error) {
+      console.error('Failed to fork session:', error)
+      alert(t('app.errors.forkSession', { defaultValue: 'Failed to fork session' }))
+      return null
+    }
+  }, [isDemoMode, t])
+
   return {
     sessions,
     loading,
@@ -266,5 +295,6 @@ export function useSessions(): UseSessionsReturn {
     confirmDeleteSession,
     cancelDeleteSession,
     handleRenameSession,
+    forkSession,
   }
 }

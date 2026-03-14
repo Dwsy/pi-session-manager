@@ -1,7 +1,7 @@
 use super::deps::*;
 
 /// Current schema version for migrations
-pub(crate) const LATEST_SCHEMA_VERSION: i64 = 4;
+pub(crate) const LATEST_SCHEMA_VERSION: i64 = 5;
 
 /// Ensure the schema_version table exists and initialize to 0 if empty.
 pub(crate) fn ensure_schema_version_table(conn: &Connection) -> Result<(), String> {

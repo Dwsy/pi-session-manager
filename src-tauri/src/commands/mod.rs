@@ -8,7 +8,7 @@ pub mod pi_resources;
 mod pi_settings;
 pub mod search;
 mod session;
-mod session_file;
+pub(super) mod session_file;
 mod session_list;
 mod session_open;
 mod settings;

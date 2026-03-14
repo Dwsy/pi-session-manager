@@ -8,6 +8,7 @@ import {
   Brain,
   BrainCircuit,
   ChevronLeft,
+  Copy,
   Download,
   List,
   ListTree,
@@ -45,6 +46,7 @@ export default function SessionViewerToolbar({
   onScrollToTop,
   onScrollToBottom,
   onRename,
+  onFork,
   onExport,
   onResume,
   desktopResumeButton,
@@ -216,6 +218,16 @@ export default function SessionViewerToolbar({
               >
                 {t("common.rename")}
               </button>
+              {onFork && (
+                <button
+                  onClick={onFork}
+                  className="px-2.5 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors flex items-center gap-1"
+                  title={t("session.fork.title")}
+                >
+                  <Copy className="h-3 w-3" />
+                  {t("session.fork.confirm")}
+                </button>
+              )}
               <KbdTooltip shortcut="Cmd+E">
                 <button
                   onClick={onExport}
@@ -401,6 +413,18 @@ export default function SessionViewerToolbar({
               <Pencil className="h-4 w-4 text-muted-foreground" />
               {t("common.rename")}
             </button>
+            {onFork && (
+              <button
+                onClick={() => {
+                  onFork();
+                  closeMobileMenu();
+                }}
+                className={mobileSheetItemClass}
+              >
+                <Copy className="h-4 w-4 text-muted-foreground" />
+                {t("session.fork.confirm")}
+              </button>
+            )}
             <button
               onClick={() => {
                 onExport();

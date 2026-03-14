@@ -81,7 +81,7 @@ pub fn preload_recent_sessions(
     count: usize,
 ) -> Result<Vec<SessionInfo>, String> {
     let mut stmt = conn.prepare(
-        "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role
+        "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
          FROM sessions
          ORDER BY last_accessed DESC, access_count DESC, modified DESC, path ASC
          LIMIT ?"
@@ -103,6 +103,7 @@ pub fn preload_recent_sessions(
                 assistant_messages_text: row.get(10).unwrap_or_default(),
                 last_message: row.get(11).unwrap_or_default(),
                 last_message_role: row.get(12).unwrap_or_default(),
+                parent_session_path: row.get(13)?,
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?

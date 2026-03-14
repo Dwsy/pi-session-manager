@@ -169,6 +169,16 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             crate::rename_session(path, new_name).await?;
             Ok(Value::Null)
         }
+        "fork_session" => {
+            let source_path = extract_string(payload, "sourcePath")?;
+            let target_name = payload
+                .get("targetName")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let result =
+                crate::commands::session_file::fork_session_impl(source_path, target_name).await?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
         "get_session_stats" => {
             let sessions: Vec<crate::models::SessionInfo> = serde_json::from_value(
                 payload

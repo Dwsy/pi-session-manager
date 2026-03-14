@@ -1,41 +1,42 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Pencil } from 'lucide-react'
+import { Copy } from 'lucide-react'
 import type { SessionInfo } from '../types'
 import { useIsMobile } from '../hooks/useIsMobile'
 
-interface RenameDialogProps {
+interface ForkDialogProps {
   session: SessionInfo
-  onRename: (newName: string) => void
+  onFork: (targetName?: string) => void
   onClose: () => void
 }
 
-export default function RenameDialog({ session, onRename, onClose }: RenameDialogProps) {
+export default function ForkDialog({ session, onFork, onClose }: ForkDialogProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
-  const [newName, setNewName] = useState(session.name || '')
+  const [targetName, setTargetName] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (newName.trim()) {
-      onRename(newName.trim())
-    }
+    onFork(targetName.trim() || undefined)
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className={`bg-background border border-border rounded-lg p-6 ${isMobile ? 'w-[95vw]' : 'w-96'}`}>
-        <div className="flex items-center gap-2 mb-4">
-          <Pencil className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold">{t('session.rename.title')}</h3>
+        <div className="flex items-center gap-2 mb-2">
+          <Copy className="h-5 w-5 text-primary" />
+          <h3 className="text-lg font-semibold">{t('session.fork.title')}</h3>
         </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          {t('session.fork.placeholder')}
+        </p>
 
         <form onSubmit={handleSubmit}>
           <input
             type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder={t('session.rename.placeholder')}
+            value={targetName}
+            onChange={(e) => setTargetName(e.target.value)}
+            placeholder={session.name || t('session.list.untitled')}
             className="w-full px-3 py-2 bg-secondary border border-border rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 mb-4"
             autoFocus
           />
@@ -50,11 +51,10 @@ export default function RenameDialog({ session, onRename, onClose }: RenameDialo
             </button>
             <button
               type="submit"
-              disabled={!newName.trim()}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded transition-colors"
             >
-              <Pencil className="h-4 w-4" />
-              {t('session.rename.confirm')}
+              <Copy className="h-4 w-4" />
+              {t('session.fork.confirm')}
             </button>
           </div>
         </form>

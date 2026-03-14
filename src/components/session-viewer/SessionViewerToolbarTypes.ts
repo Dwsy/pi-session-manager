@@ -22,6 +22,7 @@ export interface SessionViewerToolbarProps {
   onScrollToTop: () => void;
   onScrollToBottom: () => void;
   onRename: () => void;
+  onFork?: () => void;
   onExport: () => void;
   onResume?: () => void;
   desktopResumeButton?: ReactNode;

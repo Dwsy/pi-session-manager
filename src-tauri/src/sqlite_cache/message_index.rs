@@ -102,6 +102,7 @@ fn backfill_missing_message_entries(conn: &Connection) -> Result<(), String> {
             assistant_messages_text: String::new(),
             last_message: String::new(),
             last_message_role: String::new(),
+            parent_session_path: None,
         };
         if let Err(e) = insert_message_entries(conn, &session) {
             if Path::new(path).exists() {

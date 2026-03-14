@@ -23,6 +23,7 @@ export const app = {
     deleteSession: 'Failed to delete session',
     deleteSessionPartial: '{{count}} sessions failed to delete. Check the console for details.',
     renameSession: 'Failed to rename session',
+    forkSession: 'Failed to fork session',
     exportFailed: 'Export failed',
     exportSuccess: 'Export successful!',
   },

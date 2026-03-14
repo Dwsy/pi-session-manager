@@ -98,6 +98,18 @@ export const components = {
     switchedTo: 'Switched to model',
     switchedToModel: 'Switched to model',
   },
+  sessionInfo: {
+    renamedTo: 'Session renamed to "{{name}}"',
+  },
+  thinkingLevel: {
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    changed: 'Thinking level: {{level}}',
+  },
+  labelEntry: {
+    bookmark: 'Bookmark',
+  },
   sessionTree: {
     searchPlaceholder: 'Search...',
     search: 'Search...',

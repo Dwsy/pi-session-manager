@@ -3,6 +3,7 @@ import type { ComponentType, LazyExoticComponent } from "react";
 
 import ExportDialog from "../ExportDialog";
 import RenameDialog from "../RenameDialog";
+import ForkDialog from "../ForkDialog";
 import DeleteSessionConfirmDialog from "../DeleteSessionConfirmDialog";
 import Onboarding from "../Onboarding";
 import type { PendingDeleteSession } from "../../hooks/useSessions";
@@ -29,6 +30,7 @@ export interface FullTextSearchOverlayProps {
 export interface AppOverlaysProps {
   showExportDialog: boolean;
   showRenameDialog: boolean;
+  showForkDialog: boolean;
   showSettings: boolean;
   showFullTextSearch: boolean;
   showOnboarding: boolean;
@@ -37,8 +39,10 @@ export interface AppOverlaysProps {
   commandContext: SearchContext;
   onExportSession: (format: ExportFormat) => Promise<void> | void;
   onRenameSession: (newName: string) => Promise<void> | void;
+  onForkSession: (targetName?: string) => Promise<void> | void;
   onCloseExportDialog: () => void;
   onCloseRenameDialog: () => void;
+  onCloseForkDialog: () => void;
   onConfirmDeleteSession: () => Promise<void>;
   onCancelDeleteSession: () => void;
   onDeleteSessionConfirmStart?: () => void;
@@ -54,6 +58,7 @@ export interface AppOverlaysProps {
 function AppOverlays({
   showExportDialog,
   showRenameDialog,
+  showForkDialog,
   showSettings,
   showFullTextSearch,
   showOnboarding,
@@ -62,8 +67,10 @@ function AppOverlays({
   commandContext,
   onExportSession,
   onRenameSession,
+  onForkSession,
   onCloseExportDialog,
   onCloseRenameDialog,
+  onCloseForkDialog,
   onConfirmDeleteSession,
   onCancelDeleteSession,
   onDeleteSessionConfirmStart,
@@ -89,6 +96,13 @@ function AppOverlays({
           session={selectedSession}
           onRename={onRenameSession}
           onClose={onCloseRenameDialog}
+        />
+      )}
+      {showForkDialog && selectedSession && (
+        <ForkDialog
+          session={selectedSession}
+          onFork={onForkSession}
+          onClose={onCloseForkDialog}
         />
       )}
       {pendingDeleteSession && (

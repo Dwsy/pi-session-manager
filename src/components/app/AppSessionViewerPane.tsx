@@ -7,6 +7,7 @@ export type AppSessionViewerPaneProps = Pick<
   | "session"
   | "onExport"
   | "onRename"
+  | "onFork"
   | "onBack"
   | "onWebResume"
   | "terminal"
@@ -19,6 +20,7 @@ function AppSessionViewerPane({
   session,
   onExport,
   onRename,
+  onFork,
   onBack,
   onWebResume,
   terminal,
@@ -31,6 +33,7 @@ function AppSessionViewerPane({
       session={session}
       onExport={onExport}
       onRename={onRename}
+      onFork={onFork}
       onBack={onBack}
       onWebResume={onWebResume}
       terminal={terminal}

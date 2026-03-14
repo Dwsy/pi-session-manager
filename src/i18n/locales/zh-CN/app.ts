@@ -23,6 +23,7 @@ export const app = {
     deleteSession: '删除会话失败',
     deleteSessionPartial: '{{count}} 个会话删除失败，请查看控制台了解详情。',
     renameSession: '重命名会话失败',
+    forkSession: '复制会话失败',
     exportFailed: '导出失败',
     exportSuccess: '导出成功！',
   },

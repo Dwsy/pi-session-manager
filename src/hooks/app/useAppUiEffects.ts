@@ -7,6 +7,7 @@ export interface UseAppUiEffectsOptions {
   isMobile: boolean;
   showExportDialog: boolean;
   showRenameDialog: boolean;
+  showForkDialog: boolean;
   hasPendingDeleteSession: boolean;
   showSettings: boolean;
   showFullTextSearch: boolean;
@@ -21,6 +22,7 @@ export function useAppUiEffects({
   isMobile,
   showExportDialog,
   showRenameDialog,
+  showForkDialog,
   hasPendingDeleteSession,
   showSettings,
   showFullTextSearch,
@@ -38,6 +40,7 @@ export function useAppUiEffects({
     const isAnyModalOpen =
       showExportDialog ||
       showRenameDialog ||
+      showForkDialog ||
       hasPendingDeleteSession ||
       showSettings ||
       showFullTextSearch ||
@@ -57,6 +60,7 @@ export function useAppUiEffects({
     isMobile,
     showExportDialog,
     showRenameDialog,
+    showForkDialog,
     hasPendingDeleteSession,
     showSettings,
     showFullTextSearch,

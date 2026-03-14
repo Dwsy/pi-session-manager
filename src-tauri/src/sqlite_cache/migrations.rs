@@ -11,6 +11,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             2 => migration_2(conn)?,
             3 => migration_3(conn)?,
             4 => migration_4(conn)?,
+            5 => migration_5(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -138,5 +139,30 @@ fn migration_4(conn: &Connection) -> Result<(), String> {
         [],
     )
     .map_err(|e| format!("Migration 4 failed creating entry index: {e}"))?;
+    Ok(())
+}
+
+/// Migration to version 5: add parent_session_path column for fork support.
+fn migration_5(conn: &Connection) -> Result<(), String> {
+    fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
+        let mut stmt = conn
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .map_err(|e| format!("Failed to prepare PRAGMA table_info for {table}: {e}"))?;
+        let column_names: Vec<String> = stmt
+            .query_map([], |row| row.get(1))
+            .map_err(|e| format!("Failed to query columns for {table}: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect columns for {table}: {e}"))?;
+        Ok(column_names.iter().any(|name| name == column))
+    }
+
+    if !column_exists(conn, "sessions", "parent_session_path")? {
+        conn.execute(
+            "ALTER TABLE sessions ADD COLUMN parent_session_path TEXT",
+            [],
+        )
+        .map_err(|e| format!("Migration 5 failed adding parent_session_path: {e}"))?;
+    }
+
     Ok(())
 }
