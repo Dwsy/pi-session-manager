@@ -3,8 +3,10 @@ import { useEffect } from 'react'
 export interface UseSessionViewerHotkeysOptions {
   enabled?: boolean
   isSearchOpen: boolean
+  cmdFBehavior: 'inSessionSearch' | 'toggleSidebar'
   onToggleThinking: () => void
   onToggleToolsExpanded: () => void
+  onToggleSidebar: () => void
   onOpenSearch: () => void
   onCloseSearch: () => void
   onNextSearchMatch: () => void
@@ -14,8 +16,10 @@ export interface UseSessionViewerHotkeysOptions {
 export function useSessionViewerHotkeys({
   enabled = true,
   isSearchOpen,
+  cmdFBehavior = 'inSessionSearch',
   onToggleThinking,
   onToggleToolsExpanded,
+  onToggleSidebar,
   onOpenSearch,
   onCloseSearch,
   onNextSearchMatch,
@@ -33,10 +37,29 @@ export function useSessionViewerHotkeys({
 
       const key = event.key.toLowerCase()
 
+      // Cmd+Shift+F behavior depends on cmdFBehavior setting
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && key === 'f') {
+        event.preventDefault()
+        event.stopPropagation()
+        if (cmdFBehavior === 'inSessionSearch') {
+          // Cmd+Shift+F toggles sidebar when Cmd+F is in-session search
+          onToggleSidebar()
+        } else {
+          // Cmd+Shift+F opens in-session search when Cmd+F toggles sidebar
+          onOpenSearch()
+        }
+        return
+      }
+
+      // Cmd+F behavior depends on cmdFBehavior setting
       if ((event.metaKey || event.ctrlKey) && key === 'f') {
         event.preventDefault()
         event.stopPropagation()
-        onOpenSearch()
+        if (cmdFBehavior === 'inSessionSearch') {
+          onOpenSearch()
+        } else {
+          onToggleSidebar()
+        }
         return
       }
 
@@ -83,11 +106,13 @@ export function useSessionViewerHotkeys({
   }, [
     enabled,
     isSearchOpen,
+    cmdFBehavior,
     onCloseSearch,
     onNextSearchMatch,
     onOpenSearch,
     onPreviousSearchMatch,
     onToggleThinking,
     onToggleToolsExpanded,
+    onToggleSidebar,
   ])
 }

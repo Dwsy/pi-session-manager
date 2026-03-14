@@ -92,6 +92,16 @@ export const settings = {
       top: 'Oben',
       bottom: 'Unten',
     },
+    cmdFBehavior: 'Cmd+F-Verhalten',
+    cmdFBehaviorHelp: 'Wählen Sie die Funktion des Cmd+F-Kurzbefehls',
+    cmdFBehaviorOptions: {
+      inSessionSearch: 'In Sitzung suchen',
+      toggleSidebar: 'Sitzungsbaum umschalten',
+    },
+    cmdFBehaviorHint: {
+      search: 'Cmd+Shift+F schaltet Sitzungsbaum um',
+      sidebar: 'Cmd+Shift+F öffnet Sitzungssuche',
+    },
   },
   search: {
     defaultSearchMode: 'Standard-Suchmodus',

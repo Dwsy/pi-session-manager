@@ -95,6 +95,16 @@ export const settings = {
       top: '顶部',
       bottom: '底部',
     },
+    cmdFBehavior: 'Cmd+F 行为',
+    cmdFBehaviorHelp: '选择 Cmd+F 快捷键的功能',
+    cmdFBehaviorOptions: {
+      inSessionSearch: '会话内搜索',
+      toggleSidebar: '切换会话树',
+    },
+    cmdFBehaviorHint: {
+      search: 'Cmd+Shift+F 切换会话树',
+      sidebar: 'Cmd+Shift+F 打开会话内搜索',
+    },
   },
   search: {
     defaultSearchMode: '默认搜索模式',

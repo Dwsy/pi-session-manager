@@ -92,6 +92,16 @@ export const settings = {
       top: 'Haut',
       bottom: 'Bas',
     },
+    cmdFBehavior: 'Comportement de Cmd+F',
+    cmdFBehaviorHelp: 'Choisissez l\'action du raccourci Cmd+F',
+    cmdFBehaviorOptions: {
+      inSessionSearch: 'Rechercher dans la session',
+      toggleSidebar: 'Basculer l\'arborescence des sessions',
+    },
+    cmdFBehaviorHint: {
+      search: 'Cmd+Shift+F bascule l\'arborescence des sessions',
+      sidebar: 'Cmd+Shift+F ouvre la recherche dans la session',
+    },
   },
   search: {
     defaultSearchMode: 'Mode de recherche par défaut',

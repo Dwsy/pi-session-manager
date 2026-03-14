@@ -92,6 +92,16 @@ export const settings = {
       top: 'Arriba',
       bottom: 'Abajo',
     },
+    cmdFBehavior: 'Comportamiento de Cmd+F',
+    cmdFBehaviorHelp: 'Elija la función del atajo Cmd+F',
+    cmdFBehaviorOptions: {
+      inSessionSearch: 'Buscar en sesión',
+      toggleSidebar: 'Alternar árbol de sesiones',
+    },
+    cmdFBehaviorHint: {
+      search: 'Cmd+Shift+F alterna el árbol de sesiones',
+      sidebar: 'Cmd+Shift+F abre búsqueda en sesión',
+    },
   },
   search: {
     defaultSearchMode: 'Modo de búsqueda predeterminado',

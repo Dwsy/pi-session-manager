@@ -154,6 +154,44 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
           ))}
         </div>
       </div>
+
+      <div className="space-y-3">
+        <label className="text-sm font-medium text-foreground">
+          {t('settings.session.cmdFBehavior', 'Cmd+F 行为')}
+        </label>
+        <p className="text-xs text-muted-foreground">
+          {t('settings.session.cmdFBehaviorHelp', '选择 Cmd+F 快捷键的功能')}
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => onUpdate('session', 'cmdFBehavior', 'inSessionSearch')}
+            className={`py-2 px-3 rounded-lg border text-sm transition-all text-left ${
+              settings.session.cmdFBehavior !== 'toggleSidebar'
+                ? 'border-info bg-info/10 text-foreground'
+                : 'border-border text-muted-foreground hover:border-border-hover'
+            }`}
+          >
+            <div className="font-medium">{t('settings.session.cmdFBehaviorOptions.inSessionSearch', '会话内搜索')}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Cmd+F</div>
+          </button>
+          <button
+            onClick={() => onUpdate('session', 'cmdFBehavior', 'toggleSidebar')}
+            className={`py-2 px-3 rounded-lg border text-sm transition-all text-left ${
+              settings.session.cmdFBehavior === 'toggleSidebar'
+                ? 'border-info bg-info/10 text-foreground'
+                : 'border-border text-muted-foreground hover:border-border-hover'
+            }`}
+          >
+            <div className="font-medium">{t('settings.session.cmdFBehaviorOptions.toggleSidebar', '切换会话树')}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Cmd+F</div>
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {settings.session.cmdFBehavior === 'inSessionSearch'
+            ? t('settings.session.cmdFBehaviorHint.search', 'Cmd+Shift+F 切换会话树')
+            : t('settings.session.cmdFBehaviorHint.sidebar', 'Cmd+Shift+F 打开会话内搜索')}
+        </p>
+      </div>
     </div>
   )
 }

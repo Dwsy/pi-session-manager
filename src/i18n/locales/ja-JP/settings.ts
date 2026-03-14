@@ -92,6 +92,16 @@ export const settings = {
       top: '上部',
       bottom: '下部',
     },
+    cmdFBehavior: 'Cmd+F の動作',
+    cmdFBehaviorHelp: 'Cmd+F ショートカットの機能を選択',
+    cmdFBehaviorOptions: {
+      inSessionSearch: 'セッション内検索',
+      toggleSidebar: 'セッションツリーの切り替え',
+    },
+    cmdFBehaviorHint: {
+      search: 'Cmd+Shift+F でセッションツリーを切り替え',
+      sidebar: 'Cmd+Shift+F でセッション内検索を開く',
+    },
   },
   search: {
     defaultSearchMode: 'デフォルト検索モード',

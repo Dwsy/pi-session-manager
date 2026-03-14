@@ -102,6 +102,16 @@ export const settings = {
       top: 'Top',
       bottom: 'Bottom',
     },
+    cmdFBehavior: 'Cmd+F Behavior',
+    cmdFBehaviorHelp: 'Choose what Cmd+F shortcut does',
+    cmdFBehaviorOptions: {
+      inSessionSearch: 'Search in session',
+      toggleSidebar: 'Toggle session tree',
+    },
+    cmdFBehaviorHint: {
+      search: 'Cmd+Shift+F toggles session tree',
+      sidebar: 'Cmd+Shift+F opens in-session search',
+    },
   },
   search: {
     defaultSearchMode: 'Default Search Mode',

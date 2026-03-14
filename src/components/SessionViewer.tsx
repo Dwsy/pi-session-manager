@@ -23,6 +23,7 @@ import { useSessionViewerData } from "../hooks/useSessionViewerData";
 import { useSessionViewerDerivedData } from "../hooks/useSessionViewerDerivedData";
 import { useSessionViewerHotkeys } from "../hooks/useSessionViewerHotkeys";
 import { useSessionViewerInMessageSearch } from "../hooks/useSessionViewerInMessageSearch";
+import { useSettings } from "../hooks/useSettings";
 
 import { getPlatformDefaults } from "./settings/types";
 import type { SessionInfo } from "../types";
@@ -72,6 +73,8 @@ function SessionViewerContent({
     restoreSearchExpandedTools,
   } = useSessionView();
   const isMobile = useIsMobile();
+  const { getSessionSetting } = useSettings();
+  const cmdFBehavior = getSessionSetting('cmdFBehavior');
   const [showSidebar, setShowSidebar] = useState(false);
   const [searchFocusKey, setSearchFocusKey] = useState(0);
   const { sidebarWidth, isResizing, handleMouseDown } = useResizableSidebar({
@@ -167,8 +170,10 @@ function SessionViewerContent({
   useSessionViewerHotkeys({
     enabled: !showSystemPromptDialog && !showMobileMenu,
     isSearchOpen,
+    cmdFBehavior,
     onToggleThinking: toggleThinking,
     onToggleToolsExpanded: toggleToolsExpanded,
+    onToggleSidebar: handleToggleSidebar,
     onOpenSearch: handleOpenSearch,
     onCloseSearch: handleCloseSearch,
     onNextSearchMatch: goToNextMatch,

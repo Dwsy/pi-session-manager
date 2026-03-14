@@ -56,6 +56,8 @@ export interface AppSettings {
     previewLines: number
     colorizeToolCalls: boolean
     openPosition: 'top' | 'bottom'
+    /** Cmd+F behavior: 'inSessionSearch' = search in current session, 'toggleSidebar' = toggle session tree */
+    cmdFBehavior: 'inSessionSearch' | 'toggleSidebar'
   }
   search: {
     defaultSearchMode: 'content' | 'name'
@@ -122,6 +124,7 @@ export const defaultSettings: AppSettings = {
     previewLines: 2,
     colorizeToolCalls: true,
     openPosition: 'top',
+    cmdFBehavior: 'inSessionSearch',
   },
   search: {
     defaultSearchMode: 'content',
