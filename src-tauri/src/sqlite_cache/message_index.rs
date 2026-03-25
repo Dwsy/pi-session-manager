@@ -548,6 +548,7 @@ pub fn insert_message_entries(conn: &Connection, session: &SessionInfo) -> Resul
 
 /// Upsert message entries into message_entries table from a pre-parsed list.
 /// This is more efficient than insert_message_entries because it avoids re-reading the session file.
+/// Callers are responsible for clearing stale rows before invoking this helper.
 pub fn upsert_message_entries(
     conn: &Connection,
     session_path: &str,
@@ -566,13 +567,12 @@ pub fn upsert_message_entries(
 
     drop(stmt);
 
-    conn.execute(
-        "DELETE FROM message_entries WHERE session_path = ?",
-        params![session_path],
-    )
-    .map_err(|e| format!("Failed to delete existing message entries for {session_path}: {e}"))?;
-
     let include_thinking = load_include_thinking_in_search();
+    let mut insert_stmt = conn
+        .prepare_cached(
+            "INSERT OR REPLACE INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        )
+        .map_err(|e| format!("Failed to prepare message entry upsert statement: {e}"))?;
 
     for entry in entries {
         let Some(ref msg) = entry.message else {
@@ -612,21 +612,20 @@ pub fn upsert_message_entries(
             segments.push(("thinking".to_string(), thinking_parts.join("\n")));
         }
 
+        let timestamp = entry.timestamp.to_rfc3339();
         for (source_type, content) in segments {
             let row_id = format!("{}:{}", entry.id, source_type);
-            conn.execute(
-                "INSERT OR REPLACE INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![
+            insert_stmt
+                .execute(params![
                     row_id,
                     &entry.id,
                     session_path,
                     &msg.role,
                     source_type,
                     content,
-                    &entry.timestamp.to_rfc3339(),
-                ],
-            )
-            .map_err(|e| format!("Failed to insert message entry {}: {}", entry.id, e))?;
+                    &timestamp,
+                ])
+                .map_err(|e| format!("Failed to insert message entry {}: {}", entry.id, e))?;
         }
     }
 
