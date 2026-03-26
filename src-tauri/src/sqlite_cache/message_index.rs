@@ -557,7 +557,6 @@ pub fn upsert_message_entries(
     struct MessageEntryRow {
         row_id: String,
         entry_id: String,
-        session_path: String,
         role: String,
         source_type: String,
         content: String,
@@ -625,7 +624,6 @@ pub fn upsert_message_entries(
             rows.push(MessageEntryRow {
                 row_id: format!("{}:{}", entry.id, source_type),
                 entry_id: entry.id.clone(),
-                session_path: session_path.to_string(),
                 role: msg.role.clone(),
                 source_type,
                 content,
@@ -660,7 +658,7 @@ pub fn upsert_message_entries(
         for row in chunk {
             params.push(&row.row_id);
             params.push(&row.entry_id);
-            params.push(&row.session_path);
+            params.push(&session_path);
             params.push(&row.role);
             params.push(&row.source_type);
             params.push(&row.content);
