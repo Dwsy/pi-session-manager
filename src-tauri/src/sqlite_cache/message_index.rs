@@ -564,7 +564,7 @@ pub fn upsert_message_entries(
         timestamp: String,
     }
 
-    const INSERT_CHUNK_SIZE: usize = 64;
+    const INSERT_CHUNK_SIZE: usize = 32;
 
     let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'")
