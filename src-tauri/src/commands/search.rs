@@ -304,17 +304,6 @@ pub async fn full_text_search(
                 )"
             );
 
-            let total_hits: usize = {
-                let mut stmt = conn
-                    .prepare(&count_sql)
-                    .map_err(|e| format!("Failed to prepare total count query: {e}"))?;
-                let count: i64 = match stmt.query_row(params.as_slice(), |row| row.get(0)) {
-                    Ok(c) => c,
-                    Err(e) => return Err(format!("Failed to get total hits count: {e}")),
-                };
-                count as usize
-            };
-
             // --- Fetch the page of hits with global ordering and per-session limit ---
             let rank_expr = if use_content_like { "-1.0" } else { "message_fts.rank" };
             let offset = page * page_size;
@@ -345,8 +334,14 @@ pub async fn full_text_search(
                 ),
                 filtered AS (
                     SELECT
-                        entry_id, session_path, role, source_type, timestamp, rank,
-                        ROW_NUMBER() OVER (ORDER BY rank) as global_rn
+                        entry_id,
+                        session_path,
+                        role,
+                        source_type,
+                        timestamp,
+                        rank,
+                        ROW_NUMBER() OVER (ORDER BY rank) as global_rn,
+                        COUNT(*) OVER () as total_hits
                     FROM deduped
                     WHERE rn_in_session <= 3
                 )
@@ -359,7 +354,8 @@ pub async fn full_text_search(
                     f.source_type,
                     m.content,
                     f.timestamp,
-                    f.rank
+                    f.rank,
+                    f.total_hits
                 FROM filtered f
                 JOIN message_entries m ON f.entry_id = m.entry_id AND f.session_path = m.session_path AND f.source_type = m.source_type
                 JOIN sessions s ON s.path = f.session_path
@@ -390,11 +386,28 @@ pub async fn full_text_search(
                         row.get::<_, String>(6)?,          // content
                         row.get::<_, String>(7)?,          // timestamp
                         row.get::<_, f32>(8)?,             // rank
+                        row.get::<_, i64>(9)?,             // total_hits
                     ))
                 })
                 .map_err(|e| format!("Failed to query message FTS: {e}"))?
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| format!("Failed to collect message FTS results: {e}"))?;
+
+            let total_hits: usize = if rows.is_empty() {
+                if offset == 0 {
+                    0
+                } else {
+                    let mut stmt = conn
+                        .prepare(&count_sql)
+                        .map_err(|e| format!("Failed to prepare total count query: {e}"))?;
+                    let count: i64 = stmt
+                        .query_row(params.as_slice(), |row| row.get(0))
+                        .map_err(|e| format!("Failed to get total hits count: {e}"))?;
+                    count as usize
+                }
+            } else {
+                rows[0].9 as usize
+            };
 
             let mut all_hits = Vec::with_capacity(rows.len());
 
@@ -408,6 +421,7 @@ pub async fn full_text_search(
                 content,
                 timestamp_str,
                 rank,
+                _,
             ) in rows
             {
                 let timestamp = match chrono::DateTime::parse_from_rfc3339(&timestamp_str) {

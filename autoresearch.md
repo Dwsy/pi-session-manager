@@ -64,6 +64,7 @@ This workload is fixed after baseline unless a harness bug is found.
 - Confirmed wins so far:
   - removed redundant `DELETE FROM message_entries` in the pre-parsed upsert path and reused a cached insert statement
   - joined `sessions` inside `full_text_search` result SQL to avoid per-hit `get_session()` lookups
+  - batched pre-parsed message-entry writes into chunked multi-row `INSERT OR REPLACE` statements, massively reducing ingest SQL statement count
 - Confirmed dead ends so far:
   - simplifying `delete_message_entries_for_session` into an optimistic delete-only path regressed
   - caching the `sessions` upsert statement regressed and increased variance
