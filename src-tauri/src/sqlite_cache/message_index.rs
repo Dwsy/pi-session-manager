@@ -554,6 +554,18 @@ pub fn upsert_message_entries(
     session_path: &str,
     entries: &[SessionEntry],
 ) -> Result<(), String> {
+    struct MessageEntryRow {
+        row_id: String,
+        entry_id: String,
+        session_path: String,
+        role: String,
+        source_type: String,
+        content: String,
+        timestamp: String,
+    }
+
+    const INSERT_CHUNK_SIZE: usize = 64;
+
     let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'")
         .map_err(|e| format!("Failed to check message_entries existence: {e}"))?;
@@ -568,11 +580,7 @@ pub fn upsert_message_entries(
     drop(stmt);
 
     let include_thinking = load_include_thinking_in_search();
-    let mut insert_stmt = conn
-        .prepare_cached(
-            "INSERT OR REPLACE INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        )
-        .map_err(|e| format!("Failed to prepare message entry upsert statement: {e}"))?;
+    let mut rows = Vec::new();
 
     for entry in entries {
         let Some(ref msg) = entry.message else {
@@ -614,24 +622,58 @@ pub fn upsert_message_entries(
 
         let timestamp = entry.timestamp.to_rfc3339();
         for (source_type, content) in segments {
-            let row_id = format!("{}:{}", entry.id, source_type);
-            insert_stmt
-                .execute(params![
-                    row_id,
-                    &entry.id,
-                    session_path,
-                    &msg.role,
-                    source_type,
-                    content,
-                    &timestamp,
-                ])
-                .map_err(|e| format!("Failed to insert message entry {}: {}", entry.id, e))?;
+            rows.push(MessageEntryRow {
+                row_id: format!("{}:{}", entry.id, source_type),
+                entry_id: entry.id.clone(),
+                session_path: session_path.to_string(),
+                role: msg.role.clone(),
+                source_type,
+                content,
+                timestamp: timestamp.clone(),
+            });
         }
     }
 
+    for chunk in rows.chunks(INSERT_CHUNK_SIZE) {
+        let values_sql = (0..chunk.len())
+            .map(|index| {
+                let base = index * 7;
+                format!(
+                    "(?{}, ?{}, ?{}, ?{}, ?{}, ?{}, ?{})",
+                    base + 1,
+                    base + 2,
+                    base + 3,
+                    base + 4,
+                    base + 5,
+                    base + 6,
+                    base + 7
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let sql = format!(
+            "INSERT OR REPLACE INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES {values_sql}"
+        );
+
+        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(chunk.len() * 7);
+        for row in chunk {
+            params.push(&row.row_id);
+            params.push(&row.entry_id);
+            params.push(&row.session_path);
+            params.push(&row.role);
+            params.push(&row.source_type);
+            params.push(&row.content);
+            params.push(&row.timestamp);
+        }
+
+        conn.execute(&sql, params.as_slice())
+            .map_err(|e| format!("Failed to bulk insert message entries for {}: {}", session_path, e))?;
+    }
+
     debug!(
-        "Upserted {} message entries for session: {}",
-        entries.len(),
+        "Upserted {} message entry rows for session: {}",
+        rows.len(),
         session_path
     );
     Ok(())

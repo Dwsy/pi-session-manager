@@ -1,4 +1,4 @@
 # Autoresearch ideas backlog
 
-- Batch session metadata lookup inside `full_text_search` SQL to remove follow-up `get_session()` calls.
-- Evaluate a composite `message_entries` index tuned for `(session_path, entry_id, timestamp)` window/dedup paths.
+- Redesign multi-session ingest at a lower level (e.g. fewer SQL statements / different write pipeline), rather than wrapping the current `upsert_session` shape in savepoints.
+- If revisiting search, target rewrites that remove enough work to beat the mixed metric, not just retrieval latency in isolation.

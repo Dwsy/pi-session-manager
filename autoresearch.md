@@ -61,7 +61,21 @@ This workload is fixed after baseline unless a harness bug is found.
 - Initial benchmark harness created around the real init/index/search path.
 - Harness bug found on first run: project-path filtered query returned zero hits because the synthetic dataset did not guarantee `tokio async` content inside `/workspace/project-b`. Fixed by ensuring project-b sessions carry that term.
 - Checks bug found on second run: `--no-default-features --features cli` test commands compile an existing broken CLI-only path unrelated to search/index behavior. Checks were narrowed to the same relevant tests under the default feature set.
-- Suspected hotspots before experiments:
-  - redundant delete work during `upsert_session` + `upsert_message_entries`
-  - extra session lookups after search rows are fetched
-  - missing composite indexes for window-function-heavy retrieval paths
+- Confirmed wins so far:
+  - removed redundant `DELETE FROM message_entries` in the pre-parsed upsert path and reused a cached insert statement
+  - joined `sessions` inside `full_text_search` result SQL to avoid per-hit `get_session()` lookups
+- Confirmed dead ends so far:
+  - simplifying `delete_message_entries_for_session` into an optimistic delete-only path regressed
+  - caching the `sessions` upsert statement regressed and increased variance
+  - carrying `content` through the search CTE regressed; wider intermediate rows hurt more than the final join
+  - removing redundant existence probes in `upsert_session` / `upsert_message_entries` regressed sharply
+  - extra lookup index on `message_entries(entry_id, session_path, source_type)` was classic over-indexing and hurt ingest badly
+  - process-level caching for `includeThinkingInSearch` did not help enough to justify itself
+  - `PRAGMA temp_store=MEMORY` regressed both ingest and search
+  - schema-readiness caching for `delete_message_entries_for_session` regressed badly
+  - direct iteration over normalized `SessionEntry.message.content` regressed badly
+  - batch session-upsert savepoints did not pay off, even after precomputing settings to avoid cross-connection lock hazards
+  - folding `total_hits` into the search query via `COUNT(*) OVER ()` produced a real search win, but still worsened the primary mixed workload metric on repeated runs
+- Remaining hotspots worth exploring:
+  - deeper write-path redesign for multi-session ingest (not superficial savepoint wrappers)
+  - search rewrites only if they can deliver enough gain to overcome ingest noise on the mixed metric
