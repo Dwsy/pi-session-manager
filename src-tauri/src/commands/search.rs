@@ -3,7 +3,6 @@ use crate::models::{FullTextSearchHit, FullTextSearchResponse, SessionInfo};
 use crate::{config, search, sqlite_cache};
 use chrono::{DateTime, Utc};
 use rusqlite::ToSql;
-use std::collections::HashMap;
 use std::time::Instant;
 use tokio::time::Duration;
 
@@ -305,17 +304,6 @@ pub async fn full_text_search(
                 )"
             );
 
-            let total_hits: usize = {
-                let mut stmt = conn
-                    .prepare(&count_sql)
-                    .map_err(|e| format!("Failed to prepare total count query: {e}"))?;
-                let count: i64 = match stmt.query_row(params.as_slice(), |row| row.get(0)) {
-                    Ok(c) => c,
-                    Err(e) => return Err(format!("Failed to get total hits count: {e}")),
-                };
-                count as usize
-            };
-
             // --- Fetch the page of hits with global ordering and per-session limit ---
             let rank_expr = if use_content_like { "-1.0" } else { "message_fts.rank" };
             let offset = page * page_size;
@@ -346,14 +334,31 @@ pub async fn full_text_search(
                 ),
                 filtered AS (
                     SELECT
-                        entry_id, session_path, role, source_type, timestamp, rank,
-                        ROW_NUMBER() OVER (ORDER BY rank) as global_rn
+                        entry_id,
+                        session_path,
+                        role,
+                        source_type,
+                        timestamp,
+                        rank,
+                        ROW_NUMBER() OVER (ORDER BY rank) as global_rn,
+                        COUNT(*) OVER () as total_hits
                     FROM deduped
                     WHERE rn_in_session <= 3
                 )
-                SELECT f.entry_id, f.session_path, f.role, f.source_type, m.content, f.timestamp, f.rank
+                SELECT
+                    f.entry_id,
+                    f.session_path,
+                    s.id,
+                    s.name,
+                    f.role,
+                    f.source_type,
+                    m.content,
+                    f.timestamp,
+                    f.rank,
+                    f.total_hits
                 FROM filtered f
                 JOIN message_entries m ON f.entry_id = m.entry_id AND f.session_path = m.session_path AND f.source_type = m.source_type
+                JOIN sessions s ON s.path = f.session_path
                 WHERE f.global_rn > ? AND f.global_rn <= ?
                 ORDER BY f.rank"
             );
@@ -372,35 +377,53 @@ pub async fn full_text_search(
             let rows = stmt
                 .query_map(data_params.as_slice(), |row| {
                     Ok((
-                        row.get::<_, String>(0)?, // entry_id
-                        row.get::<_, String>(1)?, // session_path
-                        row.get::<_, String>(2)?, // role
-                        row.get::<_, String>(3)?, // source_type
-                        row.get::<_, String>(4)?, // content
-                        row.get::<_, String>(5)?, // timestamp
-                        row.get::<_, f32>(6)?,    // rank
+                        row.get::<_, String>(0)?,          // entry_id
+                        row.get::<_, String>(1)?,          // session_path
+                        row.get::<_, String>(2)?,          // session_id
+                        row.get::<_, Option<String>>(3)?,  // session_name
+                        row.get::<_, String>(4)?,          // role
+                        row.get::<_, String>(5)?,          // source_type
+                        row.get::<_, String>(6)?,          // content
+                        row.get::<_, String>(7)?,          // timestamp
+                        row.get::<_, f32>(8)?,             // rank
+                        row.get::<_, i64>(9)?,             // total_hits
                     ))
                 })
                 .map_err(|e| format!("Failed to query message FTS: {e}"))?
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| format!("Failed to collect message FTS results: {e}"))?;
 
-            // Batch fetch session details and build hits
-            let mut all_hits = Vec::new();
-            let mut sessions_cache: HashMap<String, SessionInfo> = HashMap::new();
-
-            for (entry_id, session_path, role, source_type, content, timestamp_str, rank) in rows {
-                // Get session from cache or DB
-                let session = if let Some(sess) = sessions_cache.get(&session_path) {
-                    sess.clone()
-                } else if let Some(sess) = sqlite_cache::get_session(&conn, &session_path)? {
-                    sessions_cache.insert(session_path.clone(), sess.clone());
-                    sess
+            let total_hits: usize = if rows.is_empty() {
+                if offset == 0 {
+                    0
                 } else {
-                    continue;
-                };
+                    let mut stmt = conn
+                        .prepare(&count_sql)
+                        .map_err(|e| format!("Failed to prepare total count query: {e}"))?;
+                    let count: i64 = stmt
+                        .query_row(params.as_slice(), |row| row.get(0))
+                        .map_err(|e| format!("Failed to get total hits count: {e}"))?;
+                    count as usize
+                }
+            } else {
+                rows[0].9 as usize
+            };
 
-                // Parse timestamp
+            let mut all_hits = Vec::with_capacity(rows.len());
+
+            for (
+                entry_id,
+                session_path,
+                session_id,
+                session_name,
+                role,
+                source_type,
+                content,
+                timestamp_str,
+                rank,
+                _,
+            ) in rows
+            {
                 let timestamp = match chrono::DateTime::parse_from_rfc3339(&timestamp_str) {
                     Ok(dt) => dt.with_timezone(&chrono::Utc),
                     Err(e) => {
@@ -412,9 +435,9 @@ pub async fn full_text_search(
                 };
 
                 all_hits.push(FullTextSearchHit {
-                    session_id: session.id.clone(),
-                    session_path: session.path.clone(),
-                    session_name: session.name.clone(),
+                    session_id,
+                    session_path,
+                    session_name,
                     entry_id,
                     role,
                     source_type,

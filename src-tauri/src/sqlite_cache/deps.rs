@@ -5,7 +5,7 @@ pub(crate) use crate::session_parser::SessionDetails;
 pub(crate) use chrono::{DateTime, Utc};
 pub(crate) use rusqlite::{params, Connection, OptionalExtension, Result as SqliteResult};
 pub(crate) use serde_json::Value;
-pub(crate) use std::collections::HashSet;
+pub(crate) use std::collections::{HashMap, HashSet};
 pub(crate) use std::fs;
 pub(crate) use std::io::{BufRead, BufReader};
 pub(crate) use std::path::{Path, PathBuf};
