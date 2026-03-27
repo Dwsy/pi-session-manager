@@ -160,7 +160,7 @@ cd src-tauri && cargo test
 - Push tag `v*` to trigger `release.yml`
 - Artifacts:
   - Desktop installers (built via Tauri action)
-  - CLI binary archives + sha256
+  - CLI binaries + sha256
 - The workflow finally generates release notes automatically and publishes the release
 
 ### 5.3.1 Version Synchronization Rules (Must Follow)
@@ -168,10 +168,12 @@ cd src-tauri && cargo test
 - The current version source for frontend injection is `package.json` only (`vite.config.ts` injects `__APP_VERSION__` via `npm_package_version`).
 - Before release, ensure the following files all have the same version:
   - `package.json`
+  - `package-lock.json` (root `version` and `packages[""].version`, if using npm)
   - `src-tauri/Cargo.toml`
   - `src-tauri-cli/Cargo.toml`
-  - `package-lock.json` (if using npm)
+  - `src-tauri/tauri.conf.json`
 - `git tag` must match the versions above (recommended: `vX.Y.Z`).
+- Use `node scripts/release-version.mjs check` to verify sync, and `node scripts/release-version.mjs sync <version>` to normalize all release metadata.
 - Release reminder for agents/LLMs: **sync and update all versions above before pushing a new tag; do not change versions after pushing the tag**, otherwise update prompts may show inconsistent versions.
 
 ## 5.4 Docs Site Deployment

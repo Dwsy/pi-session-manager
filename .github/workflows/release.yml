@@ -22,25 +22,25 @@ jobs:
           # macOS ARM64
           - platform: macos-latest
             target: aarch64-apple-darwin
-            tauri_args: "--target aarch64-apple-darwin"
+            tauri_args: "--target aarch64-apple-darwin --bundles dmg"
             cli_artifact: pi-session-cli-macos-arm64
             cli_binary: pi-session-cli
           # macOS x64
           - platform: macos-latest
             target: x86_64-apple-darwin
-            tauri_args: "--target x86_64-apple-darwin"
+            tauri_args: "--target x86_64-apple-darwin --bundles dmg"
             cli_artifact: pi-session-cli-macos-x64
             cli_binary: pi-session-cli
           # Linux x64
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            tauri_args: ""
+            tauri_args: "--bundles appimage,deb,rpm"
             cli_artifact: pi-session-cli-linux-x64
             cli_binary: pi-session-cli
           # Windows x64
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
-            tauri_args: ""
+            tauri_args: "--bundles msi,nsis"
             cli_artifact: pi-session-cli-windows-x64.exe
             cli_binary: pi-session-cli.exe
 
@@ -78,11 +78,21 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release version sync
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            node scripts/release-version.mjs check "${GITHUB_REF_NAME#v}"
+          else
+            node scripts/release-version.mjs check
+          fi
+
       # ── Frontend (shared by both Desktop and CLI) ──────────
       - name: Build frontend
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm run build
+        run: pnpm run build
 
       # ── Desktop (Tauri) ───────────────────────────────────
       - name: Build Tauri desktop app
@@ -109,9 +119,7 @@ jobs:
           mkdir -p cli-dist
           cp target/${{ matrix.target }}/release/${{ matrix.cli_binary }} cli-dist/${{ matrix.cli_artifact }}
           chmod +x cli-dist/${{ matrix.cli_artifact }}
-          cd cli-dist
-          tar -czf ${{ matrix.cli_artifact }}.tar.gz ${{ matrix.cli_artifact }}
-          shasum -a 256 ${{ matrix.cli_artifact }}.tar.gz > ${{ matrix.cli_artifact }}.tar.gz.sha256
+          shasum -a 256 cli-dist/${{ matrix.cli_artifact }} > cli-dist/${{ matrix.cli_artifact }}.sha256
 
       - name: Package CLI (Windows)
         if: runner.os == 'Windows'
@@ -119,15 +127,14 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path cli-dist
           Copy-Item "target/${{ matrix.target }}/release/${{ matrix.cli_binary }}" "cli-dist/${{ matrix.cli_artifact }}"
-          Compress-Archive -Path "cli-dist/${{ matrix.cli_artifact }}" -DestinationPath "cli-dist/${{ matrix.cli_artifact }}.zip"
-          $hash = (Get-FileHash "cli-dist/${{ matrix.cli_artifact }}.zip" -Algorithm SHA256).Hash
-          "$hash  ${{ matrix.cli_artifact }}.zip" | Out-File -FilePath "cli-dist/${{ matrix.cli_artifact }}.zip.sha256" -Encoding ASCII
+          $hash = (Get-FileHash "cli-dist/${{ matrix.cli_artifact }}" -Algorithm SHA256).Hash
+          "$hash  ${{ matrix.cli_artifact }}" | Out-File -FilePath "cli-dist/${{ matrix.cli_artifact }}.sha256" -Encoding ASCII
 
       - name: Upload CLI artifacts
         uses: actions/upload-artifact@v4
         with:
           name: cli-${{ matrix.cli_artifact }}
-          path: cli-dist/*.*
+          path: cli-dist/*
           retention-days: 7
 
   # ── Finalize Release ─────────────────────────────────────
@@ -185,7 +192,7 @@ jobs:
             echo "| macOS (Apple Silicon) | \`Pi.Session.Manager_${VERSION}_aarch64.dmg\` |"
             echo "| macOS (Intel) | \`Pi.Session.Manager_${VERSION}_x64.dmg\` |"
             echo "| Windows | \`.exe\` / \`.msi\` installer |"
-            echo "| Linux | \`.deb\` / \`.AppImage\` |"
+            echo "| Linux | \`.deb\` / \`.rpm\` / \`.AppImage\` |"
             echo ""
             echo "### ⚡ CLI Server (Headless)"
             echo ""
@@ -194,16 +201,16 @@ jobs:
             echo ""
             echo "| Platform | File |"
             echo "|----------|------|"
-            echo "| macOS (Apple Silicon) | \`pi-session-cli-macos-arm64.tar.gz\` |"
-            echo "| macOS (Intel) | \`pi-session-cli-macos-x64.tar.gz\` |"
-            echo "| Linux (x64) | \`pi-session-cli-linux-x64.tar.gz\` |"
-            echo "| Windows (x64) | \`pi-session-cli-windows-x64.exe.zip\` |"
+            echo "| macOS (Apple Silicon) | \`pi-session-cli-macos-arm64\` |"
+            echo "| macOS (Intel) | \`pi-session-cli-macos-x64\` |"
+            echo "| Linux (x64) | \`pi-session-cli-linux-x64\` |"
+            echo "| Windows (x64) | \`pi-session-cli-windows-x64.exe\` |"
+            echo ""
+            echo "Each CLI binary ships with a matching \`.sha256\` checksum file."
             echo ""
             echo "#### CLI Quick Start"
             echo ""
             echo "\`\`\`bash"
-            echo "# Extract and run"
-            echo "tar -xzf pi-session-cli-*.tar.gz"
             echo "chmod +x pi-session-cli-*"
             echo "./pi-session-cli-*"
             echo ""

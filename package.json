@@ -14,6 +14,8 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "build:cli": "node scripts/build-cli.mjs",
+    "release:version:check": "node scripts/release-version.mjs check",
+    "release:version:sync": "node scripts/release-version.mjs sync",
     "prepare": "husky"
   },
   "dependencies": {
