@@ -65,6 +65,9 @@ This workload is fixed after baseline unless a harness bug is found.
   - removed redundant `DELETE FROM message_entries` in the pre-parsed upsert path and reused a cached insert statement
   - joined `sessions` inside `full_text_search` result SQL to avoid per-hit `get_session()` lookups
   - batched pre-parsed message-entry writes into chunked multi-row `INSERT OR REPLACE` statements, massively reducing ingest SQL statement count
+  - after ingest got cheaper, folding `total_hits` into the main paged search query via `COUNT(*) OVER ()` became a real mixed-workload win
+  - tuning the bulk insert chunk size from 64 down to 32 produced a further ingest win
+  - avoiding per-row `session_path` clones inside the staged bulk-insert rows delivered a smaller but real follow-up gain
 - Confirmed dead ends so far:
   - simplifying `delete_message_entries_for_session` into an optimistic delete-only path regressed
   - caching the `sessions` upsert statement regressed and increased variance
@@ -76,7 +79,10 @@ This workload is fixed after baseline unless a harness bug is found.
   - schema-readiness caching for `delete_message_entries_for_session` regressed badly
   - direct iteration over normalized `SessionEntry.message.content` regressed badly
   - batch session-upsert savepoints did not pay off, even after precomputing settings to avoid cross-connection lock hazards
-  - folding `total_hits` into the search query via `COUNT(*) OVER ()` produced a real search win, but still worsened the primary mixed workload metric on repeated runs
+  - before the big ingest rewrite, folding `total_hits` into the search query via `COUNT(*) OVER ()` improved search but not the mixed primary metric
+  - replacing `ROW_NUMBER()` pagination with `ORDER BY rank LIMIT/OFFSET` regressed; SQLite preferred the previous pagination plan
+  - bulk insert chunk size 128 regressed, and chunk size 16 regressed; 32 is currently the sweet spot
+  - borrowing `entry_id`/`role` in staged bulk-insert rows regressed despite looking allocation-cheaper on paper
 - Remaining hotspots worth exploring:
   - deeper write-path redesign for multi-session ingest (not superficial savepoint wrappers)
   - search rewrites only if they can deliver enough gain to overcome ingest noise on the mixed metric
