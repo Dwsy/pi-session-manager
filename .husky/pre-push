@@ -3,23 +3,21 @@
 set -e
 
 HEAD_SHA=$(git rev-parse HEAD)
+VERSION_FILES="package.json package-lock.json src-tauri/Cargo.toml src-tauri-cli/Cargo.toml src-tauri/tauri.conf.json"
 
-sync_package_version_from_tag() {
+sync_release_versions_from_tag() {
   tag_version="$1"
-  current_version=$(node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));process.stdout.write(pkg.version||'');")
 
-  if [ "$current_version" = "$tag_version" ]; then
+  echo "[husky] detected release tag v$tag_version"
+  node scripts/release-version.mjs sync "$tag_version"
+
+  if git diff --quiet -- $VERSION_FILES; then
     return 0
   fi
 
-  echo "[husky] detected release tag v$tag_version"
-  echo "[husky] syncing package.json version: $current_version -> $tag_version"
+  git add $VERSION_FILES
 
-  TAG_VERSION="$tag_version" node -e "const fs=require('fs');const file='package.json';const pkg=JSON.parse(fs.readFileSync(file,'utf8'));pkg.version=process.env.TAG_VERSION;fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');"
-
-  git add package.json
-
-  echo "[husky] package.json has been updated and staged."
+  echo "[husky] release version files have been updated and staged."
   echo "[husky] commit this change, move/create tag on the new commit, then push again."
   exit 1
 }
@@ -38,12 +36,15 @@ while IFS=' ' read -r local_ref local_sha _remote_ref _remote_sha; do
         continue
       fi
 
-      sync_package_version_from_tag "${local_ref#refs/tags/v}"
+      sync_release_versions_from_tag "${local_ref#refs/tags/v}"
       ;;
   esac
 done
 
 echo "[husky] pre-push full checks"
+
+echo "[husky] Release version sync check"
+node scripts/release-version.mjs check
 
 echo "[husky] TypeScript check"
 pnpm exec tsc --noEmit
