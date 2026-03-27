@@ -157,6 +157,41 @@ So it always opens with rich English demo data and does not require backend serv
 | `~/.pi/agent/settings.json` | Pi settings |
 | `~/.config/pi-session-manager.json` | Standalone `pi-session-cli` config |
 
+## Custom Terminal Command
+
+Settings → Terminal → Custom lets you define how "Resume" opens a session in an external terminal. The command supports four placeholders:
+
+| Placeholder | Expands to |
+| --- | --- |
+| `{command}` | Full resume command (`cd <cwd> && pi --session <path>`) |
+| `{cwd}` | Session working directory |
+| `{path}` | Session file path |
+| `{pi}` | Pi binary path (from Pi Command Path setting) |
+
+If no placeholders are present the app appends `sh -lc '<resume command>'` automatically.
+
+### Examples
+
+**tmux — new window in an existing session:**
+
+```text
+/opt/homebrew/bin/tmux new-window -t <session> -c {cwd} "/bin/zsh -lic \"{pi} --session {path}\""
+```
+
+**tmux — new pane in an existing session:**
+
+```text
+/opt/homebrew/bin/tmux split-window -t <session> -c {cwd} "/bin/zsh -lic \"{pi} --session {path}\""
+```
+
+Replace `<session>` with the target tmux session name and adjust the tmux path for your system.
+
+### Troubleshooting
+
+- **GUI apps may not inherit the same `PATH` as an interactive shell.** If `pi` or its dependencies (e.g. `node`) are not found, wrap the command in a login shell (`zsh -lic "..."` or `bash -lic "..."`).
+- **Detached tmux windows (`-d` flag) can make it look like nothing happened.** Omit `-d` while debugging, or append `; exec $SHELL` to keep the window open after the command exits.
+- **`{command}` is already a compound shell expression** containing `&&`. For tmux it can be simpler to use `{cwd}` + `{path}` directly with `-c` and avoid extra quoting layers.
+
 ## Development Checks
 
 ```bash
