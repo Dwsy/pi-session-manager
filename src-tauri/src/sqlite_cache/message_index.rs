@@ -1,6 +1,70 @@
 use super::deps::*;
 
-pub(crate) static MESSAGE_ENTRIES_BACKFILL_ONCE: Mutex<Option<HashSet<String>>> = Mutex::new(None);
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MessageEntriesBackfillState {
+    InProgress,
+    Done,
+}
+
+static MESSAGE_ENTRIES_BACKFILL_STATE: Mutex<Option<HashMap<String, MessageEntriesBackfillState>>> =
+    Mutex::new(None);
+
+fn try_claim_message_entries_backfill(db_key: &str) -> Result<bool, String> {
+    let mut guard = MESSAGE_ENTRIES_BACKFILL_STATE
+        .lock()
+        .map_err(|_| "Failed to lock backfill state guard".to_string())?;
+    let states = guard.get_or_insert_with(HashMap::new);
+
+    match states.get(db_key) {
+        Some(MessageEntriesBackfillState::InProgress) => {
+            debug!(
+                "[Migration] message_entries backfill already in progress for db {}, skipping duplicate trigger",
+                db_key
+            );
+            Ok(false)
+        }
+        Some(MessageEntriesBackfillState::Done) => {
+            debug!(
+                "[Migration] message_entries backfill already completed for db {}, skipping duplicate trigger",
+                db_key
+            );
+            Ok(false)
+        }
+        None => {
+            states.insert(db_key.to_string(), MessageEntriesBackfillState::InProgress);
+            Ok(true)
+        }
+    }
+}
+
+fn finish_message_entries_backfill(db_key: &str, mark_done: bool) -> Result<(), String> {
+    let mut guard = MESSAGE_ENTRIES_BACKFILL_STATE
+        .lock()
+        .map_err(|_| "Failed to lock backfill state guard".to_string())?;
+    let states = guard.get_or_insert_with(HashMap::new);
+
+    if mark_done {
+        states.insert(db_key.to_string(), MessageEntriesBackfillState::Done);
+    } else {
+        states.remove(db_key);
+        if states.is_empty() {
+            *guard = None;
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn clear_message_entries_backfill_state_for_tests(db_key: &str) {
+    let mut guard = MESSAGE_ENTRIES_BACKFILL_STATE.lock().unwrap();
+    if let Some(states) = guard.as_mut() {
+        states.remove(db_key);
+        if states.is_empty() {
+            *guard = None;
+        }
+    }
+}
 
 fn backfill_missing_message_entries(conn: &Connection) -> Result<(), String> {
     let db_key = conn
@@ -8,136 +72,131 @@ fn backfill_missing_message_entries(conn: &Connection) -> Result<(), String> {
         .map(|path| path.to_string())
         .unwrap_or_else(|| "<memory>".to_string());
 
-    let already_done = {
-        let guard = MESSAGE_ENTRIES_BACKFILL_ONCE
-            .lock()
-            .map_err(|_| "Failed to lock backfill once guard".to_string())?;
-        guard
-            .as_ref()
-            .map(|seen| seen.contains(&db_key))
-            .unwrap_or(false)
-    };
-    if already_done {
-        debug!(
-            "[Migration] message_entries backfill already completed for db {}, skipping duplicate trigger",
-            db_key
+    if !try_claim_message_entries_backfill(&db_key)? {
+        return Ok(());
+    }
+
+    let result = (|| -> Result<bool, String> {
+        let sessions_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .map_err(|e| format!("Failed to count sessions for message_entries backfill: {e}"))?;
+        if sessions_count == 0 {
+            return Ok(false);
+        }
+
+        let indexed_sessions_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(DISTINCT session_path) FROM message_entries",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| {
+                format!("Failed to count indexed sessions for message_entries backfill: {e}")
+            })?;
+
+        if indexed_sessions_count >= sessions_count {
+            return Ok(false);
+        }
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT s.path
+                 FROM sessions s
+                 WHERE (
+                     COALESCE(s.first_message, '') <> ''
+                     OR COALESCE(s.last_message, '') <> ''
+                     OR COALESCE(s.user_messages_text, '') <> ''
+                     OR COALESCE(s.assistant_messages_text, '') <> ''
+                 )
+                 AND NOT EXISTS (
+                     SELECT 1 FROM message_entries m WHERE m.session_path = s.path
+                 )
+                 ORDER BY s.modified DESC",
+            )
+            .map_err(|e| {
+                format!("Failed to prepare missing session paths for message_entries backfill: {e}")
+            })?;
+
+        let missing_paths: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(|e| {
+                format!("Failed to query missing session paths for message_entries backfill: {e}")
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| {
+                format!("Failed to collect missing session paths for message_entries backfill: {e}")
+            })?;
+
+        if missing_paths.is_empty() {
+            return Ok(false);
+        }
+
+        info!(
+            "[Migration] message_entries indexed sessions {}/{}. Backfilling {} missing sessions...",
+            indexed_sessions_count,
+            sessions_count,
+            missing_paths.len()
         );
-        return Ok(());
-    }
 
-    let sessions_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
-        .map_err(|e| format!("Failed to count sessions for message_entries backfill: {e}"))?;
-    if sessions_count == 0 {
-        return Ok(());
-    }
-
-    let indexed_sessions_count: i64 = conn
-        .query_row(
-            "SELECT COUNT(DISTINCT session_path) FROM message_entries",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(|e| {
-            format!("Failed to count indexed sessions for message_entries backfill: {e}")
-        })?;
-
-    if indexed_sessions_count >= sessions_count {
-        return Ok(());
-    }
-
-    let mut stmt = conn
-        .prepare(
-            "SELECT s.path
-             FROM sessions s
-             WHERE (
-                 COALESCE(s.first_message, '') <> ''
-                 OR COALESCE(s.last_message, '') <> ''
-                 OR COALESCE(s.user_messages_text, '') <> ''
-                 OR COALESCE(s.assistant_messages_text, '') <> ''
-             )
-             AND NOT EXISTS (
-                 SELECT 1 FROM message_entries m WHERE m.session_path = s.path
-             )
-             ORDER BY s.modified DESC",
-        )
-        .map_err(|e| {
-            format!("Failed to prepare missing session paths for message_entries backfill: {e}")
-        })?;
-
-    let missing_paths: Vec<String> = stmt
-        .query_map([], |row| row.get(0))
-        .map_err(|e| {
-            format!("Failed to query missing session paths for message_entries backfill: {e}")
-        })?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| {
-            format!("Failed to collect missing session paths for message_entries backfill: {e}")
-        })?;
-
-    if missing_paths.is_empty() {
-        return Ok(());
-    }
-
-    info!(
-        "[Migration] message_entries indexed sessions {}/{}. Backfilling {} missing sessions...",
-        indexed_sessions_count,
-        sessions_count,
-        missing_paths.len()
-    );
-
-    let mut backfilled = 0usize;
-    for path in &missing_paths {
-        let session = SessionInfo {
-            path: path.clone(),
-            id: String::new(),
-            cwd: String::new(),
-            name: None,
-            created: Utc::now(),
-            modified: Utc::now(),
-            message_count: 0,
-            first_message: String::new(),
-            all_messages_text: String::new(),
-            user_messages_text: String::new(),
-            assistant_messages_text: String::new(),
-            last_message: String::new(),
-            last_message_role: String::new(),
-            parent_session_path: None,
-        };
-        if let Err(e) = insert_message_entries(conn, &session) {
-            if Path::new(path).exists() {
-                warn!(
-                    "[Migration] Failed to backfill missing message entries for session {}: {}",
-                    path, e
-                );
-            } else {
-                warn!(
-                    "[Migration] Removing stale session cache entry for missing file: {}",
-                    path
-                );
-                if let Err(delete_err) = super::maintenance::delete_session(conn, path) {
+        let mut backfilled = 0usize;
+        for path in &missing_paths {
+            let session = SessionInfo {
+                path: path.clone(),
+                id: String::new(),
+                cwd: String::new(),
+                name: None,
+                created: Utc::now(),
+                modified: Utc::now(),
+                message_count: 0,
+                first_message: String::new(),
+                all_messages_text: String::new(),
+                user_messages_text: String::new(),
+                assistant_messages_text: String::new(),
+                last_message: String::new(),
+                last_message_role: String::new(),
+                parent_session_path: None,
+            };
+            if let Err(e) = insert_message_entries(conn, &session) {
+                if Path::new(path).exists() {
                     warn!(
-                        "[Migration] Failed to remove stale session cache entry {}: {}",
-                        path, delete_err
+                        "[Migration] Failed to backfill missing message entries for session {}: {}",
+                        path, e
                     );
+                } else {
+                    warn!(
+                        "[Migration] Removing stale session cache entry for missing file: {}",
+                        path
+                    );
+                    if let Err(delete_err) = super::maintenance::delete_session(conn, path) {
+                        warn!(
+                            "[Migration] Failed to remove stale session cache entry {}: {}",
+                            path, delete_err
+                        );
+                    }
                 }
+            } else {
+                backfilled += 1;
             }
-        } else {
-            backfilled += 1;
+        }
+
+        info!(
+            "[Migration] Backfilled message entries for {} missing sessions",
+            backfilled
+        );
+
+        Ok(true)
+    })();
+
+    match result {
+        Ok(mark_done) => {
+            finish_message_entries_backfill(&db_key, mark_done)?;
+            Ok(())
+        }
+        Err(error) => {
+            finish_message_entries_backfill(&db_key, false)?;
+            Err(error)
         }
     }
-
-    info!(
-        "[Migration] Backfilled message entries for {} missing sessions",
-        backfilled
-    );
-
-    let mut guard = MESSAGE_ENTRIES_BACKFILL_ONCE
-        .lock()
-        .map_err(|_| "Failed to lock backfill once guard".to_string())?;
-    guard.get_or_insert_with(HashSet::new).insert(db_key);
-
-    Ok(())
 }
 
 pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
@@ -747,4 +806,54 @@ pub fn search_message_fts(
         .map_err(|e| format!("Failed to collect message FTS results: {e}"))?;
 
     Ok(rows)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    #[test]
+    fn backfill_claim_allows_only_one_concurrent_winner_per_db() {
+        let db_key = "/tmp/test-claim-concurrent.db";
+        clear_message_entries_backfill_state_for_tests(db_key);
+
+        let barrier = Arc::new(Barrier::new(8));
+        let mut handles = Vec::new();
+
+        for _ in 0..8 {
+            let barrier = Arc::clone(&barrier);
+            handles.push(thread::spawn(move || {
+                barrier.wait();
+                try_claim_message_entries_backfill(db_key).unwrap()
+            }));
+        }
+
+        let winners = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .filter(|claimed| *claimed)
+            .count();
+
+        assert_eq!(winners, 1, "only one thread should claim the backfill slot");
+
+        finish_message_entries_backfill(db_key, false).unwrap();
+        clear_message_entries_backfill_state_for_tests(db_key);
+    }
+
+    #[test]
+    fn backfill_claim_can_retry_after_noop_but_blocks_after_done() {
+        let db_key = "/tmp/test-claim-retry.db";
+        clear_message_entries_backfill_state_for_tests(db_key);
+
+        assert!(try_claim_message_entries_backfill(db_key).unwrap());
+        finish_message_entries_backfill(db_key, false).unwrap();
+        assert!(try_claim_message_entries_backfill(db_key).unwrap());
+
+        finish_message_entries_backfill(db_key, true).unwrap();
+        assert!(!try_claim_message_entries_backfill(db_key).unwrap());
+
+        clear_message_entries_backfill_state_for_tests(db_key);
+    }
 }
