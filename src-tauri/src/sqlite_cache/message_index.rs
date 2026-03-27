@@ -665,8 +665,9 @@ pub fn upsert_message_entries(
             params.push(&row.timestamp);
         }
 
-        conn.execute(&sql, params.as_slice())
-            .map_err(|e| format!("Failed to bulk insert message entries for {}: {}", session_path, e))?;
+        conn.execute(&sql, params.as_slice()).map_err(|e| {
+            format!("Failed to bulk insert message entries for {session_path}: {e}")
+        })?;
     }
 
     debug!(

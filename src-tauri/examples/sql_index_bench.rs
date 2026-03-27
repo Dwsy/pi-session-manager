@@ -111,7 +111,8 @@ fn parse_args() -> Result<BenchArgs, Box<dyn std::error::Error>> {
         }
     }
 
-    if args.runs == 0 || args.sessions == 0 || args.messages_per_session == 0 || args.page_size == 0 {
+    if args.runs == 0 || args.sessions == 0 || args.messages_per_session == 0 || args.page_size == 0
+    {
         return Err(boxed_error("all numeric benchmark arguments must be > 0"));
     }
 
