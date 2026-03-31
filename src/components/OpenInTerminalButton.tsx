@@ -5,17 +5,20 @@ import { Terminal, Loader2 } from 'lucide-react'
 import type { SessionInfo } from '../types'
 import type { TerminalType } from './settings/types'
 import { getPlatformDefaults } from './settings/types'
+import { getCachedSettings } from '../utils/settingsApi'
 
 interface OpenInTerminalButtonProps {
   session: SessionInfo
   terminal?: TerminalType
   piPath?: string
   customCommand?: string
+  resumeCommand?: string
   size?: 'sm' | 'md' | 'lg'
-  variant?: 'default' | 'outline' | 'ghost'
+  variant?: 'default' | 'outline' | 'ghost' | 'secondary'
   className?: string
   label?: string
   showLabel?: boolean
+  showShortcut?: boolean
   onSuccess?: () => void
   onError?: (error: string) => void
   onWebResume?: () => void
@@ -24,14 +27,16 @@ interface OpenInTerminalButtonProps {
 
 export default function OpenInTerminalButton({
   session,
-  terminal = getPlatformDefaults().defaultTerminal,
-  piPath,
-  customCommand,
+  terminal: propTerminal,
+  piPath: propPiPath,
+  customCommand: propCustomCommand,
+  resumeCommand: propResumeCommand,
   size = 'sm',
   variant = 'ghost',
   className = '',
   label,
   showLabel = false,
+  showShortcut = false,
   onSuccess,
   onError,
   onWebResume,
@@ -39,6 +44,47 @@ export default function OpenInTerminalButton({
 }: OpenInTerminalButtonProps) {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
+
+  // Get latest settings from cache (fallback to props)
+  const getTerminal = () => {
+    try {
+      const settings = getCachedSettings()
+      return settings.terminal?.defaultTerminal || propTerminal || getPlatformDefaults().defaultTerminal
+    } catch {
+      return propTerminal || getPlatformDefaults().defaultTerminal
+    }
+  }
+
+  const getPiPath = () => {
+    try {
+      const settings = getCachedSettings()
+      return settings.terminal?.piCommandPath || propPiPath || 'pi'
+    } catch {
+      return propPiPath || 'pi'
+    }
+  }
+
+  const getCustomCommand = () => {
+    try {
+      const settings = getCachedSettings()
+      return settings.terminal?.customTerminalCommand || propCustomCommand || ''
+    } catch {
+      return propCustomCommand || ''
+    }
+  }
+
+  const getResumeCommand = () => {
+    try {
+      const settings = getCachedSettings()
+      console.log('[DEBUG] getCachedSettings terminal:', settings.terminal)
+      console.log('[DEBUG] resumeCommand:', settings.terminal?.resumeCommand)
+      console.log('[DEBUG] propResumeCommand:', propResumeCommand)
+      return settings.terminal?.resumeCommand || propResumeCommand || ''
+    } catch (e) {
+      console.error('[DEBUG] getResumeCommand error:', e)
+      return propResumeCommand || ''
+    }
+  }
 
   const sizeClasses = {
     sm: 'p-1.5',
@@ -56,6 +102,7 @@ export default function OpenInTerminalButton({
     default: 'bg-primary text-primary-foreground hover:bg-primary/90',
     outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
     ghost: 'text-muted-foreground hover:text-primary hover:bg-primary/10',
+    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
   }
 
   const handleOpenInTerminal = async (e?: React.MouseEvent) => {
@@ -70,11 +117,20 @@ export default function OpenInTerminalButton({
 
     setLoading(true)
     try {
+      const terminal = getTerminal()
+      const customCommand = getCustomCommand()
+      const piPath = getPiPath()
+      const resumeCommand = getResumeCommand()
+
+      console.log('[OpenInTerminal] Terminal:', terminal)
+      console.log('[OpenInTerminal] Resume command:', resumeCommand)
+
       await invoke('open_session_in_terminal', {
         path: session.path,
         cwd: session.cwd,
         terminal: terminal === 'custom' ? customCommand : terminal,
-        pi_path: piPath || null,
+        piPath: piPath || null,
+        resumeCommand: resumeCommand || null,
       })
       onSuccess?.()
     } catch (err) {
@@ -108,6 +164,11 @@ export default function OpenInTerminalButton({
             <span className="text-xs">
               {children || label || t('session.resume', '恢复')}
             </span>
+          )}
+          {showShortcut && (
+            <kbd className="ml-1 px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 text-[9px] font-mono">
+              ⌘R
+            </kbd>
           )}
         </>
       )}
