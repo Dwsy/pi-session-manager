@@ -6,6 +6,7 @@ interface Shortcuts {
 
 interface UseKeyboardShortcutsOptions {
   shouldHandleEvent?: (event: KeyboardEvent) => boolean
+  allowInTextEntry?: string[]
 }
 
 export const isTextEntryTarget = (target: EventTarget | null): boolean => {
@@ -26,8 +27,8 @@ export const isTextEntryTarget = (target: EventTarget | null): boolean => {
 export function useKeyboardShortcuts(shortcuts: Shortcuts, options?: UseKeyboardShortcutsOptions) {
   // Use ref to store shortcuts, avoid rebinding events on every render
   const shortcutsRef = useRef(shortcuts)
-
   const shouldHandleEventRef = useRef(options?.shouldHandleEvent)
+  const allowInTextEntryRef = useRef(new Set(options?.allowInTextEntry ?? []))
 
   // Update shortcuts in ref
   useEffect(() => {
@@ -39,20 +40,24 @@ export function useKeyboardShortcuts(shortcuts: Shortcuts, options?: UseKeyboard
   }, [options?.shouldHandleEvent])
 
   useEffect(() => {
+    allowInTextEntryRef.current = new Set(options?.allowInTextEntry ?? [])
+  }, [options?.allowInTextEntry])
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) {
         return
       }
 
-      if (isTextEntryTarget(e.target)) {
+      const key = `${e.metaKey || e.ctrlKey ? 'cmd+' : ''}${e.altKey ? 'alt+' : ''}${e.shiftKey ? 'shift+' : ''}${e.key.toLowerCase()}`
+
+      if (isTextEntryTarget(e.target) && !allowInTextEntryRef.current.has(key)) {
         return
       }
 
       if (shouldHandleEventRef.current && !shouldHandleEventRef.current(e)) {
         return
       }
-
-      const key = `${e.metaKey || e.ctrlKey ? 'cmd+' : ''}${e.altKey ? 'alt+' : ''}${e.shiftKey ? 'shift+' : ''}${e.key.toLowerCase()}`
 
       // Get latest shortcuts from ref
       const handler = shortcutsRef.current[key]
