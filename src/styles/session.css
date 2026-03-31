@@ -770,34 +770,68 @@
    background: var(--bg-inset-hover);
  }
 
+ .compaction-header {
+   display: flex;
+   flex-direction: column;
+   gap: 4px;
+ }
+
  .compaction-label {
    font-size: 11px;
    font-weight: 600;
    color: var(--borderAccent);
    text-transform: uppercase;
    letter-spacing: 0.5px;
-   margin-bottom: 4px;
  }
 
  .compaction-collapsed {
    font-size: 12px;
    color: rgb(var(--color-muted-foreground));
+   cursor: pointer;
  }
 
  .compaction-content {
    display: none;
    font-size: 12px;
    color: var(--text-secondary);
-   margin-top: 8px;
+   margin-top: 12px;
    line-height: 1.5;
  }
 
  .compaction-content-header {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
    font-weight: 600;
    margin-bottom: 8px;
+   gap: 8px;
  }
 
- .compaction.expanded .compaction-collapsed {
+ .compaction-copy-button {
+   display: inline-flex;
+   align-items: center;
+   gap: 4px;
+   padding: 4px 8px;
+   font-size: 11px;
+   color: var(--text-secondary);
+   background: transparent;
+   border: 1px solid rgba(var(--accent-rgb), 0.2);
+   border-radius: 4px;
+   cursor: pointer;
+   transition: all 0.2s ease;
+   white-space: nowrap;
+ }
+
+ .compaction-copy-button:hover {
+   background: var(--bg-inset-hover);
+   border-color: rgba(var(--accent-rgb), 0.4);
+ }
+
+ .compaction-copy-text {
+   font-size: 11px;
+ }
+
+ .compaction.expanded .compaction-header {
    display: none;
  }
 
