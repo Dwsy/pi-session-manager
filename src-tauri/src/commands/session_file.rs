@@ -4,6 +4,7 @@ use std::cmp;
 use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
+use std::path::Path;
 
 use crate::{config, sqlite_cache};
 
@@ -297,7 +298,11 @@ fn build_session_info_line(new_name: &str) -> Result<String, String> {
     serde_json::to_string(&session_info).map_err(|e| format!("Failed to serialize: {e}"))
 }
 
-pub(super) async fn rename_session_impl(path: String, new_name: String) -> Result<(), String> {
+async fn rename_session_impl_with_db_path(
+    path: String,
+    new_name: String,
+    db_path: Option<&Path>,
+) -> Result<(), String> {
     let content =
         fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
@@ -310,7 +315,10 @@ pub(super) async fn rename_session_impl(path: String, new_name: String) -> Resul
 
     // Sync update to database cache to avoid waiting for file watcher
     let config = config::load_config().map_err(|e| format!("Failed to load config: {e}"))?;
-    let conn = sqlite_cache::init_db_with_config(&config)?;
+    let conn = match db_path {
+        Some(db_path) => sqlite_cache::init_db_with_path(db_path, &config)?,
+        None => sqlite_cache::init_db_with_config(&config)?,
+    };
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
         "UPDATE sessions SET name = ?1, modified = ?2 WHERE path = ?3",
@@ -319,6 +327,10 @@ pub(super) async fn rename_session_impl(path: String, new_name: String) -> Resul
     .map_err(|e| format!("Failed to update session name in cache: {e}"))?;
 
     Ok(())
+}
+
+pub(super) async fn rename_session_impl(path: String, new_name: String) -> Result<(), String> {
+    rename_session_impl_with_db_path(path, new_name, None).await
 }
 
 pub async fn fork_session_impl(
@@ -430,7 +442,7 @@ pub async fn fork_session_impl(
 mod tests {
     use super::{
         read_session_file_chunk_impl, read_session_file_incremental_impl,
-        read_session_file_incremental_offset_impl, rename_session_impl, utf8_safe_cut,
+        read_session_file_incremental_offset_impl, rename_session_impl_with_db_path, utf8_safe_cut,
     };
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -534,15 +546,17 @@ mod tests {
         fs::create_dir_all(&base_dir).expect("create temp dir");
 
         let path = base_dir.join("session.jsonl");
+        let db_path = base_dir.join("test.db");
         fs::write(
             &path,
             "{\"type\":\"session_info\",\"name\":\"old\"}\n{\"type\":\"message\",\"id\":\"m1\"}\n",
         )
         .expect("write session content");
 
-        rename_session_impl(
+        rename_session_impl_with_db_path(
             path.to_str().expect("path utf8").to_string(),
             "new-name".to_string(),
+            Some(&db_path),
         )
         .await
         .expect("rename should succeed");
@@ -566,11 +580,13 @@ mod tests {
         fs::create_dir_all(&base_dir).expect("create temp dir");
 
         let path = base_dir.join("session.jsonl");
+        let db_path = base_dir.join("test.db");
         fs::write(&path, "{\"type\":\"message\",\"id\":\"m1\"}\n").expect("write session content");
 
-        rename_session_impl(
+        rename_session_impl_with_db_path(
             path.to_str().expect("path utf8").to_string(),
             "added-name".to_string(),
+            Some(&db_path),
         )
         .await
         .expect("rename should succeed");
