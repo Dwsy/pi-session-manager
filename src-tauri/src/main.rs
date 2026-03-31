@@ -2,6 +2,79 @@
 
 use tauri::{Listener, Manager};
 
+const DEFAULT_WINDOW_WIDTH: f64 = 1400.0;
+const DEFAULT_WINDOW_HEIGHT: f64 = 900.0;
+const DEFAULT_MIN_WINDOW_WIDTH: f64 = 1000.0;
+const DEFAULT_MIN_WINDOW_HEIGHT: f64 = 600.0;
+
+fn clamp_window_dimensions(
+    available_width: f64,
+    available_height: f64,
+) -> ((f64, f64), (f64, f64)) {
+    let initial_width = DEFAULT_WINDOW_WIDTH.min(available_width).max(1.0);
+    let initial_height = DEFAULT_WINDOW_HEIGHT.min(available_height).max(1.0);
+    let min_width = DEFAULT_MIN_WINDOW_WIDTH.min(initial_width);
+    let min_height = DEFAULT_MIN_WINDOW_HEIGHT.min(initial_height);
+
+    ((initial_width, initial_height), (min_width, min_height))
+}
+
+fn resolve_window_dimensions(monitor: Option<&tauri::Monitor>) -> ((f64, f64), (f64, f64)) {
+    monitor.map_or(
+        (
+            (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT),
+            (DEFAULT_MIN_WINDOW_WIDTH, DEFAULT_MIN_WINDOW_HEIGHT),
+        ),
+        |monitor| {
+            let work_area = monitor.work_area();
+            let scale_factor = monitor.scale_factor();
+
+            clamp_window_dimensions(
+                f64::from(work_area.size.width) / scale_factor,
+                f64::from(work_area.size.height) / scale_factor,
+            )
+        },
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{clamp_window_dimensions, DEFAULT_MIN_WINDOW_HEIGHT, DEFAULT_MIN_WINDOW_WIDTH};
+
+    #[test]
+    fn test_clamp_window_dimensions_preserves_default_size_on_large_screens() {
+        let ((initial_width, initial_height), (min_width, min_height)) =
+            clamp_window_dimensions(1728.0, 1117.0);
+
+        assert_eq!(initial_width, 1400.0);
+        assert_eq!(initial_height, 900.0);
+        assert_eq!(min_width, DEFAULT_MIN_WINDOW_WIDTH);
+        assert_eq!(min_height, DEFAULT_MIN_WINDOW_HEIGHT);
+    }
+
+    #[test]
+    fn test_clamp_window_dimensions_shrinks_to_fit_smaller_work_areas() {
+        let ((initial_width, initial_height), (min_width, min_height)) =
+            clamp_window_dimensions(1352.0, 820.0);
+
+        assert_eq!(initial_width, 1352.0);
+        assert_eq!(initial_height, 820.0);
+        assert_eq!(min_width, DEFAULT_MIN_WINDOW_WIDTH);
+        assert_eq!(min_height, 600.0);
+    }
+
+    #[test]
+    fn test_clamp_window_dimensions_caps_minimum_size_to_available_space() {
+        let ((initial_width, initial_height), (min_width, min_height)) =
+            clamp_window_dimensions(920.0, 560.0);
+
+        assert_eq!(initial_width, 920.0);
+        assert_eq!(initial_height, 560.0);
+        assert_eq!(min_width, 920.0);
+        assert_eq!(min_height, 560.0);
+    }
+}
+
 #[derive(Debug, Default)]
 struct MainCliArgs {
     show_help: bool,
@@ -368,14 +441,27 @@ fn main() {
                 }
                 log::info!("{info}");
             } else {
+                let monitor = match app.primary_monitor() {
+                    Ok(monitor) => monitor,
+                    Err(error) => {
+                        log::warn!(
+                            "Failed to read primary monitor for initial window sizing: {error}"
+                        );
+                        None
+                    }
+                };
+                let ((initial_width, initial_height), (min_width, min_height)) =
+                    resolve_window_dimensions(monitor.as_ref());
+
                 let builder = tauri::WebviewWindowBuilder::new(
                     app,
                     "main",
                     tauri::WebviewUrl::App("index.html".into()),
                 )
                 .title("Pi Session Manager")
-                .inner_size(1400.0, 900.0)
-                .min_inner_size(1000.0, 600.0)
+                .inner_size(initial_width, initial_height)
+                .min_inner_size(min_width, min_height)
+                .center()
                 .resizable(true)
                 .fullscreen(false);
 
