@@ -27,7 +27,7 @@ pub mod types;
 #[path = "sqlite_cache/util.rs"]
 mod util;
 
-pub use bootstrap::{get_db_path, init_db, init_db_with_config};
+pub use bootstrap::{get_db_path, init_db, init_db_with_config, init_db_with_path};
 pub use details_cache::{get_session_details_cache, upsert_session_details_cache};
 pub use favorites::{
     add_favorite, get_all_favorites, is_favorite, remove_favorite, toggle_favorite,
