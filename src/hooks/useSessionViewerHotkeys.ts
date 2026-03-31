@@ -56,7 +56,12 @@ export function useSessionViewerHotkeys({
         event.preventDefault()
         event.stopPropagation()
         if (cmdFBehavior === 'inSessionSearch') {
-          onOpenSearch()
+          // Toggle: close if open, open if closed
+          if (isSearchOpen) {
+            onCloseSearch()
+          } else {
+            onOpenSearch()
+          }
         } else {
           onToggleSidebar()
         }
