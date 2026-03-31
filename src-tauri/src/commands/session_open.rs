@@ -34,6 +34,19 @@ fn build_unix_resume_command(cwd: &str, path: &str, pi_cmd: &str) -> String {
     )
 }
 
+/// Build resume command, using custom template if provided
+fn build_resume_command(cwd: &str, path: &str, pi_cmd: &str, custom_template: Option<&str>) -> String {
+    match custom_template {
+        Some(template) if !template.trim().is_empty() => {
+            template
+                .replace("{cwd}", cwd)
+                .replace("{path}", path)
+                .replace("{pi}", pi_cmd)
+        }
+        _ => build_unix_resume_command(cwd, path, pi_cmd),
+    }
+}
+
 fn build_windows_cmd_resume_command(cwd: &str, path: &str, pi_cmd: &str) -> String {
     format!(
         "cd /d {} && {} --session {}",
@@ -125,7 +138,7 @@ fn is_known_external_terminal(terminal_id: &str) -> bool {
     {
         matches!(
             terminal_id,
-            "iterm2" | "terminal" | "vscode" | "wezterm" | "kitty" | "alacritty"
+            "iterm2" | "terminal" | "vscode" | "wezterm" | "kitty" | "alacritty" | "tmux"
         )
     }
 
@@ -217,14 +230,17 @@ fn has_custom_terminal_placeholder(template: &str) -> bool {
 #[cfg(target_os = "windows")]
 fn render_custom_terminal_command(template: &str, cwd: &str, path: &str, pi_cmd: &str) -> String {
     let resume_cmd = build_windows_cmd_resume_command(cwd, path, pi_cmd);
-    let has_placeholder = has_custom_terminal_placeholder(template);
+    let has_any_placeholder = has_custom_terminal_placeholder(template);
     let mut rendered = template
         .replace("{command}", &resume_cmd)
-        .replace("{cwd}", &cmd_double_quote(cwd))
-        .replace("{path}", &cmd_double_quote(path))
-        .replace("{pi}", &cmd_double_quote(pi_cmd));
+        // Direct replacement, user controls quoting in their template
+        .replace("{cwd}", cwd)
+        .replace("{path}", path)
+        .replace("{pi}", pi_cmd);
 
-    if !has_placeholder {
+    // Only append resume command if user didn't use any placeholder
+    // Using any placeholder means user has already embedded the command logic
+    if !has_any_placeholder {
         rendered = format!("{rendered} cmd /K {}", cmd_double_quote(&resume_cmd));
     }
 
@@ -234,18 +250,51 @@ fn render_custom_terminal_command(template: &str, cwd: &str, path: &str, pi_cmd:
 #[cfg(not(target_os = "windows"))]
 fn render_custom_terminal_command(template: &str, cwd: &str, path: &str, pi_cmd: &str) -> String {
     let resume_cmd = build_unix_resume_command(cwd, path, pi_cmd);
-    let has_placeholder = has_custom_terminal_placeholder(template);
+    let has_any_placeholder = has_custom_terminal_placeholder(template);
     let mut rendered = template
         .replace("{command}", &resume_cmd)
-        .replace("{cwd}", &shell_single_quote(cwd))
-        .replace("{path}", &shell_single_quote(path))
-        .replace("{pi}", &shell_single_quote(pi_cmd));
+        // Direct replacement, user controls quoting in their template
+        .replace("{cwd}", cwd)
+        .replace("{path}", path)
+        .replace("{pi}", pi_cmd);
 
-    if !has_placeholder {
+    // Only append resume command if user didn't use any placeholder
+    // Using any placeholder means user has already embedded the command logic
+    if !has_any_placeholder {
         rendered = format!("{rendered} sh -lc {}", shell_single_quote(&resume_cmd));
     }
 
     rendered
+}
+
+#[cfg(target_os = "macos")]
+fn launch_via_osascript(app_name: &str, command: &str, _cwd: &str) -> Result<(), String> {
+    if !macos_app_exists(app_name) {
+        return Err(format!("{} is not installed", app_name));
+    }
+
+    let script = if app_name == "iTerm" {
+        format!(
+            r#"tell application "iTerm"
+    activate
+    set newWindow to (create window with default profile)
+    tell current session of newWindow
+        write text "{}"
+    end tell
+end tell"#,
+            escape_double_quoted(command)
+        )
+    } else {
+        format!(
+            r#"tell application "Terminal"
+    activate
+    do script "{}"
+end tell"#,
+            escape_double_quoted(command)
+        )
+    };
+
+    run_osascript(&script)
 }
 
 fn try_launch_custom_terminal(
@@ -260,6 +309,23 @@ fn try_launch_custom_terminal(
     }
 
     let rendered = render_custom_terminal_command(template, cwd, path, pi_cmd);
+    log::info!("[Terminal] Template: {}", template);
+    log::info!("[Terminal] CWD: {}", cwd);
+    log::info!("[Terminal] Path: {}", path);
+    log::info!("[Terminal] Pi: {}", pi_cmd);
+    log::info!("[Terminal] Rendered command: {}", rendered);
+
+    // Check if it's a known terminal name - use osascript for PTY support
+    #[cfg(target_os = "macos")]
+    {
+        let template_lower = template.to_lowercase();
+        if template_lower == "iterm2" || template_lower == "iterm" {
+            return launch_via_osascript("iTerm", &rendered, cwd);
+        }
+        if template_lower == "terminal" || template_lower == "terminal.app" {
+            return launch_via_osascript("Terminal", &rendered, cwd);
+        }
+    }
 
     #[cfg(target_os = "windows")]
     {
@@ -325,8 +391,12 @@ fn try_launch_known_terminal_macos(
     cwd: &str,
     path: &str,
     pi_cmd: &str,
+    resume_command: Option<&str>,
 ) -> Result<bool, String> {
-    let resume_cmd = build_unix_resume_command(cwd, path, pi_cmd);
+    let resume_cmd = build_resume_command(cwd, path, pi_cmd, resume_command);
+    log::info!("[Terminal macOS] terminal_id: {}", terminal_id);
+    log::info!("[Terminal macOS] resume_command input: {:?}", resume_command);
+    log::info!("[Terminal macOS] resume_cmd built: {}", resume_cmd);
     match terminal_id {
         "iterm2" => {
             if !macos_app_exists("iTerm") {
@@ -417,6 +487,41 @@ end tell"#,
             spawn_command(&mut command, "VS Code")?;
             Ok(true)
         }
+        "tmux" => {
+            // tmux needs a real terminal - use Terminal.app or iTerm2 via osascript
+            let tmux_session = "pi";
+            let tmux_cmd = format!(
+                "/opt/homebrew/bin/tmux has-session -t {tmux_session} 2>/dev/null || /opt/homebrew/bin/tmux new-session -d -s {tmux_session} -c '{}'; /opt/homebrew/bin/tmux send-keys -t {tmux_session} \"{}\" Enter; /opt/homebrew/bin/tmux attach -t {tmux_session}",
+                escape_double_quoted(cwd),
+                escape_double_quoted(&resume_cmd)
+            );
+
+            // Try iTerm first, then Terminal.app
+            if macos_app_exists("iTerm") {
+                let script = format!(
+                    r#"tell application "iTerm"
+    activate
+    set newWindow to (create window with default profile)
+    tell current session of newWindow
+        write text "{}"
+    end tell
+end tell"#,
+                    escape_double_quoted(&tmux_cmd)
+                );
+                run_osascript(&script).map(|_| true)
+            } else if macos_app_exists("Terminal") {
+                let script = format!(
+                    r#"tell application "Terminal"
+    activate
+    do script "{}"
+end tell"#,
+                    escape_double_quoted(&tmux_cmd)
+                );
+                run_osascript(&script).map(|_| true)
+            } else {
+                Ok(false)
+            }
+        }
         _ => Ok(false),
     }
 }
@@ -427,9 +532,21 @@ fn try_launch_known_terminal_windows(
     cwd: &str,
     path: &str,
     pi_cmd: &str,
+    resume_command: Option<&str>,
 ) -> Result<bool, String> {
-    let cmd_resume = build_windows_cmd_resume_command(cwd, path, pi_cmd);
-    let ps_resume = build_windows_powershell_resume_command(cwd, path, pi_cmd);
+    // For custom resume command, use it directly with cmd
+    let cmd_resume = match resume_command {
+        Some(template) if !template.trim().is_empty() => {
+            template.replace("{cwd}", cwd).replace("{path}", path).replace("{pi}", pi_cmd)
+        }
+        _ => build_windows_cmd_resume_command(cwd, path, pi_cmd),
+    };
+    let ps_resume = match resume_command {
+        Some(template) if !template.trim().is_empty() => {
+            template.replace("{cwd}", cwd).replace("{path}", path).replace("{pi}", pi_cmd)
+        }
+        _ => build_windows_powershell_resume_command(cwd, path, pi_cmd),
+    };
     match terminal_id {
         "windows-terminal" => {
             if !command_exists("wt") {
@@ -503,8 +620,9 @@ fn try_launch_known_terminal_linux(
     cwd: &str,
     path: &str,
     pi_cmd: &str,
+    resume_command: Option<&str>,
 ) -> Result<bool, String> {
-    let resume_cmd = build_unix_resume_command(cwd, path, pi_cmd);
+    let resume_cmd = build_resume_command(cwd, path, pi_cmd, resume_command);
     match terminal_id {
         "gnome-terminal" => {
             if !command_exists("gnome-terminal") {
@@ -693,20 +811,21 @@ fn try_launch_known_terminal(
     cwd: &str,
     path: &str,
     pi_cmd: &str,
+    resume_command: Option<&str>,
 ) -> Result<bool, String> {
     #[cfg(target_os = "macos")]
     {
-        try_launch_known_terminal_macos(terminal_id, cwd, path, pi_cmd)
+        try_launch_known_terminal_macos(terminal_id, cwd, path, pi_cmd, resume_command)
     }
 
     #[cfg(target_os = "windows")]
     {
-        return try_launch_known_terminal_windows(terminal_id, cwd, path, pi_cmd);
+        return try_launch_known_terminal_windows(terminal_id, cwd, path, pi_cmd, resume_command);
     }
 
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
     {
-        try_launch_known_terminal_linux(terminal_id, cwd, path, pi_cmd)
+        try_launch_known_terminal_linux(terminal_id, cwd, path, pi_cmd, resume_command)
     }
 }
 
@@ -715,6 +834,7 @@ pub(super) async fn open_session_in_terminal_impl(
     cwd: String,
     terminal: Option<String>,
     pi_path: Option<String>,
+    resume_command: Option<String>,
 ) -> Result<(), String> {
     if !Path::new(&path).is_file() {
         return Err(format!("Session file does not exist: {path}"));
@@ -732,6 +852,16 @@ pub(super) async fn open_session_in_terminal_impl(
         .filter(|value| !value.is_empty())
         .unwrap_or("pi")
         .to_string();
+    let resume_cmd = resume_command
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+
+    log::info!("[Terminal] Terminal: {}", requested_terminal);
+    log::info!("[Terminal] CWD: {}", resolved_cwd);
+    log::info!("[Terminal] Path: {}", path);
+    log::info!("[Terminal] Pi: {}", pi_cmd);
+    log::info!("[Terminal] Resume command: {:?}", resume_cmd);
 
     let mut attempts: Vec<String> = Vec::new();
     let try_custom_first =
@@ -745,7 +875,7 @@ pub(super) async fn open_session_in_terminal_impl(
     }
 
     for terminal_id in build_terminal_attempt_order(requested_terminal) {
-        match try_launch_known_terminal(&terminal_id, &resolved_cwd, &path, &pi_cmd) {
+        match try_launch_known_terminal(&terminal_id, &resolved_cwd, &path, &pi_cmd, resume_cmd) {
             Ok(true) => return Ok(()),
             Ok(false) => attempts.push(format!("{terminal_id}: not installed")),
             Err(error) => attempts.push(format!("{terminal_id}: {error}")),
