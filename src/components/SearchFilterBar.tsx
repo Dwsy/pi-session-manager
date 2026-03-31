@@ -48,10 +48,18 @@ export default function SearchFilterBar({
 
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
         const active = document.activeElement
-        if (active?.tagName !== 'INPUT' && active?.tagName !== 'TEXTAREA') {
-          e.preventDefault()
+        const isInputFocused = active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA'
+
+        e.preventDefault()
+
+        if (isInputFocused && active === inputRef.current) {
+          // Already focused on search input - blur to close
+          inputRef.current?.blur()
+        } else if (!isInputFocused) {
+          // Focus search input
           inputRef.current?.focus()
         }
+        // If focused on other input, do nothing (let that input handle it)
       }
     }
     document.addEventListener('keydown', handler)
