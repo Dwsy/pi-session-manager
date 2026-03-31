@@ -74,25 +74,26 @@ pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
 fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, String> {
     let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
 
-    // Enable WAL mode for better concurrency and reliability
-    conn.prepare("PRAGMA journal_mode=WAL;")
-        .map_err(|e| format!("Failed to set WAL mode: {e}"))?
-        .query_row([], |_| Ok(()))
-        .map_err(|e| format!("Failed to set WAL mode: {e}"))?;
+    let init_result = (|| -> Result<(), String> {
+        // Enable WAL mode for better concurrency and reliability
+        conn.prepare("PRAGMA journal_mode=WAL;")
+            .map_err(|e| format!("Failed to set WAL mode: {e}"))?
+            .query_row([], |_| Ok(()))
+            .map_err(|e| format!("Failed to set WAL mode: {e}"))?;
 
-    // Set synchronous mode (does not return a result row)
-    conn.execute("PRAGMA synchronous=NORMAL;", [])
-        .map_err(|e| format!("Failed to set synchronous mode: {e}"))?;
+        // Set synchronous mode (does not return a result row)
+        conn.execute("PRAGMA synchronous=NORMAL;", [])
+            .map_err(|e| format!("Failed to set synchronous mode: {e}"))?;
 
-    // Enable foreign key constraints
-    conn.execute("PRAGMA foreign_keys=ON;", [])
-        .map_err(|e| format!("Failed to enable foreign keys: {e}"))?;
+        // Enable foreign key constraints
+        conn.execute("PRAGMA foreign_keys=ON;", [])
+            .map_err(|e| format!("Failed to enable foreign keys: {e}"))?;
 
-    // Ensure schema_version table exists for migrations
-    ensure_schema_version_table(&conn)?;
+        // Ensure schema_version table exists for migrations
+        ensure_schema_version_table(&conn)?;
 
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS sessions (
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS sessions (
             id TEXT PRIMARY KEY,
             path TEXT NOT NULL UNIQUE,
             cwd TEXT NOT NULL,
@@ -111,12 +112,12 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             access_count INTEGER DEFAULT 0,
             last_accessed TEXT
         )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create table: {e}"))?;
+            [],
+        )
+        .map_err(|e| format!("Failed to create table: {e}"))?;
 
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS session_details_cache (
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS session_details_cache (
             path TEXT PRIMARY KEY,
             file_modified TEXT NOT NULL,
             user_messages INTEGER NOT NULL,
@@ -132,12 +133,12 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             models_json TEXT NOT NULL,
             model_usage_json TEXT NOT NULL DEFAULT '{}'
         )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create table session_details_cache: {e}"))?;
+            [],
+        )
+        .map_err(|e| format!("Failed to create table session_details_cache: {e}"))?;
 
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS subagent_meta_cache (
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS subagent_meta_cache (
             path TEXT PRIMARY KEY,
             file_modified TEXT NOT NULL,
             run_id TEXT NOT NULL,
@@ -153,41 +154,41 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             tool_count INTEGER NOT NULL,
             timestamp INTEGER NOT NULL
         )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create table subagent_meta_cache: {e}"))?;
+            [],
+        )
+        .map_err(|e| format!("Failed to create table subagent_meta_cache: {e}"))?;
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_modified ON sessions(modified DESC)",
-        [],
-    )
-    .map_err(|e| format!("Failed to create index idx_modified: {e}"))?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_modified ON sessions(modified DESC)",
+            [],
+        )
+        .map_err(|e| format!("Failed to create index idx_modified: {e}"))?;
 
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_cwd ON sessions(cwd)", [])
-        .map_err(|e| format!("Failed to create index idx_cwd: {e}"))?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_cwd ON sessions(cwd)", [])
+            .map_err(|e| format!("Failed to create index idx_cwd: {e}"))?;
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_file_modified ON sessions(file_modified)",
-        [],
-    )
-    .map_err(|e| format!("Failed to create index idx_file_modified: {e}"))?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_file_modified ON sessions(file_modified)",
+            [],
+        )
+        .map_err(|e| format!("Failed to create index idx_file_modified: {e}"))?;
 
-    // Create favorites table
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS favorites (
+        // Create favorites table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS favorites (
             id TEXT PRIMARY KEY,
             type TEXT NOT NULL CHECK(type IN ('session', 'project')),
             name TEXT NOT NULL,
             path TEXT NOT NULL,
             added_at TEXT NOT NULL
         )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create favorites table: {e}"))?;
+            [],
+        )
+        .map_err(|e| format!("Failed to create favorites table: {e}"))?;
 
-    // Create tags table
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS tags (
+        // Create tags table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS tags (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             color TEXT NOT NULL DEFAULT 'info',
@@ -196,64 +197,64 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             is_builtin INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create tags table: {e}"))?;
+            [],
+        )
+        .map_err(|e| format!("Failed to create tags table: {e}"))?;
 
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS session_tags (
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS session_tags (
             session_id TEXT NOT NULL,
             tag_id TEXT NOT NULL,
             position INTEGER NOT NULL DEFAULT 0,
             assigned_at TEXT NOT NULL,
             PRIMARY KEY (session_id, tag_id)
         )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create session_tags table: {e}"))?;
+            [],
+        )
+        .map_err(|e| format!("Failed to create session_tags table: {e}"))?;
 
-    // Insert builtin tags based on system language
-    let now = Utc::now().to_rfc3339();
+        // Insert builtin tags based on system language
+        let now = Utc::now().to_rfc3339();
 
-    // Detect system language
-    let is_chinese = std::env::var("LANG")
-        .or_else(|_| std::env::var("LC_ALL"))
-        .or_else(|_| std::env::var("LC_MESSAGES"))
-        .map(|lang| lang.to_lowercase().contains("zh") || lang.to_lowercase().contains("cn"))
-        .unwrap_or(false);
+        // Detect system language
+        let is_chinese = std::env::var("LANG")
+            .or_else(|_| std::env::var("LC_ALL"))
+            .or_else(|_| std::env::var("LC_MESSAGES"))
+            .map(|lang| lang.to_lowercase().contains("zh") || lang.to_lowercase().contains("cn"))
+            .unwrap_or(false);
 
-    let builtins = if is_chinese {
-        // Chinese labels
-        [
-            ("builtin-todo", "待处理", "warning", 0),
-            ("builtin-wip", "进行中", "info", 1),
-            ("builtin-done", "已完成", "success", 2),
-            ("builtin-important", "重要", "destructive", 3),
-            ("builtin-archive", "归档", "slate", 4),
-        ]
-    } else {
-        // English labels
-        [
-            ("builtin-todo", "To Do", "warning", 0),
-            ("builtin-wip", "In Progress", "info", 1),
-            ("builtin-done", "Done", "success", 2),
-            ("builtin-important", "Important", "destructive", 3),
-            ("builtin-archive", "Archive", "slate", 4),
-        ]
-    };
+        let builtins = if is_chinese {
+            // Chinese labels
+            [
+                ("builtin-todo", "待处理", "warning", 0),
+                ("builtin-wip", "进行中", "info", 1),
+                ("builtin-done", "已完成", "success", 2),
+                ("builtin-important", "重要", "destructive", 3),
+                ("builtin-archive", "归档", "slate", 4),
+            ]
+        } else {
+            // English labels
+            [
+                ("builtin-todo", "To Do", "warning", 0),
+                ("builtin-wip", "In Progress", "info", 1),
+                ("builtin-done", "Done", "success", 2),
+                ("builtin-important", "Important", "destructive", 3),
+                ("builtin-archive", "Archive", "slate", 4),
+            ]
+        };
 
-    for (id, name, color, order) in &builtins {
-        conn.execute(
+        for (id, name, color, order) in &builtins {
+            conn.execute(
             "INSERT OR IGNORE INTO tags (id, name, color, sort_order, is_builtin, created_at) VALUES (?1, ?2, ?3, ?4, 1, ?5)",
             params![id, name, color, order, now],
         ).ok();
-    }
+        }
 
-    // Create message_entries table for fresh installs.
-    // Existing databases may still be on the old schema, so defer new-column index creation
-    // until after versioned migrations and schema reconciliation complete.
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS message_entries (
+        // Create message_entries table for fresh installs.
+        // Existing databases may still be on the old schema, so defer new-column index creation
+        // until after versioned migrations and schema reconciliation complete.
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS message_entries (
             id TEXT PRIMARY KEY,
             entry_id TEXT NOT NULL,
             session_path TEXT NOT NULL,
@@ -263,37 +264,51 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
         )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create message_entries table: {e}"))?;
+            [],
+        )
+        .map_err(|e| format!("Failed to create message_entries table: {e}"))?;
 
-    // Apply versioned schema migrations if needed
-    let current_version = get_current_version(&conn)?;
-    if current_version < LATEST_SCHEMA_VERSION {
-        apply_migrations(&conn, current_version)?;
-    }
+        // Apply versioned schema migrations if needed
+        let current_version = get_current_version(&conn)?;
+        if current_version < LATEST_SCHEMA_VERSION {
+            apply_migrations(&conn, current_version)?;
+        }
 
-    conn.execute(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)",
         [],
     )
     .map_err(|e| format!("Failed to create index on message_entries: {e}"))?;
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id)",
-        [],
-    )
-    .map_err(|e| format!("Failed to create entry_id index on message_entries: {e}"))?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id)",
+            [],
+        )
+        .map_err(|e| format!("Failed to create entry_id index on message_entries: {e}"))?;
 
-    if config.enable_fts5 {
-        // init_fts5(&conn)?; // DISABLED: sessions_fts incompatible with sessions schema (TEXT PRIMARY KEY)
-        // Comprehensive schema check for message-level FTS only
-        ensure_message_fts_schema(&conn)?;
-    } else {
-        // FTS disabled: ensure no leftover triggers for both message-level and session-level
-        let _ = drop_message_entries_triggers(&conn);
-        let _ = drop_sessions_fts_triggers(&conn);
+        if config.enable_fts5 {
+            // init_fts5(&conn)?; // DISABLED: sessions_fts incompatible with sessions schema (TEXT PRIMARY KEY)
+            // Comprehensive schema check for message-level FTS only
+            ensure_message_fts_schema(&conn)?;
+        } else {
+            // FTS disabled: ensure no leftover triggers for both message-level and session-level
+            let _ = drop_message_entries_triggers(&conn);
+            let _ = drop_sessions_fts_triggers(&conn);
+        }
+
+        Ok(())
+    })();
+
+    match init_result {
+        Ok(()) => Ok(conn),
+        Err(error) => {
+            if let Err((_, close_error)) = conn.close() {
+                warn!(
+                    "Failed to close SQLite connection after initialization error: {}",
+                    close_error
+                );
+            }
+            Err(error)
+        }
     }
-
-    Ok(conn)
 }
