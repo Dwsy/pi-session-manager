@@ -46,7 +46,7 @@ export default function SearchFilterBar({
         return
       }
 
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
         const active = document.activeElement
         if (active?.tagName !== 'INPUT' && active?.tagName !== 'TEXTAREA') {
           e.preventDefault()

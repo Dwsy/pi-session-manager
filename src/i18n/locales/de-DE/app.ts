@@ -13,7 +13,7 @@ export const app = {
     exportHtml: 'Exportieren & öffnen (Cmd+E)',
     deleteSelected: 'Ausgewählte Sitzung(en) löschen (Cmd+Backspace)',
     projectView: 'Projektansicht (Cmd+P)',
-    searchAll: 'Seitenleiste Sitzungsbaum umschalten (Cmd+Shift+F)',
+    searchAll: 'Alle Sitzungen durchsuchen (Cmd+Shift+F)',
     search: 'In Sitzung suchen (Cmd+F)',
     settings: 'Einstellungen öffnen (Cmd+,)',
     close: 'Schließen (Esc)',

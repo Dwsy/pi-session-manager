@@ -25,6 +25,7 @@ import type { AppSettings, SettingsSection } from './types'
 import { defaultSettings } from './types'
 import { loadAppSettings, saveAppSettings } from '../../utils/settingsApi'
 import { applyPiChatTheme, resolvePiThemeColorScheme } from '../../utils/piTheme'
+import { useSettings as useAppSettingsContext } from '../../hooks/useSettings'
 import TerminalSettings from './sections/TerminalSettings'
 import AppearanceSettings from './sections/AppearanceSettings'
 import LanguageSettings from './sections/LanguageSettings'
@@ -46,6 +47,7 @@ interface SettingsPanelProps {
 
 export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const { t, i18n } = useTranslation()
+  const { reloadSettings } = useAppSettingsContext()
   const [activeSection, setActiveSection] = useState<SettingsSection>('terminal')
   const [settings, setSettings] = useState<AppSettings>(defaultSettings)
   const [loading, setLoading] = useState(false)
@@ -126,6 +128,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       root.style.setProperty('--spacing-base', spacingMap[messageSpacing] || '16px')
       if (codeBlockTheme) root.setAttribute('data-code-theme', codeBlockTheme)
       await applyPiChatTheme(theme === 'custom' ? customTheme : 'app-default')
+      await reloadSettings()
 
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)

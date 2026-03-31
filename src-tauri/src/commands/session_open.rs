@@ -701,7 +701,7 @@ fn try_launch_known_terminal(
 
     #[cfg(target_os = "windows")]
     {
-        return try_launch_known_terminal_windows(terminal_id, cwd, path, pi_cmd);
+        try_launch_known_terminal_windows(terminal_id, cwd, path, pi_cmd)
     }
 
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
