@@ -108,7 +108,7 @@ function App() {
     forkSession,
   } = useSessions();
 
-  const { terminal, piPath, customCommand, loadSettings } = useAppSettings();
+  const { terminal, piPath, customCommand, resumeCommand, loadSettings } = useAppSettings();
   const { handleExportSession } = useSessionActions();
   const { getBadgeType, clearBadge } = useSessionBadges(
     sessions,
@@ -252,7 +252,8 @@ function App() {
         path: selectedSession.path,
         cwd: selectedSession.cwd,
         terminal: terminal === "custom" ? customCommand : terminal,
-        pi_path: piPath || null,
+        piPath: piPath || null,
+        resumeCommand: resumeCommand || null,
       });
     } catch (err) {
       console.error("Failed to resume session:", err);
@@ -527,6 +528,7 @@ function App() {
       terminal={terminal}
       piPath={piPath}
       customCommand={customCommand}
+      resumeCommand={resumeCommand}
       getBadgeType={getBadgeType}
       favorites={favorites}
       onToggleFavorite={toggleFavorite}
@@ -551,6 +553,7 @@ function App() {
       terminal={terminal}
       piPath={piPath}
       customCommand={customCommand}
+      resumeCommand={resumeCommand}
       onCreateTag={createTag}
       projectFilter={selectedProject}
       filterTagIds={filterTagIds}
@@ -601,6 +604,7 @@ function App() {
       terminal={terminal}
       piPath={piPath}
       customCommand={customCommand}
+      resumeCommand={resumeCommand}
       initialEntryId={pendingScrollEntryId || undefined}
     />
   );
@@ -747,6 +751,7 @@ function App() {
       terminal={terminal}
       piPath={piPath}
       customCommand={customCommand}
+      resumeCommand={resumeCommand}
       getBadgeType={getBadgeType}
       listScrollRef={listScrollRef}
       sessionListCommonProps={sessionListCommonProps}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { useTranslation } from 'react-i18next'
 import {
@@ -73,6 +73,40 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  // Auto-save settings when they change (with debounce)
+  const settingsRef = useRef(settings)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => {
+    settingsRef.current = settings
+  }, [settings])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    // Clear any pending save
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+    }
+
+    // Debounce save by 500ms
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        await saveAppSettings(settingsRef.current)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 1500)
+      } catch (error) {
+        console.error('Auto-save failed:', error)
+      }
+    }, 500)
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+      }
+    }
+  }, [settings, isOpen])
 
   const loadSettings = async () => {
     setLoading(true)

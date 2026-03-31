@@ -37,6 +37,7 @@ interface KanbanBoardProps {
   terminal?: TerminalType
   piPath?: string
   customCommand?: string
+  resumeCommand?: string
   onCreateTag?: (name: string, color: string) => void
   projectFilter?: string | null // null = all projects
   filterTagIds?: string[]
@@ -67,6 +68,7 @@ export default function KanbanBoard({
   terminal,
   piPath,
   customCommand,
+  resumeCommand,
   projectFilter,
   filterTagIds = [],
   onFilterChange,
@@ -380,6 +382,7 @@ export default function KanbanBoard({
         terminal={terminal}
         piPath={piPath}
         customCommand={customCommand}
+        resumeCommand={resumeCommand}
         initialClickPoint={initialClickPoint}
         animationMode="origin-point"
       />

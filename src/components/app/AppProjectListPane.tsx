@@ -24,6 +24,7 @@ export type AppProjectListPaneSessionListCommonProps = Pick<
   | "terminal"
   | "piPath"
   | "customCommand"
+  | "resumeCommand"
   | "favorites"
   | "onToggleFavorite"
   | "tags"
@@ -57,6 +58,7 @@ export interface AppProjectListPaneProps {
   terminal?: ProjectListProps["terminal"];
   piPath?: ProjectListProps["piPath"];
   customCommand?: ProjectListProps["customCommand"];
+  resumeCommand?: ProjectListProps["resumeCommand"];
   getBadgeType?: SessionListProps["getBadgeType"];
   favorites: NonNullable<ProjectListProps["favorites"]>;
   onToggleFavorite: NonNullable<ProjectListProps["onToggleFavorite"]>;
@@ -85,6 +87,7 @@ function AppProjectListPane({
   terminal,
   piPath,
   customCommand,
+  resumeCommand,
   getBadgeType,
   favorites,
   onToggleFavorite,
@@ -124,6 +127,7 @@ function AppProjectListPane({
             terminal={terminal}
             piPath={piPath}
             customCommand={customCommand}
+            resumeCommand={resumeCommand}
             getBadgeType={getBadgeType}
             scrollParentRef={projectScrollRef}
             favorites={favorites}

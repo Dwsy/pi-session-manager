@@ -37,6 +37,7 @@ interface SessionListProps {
   terminal?: TerminalType;
   piPath?: string;
   customCommand?: string;
+  resumeCommand?: string;
   scrollParentRef?: RefObject<HTMLDivElement>;
   favorites?: FavoriteItem[];
   onToggleFavorite?: (item: Omit<FavoriteItem, "addedAt">) => void;
@@ -67,6 +68,7 @@ export default function SessionList({
   terminal = getPlatformDefaults().defaultTerminal,
   piPath,
   customCommand,
+  resumeCommand,
   scrollParentRef,
   favorites = [],
   onToggleFavorite,
@@ -849,6 +851,7 @@ export default function SessionList({
                                 terminal={terminal}
                                 piPath={piPath}
                                 customCommand={customCommand}
+                                resumeCommand={resumeCommand}
                                 size="sm"
                                 variant="ghost"
                                 onError={(error) =>
@@ -927,7 +930,8 @@ export default function SessionList({
                     path: contextMenuSession.path,
                     cwd: contextMenuSession.cwd,
                     terminal: terminal === "custom" ? customCommand : terminal,
-                    pi_path: piPath || null,
+                    piPath: piPath || null,
+                    resumeCommand: resumeCommand || null,
                   }).catch(console.error);
                 }
               : undefined

@@ -40,6 +40,7 @@ interface SessionViewerProps {
   terminal?: TerminalType;
   piPath?: string;
   customCommand?: string;
+  resumeCommand?: string;
   initialEntryId?: string;
 }
 
@@ -61,6 +62,7 @@ function SessionViewerContent({
   terminal = getPlatformDefaults().defaultTerminal,
   piPath,
   customCommand,
+  resumeCommand,
   initialEntryId,
 }: SessionViewerProps) {
   const { t } = useTranslation();
@@ -282,6 +284,7 @@ function SessionViewerContent({
                 terminal={terminal}
                 piPath={piPath}
                 customCommand={customCommand}
+                resumeCommand={resumeCommand}
                 size="sm"
                 variant="ghost"
                 label={t("session.resume", "恢复")}

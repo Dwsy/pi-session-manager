@@ -26,6 +26,7 @@ type AppKanbanPaneBaseProps = Pick<
   | "terminal"
   | "piPath"
   | "customCommand"
+  | "resumeCommand"
   | "onCreateTag"
   | "projectFilter"
   | "filterTagIds"
