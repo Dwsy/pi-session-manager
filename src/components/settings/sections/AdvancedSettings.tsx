@@ -201,7 +201,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
                   min="1024"
                   max="65535"
                   value={serverSettings.ws_port}
-                  onChange={(e) => updateServer('ws_port', parseInt(e.target.value) || 52130)}
+                  onChange={(e) => updateServer('ws_port', parseInt(e.target.value) || 52131)}  // Single-port: same as HTTP
                   className={`w-28 ${inputAccentClass}`}
                 />
               </SettingsField>

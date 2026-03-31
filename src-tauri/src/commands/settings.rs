@@ -27,7 +27,7 @@ impl Default for ServerSettings {
     fn default() -> Self {
         Self {
             ws_enabled: true,
-            ws_port: 52130,
+            ws_port: 52131, // Single-port architecture: same as HTTP port
             http_enabled: true,
             http_port: 52131,
             auth_enabled: true,

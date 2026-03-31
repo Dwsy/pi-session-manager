@@ -4,6 +4,19 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Unified single-port architecture for GUI mode**
+  - Changed default `ws_port` from `52130` to `52131` (same as `http_port`)
+  - GUI mode now uses HTTP `/ws` path instead of standalone WebSocket server
+  - Both GUI and CLI modes now share the same single-port architecture
+  - Updated default configurations in:
+    - `src-tauri/src/commands/settings.rs` (`ServerSettings::default()`)
+    - `src/components/settings/sections/AdvancedSettings.tsx`
+    - `src/components/Onboarding.tsx`
+  - Updated documentation: `README.md`, `AGENTS.md`
+  - Legacy `ws_adapter.rs` remains for backward compatibility but is no longer used by default
+
 ### Added
 
 - **Session viewer in-message search navigation**

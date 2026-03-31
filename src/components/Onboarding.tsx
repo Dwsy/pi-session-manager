@@ -42,7 +42,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const isMobile = useIsMobile()
   const [currentStep, setCurrentStep] = useState(0)
   const [serverSettings, setServerSettings] = useState<ServerSettings>({
-    ws_enabled: true, ws_port: 52130,
+    ws_enabled: true, ws_port: 52131,  // Single-port: same as HTTP
     http_enabled: true, http_port: 52131,
     auth_enabled: true,
     bind_addr: '127.0.0.1',

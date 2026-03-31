@@ -30,7 +30,7 @@ Pi Session Manager is built on a three-layer architecture: a React frontend, a R
 │  └─────────────────────────────────────────────────────────────┘   │
 ├───────────────────────────┬───────────────────┬─────────────────────┤
 │       Tauri IPC           │    WebSocket      │  HTTP + Embedded UI │
-│       (Desktop)           │   ws://:52130     │  http://:52131      │
+│       (Desktop)           │   http://:52131 (WS at /ws)            │
 └───────────────────────────┴───────────────────┴─────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────────────┐
@@ -111,8 +111,12 @@ All three protocols share a single command router — `dispatch()`:
 | Protocol | Address | Use Case |
 |----------|---------|----------|
 | Tauri IPC | `invoke()` | Desktop app (GUI mode only) |
-| WebSocket | `ws://127.0.0.1:52130` | Real-time bidirectional (browser) |
+| WebSocket | `ws://127.0.0.1:52131/ws` | Real-time bidirectional (browser) |
 | HTTP POST | `http://127.0.0.1:52131/api` | Stateless single calls (curl, integrations) |
+
+<Callout type="info">
+**Single-Port Architecture**: WebSocket is now served on the same port as HTTP via the `/ws` path, simplifying deployment and configuration.
+</Callout>
 
 Adding a new command requires only one `match` arm in `dispatch()`. WebSocket and HTTP inherit it automatically.
 

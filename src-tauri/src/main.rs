@@ -275,24 +275,21 @@ fn main() {
             app.manage(app_state.clone());
 
             // Initialize WebSocket adapter
-            if server_cfg.ws_enabled && !cli_mode {
-                let ws_state = app_state.clone();
-                let ws_port = server_cfg.ws_port;
-                let ws_bind = server_cfg.bind_addr.clone();
-                tauri::async_runtime::spawn(async move {
-                    if let Err(e) =
-                        pi_session_manager::ws_adapter::init_ws_adapter(ws_state, &ws_bind, ws_port)
-                            .await
-                    {
-                        eprintln!("Failed to init WebSocket adapter: {e}");
-                    }
-                });
-            } else if cli_mode && server_cfg.ws_enabled {
-                log::info!(
-                    "CLI mode uses HTTP /ws on {}:{} (ws_port is ignored)",
-                    server_cfg.bind_addr,
-                    server_cfg.http_port
-                );
+            // Single-port architecture: both GUI and CLI modes use HTTP /ws path
+            if server_cfg.ws_enabled {
+                if cli_mode {
+                    log::info!(
+                        "CLI mode uses HTTP /ws on {}:{} (unified single-port)",
+                        server_cfg.bind_addr,
+                        server_cfg.http_port
+                    );
+                } else {
+                    log::info!(
+                        "GUI mode uses HTTP /ws on {}:{} (unified single-port)",
+                        server_cfg.bind_addr,
+                        server_cfg.http_port
+                    );
+                }
             }
 
             // Initialize HTTP adapter

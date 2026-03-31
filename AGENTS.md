@@ -40,7 +40,7 @@ The repository also contains a documentation site (`website/`, Next.js + Fumadoc
 │   ├── src/lib.rs          # Module exports and command registration
 │   ├── src/dispatch.rs     # Protocol-agnostic command dispatch (core business routing)
 │   ├── src/http_adapter.rs # HTTP API + /ws + SSE + static asset serving
-│   ├── src/ws_adapter.rs   # Standalone WebSocket server (default: 52130)
+│   ├── src/ws_adapter.rs   # Standalone WebSocket server (legacy, now uses HTTP /ws path)
 │   ├── src/commands/       # Thin Tauri command layer (session/search/settings/tags/...)
 │   ├── src/scanner.rs      # Session scanning, snapshot cache, incremental rescans
 │   ├── src/sqlite_cache.rs # SQLite initialization, migrations, indexes, cached read/write
@@ -214,8 +214,7 @@ Core idea: **protocol adapters + shared business dispatch**
 ## 6.4 Network Service Ports (Code Defaults)
 
 ### GUI Main Program (`src-tauri/src/main.rs` + settings)
-- WS: `52130`
-- HTTP: `52131`
+- **Unified single-port**: HTTP + WS(`/ws`) on `52131`
 - Default `bind_addr`: `127.0.0.1`
 
 ### Standalone CLI Crate (`src-tauri-cli/src/main.rs`)

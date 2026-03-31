@@ -37,7 +37,7 @@
 
 | Mode | Entry | Network behavior |
 | --- | --- | --- |
-| Desktop GUI | `pi-session-manager` | GUI + backend services; default settings include WS `52130`, HTTP `52131` |
+| Desktop GUI | `pi-session-manager` | GUI + backend services; **unified single-port** HTTP + WS(`/ws`) on `http_port` (default `52131`) |
 | Headless in main binary | `pi-session-manager --cli` / `--headless` | Single-port HTTP + WS(`/ws`) on `http_port` (default `52131`) |
 | Standalone CLI crate | `pi-session-cli` | Single-port HTTP + WS(`/ws`) (default `52131`) |
 | Static demo page | `dist-demo/index.html` | No backend required, forced demo data |
