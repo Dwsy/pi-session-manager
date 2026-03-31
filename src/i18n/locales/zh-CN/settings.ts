@@ -31,19 +31,57 @@ export const settings = {
     apiTest: 'API 测试',
   },
   terminal: {
-    default: '默认终端',
-    customCommand: '自定义终端命令',
-    customCommandHelp: '支持 {command} / {cwd} / {path} / {pi} 占位符',
+    // Resume Mode
+    resumeMode: '恢复模式',
+    resumeModeHelp: '选择如何恢复会话',
+    resumeModes: {
+      builtin: '内置终端',
+      builtinDesc: '在应用内直接打开终端',
+      external: '外部终端',
+      externalDesc: '在系统终端应用中打开',
+    },
+    // External Terminal
+    externalTerminal: '外部终端',
+    externalTerminalHelp: '选择用于恢复会话的终端应用',
+    defaultTerminal: '默认终端',
+    customCommand: '自定义终端',
+    customCommandHelp: '输入 iterm2 或 terminal 使用系统终端，或输入完整命令',
     piCommandPath: 'Pi 命令路径',
     piCommandPathHelp: '如果 pi 不在系统 PATH 中，请指定完整路径',
     commandExample: '例如：alacritty -e',
+    // Placeholders
+    placeholders: '占位符参考',
+    placeholdersHelp: '在自定义命令中使用以下占位符',
+    placeholderCommand: '{command}',
+    placeholderCommandDesc: '完整的恢复命令（cd + pi --session）',
+    placeholderCwd: '{cwd}',
+    placeholderCwdDesc: '会话工作目录',
+    placeholderPath: '{path}',
+    placeholderPathDesc: '会话文件路径',
+    placeholderPi: '{pi}',
+    placeholderPiDesc: 'Pi 命令路径',
+    // Resume Command
+    resumeCommand: '恢复命令',
+    resumeCommandHelp: '在终端中执行的命令。留空则使用默认：cd {cwd} && {pi} --session {path}',
+    resumeCommandPlaceholder: '例如：/opt/homebrew/bin/tmux new-session -A -s pi',
+    // Examples
+    examples: '示例',
+    exampleDefault: '默认（留空）',
+    exampleTmux: 'tmux 会话',
+    exampleTmuxWithCmd: 'tmux 自定义命令',
+    // Built-in Terminal
     builtinEnabled: '内置终端',
     builtinEnabledHelp: '在应用内使用集成终端面板（Ctrl+`）',
     defaultShell: '默认 Shell',
     defaultShellHelp: '新建终端标签页时使用的 Shell，也可通过下拉菜单临时切换',
     fontSize: '终端字号',
+    // Shortcuts
+    shortcutResume: '恢复',
+    shortcutToggle: '切换终端',
+    // Legacy
     collapse: '收起',
     expandSettings: '展开设置',
+    // Terminal Options
     options: {
       iterm2: { name: 'iTerm2', description: '推荐的 macOS 终端' },
       terminal: { name: 'Terminal.app', description: 'macOS 自带终端' },
