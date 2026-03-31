@@ -11,6 +11,7 @@ export interface UseAppSettingsReturn {
   terminal: TerminalType
   piPath: string
   customCommand: string
+  resumeCommand: string
   loadSettings: () => Promise<void>
 }
 
@@ -18,6 +19,7 @@ export function useAppSettings(): UseAppSettingsReturn {
   const [terminal, setTerminal] = useState<TerminalType>(platformDefaults.defaultTerminal)
   const [piPath, setPiPath] = useState<string>('pi')
   const [customCommand, setCustomCommand] = useState<string>('')
+  const [resumeCommand, setResumeCommand] = useState<string>('')
 
   const loadSettings = useCallback(async () => {
     try {
@@ -26,6 +28,7 @@ export function useAppSettings(): UseAppSettingsReturn {
         setTerminal(settings.terminal.defaultTerminal || platformDefaults.defaultTerminal)
         setPiPath(settings.terminal.piCommandPath || 'pi')
         setCustomCommand(settings.terminal.customTerminalCommand || '')
+        setResumeCommand(settings.terminal.resumeCommand || '')
       }
       if (settings?.language?.locale) {
         i18n.changeLanguage(settings.language.locale)
@@ -39,6 +42,7 @@ export function useAppSettings(): UseAppSettingsReturn {
     terminal,
     piPath,
     customCommand,
+    resumeCommand,
     loadSettings,
   }
 }

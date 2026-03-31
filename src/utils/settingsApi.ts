@@ -88,7 +88,11 @@ export async function loadAppSettings(): Promise<AppSettings> {
 
   try {
     const raw = await invoke<Partial<AppSettings>>('load_app_settings')
+    console.log('[DEBUG loadAppSettings] raw from backend:', raw)
+    console.log('[DEBUG loadAppSettings] raw.terminal:', raw?.terminal)
+    console.log('[DEBUG loadAppSettings] raw.terminal.resumeCommand:', (raw?.terminal as any)?.resumeCommand)
     const settings = mergeDefaults(raw ?? {})
+    console.log('[DEBUG loadAppSettings] merged settings.terminal:', settings.terminal)
     writeCache(settings)
     return settings
   } catch (e) {
