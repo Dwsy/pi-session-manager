@@ -1,10 +1,16 @@
 use chrono::Utc;
+use lazy_static::lazy_static;
 use pi_session_manager::scanner;
 use pi_session_manager::sqlite_cache;
 use rusqlite::{params, Connection};
 use std::fs;
 use std::io::Write;
+use std::sync::Mutex;
 use tempfile::tempdir;
+
+lazy_static! {
+    static ref FTS_DB_LOCK: Mutex<()> = Mutex::new(());
+}
 
 /// Helper: create a minimal session file content as JSONL
 fn make_session_file(id: &str, cwd: &str, messages: &[(&str, &str)]) -> String {
@@ -710,6 +716,7 @@ fn test_fts_escaping_and_snippet_tags() {
 
 #[test]
 fn test_database_recovery_from_message_fts_corruption() {
+    let _lock = FTS_DB_LOCK.lock().unwrap();
     use chrono::Utc;
     use pi_session_manager::config::Config;
     use pi_session_manager::sqlite_cache;
@@ -718,11 +725,11 @@ fn test_database_recovery_from_message_fts_corruption() {
     use tempfile::tempdir;
 
     let temp_dir = tempdir().unwrap();
-    let original_home = env::var("HOME").ok();
-    env::set_var("HOME", temp_dir.path());
+    let db_path = temp_dir.path().join("test_corruption.db");
+    let original_test_db = env::var("PPM_TEST_DB").ok();
+    env::set_var("PPM_TEST_DB", &db_path);
 
     // Ensure no existing DB
-    let db_path = sqlite_cache::get_db_path().expect("get_db_path should succeed");
     let _ = std::fs::remove_file(&db_path);
 
     let config = Config::default();
@@ -806,11 +813,11 @@ fn test_database_recovery_from_message_fts_corruption() {
     assert_eq!(results_after.len(), 1);
     assert_eq!(results_after[0].1, session_path);
 
-    // Restore HOME
-    if let Some(home) = original_home {
-        env::set_var("HOME", home);
+    // Restore test DB override
+    if let Some(test_db) = original_test_db {
+        env::set_var("PPM_TEST_DB", test_db);
     } else {
-        env::remove_var("HOME");
+        env::remove_var("PPM_TEST_DB");
     }
 }
 
