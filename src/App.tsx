@@ -56,6 +56,17 @@ const startDragging = () => {
   }
 };
 
+const GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY = [
+  // Keep app-level navigation shortcuts available while typing, but do not
+  // allow destructive or session-launch actions to fire from text inputs.
+  "cmd+l",
+  "cmd+p",
+  "cmd+b",
+  "cmd+,",
+  "cmd+`",
+  "cmd+shift+f",
+];
+
 // Lazy load heavy components
 const Dashboard = lazy(() => import("./components/Dashboard"));
 const KanbanBoard = lazy(() => import("./components/kanban/KanbanBoard"));
@@ -366,6 +377,7 @@ function App() {
 
   useKeyboardShortcuts(shortcuts, {
     shouldHandleEvent: shouldHandleGlobalShortcutEvent,
+    allowInTextEntry: GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY,
   });
 
   const commandContext = useMemo<SearchContext>(

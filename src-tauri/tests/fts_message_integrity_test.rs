@@ -721,13 +721,10 @@ fn test_database_recovery_from_message_fts_corruption() {
     use pi_session_manager::config::Config;
     use pi_session_manager::sqlite_cache;
     use rusqlite::{params, Connection, OptionalExtension};
-    use std::env;
     use tempfile::tempdir;
 
     let temp_dir = tempdir().unwrap();
     let db_path = temp_dir.path().join("test_corruption.db");
-    let original_test_db = env::var("PPM_TEST_DB").ok();
-    env::set_var("PPM_TEST_DB", &db_path);
 
     // Ensure no existing DB
     let _ = std::fs::remove_file(&db_path);
@@ -737,7 +734,8 @@ fn test_database_recovery_from_message_fts_corruption() {
 
     // First initialization: should succeed and create DB with FTS
     {
-        let conn = sqlite_cache::init_db_with_config(&config).expect("initial init should succeed");
+        let conn = sqlite_cache::init_db_with_path(&db_path, &config)
+            .expect("initial init should succeed");
         // Insert test session and message
         conn.execute(
             "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
@@ -780,8 +778,8 @@ fn test_database_recovery_from_message_fts_corruption() {
     }
 
     // Second initialization: should recover by deleting corrupted DB and recreating fresh
-    let conn2 =
-        sqlite_cache::init_db_with_config(&config).expect("init after corruption should recover");
+    let conn2 = sqlite_cache::init_db_with_path(&db_path, &config)
+        .expect("init after corruption should recover");
 
     // After full DB recovery, the previous data is gone; we need to repopulate
     conn2.execute(
@@ -812,13 +810,6 @@ fn test_database_recovery_from_message_fts_corruption() {
     let results_after = sqlite_cache::search_message_fts(&conn2, "hello", None, 10).unwrap();
     assert_eq!(results_after.len(), 1);
     assert_eq!(results_after[0].1, session_path);
-
-    // Restore test DB override
-    if let Some(test_db) = original_test_db {
-        env::set_var("PPM_TEST_DB", test_db);
-    } else {
-        env::remove_var("PPM_TEST_DB");
-    }
 }
 
 #[test]

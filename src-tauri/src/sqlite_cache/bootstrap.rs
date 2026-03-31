@@ -31,8 +31,11 @@ pub fn init_db() -> Result<Connection, String> {
 
 pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
     let db_path = get_db_path()?;
+    init_db_with_path(&db_path, config)
+}
 
-    match open_and_init_db(&db_path, config) {
+pub fn init_db_with_path(db_path: &Path, config: &Config) -> Result<Connection, String> {
+    match open_and_init_db(db_path, config) {
         Ok(conn) => Ok(conn),
         Err(e)
             if e.contains("malformed")
@@ -56,16 +59,16 @@ pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
                         Utc::now().timestamp()
                     ))
                 };
-                fs::copy(&db_path, &backup_path).map_err(|e| {
+                fs::copy(db_path, &backup_path).map_err(|e| {
                     format!("Failed to backup corrupted DB to {backup_path:?}: {e}")
                 })?;
                 info!("Backed up corrupted DB to {:?}", backup_path);
                 // Increment recovery counter
                 crate::metrics::inc_corruption_recovery();
-                fs::remove_file(&db_path)
+                fs::remove_file(db_path)
                     .map_err(|err| format!("Failed to delete corrupted DB: {err}"))?;
             }
-            open_and_init_db(&db_path, config)
+            open_and_init_db(db_path, config)
         }
         Err(e) => Err(e),
     }
