@@ -95,8 +95,8 @@ export const settings = {
       top: '顶部',
       bottom: '底部',
     },
-    cmdFBehavior: 'Cmd+F 行为',
-    cmdFBehaviorHelp: '选择 Cmd+F 快捷键的功能',
+    cmdFBehavior: '会话内 Cmd+F 行为',
+    cmdFBehaviorHelp: '选择 Cmd+F 在会话查看器中的功能',
     cmdFBehaviorOptions: {
       inSessionSearch: '会话内搜索',
       toggleSidebar: '切换会话树',

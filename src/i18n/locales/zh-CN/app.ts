@@ -13,7 +13,7 @@ export const app = {
     exportHtml: '导出并打开 (Cmd+E)',
     deleteSelected: '删除所选会话 (Cmd+Backspace)',
     projectView: '项目视图 (Cmd+P)',
-    searchAll: '切换会话树侧边栏 (Cmd+Shift+F)',
+    searchAll: '搜索所有会话 (Cmd+Shift+F)',
     search: '会话内搜索 (Cmd+F)',
     settings: '打开设置 (Cmd+,)',
     close: '关闭 (Esc)',

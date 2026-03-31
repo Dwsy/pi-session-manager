@@ -102,8 +102,8 @@ export const settings = {
       top: 'Top',
       bottom: 'Bottom',
     },
-    cmdFBehavior: 'Cmd+F Behavior',
-    cmdFBehaviorHelp: 'Choose what Cmd+F shortcut does',
+    cmdFBehavior: 'In-session Cmd+F behavior',
+    cmdFBehaviorHelp: 'Choose what Cmd+F does in the session viewer',
     cmdFBehaviorOptions: {
       inSessionSearch: 'Search in session',
       toggleSidebar: 'Toggle session tree',

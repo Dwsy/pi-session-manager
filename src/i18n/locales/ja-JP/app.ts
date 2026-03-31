@@ -13,7 +13,7 @@ export const app = {
     exportHtml: 'エクスポート＆開く (Cmd+E)',
     deleteSelected: '選択したセッションを削除 (Cmd+Backspace)',
     projectView: 'プロジェクト表示 (Cmd+P)',
-    searchAll: 'セッションツリーサイドバーの切り替え (Cmd+Shift+F)',
+    searchAll: 'すべてのセッションを検索 (Cmd+Shift+F)',
     search: 'セッション内検索 (Cmd+F)',
     settings: '設定を開く (Cmd+,)',
     close: '閉じる (Esc)',

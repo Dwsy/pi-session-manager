@@ -13,7 +13,7 @@ export const app = {
     exportHtml: 'Export & open (Cmd+E)',
     deleteSelected: 'Delete selected session(s) (Cmd+Backspace)',
     projectView: 'Project view (Cmd+P)',
-    searchAll: 'Toggle session tree sidebar (Cmd+Shift+F)',
+    searchAll: 'Search all sessions (Cmd+Shift+F)',
     search: 'Search in session (Cmd+F)',
     settings: 'Open settings (Cmd+,)',
     close: 'Close (Esc)',

@@ -92,8 +92,8 @@ export const settings = {
       top: 'Oben',
       bottom: 'Unten',
     },
-    cmdFBehavior: 'Cmd+F-Verhalten',
-    cmdFBehaviorHelp: 'Wählen Sie die Funktion des Cmd+F-Kurzbefehls',
+    cmdFBehavior: 'Cmd+F-Verhalten in Sitzungen',
+    cmdFBehaviorHelp: 'Wählen Sie, was Cmd+F im Sitzungsbetrachter macht',
     cmdFBehaviorOptions: {
       inSessionSearch: 'In Sitzung suchen',
       toggleSidebar: 'Sitzungsbaum umschalten',

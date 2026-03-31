@@ -92,8 +92,8 @@ export const settings = {
       top: 'Haut',
       bottom: 'Bas',
     },
-    cmdFBehavior: 'Comportement de Cmd+F',
-    cmdFBehaviorHelp: 'Choisissez l\'action du raccourci Cmd+F',
+    cmdFBehavior: 'Comportement de Cmd+F dans la session',
+    cmdFBehaviorHelp: 'Choisissez l\'action de Cmd+F dans le visualiseur de session',
     cmdFBehaviorOptions: {
       inSessionSearch: 'Rechercher dans la session',
       toggleSidebar: 'Basculer l\'arborescence des sessions',

@@ -92,8 +92,8 @@ export const settings = {
       top: 'Arriba',
       bottom: 'Abajo',
     },
-    cmdFBehavior: 'Comportamiento de Cmd+F',
-    cmdFBehaviorHelp: 'Elija la función del atajo Cmd+F',
+    cmdFBehavior: 'Comportamiento de Cmd+F en sesión',
+    cmdFBehaviorHelp: 'Elija qué hace Cmd+F en el visor de sesiones',
     cmdFBehaviorOptions: {
       inSessionSearch: 'Buscar en sesión',
       toggleSidebar: 'Alternar árbol de sesiones',

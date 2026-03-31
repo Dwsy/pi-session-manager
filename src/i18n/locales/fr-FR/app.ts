@@ -13,7 +13,7 @@ export const app = {
     exportHtml: 'Exporter et ouvrir (Cmd+E)',
     deleteSelected: 'Supprimer les sessions sélectionnées (Cmd+Backspace)',
     projectView: 'Vue projet (Cmd+P)',
-    searchAll: 'Basculer la barre latérale de l\'arborescence des sessions (Cmd+Shift+F)',
+    searchAll: 'Rechercher dans toutes les sessions (Cmd+Shift+F)',
     search: 'Rechercher dans la session (Cmd+F)',
     settings: 'Ouvrir les paramètres (Cmd+,)',
     close: 'Fermer (Esc)',
