@@ -1,6 +1,6 @@
 export type TerminalType =
   | 'auto'
-  | 'iterm2' | 'terminal' | 'vscode' | 'custom'
+  | 'iterm2' | 'terminal' | 'vscode' | 'custom' | 'tmux'
   | 'wezterm' | 'kitty' | 'alacritty'
   | 'powershell' | 'cmd' | 'windows-terminal'
   | 'gnome-terminal' | 'konsole' | 'xfce4-terminal' | 'xterm' | 'x-terminal-emulator'
@@ -30,6 +30,8 @@ export interface AppSettings {
   terminal: {
     defaultTerminal: TerminalType
     customTerminalCommand?: string
+    /** Custom resume command to run inside the terminal. Supports {cwd}, {path}, {pi} placeholders. */
+    resumeCommand?: string
     piCommandPath: string
     builtinTerminalEnabled: boolean
     defaultShell: string

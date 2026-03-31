@@ -30,6 +30,7 @@ export type AppDesktopSidebarSessionListCommonProps = Pick<
   | "terminal"
   | "piPath"
   | "customCommand"
+  | "resumeCommand"
   | "favorites"
   | "onToggleFavorite"
   | "tags"
@@ -58,6 +59,7 @@ export interface AppDesktopSidebarContentProps {
   terminal?: ProjectListProps["terminal"];
   piPath?: ProjectListProps["piPath"];
   customCommand?: ProjectListProps["customCommand"];
+  resumeCommand?: ProjectListProps["resumeCommand"];
   getBadgeType?: SessionListProps["getBadgeType"];
   listScrollRef: RefObject<HTMLDivElement>;
   sessionListCommonProps: AppDesktopSidebarSessionListCommonProps;
@@ -89,6 +91,7 @@ function AppDesktopSidebarContent({
   terminal,
   piPath,
   customCommand,
+  resumeCommand,
   getBadgeType,
   listScrollRef,
   sessionListCommonProps,
@@ -159,6 +162,7 @@ function AppDesktopSidebarContent({
           terminal={terminal}
           piPath={piPath}
           customCommand={customCommand}
+          resumeCommand={resumeCommand}
           getBadgeType={getBadgeType}
           scrollParentRef={listScrollRef}
           favorites={favorites}

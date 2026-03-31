@@ -22,6 +22,7 @@ interface ProjectListProps {
   terminal?: TerminalType;
   piPath?: string;
   customCommand?: string;
+  resumeCommand?: string;
   getBadgeType?: (sessionId: string) => "new" | "updated" | null;
   scrollParentRef?: RefObject<HTMLDivElement>;
   showHeader?: boolean;
@@ -48,6 +49,7 @@ export default function ProjectList({
   terminal = getPlatformDefaults().defaultTerminal,
   piPath,
   customCommand,
+  resumeCommand,
   getBadgeType,
   scrollParentRef,
   showHeader = true,
@@ -249,6 +251,7 @@ export default function ProjectList({
         terminal={terminal}
         piPath={piPath}
         customCommand={customCommand}
+        resumeCommand={resumeCommand}
         scrollParentRef={scrollParentRef}
         favorites={favorites}
         onToggleFavorite={onToggleFavorite}

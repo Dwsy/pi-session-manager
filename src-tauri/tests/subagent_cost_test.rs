@@ -17,7 +17,7 @@ fn create_meta_json(
     input: u64,
     output: u64,
 ) -> PathBuf {
-    let file_path = dir.join(format!("{}_{}_meta.json", run_id, agent));
+    let file_path = dir.join(format!("{run_id}_{agent}_meta.json"));
     let content = format!(
         r#"{{
             "runId": "{}",
@@ -221,7 +221,7 @@ fn test_subagent_file_modification() {
     );
 
     // First scan
-    let summary1 = scan_subagent_artifacts(&vec![session_dir.clone()], None);
+    let summary1 = scan_subagent_artifacts(&[session_dir.clone()], None);
     assert_eq!(summary1.total_runs, 1);
     assert!((summary1.total_cost - 0.10).abs() < 1e-9);
 
@@ -230,7 +230,7 @@ fn test_subagent_file_modification() {
         .expect("Failed to modify file");
 
     // Second scan - should read updated values
-    let summary2 = scan_subagent_artifacts(&vec![session_dir.clone()], None);
+    let summary2 = scan_subagent_artifacts(&[session_dir.clone()], None);
     assert_eq!(summary2.total_runs, 1);
     assert!((summary2.total_cost - 0.99).abs() < 1e-9);
     assert!(summary2.runs_by_model.contains_key("opus"));
@@ -253,7 +253,7 @@ fn test_full_subagent_scanning_integration() {
     create_meta_json(&artifacts_dir, "w1", "worker", "sonnet", 0.12, 12000, 6000);
 
     // Scan artifacts
-    let summary = scan_subagent_artifacts(&vec![session_dir], None);
+    let summary = scan_subagent_artifacts(&[session_dir], None);
 
     // Verify subagent stats
     assert_eq!(summary.total_runs, 2);
@@ -282,7 +282,7 @@ fn test_empty_subagent_directory() {
 
     // Do not create any meta.json files
 
-    let summary = scan_subagent_artifacts(&vec![session_dir], None);
+    let summary = scan_subagent_artifacts(&[session_dir], None);
 
     // Should return empty stats without errors
     assert_eq!(summary.total_runs, 0);
@@ -346,7 +346,7 @@ fn test_multiple_session_directories() {
         4000,
     );
 
-    let summary = scan_subagent_artifacts(&vec![session1, session2, session3], None);
+    let summary = scan_subagent_artifacts(&[session1, session2, session3], None);
 
     // Verify cross-directory aggregation
     assert_eq!(summary.total_runs, 4);
@@ -385,7 +385,7 @@ fn test_malformed_meta_json_graceful_handling() {
     fs::write(artifacts_dir.join("empty_meta.json"), "").expect("Failed to write empty file");
 
     // Should not panic; gracefully skip corrupted files
-    let summary = scan_subagent_artifacts(&vec![session_dir], None);
+    let summary = scan_subagent_artifacts(&[session_dir], None);
 
     // Count only valid files
     assert_eq!(summary.total_runs, 1);

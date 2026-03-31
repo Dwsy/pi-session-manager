@@ -395,7 +395,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("METRIC init_ms={:.3}", median(&init_values));
     println!("METRIC ingest_ms={:.3}", median(&ingest_values));
     println!("METRIC search_ms={:.3}", median(&search_values));
-    println!("METRIC total_hits={}", total_hits);
+    println!("METRIC total_hits={total_hits}");
 
     Ok(())
 }

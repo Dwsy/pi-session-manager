@@ -31,19 +31,57 @@ export const settings = {
     apiTest: 'API Test',
   },
   terminal: {
-    default: 'Default Terminal',
-    customCommand: 'Custom Terminal Command',
-    customCommandHelp: 'Supports {command}, {cwd}, {path}, and {pi} placeholders',
+    // Resume Mode
+    resumeMode: 'Resume Mode',
+    resumeModeHelp: 'Choose how to resume sessions',
+    resumeModes: {
+      builtin: 'Built-in',
+      builtinDesc: 'Open terminal inside the app',
+      external: 'External',
+      externalDesc: 'Open in system terminal app',
+    },
+    // External Terminal
+    externalTerminal: 'External Terminal',
+    externalTerminalHelp: 'Select terminal app for resuming sessions',
+    defaultTerminal: 'Default Terminal',
+    customCommand: 'Custom Terminal',
+    customCommandHelp: 'Enter iterm2 or terminal for system terminal, or full command',
     piCommandPath: 'Pi Command Path',
     piCommandPathHelp: 'Specify full path if pi is not in system PATH',
     commandExample: 'e.g., alacritty -e',
+    // Placeholders
+    placeholders: 'Placeholder Reference',
+    placeholdersHelp: 'Use these placeholders in custom commands',
+    placeholderCommand: '{command}',
+    placeholderCommandDesc: 'Full resume command (cd + pi --session)',
+    placeholderCwd: '{cwd}',
+    placeholderCwdDesc: 'Session working directory',
+    placeholderPath: '{path}',
+    placeholderPathDesc: 'Session file path',
+    placeholderPi: '{pi}',
+    placeholderPiDesc: 'Pi command path',
+    // Resume Command
+    resumeCommand: 'Resume Command',
+    resumeCommandHelp: 'Command to run inside the terminal. Leave empty for default: cd {cwd} && {pi} --session {path}',
+    resumeCommandPlaceholder: 'e.g., /opt/homebrew/bin/tmux new-session -A -s pi',
+    // Examples
+    examples: 'Examples',
+    exampleDefault: 'Default (empty)',
+    exampleTmux: 'tmux session',
+    exampleTmuxWithCmd: 'tmux with custom command',
+    // Built-in Terminal
     builtinEnabled: 'Built-in Terminal',
     builtinEnabledHelp: 'Use integrated terminal panel inside the app (Ctrl+`)',
     defaultShell: 'Default Shell',
     defaultShellHelp: 'Shell used when creating new terminal tabs. Can also switch via dropdown.',
     fontSize: 'Terminal Font Size',
+    // Shortcuts
+    shortcutResume: 'Resume',
+    shortcutToggle: 'Toggle Terminal',
+    // Legacy
     collapse: 'Collapse',
     expandSettings: 'Expand settings',
+    // Terminal Options
     options: {
       iterm2: { name: 'iTerm2', description: 'Recommended macOS terminal' },
       terminal: { name: 'Terminal.app', description: 'Built-in macOS terminal' },

@@ -19,6 +19,7 @@ export interface SessionPreviewModalProps {
   terminal?: TerminalType
   piPath?: string
   customCommand?: string
+  resumeCommand?: string
   initialClickPoint?: { x: number; y: number } | null
   animationMode?: SessionPreviewAnimationMode
   onCloseAnimationComplete?: () => void
@@ -49,6 +50,7 @@ export default function SessionPreviewModal({
   terminal,
   piPath,
   customCommand,
+  resumeCommand,
   initialClickPoint,
   animationMode = 'stable',
   onCloseAnimationComplete,
@@ -291,6 +293,7 @@ export default function SessionPreviewModal({
             terminal={terminal}
             piPath={piPath}
             customCommand={customCommand}
+            resumeCommand={resumeCommand}
           />
         </div>
       </div>

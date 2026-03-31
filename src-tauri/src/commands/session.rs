@@ -161,8 +161,10 @@ pub async fn open_session_in_terminal(
     cwd: String,
     terminal: Option<String>,
     pi_path: Option<String>,
+    resume_command: Option<String>,
 ) -> Result<(), String> {
-    super::session_open::open_session_in_terminal_impl(path, cwd, terminal, pi_path).await
+    super::session_open::open_session_in_terminal_impl(path, cwd, terminal, pi_path, resume_command)
+        .await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]

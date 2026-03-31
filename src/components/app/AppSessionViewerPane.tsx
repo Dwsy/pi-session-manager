@@ -13,6 +13,7 @@ export type AppSessionViewerPaneProps = Pick<
   | "terminal"
   | "piPath"
   | "customCommand"
+  | "resumeCommand"
   | "initialEntryId"
 >;
 

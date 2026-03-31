@@ -20,6 +20,7 @@ interface SessionListByDirectoryProps {
   terminal?: TerminalType
   piPath?: string
   customCommand?: string
+  resumeCommand?: string
   getBadgeType?: (sessionId: string) => 'new' | 'updated' | null
   scrollParentRef?: RefObject<HTMLDivElement>
 }
@@ -33,6 +34,7 @@ export default function SessionListByDirectory({
   terminal = getPlatformDefaults().defaultTerminal,
   piPath,
   customCommand,
+  resumeCommand,
   getBadgeType,
   scrollParentRef,
 }: SessionListByDirectoryProps) {
@@ -233,6 +235,7 @@ export default function SessionListByDirectory({
                       terminal={terminal}
                       piPath={piPath}
                       customCommand={customCommand}
+                      resumeCommand={resumeCommand}
                       size="sm"
                       variant="ghost"
                       onError={(error) => console.error('Failed to open in terminal:', error)}
