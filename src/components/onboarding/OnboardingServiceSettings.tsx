@@ -42,7 +42,7 @@ export default function OnboardingServiceSettings({
   return (
     <div className="mt-4 space-y-3 text-left max-w-xs mx-auto">
       <OnboardingSelectRow
-        label={t('settings.advanced.bindAddr', '绑定地址')}
+        label={t('settings.advanced.bindAddr', 'Bind Address')}
         value={serverSettings.bind_addr}
         onChange={(value) => updateServerSettings({ bind_addr: value })}
         options={[
@@ -50,8 +50,8 @@ export default function OnboardingServiceSettings({
           { value: '0.0.0.0', label: '0.0.0.0' },
         ]}
         description={serverSettings.bind_addr === '0.0.0.0'
-          ? t('onboarding.steps.services.bindRemote', '允许局域网设备（手机/平板）连接')
-          : t('onboarding.steps.services.bindLocal', '仅本机访问')}
+          ? t('onboarding.steps.services.bindRemote', 'Allow LAN devices (phone/tablet) to connect')
+          : t('onboarding.steps.services.bindLocal', 'Local access only')}
       />
 
       <SettingsToggleRow
@@ -77,8 +77,8 @@ export default function OnboardingServiceSettings({
       />
 
       <SettingsToggleRow
-        title={t('onboarding.steps.services.terminal', '内置终端')}
-        description={t('onboarding.steps.services.terminalHint', '在应用内直接使用终端')}
+        title={t('onboarding.steps.services.terminal', 'Built-in Terminal')}
+        description={t('onboarding.steps.services.terminalHint', 'Use terminal directly in the app')}
         checked={terminalEnabled}
         onChange={onTerminalEnabledChange}
         className={TOGGLE_ROW_CLASS_NAME}
@@ -88,12 +88,12 @@ export default function OnboardingServiceSettings({
       />
 
       <OnboardingSelectRow
-        label={t('settings.session.openPosition', '任务定位打开位置')}
+        label={t('settings.session.openPosition', 'Task positioning open position')}
         value={openPosition}
         onChange={(value) => onOpenPositionChange(value === 'bottom' ? 'bottom' : 'top')}
         options={[
-          { value: 'top', label: t('settings.session.openPositions.top', '顶部') },
-          { value: 'bottom', label: t('settings.session.openPositions.bottom', '底部') },
+          { value: 'top', label: t('settings.session.openPositions.top', 'Top') },
+          { value: 'bottom', label: t('settings.session.openPositions.bottom', 'Bottom') },
         ]}
       />
 
@@ -101,7 +101,7 @@ export default function OnboardingServiceSettings({
         <p className="text-[11px] text-amber-400/80 px-1">
           {t('onboarding.steps.services.mobileHint', {
             port: serverSettings.http_port,
-            defaultValue: '移动端通过浏览器访问 http://<电脑IP>:{{port}} 即可使用，自动切换 HTTP 模式',
+            defaultValue: 'Mobile devices can access via browser at http://<computer-IP>:{{port}}, automatically switches to HTTP mode',
           })}
         </p>
       )}

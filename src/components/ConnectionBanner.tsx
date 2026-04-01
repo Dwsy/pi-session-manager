@@ -65,13 +65,13 @@ export default function ConnectionBanner() {
       {isDisconnected && (
         <>
           <WifiOff className="h-3.5 w-3.5" />
-          {t('connection.disconnected', '无法连接到服务，请检查应用是否运行')}
+          {t('connection.disconnected', 'Cannot connect to service, please check if the app is running')}
         </>
       )}
       {isConnecting && (
         <>
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          {t('connection.connecting', '正在重新连接…')}
+          {t('connection.connecting', 'Reconnecting…')}
         </>
       )}
       {isReconnected && (
@@ -79,7 +79,7 @@ export default function ConnectionBanner() {
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          {t('connection.reconnected', '已重新连接')}
+          {t('connection.reconnected', 'Reconnected')}
         </>
       )}
     </div>

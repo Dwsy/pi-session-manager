@@ -64,7 +64,7 @@ function AppMobileLayout({
       {
         id: "projects",
         icon: <FolderOpen className="h-5 w-5" />,
-        label: t("app.viewMode.project", "项目"),
+        label: t("app.viewMode.project", "project"),
       },
       {
         id: "kanban",

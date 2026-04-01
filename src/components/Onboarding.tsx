@@ -190,7 +190,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             <div className="mt-4 space-y-3 text-left max-w-xs mx-auto">
               <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground">{t('settings.advanced.bindAddr', '绑定地址')}</span>
+                  <span className="text-sm text-foreground">{t('settings.advanced.bindAddr', 'Bind Address')}</span>
                   <select
                     value={serverSettings.bind_addr}
                     onChange={(e) => setServerSettings((s) => ({ ...s, bind_addr: e.target.value }))}
@@ -202,8 +202,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   {serverSettings.bind_addr === '0.0.0.0'
-                    ? t('onboarding.steps.services.bindRemote', '允许局域网设备（手机/平板）连接')
-                    : t('onboarding.steps.services.bindLocal', '仅本机访问')}
+                    ? t('onboarding.steps.services.bindRemote', 'Allow LAN devices (phone/tablet) to connect')
+                    : t('onboarding.steps.services.bindLocal', 'Local access only')}
                 </p>
               </div>
               <ToggleRow
@@ -219,21 +219,21 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 onChange={(v) => setServerSettings((s) => ({ ...s, http_enabled: v }))}
               />
               <ToggleRow
-                label={t('onboarding.steps.services.terminal', '内置终端')}
-                hint={t('onboarding.steps.services.terminalHint', '在应用内直接使用终端')}
+                label={t('onboarding.steps.services.terminal', 'Built-in Terminal')}
+                hint={t('onboarding.steps.services.terminalHint', 'Use terminal directly in the app')}
                 checked={terminalEnabled}
                 onChange={setTerminalEnabled}
               />
               <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground">{t('settings.session.openPosition', '任务定位打开位置')}</span>
+                  <span className="text-sm text-foreground">{t('settings.session.openPosition', 'Task positioning open position')}</span>
                   <select
                     value={openPosition}
                     onChange={(e) => setOpenPosition(e.target.value as OpenPosition)}
                     className="px-2 py-1 bg-background border border-border rounded text-xs text-foreground"
                   >
-                    <option value="top">{t('settings.session.openPositions.top', '顶部')}</option>
-                    <option value="bottom">{t('settings.session.openPositions.bottom', '底部')}</option>
+                    <option value="top">{t('settings.session.openPositions.top', 'Top')}</option>
+                    <option value="bottom">{t('settings.session.openPositions.bottom', 'Bottom')}</option>
                   </select>
                 </div>
               </div>
@@ -241,7 +241,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 <p className="text-[11px] text-amber-400/80 px-1">
                   {t('onboarding.steps.services.mobileHint', {
                     port: serverSettings.http_port,
-                    defaultValue: '移动端通过浏览器访问 http://<电脑IP>:{{port}} 即可使用，自动切换 HTTP 模式',
+                    defaultValue: 'Mobile devices can access via browser at http://<computer-IP>:{{port}}, automatically switches to HTTP mode',
                   })}
                 </p>
               )}

@@ -153,7 +153,7 @@ export default function OpenInTerminalButton({
         ${variantClasses[variant]}
         ${className}
       `}
-      title={t('session.openInTerminal', '在终端中打开')}
+      title={t('session.openInTerminal', 'Open in Terminal')}
     >
       {loading ? (
         <Loader2 className={`${iconSizes[size]} animate-spin`} />
@@ -162,7 +162,7 @@ export default function OpenInTerminalButton({
           <Terminal className={iconSizes[size]} />
           {(showLabel || label || children) && (
             <span className="text-xs">
-              {children || label || t('session.resume', '恢复')}
+              {children || label || t('session.resume', 'Resume')}
             </span>
           )}
           {showShortcut && (

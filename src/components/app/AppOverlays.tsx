@@ -4,9 +4,7 @@ import type { ComponentType, LazyExoticComponent } from "react";
 import ExportDialog from "../ExportDialog";
 import RenameDialog from "../RenameDialog";
 import ForkDialog from "../ForkDialog";
-import DeleteSessionConfirmDialog from "../DeleteSessionConfirmDialog";
 import Onboarding from "../Onboarding";
-import type { PendingDeleteSession } from "../../hooks/useSessions";
 import type { SearchContext } from "../../plugins/types";
 import type { SessionInfo } from "../../types";
 
@@ -35,7 +33,6 @@ export interface AppOverlaysProps {
   showFullTextSearch: boolean;
   showOnboarding: boolean;
   selectedSession: SessionInfo | null;
-  pendingDeleteSession: PendingDeleteSession | null;
   commandContext: SearchContext;
   onExportSession: (format: ExportFormat) => Promise<void> | void;
   onRenameSession: (newName: string) => Promise<void> | void;
@@ -43,9 +40,6 @@ export interface AppOverlaysProps {
   onCloseExportDialog: () => void;
   onCloseRenameDialog: () => void;
   onCloseForkDialog: () => void;
-  onConfirmDeleteSession: () => Promise<void>;
-  onCancelDeleteSession: () => void;
-  onDeleteSessionConfirmStart?: () => void;
   onCloseSettings: () => void;
   onCloseFullTextSearch: () => void;
   onSelectFullTextSearchResult: (session: SessionInfo, entryId: string) => void;
@@ -63,7 +57,6 @@ function AppOverlays({
   showFullTextSearch,
   showOnboarding,
   selectedSession,
-  pendingDeleteSession,
   commandContext,
   onExportSession,
   onRenameSession,
@@ -71,9 +64,6 @@ function AppOverlays({
   onCloseExportDialog,
   onCloseRenameDialog,
   onCloseForkDialog,
-  onConfirmDeleteSession,
-  onCancelDeleteSession,
-  onDeleteSessionConfirmStart,
   onCloseSettings,
   onCloseFullTextSearch,
   onSelectFullTextSearchResult,
@@ -103,14 +93,6 @@ function AppOverlays({
           session={selectedSession}
           onFork={onForkSession}
           onClose={onCloseForkDialog}
-        />
-      )}
-      {pendingDeleteSession && (
-        <DeleteSessionConfirmDialog
-          sessions={pendingDeleteSession.sessions}
-          onConfirm={onConfirmDeleteSession}
-          onCancel={onCancelDeleteSession}
-          onConfirmStart={onDeleteSessionConfirmStart}
         />
       )}
       <Suspense fallback={null}>

@@ -75,7 +75,7 @@ export default function OpenInBrowserButton({
         ${variantClasses[variant]}
         ${className}
       `}
-      title={t('session.openInBrowser', '在浏览器中打开')}
+      title={t('session.openInBrowser', 'Open in Browser')}
     >
       {loading ? (
         <Loader2 className={`${iconSizes[size]} animate-spin`} />

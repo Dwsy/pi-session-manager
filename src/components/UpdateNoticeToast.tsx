@@ -31,12 +31,12 @@ export default function UpdateNoticeToast({
 
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-foreground">
-                {t('settings.update.toast.title', '发现新版本')}
+                {t('settings.update.toast.title', 'New version available')}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {t(
                   'settings.update.toast.version',
-                  '当前 v{{current}}，最新 v{{latest}}',
+                  'Current v{{current}}, latest v{{latest}}',
                   {
                     current: update.currentVersion,
                     latest: update.latestVersion,
@@ -55,20 +55,20 @@ export default function UpdateNoticeToast({
                   className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-foreground bg-surface hover:bg-surface-hover motion-color motion-press focus-ring"
                 >
                   <FileText className="h-3.5 w-3.5" />
-                  {t('settings.update.toast.viewNotes', '查看更新说明')}
+                  {t('settings.update.toast.viewNotes', 'View release notes')}
                 </button>
                 <button
                   onClick={onOpenRelease}
                   className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white bg-info hover:bg-info/90 motion-color motion-press focus-ring"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                  {t('settings.update.toast.download', '去下载')}
+                  {t('settings.update.toast.download', 'Download')}
                 </button>
                 <button
                   onClick={onClose}
                   className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-surface motion-color motion-press focus-ring"
                 >
-                  {t('settings.update.toast.later', '稍后')}
+                  {t('settings.update.toast.later', 'Later')}
                 </button>
               </div>
             </div>
@@ -76,7 +76,7 @@ export default function UpdateNoticeToast({
             <button
               onClick={onClose}
               className="p-1 text-muted-foreground hover:text-foreground rounded-md motion-color motion-press focus-ring"
-              aria-label={t('settings.update.toast.close', '关闭更新提示')}
+              aria-label={t('settings.update.toast.close', 'Close update notice')}
             >
               <X className="h-4 w-4" />
             </button>
@@ -90,7 +90,7 @@ export default function UpdateNoticeToast({
             <div className="px-4 py-3 border-b border-border/80 flex items-center justify-between">
               <div className="min-w-0">
                 <h3 className="text-sm font-semibold text-foreground truncate">
-                  {t('settings.update.toast.notesTitle', '更新说明')}
+                  {t('settings.update.toast.notesTitle', 'Release Notes')}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
                   {update.releaseName}
@@ -99,7 +99,7 @@ export default function UpdateNoticeToast({
               <button
                 onClick={() => setShowNotesModal(false)}
                 className="p-2 text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg motion-color motion-press focus-ring"
-                aria-label={t('common.close', '关闭')}
+                aria-label={t('common.close', 'Close')}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -110,7 +110,7 @@ export default function UpdateNoticeToast({
                 <MarkdownContent content={update.releaseNotesMarkdown} />
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  {t('settings.update.toast.noNotes', '该版本未提供更新说明。')}
+                  {t('settings.update.toast.noNotes', 'No release notes available for this version.')}
                 </p>
               )}
             </div>
@@ -120,14 +120,14 @@ export default function UpdateNoticeToast({
                 onClick={() => setShowNotesModal(false)}
                 className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-surface motion-color motion-press focus-ring"
               >
-                {t('common.close', '关闭')}
+                {t('common.close', 'Close')}
               </button>
               <button
                 onClick={onOpenRelease}
                 className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white bg-info hover:bg-info/90 motion-color motion-press focus-ring"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                {t('settings.update.toast.download', '去下载')}
+                {t('settings.update.toast.download', 'Download')}
               </button>
             </div>
           </div>
