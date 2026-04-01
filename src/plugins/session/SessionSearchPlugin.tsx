@@ -11,15 +11,15 @@ import { parseQuotedQuery } from '../../utils/search'
 export class SessionSearchPlugin extends BaseSearchPlugin {
   id = 'session-search'
   icon = FileText
-  keywords = ['session', 'file', 'conversation', '会话', '文件', '对话']
+  keywords = ['session', 'file', 'conversation', 'session', 'file', 'conversation']
   priority = 60
   
   get name(): string {
-    return this.context?.t('plugins.session.name', '会话搜索') || '会话搜索'
+    return this.context?.t('plugins.session.name', 'Session Search') || 'session搜索'
   }
   
   get description(): string {
-    return this.context?.t('plugins.session.description', '搜索会话名称和元数据') || '搜索会话名称和元数据'
+    return this.context?.t('plugins.session.description', 'Search session names and metadata') || '搜索sessionName和元数据'
   }
   
   async search(
@@ -143,7 +143,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
     // Message count
     parts.push(context.t('session.messageCount', {
       count: session.message_count,
-      defaultValue: `${session.message_count} 条消息`
+      defaultValue: 'messages'
     }))
     
     // Modified time

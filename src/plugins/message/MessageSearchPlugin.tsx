@@ -39,16 +39,16 @@ const MAX_SNIPPET_LINE_LENGTH = 180
 export class MessageSearchPlugin extends BaseSearchPlugin {
   id = 'message-search'
   icon = MessageSquare
-  keywords = ['message', 'content', 'text', 'conversation', '消息', '内容', '对话']
+  keywords = ['message', 'content', 'text', 'conversation', 'message', 'Content', 'conversation']
   priority = 80
   private readonly sessionCache = new Map<string, SessionInfo>()
 
   get name(): string {
-    return this.context?.t('plugins.message.name', '消息搜索') || '消息搜索'
+    return this.context?.t('plugins.message.name', 'Message Search') || 'message搜索'
   }
 
   get description(): string {
-    return this.context?.t('plugins.message.description', '搜索用户消息和助手回复') || '搜索用户消息和助手回复'
+    return this.context?.t('plugins.message.description', 'Search user messages and assistant replies') || '搜索用户message和助手回复'
   }
 
   private truncateText(text: string, maxLength: number): string {
@@ -204,7 +204,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     }
 
     if (role === 'user') {
-      return this.context.t('search.fullText.role.user', '用户')
+      return this.context.t('search.fullText.role.user', 'User')
     }
 
     return role
@@ -297,7 +297,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       return maybeParent
     }
 
-    return this.context?.t('command.allProjects', '所有项目') || 'Project'
+    return this.context?.t('command.allProjects', 'All Projects') || 'Project'
   }
 
   async search(

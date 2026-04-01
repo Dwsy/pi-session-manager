@@ -11,15 +11,15 @@ import { parseQuotedQuery } from '../../utils/search'
 export class ProjectSearchPlugin extends BaseSearchPlugin {
   id = 'project-search'
   icon = FolderOpen
-  keywords = ['project', 'folder', 'directory', '项目', '文件夹', '目录']
+  keywords = ['project', 'folder', 'directory', 'project', 'folder', 'directory']
   priority = 70
   
   get name(): string {
-    return this.context?.t('plugins.project.name', '项目搜索') || '项目搜索'
+    return this.context?.t('plugins.project.name', 'Project Search') || 'project搜索'
   }
   
   get description(): string {
-    return this.context?.t('plugins.project.description', '搜索项目路径') || '搜索项目路径'
+    return this.context?.t('plugins.project.description', 'Search project paths') || '搜索project路径'
   }
   
   async search(
@@ -90,7 +90,7 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
             subtitle: project,
             description: context.t('project.sessionCount', {
               count,
-              defaultValue: `${count} 个会话`
+              defaultValue: `${count} sessions`
             }),
             icon: <FolderOpen className="w-4 h-4 text-yellow-400" />,
             metadata: {

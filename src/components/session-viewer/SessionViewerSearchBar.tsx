@@ -45,6 +45,7 @@ export default function SessionViewerSearchBar({
 }: SessionViewerSearchBarProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<NodeJS.Timeout>();
   const hasQuery = searchQuery.trim().length > 0;
   const hasMatches = totalMatches > 0;
 
@@ -52,6 +53,15 @@ export default function SessionViewerSearchBar({
     inputRef.current?.focus();
     inputRef.current?.select();
   }, [focusKey]);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
 
   const handleClear = useCallback(() => {
     onSearchChange("");
@@ -67,7 +77,16 @@ export default function SessionViewerSearchBar({
             ref={inputRef}
             type="text"
             value={searchQuery}
-            onChange={(event) => onSearchChange(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              // Debounce search to avoid excessive operations on every keystroke
+              if (debounceRef.current) {
+                clearTimeout(debounceRef.current);
+              }
+              debounceRef.current = setTimeout(() => {
+                onSearchChange(value);
+              }, 200);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 event.preventDefault();

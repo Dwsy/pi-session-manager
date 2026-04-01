@@ -66,8 +66,8 @@ export default function SessionViewerToolbar({
     "Search messages",
   );
   const scrollMarkersToggleLabel = showScrollMarkers
-    ? t("session.toolbar.hideUserMarkers", "隐藏消息锚点")
-    : t("session.toolbar.showUserMarkers", "显示消息锚点");
+    ? t("session.toolbar.hideUserMarkers", "隐藏message锚点")
+    : t("session.toolbar.showUserMarkers", "显示message锚点");
   const toggleButtonBase =
     "rounded border transition-colors text-foreground";
   const toggleButtonActive =
@@ -269,7 +269,7 @@ export default function SessionViewerToolbar({
                   <PanelLeftOpen className="h-3.5 w-3.5 flex-shrink-0" />
                 )}
                 <span className="truncate">
-                  {t("session.toolbar.outline", "大纲")}
+                  {t("session.toolbar.outline", "Large纲")}
                 </span>
               </button>
               <button

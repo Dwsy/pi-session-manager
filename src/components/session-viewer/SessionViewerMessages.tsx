@@ -247,7 +247,7 @@ const SessionViewerMessages = forwardRef<
           title={t("session.scrollToBottom", "滚动到底部")}
         >
           <ArrowDown className="h-3.5 w-3.5" />
-          {t("session.newMessages", "有新消息")}
+          {t("session.newMessages", "有新message")}
         </button>
       )}
       <div
