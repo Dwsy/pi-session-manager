@@ -11,6 +11,7 @@ import { SessionBadge } from "./SessionBadge";
 import TagBadge from "./TagBadge";
 import TagPicker from "./TagPicker";
 import SessionContextMenu from "./SessionContextMenu";
+import DeleteSessionPopover from "./DeleteSessionPopover";
 import { getSessionSourceTag } from "../utils/session";
 import { formatDirectory, formatShortTime } from "../utils/sessionDisplay";
 import type { TerminalType } from "./settings/types";
@@ -97,7 +98,12 @@ export default function SessionList({
     y: number;
     sessionId: string;
   } | null>(null);
+  const [pendingDeleteSession, setPendingDeleteSession] = useState<{
+    sessions: SessionInfo[];
+    anchorRef: React.RefObject<HTMLElement>;
+  } | null>(null);
   const lastSelectedSessionIdRef = useRef<string | null>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const selectionAnchorSessionIdRef = useRef<string | null>(null);
   const selectedSessionsRef = useRef<SessionInfo[]>([]);
   const lastSelectionModeTriggerRef = useRef(selectionModeTrigger);
@@ -871,9 +877,13 @@ export default function SessionList({
                             )}
                             {!isSelectionMode && onDeleteSession && (
                               <button
+                                ref={pendingDeleteSession?.sessions[0].id === session.id ? deleteButtonRef : null}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onDeleteSession(session);
+                                  setPendingDeleteSession({
+                                    sessions: [session],
+                                    anchorRef: deleteButtonRef,
+                                  });
                                 }}
                                 className="p-1 text-muted-foreground/60 hover:text-red-500 rounded motion-color motion-press focus-ring"
                                 title={t("common.deleteSession")}
@@ -962,9 +972,28 @@ export default function SessionList({
           }
           isFavorite={favoriteSessionIds.has(contextMenuSession.id)}
           onDelete={
-            onDeleteSession ? () => onDeleteSession(contextMenuSession) : undefined
+            onDeleteSession
+              ? () => {
+                  setPendingDeleteSession({
+                    sessions: [contextMenuSession],
+                    anchorRef: deleteButtonRef,
+                  });
+                }
+              : undefined
           }
           onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {pendingDeleteSession && (
+        <DeleteSessionPopover
+          sessions={pendingDeleteSession.sessions}
+          anchorRef={pendingDeleteSession.anchorRef}
+          onConfirm={async () => {
+            await onDeleteSession?.(pendingDeleteSession.sessions[0]);
+            setPendingDeleteSession(null);
+          }}
+          onCancel={() => setPendingDeleteSession(null)}
         />
       )}
     </div>

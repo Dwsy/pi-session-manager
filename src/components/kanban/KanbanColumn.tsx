@@ -6,7 +6,11 @@ import { useTranslation } from 'react-i18next'
 import type { SessionInfo, Tag, FavoriteItem } from '../../types'
 import KanbanCard from './KanbanCard'
 import KanbanContextMenu from './KanbanContextMenu'
+import DeleteSessionPopover from '../DeleteSessionPopover'
 import { getColorClass, getColorStyle } from '../TagBadge'
+import { invoke, isTauri } from '../../transport'
+import { getCachedSettings } from '../../utils/settingsApi'
+import { getPlatformDefaults } from '../settings/types'
 
 interface KanbanColumnProps {
   id: string
@@ -42,6 +46,9 @@ export default function KanbanColumn({
   onToggleFavorite,
   onToggleTag,
   onDeleteSession,
+  terminal: propTerminal,
+  piPath: propPiPath,
+  customCommand: propCustomCommand,
   isMobile,
 }: KanbanColumnProps) {
   const { t } = useTranslation()
@@ -53,6 +60,11 @@ export default function KanbanColumn({
     session: SessionInfo
     position: { x: number; y: number }
   } | null>(null)
+  const [pendingDeleteSession, setPendingDeleteSession] = useState<{
+    sessions: SessionInfo[]
+    anchorRef: React.RefObject<HTMLElement>
+  } | null>(null)
+  const deleteButtonRef = useRef<HTMLButtonElement>(null)
 
   const handleContextMenu = (session: SessionInfo, e: React.MouseEvent) => {
     e.preventDefault()
@@ -193,13 +205,32 @@ export default function KanbanColumn({
           favorites={favorites}
           position={contextMenu.position}
           onClose={() => setContextMenu(null)}
-          onOpenInTerminal={() => {
-            // TODO: implement
-            console.log('Open in terminal:', contextMenu.session.path)
+          onOpenInTerminal={async () => {
+            if (!isTauri()) return
+            try {
+              const settings = getCachedSettings()
+              const terminal = settings.terminal?.defaultTerminal || propTerminal || getPlatformDefaults().defaultTerminal
+              const customCommand = settings.terminal?.customTerminalCommand || propCustomCommand || ''
+              const piPath = settings.terminal?.piCommandPath || propPiPath || 'pi'
+              const resumeCommand = settings.terminal?.resumeCommand || ''
+              await invoke('open_session_in_terminal', {
+                path: contextMenu.session.path,
+                cwd: contextMenu.session.cwd,
+                terminal: terminal === 'custom' ? customCommand : terminal,
+                piPath: piPath || null,
+                resumeCommand: resumeCommand || null,
+              })
+            } catch (err) {
+              console.error('Failed to open in terminal:', err)
+            }
           }}
-          onOpenInBrowser={() => {
-            // TODO: implement
-            console.log('Open in browser:', contextMenu.session.path)
+          onOpenInBrowser={async () => {
+            if (!isTauri()) return
+            try {
+              await invoke('open_session_in_browser', { path: contextMenu.session.path })
+            } catch (err) {
+              console.error('Failed to open in browser:', err)
+            }
           }}
           onToggleFavorite={() => {
             onToggleFavorite({
@@ -213,9 +244,24 @@ export default function KanbanColumn({
             onToggleTag(contextMenu.session.id, tagId, assigned)
           }}
           onDelete={() => {
-            onDeleteSession?.(contextMenu.session)
+            setPendingDeleteSession({
+              sessions: [contextMenu.session],
+              anchorRef: deleteButtonRef,
+            })
             setContextMenu(null)
           }}
+        />
+      )}
+
+      {pendingDeleteSession && (
+        <DeleteSessionPopover
+          sessions={pendingDeleteSession.sessions}
+          anchorRef={pendingDeleteSession.anchorRef}
+          onConfirm={async () => {
+            await onDeleteSession?.(pendingDeleteSession.sessions[0])
+            setPendingDeleteSession(null)
+          }}
+          onCancel={() => setPendingDeleteSession(null)}
         />
       )}
     </div>

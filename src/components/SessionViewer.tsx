@@ -242,7 +242,7 @@ function SessionViewerContent({
         treeRef={treeRef}
         sidebarRef={sidebarRef}
         resizeHandleRef={resizeHandleRef}
-        outlineTitle={t("session.toolbar.outline", "大纲")}
+        outlineTitle={t("session.toolbar.outline", "Large纲")}
         hideSidebarTitle={t("session.hideSidebar")}
       />
 

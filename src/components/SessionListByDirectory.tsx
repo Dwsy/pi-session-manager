@@ -164,7 +164,7 @@ export default function SessionListByDirectory({
                   </div>
                   <span className="text-xs font-medium flex-1 truncate">{row.dirName}</span>
                   <span className="px-2 py-0.5 rounded-md bg-surface border border-border/30 text-[11px] text-muted-foreground tabular-nums">
-                    {row.count} {t('project.list.sessions', '会话')}
+                    {row.count} {t('project.list.sessions', 'Session')}
                   </span>
                 </button>
               </div>

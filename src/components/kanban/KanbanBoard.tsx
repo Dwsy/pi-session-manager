@@ -265,7 +265,7 @@ export default function KanbanBoard({
           </span>
         ) : (
           <span className="text-[10px] text-muted-foreground shrink-0">
-            {t('tags.kanban.allProjects', '全部项目')}
+            {t('tags.kanban.allProjects', 'All Projects')}
           </span>
         )}
         <div className="flex-1 min-w-0 max-w-[360px]">
