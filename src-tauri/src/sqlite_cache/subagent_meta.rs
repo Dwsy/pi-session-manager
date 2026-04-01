@@ -11,7 +11,7 @@ pub fn get_cached_subagent_meta(
         .prepare(
             "SELECT file_modified, run_id, agent, model, exit_code, cost,
                     input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
-                    duration_ms, tool_count, timestamp
+                    duration_ms, tool_count, timestamp, turns
              FROM subagent_meta_cache
              WHERE path = ?",
         )
@@ -34,6 +34,7 @@ pub fn get_cached_subagent_meta(
                     duration_ms: row.get::<_, i64>(10)? as u64,
                     tool_count: row.get::<_, i64>(11)? as usize,
                     timestamp: row.get(12)?,
+                    turns: row.get::<_, i64>(13).unwrap_or(0) as usize,
                 },
             ))
         })
@@ -53,8 +54,8 @@ pub fn upsert_subagent_meta(
         "INSERT INTO subagent_meta_cache (
             path, file_modified, run_id, agent, model, exit_code, cost,
             input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
-            duration_ms, tool_count, timestamp
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+            duration_ms, tool_count, timestamp, turns
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
         ON CONFLICT(path) DO UPDATE SET
             file_modified = excluded.file_modified,
             run_id = excluded.run_id,
@@ -68,7 +69,8 @@ pub fn upsert_subagent_meta(
             cache_write_tokens = excluded.cache_write_tokens,
             duration_ms = excluded.duration_ms,
             tool_count = excluded.tool_count,
-            timestamp = excluded.timestamp",
+            timestamp = excluded.timestamp,
+            turns = excluded.turns",
         params![
             path,
             &file_modified.to_rfc3339(),
@@ -84,6 +86,7 @@ pub fn upsert_subagent_meta(
             run.duration_ms as i64,
             run.tool_count as i64,
             run.timestamp,
+            run.turns as i64,
         ],
     )
     .map_err(|e| format!("Failed to upsert subagent_meta_cache: {e}"))?;

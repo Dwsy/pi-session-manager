@@ -155,7 +155,8 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             cache_write_tokens INTEGER NOT NULL,
             duration_ms INTEGER NOT NULL,
             tool_count INTEGER NOT NULL,
-            timestamp INTEGER NOT NULL
+            timestamp INTEGER NOT NULL,
+            turns INTEGER NOT NULL DEFAULT 0
         )",
             [],
         )

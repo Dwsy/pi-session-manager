@@ -106,6 +106,9 @@ pub struct SubagentRunInfo {
     pub duration_ms: u64,
     pub tool_count: usize,
     pub timestamp: i64,
+    /// Number of agentic turns (added for @tintinweb/pi-subagents compatibility)
+    #[serde(default)]
+    pub turns: usize,
 }
 
 /// Per-agent-type aggregated stats

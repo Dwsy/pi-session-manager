@@ -101,6 +101,7 @@ fn test_aggregate_multiple_runs() {
             duration_ms: 2000,
             tool_count: 2,
             timestamp: 1000,
+            turns: 2,
         },
         SubagentRunInfo {
             run_id: "run2".to_string(),
@@ -115,6 +116,7 @@ fn test_aggregate_multiple_runs() {
             duration_ms: 10000,
             tool_count: 8,
             timestamp: 2000,
+            turns: 3,
         },
         SubagentRunInfo {
             run_id: "run3".to_string(),
@@ -129,6 +131,7 @@ fn test_aggregate_multiple_runs() {
             duration_ms: 20000,
             tool_count: 15,
             timestamp: 3000,
+            turns: 5,
         },
     ];
 

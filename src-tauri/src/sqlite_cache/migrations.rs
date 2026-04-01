@@ -12,6 +12,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             3 => migration_3(conn)?,
             4 => migration_4(conn)?,
             5 => migration_5(conn)?,
+            6 => migration_6(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -162,6 +163,31 @@ fn migration_5(conn: &Connection) -> Result<(), String> {
             [],
         )
         .map_err(|e| format!("Migration 5 failed adding parent_session_path: {e}"))?;
+    }
+
+    Ok(())
+}
+
+/// Migration to version 6: add turns column to subagent_meta_cache for @tintinweb/pi-subagents compatibility.
+fn migration_6(conn: &Connection) -> Result<(), String> {
+    fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
+        let mut stmt = conn
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .map_err(|e| format!("Failed to prepare PRAGMA table_info for {table}: {e}"))?;
+        let column_names: Vec<String> = stmt
+            .query_map([], |row| row.get(1))
+            .map_err(|e| format!("Failed to query columns for {table}: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect columns for {table}: {e}"))?;
+        Ok(column_names.iter().any(|name| name == column))
+    }
+
+    if !column_exists(conn, "subagent_meta_cache", "turns")? {
+        conn.execute(
+            "ALTER TABLE subagent_meta_cache ADD COLUMN turns INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
+        .map_err(|e| format!("Migration 6 failed adding turns column: {e}"))?;
     }
 
     Ok(())

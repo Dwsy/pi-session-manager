@@ -44,6 +44,7 @@ pub fn parse_meta_json(content: &str) -> Option<SubagentRunInfo> {
         duration_ms: v.get("durationMs").and_then(|x| x.as_u64()).unwrap_or(0),
         tool_count: v.get("toolCount").and_then(|x| x.as_u64()).unwrap_or(0) as usize,
         timestamp: v.get("timestamp").and_then(|x| x.as_i64()).unwrap_or(0),
+        turns: usage.get("turns").and_then(|x| x.as_u64()).unwrap_or(0) as usize,
     })
 }
 
@@ -210,6 +211,7 @@ mod tests {
         assert_eq!(info.duration_ms, 44428);
         assert_eq!(info.tool_count, 13);
         assert_eq!(info.timestamp, 1771087154366);
+        assert_eq!(info.turns, 11); // @tintinweb/pi-subagents compatibility
     }
 
     #[test]
@@ -222,6 +224,7 @@ mod tests {
         assert_eq!(info.cost, 0.0);
         assert_eq!(info.input_tokens, 0);
         assert_eq!(info.output_tokens, 0);
+        assert_eq!(info.turns, 0); // turns defaults to 0 when missing
     }
 
     #[test]
@@ -246,6 +249,7 @@ mod tests {
                 duration_ms: 1000,
                 tool_count: 5,
                 timestamp: 0,
+                turns: 3,
             },
             SubagentRunInfo {
                 run_id: "b".to_string(),
@@ -260,6 +264,7 @@ mod tests {
                 duration_ms: 500,
                 tool_count: 2,
                 timestamp: 0,
+                turns: 2,
             },
             SubagentRunInfo {
                 run_id: "c".to_string(),
@@ -274,6 +279,7 @@ mod tests {
                 duration_ms: 2000,
                 tool_count: 8,
                 timestamp: 0,
+                turns: 5,
             },
         ];
 

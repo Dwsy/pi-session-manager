@@ -1,4 +1,4 @@
-import type { Content, SessionEntry } from '../types'
+import type { Content, SessionEntry, SubagentDetails, TintinwebAgentDetails } from '../types'
 import BashExecution from './BashExecution'
 import ReadExecution from './ReadExecution'
 import WriteExecution from './WriteExecution'
@@ -85,13 +85,30 @@ function ToolCallList({
               />
             )
 
+          case 'Agent':
           case 'subagent':
+            // Only render as SubagentToolCall if this is actually a subagent call
+            // (has subagent_type in arguments or has details)
+            if (args?.subagent_type || result?.message?.details) {
+              return (
+                <SubagentToolCall
+                  key={index}
+                  arguments={args}
+                  details={result?.message?.details as SubagentDetails | TintinwebAgentDetails | undefined}
+                  output={output}
+                  entryId={entryId}
+                  searchQuery={searchQuery}
+                />
+              )
+            }
+            // Fall through to GenericToolCall for regular Agent calls without subagent details
             return (
-              <SubagentToolCall
+              <GenericToolCall
                 key={index}
+                name={name}
                 arguments={args}
-                details={result?.message?.details}
                 output={output}
+                isError={isError}
                 entryId={entryId}
                 searchQuery={searchQuery}
               />

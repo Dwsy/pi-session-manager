@@ -174,15 +174,36 @@ export interface Message {
   toolCallId?: string
   toolName?: string
   isError?: boolean
-  details?: SubagentDetails
+  // Support both our format and @tintinweb/pi-subagents format
+  details?: SubagentDetails | TintinwebAgentDetails | { diff?: string }
 }
 
 // --- Subagent types ---
 
+// Our format: multiple agents with mode
 export interface SubagentDetails {
   mode: 'single' | 'parallel' | 'chain' | 'management'
   results: SubagentResult[]
   artifacts?: { dir: string; files: SubagentArtifactPaths[] }
+}
+
+// @tintinweb/pi-subagents format: single agent details
+export interface TintinwebAgentDetails {
+  displayName: string
+  description: string
+  subagentType: string
+  toolUses: number
+  tokens: string
+  turnCount?: number
+  maxTurns?: number
+  durationMs: number
+  status: 'queued' | 'running' | 'completed' | 'steered' | 'aborted' | 'stopped' | 'error' | 'background'
+  agentId?: string
+  error?: string
+  modelName?: string
+  tags?: string[]
+  activity?: string
+  spinnerFrame?: number
 }
 
 export interface SubagentResult {
@@ -197,6 +218,10 @@ export interface SubagentResult {
   sessionFile?: string
   messages?: any[]
   progress?: any
+  // @tintinweb/pi-subagents compatibility fields
+  agentId?: string
+  outputFile?: string
+  isSidechain?: boolean
 }
 
 export interface SubagentArtifactPaths {
@@ -204,6 +229,16 @@ export interface SubagentArtifactPaths {
   outputPath: string
   jsonlPath: string
   metadataPath: string
+}
+
+// @tintinweb/pi-subagents JSONL output file entry format
+export interface SubagentOutputEntry {
+  isSidechain: boolean
+  agentId: string
+  type: 'user' | 'assistant' | 'toolResult'
+  message: Message
+  timestamp: string
+  cwd: string
 }
 
 export interface Content {

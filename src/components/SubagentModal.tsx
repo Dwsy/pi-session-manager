@@ -32,6 +32,10 @@ function formatTokens(n: number): string {
   return `${(n / 1000000).toFixed(2)}M`
 }
 
+function formatTurns(n: number): string {
+  return `${n} turn${n !== 1 ? 's' : ''}`
+}
+
 // Simple in-memory cache for subagent JSONL content
 const jsonlCache = new Map<string, SessionEntry[]>()
 const MAX_CACHE = 10
@@ -56,20 +60,17 @@ function messagesAsEntries(messages: any[]): SessionEntry[] {
 }
 
 /**
- * Try multiple paths to load subagent session entries.
+ * Load subagent session entries.
  *
- * Why file paths usually fail:
- *   pi-subagents (upstream) sets DEFAULT_ARTIFACT_CONFIG.includeJsonl = false,
- *   so JSONL artifact files are NOT written by default. The artifactPaths.jsonlPath
- *   in the result is always populated as a "would-be" path, but the file rarely
- *   exists. On top of that, cleanupOldArtifacts() runs on session_start and
- *   removes files older than 7 days, so even the few that were written get purged.
+ * Supports two formats:
+ * 1. @tintinweb/pi-subagents: JSONL file in /tmp/ + output text
+ * 2. Our format: sessionFile pointing to ~/.pi/agent/sessions/
  *
- * Fallback strategy:
- *   1. Try artifactPaths.jsonlPath / sessionFile (works for the rare cases)
- *   2. Fall back to result.messages[] — the inline message array that pi-subagents
- *      always embeds in the toolResult details. This covers ~95% of real sessions.
- *   3. Return [] only when both are empty (failed runs with exitCode != 0).
+ * Strategy:
+ *   1. Try sessionFile (our format)
+ *   2. Try artifactPaths.jsonlPath (@tintinweb format - /tmp/)
+ *   3. Fall back to result.messages[] (inline messages)
+ *   4. Return [] if all fail
  */
 async function loadSubagentEntries(result: SubagentResult): Promise<SessionEntry[]> {
   const key = cacheKey(result)
@@ -84,23 +85,35 @@ async function loadSubagentEntries(result: SubagentResult): Promise<SessionEntry
     return entries
   }
 
-  // 1. Try file paths (almost always missing — see comment above)
-  const paths = [
-    result.artifactPaths?.jsonlPath,
-    result.sessionFile,
-  ].filter(Boolean) as string[]
-
-  for (const path of paths) {
+  // 1. Try sessionFile (our format - points to ~/.pi/agent/sessions/)
+  if (result.sessionFile) {
     try {
-      const content = await invoke<string>('read_session_file', { path })
+      const content = await invoke<string>('read_session_file', { path: result.sessionFile })
       if (content?.trim()) {
         const entries = parseSessionEntries(content)
         if (entries.length > 0) return cacheAndReturn(entries)
       }
-    } catch { /* file may not exist, try next */ }
+    } catch (e) {
+      console.log('[SubagentModal] sessionFile read failed:', e)
+    }
   }
 
-  // 2. Fall back to inline messages embedded in the result
+  // 2. Try artifactPaths.jsonlPath (@tintinweb format - /tmp/)
+  // Note: These files are often cleaned up after 7 days, so this usually fails
+  if (result.artifactPaths?.jsonlPath) {
+    try {
+      const content = await invoke<string>('read_session_file', { path: result.artifactPaths.jsonlPath })
+      if (content?.trim()) {
+        const entries = parseSessionEntries(content)
+        if (entries.length > 0) return cacheAndReturn(entries)
+      }
+    } catch (e) {
+      // File was likely cleaned up - this is normal, fall back to inline messages
+      console.log('[SubagentModal] JSONL file cleaned up, using inline messages')
+    }
+  }
+
+  // 3. Fall back to inline messages embedded in the result
   if (result.messages?.length) {
     return cacheAndReturn(messagesAsEntries(result.messages))
   }
@@ -383,6 +396,12 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
                       count: ps.toolCount,
                       defaultValue: '{{count}} tools',
                     })}
+                  </span>
+                )}
+                {result.usage?.turns && (
+                  <span className="subagent-meta-item">
+                    <Bot size={13} />
+                    {formatTurns(result.usage.turns)}
                   </span>
                 )}
               </>

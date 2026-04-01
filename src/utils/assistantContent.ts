@@ -19,10 +19,10 @@ export function looksLikeThinkingText(text: string): boolean {
     normalized.startsWith('thinking…') ||
     normalized.startsWith('thinking:') ||
     normalized.startsWith('reasoning:') ||
-    normalized.startsWith('思考：') ||
-    normalized.startsWith('思考:') ||
-    normalized.startsWith('推理：') ||
-    normalized.startsWith('推理:')
+    normalized.startsWith('Thinking:') ||
+    normalized.startsWith('Thinking:') ||
+    normalized.startsWith('Reasoning:') ||
+    normalized.startsWith('Reasoning:')
   ) {
     return true
   }

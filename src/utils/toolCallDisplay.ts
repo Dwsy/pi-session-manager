@@ -1,4 +1,4 @@
-import type { Content, SessionEntry, SubagentResult } from '../types'
+import type { Content, SessionEntry, SubagentResult, SubagentDetails, TintinwebAgentDetails } from '../types'
 
 import {
   escapeHtml,
@@ -327,11 +327,15 @@ export function getSearchableToolCallRenderedHtmlSegments(
 
     case 'subagent': {
       appendUniqueHtml(segments, output ? escapeHtml(output) : '')
-      result?.message?.details?.results?.forEach((subagentResult) => {
-        getVisibleSubagentResultTextSegments(subagentResult).forEach((segment) => {
-          appendUniqueHtml(segments, escapeHtml(segment))
+      // Only our format has results array
+      const details = result?.message?.details as SubagentDetails | TintinwebAgentDetails | undefined
+      if (details && 'results' in details && Array.isArray(details.results)) {
+        details.results.forEach((subagentResult) => {
+          getVisibleSubagentResultTextSegments(subagentResult).forEach((segment) => {
+            appendUniqueHtml(segments, escapeHtml(segment))
+          })
         })
-      })
+      }
       return segments
     }
 
