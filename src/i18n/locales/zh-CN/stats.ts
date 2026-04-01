@@ -1,13 +1,13 @@
 export const stats = {
   panel: {
     title: '分析仪表板',
-    subtitle: '会话洞察和活动指标',
+    subtitle: 'session洞察和活动指标',
     loading: '加载分析数据中...',
     noData: '无统计数据可用',
     tabs: {
       overview: '概览',
       activity: '活动',
-      projects: '项目',
+      projects: 'project',
       time: '时间',
       tokens: '令牌',
       productivity: '生产力',
@@ -21,12 +21,12 @@ export const stats = {
     },
   },
   cards: {
-    totalSessions: '总会话数',
-    totalMessages: '总消息数',
-    avgPerSession: '平均/会话',
+    totalSessions: '总session数',
+    totalMessages: '总message数',
+    avgPerSession: '平均/session',
     activeDays: '活跃天数',
-    sessions: '会话',
-    messages: '消息',
+    sessions: 'session',
+    messages: 'message',
   },
   activity: {
     title: '活动等级',
@@ -44,12 +44,12 @@ export const stats = {
     monthly: '每月活动',
   },
   productivity: {
-    title: '会话洞察',
-    totalSessions: '总会话数',
-    totalMessages: '总消息数',
-    messagesPerSession: '消息/会话',
-    userMessages: '用户消息',
-    assistantMessages: '助手消息',
+    title: 'session洞察',
+    totalSessions: '总session数',
+    totalMessages: '总message数',
+    messagesPerSession: 'message/session',
+    userMessages: '用户message',
+    assistantMessages: '助手message',
   },
   achievements: {
     title: '成就',

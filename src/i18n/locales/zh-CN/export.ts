@@ -1,7 +1,7 @@
 export const exportModule = {
   dialog: {
-    title: '导出会话',
-    untitledSession: '未命名会话',
+    title: '导出session',
+    untitledSession: '未命名session',
     formats: {
       html: {
         name: 'HTML',

@@ -34,7 +34,7 @@ export const components = {
   },
   writeExecution: {
     filePath: 'ファイルパス',
-    content: '内容',
+    content: 'Content',
     output: '出力',
     success: 'ファイルの書き込み成功',
     lines: '行',

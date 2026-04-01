@@ -1,8 +1,8 @@
 export const languageSwitcher = {
   title: 'Language',
   en: 'English',
-  zh: '中文',
-  ja: '日本語',
+  zh: 'Chinese',
+  ja: 'Japanese',
   fr: 'Français',
   de: 'Deutsch',
   es: 'Español',

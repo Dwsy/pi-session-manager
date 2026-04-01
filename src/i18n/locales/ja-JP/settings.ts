@@ -106,12 +106,12 @@ export const settings = {
   search: {
     defaultSearchMode: 'デフォルト検索モード',
     modes: {
-      content: '内容',
+      content: 'Content',
       name: '名前',
     },
     caseSensitive: '大文字小文字を区別',
     includeToolCalls: 'ツール呼出を含む',
-    includeToolCallsHelp: '検索結果にツール呼出の内容を含む',
+    includeToolCallsHelp: '検索結果にツール呼出のContentを含む',
     highlightMatches: 'マッチをハイライト',
     highlightMatchesHelp: '検索結果でマッチしたテキストをハイライト表示',
   },
