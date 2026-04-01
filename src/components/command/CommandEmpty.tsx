@@ -13,7 +13,7 @@ export default function CommandEmpty({ query }: CommandEmptyProps) {
     <Command.Empty className="flex flex-col items-center justify-center py-12 text-center">
       <SearchX className="w-12 h-12 text-muted-foreground/50 mb-3" />
       <p className="text-sm text-muted-foreground">
-        {t('command.empty', '未找到结果')}
+        {t('command.empty', 'No results found')}
       </p>
       {query && (
         <p className="text-xs text-muted-foreground/70 mt-1">

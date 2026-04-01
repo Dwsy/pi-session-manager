@@ -7,26 +7,26 @@ export default function CommandHints() {
   const hints = [
     {
       icon: MessageSquare,
-      title: t('command.hints.messages', '搜索消息'),
+      title: t('command.hints.messages', 'Search messages'),
       examples: [
-        t('command.hints.messageExample1', '"auth" - 搜索包含 auth 的消息'),
-        t('command.hints.messageExample2', '"error" - 搜索错误相关消息'),
+        t('command.hints.messageExample1', '"auth" - Search messages containing auth'),
+        t('command.hints.messageExample2', '"error" - Search error related messages'),
       ]
     },
     {
       icon: FolderOpen,
-      title: t('command.hints.projects', '搜索项目'),
+      title: t('command.hints.projects', 'Search projects'),
       examples: [
-        t('command.hints.projectExample1', '"pi-session" - 搜索项目名称'),
-        t('command.hints.projectExample2', '"/Users/..." - 搜索项目路径'),
+        t('command.hints.projectExample1', '"pi-session" - Search project names'),
+        t('command.hints.projectExample2', '"/Users/..." - Search project paths'),
       ]
     },
     {
       icon: FileText,
-      title: t('command.hints.sessions', '搜索会话'),
+      title: t('command.hints.sessions', 'Search sessions'),
       examples: [
-        t('command.hints.sessionExample1', '"实现功能" - 搜索会话名称'),
-        t('command.hints.sessionExample2', '"今天" - 搜索最近会话'),
+        t('command.hints.sessionExample1', '"implement feature" - Search session names'),
+        t('command.hints.sessionExample2', '"today" - Search recent sessions'),
       ]
     }
   ]
@@ -36,7 +36,7 @@ export default function CommandHints() {
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-4 h-4 text-blue-400" />
         <h3 className="text-sm font-medium text-foreground">
-          {t('command.hints.title', '搜索提示')}
+          {t('command.hints.title', 'Search tips')}
         </h3>
       </div>
       
@@ -62,12 +62,12 @@ export default function CommandHints() {
       
       <div className="mt-4 pt-4 border-t border-border">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>{t('command.hints.navigate', '使用 ↑↓ 导航')}</span>
-          <span>{t('command.hints.select', '按 Enter 选择')}</span>
+          <span>{t('command.hints.navigate', 'Use ↑↓ to navigate')}</span>
+          <span>{t('command.hints.select', 'Press Enter to select')}</span>
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground/80">
-          <span>{t('command.hints.switchTab', 'Alt + 1/2/3/4 切换分类')}</span>
-          <span>{t('command.hints.scopeToggle', '点击项目按钮切换搜索范围')}</span>
+          <span>{t('command.hints.switchTab', 'Alt + 1/2/3/4 to switch categories')}</span>
+          <span>{t('command.hints.scopeToggle', 'Click project button to switch search scope')}</span>
         </div>
       </div>
     </div>

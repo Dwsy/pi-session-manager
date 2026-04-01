@@ -212,7 +212,7 @@ export default function CommandMenu({
         <Command.Input
           value={query}
           onValueChange={setQuery}
-          placeholder={t('command.placeholder', '搜索会话、项目、消息...')}
+          placeholder={t('command.placeholder', 'Search sessions, projects, messages...')}
           className="flex-1 bg-transparent border-0 outline-none text-[15px] text-foreground placeholder:text-muted-foreground"
         />
         {isSearching && (
@@ -236,15 +236,15 @@ export default function CommandMenu({
           ].join(' ')}
           title={
             !currentProjectName
-              ? t('command.noProjectSelected', '请先选择项目')
+              ? t('command.noProjectSelected', 'Please select a project first')
               : searchCurrentProjectOnly
-                ? t('command.searchAllProjects', '搜索所有项目')
-                : t('command.searchCurrentProject', '只搜索当前项目')
+                ? t('command.searchAllProjects', 'Search all projects')
+                : t('command.searchCurrentProject', 'Search current project only')
           }
         >
           <FolderOpen className="w-3.5 h-3.5" />
           <span className="max-w-[140px] truncate">
-            {currentProjectName || t('command.allProjects', '所有项目')}
+            {currentProjectName || t('command.allProjects', 'All Projects')}
           </span>
         </button>
 
@@ -273,7 +273,7 @@ export default function CommandMenu({
                   ? 'bg-foreground/10 text-foreground border-border-hover shadow-sm'
                   : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-surface hover:border-border/70'
               ].join(' ')}
-              title={t('command.shortcuts.switchTab', '切换分类') + ` (Alt+${tab.shortcut})`}
+              title={t('command.shortcuts.switchTab', 'Switch category') + ` (Alt+${tab.shortcut})`}
             >
               {Icon && <Icon className="w-3.5 h-3.5" />}
               <span>{t(`command.${tab.key}`)}</span>
@@ -295,11 +295,11 @@ export default function CommandMenu({
           <span>
             {t('command.summary.results', {
               count: visibleResultsCount,
-              defaultValue: `${visibleResultsCount} 条结果`
+              defaultValue: `${visibleResultsCount}  results`
             })}
           </span>
           <span className="text-muted-foreground/80">
-            {t('command.shortcuts.switchTab', '切换分类')} Alt + 1/2/3/4
+            {t('command.shortcuts.switchTab', 'Switch category')} Alt + 1/2/3/4
           </span>
         </div>
       )}

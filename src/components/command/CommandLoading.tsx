@@ -8,7 +8,7 @@ export default function CommandLoading() {
     <div className="flex items-center justify-center py-12">
       <Loader2 className="w-6 h-6 text-muted-foreground animate-spin mr-2" />
       <span className="text-sm text-muted-foreground">
-        {t('command.loading', '搜索中...')}
+        {t('command.loading', 'Searching...')}
       </span>
     </div>
   )
