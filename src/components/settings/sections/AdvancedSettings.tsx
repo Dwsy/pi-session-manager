@@ -86,7 +86,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
     const isManual = keyMode === 'manual'
 
     if (isManual && (!key || !value)) {
-      alert(t('settings.advanced.manualKeyValidation', '手动创建时，Key 和 Value 必须同时填写'))
+      alert(t('settings.advanced.manualKeyValidation', 'When creating manually, both Key and Value must be filled'))
       return
     }
 
@@ -104,14 +104,14 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
       await loadApiKeys()
     } catch (e) {
       console.error('Failed to create API key:', e)
-      alert(t('settings.advanced.createKeyFailed', '创建密钥失败'))
+      alert(t('settings.advanced.createKeyFailed', 'Failed to create key'))
     } finally {
       setCreating(false)
     }
   }
 
   const handleRevokeKey = async (keyPreview: string) => {
-    if (!confirm(t('settings.advanced.revokeKeyConfirm', '确定要吊销此密钥？此操作不可撤销。'))) return
+    if (!confirm(t('settings.advanced.revokeKeyConfirm', 'Are you sure you want to revoke this key? This action cannot be undone.'))) return
     try {
       await invoke('revoke_api_key', { keyPreview })
       await loadApiKeys()
@@ -125,18 +125,18 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
   }
 
   const handleClearCache = async () => {
-    if (!confirm(t('settings.advanced.clearCacheConfirm', '确定要清除所有缓存数据吗？这将删除所有会话缓存，但保留收藏夹。'))) {
+    if (!confirm(t('settings.advanced.clearCacheConfirm', 'Are you sure you want to clear all cache data? This will delete all session cache but keep favorites.'))) {
       return
     }
     try {
       const result = await invoke<ClearCacheResult>('clear_cache')
-      alert(t('settings.advanced.cacheClearedDetail', '缓存已清除：{{sessions}} 个会话，{{details}} 个详情缓存', {
+      alert(t('settings.advanced.cacheClearedDetail', 'Cache cleared: {{sessions}} sessions, {{details}} details cache', {
         sessions: result.sessions_deleted,
         details: result.details_deleted
       }))
     } catch (error) {
       console.error('Failed to clear cache:', error)
-      alert(t('settings.advanced.cacheClearFailed', '清除缓存失败'))
+      alert(t('settings.advanced.cacheClearFailed', 'Failed to clear cache'))
     }
   }
 
@@ -152,15 +152,15 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
       {/* Server Settings */}
       {serverSettings && (
         <SettingsCard
-          title={t('settings.advanced.serverSection', '服务设置')}
-          description={t('settings.advanced.serverSectionDesc', 'WebSocket、HTTP API 及认证配置')}
+          title={t('settings.advanced.serverSection', 'Server Settings')}
+          description={t('settings.advanced.serverSectionDesc', 'WebSocket, HTTP API and authentication configuration')}
           icon={<Server className="h-4 w-4" />}
         >
           <div className="space-y-5">
             {/* Bind Address */}
             <SettingsField
-              label={t('settings.advanced.bindAddr', '绑定地址')}
-              description={t('settings.advanced.bindAddrHelp', '127.0.0.1 仅本地访问，0.0.0.0 允许远程连接')}
+              label={t('settings.advanced.bindAddr', 'Bind Address')}
+              description={t('settings.advanced.bindAddrHelp', '127.0.0.1 for local access only, 0.0.0.0 allows remote connections')}
               className="space-y-2"
             >
               <div className="flex flex-wrap items-center gap-2">
@@ -175,7 +175,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
                 {isRemoteBind && (
                   <span className="flex items-center gap-1.5 text-xs text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg">
                     <Shield className="h-3.5 w-3.5 flex-shrink-0" />
-                    {t('settings.advanced.remoteWarning', '远程访问已开启，请确保认证已启用')}
+                    {t('settings.advanced.remoteWarning', 'Remote access is enabled, please ensure authentication is enabled')}
                   </span>
                 )}
               </div>
@@ -192,7 +192,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
             />
             {serverSettings.ws_enabled && (
               <SettingsField
-                label={t('settings.advanced.wsPort', 'WebSocket 端口')}
+                label={t('settings.advanced.wsPort', 'WebSocket Port')}
                 className="space-y-1 pl-0"
                 labelClassName="text-xs text-muted-foreground"
               >
@@ -218,7 +218,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
             />
             {serverSettings.http_enabled && (
               <SettingsField
-                label={t('settings.advanced.httpPort', 'HTTP 端口')}
+                label={t('settings.advanced.httpPort', 'HTTP Port')}
                 className="space-y-1"
                 labelClassName="text-xs text-muted-foreground"
               >
@@ -235,8 +235,8 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
 
             {/* Auth */}
             <SettingsToggleRow
-              title={t('settings.advanced.auth', '认证')}
-              description={t('settings.advanced.authHelp', '非本地连接需要 Token 认证')}
+              title={t('settings.advanced.auth', 'Authentication')}
+              description={t('settings.advanced.authHelp', 'Non-local connections require token authentication')}
               checked={serverSettings.auth_enabled}
               onChange={(checked) => updateServer('auth_enabled', checked)}
               className="items-start py-2 border-t border-border/60"
@@ -249,11 +249,11 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
                   onClick={saveServerSettings}
                   className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring shadow-sm"
                 >
-                  {t('settings.advanced.saveServer', '保存服务设置')}
+                  {t('settings.advanced.saveServer', 'Save server settings')}
                 </button>
                 <span className="flex items-center gap-1.5 text-xs text-amber-400">
                   <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-                  {t('settings.advanced.restartRequired', '需重启应用生效')}
+                  {t('settings.advanced.restartRequired', 'Requires app restart to take effect')}
                 </span>
               </div>
             )}
@@ -263,8 +263,8 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
 
       {/* API Keys */}
       <SettingsCard
-        title={t('settings.advanced.apiKeys', 'API 密钥')}
-        description={t('settings.advanced.apiKeysHelp', '用于远程连接认证，通过 Authorization: Bearer <key> 使用')}
+        title={t('settings.advanced.apiKeys', 'API Keys')}
+        description={t('settings.advanced.apiKeysHelp', 'Used for remote connection authentication via Authorization: Bearer <key>')}
         icon={<Key className="h-4 w-4" />}
       >
         <div className="space-y-4">
@@ -281,16 +281,16 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
                       <code className="text-xs text-muted-foreground font-mono truncate">{k.key_preview}</code>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {t('settings.advanced.keyCreated', '创建')}: {new Date(k.created_at).toLocaleDateString()}
+                      {t('settings.advanced.keyCreated', 'Create')}: {new Date(k.created_at).toLocaleDateString()}
                       {k.last_used && (
-                        <> · {t('settings.advanced.keyLastUsed', '最后使用')}: {new Date(k.last_used).toLocaleDateString()}</>
+                        <> · {t('settings.advanced.keyLastUsed', 'Last used')}: {new Date(k.last_used).toLocaleDateString()}</>
                       )}
                     </div>
                   </div>
                   <button
                     onClick={() => handleRevokeKey(k.key_preview)}
                     className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg motion-color motion-press focus-ring flex-shrink-0"
-                    title={t('settings.advanced.revokeKey', '吊销')}
+                    title={t('settings.advanced.revokeKey', 'Revoke')}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -302,7 +302,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
           {newKeyValue && (
             <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg space-y-3">
               <p className="text-sm text-green-400">
-                {t('settings.advanced.newKeyCreated', '密钥已创建，请立即复制保存，此后不再显示完整密钥。')}
+                {t('settings.advanced.newKeyCreated', 'Key created, please copy and save it now, the full key will not be shown again.')}
               </p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 text-xs font-mono text-foreground bg-surface px-3 py-2 rounded-lg break-all select-all border border-border">
@@ -311,7 +311,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
                 <button
                   onClick={() => { copyToClipboard(newKeyValue); setNewKeyValue(null) }}
                   className="p-2 text-info hover:bg-info/10 rounded-lg motion-color motion-press focus-ring flex-shrink-0"
-                  title={t('settings.advanced.copyKey', '复制')}
+                  title={t('settings.advanced.copyKey', 'Copy')}
                 >
                   <Copy className="h-4 w-4" />
                 </button>
@@ -321,7 +321,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
 
           <div className="space-y-2">
             <label className="block text-xs text-muted-foreground">
-              {t('settings.advanced.keyMode', '创建模式')}
+              {t('settings.advanced.keyMode', 'Creation Mode')}
             </label>
             <div className="inline-flex rounded-lg border border-border p-1 bg-surface/60">
               <button
@@ -333,14 +333,14 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
                 }}
                 className={`px-3 py-1.5 text-xs rounded-md motion-color motion-press focus-ring ${keyMode === 'auto' ? 'bg-info text-white' : 'text-muted-foreground hover:text-foreground'}`}
               >
-                {t('settings.advanced.keyModeAuto', '自动生成')}
+                {t('settings.advanced.keyModeAuto', 'Auto generate')}
               </button>
               <button
                 type="button"
                 onClick={() => setKeyMode('manual')}
                 className={`px-3 py-1.5 text-xs rounded-md motion-color motion-press focus-ring ${keyMode === 'manual' ? 'bg-info text-white' : 'text-muted-foreground hover:text-foreground'}`}
               >
-                {t('settings.advanced.keyModeManual', '手动设置')}
+                {t('settings.advanced.keyModeManual', 'Manual Setup')}
               </button>
             </div>
           </div>
@@ -350,7 +350,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
               type="text"
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
-              placeholder={t('settings.advanced.keyNamePlaceholder', '密钥名称（可选）')}
+              placeholder={t('settings.advanced.keyNamePlaceholder', 'Key name (optional)')}
               className={inputAccentClass}
             />
             {keyMode === 'manual' && (
@@ -359,14 +359,14 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
                   type="text"
                   value={manualKey}
                   onChange={(e) => setManualKey(e.target.value)}
-                  placeholder={t('settings.advanced.manualKeyPlaceholder', '手动 Key（可选）')}
+                  placeholder={t('settings.advanced.manualKeyPlaceholder', 'Manual Key (optional)')}
                   className={inputAccentClass}
                 />
                 <SettingsInput
                   type="text"
                   value={manualValue}
                   onChange={(e) => setManualValue(e.target.value)}
-                  placeholder={t('settings.advanced.manualValuePlaceholder', '手动 Value（可选）')}
+                  placeholder={t('settings.advanced.manualValuePlaceholder', 'Manual Value (optional)')}
                   className={inputAccentClass}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreateKey()}
                 />
@@ -376,8 +376,8 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
 
           <p className="text-xs text-muted-foreground">
             {keyMode === 'manual'
-              ? t('settings.advanced.manualKeyHint', '手动模式下需要同时填写 Key 和 Value。')
-              : t('settings.advanced.autoKeyHint', '自动模式将随机生成安全密钥。')}
+              ? t('settings.advanced.manualKeyHint', 'Both Key and Value must be filled in manual mode.')
+              : t('settings.advanced.autoKeyHint', 'Auto mode will randomly generate a secure key.')}
           </p>
 
           <div>
@@ -387,7 +387,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-info hover:bg-info/90 text-white rounded-lg motion-color motion-press focus-ring disabled:opacity-50 shadow-sm"
             >
               <Plus className="h-4 w-4" />
-              {t('settings.advanced.createKey', '创建密钥')}
+              {t('settings.advanced.createKey', 'Create Key')}
             </button>
           </div>
         </div>
@@ -395,8 +395,8 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
 
       {/* Session Dirs */}
       <SettingsCard
-        title={t('settings.advanced.sessionDir', '会话目录')}
-        description={t('settings.advanced.sessionDirHelp', 'Pi 会话文件的存储位置，默认路径始终包含在内')}
+        title={t('settings.advanced.sessionDir', 'Session directories')}
+        description={t('settings.advanced.sessionDirHelp', 'Storage location for Pi session files, default path is always included')}
         icon={<FolderOpen className="h-4 w-4" />}
       >
         <div className="space-y-3">
@@ -408,7 +408,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
               className={`flex-1 w-auto ${inputAccentClass} opacity-80 cursor-not-allowed`}
             />
             <span className="text-xs text-muted-foreground whitespace-nowrap px-2 py-1 bg-secondary/50 rounded">
-              {t('settings.advanced.defaultSessionDir', '默认')}
+              {t('settings.advanced.defaultSessionDir', 'Default')}
             </span>
           </div>
           {(settings.advanced.sessionDirs || [])
@@ -437,7 +437,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
                     onUpdate('advanced', 'sessionDirs', ['~/.pi/agent/sessions', ...extraDirs])
                   }}
                   className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg motion-color motion-press focus-ring"
-                  title={t('settings.advanced.removeSessionDir', '移除')}
+                  title={t('settings.advanced.removeSessionDir', 'Remove')}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -451,20 +451,20 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
             className="flex items-center gap-2 px-3 py-2 text-sm text-info hover:bg-info/10 rounded-lg motion-color motion-press focus-ring"
           >
             <Plus className="h-4 w-4" />
-            {t('settings.advanced.addSessionDir', '添加路径')}
+            {t('settings.advanced.addSessionDir', 'Add path')}
           </button>
         </div>
       </SettingsCard>
 
       {/* General options card */}
       <SettingsCard
-        title={t('settings.advanced.generalTitle', '常规选项')}
+        title={t('settings.advanced.generalTitle', 'General options')}
         icon={<Settings2 className="h-4 w-4" />}
       >
         <div className="space-y-4">
           <SettingsToggleRow
-            title={t('settings.advanced.cacheEnabled', '启用缓存')}
-            description={t('settings.advanced.cacheEnabledHelp', '缓存会话数据以提高性能')}
+            title={t('settings.advanced.cacheEnabled', 'Enable cache')}
+            description={t('settings.advanced.cacheEnabledHelp', 'Cache session data to improve performance')}
             checked={settings.advanced.cacheEnabled}
             onChange={(checked) => onUpdate('advanced', 'cacheEnabled', checked)}
             className="items-start py-2"
@@ -473,7 +473,7 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
           {settings.advanced.cacheEnabled && (
             <div className="pl-0 pt-2 border-t border-border/60">
               <SettingsSliderField
-                label={t('settings.advanced.maxCacheSize', '最大缓存大小')}
+                label={t('settings.advanced.maxCacheSize', 'Max cache size')}
                 value={settings.advanced.maxCacheSize}
                 min={10}
                 max={1000}
@@ -488,8 +488,8 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
           )}
 
           <SettingsToggleRow
-            title={t('settings.advanced.debugMode', '调试模式')}
-            description={t('settings.advanced.debugModeHelp', '启用详细日志记录')}
+            title={t('settings.advanced.debugMode', 'Debug mode')}
+            description={t('settings.advanced.debugModeHelp', 'Enable verbose logging')}
             checked={settings.advanced.debugMode}
             onChange={(checked) => onUpdate('advanced', 'debugMode', checked)}
             className="items-start py-2 border-t border-border/60"
@@ -497,8 +497,8 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
           />
 
           <SettingsToggleRow
-            title={t('app.demoMode', '演示模式')}
-            description={t('app.demoModeDescription', '查看演示数据以探索所有功能')}
+            title={t('app.demoMode', 'Demo mode')}
+            description={t('app.demoModeDescription', 'View demo data to explore all features')}
             checked={settings.advanced.demoMode}
             onChange={(checked) => onUpdate('advanced', 'demoMode', checked)}
             className="items-start py-2 border-t border-border/60"
@@ -513,17 +513,17 @@ export default function AdvancedSettings({ settings, onUpdate }: AdvancedSetting
           <button
             onClick={() => {
               localStorage.removeItem('onboarding-completed')
-              alert(t('settings.advanced.onboardingReset', '下次打开应用时将显示引导'))
+              alert(t('settings.advanced.onboardingReset', 'Onboarding will be shown next time the app opens'))
             }}
             className="px-4 py-2 bg-info/10 text-info hover:bg-info/20 rounded-lg text-sm font-medium motion-color motion-press focus-ring"
           >
-            {t('settings.advanced.showOnboarding', '重新显示新手引导')}
+            {t('settings.advanced.showOnboarding', 'Show onboarding again')}
           </button>
           <button
             onClick={handleClearCache}
             className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium motion-color motion-press focus-ring"
           >
-            {t('settings.advanced.clearCache', '清除缓存')}
+            {t('settings.advanced.clearCache', 'Clear cache')}
           </button>
         </div>
       </SettingsCard>

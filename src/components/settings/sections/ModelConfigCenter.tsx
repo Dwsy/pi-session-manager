@@ -430,7 +430,7 @@ export default function ModelConfigCenter() {
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
 
   const [selectedProvider, setSelectedProvider] = useState('')
-  // 选中模型用索引而不是 id，允许用户先创建空模型再补齐 ID。
+  // Use index instead of ID for selected model, allowing users to create an empty model first and fill in the ID later.
   const [selectedModel, setSelectedModel] = useState('')
   const [providerNameDraft, setProviderNameDraft] = useState('')
 
@@ -472,7 +472,7 @@ export default function ModelConfigCenter() {
     ? selectedProviderModels[selectedModelIndex]
     : undefined
   const activeModelLabel = selectedModelEntry
-    ? (selectedModelEntry.name?.trim() || selectedModelEntry.id?.trim() || t('settings.modelConfigCenter.status.unnamedModel', '未命名模型'))
+    ? (selectedModelEntry.name?.trim() || selectedModelEntry.id?.trim() || t('settings.modelConfigCenter.status.unnamedModel', 'Unnamed Model'))
     : ''
 
 
@@ -550,7 +550,7 @@ export default function ModelConfigCenter() {
       setConfig(parsed)
       setBackups(backupItems)
       setVersions(versionItems)
-      // 用稳定序列化结果比较草稿是否发生变化，避免对象引用导致的误判。
+      // Compare drafts using stable serialization results to avoid misjudgment caused by object references.
       setBaselineSnapshot(serializeConfig(parsed))
       setSelectedProvider(nextProvider)
       setSelectedModel(nextModel)
@@ -558,7 +558,7 @@ export default function ModelConfigCenter() {
       console.error('Failed to load model config center:', error)
       setFeedback({
         tone: 'error',
-        message: t('settings.modelConfigCenter.feedback.loadFailed', '加载模型配置失败：{{reason}}', {
+        message: t('settings.modelConfigCenter.feedback.loadFailed', 'Failed to load model config: {{reason}}', {
           reason: asErrorMessage(error),
         }),
       })
@@ -584,9 +584,9 @@ export default function ModelConfigCenter() {
     }
 
     openConfirm({
-      title: t('settings.modelConfigCenter.dialogs.unsavedTitle', '放弃未保存的改动？'),
+      title: t('settings.modelConfigCenter.dialogs.unsavedTitle', 'Discard unsaved changes?'),
       description,
-      confirmLabel: t('settings.modelConfigCenter.actions.continue', '继续'),
+      confirmLabel: t('settings.modelConfigCenter.actions.continue', 'Continue'),
       tone: 'warning',
       onConfirm,
     })
@@ -659,7 +659,7 @@ export default function ModelConfigCenter() {
       setProviderNameDraft(selectedProvider)
       pushFeedback(
         'warning',
-        t('settings.modelConfigCenter.feedback.providerNameRequired', 'Provider 名称不能为空')
+        t('settings.modelConfigCenter.feedback.providerNameRequired', 'Provider name cannot be empty')
       )
       return
     }
@@ -672,7 +672,7 @@ export default function ModelConfigCenter() {
       setProviderNameDraft(selectedProvider)
       pushFeedback(
         'error',
-        t('settings.modelConfigCenter.feedback.providerNameExists', 'Provider 名称已存在：{{name}}', {
+        t('settings.modelConfigCenter.feedback.providerNameExists', 'Provider name already exists: {{name}}', {
           name: nextName,
         })
       )
@@ -689,7 +689,7 @@ export default function ModelConfigCenter() {
     setSelectedProvider(nextName)
     pushFeedback(
       'success',
-      t('settings.modelConfigCenter.feedback.providerRenamed', 'Provider 已重命名为 {{name}}', {
+      t('settings.modelConfigCenter.feedback.providerRenamed', 'Provider renamed to {{name}}', {
         name: nextName,
       })
     )
@@ -700,7 +700,7 @@ export default function ModelConfigCenter() {
     if (!name) {
       pushFeedback(
         'warning',
-        t('settings.modelConfigCenter.feedback.providerNameRequired', 'Provider 名称不能为空')
+        t('settings.modelConfigCenter.feedback.providerNameRequired', 'Provider name cannot be empty')
       )
       return
     }
@@ -708,7 +708,7 @@ export default function ModelConfigCenter() {
     if (config.providers[name]) {
       pushFeedback(
         'error',
-        t('settings.modelConfigCenter.feedback.providerNameExists', 'Provider 名称已存在：{{name}}', {
+        t('settings.modelConfigCenter.feedback.providerNameExists', 'Provider name already exists: {{name}}', {
           name,
         })
       )
@@ -731,17 +731,17 @@ export default function ModelConfigCenter() {
     setNewProviderName('')
     pushFeedback(
       'success',
-      t('settings.modelConfigCenter.feedback.providerCreated', '已创建 Provider：{{name}}', { name })
+      t('settings.modelConfigCenter.feedback.providerCreated', 'Provider created: {{name}}', { name })
     )
   }
 
   function requestDeleteProvider(providerName: string) {
     openConfirm({
-      title: t('settings.modelConfigCenter.dialogs.deleteProviderTitle', '删除 Provider？'),
-      description: t('settings.modelConfigCenter.dialogs.deleteProviderDesc', '这会从当前草稿中移除 Provider“{{name}}”及其所有模型。', {
+      title: t('settings.modelConfigCenter.dialogs.deleteProviderTitle', 'Delete Provider?'),
+      description: t('settings.modelConfigCenter.dialogs.deleteProviderDesc', 'This will remove Provider "{{name}}" and all its models from the current draft.', {
         name: providerName,
       }),
-      confirmLabel: t('settings.modelConfigCenter.actions.delete', '删除'),
+      confirmLabel: t('settings.modelConfigCenter.actions.delete', 'Delete'),
       tone: 'danger',
       onConfirm: () => {
         setConfig((prev) => {
@@ -755,7 +755,7 @@ export default function ModelConfigCenter() {
         }
         pushFeedback(
           'success',
-          t('settings.modelConfigCenter.feedback.providerDeleted', '已移除 Provider：{{name}}', {
+          t('settings.modelConfigCenter.feedback.providerDeleted', 'Provider removed: {{name}}', {
             name: providerName,
           })
         )
@@ -773,32 +773,29 @@ export default function ModelConfigCenter() {
     setSelectedModel(modelSelectionValue(nextIndex))
     setMainTab('configure')
     setConfigDetailTab('model')
-    pushFeedback('info', t('settings.modelConfigCenter.feedback.modelCreated', '已新增一个模型草稿'))
+    pushFeedback('info', t('settings.modelConfigCenter.feedback.modelCreated', 'New model draft added'))
   }
 
   function requestDeleteModel(index: number) {
     if (!selectedProvider) return
     const currentModel = selectedProviderModels[index]
-    const modelLabel = currentModel?.name?.trim() || currentModel?.id?.trim() || t('settings.modelConfigCenter.status.unnamedModel', '未命名模型')
+    const modelLabel = currentModel?.name?.trim() || currentModel?.id?.trim() || t('settings.modelConfigCenter.status.unnamedModel', 'Unnamed Model')
 
     openConfirm({
-      title: t('settings.modelConfigCenter.dialogs.deleteModelTitle', '删除模型？'),
-      description: t('settings.modelConfigCenter.dialogs.deleteModelDesc', '这会从当前草稿中移除模型“{{name}}”。', {
+      title: t('settings.modelConfigCenter.dialogs.deleteModelTitle', 'Delete model?'),
+      description: t('settings.modelConfigCenter.dialogs.deleteModelDesc', 'This will remove model "{{name}}" from the current draft.', {
         name: modelLabel,
       }),
-      confirmLabel: t('settings.modelConfigCenter.actions.delete', '删除'),
+      confirmLabel: t('settings.modelConfigCenter.actions.delete', 'Delete'),
       tone: 'danger',
       onConfirm: () => {
         updateSelectedProviderEntry((provider) => ({
           ...provider,
           models: (provider.models ?? []).filter((_, modelIndex) => modelIndex !== index),
         }))
-        pushFeedback(
-          'success',
-          t('settings.modelConfigCenter.feedback.modelDeleted', '已移除模型“{{name}}”', {
-            name: modelLabel,
-          })
-        )
+        pushFeedback('success', t('settings.modelConfigCenter.feedback.modelRemoved', 'Model "{{name}}" removed', {
+          name: modelLabel,
+        }))
       },
     })
   }
@@ -809,12 +806,12 @@ export default function ModelConfigCenter() {
     try {
       await invoke('save_model_config', { content: config, createBackup: true })
       await loadAll({ showSpinner: false })
-      pushFeedback('success', t('settings.modelConfigCenter.feedback.saveSuccess', '模型配置已保存'))
+      pushFeedback('success', t('settings.modelConfigCenter.feedback.saveSuccess', 'Model configuration saved'))
     } catch (error) {
       console.error('Save model config failed:', error)
       pushFeedback(
         'error',
-        t('settings.modelConfigCenter.feedback.saveFailed', '保存失败：{{reason}}', {
+        t('settings.modelConfigCenter.feedback.saveFailed', 'Save failed: {{reason}}', {
           reason: asErrorMessage(error),
         })
       )
@@ -825,7 +822,7 @@ export default function ModelConfigCenter() {
 
   function refreshConfig() {
     guardUnsaved(
-      t('settings.modelConfigCenter.dialogs.unsavedDescRefresh', '刷新会丢弃当前未保存的改动，并重新加载磁盘内容。'),
+      t('settings.modelConfigCenter.dialogs.unsavedDescRefresh', 'Refreshing will discard current unsaved changes and reload disk content.'),
       async () => {
         setBusy('refresh')
         try {
@@ -842,11 +839,11 @@ export default function ModelConfigCenter() {
     try {
       await invoke('create_model_config_backup', { note: 'manual backup from model config center' })
       await loadAll({ showSpinner: false })
-      pushFeedback('success', t('settings.modelConfigCenter.feedback.backupCreated', '已创建配置备份'))
+      pushFeedback('success', t('settings.modelConfigCenter.feedback.backupCreated', 'Configuration backup created'))
     } catch (error) {
       pushFeedback(
         'error',
-        t('settings.modelConfigCenter.feedback.backupCreateFailed', '创建备份失败：{{reason}}', {
+        t('settings.modelConfigCenter.feedback.backupCreateFailed', 'Failed to create backup: {{reason}}', {
           reason: asErrorMessage(error),
         })
       )
@@ -866,12 +863,12 @@ export default function ModelConfigCenter() {
       await invoke('export_model_config_to_path', { path: pathValue })
       pushFeedback(
         'success',
-        t('settings.modelConfigCenter.feedback.exportSuccess', '已导出到 {{path}}', { path: pathValue })
+        t('settings.modelConfigCenter.feedback.exportSuccess', 'Exported to {{path}}', { path: pathValue })
       )
     } catch (error) {
       pushFeedback(
         'error',
-        t('settings.modelConfigCenter.feedback.exportFailed', '导出失败：{{reason}}', {
+        t('settings.modelConfigCenter.feedback.exportFailed', 'Export failed: {{reason}}', {
           reason: asErrorMessage(error),
         })
       )
@@ -881,11 +878,11 @@ export default function ModelConfigCenter() {
   async function copyDraftJson() {
     try {
       await copyText(prettyConfig(config))
-      pushFeedback('success', t('settings.modelConfigCenter.feedback.copySuccess', '当前草稿 JSON 已复制'))
+      pushFeedback('success', t('settings.modelConfigCenter.feedback.copySuccess', 'Current draft JSON copied'))
     } catch (error) {
       pushFeedback(
         'error',
-        t('settings.modelConfigCenter.feedback.copyFailed', '复制失败：{{reason}}', {
+        t('settings.modelConfigCenter.feedback.copyFailed', 'Copy failed: {{reason}}', {
           reason: asErrorMessage(error),
         })
       )
@@ -894,7 +891,7 @@ export default function ModelConfigCenter() {
 
   function openImportContentModal() {
     guardUnsaved(
-      t('settings.modelConfigCenter.dialogs.unsavedDescImport', '导入会覆盖当前草稿状态，请先保存或确认放弃未保存修改。'),
+      t('settings.modelConfigCenter.dialogs.unsavedDescImport', 'Importing will overwrite current draft state, please save first or confirm to discard unsaved changes.'),
       () => {
         setImportContentDraft('')
         setShowImportModal(true)
@@ -904,7 +901,7 @@ export default function ModelConfigCenter() {
 
   function importFromPath() {
     guardUnsaved(
-      t('settings.modelConfigCenter.dialogs.unsavedDescImport', '导入会覆盖当前草稿状态，请先保存或确认放弃未保存修改。'),
+      t('settings.modelConfigCenter.dialogs.unsavedDescImport', 'Importing will overwrite current draft state, please save first or confirm to discard unsaved changes.'),
       async () => {
         const selected = await openDialog({
           title: 'Import model config',
@@ -917,11 +914,11 @@ export default function ModelConfigCenter() {
         try {
           await invoke('import_model_config_from_path', { path: selected, mode: importMode })
           await loadAll({ showSpinner: false })
-          pushFeedback('success', t('settings.modelConfigCenter.feedback.importSuccess', '模型配置已导入'))
+          pushFeedback('success', t('settings.modelConfigCenter.feedback.importSuccess', 'Model configuration imported'))
         } catch (error) {
           pushFeedback(
             'error',
-            t('settings.modelConfigCenter.feedback.importFailed', '导入失败：{{reason}}', {
+            t('settings.modelConfigCenter.feedback.importFailed', 'Import failed: {{reason}}', {
               reason: asErrorMessage(error),
             })
           )
@@ -939,7 +936,7 @@ export default function ModelConfigCenter() {
     } catch (error) {
       pushFeedback(
         'error',
-        t('settings.modelConfigCenter.feedback.clipboardFailed', '读取剪贴板失败：{{reason}}', {
+        t('settings.modelConfigCenter.feedback.clipboardFailed', 'Failed to read clipboard: {{reason}}', {
           reason: asErrorMessage(error),
         })
       )
@@ -951,7 +948,7 @@ export default function ModelConfigCenter() {
     if (!content) {
       pushFeedback(
         'warning',
-        t('settings.modelConfigCenter.feedback.importInvalidJson', '请输入有效的 JSON 内容')
+        t('settings.modelConfigCenter.feedback.importInvalidJson', 'Please enter valid JSON content')
       )
       return
     }
@@ -961,7 +958,7 @@ export default function ModelConfigCenter() {
     } catch {
       pushFeedback(
         'error',
-        t('settings.modelConfigCenter.feedback.importInvalidJson', '请输入有效的 JSON 内容')
+        t('settings.modelConfigCenter.feedback.importInvalidJson', 'Please enter valid JSON content')
       )
       return
     }
@@ -971,11 +968,11 @@ export default function ModelConfigCenter() {
       await invoke('import_model_config_content', { content, mode: importMode })
       setShowImportModal(false)
       await loadAll({ showSpinner: false })
-      pushFeedback('success', t('settings.modelConfigCenter.feedback.importSuccess', '模型配置已导入'))
+      pushFeedback('success', t('settings.modelConfigCenter.feedback.importSuccess', 'Model configuration imported'))
     } catch (error) {
       pushFeedback(
         'error',
-        t('settings.modelConfigCenter.feedback.importFailed', '导入失败：{{reason}}', {
+        t('settings.modelConfigCenter.feedback.importFailed', 'Import failed: {{reason}}', {
           reason: asErrorMessage(error),
         })
       )
@@ -987,20 +984,20 @@ export default function ModelConfigCenter() {
   function requestRestoreBackup(backupId: string) {
     const confirmRestore = () => {
       openConfirm({
-        title: t('settings.modelConfigCenter.dialogs.restoreBackupTitle', '恢复这个备份？'),
-        description: t('settings.modelConfigCenter.dialogs.restoreBackupDesc', '恢复后会自动为当前配置创建一个新备份。'),
-        confirmLabel: t('settings.modelConfigCenter.actions.restore', '恢复'),
+        title: t('settings.modelConfigCenter.dialogs.restoreBackupTitle', 'Restore this backup?'),
+        description: t('settings.modelConfigCenter.dialogs.restoreBackupDesc', 'A new backup will be automatically created for the current configuration after restoration.'),
+        confirmLabel: t('settings.modelConfigCenter.actions.restore', 'Resume'),
         tone: 'warning',
         onConfirm: async () => {
           setBusy(`restore-${backupId}`)
           try {
             await invoke('restore_model_config_backup', { id: backupId })
             await loadAll({ showSpinner: false })
-            pushFeedback('success', t('settings.modelConfigCenter.feedback.backupRestored', '备份已恢复'))
+            pushFeedback('success', t('settings.modelConfigCenter.feedback.backupRestored', 'Backup restored'))
           } catch (error) {
             pushFeedback(
               'error',
-              t('settings.modelConfigCenter.feedback.backupRestoreFailed', '恢复备份失败：{{reason}}', {
+              t('settings.modelConfigCenter.feedback.backupRestoreFailed', 'Failed to restore backup: {{reason}}', {
                 reason: asErrorMessage(error),
               })
             )
@@ -1012,27 +1009,27 @@ export default function ModelConfigCenter() {
     }
 
     guardUnsaved(
-      t('settings.modelConfigCenter.dialogs.unsavedDescRestore', '恢复操作会覆盖当前草稿内容，请先保存或确认放弃未保存修改。'),
+      t('settings.modelConfigCenter.dialogs.unsavedDescRestore', 'Restoration will overwrite current draft content, please save first or confirm to discard unsaved changes.'),
       confirmRestore
     )
   }
 
   function requestDeleteBackup(backupId: string) {
     openConfirm({
-      title: t('settings.modelConfigCenter.dialogs.deleteBackupTitle', '删除这个备份？'),
-      description: t('settings.modelConfigCenter.dialogs.deleteBackupDesc', '删除后无法恢复该备份文件。'),
-      confirmLabel: t('settings.modelConfigCenter.actions.delete', '删除'),
+      title: t('settings.modelConfigCenter.dialogs.deleteBackupTitle', 'Delete this backup?'),
+      description: t('settings.modelConfigCenter.dialogs.deleteBackupDesc', 'This backup file cannot be recovered after deletion.'),
+      confirmLabel: t('settings.modelConfigCenter.actions.delete', 'Delete'),
       tone: 'danger',
       onConfirm: async () => {
         setBusy(`delete-${backupId}`)
         try {
           await invoke('delete_model_config_backup', { id: backupId })
           await loadAll({ showSpinner: false })
-          pushFeedback('success', t('settings.modelConfigCenter.feedback.backupDeleted', '备份已删除'))
+          pushFeedback('success', t('settings.modelConfigCenter.feedback.backupDeleted', 'Backup deleted'))
         } catch (error) {
           pushFeedback(
             'error',
-            t('settings.modelConfigCenter.feedback.backupDeleteFailed', '删除备份失败：{{reason}}', {
+            t('settings.modelConfigCenter.feedback.backupDeleteFailed', 'Failed to delete backup: {{reason}}', {
               reason: asErrorMessage(error),
             })
           )
@@ -1046,9 +1043,9 @@ export default function ModelConfigCenter() {
   function requestRestoreVersion(versionId: number) {
     const confirmRestore = () => {
       openConfirm({
-        title: t('settings.modelConfigCenter.dialogs.restoreVersionTitle', '恢复这个版本？'),
-        description: t('settings.modelConfigCenter.dialogs.restoreVersionDesc', '这会把当前配置回退到所选历史版本。'),
-        confirmLabel: t('settings.modelConfigCenter.actions.restore', '恢复'),
+        title: t('settings.modelConfigCenter.dialogs.restoreVersionTitle', 'Restore this version?'),
+        description: t('settings.modelConfigCenter.dialogs.restoreVersionDesc', 'This will revert the current configuration to the selected historical version.'),
+        confirmLabel: t('settings.modelConfigCenter.actions.restore', 'Resume'),
         tone: 'warning',
         onConfirm: async () => {
           setBusy(`version-${versionId}`)
@@ -1057,14 +1054,14 @@ export default function ModelConfigCenter() {
             await loadAll({ showSpinner: false })
             pushFeedback(
               'success',
-              t('settings.modelConfigCenter.feedback.versionRestored', '已恢复到版本 #{{id}}', {
+              t('settings.modelConfigCenter.feedback.versionRestored', 'Restored to version #{{id}}', {
                 id: versionId,
               })
             )
           } catch (error) {
             pushFeedback(
               'error',
-              t('settings.modelConfigCenter.feedback.versionRestoreFailed', '恢复版本失败：{{reason}}', {
+              t('settings.modelConfigCenter.feedback.versionRestoreFailed', 'Failed to restore version: {{reason}}', {
                 reason: asErrorMessage(error),
               })
             )
@@ -1076,7 +1073,7 @@ export default function ModelConfigCenter() {
     }
 
     guardUnsaved(
-      t('settings.modelConfigCenter.dialogs.unsavedDescRestore', '恢复操作会覆盖当前草稿内容，请先保存或确认放弃未保存修改。'),
+      t('settings.modelConfigCenter.dialogs.unsavedDescRestore', 'Restoration will overwrite current draft content, please save first or confirm to discard unsaved changes.'),
       confirmRestore
     )
   }
@@ -1097,7 +1094,7 @@ export default function ModelConfigCenter() {
     } catch (error) {
       pushFeedback(
         'error',
-        t('settings.modelConfigCenter.feedback.httpTestFailed', 'HTTP 测试失败：{{reason}}', {
+        t('settings.modelConfigCenter.feedback.httpTestFailed', 'HTTP test failed: {{reason}}', {
           reason: asErrorMessage(error),
         })
       )
@@ -1110,11 +1107,11 @@ export default function ModelConfigCenter() {
     if (!testResult) return
     try {
       await copyText(testResult.curlCommand)
-      pushFeedback('success', t('settings.modelConfigCenter.feedback.curlCopied', 'cURL 已复制'))
+      pushFeedback('success', t('settings.modelConfigCenter.feedback.curlCopied', 'cURL copied'))
     } catch (error) {
       pushFeedback(
         'error',
-        t('settings.modelConfigCenter.feedback.copyFailed', '复制失败：{{reason}}', {
+        t('settings.modelConfigCenter.feedback.copyFailed', 'Copy failed: {{reason}}', {
           reason: asErrorMessage(error),
         })
       )
@@ -1135,8 +1132,8 @@ export default function ModelConfigCenter() {
       <div className="space-y-4">
         <SettingsCard
           icon={<Server className="h-5 w-5" />}
-          title={t('settings.modelConfigCenter.title', '模型配置中心')}
-          description={t('settings.modelConfigCenter.description', '可视化编辑 ~/.pi/agent/models.json，支持备份/版本/导入导出与在线 HTTP 测试。')}
+          title={t('settings.modelConfigCenter.title', 'Model Config Center')}
+          description={t('settings.modelConfigCenter.description', 'Visually edit ~/.pi/agent/models.json, with backup/version/import-export and online HTTP testing support.')}
         >
           <div className="space-y-4">
             {feedback && (
@@ -1156,8 +1153,8 @@ export default function ModelConfigCenter() {
                       : 'bg-green-500/10 text-green-300'
                   }`}>
                     {isDirty
-                      ? t('settings.modelConfigCenter.status.dirty', '未保存改动')
-                      : t('settings.modelConfigCenter.status.saved', '已与磁盘同步')}
+                      ? t('settings.modelConfigCenter.status.dirty', 'Unsaved changes')
+                      : t('settings.modelConfigCenter.status.saved', 'Synced with disk')}
                   </span>
                   {selectedProvider && (
                     <span className="inline-flex items-center rounded-full bg-surface px-2.5 py-1 text-xs text-foreground">
@@ -1175,7 +1172,7 @@ export default function ModelConfigCenter() {
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {t('settings.modelConfigCenter.pathLabel', '配置文件')}: <span className="font-mono text-foreground/80">{MODEL_CONFIG_PATH}</span>
+                  {t('settings.modelConfigCenter.pathLabel', 'Config file')}: <span className="font-mono text-foreground/80">{MODEL_CONFIG_PATH}</span>
                 </div>
               </div>
 
@@ -1187,7 +1184,7 @@ export default function ModelConfigCenter() {
                   className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm font-medium text-white hover:bg-info/90 motion-color motion-press focus-ring disabled:opacity-60"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {t('settings.modelConfigCenter.actions.save', '保存配置')}
+                  {t('settings.modelConfigCenter.actions.save', 'Save Configuration')}
                 </button>
                 <button
                   type="button"
@@ -1196,7 +1193,7 @@ export default function ModelConfigCenter() {
                   className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring disabled:opacity-60"
                 >
                   {busy === 'refresh' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  {t('settings.modelConfigCenter.actions.refresh', '刷新')}
+                  {t('settings.modelConfigCenter.actions.refresh', 'Refresh')}
                 </button>
               </div>
             </div>
@@ -1215,25 +1212,25 @@ export default function ModelConfigCenter() {
             active={mainTab === 'configure'}
             onClick={() => setMainTab('configure')}
             icon={<FileJson className="h-3.5 w-3.5" />}
-            label={t('settings.modelConfigCenter.tabs.configure', '配置')}
+            label={t('settings.modelConfigCenter.tabs.configure', 'Configure')}
           />
           <MainTabButton
             active={mainTab === 'test'}
             onClick={() => setMainTab('test')}
             icon={<FlaskConical className="h-3.5 w-3.5" />}
-            label={t('settings.modelConfigCenter.tabs.test', '测试')}
+            label={t('settings.modelConfigCenter.tabs.test', 'Test')}
           />
           <MainTabButton
             active={mainTab === 'tools'}
             onClick={() => setMainTab('tools')}
             icon={<Upload className="h-3.5 w-3.5" />}
-            label={t('settings.modelConfigCenter.tabs.tools', '导入导出')}
+            label={t('settings.modelConfigCenter.tabs.tools', 'Import/Export')}
           />
           <MainTabButton
             active={mainTab === 'history'}
             onClick={() => setMainTab('history')}
             icon={<History className="h-3.5 w-3.5" />}
-            label={t('settings.modelConfigCenter.tabs.history', '历史恢复')}
+            label={t('settings.modelConfigCenter.tabs.history', 'History & Restore')}
           />
         </div>
 
@@ -1241,8 +1238,8 @@ export default function ModelConfigCenter() {
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
           <SettingsCard
             icon={<FileJson className="h-5 w-5" />}
-            title={t('settings.modelConfigCenter.sections.navigatorTitle', 'Provider / Model 导航')}
-            description={t('settings.modelConfigCenter.sections.navigatorDesc', '先定位 Provider，再聚焦当前模型细节。')}
+            title={t('settings.modelConfigCenter.sections.navigatorTitle', 'Provider / Model Navigation')}
+            description={t('settings.modelConfigCenter.sections.navigatorDesc', 'Locate Provider first, then focus on current model details.')}
           >
             <div className="max-h-[740px] space-y-5 overflow-y-auto pr-1">
               <section className="space-y-3">
@@ -1259,7 +1256,7 @@ export default function ModelConfigCenter() {
                     className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface motion-color motion-press focus-ring"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    {t('settings.modelConfigCenter.actions.addProvider', '新增 Provider')}
+                    {t('settings.modelConfigCenter.actions.addProvider', 'Add Provider')}
                   </button>
                 </div>
 
@@ -1299,7 +1296,7 @@ export default function ModelConfigCenter() {
                               requestDeleteProvider(providerName)
                             }}
                             className="rounded-lg p-2 text-muted-foreground hover:bg-red-500/10 hover:text-red-300 motion-color motion-press focus-ring"
-                            title={t('settings.modelConfigCenter.actions.delete', '删除')}
+                            title={t('settings.modelConfigCenter.actions.delete', 'Delete')}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -1310,10 +1307,10 @@ export default function ModelConfigCenter() {
                 ) : (
                   <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
                     <div className="text-sm font-medium text-foreground">
-                      {t('settings.modelConfigCenter.empty.noProvidersTitle', '还没有 Provider')}
+                      {t('settings.modelConfigCenter.empty.noProvidersTitle', 'No providers yet')}
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">
-                      {t('settings.modelConfigCenter.empty.noProvidersDesc', '先创建一个 Provider，右侧就会出现对应的连接与模型配置。')}
+                      {t('settings.modelConfigCenter.empty.noProvidersDesc', 'Create a Provider first, then the corresponding connection and model configuration will appear on the right.')}
                     </p>
                     <button
                       type="button"
@@ -1321,7 +1318,7 @@ export default function ModelConfigCenter() {
                       className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-info px-3 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring"
                     >
                       <Plus className="h-4 w-4" />
-                      {t('settings.modelConfigCenter.actions.createProvider', '创建 Provider')}
+                      {t('settings.modelConfigCenter.actions.createProvider', 'Create Provider')}
                     </button>
                   </div>
                 )}
@@ -1334,7 +1331,7 @@ export default function ModelConfigCenter() {
                       {t('settings.modelConfigCenter.summary.models', 'Models')}
                     </div>
                     <div className="mt-1 text-sm font-medium text-foreground">
-                      {selectedProvider ? `${selectedProviderModels.length} / ${selectedProvider}` : t('settings.modelConfigCenter.sections.testSelection', '选择一个 Provider 继续')}
+                      {selectedProvider ? `${selectedProviderModels.length} / ${selectedProvider}` : t('settings.modelConfigCenter.sections.testSelection', 'Select a provider to continue')}
                     </div>
                   </div>
                   <button
@@ -1344,7 +1341,7 @@ export default function ModelConfigCenter() {
                     className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface motion-color motion-press focus-ring disabled:opacity-50"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    {t('settings.modelConfigCenter.actions.addModel', '新增模型')}
+                    {t('settings.modelConfigCenter.actions.addModel', 'Add Model')}
                   </button>
                 </div>
 
@@ -1353,7 +1350,7 @@ export default function ModelConfigCenter() {
                     <div className="space-y-2">
                       {selectedProviderModels.map((model, index) => {
                         const isActive = selectedModel === modelSelectionValue(index)
-                        const label = model.name?.trim() || model.id?.trim() || t('settings.modelConfigCenter.status.unnamedModel', '未命名模型')
+                        const label = model.name?.trim() || model.id?.trim() || t('settings.modelConfigCenter.status.unnamedModel', 'Unnamed Model')
                         return (
                           <button
                             key={`${selectedProvider}-${index}`}
@@ -1370,10 +1367,10 @@ export default function ModelConfigCenter() {
                           >
                             <div className="truncate text-sm font-medium text-foreground">{label}</div>
                             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                              <span>{model.id?.trim() || t('settings.modelConfigCenter.status.unnamedModel', '未命名模型')}</span>
+                              <span>{model.id?.trim() || t('settings.modelConfigCenter.status.unnamedModel', 'Unnamed Model')}</span>
                               {model.reasoning && (
                                 <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-300">
-                                  {t('settings.modelConfigCenter.fields.reasoning', '推理')}
+                                  {t('settings.modelConfigCenter.fields.reasoning', 'Inference')}
                                 </span>
                               )}
                               <span>{model.contextWindow ?? 128000}</span>
@@ -1385,10 +1382,10 @@ export default function ModelConfigCenter() {
                   ) : (
                     <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
                       <div className="text-sm font-medium text-foreground">
-                        {t('settings.modelConfigCenter.empty.noModelsTitle', '当前 Provider 还没有模型')}
+                        {t('settings.modelConfigCenter.empty.noModelsTitle', 'Current provider has no models yet')}
                       </div>
                       <p className="mt-2 text-sm text-muted-foreground">
-                        {t('settings.modelConfigCenter.empty.noModelsDesc', '先创建一个模型，再在右侧补充 ID、能力与成本信息。')}
+                        {t('settings.modelConfigCenter.empty.noModelsDesc', 'Create a model first, then fill in ID, capabilities and cost info on the right.')}
                       </p>
                       <button
                         type="button"
@@ -1396,13 +1393,13 @@ export default function ModelConfigCenter() {
                         className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-info px-3 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring"
                       >
                         <Plus className="h-4 w-4" />
-                        {t('settings.modelConfigCenter.actions.addModel', '新增模型')}
+                        {t('settings.modelConfigCenter.actions.addModel', 'Add Model')}
                       </button>
                     </div>
                   )
                 ) : (
                   <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-                    {t('settings.modelConfigCenter.sections.testSelection', '选择一个 Provider 继续')}
+                    {t('settings.modelConfigCenter.sections.testSelection', 'Select a provider to continue')}
                   </div>
                 )}
               </section>
@@ -1413,25 +1410,25 @@ export default function ModelConfigCenter() {
           <div className="space-y-4">
             <div className="inline-flex rounded-lg border border-border bg-surface/60 p-1">
               <SegmentedButton active={configDetailTab === 'provider'} onClick={() => setConfigDetailTab('provider')}>
-                {t('settings.modelConfigCenter.tabs.provider', 'Provider 详情')}
+                {t('settings.modelConfigCenter.tabs.provider', 'Provider Details')}
               </SegmentedButton>
               <SegmentedButton active={configDetailTab === 'model'} onClick={() => setConfigDetailTab('model')}>
-                {t('settings.modelConfigCenter.tabs.model', '模型详情')}
+                {t('settings.modelConfigCenter.tabs.model', 'Model Details')}
               </SegmentedButton>
             </div>
 
             {configDetailTab === 'provider' && (
               <SettingsCard
                 icon={<Server className="h-5 w-5" />}
-              title={t('settings.modelConfigCenter.sections.providerDetailsTitle', 'Provider 详情')}
-              description={t('settings.modelConfigCenter.sections.providerDetailsDesc', '当前 Provider 的连接、鉴权与默认 API 配置。')}
+              title={t('settings.modelConfigCenter.sections.providerDetailsTitle', 'Provider Details')}
+              description={t('settings.modelConfigCenter.sections.providerDetailsDesc', 'Current Provider connection, authentication and default API configuration.')}
             >
               {selectedProviderEntry ? (
                 <div className="space-y-5">
                   <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                     <SettingsField
                       label={t('settings.modelConfigCenter.fields.providerKey', 'Provider Key')}
-                      description={t('settings.modelConfigCenter.help.providerKey', '修改后会更新 providers 下的 key 名称。')}
+                      description={t('settings.modelConfigCenter.help.providerKey', 'The key name under providers will be updated after modification.')}
                     >
                       <SettingsInput
                         value={providerNameDraft}
@@ -1447,11 +1444,11 @@ export default function ModelConfigCenter() {
                             event.currentTarget.blur()
                           }
                         }}
-                        placeholder={t('settings.modelConfigCenter.placeholders.providerName', '例如：local-openai')}
+                        placeholder={t('settings.modelConfigCenter.placeholders.providerName', 'e.g., local-openai')}
                       />
                     </SettingsField>
 
-                    <SettingsField label={t('settings.modelConfigCenter.fields.apiType', 'API 类型')}>
+                    <SettingsField label={t('settings.modelConfigCenter.fields.apiType', 'API Type')}>
                       <SettingsSelect
                         value={selectedProviderEntry.api ?? 'openai-completions'}
                         onChange={(event) => updateSelectedProviderEntry((provider) => ({ ...provider, api: event.target.value }))}
@@ -1474,20 +1471,20 @@ export default function ModelConfigCenter() {
 
                     <SettingsField
                       label={t('settings.modelConfigCenter.fields.apiKey', 'API Key')}
-                      description={t('settings.modelConfigCenter.help.apiKey', '支持直接写密钥、环境变量名，或 `!command` 形式。')}
+                      description={t('settings.modelConfigCenter.help.apiKey', 'Supports direct key, environment variable name, or `!command` form.')}
                     >
                       <SettingsInput
                         value={selectedProviderEntry.apiKey ?? ''}
                         onChange={(event) => updateSelectedProviderEntry((provider) => ({ ...provider, apiKey: event.target.value }))}
-                        placeholder={t('settings.modelConfigCenter.placeholders.apiKey', 'MY_API_KEY 或 !security ...')}
+                        placeholder={t('settings.modelConfigCenter.placeholders.apiKey', 'MY_API_KEY or !security ...')}
                       />
                     </SettingsField>
                   </div>
 
                   <div className="rounded-xl border border-border/70 bg-background/35 px-4 py-3">
                     <SettingsToggleRow
-                      title={t('settings.modelConfigCenter.fields.authHeader', '使用 Bearer 鉴权头')}
-                      description={t('settings.modelConfigCenter.help.authHeader', '对当前 Provider 下的模型统一生效。')}
+                      title={t('settings.modelConfigCenter.fields.authHeader', 'Use Bearer auth header')}
+                      description={t('settings.modelConfigCenter.help.authHeader', 'Applies uniformly to all models under current Provider.')}
                       checked={selectedProviderEntry.authHeader === true}
                       onChange={(checked) => updateSelectedProviderEntry((provider) => ({ ...provider, authHeader: checked }))}
                       className="items-start"
@@ -1501,17 +1498,17 @@ export default function ModelConfigCenter() {
                       className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300 hover:bg-red-500/20 motion-color motion-press focus-ring"
                     >
                       <Trash2 className="h-4 w-4" />
-                      {t('settings.modelConfigCenter.actions.delete', '删除')}
+                      {t('settings.modelConfigCenter.actions.delete', 'Delete')}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
                   <div className="text-sm font-medium text-foreground">
-                    {t('settings.modelConfigCenter.empty.noProvidersTitle', '还没有 Provider')}
+                    {t('settings.modelConfigCenter.empty.noProvidersTitle', 'No providers yet')}
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    {t('settings.modelConfigCenter.empty.noProvidersDesc', '先创建一个 Provider，右侧就会出现对应的连接与模型配置。')}
+                    {t('settings.modelConfigCenter.empty.noProvidersDesc', 'Create a Provider first, then the corresponding connection and model configuration will appear on the right.')}
                   </p>
                 </div>
               )}
@@ -1521,8 +1518,8 @@ export default function ModelConfigCenter() {
             {configDetailTab === 'model' && (
               <SettingsCard
                 icon={<FileJson className="h-5 w-5" />}
-              title={t('settings.modelConfigCenter.sections.modelDetailsTitle', '模型详情')}
-              description={t('settings.modelConfigCenter.sections.modelDetailsDesc', '默认只展示高频字段，把能力与成本分层展开。')}
+              title={t('settings.modelConfigCenter.sections.modelDetailsTitle', 'Model Details')}
+              description={t('settings.modelConfigCenter.sections.modelDetailsDesc', 'Shows high-frequency fields by default, expands capabilities and cost in layers.')}
             >
               {selectedProviderEntry ? (
                 selectedModelEntry ? (
@@ -1538,18 +1535,18 @@ export default function ModelConfigCenter() {
                         className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300 hover:bg-red-500/20 motion-color motion-press focus-ring"
                       >
                         <Trash2 className="h-4 w-4" />
-                        {t('settings.modelConfigCenter.actions.delete', '删除')}
+                        {t('settings.modelConfigCenter.actions.delete', 'Delete')}
                       </button>
                     </div>
 
                     <div className="rounded-xl border border-border/70 bg-background/30 p-4">
                       <div className="mb-4">
                         <div className="text-sm font-medium text-foreground">
-                          {t('settings.modelConfigCenter.sections.basicSection', '基础信息')}
+                          {t('settings.modelConfigCenter.sections.basicSection', 'Basic Info')}
                         </div>
                       </div>
                       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                        <SettingsField label={t('settings.modelConfigCenter.fields.modelId', '模型 ID')}>
+                        <SettingsField label={t('settings.modelConfigCenter.fields.modelId', 'Model ID')}>
                           <SettingsInput
                             value={selectedModelEntry.id}
                             onChange={(event) => updateSelectedModelEntry((model) => ({ ...model, id: event.target.value }))}
@@ -1557,17 +1554,17 @@ export default function ModelConfigCenter() {
                           />
                         </SettingsField>
 
-                        <SettingsField label={t('settings.modelConfigCenter.fields.modelName', '显示名称')}>
+                        <SettingsField label={t('settings.modelConfigCenter.fields.modelName', 'Display Name')}>
                           <SettingsInput
                             value={selectedModelEntry.name ?? ''}
                             onChange={(event) => updateSelectedModelEntry((model) => ({ ...model, name: event.target.value }))}
-                            placeholder={t('settings.modelConfigCenter.placeholders.modelName', '对用户更友好的展示名称')}
+                            placeholder={t('settings.modelConfigCenter.placeholders.modelName', 'More user-friendly display name')}
                           />
                         </SettingsField>
 
                         <SettingsField
-                          label={t('settings.modelConfigCenter.fields.inputTypes', '输入类型')}
-                          description={t('settings.modelConfigCenter.help.inputTypes', '用逗号分隔，例如 text,image。')}
+                          label={t('settings.modelConfigCenter.fields.inputTypes', 'Input types')}
+                          description={t('settings.modelConfigCenter.help.inputTypes', 'Comma separated, e.g., text,image.')}
                         >
                           <SettingsInput
                             value={(selectedModelEntry.input ?? ['text']).join(', ')}
@@ -1584,8 +1581,8 @@ export default function ModelConfigCenter() {
 
                         <div className="rounded-lg border border-border/70 bg-background/35 px-4 py-3">
                           <SettingsToggleRow
-                            title={t('settings.modelConfigCenter.fields.reasoning', '推理模型')}
-                            description={t('settings.modelConfigCenter.help.reasoning', '用于区分是否支持更深层次的思考能力')}
+                            title={t('settings.modelConfigCenter.fields.reasoning', 'Reasoning model')}
+                            description={t('settings.modelConfigCenter.help.reasoning', 'Used to distinguish if deeper thinking capability is supported')}
                             checked={selectedModelEntry.reasoning === true}
                             onChange={(checked) => updateSelectedModelEntry((model) => ({ ...model, reasoning: checked }))}
                             className="items-start"
@@ -1597,11 +1594,11 @@ export default function ModelConfigCenter() {
                     <div className="rounded-xl border border-border/70 bg-background/30 p-4">
                       <div className="mb-4">
                         <div className="text-sm font-medium text-foreground">
-                          {t('settings.modelConfigCenter.sections.capabilitySection', '能力边界')}
+                          {t('settings.modelConfigCenter.sections.capabilitySection', 'Capabilities')}
                         </div>
                       </div>
                       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                        <SettingsField label={t('settings.modelConfigCenter.fields.contextWindow', '上下文窗口')}>
+                        <SettingsField label={t('settings.modelConfigCenter.fields.contextWindow', 'Context window')}>
                           <SettingsInput
                             type="number"
                             value={selectedModelEntry.contextWindow ?? 128000}
@@ -1612,7 +1609,7 @@ export default function ModelConfigCenter() {
                           />
                         </SettingsField>
 
-                        <SettingsField label={t('settings.modelConfigCenter.fields.maxTokens', '最大输出 Token')}>
+                        <SettingsField label={t('settings.modelConfigCenter.fields.maxTokens', 'Max output tokens')}>
                           <SettingsInput
                             type="number"
                             value={selectedModelEntry.maxTokens ?? 16384}
@@ -1628,7 +1625,7 @@ export default function ModelConfigCenter() {
                     <div className="rounded-xl border border-border/70 bg-background/30 p-4">
                       <div className="mb-4">
                         <div className="text-sm font-medium text-foreground">
-                          {t('settings.modelConfigCenter.sections.advancedSection', '高级 / 成本')}
+                          {t('settings.modelConfigCenter.sections.advancedSection', 'Advanced / Cost')}
                         </div>
                       </div>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -1660,20 +1657,20 @@ export default function ModelConfigCenter() {
                 ) : (
                   <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
                     <div className="text-sm font-medium text-foreground">
-                      {t('settings.modelConfigCenter.empty.noModelsTitle', '当前 Provider 还没有模型')}
+                      {t('settings.modelConfigCenter.empty.noModelsTitle', 'Current provider has no models yet')}
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">
-                      {t('settings.modelConfigCenter.empty.noModelsDesc', '先创建一个模型，再在右侧补充 ID、能力与成本信息。')}
+                      {t('settings.modelConfigCenter.empty.noModelsDesc', 'Create a model first, then fill in ID, capabilities and cost info on the right.')}
                     </p>
                   </div>
                 )
               ) : (
                 <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
                   <div className="text-sm font-medium text-foreground">
-                    {t('settings.modelConfigCenter.empty.noProvidersTitle', '还没有 Provider')}
+                    {t('settings.modelConfigCenter.empty.noProvidersTitle', 'No providers yet')}
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    {t('settings.modelConfigCenter.empty.noProvidersDesc', '先创建一个 Provider，右侧就会出现对应的连接与模型配置。')}
+                    {t('settings.modelConfigCenter.empty.noProvidersDesc', 'Create a Provider first, then the corresponding connection and model configuration will appear on the right.')}
                   </p>
                 </div>
               )}
@@ -1690,24 +1687,24 @@ export default function ModelConfigCenter() {
               {mainTab === 'tools' && (
               <SettingsCard
                 icon={<Upload className="h-5 w-5" />}
-                title={t('settings.modelConfigCenter.sections.toolsTitle', '导入与导出')}
-                description={t('settings.modelConfigCenter.sections.toolsDesc', '把工具操作从主编辑区拆出来，避免干扰配置主路径。')}
+                title={t('settings.modelConfigCenter.sections.toolsTitle', 'Import & Export')}
+                description={t('settings.modelConfigCenter.sections.toolsDesc', 'Separates tool operations from main editor to avoid interfering with main configuration flow.')}
             >
               <div className="space-y-4">
                 <div className="rounded-xl border border-border/70 bg-background/30 p-4">
                   <div className="text-sm font-medium text-foreground">
-                    {t('settings.modelConfigCenter.sections.importMode', '导入模式')}
+                    {t('settings.modelConfigCenter.sections.importMode', 'Import Mode')}
                   </div>
                   <div className="mt-3 inline-flex rounded-lg border border-border bg-surface/60 p-1">
                     <SegmentedButton active={importMode === 'merge'} onClick={() => setImportMode('merge')}>
-                      {t('settings.modelConfigCenter.tabs.merge', '合并')}
+                      {t('settings.modelConfigCenter.tabs.merge', 'Merge')}
                     </SegmentedButton>
                     <SegmentedButton active={importMode === 'replace'} onClick={() => setImportMode('replace')}>
-                      {t('settings.modelConfigCenter.tabs.replace', '替换')}
+                      {t('settings.modelConfigCenter.tabs.replace', 'Replace')}
                     </SegmentedButton>
                   </div>
                   <p className="mt-3 text-xs text-muted-foreground">
-                    {t('settings.modelConfigCenter.help.importMode', '合并保留现有 Provider，替换会直接采用导入内容。')}
+                    {t('settings.modelConfigCenter.help.importMode', 'Merge keeps existing providers, replace will directly use imported content.')}
                   </p>
                 </div>
 
@@ -1719,7 +1716,7 @@ export default function ModelConfigCenter() {
                     className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring disabled:opacity-60"
                   >
                     {busy === 'import-file' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
-                    {t('settings.modelConfigCenter.actions.importFile', '导入文件')}
+                    {t('settings.modelConfigCenter.actions.importFile', 'Import file')}
                   </button>
                   <button
                     type="button"
@@ -1727,7 +1724,7 @@ export default function ModelConfigCenter() {
                     className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
                   >
                     <Upload className="h-4 w-4" />
-                    {t('settings.modelConfigCenter.actions.importContent', '导入 JSON 内容')}
+                    {t('settings.modelConfigCenter.actions.importContent', 'Import JSON content')}
                   </button>
                   <button
                     type="button"
@@ -1735,7 +1732,7 @@ export default function ModelConfigCenter() {
                     className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
                   >
                     <Copy className="h-4 w-4" />
-                    {t('settings.modelConfigCenter.actions.copyDraft', '复制当前草稿')}
+                    {t('settings.modelConfigCenter.actions.copyDraft', 'Copy current draft')}
                   </button>
                   <button
                     type="button"
@@ -1743,13 +1740,13 @@ export default function ModelConfigCenter() {
                     className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
                   >
                     <Download className="h-4 w-4" />
-                    {t('settings.modelConfigCenter.actions.exportSaved', '导出已保存文件')}
+                    {t('settings.modelConfigCenter.actions.exportSaved', 'Export saved file')}
                   </button>
                 </div>
 
                 <div className="rounded-xl border border-dashed border-border px-4 py-3 text-xs text-muted-foreground">
-                  <div>{t('settings.modelConfigCenter.help.copyDraft', '“复制当前草稿”会包含你尚未保存的修改。')}</div>
-                  <div className="mt-1">{t('settings.modelConfigCenter.help.exportSaved', '“导出已保存文件”读取磁盘上的 models.json，适合做归档。')}</div>
+                  <div>{t('settings.modelConfigCenter.help.copyDraft', '"Copy current draft" includes your unsaved changes.')}</div>
+                  <div>{t('settings.modelConfigCenter.help.exportSaved', '"Export saved file" reads models.json from disk, suitable for archiving.')}</div>
                 </div>
               </div>
             </SettingsCard>
@@ -1758,20 +1755,20 @@ export default function ModelConfigCenter() {
             {mainTab === 'test' && (
               <SettingsCard
                 icon={<FlaskConical className="h-5 w-5" />}
-                  title={t('settings.modelConfigCenter.httpTestTitle', '在线 HTTP / cURL 测试')}
-                  description={t('settings.modelConfigCenter.httpTestDesc', '按当前选中的 Provider + Model 发起真实请求，验证配置是否可用。')}
+                  title={t('settings.modelConfigCenter.httpTestTitle', 'Online HTTP / cURL Test')}
+                  description={t('settings.modelConfigCenter.httpTestDesc', 'Makes real request with currently selected Provider + Model to verify configuration.')}
             >
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <div className="rounded-xl border border-border/70 bg-background/35 px-4 py-3">
                     <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                      {t('settings.modelConfigCenter.fields.selectedProvider', '当前 Provider')}
+                      {t('settings.modelConfigCenter.fields.selectedProvider', 'Current Provider')}
                     </div>
                     <div className="mt-2 truncate text-sm font-medium text-foreground">{selectedProvider || '-'}</div>
                   </div>
                   <div className="rounded-xl border border-border/70 bg-background/35 px-4 py-3">
                     <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                      {t('settings.modelConfigCenter.fields.selectedModel', '当前 Model')}
+                      {t('settings.modelConfigCenter.fields.selectedModel', 'Current Model')}
                     </div>
                     <div className="mt-2 truncate text-sm font-medium text-foreground">{selectedModelEntry?.id?.trim() || activeModelLabel || '-'}</div>
                   </div>
@@ -1783,21 +1780,21 @@ export default function ModelConfigCenter() {
 
                 {!selectedProviderEntry && (
                   <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                    {t('settings.modelConfigCenter.empty.testEmpty', '先到配置页选择 Provider 和模型，再回来运行测试。')}
+                    {t('settings.modelConfigCenter.empty.testEmpty', 'Go to config page to select Provider and model first, then come back to run test.')}
                   </div>
                 )}
 
                 {!selectedModelEntry?.id?.trim() && selectedProviderEntry && (
                   <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-                    {t('settings.modelConfigCenter.help.noModelId', '当前模型还没有填写 ID，无法发起 HTTP 测试。')}
+                    {t('settings.modelConfigCenter.help.noModelId', 'Current model has no ID filled, cannot make HTTP test.')}
                   </div>
                 )}
 
-                <SettingsField label={t('settings.modelConfigCenter.fields.prompt', '测试 Prompt')}>
+                <SettingsField label={t('settings.modelConfigCenter.fields.prompt', 'Test Prompt')}>
                   <SettingsInput
                     value={testPrompt}
                     onChange={(event) => setTestPrompt(event.target.value)}
-                    placeholder={t('settings.modelConfigCenter.placeholders.testPrompt', '请只回复 OK')}
+                    placeholder={t('settings.modelConfigCenter.placeholders.testPrompt', 'Please reply only with OK')}
                   />
                 </SettingsField>
 
@@ -1809,7 +1806,7 @@ export default function ModelConfigCenter() {
                     className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm font-medium text-white hover:bg-info/90 motion-color motion-press focus-ring disabled:opacity-60"
                   >
                     {busy === 'http-test' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                    {t('settings.modelConfigCenter.actions.runTest', '运行测试')}
+                    {t('settings.modelConfigCenter.actions.runTest', 'Run Test')}
                   </button>
                   {testResult && (
                     <button
@@ -1818,7 +1815,7 @@ export default function ModelConfigCenter() {
                       className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
                     >
                       <Copy className="h-4 w-4" />
-                      {t('settings.modelConfigCenter.actions.copyCurl', '复制 cURL')}
+                      {t('settings.modelConfigCenter.actions.copyCurl', 'Copy cURL')}
                     </button>
                   )}
                   <button
@@ -1827,7 +1824,7 @@ export default function ModelConfigCenter() {
                     className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
                   >
                     <FileJson className="h-4 w-4" />
-                    {t('settings.modelConfigCenter.actions.backToConfigure', '返回配置页')}
+                    {t('settings.modelConfigCenter.actions.backToConfigure', 'Back to Config')}
                   </button>
                 </div>
 
@@ -1891,17 +1888,17 @@ export default function ModelConfigCenter() {
           {mainTab === 'history' && (
             <SettingsCard
               icon={<History className="h-5 w-5" />}
-              title={t('settings.modelConfigCenter.sections.historyTitle', '历史与恢复')}
-              description={t('settings.modelConfigCenter.sections.historyDesc', '备份与版本快照统一放在一处，减少上下跳转。')}
+              title={t('settings.modelConfigCenter.sections.historyTitle', 'History & Restore')}
+              description={t('settings.modelConfigCenter.sections.historyDesc', 'Backups and version snapshots in one place to reduce navigation.')}
           >
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="inline-flex rounded-lg border border-border bg-surface/60 p-1">
                   <SegmentedButton active={historyTab === 'backups'} onClick={() => setHistoryTab('backups')}>
-                    {t('settings.modelConfigCenter.tabs.backups', '备份')}
+                    {t('settings.modelConfigCenter.tabs.backups', 'Backup')}
                   </SegmentedButton>
                   <SegmentedButton active={historyTab === 'versions'} onClick={() => setHistoryTab('versions')}>
-                    {t('settings.modelConfigCenter.tabs.versions', '版本')}
+                    {t('settings.modelConfigCenter.tabs.versions', 'Version')}
                   </SegmentedButton>
                 </div>
                 <button
@@ -1911,7 +1908,7 @@ export default function ModelConfigCenter() {
                   className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring disabled:opacity-60"
                 >
                   {busy === 'backup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4" />}
-                  {t('settings.modelConfigCenter.actions.createBackup', '立即备份')}
+                  {t('settings.modelConfigCenter.actions.createBackup', 'Backup Now')}
                 </button>
               </div>
 
@@ -1939,7 +1936,7 @@ export default function ModelConfigCenter() {
                             className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface motion-color motion-press focus-ring disabled:opacity-60"
                           >
                             {busy === `restore-${backup.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                            {t('settings.modelConfigCenter.actions.restore', '恢复')}
+                            {t('settings.modelConfigCenter.actions.restore', 'Resume')}
                           </button>
                           <button
                             type="button"
@@ -1948,14 +1945,14 @@ export default function ModelConfigCenter() {
                             className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface motion-color motion-press focus-ring disabled:opacity-60"
                           >
                             {busy === `delete-${backup.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                            {t('settings.modelConfigCenter.actions.delete', '删除')}
+                            {t('settings.modelConfigCenter.actions.delete', 'Delete')}
                           </button>
                         </div>
                       </div>
                     ))
                   ) : (
                     <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                      {t('settings.modelConfigCenter.empty.noBackups', '还没有备份记录')}
+                      {t('settings.modelConfigCenter.empty.noBackups', 'No backup records yet')}
                     </div>
                   )
                 ) : (
@@ -1974,14 +1971,14 @@ export default function ModelConfigCenter() {
                             className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface motion-color motion-press focus-ring disabled:opacity-60"
                           >
                             {busy === `version-${version.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                            {t('settings.modelConfigCenter.actions.restore', '恢复')}
+                            {t('settings.modelConfigCenter.actions.restore', 'Resume')}
                           </button>
                         </div>
                       </div>
                     ))
                   ) : (
                     <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                      {t('settings.modelConfigCenter.empty.noVersions', '还没有版本快照')}
+                      {t('settings.modelConfigCenter.empty.noVersions', 'No version snapshots yet')}
                     </div>
                   )
                 )}
@@ -1995,8 +1992,8 @@ export default function ModelConfigCenter() {
 
       {showAddProviderModal && (
         <ModalShell
-          title={t('settings.modelConfigCenter.dialogs.addProviderTitle', '新增 Provider')}
-          description={t('settings.modelConfigCenter.dialogs.addProviderDesc', '先给 Provider 一个稳定名称，创建后可在右侧继续补充连接信息。')}
+          title={t('settings.modelConfigCenter.dialogs.addProviderTitle', 'Add Provider')}
+          description={t('settings.modelConfigCenter.dialogs.addProviderDesc', 'Give Provider a stable name first, then continue to fill in connection info on the right after creation.')}
           onClose={() => setShowAddProviderModal(false)}
           footer={(
             <>
@@ -2005,7 +2002,7 @@ export default function ModelConfigCenter() {
                 onClick={() => setShowAddProviderModal(false)}
                 className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
               >
-                {t('settings.modelConfigCenter.actions.cancel', '取消')}
+                {t('settings.modelConfigCenter.actions.cancel', 'Cancel')}
               </button>
               <button
                 type="button"
@@ -2013,7 +2010,7 @@ export default function ModelConfigCenter() {
                 className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring"
               >
                 <Plus className="h-4 w-4" />
-                {t('settings.modelConfigCenter.actions.createProvider', '创建 Provider')}
+                {t('settings.modelConfigCenter.actions.createProvider', 'Create Provider')}
               </button>
             </>
           )}
@@ -2029,7 +2026,7 @@ export default function ModelConfigCenter() {
                   handleCreateProvider()
                 }
               }}
-              placeholder={t('settings.modelConfigCenter.placeholders.providerName', '例如：local-openai')}
+              placeholder={t('settings.modelConfigCenter.placeholders.providerName', 'e.g., local-openai')}
             />
           </SettingsField>
         </ModalShell>
@@ -2038,8 +2035,8 @@ export default function ModelConfigCenter() {
 
       {showImportModal && (
         <ModalShell
-          title={t('settings.modelConfigCenter.dialogs.importContentTitle', '导入 JSON 内容')}
-          description={t('settings.modelConfigCenter.dialogs.importContentDesc', '把完整的 models.json 内容粘贴进来，并按当前导入模式应用。')}
+          title={t('settings.modelConfigCenter.dialogs.importContentTitle', 'Import JSON content')}
+          description={t('settings.modelConfigCenter.dialogs.importContentDesc', 'Paste complete models.json content here and apply according to current import mode.')}
           onClose={() => {
             if (busy !== 'import-content') {
               setShowImportModal(false)
@@ -2054,7 +2051,7 @@ export default function ModelConfigCenter() {
                 disabled={busy === 'import-content'}
                 className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring disabled:opacity-60"
               >
-                {t('settings.modelConfigCenter.actions.cancel', '取消')}
+                {t('settings.modelConfigCenter.actions.cancel', 'Cancel')}
               </button>
               <button
                 type="button"
@@ -2063,7 +2060,7 @@ export default function ModelConfigCenter() {
                 className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring disabled:opacity-60"
               >
                 {busy === 'import-content' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                {t('settings.modelConfigCenter.actions.importNow', '立即导入')}
+                {t('settings.modelConfigCenter.actions.importNow', 'Import Now')}
               </button>
             </>
           )}
@@ -2072,18 +2069,18 @@ export default function ModelConfigCenter() {
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/30 px-4 py-3">
               <div>
                 <div className="text-sm font-medium text-foreground">
-                  {t('settings.modelConfigCenter.sections.importMode', '导入模式')}
+                  {t('settings.modelConfigCenter.sections.importMode', 'Import Mode')}
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {t('settings.modelConfigCenter.help.importMode', '合并保留现有 Provider，替换会直接采用导入内容。')}
+                  {t('settings.modelConfigCenter.help.importMode', 'Merge keeps existing providers, replace will directly use imported content.')}
                 </div>
               </div>
               <div className="inline-flex rounded-lg border border-border bg-surface/60 p-1">
                 <SegmentedButton active={importMode === 'merge'} onClick={() => setImportMode('merge')}>
-                  {t('settings.modelConfigCenter.tabs.merge', '合并')}
+                  {t('settings.modelConfigCenter.tabs.merge', 'Merge')}
                 </SegmentedButton>
                 <SegmentedButton active={importMode === 'replace'} onClick={() => setImportMode('replace')}>
-                  {t('settings.modelConfigCenter.tabs.replace', '替换')}
+                  {t('settings.modelConfigCenter.tabs.replace', 'Replace')}
                 </SegmentedButton>
               </div>
             </div>
@@ -2095,14 +2092,14 @@ export default function ModelConfigCenter() {
                 className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
               >
                 <Copy className="h-4 w-4" />
-                {t('settings.modelConfigCenter.actions.pasteClipboard', '从剪贴板粘贴')}
+                {t('settings.modelConfigCenter.actions.pasteClipboard', 'Paste from clipboard')}
               </button>
             </div>
 
             <textarea
               value={importContentDraft}
               onChange={(event) => setImportContentDraft(event.target.value)}
-              placeholder={t('settings.modelConfigCenter.placeholders.importContent', '粘贴完整的 models.json 内容')}
+              placeholder={t('settings.modelConfigCenter.placeholders.importContent', 'Paste complete models.json content')}
               className="min-h-[320px] w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-info focus:outline-none motion-color motion-surface"
             />
           </div>
@@ -2113,7 +2110,7 @@ export default function ModelConfigCenter() {
         <ConfirmDialog
           dialog={confirmDialog}
           confirming={confirmingDialog}
-          cancelLabel={t('settings.modelConfigCenter.actions.cancel', '取消')}
+          cancelLabel={t('settings.modelConfigCenter.actions.cancel', 'Cancel')}
           onCancel={() => {
             if (!confirmingDialog) {
               setConfirmDialog(null)

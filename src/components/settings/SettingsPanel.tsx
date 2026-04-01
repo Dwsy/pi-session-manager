@@ -188,7 +188,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   }
 
   const resetSettings = () => {
-    if (confirm(t('settings.confirmReset', '确定要重置所有设置吗？'))) {
+    if (confirm(t('settings.confirmReset', 'Are you sure you want to reset all settings?'))) {
       setSettings(defaultSettings)
     }
   }
@@ -196,19 +196,19 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   if (!isOpen) return null
 
   const menuItems: { id: SettingsSection; icon: React.ReactNode; label: string }[] = [
-    { id: 'terminal', icon: <Terminal className="h-4 w-4" />, label: t('settings.sections.terminal', '终端') },
-    { id: 'appearance', icon: <Palette className="h-4 w-4" />, label: t('settings.sections.appearance', '外观') },
-    { id: 'language', icon: <Globe className="h-4 w-4" />, label: t('settings.sections.language', '语言') },
-    { id: 'session', icon: <Database className="h-4 w-4" />, label: t('settings.sections.session', '会话') },
-    { id: 'tags', icon: <Tags className="h-4 w-4" />, label: t('settings.sections.tags', '标签') },
-    { id: 'search', icon: <Code className="h-4 w-4" />, label: t('settings.sections.search', '搜索') },
-    { id: 'export', icon: <ChevronRight className="h-4 w-4" />, label: t('settings.sections.export', '导出') },
-    { id: 'updates', icon: <Download className="h-4 w-4" />, label: t('settings.sections.updates', '更新') },
-    { id: 'pi-config', icon: <Puzzle className="h-4 w-4" />, label: t('settings.sections.piConfig', 'Pi 配置') },
-    { id: 'models', icon: <Cpu className="h-4 w-4" />, label: t('settings.sections.models', '模型') },
-    { id: 'shortcuts', icon: <Keyboard className="h-4 w-4" />, label: t('settings.sections.shortcuts', '快捷键') },
-    { id: 'advanced', icon: <Shield className="h-4 w-4" />, label: t('settings.sections.advanced', '高级') },
-    { id: 'api-test', icon: <Activity className="h-4 w-4" />, label: t('settings.sections.apiTest', 'API 测试') },
+    { id: 'terminal', icon: <Terminal className="h-4 w-4" />, label: t('settings.sections.terminal', 'Terminal') },
+    { id: 'appearance', icon: <Palette className="h-4 w-4" />, label: t('settings.sections.appearance', 'Appearance') },
+    { id: 'language', icon: <Globe className="h-4 w-4" />, label: t('settings.sections.language', 'Language') },
+    { id: 'session', icon: <Database className="h-4 w-4" />, label: t('settings.sections.session', 'Session') },
+    { id: 'tags', icon: <Tags className="h-4 w-4" />, label: t('settings.sections.tags', 'Labels') },
+    { id: 'search', icon: <Code className="h-4 w-4" />, label: t('settings.sections.search', 'Search') },
+    { id: 'export', icon: <ChevronRight className="h-4 w-4" />, label: t('settings.sections.export', 'Export') },
+    { id: 'updates', icon: <Download className="h-4 w-4" />, label: t('settings.sections.updates', 'Update') },
+    { id: 'pi-config', icon: <Puzzle className="h-4 w-4" />, label: t('settings.sections.piConfig', 'Pi Config') },
+    { id: 'models', icon: <Cpu className="h-4 w-4" />, label: t('settings.sections.models', 'Models') },
+    { id: 'shortcuts', icon: <Keyboard className="h-4 w-4" />, label: t('settings.sections.shortcuts', 'Shortcuts') },
+    { id: 'advanced', icon: <Shield className="h-4 w-4" />, label: t('settings.sections.advanced', 'Advanced') },
+    { id: 'api-test', icon: <Activity className="h-4 w-4" />, label: t('settings.sections.apiTest', 'API Test') },
   ]
 
   return (
@@ -348,7 +348,7 @@ function MobileSettings({
           onTransitionEnd={!showDetail ? handleTransitionEnd : undefined}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background flex-shrink-0 safe-area-top">
-            <h2 className="text-lg font-semibold text-foreground">{t('settings.title', '设置')}</h2>
+            <h2 className="text-lg font-semibold text-foreground">{t('settings.title', 'Settings')}</h2>
             <button
               onClick={onClose}
               className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg motion-color motion-press focus-ring"
@@ -378,7 +378,7 @@ function MobileSettings({
                 className="w-full flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border motion-color motion-surface motion-press focus-ring"
               >
                 <RefreshCw className="h-4 w-4" />
-                {t('settings.reset', '重置设置')}
+                {t('settings.reset', 'Reset Settings')}
               </button>
             </div>
           </div>
@@ -428,7 +428,7 @@ function MobileSettings({
               onClick={handleBack}
               className="flex-1 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg motion-color motion-surface motion-press focus-ring flex items-center justify-center"
             >
-              {t('common.cancel', '取消')}
+              {t('common.cancel', 'Cancel')}
             </button>
             <button
               onClick={onSave}
@@ -436,7 +436,7 @@ function MobileSettings({
               className="flex-1 flex items-center justify-center gap-2 min-h-[44px] px-4 bg-info hover:bg-info/80 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
-              {saved ? t('settings.saved', '已保存') : t('common.save', '保存')}
+              {saved ? t('settings.saved', 'Saved') : t('common.save', 'Save')}
             </button>
           </div>
         </div>
@@ -458,8 +458,8 @@ function SettingsSidebar({ menuItems, activeSection, onSectionChange, onReset }:
   return (
     <div className="w-64 bg-background/95 border-r border-border flex flex-col overflow-y-auto">
       <div className="p-5 border-b border-border/80 flex-shrink-0">
-        <h2 className="text-lg font-semibold text-foreground tracking-tight">{t('settings.title', '设置')}</h2>
-        <p className="text-xs text-muted-foreground mt-1.5">{t('settings.subtitle', '自定义您的体验')}</p>
+        <h2 className="text-lg font-semibold text-foreground tracking-tight">{t('settings.title', 'Settings')}</h2>
+        <p className="text-xs text-muted-foreground mt-1.5">{t('settings.subtitle', 'Customize your experience')}</p>
       </div>
 
       <nav className="flex-1 p-2 space-y-0.5">
@@ -490,7 +490,7 @@ function SettingsSidebar({ menuItems, activeSection, onSectionChange, onReset }:
           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
         >
           <RefreshCw className="h-4 w-4" />
-          {t('settings.reset', '重置设置')}
+          {t('settings.reset', 'Reset Settings')}
         </button>
       </div>
     </div>
@@ -565,7 +565,7 @@ function SettingsContent({
           onClick={onClose}
           className="px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg motion-color motion-press focus-ring"
         >
-          {t('common.cancel', '取消')}
+          {t('common.cancel', 'Cancel')}
         </button>
         <button
           onClick={onSave}
@@ -573,7 +573,7 @@ function SettingsContent({
           className="flex items-center gap-2 px-5 py-2.5 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring disabled:opacity-50 shadow-sm"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
-          {saved ? t('settings.saved', '已保存') : t('common.save', '保存设置')}
+          {saved ? t('settings.saved', 'Saved') : t('common.save', 'Save Settings')}
         </button>
       </div>
     </div>

@@ -35,7 +35,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
   const lastCheckedLabel = useMemo(() => {
     return (
       formatDateTime(lastCheckedAt) ||
-      t('settings.update.neverChecked', '尚未检测')
+      t('settings.update.neverChecked', 'Not checked yet')
     )
   }, [lastCheckedAt, t])
 
@@ -50,7 +50,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
         type: 'update',
         text: t(
           'settings.update.result.hasUpdate',
-          '发现新版本 v{{latest}}（当前 v{{current}}）',
+          'New version v{{latest}} available (current v{{current}})',
           {
             latest: result.update.latestVersion,
             current: result.update.currentVersion,
@@ -67,7 +67,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
         type: 'success',
         text: t(
           'settings.update.result.upToDate',
-          '当前已是最新版本（v{{version}}）',
+          'Already at latest version (v{{version}})',
           { version: result.currentVersion },
         ),
       })
@@ -77,7 +77,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
 
     setMessage({
       type: 'error',
-      text: t('settings.update.result.failed', '检测失败：{{reason}}', {
+      text: t('settings.update.result.failed', 'Check failed: {{reason}}', {
         reason: result.errorMessage,
       }),
     })
@@ -91,19 +91,19 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
   return (
     <div className="space-y-6">
       <SettingsCard
-        title={t('settings.update.title', '更新')}
+        title={t('settings.update.title', 'Update')}
         description={t(
           'settings.update.description',
-          '基于 GitHub Releases 检测新版本',
+          'Check for new versions via GitHub Releases',
         )}
         icon={<Download className="h-4 w-4" />}
       >
         <div className="space-y-4">
           <SettingsToggleRow
-            title={t('settings.update.autoCheck', '自动检查更新')}
+            title={t('settings.update.autoCheck', 'Auto check for updates')}
             description={t(
               'settings.update.autoCheckHelp',
-              '默认每天自动检测一次',
+              'Auto-check once per day by default',
             )}
             checked={settings.update.autoCheck !== false}
             onChange={(checked) => onUpdate('update', 'autoCheck', checked)}
@@ -117,12 +117,12 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
             >
               <RefreshCw className={`h-4 w-4 ${checking ? 'animate-spin' : ''}`} />
               {checking
-                ? t('settings.update.checking', '检测中...')
-                : t('settings.update.checkNow', '立即检查更新')}
+                ? t('settings.update.checking', 'Checking...')
+                : t('settings.update.checkNow', 'Check for updates now')}
             </button>
 
             <p className="text-xs text-muted-foreground">
-              {t('settings.update.lastCheckedAt', '最近检测时间')}: {lastCheckedLabel}
+              {t('settings.update.lastCheckedAt', 'Last checked at')}: {lastCheckedLabel}
             </p>
 
             {message && (
@@ -151,7 +151,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
                         className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-info/20 hover:bg-info/30 text-info motion-color motion-press focus-ring"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
-                        {t('settings.update.openRelease', '打开发布页')}
+                        {t('settings.update.openRelease', 'Open release page')}
                       </button>
                     )}
                   </div>

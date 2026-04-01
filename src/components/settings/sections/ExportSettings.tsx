@@ -13,7 +13,7 @@ export default function ExportSettings({ settings, onUpdate }: ExportSettingsPro
 
   return (
     <div className="space-y-6">
-      <SettingsField label={t('settings.export.defaultFormat', '默认导出格式')}>
+      <SettingsField label={t('settings.export.defaultFormat', 'Default export format')}>
         <SettingsOptionGroup
           options={['html', 'md', 'json'] as const}
           value={settings.export.defaultFormat}
@@ -25,15 +25,15 @@ export default function ExportSettings({ settings, onUpdate }: ExportSettingsPro
       </SettingsField>
 
       <SettingsToggleRow
-        title={t('settings.export.includeMetadata', '包含元数据')}
-        description={t('settings.export.includeMetadataHelp', '导出时包含会话元数据')}
+        title={t('settings.export.includeMetadata', 'Include metadata')}
+        description={t('settings.export.includeMetadataHelp', 'Include session metadata when exporting')}
         checked={settings.export.includeMetadata}
         onChange={(checked) => onUpdate('export', 'includeMetadata', checked)}
       />
 
       <SettingsToggleRow
-        title={t('settings.export.includeTimestamps', '包含时间戳')}
-        description={t('settings.export.includeTimestampsHelp', '导出时包含消息时间戳')}
+        title={t('settings.export.includeTimestamps', 'Include timestamps')}
+        description={t('settings.export.includeTimestampsHelp', 'Include message timestamps when exporting')}
         checked={settings.export.includeTimestamps}
         onChange={(checked) => onUpdate('export', 'includeTimestamps', checked)}
       />

@@ -13,10 +13,10 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
       <div className="flex items-center justify-between">
         <div>
           <label className="text-sm font-medium text-foreground">
-            {t('settings.session.autoRefresh', '自动刷新')}
+            {t('settings.session.autoRefresh', 'Auto refresh')}
           </label>
           <p className="text-xs text-muted-foreground">
-            {t('settings.session.autoRefreshHelp', '自动检测新会话')}
+            {t('settings.session.autoRefreshHelp', 'Auto detect new sessions')}
           </p>
         </div>
         <label className="relative inline-flex items-center cursor-pointer">
@@ -33,7 +33,7 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
       {settings.session.autoRefresh && (
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">
-            {t('settings.session.refreshInterval', '刷新间隔')}
+            {t('settings.session.refreshInterval', 'Refresh interval')}
           </label>
           <div className="flex items-center gap-3">
             <input
@@ -54,7 +54,7 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
 
       <div className="space-y-3">
         <label className="text-sm font-medium text-foreground">
-          {t('settings.session.defaultViewMode', '默认视图模式')}
+          {t('settings.session.defaultViewMode', 'Default view mode')}
         </label>
         <div className="grid grid-cols-3 gap-2">
           {(['list', 'directory', 'project'] as const).map((mode) => (
@@ -76,10 +76,10 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
       <div className="flex items-center justify-between">
         <div>
           <label className="text-sm font-medium text-foreground">
-            {t('settings.session.showMessagePreview', '显示消息预览')}
+            {t('settings.session.showMessagePreview', 'Show message preview')}
           </label>
           <p className="text-xs text-muted-foreground">
-            {t('settings.session.showMessagePreviewHelp', '在会话列表中显示最后一条消息')}
+            {t('settings.session.showMessagePreviewHelp', 'Show last message in session list')}
           </p>
         </div>
         <label className="relative inline-flex items-center cursor-pointer">
@@ -96,7 +96,7 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
       {settings.session.showMessagePreview && (
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">
-            {t('settings.session.previewLines', '预览行数')}
+            {t('settings.session.previewLines', 'Preview lines')}
           </label>
           <div className="flex items-center gap-3">
             <input
@@ -117,10 +117,10 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
       <div className="flex items-center justify-between">
         <div>
           <label className="text-sm font-medium text-foreground">
-            {t('settings.session.colorizeToolCalls', '工具调用着色')}
+            {t('settings.session.colorizeToolCalls', 'Tool call coloring')}
           </label>
           <p className="text-xs text-muted-foreground">
-            {t('settings.session.colorizeToolCallsHelp', '在会话树中为不同工具调用显示不同颜色')}
+            {t('settings.session.colorizeToolCallsHelp', 'Show different colors for different tool calls in session tree')}
           </p>
         </div>
         <label className="relative inline-flex items-center cursor-pointer">
@@ -136,7 +136,7 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
 
       <div className="space-y-3">
         <label className="text-sm font-medium text-foreground">
-          {t('settings.session.openPosition', '任务定位打开位置')}
+          {t('settings.session.openPosition', 'Task positioning open position')}
         </label>
         <div className="grid grid-cols-2 gap-2">
           {(['top', 'bottom'] as const).map((position) => (
@@ -157,10 +157,10 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
 
       <div className="space-y-3">
         <label className="text-sm font-medium text-foreground">
-          {t('settings.session.cmdFBehavior', 'Cmd+F 行为')}
+          {t('settings.session.cmdFBehavior', 'Cmd+F behavior')}
         </label>
         <p className="text-xs text-muted-foreground">
-          {t('settings.session.cmdFBehaviorHelp', '选择 Cmd+F 快捷键的功能')}
+          {t('settings.session.cmdFBehaviorHelp', 'Choose Cmd+F shortcut function')}
         </p>
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -171,7 +171,7 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
                 : 'border-border text-muted-foreground hover:border-border-hover'
             }`}
           >
-            <div className="font-medium">{t('settings.session.cmdFBehaviorOptions.inSessionSearch', '会话内搜索')}</div>
+            <div className="font-medium">{t('settings.session.cmdFBehaviorOptions.inSessionSearch', 'In-session search')}</div>
             <div className="text-xs text-muted-foreground mt-0.5">Cmd+F</div>
           </button>
           <button
@@ -182,14 +182,14 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
                 : 'border-border text-muted-foreground hover:border-border-hover'
             }`}
           >
-            <div className="font-medium">{t('settings.session.cmdFBehaviorOptions.toggleSidebar', '切换会话树')}</div>
+            <div className="font-medium">{t('settings.session.cmdFBehaviorOptions.toggleSidebar', 'Toggle session tree')}</div>
             <div className="text-xs text-muted-foreground mt-0.5">Cmd+F</div>
           </button>
         </div>
         <p className="text-xs text-muted-foreground">
           {settings.session.cmdFBehavior === 'inSessionSearch'
-            ? t('settings.session.cmdFBehaviorHint.search', 'Cmd+Shift+F 切换会话树')
-            : t('settings.session.cmdFBehaviorHint.sidebar', 'Cmd+Shift+F 打开会话内搜索')}
+            ? t('settings.session.cmdFBehaviorHint.search', 'Cmd+Shift+F toggles session tree')
+            : t('settings.session.cmdFBehaviorHint.sidebar', 'Cmd+Shift+F opens in-session search')}
         </p>
       </div>
     </div>

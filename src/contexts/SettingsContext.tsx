@@ -40,7 +40,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
       setSettings(s)
     } catch (err) {
       console.error('Failed to load settings:', err)
-      setError(t('settings.error.loadFailed', '加载设置失败'))
+      setError(t('settings.error.loadFailed', 'Failed to load settings'))
     } finally {
       setLoading(false)
     }
@@ -53,7 +53,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
       await saveAppSettings(settings)
     } catch (err) {
       console.error('Failed to save settings:', err)
-      setError(t('settings.error.saveFailed', '保存设置失败'))
+      setError(t('settings.error.saveFailed', 'Failed to save settings'))
       throw err
     } finally {
       setSaving(false)

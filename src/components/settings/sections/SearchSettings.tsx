@@ -13,40 +13,40 @@ export default function SearchSettings({ settings, onUpdate }: SearchSettingsPro
 
   return (
     <div className="space-y-6">
-      <SettingsField label={t('settings.search.defaultSearchMode', '默认搜索模式')}>
+      <SettingsField label={t('settings.search.defaultSearchMode', 'Default search mode')}>
         <SettingsOptionGroup
           options={['content', 'name'] as const}
           value={settings.search.defaultSearchMode}
           onChange={(mode) => onUpdate('search', 'defaultSearchMode', mode)}
-          renderLabel={(mode) => t(`settings.search.modes.${mode}`, mode === 'content' ? '内容' : '名称')}
+          renderLabel={(mode) => t(`settings.search.modes.${mode}`, mode === 'content' ? 'Content' : 'Name')}
           containerClassName="flex gap-2"
           optionClassName="flex-1 py-2"
         />
       </SettingsField>
 
       <SettingsToggleRow
-        title={t('settings.search.caseSensitive', '区分大小写')}
+        title={t('settings.search.caseSensitive', 'Case sensitive')}
         checked={settings.search.caseSensitive}
         onChange={(checked) => onUpdate('search', 'caseSensitive', checked)}
       />
 
       <SettingsToggleRow
-        title={t('settings.search.includeToolCalls', '包含工具调用')}
-        description={t('settings.search.includeToolCallsHelp', '在搜索结果中包含工具调用内容')}
+        title={t('settings.search.includeToolCalls', 'Include tool calls')}
+        description={t('settings.search.includeToolCallsHelp', 'Include tool call content in search results')}
         checked={settings.search.includeToolCalls}
         onChange={(checked) => onUpdate('search', 'includeToolCalls', checked)}
       />
 
       <SettingsToggleRow
-        title={t('settings.search.includeThinkingInSearch', '搜索思考文本')}
-        description={t('settings.search.includeThinkingInSearchHelp', '将模型思考文本纳入消息搜索索引，关闭时只索引用户输入和模型回复')}
+        title={t('settings.search.includeThinkingInSearch', 'Search thinking text')}
+        description={t('settings.search.includeThinkingInSearchHelp', 'Include model thinking text in message search index, when off only index user input and model replies')}
         checked={settings.search.includeThinkingInSearch}
         onChange={(checked) => onUpdate('search', 'includeThinkingInSearch', checked)}
       />
 
       <SettingsToggleRow
-        title={t('settings.search.highlightMatches', '高亮匹配')}
-        description={t('settings.search.highlightMatchesHelp', '在搜索结果中高亮显示匹配文本')}
+        title={t('settings.search.highlightMatches', 'Highlight matches')}
+        description={t('settings.search.highlightMatchesHelp', 'Highlight matching text in search results')}
         checked={settings.search.highlightMatches}
         onChange={(checked) => onUpdate('search', 'highlightMatches', checked)}
       />

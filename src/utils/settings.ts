@@ -69,18 +69,6 @@ export function mergeSettings(base: AppSettings, override: Partial<AppSettings>)
 }
 
 /**
- * Validate setting values
- */
-export function validateSettingValue(
-  _section: string,
-  _key: string,
-  _value: unknown
-): ValidationError | null {
-  // TODO: Implement validation logic
-  return null
-}
-
-/**
  * Format setting values for display
  */
 export function formatSettingValue(_section: string, _key: string, value: unknown): string {
@@ -94,47 +82,6 @@ export function formatSettingValue(_section: string, _key: string, value: unknow
     return value
   }
   return JSON.stringify(value)
-}
-
-/**
- * Parse setting values from strings
- */
-export function parseSettingValue(_section: string, _key: string, value: string): unknown {
-  // TODO: Implement parsing logic
-  return value
-}
-
-/**
- * Get default setting values
- */
-export function getSettingDefaultValue(_section: string, _key: string): unknown {
-  // TODO: Implement default value logic
-  return null
-}
-
-/**
- * Check whether settings were modified
- */
-export function isSettingModified(
-  _current: AppSettings,
-  _original: AppSettings
-): { modified: boolean; modifiedFields: string[] } {
-  const modifiedFields: string[] = []
-
-  // TODO: Implement comparison logic
-
-  return {
-    modified: modifiedFields.length > 0,
-    modifiedFields,
-  }
-}
-
-/**
- * Reset settings to defaults
- */
-export function resetSectionToDefault(_section: keyof AppSettings): Partial<AppSettings> {
-  // TODO: Implement reset logic
-  return {}
 }
 
 /**
@@ -153,20 +100,4 @@ export function importSettingsFromJson(json: string): AppSettings | null {
   } catch {
     return null
   }
-}
-
-/**
- * Check settings version compatibility
- */
-export function checkSettingsCompatibility(_version: string): boolean {
-  // TODO: Implement version compatibility check
-  return true
-}
-
-/**
- * Migrate legacy settings
- */
-export function migrateSettings(oldSettings: any): AppSettings {
-  // TODO: Implement migration logic
-  return oldSettings as AppSettings
 }

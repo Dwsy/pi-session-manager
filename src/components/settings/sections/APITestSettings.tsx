@@ -86,73 +86,73 @@ function ensureSuccessEnvelope(payload: unknown): Record<string, unknown> | null
 
 function validateSessions(payload: unknown): ValidationResult {
   const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: '响应缺少 success=true' }
+  if (!envelope) return { valid: false, message: 'Response missing success=true' }
   const data = envelope.data
-  if (!Array.isArray(data)) return { valid: false, message: 'sessions.data 不是数组' }
-  return { valid: true, message: `返回 ${data.length} 条会话` }
+  if (!Array.isArray(data)) return { valid: false, message: 'sessions.data is not an array' }
+  return { valid: true, message: `Returned ${data.length} sessions` }
 }
 
 function validateFullText(payload: unknown): ValidationResult {
   const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: '响应缺少 success=true' }
+  if (!envelope) return { valid: false, message: 'Response missing success=true' }
   const data = isRecord(envelope.data) ? envelope.data : null
-  if (!data) return { valid: false, message: 'search.data 不是对象' }
+  if (!data) return { valid: false, message: 'search.data is not an object' }
   const hits = getArrayField(data, 'hits')
   const totalHits = getNumberField(data, 'total_hits')
-  if (!hits) return { valid: false, message: 'search.data.hits 不是数组' }
-  if (totalHits === null) return { valid: false, message: 'search.data.total_hits 不是数字' }
-  return { valid: true, message: `命中 ${hits.length} 条，total_hits=${totalHits}` }
+  if (!hits) return { valid: false, message: 'search.data.hits is not an array' }
+  if (totalHits === null) return { valid: false, message: 'search.data.total_hits is not a number' }
+  return { valid: true, message: `Hit ${hits.length} results, total_hits=${totalHits}` }
 }
 
 function validateMemoryRecall(payload: unknown): ValidationResult {
   const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: '响应缺少 success=true' }
+  if (!envelope) return { valid: false, message: 'Response missing success=true' }
   const data = isRecord(envelope.data) ? envelope.data : null
-  if (!data) return { valid: false, message: 'memory_recall.data 不是对象' }
+  if (!data) return { valid: false, message: 'memory_recall.data is not an object' }
   const evidence = getArrayField(data, 'evidence')
   const intent = getStringField(data, 'intent')
   const routePlan = getArrayField(data, 'route_plan')
   const nextActions = getArrayField(data, 'next_actions')
-  if (!evidence) return { valid: false, message: 'memory_recall.data.evidence 不是数组' }
-  if (!intent) return { valid: false, message: 'memory_recall.data.intent 不是字符串' }
+  if (!evidence) return { valid: false, message: 'memory_recall.data.evidence is not an array' }
+  if (!intent) return { valid: false, message: 'memory_recall.data.intent is not a string' }
   if (!routePlan && !nextActions) {
-    return { valid: false, message: 'memory_recall 缺少 route_plan/next_actions' }
+    return { valid: false, message: 'memory_recall missing route_plan/next_actions' }
   }
   return { valid: true, message: `intent=${intent}, evidence=${evidence.length}` }
 }
 
 function validateMemoryUnified(payload: unknown): ValidationResult {
   const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: '响应缺少 success=true' }
+  if (!envelope) return { valid: false, message: 'Response missing success=true' }
   const data = isRecord(envelope.data) ? envelope.data : null
-  if (!data) return { valid: false, message: 'memory_unified.data 不是对象' }
+  if (!data) return { valid: false, message: 'memory_unified.data is not an object' }
   const evidence = getArrayField(data, 'evidence')
   const experience = getArrayField(data, 'experience')
-  if (!evidence) return { valid: false, message: 'memory_unified.data.evidence 不是数组' }
-  if (!experience) return { valid: false, message: 'memory_unified.data.experience 不是数组' }
+  if (!evidence) return { valid: false, message: 'memory_unified.data.evidence is not an array' }
+  if (!experience) return { valid: false, message: 'memory_unified.data.experience is not an array' }
   return { valid: true, message: `evidence=${evidence.length}, experience=${experience.length}` }
 }
 
 function validateAnalytics(payload: unknown): ValidationResult {
   const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: '响应缺少 success=true' }
+  if (!envelope) return { valid: false, message: 'Response missing success=true' }
   const data = isRecord(envelope.data) ? envelope.data : null
-  if (!data) return { valid: false, message: 'analytics.data 不是对象' }
+  if (!data) return { valid: false, message: 'analytics.data is not an object' }
   const sessions = getNumberField(data, 'sessions')
-  if (sessions === null) return { valid: false, message: 'analytics.data.sessions 不是数字' }
-  return { valid: true, message: `总会话数=${sessions}` }
+  if (sessions === null) return { valid: false, message: 'analytics.data.sessions is not a number' }
+  return { valid: true, message: `Total sessions=${sessions}` }
 }
 
 function validateObservability(payload: unknown): ValidationResult {
   const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: '响应缺少 success=true' }
+  if (!envelope) return { valid: false, message: 'Response missing success=true' }
   const data = isRecord(envelope.data) ? envelope.data : null
-  if (!data) return { valid: false, message: 'observability.data 不是对象' }
+  if (!data) return { valid: false, message: 'observability.data is not an object' }
   const endpoints = getArrayField(data, 'endpoints')
   const capabilities = getObjectField(data, 'capabilities')
-  if (!endpoints) return { valid: false, message: 'observability.data.endpoints 不是数组' }
-  if (!capabilities) return { valid: false, message: 'observability.data.capabilities 不是对象' }
-  return { valid: true, message: `对外接口清单 ${endpoints.length} 条` }
+  if (!endpoints) return { valid: false, message: 'observability.data.endpoints is not an array' }
+  if (!capabilities) return { valid: false, message: 'observability.data.capabilities is not an object' }
+  return { valid: true, message: `External API list ${endpoints.length} endpoints` }
 }
 
 const ENDPOINTS: EndpointStatus[] = [
@@ -228,7 +228,7 @@ export default function APITestSettings() {
           endpoint: ep.name,
           status: 'error',
           latency,
-          message: `响应不是 JSON: ${contentType || 'unknown'}`,
+          message: `Response is not JSON: ${contentType || 'unknown'}`,
           detail: bodyText.slice(0, 180),
         }
       }
@@ -241,7 +241,7 @@ export default function APITestSettings() {
           endpoint: ep.name,
           status: 'error',
           latency,
-          message: 'JSON 解析失败',
+          message: 'JSON parse failed',
           detail: bodyText.slice(0, 180),
         }
       }
@@ -338,13 +338,13 @@ export default function APITestSettings() {
     <div className="space-y-6">
       <SettingsCard
         icon={<Activity className="h-5 w-5" />}
-        title={t('settings.apiTest.title', 'API 连接测试')}
-        description={t('settings.apiTest.description', '对外会话检索 API 的真实连通性与响应结构测试')}
+        title={t('settings.apiTest.title', 'API Connection Test')}
+        description={t('settings.apiTest.description', 'Test real connectivity and response structure of external session retrieval API')}
       >
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground/80">
-              {t('settings.apiTest.baseUrl', '服务地址')}
+              {t('settings.apiTest.baseUrl', 'Server Address')}
             </label>
             <div className="flex gap-2">
               <input
@@ -360,7 +360,7 @@ export default function APITestSettings() {
                 className="px-4 py-2 bg-info text-info-foreground rounded-md text-sm font-medium hover:bg-info/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                {t('settings.apiTest.testAll', '测试全部')}
+                {t('settings.apiTest.testAll', 'Test All')}
               </button>
             </div>
           </div>
@@ -378,11 +378,11 @@ export default function APITestSettings() {
                 <div>
                   <p className="font-medium">
                     {errorCount === 0
-                      ? t('settings.apiTest.allPassed', '所有测试通过')
-                      : t('settings.apiTest.someFailed', '{{count}} 个测试失败', { count: errorCount })}
+                      ? t('settings.apiTest.allPassed', 'All tests passed')
+                      : t('settings.apiTest.someFailed', '{{count}} tests failed', { count: errorCount })}
                   </p>
                   <p className="text-sm opacity-80">
-                    {t('settings.apiTest.summary', '{{success}}/{{total}} 成功', {
+                    {t('settings.apiTest.summary', '{{success}}/{{total}} passed', {
                       success: successCount,
                       total: results.length,
                     })}
@@ -445,7 +445,7 @@ export default function APITestSettings() {
                         disabled={isTesting}
                         className="px-3 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded-md disabled:opacity-50"
                       >
-                        {t('settings.apiTest.retest', '重试')}
+                        {t('settings.apiTest.retest', 'Retry')}
                       </button>
                     </div>
                   </div>
@@ -477,13 +477,13 @@ export default function APITestSettings() {
           <div className="p-4 bg-muted/50 rounded-lg border border-border text-sm space-y-2">
             <p className="font-medium flex items-center gap-2">
               <Server className="h-4 w-4" />
-              {t('settings.apiTest.troubleshooting', '故障排除')}
+              {t('settings.apiTest.troubleshooting', 'Troubleshooting')}
             </p>
             <ul className="list-disc list-inside text-muted-foreground space-y-1 text-xs">
-              <li>{t('settings.apiTest.help1', '确保 pi-session-manager CLI 正在运行')}</li>
-              <li>{t('settings.apiTest.help2', '检查服务地址和端口是否正确')}</li>
-              <li>{t('settings.apiTest.help3', '确认接口返回 JSON，而不是前端 HTML 回退页面')}</li>
-              <li>{t('settings.apiTest.help4', '仅暴露会话检索类 API，embedding 相关接口默认关闭')}</li>
+              <li>{t('settings.apiTest.help1', 'Ensure pi-session-manager CLI is running')}</li>
+              <li>{t('settings.apiTest.help2', 'Check if server address and port are correct')}</li>
+              <li>{t('settings.apiTest.help3', 'Confirm API returns JSON, not frontend HTML fallback page')}</li>
+              <li>{t('settings.apiTest.help4', 'Only exposes session retrieval APIs, embedding related interfaces are disabled by default')}</li>
             </ul>
           </div>
         </div>
