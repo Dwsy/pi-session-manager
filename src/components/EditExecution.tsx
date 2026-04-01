@@ -9,6 +9,7 @@ import { getPathBasename } from '../utils/path'
 import { useTheme } from '../hooks/useAppearance'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useSessionView } from '../contexts/SessionViewContext'
+import { useSettings } from '../hooks/useSettings'
 import { highlightSearchInHTML } from '../utils/search'
 
 // Custom themes: inherit pierre themes but override editor.background to match tool card bg
@@ -20,7 +21,7 @@ if (!themesRegistered) {
   registerCustomTheme('card-light', () =>
     lightLoader().then((r: any) => {
       const base = r.default ?? r
-      return { ...base, name: 'card-light', colors: { ...base.colors, 'editor.background': '#E6F0E7' } }
+      return { ...base, name: 'card-light', colors: { ...base.colors, 'editor.background': 'transparent' } }
     })
   )
 
@@ -28,7 +29,7 @@ if (!themesRegistered) {
   registerCustomTheme('card-dark', () =>
     darkLoader().then((r: any) => {
       const base = r.default ?? r
-      return { ...base, name: 'card-dark', colors: { ...base.colors, 'editor.background': '#283228' } }
+      return { ...base, name: 'card-dark', colors: { ...base.colors, 'editor.background': 'transparent' } }
     })
   )
 }
@@ -57,6 +58,8 @@ export default function EditExecution({
   const isMobile = useIsMobile()
   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
+  const { settings } = useSettings()
+  const disableSuccessStyle = settings.appearance.disableToolSuccessStyle
   const expanded = isToolExpanded(entryId)
   const displayPath = isMobile ? shortenPath(filePath) : filePath
   const desktopPathStyle: CSSProperties | undefined = isMobile
@@ -271,10 +274,10 @@ export default function EditExecution({
   const outputText = output ?? ''
   const shouldShowOutput = Boolean(isError && outputText)
   const hasContent = Boolean(diff || shouldShowOutput)
-  const statusClass = isError ? 'error' : 'success'
+  const statusClass = isError ? 'error' : !disableSuccessStyle ? 'success' : ''
 
   return (
-    <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
+    <div className={`tool-execution ${statusClass}`.trim()} id={`entry-${entryId}`}>
       <div
         className={`tool-header ${hasContent ? 'cursor-pointer select-none' : ''}`}
         onClick={hasContent ? () => toggleToolExpanded(entryId) : undefined}

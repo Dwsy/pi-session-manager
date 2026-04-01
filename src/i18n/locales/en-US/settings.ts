@@ -116,6 +116,9 @@ export const settings = {
       comfortable: 'Comfortable',
       spacious: 'Spacious',
     },
+    disableToolSuccessStyle: 'Disable Tool Success Style',
+    disableToolSuccessStyleDesc: 'Disable green background and border on successful tool execution for cleaner tool cards',
+    enabled: 'Enabled',
   },
   language: {
     select: 'Select Language',

@@ -814,7 +814,7 @@ html, body {
 .tool-execution {
   margin: 16px 0;
   border-radius: 8px;
-  background: var(--bg-subtle);
+  background: var(--toolExecutionBg, var(--bg-subtle));
   overflow: hidden;
   border: 1px solid rgba(var(--accent-rgb), 0.12);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -832,9 +832,10 @@ html, body {
   background: var(--toolPendingBg, var(--bg-subtle));
 }
 
+/* Tool execution success style - controlled by CSS variable */
 .tool-execution.success {
-  background: var(--toolSuccessBg, rgba(var(--success-rgb), 0.08));
-  border-color: rgba(var(--success-rgb), 0.22);
+  background: var(--toolSuccessBgOverride, var(--toolExecutionBg, var(--toolSuccessBg, rgba(var(--success-rgb), 0.08))));
+  border-color: var(--toolSuccessBorderOverride, rgba(var(--success-rgb), 0.22));
 }
 
 .tool-execution.error {
@@ -947,9 +948,10 @@ html, body {
   margin-bottom: 0;
 }
 
+/* Tool output wrapper expanded margins - controlled by CSS variable */
 .tool-output-wrapper.collapsible.expanded {
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-top: var(--toolOutputExpandedMargin, 8px);
+  margin-bottom: var(--toolOutputExpandedMargin, 8px);
 }
 
 /* Tool Expand/Collapse Animation - Universal */
@@ -1138,8 +1140,8 @@ html, body {
 }
 
 .tool-diff .pierre-dark {
-  --pierre-bg-primary: #1e1e2e;
-  --pierre-bg-secondary: #282838;
+  --pierre-bg-primary: var(--toolExecutionBg, #1e1e2e);
+  --pierre-bg-secondary: var(--toolExecutionBg, #282838);
   --pierre-border: rgba(255, 255, 255, 0.1);
   --pierre-text: #e5e5e7;
   --pierre-text-muted: #808080;
@@ -1151,8 +1153,8 @@ html, body {
 }
 
 .tool-diff .pierre-light {
-  --pierre-bg-primary: #ffffff;
-  --pierre-bg-secondary: #f8f9fa;
+  --pierre-bg-primary: var(--toolExecutionBg, #ffffff);
+  --pierre-bg-secondary: var(--toolExecutionBg, #f8f9fa);
   --pierre-border: rgba(0, 0, 0, 0.1);
   --pierre-text: #1a1b2e;
   --pierre-text-muted: #6b7280;

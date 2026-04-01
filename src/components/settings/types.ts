@@ -46,6 +46,7 @@ export interface AppSettings {
     fontSize: 'small' | 'medium' | 'large'
     codeBlockTheme: 'github' | 'monokai' | 'dracula' | 'one-dark'
     messageSpacing: 'compact' | 'comfortable' | 'spacious'
+    disableToolSuccessStyle: boolean
   }
   language: {
     locale: string
@@ -114,6 +115,7 @@ export const defaultSettings: AppSettings = {
     fontSize: 'medium',
     codeBlockTheme: 'github',
     messageSpacing: 'comfortable',
+    disableToolSuccessStyle: true,
   },
   language: {
     locale: getDefaultLocale(),

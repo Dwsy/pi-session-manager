@@ -990,8 +990,9 @@
    margin-top: 0;
  }
 
- .tool-output-wrapper.collapsible.expanded {
-   margin-top: 8px;
+ /* Tool output wrapper expanded margins - controlled by CSS variable */
+.tool-output-wrapper.collapsible.expanded {
+   margin-top: var(--toolOutputExpandedMargin, 8px);
  }
 
 /*

@@ -16,6 +16,7 @@ import { useSessions } from "./hooks/useSessions";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useSessionActions } from "./hooks/useSessionActions";
 import { useAppearance } from "./hooks/useAppearance";
+import { useToolStyles } from "./hooks/useToolStyles";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useAppBootstrap } from "./hooks/app/useAppBootstrap";
 import { useAppUiEffects } from "./hooks/app/useAppUiEffects";
@@ -112,9 +113,6 @@ function App() {
     patchSessions,
     handleDeleteSession,
     handleDeleteSessions,
-    pendingDeleteSession,
-    confirmDeleteSession,
-    cancelDeleteSession,
     handleRenameSession,
     forkSession,
   } = useSessions();
@@ -136,6 +134,7 @@ function App() {
     getDescendantIds,
   } = useTags();
   useAppearance();
+  useToolStyles();
 
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "project" | "kanban">(
@@ -160,8 +159,6 @@ function App() {
     DEFAULT_SESSION_SORT_ORDER,
   );
   const [selectionModeTrigger, setSelectionModeTrigger] = useState(0);
-  const [selectionModeDismissTrigger, setSelectionModeDismissTrigger] =
-    useState(0);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     if (isDemoModeEnabled()) {
       try {
@@ -185,9 +182,6 @@ function App() {
   }, []);
   const triggerSelectionMode = useCallback(() => {
     setSelectionModeTrigger((value) => value + 1);
-  }, []);
-  const dismissSelectionMode = useCallback(() => {
-    setSelectionModeDismissTrigger((value) => value + 1);
   }, []);
   const [terminalMaximized, setTerminalMaximized] = useState(false);
   const [terminalPendingCommand, setTerminalPendingCommand] = useState<
@@ -217,7 +211,7 @@ function App() {
     showExportDialog,
     showRenameDialog,
     showForkDialog,
-    hasPendingDeleteSession: !!pendingDeleteSession,
+    hasPendingDeleteSession: false,
     showSettings,
     showFullTextSearch,
     showOnboarding,
@@ -287,8 +281,7 @@ function App() {
     showForkDialog ||
     showFullTextSearch ||
     showOnboarding ||
-    showTerminal ||
-    pendingDeleteSession !== null;
+    showTerminal;
 
   const shortcuts = useMemo(
     () => ({
@@ -322,9 +315,7 @@ function App() {
       },
       "cmd+shift+f": () => setShowFullTextSearch(true),
       escape: () => {
-        if (pendingDeleteSession) {
-          cancelDeleteSession();
-        } else if (showSettings) {
+        if (showSettings) {
           setShowSettings(false);
         } else if (showExportDialog) {
           setShowExportDialog(false);
@@ -346,8 +337,6 @@ function App() {
       },
     }),
     [
-      pendingDeleteSession,
-      cancelDeleteSession,
       showSettings,
       showExportDialog,
       showRenameDialog,
@@ -366,14 +355,10 @@ function App() {
   );
 
   const shouldHandleGlobalShortcutEvent = useCallback(
-    (event: KeyboardEvent) => {
-      if (pendingDeleteSession) {
-        return event.key === "Escape";
-      }
-
+    () => {
       return true;
     },
-    [pendingDeleteSession],
+    [],
   );
 
   useKeyboardShortcuts(shortcuts, {
@@ -443,7 +428,6 @@ function App() {
     removeTagFromSession,
     createTag,
     selectionModeTrigger,
-    selectionModeDismissTrigger,
   });
 
   const onRenameSession = async (newName: string) => {
@@ -644,7 +628,6 @@ function App() {
       showFullTextSearch={showFullTextSearch}
       showOnboarding={showOnboarding}
       selectedSession={selectedSession}
-      pendingDeleteSession={pendingDeleteSession}
       commandContext={commandContext}
       onExportSession={onExportSession}
       onRenameSession={onRenameSession}
@@ -652,9 +635,6 @@ function App() {
       onCloseExportDialog={() => setShowExportDialog(false)}
       onCloseRenameDialog={() => setShowRenameDialog(false)}
       onCloseForkDialog={() => setShowForkDialog(false)}
-      onConfirmDeleteSession={confirmDeleteSession}
-      onCancelDeleteSession={cancelDeleteSession}
-      onDeleteSessionConfirmStart={dismissSelectionMode}
       onCloseSettings={() => {
         setShowSettings(false);
         reloadTerminalConfig();

@@ -39,7 +39,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
 
   return (
     <div className="space-y-6">
-      <SettingsField label={t('settings.appearance.theme', '主题')}>
+      <SettingsField label={t('settings.appearance.theme', 'Theme')}>
         <SettingsOptionGroup
           options={['dark', 'light', 'system', 'custom'] as const}
           value={settings.appearance.theme}
@@ -47,7 +47,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
           renderLabel={(theme) =>
             t(
               `settings.appearance.themes.${theme}`,
-              theme === 'dark' ? '深色' : theme === 'light' ? '浅色' : theme === 'system' ? '跟随系统' : '自定义'
+              theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : theme === 'system' ? 'System' : 'Custom'
             )
           }
           containerClassName="grid grid-cols-1 sm:grid-cols-4 gap-3"
@@ -77,13 +77,13 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         </SettingsField>
       )}
 
-      <SettingsField label={t('settings.appearance.fontSize', '字体大小')}>
+      <SettingsField label={t('settings.appearance.fontSize', 'Font size')}>
         <SettingsOptionGroup
           options={['small', 'medium', 'large'] as const}
           value={settings.appearance.fontSize}
           onChange={(size) => onUpdate('appearance', 'fontSize', size)}
           renderLabel={(size) =>
-            t(`settings.appearance.fontSizes.${size}`, size === 'small' ? '小' : size === 'medium' ? '中' : '大')
+            t(`settings.appearance.fontSizes.${size}`, size === 'small' ? 'Small' : size === 'medium' ? 'Medium' : 'Large')
           }
           containerClassName="flex flex-wrap gap-2"
           optionClassName="flex-1 min-w-[80px] py-2"
@@ -108,7 +108,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         />
       </SettingsField>
 
-      <SettingsField label={t('settings.appearance.codeBlockTheme', '代码块主题')}>
+      <SettingsField label={t('settings.appearance.codeBlockTheme', 'Code block theme')}>
         <SettingsSelect
           value={settings.appearance.codeBlockTheme}
           onChange={(e) => onUpdate('appearance', 'codeBlockTheme', e.target.value)}
@@ -120,7 +120,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         </SettingsSelect>
       </SettingsField>
 
-      <SettingsField label={t('settings.appearance.messageSpacing', '消息间距')}>
+      <SettingsField label={t('settings.appearance.messageSpacing', 'Message spacing')}>
         <SettingsOptionGroup
           options={['compact', 'comfortable', 'spacious'] as const}
           value={settings.appearance.messageSpacing}
@@ -129,6 +129,26 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
           containerClassName="flex flex-wrap gap-2"
           optionClassName="flex-1 min-w-[80px] py-2"
         />
+      </SettingsField>
+
+      <SettingsField
+        label={t('settings.appearance.disableToolSuccessStyle', 'Disable tool success style')}
+        description={t(
+          'settings.appearance.disableToolSuccessStyleDesc',
+          'Disable green background and border on successful tool execution for cleaner tool cards'
+        )}
+      >
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={settings.appearance.disableToolSuccessStyle}
+            onChange={(e) => onUpdate('appearance', 'disableToolSuccessStyle', e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-2"
+          />
+          <span className="text-sm text-muted-foreground">
+            {t('settings.appearance.enabled', 'Enabled')}
+          </span>
+        </label>
       </SettingsField>
     </div>
   )

@@ -1,0 +1,182 @@
+# Tool Style Toggle Feature
+
+## Overview
+
+添加了一个可控开关来禁用工具执行成功时的样式（绿色背景和边框）以及工具输出展开时的上下边距。
+
+## 修改内容
+
+### 1. 设置类型 (`src/components/settings/types.ts`)
+
+在 `appearance` 设置中添加了新字段：
+```typescript
+appearance: {
+  // ... 其他字段
+  disableToolSuccessStyle: boolean
+}
+```
+
+默认值：`false`（保持原有样式）
+
+### 2. 设置 UI (`src/components/settings/sections/AppearanceSettings.tsx`)
+
+添加了新的设置项：
+- **标签**: 禁用工具成功样式
+- **描述**: 禁用工具执行成功时的绿色背景和边框，使工具卡片更简洁
+- **类型**: Checkbox
+
+### 3. CSS 变量控制
+
+#### `src/index.css`
+```css
+/* 工具执行成功样式 - 通过 CSS 变量控制 */
+.tool-execution.success {
+  background: var(--toolSuccessBgOverride, var(--toolSuccessBg, rgba(var(--success-rgb), 0.08)));
+  border-color: var(--toolSuccessBorderOverride, rgba(var(--success-rgb), 0.22));
+}
+
+/* 工具输出展开边距 - 通过 CSS 变量控制 */
+.tool-output-wrapper.collapsible.expanded {
+  margin-top: var(--toolOutputExpandedMargin, 8px);
+  margin-bottom: var(--toolOutputExpandedMargin, 8px);
+}
+```
+
+#### `src/styles/session.css`
+```css
+.tool-output-wrapper.collapsible.expanded {
+  margin-top: var(--toolOutputExpandedMargin, 8px);
+}
+```
+
+### 4. 主题工具 (`src/utils/piTheme.ts`)
+
+添加了新的 CSS 变量到 `OVERRIDE_VARS`：
+- `--toolSuccessBgOverride`
+- `--toolSuccessBorderOverride`
+- `--toolOutputExpandedMargin`
+
+### 5. 自定义 Hook (`src/hooks/useToolStyles.ts`)
+
+创建了新 hook 来根据设置动态控制 CSS 变量：
+
+```typescript
+export function useToolStyles() {
+  const { settings } = useSettings()
+  const disableSuccessStyle = settings.appearance.disableToolSuccessStyle
+
+  useEffect(() => {
+    const root = document.documentElement
+
+    if (disableSuccessStyle) {
+      // 禁用成功样式
+      root.style.setProperty('--toolSuccessBgOverride', 'var(--bg-subtle)')
+      root.style.setProperty('--toolSuccessBorderOverride', 'rgba(var(--accent-rgb), 0.12)')
+      root.style.setProperty('--toolOutputExpandedMargin', '0px')
+    } else {
+      // 启用默认样式
+      root.style.removeProperty('--toolSuccessBgOverride')
+      root.style.removeProperty('--toolSuccessBorderOverride')
+      root.style.removeProperty('--toolOutputExpandedMargin')
+    }
+
+    return () => {
+      root.style.removeProperty('--toolSuccessBgOverride')
+      root.style.removeProperty('--toolSuccessBorderOverride')
+      root.style.removeProperty('--toolOutputExpandedMargin')
+    }
+  }, [disableSuccessStyle])
+
+  return { disableSuccessStyle }
+}
+```
+
+### 6. 应用集成 (`src/App.tsx`)
+
+在 App 组件中调用 `useToolStyles()` hook：
+```typescript
+useAppearance();
+useToolStyles();
+```
+
+### 7. 组件逻辑 (`src/components/EditExecution.tsx`)
+
+修改了状态类应用逻辑：
+```typescript
+const statusClass = isError ? 'error' : !disableSuccessStyle ? 'success' : ''
+
+return (
+  <div className={`tool-execution ${statusClass}`.trim()} id={`entry-${entryId}`}>
+```
+
+### 8. 国际化
+
+#### `src/i18n/locales/zh-CN/settings.ts`
+```typescript
+appearance: {
+  // ... 其他字段
+  disableToolSuccessStyle: '禁用工具成功样式',
+  disableToolSuccessStyleDesc: '禁用工具执行成功时的绿色背景和边框，使工具卡片更简洁',
+  enabled: '已启用',
+}
+```
+
+#### `src/i18n/locales/en-US/settings.ts`
+```typescript
+appearance: {
+  // ... other fields
+  disableToolSuccessStyle: 'Disable Tool Success Style',
+  disableToolSuccessStyleDesc: 'Disable green background and border on successful tool execution for cleaner tool cards',
+  enabled: 'Enabled',
+}
+```
+
+## 使用方式
+
+1. 打开设置面板（Settings）
+2. 导航到 **外观**（Appearance）部分
+3. 找到 **禁用工具成功样式** 选项
+4. 勾选以禁用成功样式，取消勾选以恢复默认样式
+
+## 效果
+
+### 启用前（默认）
+- 工具执行成功：绿色背景 + 绿色边框
+- 工具输出展开：上下 8px 边距
+
+### 启用后
+- 工具执行成功：普通背景 + 默认边框（与其他状态一致）
+- 工具输出展开：无边距（更紧凑）
+
+## 技术实现
+
+采用 **CSS 变量 + React Hook** 的组合方案：
+
+1. **CSS 变量层**: 通过 `var(--toolSuccessBgOverride, fallback)` 实现级联控制
+2. **Hook 层**: `useToolStyles` 监听设置变化并动态更新 CSS 变量
+3. **组件层**: `EditExecution` 根据设置决定是否应用 `success` 类
+
+这种设计避免了直接修改 CSS 文件，实现了运行时动态切换。
+
+## 相关文件
+
+- `src/components/settings/types.ts` - 设置类型定义
+- `src/components/settings/sections/AppearanceSettings.tsx` - 设置 UI
+- `src/hooks/useToolStyles.ts` - 样式控制 Hook（新增）
+- `src/hooks/useSettings.ts` - 设置 Hook
+- `src/utils/piTheme.ts` - 主题工具
+- `src/index.css` - 主样式表
+- `src/styles/session.css` - 会话样式
+- `src/components/EditExecution.tsx` - 工具执行组件
+- `src/App.tsx` - 应用入口
+- `src/i18n/locales/*/settings.ts` - 国际化文件
+
+## 设计原则
+
+> 「真正的简洁，不是删除功能，而是让可控的更可控。」
+
+此功能遵循以下原则：
+1. **可控性**: 用户可以选择是否启用
+2. **非破坏性**: 默认保持原有样式
+3. **性能友好**: 使用 CSS 变量而非强制重渲染
+4. **类型安全**: 完整的 TypeScript 类型支持
