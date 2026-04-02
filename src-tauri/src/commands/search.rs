@@ -118,9 +118,10 @@ pub async fn full_text_search(
             }
 
             fn parse_quoted_terms(query: &str) -> (Vec<String>, Vec<String>, bool) {
-                let quote_count = query.chars().filter(|ch| *ch == '"').count();
+                let normalized_query = query.replace(['“', '”'], "\"");
+                let quote_count = normalized_query.chars().filter(|ch| *ch == '"').count();
                 if quote_count == 0 || quote_count % 2 != 0 {
-                    let words = query
+                    let words = normalized_query
                         .split_whitespace()
                         .map(|word| word.to_string())
                         .collect::<Vec<String>>();
@@ -132,7 +133,7 @@ pub async fn full_text_search(
                 let mut current_phrase = String::new();
                 let mut in_phrase = false;
 
-                for ch in query.chars() {
+                for ch in normalized_query.chars() {
                     if ch == '"' {
                         if in_phrase {
                             if !current_phrase.trim().is_empty() {
@@ -157,7 +158,7 @@ pub async fn full_text_search(
                     .collect::<Vec<String>>();
 
                 if phrases.is_empty() {
-                    let fallback_words = query
+                    let fallback_words = normalized_query
                         .split_whitespace()
                         .map(|word| word.to_string())
                         .collect::<Vec<String>>();

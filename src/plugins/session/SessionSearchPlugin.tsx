@@ -50,13 +50,13 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
         const sessionCwd = session.cwd
         const sessionId = session.id || ''
         const sessionIdMatchKind = getSessionIdMatchKind(sessionId, query)
-        const idPrefixMatch = sessionIdMatchKind === 'prefix'
         const idExactMatch = sessionIdMatchKind === 'exact'
+        const idPrefixMatch = sessionIdMatchKind === 'prefix'
 
-        const fields = [sessionName, firstMessage, sessionPath, sessionCwd, sessionId]
+        const fields = [sessionName, firstMessage, sessionPath, sessionCwd]
         const lowerFields = fields.map(field => field.toLowerCase())
 
-        if (hasPhraseMode && !idPrefixMatch) {
+        if (hasPhraseMode && !idExactMatch) {
           const phrasesMatched = phraseTerms.every(
             phrase => lowerFields.some(field => field.includes(phrase))
           )
@@ -102,7 +102,6 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
                 this.fuzzyMatch(term, firstMessage) * 0.8,
                 this.fuzzyMatch(term, sessionPath) * 0.5,
                 this.fuzzyMatch(term, sessionCwd) * 0.3,
-                this.fuzzyMatch(term, sessionId) * 1.5,
               ))
             )
           : Math.max(nameScore, messageScore, pathScore, cwdScore, sessionIdScore)
@@ -123,8 +122,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
             score,
             highlights: highlightTerms.flatMap(term => [
               ...this.calculateHighlights(term, session.name || '', 'title'),
-              ...this.calculateHighlights(term, session.first_message, 'title'),
-              ...this.calculateHighlights(term, session.id || '', 'subtitle')
+              ...this.calculateHighlights(term, session.first_message, 'title')
             ])
           })
         }

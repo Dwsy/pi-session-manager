@@ -27,8 +27,13 @@ pub enum SessionIdMatchKind {
     Prefix,
 }
 
+fn normalize_search_quotes(raw_query: &str) -> String {
+    raw_query.replace(['“', '”'], "\"")
+}
+
 pub fn session_id_query_is_exact(raw_query: &str) -> bool {
-    let trimmed = raw_query.trim();
+    let normalized_query = normalize_search_quotes(raw_query);
+    let trimmed = normalized_query.trim();
     trimmed.len() >= 2
         && trimmed.starts_with('"')
         && trimmed.ends_with('"')
@@ -36,7 +41,8 @@ pub fn session_id_query_is_exact(raw_query: &str) -> bool {
 }
 
 pub fn normalize_session_id_query(raw_query: &str) -> String {
-    let trimmed = raw_query.trim();
+    let normalized_query = normalize_search_quotes(raw_query);
+    let trimmed = normalized_query.trim();
     if session_id_query_is_exact(trimmed) {
         return trimmed[1..trimmed.len() - 1].trim().to_lowercase();
     }
@@ -67,9 +73,10 @@ pub fn session_id_match_kind(session_id: &str, raw_query: &str) -> Option<Sessio
 }
 
 fn parse_quoted_query_lower(query: &str) -> ParsedQuotedQuery {
-    let quote_count = query.chars().filter(|ch| *ch == '"').count();
+    let normalized_query = normalize_search_quotes(query);
+    let quote_count = normalized_query.chars().filter(|ch| *ch == '"').count();
     if quote_count == 0 || quote_count % 2 != 0 {
-        let words = query
+        let words = normalized_query
             .to_lowercase()
             .split_whitespace()
             .map(|word| word.to_string())
@@ -85,7 +92,7 @@ fn parse_quoted_query_lower(query: &str) -> ParsedQuotedQuery {
     let mut current_phrase = String::new();
     let mut in_phrase = false;
 
-    for ch in query.chars() {
+    for ch in normalized_query.chars() {
         if ch == '"' {
             if in_phrase {
                 if !current_phrase.trim().is_empty() {
