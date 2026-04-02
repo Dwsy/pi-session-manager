@@ -42,6 +42,7 @@ export interface DemoFullTextSearchOptions {
   page?: number
   pageSize?: number
   matchMode?: 'any' | 'all'
+  sortOrder?: 'newest' | 'oldest' | 'score'
 }
 
 export interface DemoListSessionsOptions {

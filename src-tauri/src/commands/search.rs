@@ -52,6 +52,7 @@ pub async fn search_sessions_fts(query: String, limit: usize) -> Result<Vec<Sess
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
+#[allow(clippy::too_many_arguments)]
 pub async fn full_text_search(
     query: String,
     role_filter: String,
@@ -60,6 +61,7 @@ pub async fn full_text_search(
     page: usize,
     page_size: usize,
     match_mode: Option<String>,
+    sort_order: Option<String>,
 ) -> Result<FullTextSearchResponse, String> {
     // Quick validation
     let trimmed = query.trim();
@@ -72,6 +74,7 @@ pub async fn full_text_search(
     }
 
     // Wrap all blocking DB operations in spawn_blocking with timeout
+    let sort_order = sort_order.unwrap_or_else(|| "relevance".to_string());
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         tokio::task::spawn_blocking(move || {
@@ -306,6 +309,20 @@ pub async fn full_text_search(
 
             // --- Fetch the page of hits with global ordering and per-session limit ---
             let rank_expr = if use_content_like { "-1.0" } else { "message_fts.rank" };
+
+            // Sort expressions.
+            // filtered CTE has no table aliases — use bare column names.
+            // final ORDER BY sees f (filtered) and m (message_entries) — needs f. prefix.
+            let bare_order = match sort_order.as_str() {
+                "newest" => "timestamp DESC",
+                "oldest" => "timestamp ASC",
+                _ => "rank",
+            };
+            let final_order = match sort_order.as_str() {
+                "newest" => "f.timestamp DESC",
+                "oldest" => "f.timestamp ASC",
+                _ => "f.rank",
+            };
             let offset = page * page_size;
             let limit = page_size;
             let data_sql = format!(
@@ -340,7 +357,7 @@ pub async fn full_text_search(
                         source_type,
                         timestamp,
                         rank,
-                        ROW_NUMBER() OVER (ORDER BY rank) as global_rn,
+                        ROW_NUMBER() OVER (ORDER BY ORDER_BY_EXPR) as global_rn,
                         COUNT(*) OVER () as total_hits
                     FROM deduped
                     WHERE rn_in_session <= 3
@@ -360,10 +377,15 @@ pub async fn full_text_search(
                 JOIN message_entries m ON f.entry_id = m.entry_id AND f.session_path = m.session_path AND f.source_type = m.source_type
                 JOIN sessions s ON s.path = f.session_path
                 WHERE f.global_rn > ? AND f.global_rn <= ?
-                ORDER BY f.rank"
+                ORDER BY FINAL_ORDER_EXPR"
             );
 
-            // Prepare parameters for data query: base params (fts_query, optional glob) plus offset and limit for global_rn
+            // Insert sort order (safe, only valid sort expressions)
+            let data_sql = data_sql
+                .replace("ORDER_BY_EXPR", bare_order)
+                .replace("FINAL_ORDER_EXPR", final_order);
+
+            // Prepare parameters for data query
             let offset_i64 = offset as i64;
             let limit_i64 = (offset + limit) as i64;
             let mut data_params: Vec<&dyn rusqlite::ToSql> = params.clone();
