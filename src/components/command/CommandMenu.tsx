@@ -1,5 +1,5 @@
 import { Command } from 'cmdk'
-import { Search, Loader2, FolderOpen, MessageSquare, FileText, SlidersHorizontal, Globe } from 'lucide-react'
+import { Search, Loader2, FolderOpen, MessageSquare, FileText, SlidersHorizontal, Globe, User, Bot, ArrowUpDown, Star } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import type { SearchPluginResult, SearchContext } from '../../plugins/types'
@@ -179,7 +179,7 @@ export default function CommandMenu({
   return (
     <Command className="w-full" shouldFilter={false}>
       {/* Header: Search + Actions */}
-      <div className="flex items-center gap-3 px-5 py-3.5 border-b border-border">
+      <div className="flex items-center gap-3 px-5 py-3 border-b border-border">
         <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
         <Command.Input
           value={query}
@@ -190,7 +190,7 @@ export default function CommandMenu({
         {isSearching && <Loader2 className="w-4 h-4 text-muted-foreground animate-spin flex-shrink-0" />}
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`relative p-2 rounded-lg transition-colors flex-shrink-0 ${
+          className={`relative p-1.5 rounded-lg transition-colors flex-shrink-0 ${
             showFilters ? 'bg-blue-500/10 text-blue-400' : 'text-muted-foreground hover:text-foreground hover:bg-surface'
           }`}
           title="Filters"
@@ -200,87 +200,100 @@ export default function CommandMenu({
         <button
           onClick={() => { if (currentProjectName) setSearchCurrentProjectOnly(!searchCurrentProjectOnly) }}
           disabled={!currentProjectName}
-          className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
+          className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
             !currentProjectName ? 'text-muted-foreground/40 cursor-not-allowed' :
             searchCurrentProjectOnly ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground hover:bg-surface'
           }`}
         >
           <FolderOpen className="w-4 h-4" />
         </button>
-        <kbd className="px-2 py-0.5 text-[10px] text-muted-foreground bg-surface rounded border border-border/70 flex-shrink-0 font-mono">ESC</kbd>
+        <kbd className="px-1.5 py-0.5 text-[10px] text-muted-foreground bg-surface rounded border border-border/70 flex-shrink-0 font-mono">ESC</kbd>
       </div>
 
-      {/* Filter Row */}
+      {/* Tabs & Filter Row — compact, left-aligned, all in one container */}
       {showFilters && (
-        <div className="flex items-center gap-2 px-5 py-2 border-b border-border bg-surface/30 overflow-x-auto custom-scrollbar">
-          <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wider font-medium flex-shrink-0">role</span>
-          {([
-            { value: 'all' as const, label: 'All' },
-            { value: 'user' as const, label: 'U' },
-            { value: 'assistant' as const, label: 'AI' },
-          ]).map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setFtsOptions({ ...ftsOptions, roleFilter: value, page: 0 })}
-              className={`px-2 py-0.5 text-xs rounded-md transition-all flex-shrink-0 ${
-                ftsOptions.roleFilter === value ? 'bg-blue-500/15 text-blue-400 font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-surface'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-          <div className="w-px h-4 bg-border/50 flex-shrink-0" />
-          <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wider font-medium flex-shrink-0">sort</span>
-          {(['newest', 'oldest', 'score'] as const).map(mode => (
-            <button
-              key={mode}
-              onClick={() => setFtsOptions({ ...ftsOptions, sortMode: mode, page: 0 })}
-              className={`px-2 py-0.5 text-xs rounded-md transition-all flex-shrink-0 capitalize ${
-                ftsOptions.sortMode === mode ? 'bg-blue-500/15 text-blue-400 font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-surface'
-              }`}
-            >
-              {mode}
-            </button>
-          ))}
-          <div className="w-px h-4 bg-border/50 flex-shrink-0" />
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <Globe className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
+        <div className="flex items-center gap-2 px-5 py-2 border-b border-border bg-surface/30">
+          {/* Tabs group */}
+          <div className="flex bg-surface-dark/50 rounded-md p-0.5 border border-border/40">
+            {TABS.map(tab => {
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-all ${
+                    isActive
+                      ? 'bg-blue-500/15 text-blue-400 font-medium'
+                      : 'text-muted-foreground/80 hover:text-foreground'
+                  }`}
+                >
+                  <tab.Icon className="w-3 h-3" />
+                  <span>{t(`command.${tab.key}`)}</span>
+                  {tabCounts[tab.id] > 0 && (
+                    <span className={`min-w-[14px] h-[14px] px-0.5 rounded text-[10px] leading-[14px] font-semibold text-center tabular-nums ${
+                      isActive ? 'bg-blue-400 text-white' : 'bg-surface text-foreground/50'
+                    }`}>
+                      {tabCounts[tab.id]}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Role group */}
+          <div className="flex bg-surface-dark/50 rounded-md p-0.5 border border-border/40">
+            {(['all', 'user', 'assistant'] as const).map(value => (
+              <button
+                key={value}
+                onClick={() => setFtsOptions({ ...ftsOptions, roleFilter: value, page: 0 })}
+                className={`flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-all ${
+                  ftsOptions.roleFilter === value
+                    ? 'bg-blue-500/15 text-blue-400 font-medium'
+                    : 'text-muted-foreground/80 hover:text-foreground'
+                }`}
+              >
+                {value === 'all' && <><User className="w-3 h-3" /><Bot className="w-3 h-3" /></>}
+                {value === 'user' && <User className="w-3 h-3" />}
+                {value === 'assistant' && <Bot className="w-3 h-3" />}
+                <span>{value === 'all' ? 'All' : value === 'user' ? 'User' : 'AI'}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Sort group */}
+          <div className="flex bg-surface-dark/50 rounded-md p-0.5 border border-border/40">
+            {(['newest', 'oldest', 'score'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setFtsOptions({ ...ftsOptions, sortMode: mode, page: 0 })}
+                className={`flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-all capitalize ${
+                  ftsOptions.sortMode === mode
+                    ? 'bg-blue-500/15 text-blue-400 font-medium'
+                    : 'text-muted-foreground/80 hover:text-foreground'
+                }`}
+              >
+                {mode === 'newest' && <ArrowUpDown className="w-3 h-3 rotate-180" />}
+                {mode === 'oldest' && <ArrowUpDown className="w-3 h-3" />}
+                {mode === 'score' && <Star className="w-3 h-3" />}
+                <span>{mode}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Path input */}
+          <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+            <Globe className="w-3.5 h-3.5 text-muted-foreground/50" />
             <input
               type="text"
               value={ftsOptions.globPattern || ''}
               onChange={e => setFtsOptions({ ...ftsOptions, globPattern: e.target.value || undefined, page: 0 })}
-              placeholder="path..."
-              className="flex-1 min-w-0 px-1.5 py-0.5 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/50 outline-none border-b border-transparent focus:border-blue-400/50 transition-colors"
+              placeholder="path…"
+              className="w-[160px] px-2 py-1 bg-surface-dark/60 rounded-md border border-border/50 text-[11px] text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-blue-400/40"
             />
           </div>
         </div>
       )}
-
-      {/* Tabs */}
-      <div className="flex items-center gap-0.5 px-5 py-1.5 border-b border-border bg-background">
-        {TABS.map(tab => {
-          const isActive = activeTab === tab.id
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors ${
-                isActive ? 'bg-foreground/10 text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-surface/60'
-              }`}
-            >
-              <tab.Icon className="w-3.5 h-3.5" />
-              <span>{t(`command.${tab.key}`)}</span>
-              {tabCounts[tab.id] > 0 && (
-                <span className={`min-w-[14px] h-[14px] px-0.5 rounded text-[10px] leading-[14px] font-semibold text-center tabular-nums ${
-                  isActive ? 'bg-foreground text-background' : 'bg-surface text-foreground/50'
-                }`}>
-                  {tabCounts[tab.id]}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
 
       {/* Summary */}
       {!!query && !isSearching && !searchError && (
