@@ -103,10 +103,13 @@ export class PluginRegistry {
       })
     )
     
-    // Merge and sort results
-    return results
-      .flat()
-      .sort((a, b) => b.score - a.score)
+    // Only re-sort across plugins; single-plugin results (e.g. message FTS)
+    // keep the backend-determined order intact.
+    const flatResults = results.flat()
+    if (pluginsToSearch.length <= 1) {
+      return flatResults
+    }
+    return flatResults.sort((a, b) => b.score - a.score)
   }
 }
 
