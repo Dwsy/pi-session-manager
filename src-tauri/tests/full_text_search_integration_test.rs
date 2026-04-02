@@ -161,7 +161,7 @@ async fn test_full_text_search_command_basic() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -186,7 +186,7 @@ async fn test_full_text_search_command_basic() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -205,7 +205,7 @@ async fn test_full_text_search_command_basic() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -223,7 +223,7 @@ async fn test_full_text_search_command_basic() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -232,10 +232,18 @@ async fn test_full_text_search_command_basic() {
     assert!(response.hits.iter().all(|h| h.role == "assistant"));
 
     // Test 5: Empty query
-    let response: FullTextSearchResponse =
-        full_text_search("".to_string(), "all".to_string(), None, None, 0, 10, None, None)
-            .await
-            .unwrap();
+    let response: FullTextSearchResponse = full_text_search(
+        "".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(response.total_hits, 0);
     assert!(response.hits.is_empty());
 
@@ -248,7 +256,7 @@ async fn test_full_text_search_command_basic() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -264,7 +272,7 @@ async fn test_full_text_search_command_basic() {
         0,
         2,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -279,7 +287,7 @@ async fn test_full_text_search_command_basic() {
         1,
         2,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -295,7 +303,7 @@ async fn test_full_text_search_command_basic() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -313,7 +321,7 @@ async fn test_full_text_search_command_basic() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -343,7 +351,7 @@ async fn test_full_text_search_pagination_across_sessions() {
         0,
         3,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -362,7 +370,7 @@ async fn test_full_text_search_pagination_across_sessions() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -390,7 +398,7 @@ async fn test_full_text_search_result_structure() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -439,7 +447,7 @@ async fn test_full_text_search_escaping_special_chars() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -454,7 +462,7 @@ async fn test_full_text_search_escaping_special_chars() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -469,7 +477,7 @@ async fn test_full_text_search_escaping_special_chars() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -502,7 +510,7 @@ async fn test_full_text_search_after_session_update() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -531,7 +539,7 @@ async fn test_full_text_search_after_session_update() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -547,7 +555,7 @@ async fn test_full_text_search_after_session_update() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -581,7 +589,7 @@ async fn test_full_text_search_cascade_delete() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -622,7 +630,7 @@ async fn test_full_text_search_cascade_delete() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -637,7 +645,7 @@ async fn test_full_text_search_cascade_delete() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -671,7 +679,7 @@ async fn test_full_text_search_per_session_limit_uses_recent() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -714,7 +722,7 @@ async fn test_full_text_search_role_filter_case_insensitive() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -730,7 +738,7 @@ async fn test_full_text_search_role_filter_case_insensitive() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -764,7 +772,7 @@ async fn test_full_text_search_match_modes() {
         0,
         10,
         Some("any".to_string()),
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -785,7 +793,7 @@ async fn test_full_text_search_match_modes() {
         0,
         10,
         Some("all".to_string()),
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -806,7 +814,7 @@ async fn test_full_text_search_match_modes() {
         0,
         10,
         Some("phrase".to_string()),
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -842,7 +850,7 @@ async fn test_full_text_search_any_mode_honors_quoted_phrase() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -882,7 +890,7 @@ async fn test_full_text_search_project_path_filter() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -931,7 +939,7 @@ async fn test_full_text_search_thinking_toggle() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -951,7 +959,7 @@ async fn test_full_text_search_thinking_toggle() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
@@ -978,7 +986,7 @@ async fn test_full_text_search_cjk_substring_query() {
         0,
         10,
         None,
-    None,
+        None,
     )
     .await
     .unwrap();
