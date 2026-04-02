@@ -1,4 +1,8 @@
 import type { SessionEntry, LegacySessionStats } from '../types'
+import { parseQuotedQuery } from './search'
+
+export const SHORT_SESSION_ID_LENGTH = 12
+export const MIN_SESSION_ID_PREFIX_LENGTH = 3
 
 export function isTauriReady(): boolean {
   return typeof window !== 'undefined' && window.__TAURI__ !== undefined
@@ -125,4 +129,65 @@ export function getSessionSourceTag(sessionPath: string): string | null {
     }
   }
   return null;
+}
+
+export function formatShortSessionId(
+  sessionId: string | undefined,
+  length = SHORT_SESSION_ID_LENGTH,
+): string {
+  if (!sessionId) {
+    return ''
+  }
+
+  return sessionId.length <= length ? sessionId : sessionId.slice(0, length)
+}
+
+export function isExactSessionIdQuery(rawQuery: string): boolean {
+  const query = rawQuery.trim()
+  if (!query) {
+    return false
+  }
+
+  const parsedQuery = parseQuotedQuery(query)
+  return parsedQuery.hasPhrases && parsedQuery.phrases.length === 1 && parsedQuery.remainderTokens.length === 0
+}
+
+export function normalizeSessionIdQuery(rawQuery: string): string {
+  const query = rawQuery.trim()
+  if (!query) {
+    return ''
+  }
+
+  if (isExactSessionIdQuery(query)) {
+    return parseQuotedQuery(query).phrases[0].trim().toLowerCase()
+  }
+
+  return query.toLowerCase()
+}
+
+export function getSessionIdMatchKind(
+  sessionId: string | undefined,
+  rawQuery: string,
+): 'exact' | 'prefix' | null {
+  const normalizedSessionId = (sessionId || '').toLowerCase()
+  const normalizedQuery = normalizeSessionIdQuery(rawQuery)
+  const exactOnly = isExactSessionIdQuery(rawQuery)
+
+  if (!normalizedSessionId || !normalizedQuery) {
+    return null
+  }
+
+  if (normalizedSessionId === normalizedQuery) {
+    return 'exact'
+  }
+
+  if (
+    !exactOnly &&
+    normalizedQuery.length >= MIN_SESSION_ID_PREFIX_LENGTH &&
+    normalizedSessionId.startsWith(normalizedQuery)
+  ) {
+    return 'prefix'
+  }
+
+  return null
 }

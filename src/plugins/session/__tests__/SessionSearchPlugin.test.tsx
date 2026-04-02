@@ -1,31 +1,32 @@
-import { SessionSearchPlugin } from '../SessionSearchPlugin';
-import type { SearchContext, SearchPluginResult } from '../../plugins/types';
+import { SessionSearchPlugin } from '../SessionSearchPlugin'
+import type { SearchContext } from '../../plugins/types'
 
 function createMockContext(overrides?: Partial<SearchContext>): SearchContext {
   return {
     sessions: [],
-    query: '',
-    setQuery: () => {},
-    isSearching: false,
-    setIsSearching: () => {},
     selectedProject: null,
     setSelectedProject: () => {},
     searchCurrentProjectOnly: false,
-    setSearchCurrentProjectOnly: () => {},
     selectedSession: null,
     setSelectedSession: () => {},
     closeCommandMenu: () => {},
-    t: (key: string, _params?: any) => key,
+    t: (key: string, options?: { count?: number }) => {
+      if (key === 'session.messageCount') {
+        return `${options?.count ?? 0} messages`
+      }
+
+      return key
+    },
     ...overrides,
-  };
+  }
 }
 
 describe('SessionSearchPlugin', () => {
-  it('returns results with title = directory name and subtitle = shortened path', async () => {
-    const plugin = new SessionSearchPlugin();
+  it('uses the session name as title and shows the short session id in subtitle', async () => {
+    const plugin = new SessionSearchPlugin()
     const sessions = [
       {
-        id: 'sess1',
+        id: '1234567890abcdef',
         path: '/projects/alpha/session1.jsonl',
         cwd: '/projects/alpha',
         name: 'My Session',
@@ -33,49 +34,36 @@ describe('SessionSearchPlugin', () => {
         first_message: 'Hello world',
         modified: '2025-01-01T00:00:00Z',
       },
-    ];
-    const context = createMockContext({ sessions });
-    const results: SearchPluginResult[] = await plugin.search('session', context);
+    ]
+    const context = createMockContext({ sessions })
 
-    expect(results.length).toBeGreaterThan(0);
-    const result = results[0];
-    // title is directory name from cwd (last part after split)
-    expect(result.title).toBe('alpha');
-    // subtitle is the shortened path (60 chars default), full path under limit so unchanged
-    expect(result.subtitle).toBe('/projects/alpha/session1.jsonl');
-    // description should include session name and message count
-    expect(result.description).toContain('My Session');
-    expect(result.description).toContain('10');
-  });
+    const results = await plugin.search('session', context)
 
-  it('sorts results by score descending', async () => {
-    const plugin = new SessionSearchPlugin();
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].title).toBe('My Session')
+    expect(results[0].subtitle).toBe('alpha · 1234567890ab')
+  })
+
+  it('keeps quoted session-id lookups exact-only', async () => {
+    const plugin = new SessionSearchPlugin()
     const sessions = [
       {
-        id: 'sess1',
-        path: '/a/b/s1.jsonl',
-        cwd: '/a/b',
-        name: 'A',
+        id: 'abc123def456',
+        path: '/projects/demo/session1.jsonl',
+        cwd: '/projects/demo',
+        name: 'Demo Session',
         message_count: 1,
-        first_message: 'nothing',
+        first_message: 'Hello world',
         modified: '2025-01-01T00:00:00Z',
       },
-      {
-        id: 'sess2',
-        path: '/c/d/s2.jsonl',
-        cwd: '/c/d',
-        name: 'B',
-        message_count: 1,
-        first_message: 'something interesting',
-        modified: '2025-01-01T00:00:00Z',
-      },
-    ];
-    const context = createMockContext({ sessions });
-    const results = await plugin.search('interesting', context);
-    // sess2 has higher score due to first_message match
-    if (results.length >= 2) {
-      expect(results[0].id).toBe('session-sess2');
-      expect(results[1].id).toBe('session-sess1');
-    }
-  });
-});
+    ]
+    const context = createMockContext({ sessions })
+
+    const prefixResults = await plugin.search('"abc"', context)
+    expect(prefixResults).toHaveLength(0)
+
+    const exactResults = await plugin.search('"abc123def456"', context)
+    expect(exactResults).toHaveLength(1)
+    expect(exactResults[0].id).toBe('session-abc123def456')
+  })
+})

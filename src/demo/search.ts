@@ -1,5 +1,6 @@
 import type { FullTextSearchHit, Match, SearchResult, SessionEntry, SessionInfo } from '../types'
 import { filterSessionsBySearchQuery } from '../utils/sessionFilters'
+import { getSessionIdMatchKind } from '../utils/session'
 import { parseQuotedQuery } from '../utils/search'
 
 import type {
@@ -18,9 +19,22 @@ function stringIncludes(source: string | undefined, target: string): boolean {
   return normalizeForSearch(source).includes(target)
 }
 
+function matchesSessionIdPrefix(sessionId: string | undefined, target: string): boolean {
+  return getSessionIdMatchKind(sessionId, target) !== null
+}
+
 function collectSessionMatches(query: string, session: SessionInfo): Match[] {
   const normalized = query.toLowerCase()
   const matches: Match[] = []
+
+  if (matchesSessionIdPrefix(session.id, normalized)) {
+    matches.push({
+      entry_id: `${session.id}-session-id`,
+      role: 'session',
+      snippet: session.id,
+      timestamp: session.modified,
+    })
+  }
 
   if (stringIncludes(session.name, normalized)) {
     matches.push({
@@ -242,6 +256,7 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
     return { hits: [], total_hits: 0, has_more: false }
   }
 
+  const idHits: FullTextSearchHit[] = []
   const hits: FullTextSearchHit[] = []
 
   for (const session of state.sessions) {
@@ -251,6 +266,26 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
 
     if (options.projectPath && session.cwd !== options.projectPath) {
       continue
+    }
+
+    const sessionIdMatchKind = getSessionIdMatchKind(session.id, query)
+    if (sessionIdMatchKind) {
+      const preview = session.last_message || session.first_message || session.name || session.cwd
+      const role = session.last_message_role === 'user' ? 'user' : 'assistant'
+      if (roleFilter === 'all' || roleFilter === role) {
+        idHits.push({
+          session_id: session.id,
+          session_path: session.path,
+          session_name: session.name,
+          entry_id: '',
+          role,
+          source_type: role,
+          content: preview,
+          timestamp: session.modified,
+          score: sessionIdMatchKind === 'exact' ? 1_000_000 : 999_000,
+          match_reason: sessionIdMatchKind === 'exact' ? 'session_id_exact' : 'session_id_prefix',
+        })
+      }
     }
 
     const entries = state.entriesByPath.get(session.path)
@@ -278,9 +313,17 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
         content,
         timestamp: entry.timestamp,
         score,
+        match_reason: 'content',
       })
     }
   }
+
+  idHits.sort((left, right) => {
+    if (right.score !== left.score) {
+      return right.score - left.score
+    }
+    return right.timestamp.localeCompare(left.timestamp)
+  })
 
   hits.sort((left, right) => {
     if (right.score !== left.score) {
@@ -289,14 +332,15 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
     return right.timestamp.localeCompare(left.timestamp)
   })
 
+  const combinedHits = [...idHits, ...hits]
   const start = page * pageSize
   const end = start + pageSize
-  const pagedHits = hits.slice(start, end)
+  const pagedHits = combinedHits.slice(start, end)
 
   return {
     hits: pagedHits,
-    total_hits: hits.length,
-    has_more: end < hits.length,
+    total_hits: combinedHits.length,
+    has_more: end < combinedHits.length,
   }
 }
 
@@ -326,7 +370,9 @@ export function listDemoSessionsPaginatedInStore(
   }
 
   if (options.searchQuery?.trim()) {
-    sessions = filterSessionsBySearchQuery(sessions, options.searchQuery)
+    sessions = filterSessionsBySearchQuery(sessions, options.searchQuery, {
+      includeId: true,
+    })
   }
 
   sessions.sort((left, right) => compareBySort(left, right, sortBy, sortOrder, state))

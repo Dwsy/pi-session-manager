@@ -3,6 +3,7 @@ import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '../types'
 import { getPathBasename } from '../../utils/path'
 import { parseQuotedQuery } from '../../utils/search'
+import { formatShortSessionId, getSessionIdMatchKind } from '../../utils/session'
 
 /**
  * Session search plugin
@@ -47,11 +48,15 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
         const firstMessage = session.first_message
         const sessionPath = session.path
         const sessionCwd = session.cwd
+        const sessionId = session.id || ''
+        const sessionIdMatchKind = getSessionIdMatchKind(sessionId, query)
+        const idExactMatch = sessionIdMatchKind === 'exact'
+        const idPrefixMatch = sessionIdMatchKind === 'prefix'
 
         const fields = [sessionName, firstMessage, sessionPath, sessionCwd]
         const lowerFields = fields.map(field => field.toLowerCase())
 
-        if (hasPhraseMode) {
+        if (hasPhraseMode && !idExactMatch) {
           const phrasesMatched = phraseTerms.every(
             phrase => lowerFields.some(field => field.includes(phrase))
           )
@@ -83,8 +88,15 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
         // Search project path
         const cwdScore = this.fuzzyMatch(query, sessionCwd) * 0.3
 
+        const sessionIdScore = idExactMatch
+          ? 200
+          : idPrefixMatch
+            ? 120
+            : 0
+
         const score = hasPhraseMode
           ? Math.max(
+              sessionIdScore,
               ...[...phraseTerms, ...remainderTerms].map(term => Math.max(
                 this.fuzzyMatch(term, sessionName),
                 this.fuzzyMatch(term, firstMessage) * 0.8,
@@ -92,7 +104,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
                 this.fuzzyMatch(term, sessionCwd) * 0.3,
               ))
             )
-          : Math.max(nameScore, messageScore, pathScore, cwdScore)
+          : Math.max(nameScore, messageScore, pathScore, cwdScore, sessionIdScore)
 
         if (score > 0) {
           const highlightTerms = hasPhraseMode ? [...phraseTerms, ...remainderTerms] : [query]
@@ -101,7 +113,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
             id: `session-${session.id}`,
             pluginId: this.id,
             title: session.name || this.truncateText(session.first_message, 60),
-            subtitle: this.getProjectName(session.cwd),
+            subtitle: `${this.getProjectName(session.cwd)} · ${formatShortSessionId(session.id)}`,
             description: this.getSessionDescription(session, context),
             icon: <FileText className="w-4 h-4 text-green-400" />,
             metadata: {
