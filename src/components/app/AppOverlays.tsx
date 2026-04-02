@@ -19,18 +19,11 @@ export interface CommandPaletteOverlayProps {
   context: SearchContext;
 }
 
-export interface FullTextSearchOverlayProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSelectResult: (session: SessionInfo, entryId: string) => void;
-}
-
 export interface AppOverlaysProps {
   showExportDialog: boolean;
   showRenameDialog: boolean;
   showForkDialog: boolean;
   showSettings: boolean;
-  showFullTextSearch: boolean;
   showOnboarding: boolean;
   selectedSession: SessionInfo | null;
   commandContext: SearchContext;
@@ -41,12 +34,9 @@ export interface AppOverlaysProps {
   onCloseRenameDialog: () => void;
   onCloseForkDialog: () => void;
   onCloseSettings: () => void;
-  onCloseFullTextSearch: () => void;
-  onSelectFullTextSearchResult: (session: SessionInfo, entryId: string) => void;
   onCompleteOnboarding: () => void;
   SettingsPanel: LazyExoticComponent<ComponentType<SettingsPanelOverlayProps>>;
   CommandPalette: LazyExoticComponent<ComponentType<CommandPaletteOverlayProps>>;
-  FullTextSearch: LazyExoticComponent<ComponentType<FullTextSearchOverlayProps>>;
 }
 
 function AppOverlays({
@@ -54,7 +44,6 @@ function AppOverlays({
   showRenameDialog,
   showForkDialog,
   showSettings,
-  showFullTextSearch,
   showOnboarding,
   selectedSession,
   commandContext,
@@ -65,12 +54,9 @@ function AppOverlays({
   onCloseRenameDialog,
   onCloseForkDialog,
   onCloseSettings,
-  onCloseFullTextSearch,
-  onSelectFullTextSearchResult,
   onCompleteOnboarding,
   SettingsPanel,
   CommandPalette,
-  FullTextSearch,
 }: AppOverlaysProps) {
   return (
     <>
@@ -101,15 +87,6 @@ function AppOverlays({
       <Suspense fallback={null}>
         <CommandPalette context={commandContext} />
       </Suspense>
-      {showFullTextSearch && (
-        <Suspense fallback={null}>
-          <FullTextSearch
-            isOpen={true}
-            onClose={onCloseFullTextSearch}
-            onSelectResult={onSelectFullTextSearchResult}
-          />
-        </Suspense>
-      )}
       {showOnboarding && <Onboarding onComplete={onCompleteOnboarding} />}
     </>
   );

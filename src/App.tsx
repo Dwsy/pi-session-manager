@@ -73,7 +73,6 @@ const Dashboard = lazy(() => import("./components/Dashboard"));
 const KanbanBoard = lazy(() => import("./components/kanban/KanbanBoard"));
 const SettingsPanel = lazy(() => import("./components/settings/SettingsPanel"));
 const TerminalPanel = lazy(() => import("./components/TerminalPanel"));
-const FullTextSearch = lazy(() => import("./components/FullTextSearch"));
 const CommandPalette = lazy(() =>
   import("./components/command").then((m) => ({ default: m.CommandPalette })),
 );
@@ -173,7 +172,6 @@ function App() {
     }
   });
   const [showTerminal, setShowTerminal] = useState(false);
-  const [showFullTextSearch, setShowFullTextSearch] = useState(false);
   const [pendingScrollEntryId, setPendingScrollEntryId] = useState<
     string | null
   >(null);
@@ -213,7 +211,6 @@ function App() {
     showForkDialog,
     hasPendingDeleteSession: false,
     showSettings,
-    showFullTextSearch,
     showOnboarding,
     mobileTab,
     pendingScrollEntryId,
@@ -229,13 +226,6 @@ function App() {
     [setSelectedSession, clearBadge],
   );
 
-  const handleFTSResultSelect = useCallback(
-    (session: SessionInfo, entryId: string) => {
-      setSelectedSession(session);
-      setPendingScrollEntryId(entryId);
-    },
-    [setSelectedSession],
-  );
 
   const buildResumeCommand = useCallback(
     (session: SessionInfo) => {
@@ -279,7 +269,6 @@ function App() {
     showExportDialog ||
     showRenameDialog ||
     showForkDialog ||
-    showFullTextSearch ||
     showOnboarding ||
     showTerminal;
 
@@ -313,7 +302,6 @@ function App() {
       "cmd+`": () => {
         if (terminalConfig.enabled) setShowTerminal((v) => !v);
       },
-      "cmd+shift+f": () => setShowFullTextSearch(true),
       escape: () => {
         if (showSettings) {
           setShowSettings(false);
@@ -625,7 +613,6 @@ function App() {
       showRenameDialog={showRenameDialog}
       showForkDialog={showForkDialog}
       showSettings={showSettings}
-      showFullTextSearch={showFullTextSearch}
       showOnboarding={showOnboarding}
       selectedSession={selectedSession}
       commandContext={commandContext}
@@ -639,15 +626,12 @@ function App() {
         setShowSettings(false);
         reloadTerminalConfig();
       }}
-      onCloseFullTextSearch={() => setShowFullTextSearch(false)}
-      onSelectFullTextSearchResult={handleFTSResultSelect}
       onCompleteOnboarding={() => {
         localStorage.setItem("onboarding-completed", "true");
         setShowOnboarding(false);
       }}
       SettingsPanel={SettingsPanel}
       CommandPalette={CommandPalette}
-      FullTextSearch={FullTextSearch}
     />
   );
 

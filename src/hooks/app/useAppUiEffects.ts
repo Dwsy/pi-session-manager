@@ -10,7 +10,6 @@ export interface UseAppUiEffectsOptions {
   showForkDialog: boolean;
   hasPendingDeleteSession: boolean;
   showSettings: boolean;
-  showFullTextSearch: boolean;
   showOnboarding: boolean;
   mobileTab: MobileTab;
   pendingScrollEntryId: string | null;
@@ -25,7 +24,6 @@ export function useAppUiEffects({
   showForkDialog,
   hasPendingDeleteSession,
   showSettings,
-  showFullTextSearch,
   showOnboarding,
   mobileTab,
   pendingScrollEntryId,
@@ -43,7 +41,6 @@ export function useAppUiEffects({
       showForkDialog ||
       hasPendingDeleteSession ||
       showSettings ||
-      showFullTextSearch ||
       showOnboarding ||
       mobileTab === "settings";
 
@@ -63,7 +60,6 @@ export function useAppUiEffects({
     showForkDialog,
     hasPendingDeleteSession,
     showSettings,
-    showFullTextSearch,
     showOnboarding,
     mobileTab,
   ]);
