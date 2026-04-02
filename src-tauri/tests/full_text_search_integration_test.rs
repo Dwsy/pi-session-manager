@@ -5,7 +5,7 @@ use chrono::Utc;
 use lazy_static::lazy_static;
 use pi_session_manager::commands::full_text_search;
 use pi_session_manager::config::Config;
-use pi_session_manager::models::{FullTextSearchHit, FullTextSearchResponse};
+use pi_session_manager::models::FullTextSearchResponse;
 use pi_session_manager::scanner;
 use pi_session_manager::sqlite_cache;
 use rusqlite::{params, Connection};
@@ -955,4 +955,81 @@ async fn test_full_text_search_cjk_substring_query() {
     assert_eq!(response.hits.len(), 1);
     assert_eq!(response.hits[0].entry_id, "cjk1-msg0");
     assert!(response.hits[0].content.contains("弱智"));
+}
+
+#[tokio::test]
+async fn test_full_text_search_prioritizes_session_id_matches() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+
+    let _temp_dir = setup_test_db(&[
+        (
+            "feedface-1111",
+            "/workspace/project-id",
+            &[("assistant", "session lookup preview")],
+        ),
+        (
+            "other-session",
+            "/workspace/project-id",
+            &[("user", "feedface appears in logs and transcripts")],
+        ),
+    ]);
+
+    let prefix_response = full_text_search(
+        "feedface".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
+
+    assert!(prefix_response.total_hits >= 2);
+    assert_eq!(prefix_response.hits[0].session_id, "feedface-1111");
+    assert_eq!(prefix_response.hits[0].entry_id, "");
+    assert_eq!(
+        prefix_response.hits[0].match_reason.as_deref(),
+        Some("session_id_prefix")
+    );
+
+    let exact_response = full_text_search(
+        "feedface-1111".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
+
+    assert!(!exact_response.hits.is_empty());
+    assert_eq!(exact_response.hits[0].session_id, "feedface-1111");
+    assert_eq!(exact_response.hits[0].entry_id, "");
+    assert_eq!(
+        exact_response.hits[0].match_reason.as_deref(),
+        Some("session_id_exact")
+    );
+
+    let quoted_exact_response = full_text_search(
+        "\"feedface-1111\"".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+    )
+    .await
+    .unwrap();
+
+    assert!(!quoted_exact_response.hits.is_empty());
+    assert_eq!(quoted_exact_response.hits[0].session_id, "feedface-1111");
+    assert_eq!(
+        quoted_exact_response.hits[0].match_reason.as_deref(),
+        Some("session_id_exact")
+    );
 }

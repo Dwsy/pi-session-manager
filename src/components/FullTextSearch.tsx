@@ -8,6 +8,7 @@ import { parseQuotedQuery } from '../utils/search';
 import { getCachedSettings } from '../utils/settingsApi';
 import type { FullTextSearchHit, FullTextSearchResponse, SessionInfo } from '../types';
 import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '../demo';
+import { formatShortSessionId } from '../utils/session';
 
 const HIGHLIGHT_CACHE_MAX_ENTRIES = 500;
 const HTML_ESCAPE_MAP: Record<string, string> = {
@@ -422,11 +423,13 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
               <>
                 {paginatedHits.map(hit => {
                   const projectName = getProjectDirName(hit.session_path);
+                  const title = hit.session_name?.trim() || projectName;
                   const truncatedPath = shortenPath(hit.session_path, 60);
                   const count = sessionCounts.get(hit.session_id) || 1;
+                  const isSessionIdMatch = hit.match_reason === 'session_id_exact' || hit.match_reason === 'session_id_prefix';
 
                   // Memoized highlight rendering
-                  const cacheKey = `${hit.entry_id}|${query}`;
+                  const cacheKey = `${hit.entry_id || `session:${hit.session_id}`}|${query}`;
                   let highlightedHtml = highlightCache.current.get(cacheKey);
                   if (highlightedHtml === undefined) {
                     highlightedHtml = highlightContent(hit.content);
@@ -454,9 +457,9 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
                             <div className="flex items-center gap-1.5 mb-0.5">
                               <h3 
                                 className="text-sm font-semibold text-foreground truncate group-hover:text-blue-300 motion-color"
-                                title={hit.session_name ? `Session: ${hit.session_name}\nPath: ${hit.session_path}` : undefined}
+                                title={`Session: ${title}\nID: ${hit.session_id}\nPath: ${hit.session_path}`}
                               >
-                                {projectName}
+                                {title}
                               </h3>
                               {count > 1 && (
                                 <span className="px-2 py-0.5 bg-blue-500/15 text-blue-300 text-xs font-bold rounded-full border border-blue-500/30 ml-auto flex-shrink-0">
@@ -466,6 +469,19 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
                             </div>
                             <div className="text-xs text-muted-foreground truncate">
                               {truncatedPath}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground/80">
+                              <span
+                                className="inline-flex items-center rounded border border-border/60 bg-muted/30 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+                                title={hit.session_id}
+                              >
+                                {formatShortSessionId(hit.session_id)}
+                              </span>
+                              {isSessionIdMatch && (
+                                <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                                  {t('search.fullText.sessionIdMatch', 'session id')}
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground/70 mt-1">
                               <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${

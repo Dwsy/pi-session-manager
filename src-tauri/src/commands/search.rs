@@ -187,7 +187,17 @@ pub async fn full_text_search(
                 if !has_phrases {
                     let escaped_words: Vec<String> = words
                         .iter()
-                        .map(|word| escape_fts_term(word))
+                        .map(|word| {
+                            let escaped = escape_fts_term(word);
+                            if word
+                                .chars()
+                                .any(|ch| !ch.is_alphanumeric() && ch != '_')
+                            {
+                                format!("\"{escaped}\"")
+                            } else {
+                                escaped
+                            }
+                        })
                         .collect();
 
                     if mode == "all" {
@@ -216,12 +226,181 @@ pub async fn full_text_search(
                 }
             }
 
+            fn glob_to_like(pattern_str: &str) -> String {
+                let mut like_pattern = String::new();
+                for ch in pattern_str.chars() {
+                    match ch {
+                        '*' => like_pattern.push('%'),
+                        '?' => like_pattern.push('_'),
+                        '%' | '_' => {
+                            like_pattern.push('\\');
+                            like_pattern.push(ch);
+                        }
+                        '\\' => {
+                            like_pattern.push('\\');
+                            like_pattern.push('\\');
+                        }
+                        _ => like_pattern.push(ch),
+                    }
+                }
+                like_pattern
+            }
+
             // Build the query string. CJK terms fall back to substring matching because unicode61 tokenization is unreliable for Chinese words.
             let use_content_like = contains_cjk(trimmed);
             let fts_query = build_fts_query(trimmed, mode);
             let content_like_query = trimmed.to_lowercase();
+            let exact_session_id_query = search::normalize_session_id_query(trimmed);
+            let session_id_exact_only = search::session_id_query_is_exact(trimmed);
+            let session_id_supports_prefix = !session_id_exact_only && exact_session_id_query.len() >= 3;
+            let like_pattern = glob_pattern
+                .as_ref()
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .map(|value| glob_to_like(&value));
+            let project_path_owned: Option<String> = project_path
+                .as_ref()
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty());
 
-            // Build the base WHERE clause for search and role filter
+            let mut session_id_where_clause = if session_id_supports_prefix {
+                "WHERE (lower(s.id) = ? OR substr(lower(s.id), 1, length(?)) = ?)".to_string()
+            } else {
+                "WHERE lower(s.id) = ?".to_string()
+            };
+            let mut session_id_params: Vec<&dyn rusqlite::ToSql> = if session_id_supports_prefix {
+                vec![
+                    &exact_session_id_query,
+                    &exact_session_id_query,
+                    &exact_session_id_query,
+                ]
+            } else {
+                vec![&exact_session_id_query]
+            };
+
+            if let Some(pattern) = like_pattern.as_ref() {
+                session_id_where_clause =
+                    format!("{session_id_where_clause} AND s.path LIKE ? ESCAPE '\\'");
+                session_id_params.push(pattern);
+            }
+
+            if let Some(project_path) = project_path_owned.as_ref() {
+                session_id_where_clause = format!("{session_id_where_clause} AND s.cwd = ?");
+                session_id_params.push(project_path);
+            }
+
+            let session_id_order_query = exact_session_id_query.clone();
+            let session_id_sql = format!(
+                "SELECT
+                    s.id,
+                    s.path,
+                    s.name,
+                    s.first_message,
+                    s.last_message,
+                    s.last_message_role,
+                    s.modified
+                FROM sessions s
+                {session_id_where_clause}
+                ORDER BY CASE WHEN lower(s.id) = ? THEN 0 ELSE 1 END, s.modified DESC, s.path ASC"
+            );
+            session_id_params.push(&session_id_order_query);
+
+            let mut session_id_stmt = conn
+                .prepare(&session_id_sql)
+                .map_err(|e| format!("Failed to prepare session id query: {e}"))?;
+            let session_id_rows = session_id_stmt
+                .query_map(session_id_params.as_slice(), |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                        row.get::<_, String>(6)?,
+                    ))
+                })
+                .map_err(|e| format!("Failed to query sessions by id: {e}"))?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| format!("Failed to collect session id results: {e}"))?;
+
+            let session_id_matches: Vec<FullTextSearchHit> = session_id_rows
+                .into_iter()
+                .filter_map(
+                    |(
+                        session_id,
+                        session_path,
+                        session_name,
+                        first_message,
+                        last_message,
+                        last_message_role,
+                        modified_str,
+                    )| {
+                        let timestamp = match chrono::DateTime::parse_from_rfc3339(&modified_str) {
+                            Ok(dt) => dt.with_timezone(&chrono::Utc),
+                            Err(e) => {
+                                eprintln!(
+                                    "[FTS] Invalid modified timestamp '{modified_str}' for session {session_id}: {e}"
+                                );
+                                return None;
+                            }
+                        };
+
+                        let match_kind = search::session_id_match_kind(&session_id, trimmed)?;
+                        let preview = if !last_message.trim().is_empty() {
+                            last_message.clone()
+                        } else if !first_message.trim().is_empty() {
+                            first_message.clone()
+                        } else {
+                            session_name
+                                .clone()
+                                .unwrap_or_else(|| session_path.clone())
+                        };
+                        let role = match last_message_role.as_str() {
+                            "user" | "assistant" => last_message_role,
+                            _ => "assistant".to_string(),
+                        };
+
+                        if let Some(expected_role) = role_opt {
+                            if role != expected_role {
+                                return None;
+                            }
+                        }
+
+                        Some(FullTextSearchHit {
+                            session_id,
+                            session_path,
+                            session_name,
+                            entry_id: String::new(),
+                            role: role.clone(),
+                            source_type: role,
+                            content: preview,
+                            timestamp,
+                            score: match match_kind {
+                                search::SessionIdMatchKind::Exact => 1_000_000.0,
+                                search::SessionIdMatchKind::Prefix => 999_000.0,
+                            },
+                            match_reason: Some(match match_kind {
+                                search::SessionIdMatchKind::Exact => {
+                                    "session_id_exact".to_string()
+                                }
+                                search::SessionIdMatchKind::Prefix => {
+                                    "session_id_prefix".to_string()
+                                }
+                            }),
+                        })
+                    },
+                )
+                .collect();
+
+            let session_id_count = session_id_matches.len();
+            let global_offset = page * page_size;
+            let global_limit = global_offset.saturating_add(page_size);
+            let session_id_page_start = global_offset.min(session_id_count);
+            let session_id_page_end = global_limit.min(session_id_count);
+            let mut all_hits = session_id_matches[session_id_page_start..session_id_page_end].to_vec();
+
+            // Build the base WHERE clause for message search and role filter.
             let role_condition = match role_opt {
                 Some("user") => "m.role = 'user'",
                 Some("assistant") => "m.role = 'assistant'",
@@ -240,42 +419,19 @@ pub async fn full_text_search(
                 params.push(&fts_query);
             }
 
-            // Include glob pattern if provided: convert to LIKE with escaping
-            let mut like_pattern = String::new();
-            let project_path_owned: Option<String> = project_path
-                .as_ref()
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty());
-            if let Some(pattern_str) = &glob_pattern {
-                if !pattern_str.is_empty() {
-                    // Convert glob pattern (* and ?) to LIKE patterns (% and _) and escape LIKE wildcards (% and _) and backslash
-                    like_pattern.clear();
-                    for ch in pattern_str.chars() {
-                        match ch {
-                            '*' => like_pattern.push('%'),
-                            '?' => like_pattern.push('_'),
-                            '%' | '_' => {
-                                like_pattern.push('\\');
-                                like_pattern.push(ch);
-                            }
-                            '\\' => {
-                                like_pattern.push('\\');
-                                like_pattern.push('\\');
-                            }
-                            _ => like_pattern.push(ch),
-                        }
-                    }
-                    where_clause = format!("{where_clause} AND m.session_path LIKE ? ESCAPE '\\'");
-                    params.push(&like_pattern);
-                }
+            if let Some(pattern) = like_pattern.as_ref() {
+                where_clause = format!("{where_clause} AND m.session_path LIKE ? ESCAPE '\\'");
+                params.push(pattern);
             }
 
             if let Some(project_path) = project_path_owned.as_ref() {
-                where_clause = format!("{where_clause} AND EXISTS (SELECT 1 FROM sessions s WHERE s.path = m.session_path AND s.cwd = ?)");
+                where_clause = format!(
+                    "{where_clause} AND EXISTS (SELECT 1 FROM sessions s WHERE s.path = m.session_path AND s.cwd = ?)"
+                );
                 params.push(project_path);
             }
 
-            // --- Count total hits after per-session limit (max 3 per session) ---
+            // --- Count total message hits after per-session limit (max 3 per session) ---
             let count_sql = format!(
                 "SELECT COUNT(*) FROM (
                     WITH ranked AS (
@@ -303,153 +459,143 @@ pub async fn full_text_search(
                     SELECT 1 FROM deduped WHERE rn_in_session <= 3
                 )"
             );
+            let mut count_stmt = conn
+                .prepare(&count_sql)
+                .map_err(|e| format!("Failed to prepare total count query: {e}"))?;
+            let message_total_hits: usize = count_stmt
+                .query_row(params.as_slice(), |row| row.get::<_, i64>(0))
+                .map_err(|e| format!("Failed to get total hits count: {e}"))?
+                as usize;
 
-            // --- Fetch the page of hits with global ordering and per-session limit ---
-            let rank_expr = if use_content_like { "-1.0" } else { "message_fts.rank" };
-            let offset = page * page_size;
-            let limit = page_size;
-            let data_sql = format!(
-                "WITH ranked AS (
-                    SELECT
-                        m.entry_id,
-                        m.session_path,
-                        m.role,
-                        m.source_type,
-                        m.timestamp,
-                        {rank_expr} as rank,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY m.session_path, m.entry_id
-                            ORDER BY CASE m.source_type WHEN 'user' THEN 0 WHEN 'assistant' THEN 1 ELSE 2 END, m.timestamp DESC
-                        ) as rn_in_entry
-                    FROM message_entries m
-                    JOIN message_fts ON m.rowid = message_fts.rowid
-                    {where_clause}
-                ),
-                deduped AS (
-                    SELECT
-                        entry_id, session_path, role, source_type, timestamp, rank,
-                        ROW_NUMBER() OVER (PARTITION BY session_path ORDER BY timestamp DESC, entry_id DESC) as rn_in_session
-                    FROM ranked
-                    WHERE rn_in_entry = 1
-                ),
-                filtered AS (
-                    SELECT
-                        entry_id,
-                        session_path,
-                        role,
-                        source_type,
-                        timestamp,
-                        rank,
-                        ROW_NUMBER() OVER (ORDER BY rank) as global_rn,
-                        COUNT(*) OVER () as total_hits
-                    FROM deduped
-                    WHERE rn_in_session <= 3
-                )
-                SELECT
-                    f.entry_id,
-                    f.session_path,
-                    s.id,
-                    s.name,
-                    f.role,
-                    f.source_type,
-                    m.content,
-                    f.timestamp,
-                    f.rank,
-                    f.total_hits
-                FROM filtered f
-                JOIN message_entries m ON f.entry_id = m.entry_id AND f.session_path = m.session_path AND f.source_type = m.source_type
-                JOIN sessions s ON s.path = f.session_path
-                WHERE f.global_rn > ? AND f.global_rn <= ?
-                ORDER BY f.rank"
-            );
+            let message_offset = global_offset.saturating_sub(session_id_count);
+            let message_limit = page_size.saturating_sub(all_hits.len());
 
-            // Prepare parameters for data query: base params (fts_query, optional glob) plus offset and limit for global_rn
-            let offset_i64 = offset as i64;
-            let limit_i64 = (offset + limit) as i64;
-            let mut data_params: Vec<&dyn rusqlite::ToSql> = params.clone();
-            data_params.push(&offset_i64);
-            data_params.push(&limit_i64);
-
-            let mut stmt = conn
-                .prepare(&data_sql)
-                .map_err(|e| format!("Failed to prepare data query: {e}"))?;
-
-            let rows = stmt
-                .query_map(data_params.as_slice(), |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,          // entry_id
-                        row.get::<_, String>(1)?,          // session_path
-                        row.get::<_, String>(2)?,          // session_id
-                        row.get::<_, Option<String>>(3)?,  // session_name
-                        row.get::<_, String>(4)?,          // role
-                        row.get::<_, String>(5)?,          // source_type
-                        row.get::<_, String>(6)?,          // content
-                        row.get::<_, String>(7)?,          // timestamp
-                        row.get::<_, f32>(8)?,             // rank
-                        row.get::<_, i64>(9)?,             // total_hits
-                    ))
-                })
-                .map_err(|e| format!("Failed to query message FTS: {e}"))?
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| format!("Failed to collect message FTS results: {e}"))?;
-
-            let total_hits: usize = if rows.is_empty() {
-                if offset == 0 {
-                    0
+            if message_limit > 0 && message_offset < message_total_hits {
+                let rank_expr = if use_content_like {
+                    "-1.0"
                 } else {
-                    let mut stmt = conn
-                        .prepare(&count_sql)
-                        .map_err(|e| format!("Failed to prepare total count query: {e}"))?;
-                    let count: i64 = stmt
-                        .query_row(params.as_slice(), |row| row.get(0))
-                        .map_err(|e| format!("Failed to get total hits count: {e}"))?;
-                    count as usize
-                }
-            } else {
-                rows[0].9 as usize
-            };
-
-            let mut all_hits = Vec::with_capacity(rows.len());
-
-            for (
-                entry_id,
-                session_path,
-                session_id,
-                session_name,
-                role,
-                source_type,
-                content,
-                timestamp_str,
-                rank,
-                _,
-            ) in rows
-            {
-                let timestamp = match chrono::DateTime::parse_from_rfc3339(&timestamp_str) {
-                    Ok(dt) => dt.with_timezone(&chrono::Utc),
-                    Err(e) => {
-                        eprintln!(
-                            "[FTS] Invalid timestamp '{timestamp_str}' for entry {entry_id}: {e}"
-                        );
-                        continue;
-                    }
+                    "message_fts.rank"
                 };
+                let data_sql = format!(
+                    "WITH ranked AS (
+                        SELECT
+                            m.entry_id,
+                            m.session_path,
+                            m.role,
+                            m.source_type,
+                            m.timestamp,
+                            {rank_expr} as rank,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY m.session_path, m.entry_id
+                                ORDER BY CASE m.source_type WHEN 'user' THEN 0 WHEN 'assistant' THEN 1 ELSE 2 END, m.timestamp DESC
+                            ) as rn_in_entry
+                        FROM message_entries m
+                        JOIN message_fts ON m.rowid = message_fts.rowid
+                        {where_clause}
+                    ),
+                    deduped AS (
+                        SELECT
+                            entry_id, session_path, role, source_type, timestamp, rank,
+                            ROW_NUMBER() OVER (PARTITION BY session_path ORDER BY timestamp DESC, entry_id DESC) as rn_in_session
+                        FROM ranked
+                        WHERE rn_in_entry = 1
+                    ),
+                    filtered AS (
+                        SELECT
+                            entry_id,
+                            session_path,
+                            role,
+                            source_type,
+                            timestamp,
+                            rank,
+                            ROW_NUMBER() OVER (ORDER BY rank) as global_rn
+                        FROM deduped
+                        WHERE rn_in_session <= 3
+                    )
+                    SELECT
+                        f.entry_id,
+                        f.session_path,
+                        s.id,
+                        s.name,
+                        f.role,
+                        f.source_type,
+                        m.content,
+                        f.timestamp,
+                        f.rank
+                    FROM filtered f
+                    JOIN message_entries m ON f.entry_id = m.entry_id AND f.session_path = m.session_path AND f.source_type = m.source_type
+                    JOIN sessions s ON s.path = f.session_path
+                    WHERE f.global_rn > ? AND f.global_rn <= ?
+                    ORDER BY f.rank"
+                );
 
-                all_hits.push(FullTextSearchHit {
-                    session_id,
-                    session_path,
-                    session_name,
+                let offset_i64 = message_offset as i64;
+                let limit_i64 = message_offset.saturating_add(message_limit) as i64;
+                let mut data_params: Vec<&dyn rusqlite::ToSql> = params.clone();
+                data_params.push(&offset_i64);
+                data_params.push(&limit_i64);
+
+                let mut stmt = conn
+                    .prepare(&data_sql)
+                    .map_err(|e| format!("Failed to prepare data query: {e}"))?;
+
+                let rows = stmt
+                    .query_map(data_params.as_slice(), |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, Option<String>>(3)?,
+                            row.get::<_, String>(4)?,
+                            row.get::<_, String>(5)?,
+                            row.get::<_, String>(6)?,
+                            row.get::<_, String>(7)?,
+                            row.get::<_, f32>(8)?,
+                        ))
+                    })
+                    .map_err(|e| format!("Failed to query message FTS: {e}"))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| format!("Failed to collect message FTS results: {e}"))?;
+
+                for (
                     entry_id,
+                    session_path,
+                    session_id,
+                    session_name,
                     role,
                     source_type,
                     content,
-                    timestamp,
-                    score: rank,
-                });
+                    timestamp_str,
+                    rank,
+                ) in rows
+                {
+                    let timestamp = match chrono::DateTime::parse_from_rfc3339(&timestamp_str) {
+                        Ok(dt) => dt.with_timezone(&chrono::Utc),
+                        Err(e) => {
+                            eprintln!(
+                                "[FTS] Invalid timestamp '{timestamp_str}' for entry {entry_id}: {e}"
+                            );
+                            continue;
+                        }
+                    };
+
+                    all_hits.push(FullTextSearchHit {
+                        session_id,
+                        session_path,
+                        session_name,
+                        entry_id,
+                        role,
+                        source_type,
+                        content,
+                        timestamp,
+                        score: rank,
+                        match_reason: Some("content".to_string()),
+                    });
+                }
             }
 
-            // Rows are already ordered by global_rn, so all_hits is in correct order.
-
-            let has_more = (page + 1) * page_size < total_hits;
+            let total_hits = session_id_count + message_total_hits;
+            let has_more = global_limit < total_hits;
 
             // Record metrics
             let latency = start.elapsed();

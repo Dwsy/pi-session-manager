@@ -82,6 +82,8 @@ pub struct FullTextSearchHit {
     pub content: String,
     pub timestamp: DateTime<Utc>,
     pub score: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub match_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

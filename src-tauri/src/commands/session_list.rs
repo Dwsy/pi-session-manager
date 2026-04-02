@@ -1,5 +1,5 @@
 use crate::models::SessionInfo;
-use crate::{config, scanner, sqlite_cache};
+use crate::{config, scanner, search, sqlite_cache};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 
@@ -125,6 +125,10 @@ fn sort_sessions(sessions: &mut [SessionInfo], raw_sort_by: Option<&str>) {
 fn session_matches_search_query(session: &SessionInfo, raw_query: &str) -> bool {
     let query = raw_query.trim().to_lowercase();
     if query.is_empty() {
+        return true;
+    }
+
+    if search::session_id_match_kind(&session.id, &query).is_some() {
         return true;
     }
 
@@ -279,8 +283,8 @@ pub(super) async fn scan_sessions_paginated_impl(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_paginated_result, session_matches_project_filter, sort_sessions,
-        strip_session_list_payload,
+        build_paginated_result, session_matches_project_filter, session_matches_search_query,
+        sort_sessions, strip_session_list_payload,
     };
     use crate::models::SessionInfo;
     use chrono::{DateTime, Utc};
@@ -334,6 +338,25 @@ mod tests {
             last_message_role: "assistant".to_string(),
             parent_session_path: None,
         }
+    }
+
+    #[test]
+    fn session_search_matches_session_id_prefix() {
+        let session = build_session_with_time(
+            "abc123def456",
+            Some("Alpha"),
+            "first",
+            "/tmp/p-session-id.jsonl",
+            "2026-01-03T00:00:00Z",
+            "2026-01-05T00:00:00Z",
+        );
+
+        assert!(session_matches_search_query(&session, "abc123"));
+        assert!(session_matches_search_query(&session, "ABC123"));
+        assert!(session_matches_search_query(&session, "\"abc123def456\""));
+        assert!(session_matches_search_query(&session, "abc"));
+        assert!(!session_matches_search_query(&session, "ab"));
+        assert!(!session_matches_search_query(&session, "123def"));
     }
 
     #[test]
