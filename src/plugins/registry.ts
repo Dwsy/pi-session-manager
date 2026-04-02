@@ -6,7 +6,7 @@ import type { SearchPlugin, SearchContext, SearchPluginResult } from './types'
  */
 export class PluginRegistry {
   private plugins: Map<string, SearchPlugin> = new Map()
-  
+
   /**
    * Register plugin
    * @param plugin Search plugin
@@ -20,7 +20,7 @@ export class PluginRegistry {
     this.plugins.set(plugin.id, plugin)
     plugin.onMount?.()
   }
-  
+
   /**
    * Unregister plugin
    * @param pluginId Plugin ID
@@ -32,7 +32,7 @@ export class PluginRegistry {
       this.plugins.delete(pluginId)
     }
   }
-  
+
   /**
    * Get plugin
    * @param pluginId Plugin ID
@@ -41,7 +41,7 @@ export class PluginRegistry {
   get(pluginId: string): SearchPlugin | undefined {
     return this.plugins.get(pluginId)
   }
-  
+
   /**
    * Get all plugins
    * @returns Plugin array (sorted by priority)
@@ -50,18 +50,18 @@ export class PluginRegistry {
     return Array.from(this.plugins.values())
       .sort((a, b) => b.priority - a.priority)
   }
-  
+
   /**
    * Get available plugins
    * @param context Search context
    * @returns Available plugin array
    */
   getEnabled(context: SearchContext): SearchPlugin[] {
-    return this.getAll().filter(plugin => 
+    return this.getAll().filter(plugin =>
       plugin.isEnabled ? plugin.isEnabled(context) : true
     )
   }
-  
+
   /**
    * Execute search
    * @param query Search query
@@ -76,7 +76,7 @@ export class PluginRegistry {
     if (!query.trim()) {
       return []
     }
-    
+
     const enabledPlugins = this.getEnabled(context)
     const scopedSet = scopedPluginIds?.length
       ? new Set(scopedPluginIds)
@@ -84,7 +84,7 @@ export class PluginRegistry {
     const pluginsToSearch = scopedSet
       ? enabledPlugins.filter(plugin => scopedSet.has(plugin.id))
       : enabledPlugins
-    
+
     // Run searches for all plugins in parallel
     const results = await Promise.all(
       pluginsToSearch.map(async plugin => {
@@ -102,7 +102,7 @@ export class PluginRegistry {
         }
       })
     )
-    
+
     // Only re-sort across plugins; single-plugin results (e.g. message FTS)
     // keep the backend-determined order intact.
     const flatResults = results.flat()
