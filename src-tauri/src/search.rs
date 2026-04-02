@@ -1,5 +1,7 @@
 use crate::models::{Match, SearchResult, SessionInfo};
 
+const MIN_SESSION_ID_PREFIX_LENGTH: usize = 3;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SearchMode {
     Name,
@@ -19,10 +21,62 @@ struct ParsedQuotedQuery {
     words: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionIdMatchKind {
+    Exact,
+    Prefix,
+}
+
+fn normalize_search_quotes(raw_query: &str) -> String {
+    raw_query.replace(['“', '”'], "\"")
+}
+
+pub fn session_id_query_is_exact(raw_query: &str) -> bool {
+    let normalized_query = normalize_search_quotes(raw_query);
+    let trimmed = normalized_query.trim();
+    trimmed.len() >= 2
+        && trimmed.starts_with('"')
+        && trimmed.ends_with('"')
+        && !trimmed[1..trimmed.len() - 1].contains('"')
+}
+
+pub fn normalize_session_id_query(raw_query: &str) -> String {
+    let normalized_query = normalize_search_quotes(raw_query);
+    let trimmed = normalized_query.trim();
+    if session_id_query_is_exact(trimmed) {
+        return trimmed[1..trimmed.len() - 1].trim().to_lowercase();
+    }
+
+    trimmed.to_lowercase()
+}
+
+pub fn session_id_match_kind(session_id: &str, raw_query: &str) -> Option<SessionIdMatchKind> {
+    let normalized_query = normalize_session_id_query(raw_query);
+    let exact_only = session_id_query_is_exact(raw_query);
+    if normalized_query.is_empty() {
+        return None;
+    }
+
+    let lower_session_id = session_id.to_lowercase();
+    if lower_session_id == normalized_query {
+        return Some(SessionIdMatchKind::Exact);
+    }
+
+    if !exact_only
+        && normalized_query.len() >= MIN_SESSION_ID_PREFIX_LENGTH
+        && lower_session_id.starts_with(&normalized_query)
+    {
+        return Some(SessionIdMatchKind::Prefix);
+    }
+
+    None
+}
+
 fn parse_quoted_query_lower(query: &str) -> ParsedQuotedQuery {
-    let quote_count = query.chars().filter(|ch| *ch == '"').count();
+    let normalized_query = normalize_search_quotes(query);
+    let quote_count = normalized_query.chars().filter(|ch| *ch == '"').count();
     if quote_count == 0 || quote_count % 2 != 0 {
-        let words = query
+        let words = normalized_query
             .to_lowercase()
             .split_whitespace()
             .map(|word| word.to_string())
@@ -38,7 +92,7 @@ fn parse_quoted_query_lower(query: &str) -> ParsedQuotedQuery {
     let mut current_phrase = String::new();
     let mut in_phrase = false;
 
-    for ch in query.chars() {
+    for ch in normalized_query.chars() {
         if ch == '"' {
             if in_phrase {
                 if !current_phrase.trim().is_empty() {
@@ -98,6 +152,18 @@ pub fn search_sessions(
     let mut results = Vec::new();
 
     for session in sessions {
+        if session_id_match_kind(&session.id, query_trimmed).is_some() {
+            results.push(SearchResult {
+                session_id: session.id.clone(),
+                session_path: session.path.clone(),
+                session_name: session.name.clone(),
+                first_message: session.first_message.clone(),
+                matches: vec![],
+                score: 1_000.0,
+            });
+            continue;
+        }
+
         if search_mode == SearchMode::Name {
             // Search session name and first message
             if matches_session_name(session, &query_terms) {

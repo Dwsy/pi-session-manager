@@ -10,10 +10,12 @@ import type {
 } from '../../types'
 import { getPathBasename, getPathParentName } from '../../utils/path'
 import { parseQuotedQuery } from '../../utils/search'
+import { formatShortSessionId } from '../../utils/session'
 import { getCachedSettings } from '../../utils/settingsApi'
 import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '../../demo'
 
 interface MessageResultMetadata {
+  sessionId: string
   sessionPath: string
   session?: SessionInfo
   sessionName?: string
@@ -27,6 +29,7 @@ interface MessageResultMetadata {
   // FTS mode fields
   score?: number
   sortMode?: 'score' | 'newest' | 'oldest'
+  matchReason?: FullTextSearchHit['match_reason']
 }
 
 /**
@@ -426,6 +429,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
 
         const snippet = this.buildSnippet(hit.content, queryTerms)
         const metadata: MessageResultMetadata = {
+          sessionId: hit.session_id,
           sessionPath: hit.session_path,
           session,
           sessionName: hit.session_name,
@@ -438,6 +442,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
           timestamp: hit.timestamp,
           score: hit.score,
           sortMode: ftsOptions.sortMode,
+          matchReason: hit.match_reason,
         }
 
         results.push(this.createSearchResult(hit, metadata, ftsOptions))
@@ -480,7 +485,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       id: `${hit.session_id}-${hit.entry_id}`,
       pluginId: this.id,
       title,
-      subtitle: `${projectName} · ${this.truncateText(hit.session_path, 60)}`,
+      subtitle: `${projectName} · ${formatShortSessionId(hit.session_id)} · ${this.truncateText(hit.session_path, 60)}`,
       description: `${this.getRoleLabel(hit.role)} · ${this.formatDate(hit.timestamp)}`,
       icon: <MessageSquare className="w-4 h-4 text-info" />,
       metadata,
@@ -527,6 +532,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     }
 
     const roleLabel = this.getRoleLabel(metadata.role)
+    const isSessionIdMatch = metadata.matchReason === 'session_id_exact' || metadata.matchReason === 'session_id_prefix'
 
     return (
       <div className="w-full min-w-0">
@@ -542,6 +548,11 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
             )}
           </div>
           <div className="flex items-center gap-2.5 flex-shrink-0">
+            {isSessionIdMatch && (
+              <span className="inline-flex items-center h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+                {this.context?.t('search.fullText.sessionIdMatch', 'session id') || 'session id'}
+              </span>
+            )}
             <span className={`inline-flex items-center gap-1.5 h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border ${this.getRoleBadgeClass(metadata.role)}`}>
               {this.getRoleIcon(metadata.role)}
               <span>{roleLabel}</span>

@@ -1,4 +1,5 @@
 import type { SessionInfo, SessionTag } from "../types";
+import { getSessionIdMatchKind, normalizeSessionIdQuery } from "./session";
 import { parseQuotedQuery } from "./search";
 
 interface SessionSearchOptions {
@@ -16,7 +17,6 @@ interface FilterSessionsOptions {
 
 function buildSearchableFields(
   session: SessionInfo,
-  includeId: boolean,
 ): string[] {
   const fields = [
     session.name || "",
@@ -25,11 +25,19 @@ function buildSearchableFields(
     session.cwd || "",
   ];
 
-  if (includeId) {
-    fields.push(session.id || "");
+  return fields.map((field) => field.toLowerCase());
+}
+
+function matchesSessionIdPrefix(
+  session: SessionInfo,
+  query: string,
+  includeId: boolean,
+): boolean {
+  if (!includeId || !query) {
+    return false;
   }
 
-  return fields.map((field) => field.toLowerCase());
+  return getSessionIdMatchKind(session.id, query) !== null;
 }
 
 export function filterSessionsBySearchQuery(
@@ -46,13 +54,17 @@ export function filterSessionsBySearchQuery(
   const parsedQuery = parseQuotedQuery(query);
 
   if (!parsedQuery.hasPhrases) {
-    const q = parsedQuery.remainder.trim().toLowerCase();
+    const q = normalizeSessionIdQuery(parsedQuery.remainder.trim());
     if (!q) {
       return sessions;
     }
 
     return sessions.filter((session) => {
-      const searchableFields = buildSearchableFields(session, includeId);
+      if (matchesSessionIdPrefix(session, q, includeId)) {
+        return true;
+      }
+
+      const searchableFields = buildSearchableFields(session);
       return searchableFields.some((field) => field.includes(q));
     });
   }
@@ -62,7 +74,11 @@ export function filterSessionsBySearchQuery(
   );
 
   return sessions.filter((session) => {
-    const searchableFields = buildSearchableFields(session, includeId);
+    if (matchesSessionIdPrefix(session, query, includeId)) {
+      return true;
+    }
+
+    const searchableFields = buildSearchableFields(session);
 
     const phrasesMatched = parsedQuery.phrases.every((phrase) =>
       searchableFields.some((field) => field.includes(phrase.toLowerCase())),
@@ -128,7 +144,9 @@ export function filterSessions({
   }
 
   if (searchQuery?.trim()) {
-    result = filterSessionsBySearchQuery(result, searchQuery);
+    result = filterSessionsBySearchQuery(result, searchQuery, {
+      includeId: true,
+    });
   }
 
   return result;

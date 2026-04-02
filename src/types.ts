@@ -278,6 +278,7 @@ export interface FullTextSearchHit {
   content: string
   timestamp: string
   score: number
+  match_reason?: 'content' | 'session_id_exact' | 'session_id_prefix'
 }
 
 export interface FullTextSearchResponse {

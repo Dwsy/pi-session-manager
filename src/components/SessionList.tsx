@@ -12,7 +12,7 @@ import TagBadge from "./TagBadge";
 import TagPicker from "./TagPicker";
 import SessionContextMenu from "./SessionContextMenu";
 import DeleteSessionPopover from "./DeleteSessionPopover";
-import { getSessionSourceTag } from "../utils/session";
+import { formatShortSessionId, getSessionSourceTag } from "../utils/session";
 import { formatDirectory, formatShortTime } from "../utils/sessionDisplay";
 import type { TerminalType } from "./settings/types";
 import { getPlatformDefaults } from "./settings/types";
@@ -751,6 +751,17 @@ export default function SessionList({
                                     })}
                                   </span>
                                 )}
+                              </div>
+                              <div className="mt-1 flex items-center gap-1.5 min-w-0">
+                                <span
+                                  className="inline-flex max-w-full items-center rounded border border-border/60 bg-muted/30 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                                  title={session.id}
+                                  aria-label={t("session.header.session", {
+                                    defaultValue: "Session",
+                                  })}
+                                >
+                                  {formatShortSessionId(session.id)}
+                                </span>
                               </div>
                             </div>
                           </div>
