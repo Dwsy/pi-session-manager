@@ -24,6 +24,27 @@ interface MessageResultMetadata {
   truncatedTail: boolean
   role: string
   timestamp: string
+  // FTS mode fields
+  score?: number
+  sortMode?: 'score' | 'newest' | 'oldest'
+}
+
+/**
+ * FTS mode options for MessageSearchPlugin
+ */
+export interface MessageSearchPluginOptions {
+  /** Enable FTS enhanced mode */
+  ftsMode?: boolean
+  /** Role filter: user/assistant/all */
+  roleFilter?: 'user' | 'assistant' | 'all'
+  /** Glob pattern for path filtering */
+  globPattern?: string
+  /** Sort mode: score/newest/oldest */
+  sortMode?: 'score' | 'newest' | 'oldest'
+  /** Page number (0-indexed) */
+  page?: number
+  /** Page size */
+  pageSize?: number
 }
 
 const MAX_RESULTS = 24
@@ -31,6 +52,7 @@ const MAX_HITS_TO_FETCH = 40
 const MAX_SESSION_PREFETCH = 12
 const MAX_SNIPPET_LINES = 3
 const MAX_SNIPPET_LINE_LENGTH = 180
+const HIGHLIGHT_CACHE_MAX_ENTRIES = 500
 
 /**
  * Message search plugin
@@ -42,6 +64,12 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
   keywords = ['message', 'content', 'text', 'conversation', 'message', 'Content', 'conversation']
   priority = 80
   private readonly sessionCache = new Map<string, SessionInfo>()
+
+  // FTS mode state
+  private ftsOptions: MessageSearchPluginOptions = {}
+
+  // Memoization cache for highlighted HTML
+  private highlightCache = new Map<string, string>()
 
   get name(): string {
     return this.context?.t('plugins.message.name', 'Message Search') || 'message搜索'
@@ -174,24 +202,34 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       return text
     }
 
-    const pattern = new RegExp(`(${uniqueTerms.map(term => this.escapeRegExp(term)).join('|')})`, 'gi')
-    const parts = text.split(pattern)
+    // Use cached highlighted HTML
+    const cacheKey = `${text}|${uniqueTerms.join('|')}`
+    let highlightedHtml = this.highlightCache.get(cacheKey)
 
-    return parts.map((part, index) => {
-      const isMatch = uniqueTerms.includes(part.toLowerCase())
-      if (!isMatch) {
-        return <span key={`${part}-${index}`}>{part}</span>
+    if (highlightedHtml === undefined) {
+      const pattern = new RegExp(`(${uniqueTerms.map(term => this.escapeRegExp(term)).join('|')})`, 'gi')
+      const parts = text.split(pattern)
+
+      highlightedHtml = parts.map((part) => {
+        const isMatch = uniqueTerms.includes(part.toLowerCase())
+        if (!isMatch) {
+          return part
+        }
+        return `<mark class="rounded bg-warning/35 text-foreground px-0.5 font-semibold">${part}</mark>`
+      }).join('')
+
+      // Cache with LRU eviction
+      if (this.highlightCache.size >= HIGHLIGHT_CACHE_MAX_ENTRIES) {
+        const oldestKey = this.highlightCache.keys().next().value
+        if (oldestKey !== undefined) {
+          this.highlightCache.delete(oldestKey)
+        }
       }
+      this.highlightCache.set(cacheKey, highlightedHtml)
+    }
 
-      return (
-        <mark
-          key={`${part}-${index}`}
-          className="rounded bg-warning/35 text-foreground px-0.5 font-semibold"
-        >
-          {part}
-        </mark>
-      )
-    })
+    // Convert HTML string to React nodes
+    return <span dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
   }
 
   private getRoleLabel(role: string): string {
@@ -300,37 +338,77 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     return this.context?.t('command.allProjects', 'All Projects') || 'Project'
   }
 
+  /**
+   * Configure FTS mode options
+   */
+  setFTSOptions(options: MessageSearchPluginOptions): void {
+    this.ftsOptions = options
+  }
+
+  /**
+   * Get current FTS options
+   */
+  getFTSOptions(): MessageSearchPluginOptions {
+    return this.ftsOptions
+  }
+
+  /**
+   * Clear highlight cache
+   */
+  clearHighlightCache(): void {
+    this.highlightCache.clear()
+  }
+
   async search(
     query: string,
-    context: SearchContext
+    context: SearchContext,
+    options?: MessageSearchPluginOptions
   ): Promise<SearchPluginResult[]> {
     this.setContext(context)
     this.warmSessionCache(context.sessions)
+
+    // Merge options: explicit params > instance options > defaults
+    const ftsOptions: MessageSearchPluginOptions = {
+      ftsMode: options?.ftsMode ?? this.ftsOptions.ftsMode ?? false,
+      roleFilter: options?.roleFilter ?? this.ftsOptions.roleFilter ?? 'all',
+      globPattern: options?.globPattern ?? this.ftsOptions.globPattern ?? undefined,
+      sortMode: options?.sortMode ?? this.ftsOptions.sortMode ?? 'score',
+      page: options?.page ?? this.ftsOptions.page ?? 0,
+      pageSize: options?.pageSize ?? this.ftsOptions.pageSize ?? MAX_HITS_TO_FETCH,
+    }
+
+    // Clear highlight cache when query changes
+    if (this.lastQuery !== query) {
+      this.clearHighlightCache()
+      this.lastQuery = query
+    }
 
     try {
       const response: FullTextSearchResponse = isDemoModeEnabled()
         ? fullTextSearchDemo({
           query,
-          roleFilter: 'all',
-          globPattern: null,
+          roleFilter: ftsOptions.roleFilter || 'all',
+          globPattern: ftsOptions.globPattern || undefined,
           projectPath: context.searchCurrentProjectOnly ? context.selectedProject : null,
           includeThinking: getCachedSettings().search.includeThinkingInSearch,
-          page: 0,
-          pageSize: MAX_HITS_TO_FETCH,
+          page: ftsOptions.page || 0,
+          pageSize: ftsOptions.pageSize || MAX_HITS_TO_FETCH,
           matchMode: 'any',
+          sortOrder: ftsOptions.sortMode || 'newest',
         })
         : await invoke<FullTextSearchResponse>('full_text_search', {
           query,
-          roleFilter: 'all',
-          globPattern: null,
+          roleFilter: ftsOptions.roleFilter || 'all',
+          globPattern: ftsOptions.globPattern || undefined,
           projectPath: context.searchCurrentProjectOnly ? context.selectedProject : null,
           includeThinking: getCachedSettings().search.includeThinkingInSearch,
-          page: 0,
-          pageSize: MAX_HITS_TO_FETCH,
+          page: ftsOptions.page || 0,
+          pageSize: ftsOptions.pageSize || MAX_HITS_TO_FETCH,
           matchMode: 'any',
+          sortOrder: ftsOptions.sortMode || 'newest',
         })
 
-      const hits = response.hits.slice(0, MAX_HITS_TO_FETCH)
+      const hits = response.hits.slice(0, ftsOptions.pageSize || MAX_HITS_TO_FETCH)
       if (!hits.length) {
         return []
       }
@@ -343,8 +421,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       const queryTerms = this.getHighlightTerms(query)
       const results: SearchPluginResult[] = []
 
-      for (let index = 0; index < hits.length; index++) {
-        const hit = hits[index]
+      for (const hit of hits) {
         const session = this.sessionCache.get(hit.session_path)
 
         const snippet = this.buildSnippet(hit.content, queryTerms)
@@ -359,9 +436,11 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
           truncatedTail: snippet.truncatedTail,
           role: hit.role,
           timestamp: hit.timestamp,
+          score: hit.score,
+          sortMode: ftsOptions.sortMode,
         }
 
-        results.push(this.createSearchResult(hit, index, hits.length, metadata))
+        results.push(this.createSearchResult(hit, metadata, ftsOptions))
       }
 
       return results.slice(0, MAX_RESULTS)
@@ -373,16 +452,29 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
 
   private createSearchResult(
     hit: FullTextSearchHit,
-    index: number,
-    total: number,
     metadata: MessageResultMetadata,
+    ftsOptions?: MessageSearchPluginOptions,
   ): SearchPluginResult {
     const session = metadata.session
     const projectName = session
       ? this.getProjectName(session.cwd)
       : this.fallbackProjectName(hit)
     const title = session?.name || this.fallbackSessionTitle(hit)
-    const relativePositionScore = 1 - index / Math.max(total, 1)
+
+    // Score used for sorting — registry sorts by this descending
+    const timestamp = new Date(hit.timestamp).getTime()
+    let score: number
+    if (ftsOptions?.sortMode === 'newest') {
+      // Newer = higher score (appear first)
+      const ageInDays = (Date.now() - timestamp) / 86400000
+      score = 10 + hit.score - ageInDays
+    } else if (ftsOptions?.sortMode === 'oldest') {
+      // Older = higher score (appear first)
+      const ageInDays = (Date.now() - timestamp) / 86400000
+      score = 10 + hit.score + ageInDays
+    } else {
+      score = hit.score
+    }
 
     return {
       id: `${hit.session_id}-${hit.entry_id}`,
@@ -392,7 +484,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       description: `${this.getRoleLabel(hit.role)} · ${this.formatDate(hit.timestamp)}`,
       icon: <MessageSquare className="w-4 h-4 text-info" />,
       metadata,
-      score: Math.max(0.05, relativePositionScore),
+      score,
       highlights: [],
     }
   }
@@ -506,4 +598,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     const years = Math.floor(days / 365)
     return this.context.t('time.yearsAgo', { count: years })
   }
+
+  // Track last query for cache invalidation
+  private lastQuery: string = ''
 }
