@@ -102,6 +102,10 @@ export const settings = {
       search: 'Cmd+Shift+F でセッションツリーを切り替え',
       sidebar: 'Cmd+Shift+F でセッション内検索を開く',
     },
+    scrollMarkersEnabled: 'スクロールマーカー',
+    scrollMarkersEnabledHelp: 'メッセージ間を素早く移動するためのサイドナビゲーションドットを表示',
+    scrollMarkersGuideSeen: '機能ガイドを表示',
+    scrollMarkersGuideSeenHelp: 'セッションを初めて開くときに使い方のヒントを表示',
   },
   search: {
     defaultSearchMode: 'デフォルト検索モード',

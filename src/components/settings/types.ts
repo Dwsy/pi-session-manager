@@ -61,6 +61,10 @@ export interface AppSettings {
     openPosition: 'top' | 'bottom'
     /** Cmd+F behavior: 'inSessionSearch' = search in current session, 'toggleSidebar' = toggle session tree */
     cmdFBehavior: 'inSessionSearch' | 'toggleSidebar'
+    /** Scroll markers feature enabled */
+    scrollMarkersEnabled: boolean
+    /** Whether the scroll markers onboarding guide has been seen */
+    scrollMarkersGuideSeen: boolean
   }
   search: {
     defaultSearchMode: 'content' | 'name'
@@ -129,6 +133,8 @@ export const defaultSettings: AppSettings = {
     colorizeToolCalls: true,
     openPosition: 'top',
     cmdFBehavior: 'inSessionSearch',
+    scrollMarkersEnabled: true,
+    scrollMarkersGuideSeen: false,
   },
   search: {
     defaultSearchMode: 'content',

@@ -20,15 +20,31 @@ pub struct PiAgentRegistry {
 
 impl PiAgentRegistry {
     pub fn new() -> Self {
-        Self { sessions: Mutex::new(HashMap::new()) }
+        Self {
+            sessions: Mutex::new(HashMap::new()),
+        }
     }
 
-    pub fn register(&self, session_id: String, session_path: Option<String>, pid: Option<u32>, cwd: Option<String>) {
+    pub fn register(
+        &self,
+        session_id: String,
+        session_path: Option<String>,
+        pid: Option<u32>,
+        cwd: Option<String>,
+    ) {
         let now = chrono::Utc::now().to_rfc3339();
-        self.sessions.lock().unwrap().insert(session_id.clone(), PiLiveSession {
-            session_id, session_path, pid, cwd,
-            is_streaming: false, entry_count: 0, last_seen: now,
-        });
+        self.sessions.lock().unwrap().insert(
+            session_id.clone(),
+            PiLiveSession {
+                session_id,
+                session_path,
+                pid,
+                cwd,
+                is_streaming: false,
+                entry_count: 0,
+                last_seen: now,
+            },
+        );
     }
 
     pub fn record_entry(&self, session_id: &str, event_type: &str) {
@@ -36,8 +52,12 @@ impl PiAgentRegistry {
         if let Some(s) = self.sessions.lock().unwrap().get_mut(session_id) {
             s.last_seen = now;
             s.entry_count += 1;
-            if event_type == "agent_start" { s.is_streaming = true; }
-            if event_type == "agent_end" || event_type == "turn_end" { s.is_streaming = false; }
+            if event_type == "agent_start" {
+                s.is_streaming = true;
+            }
+            if event_type == "agent_end" || event_type == "turn_end" {
+                s.is_streaming = false;
+            }
         }
     }
 

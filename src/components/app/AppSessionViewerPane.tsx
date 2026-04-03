@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 
 import SessionViewer from "../SessionViewer";
 
-export type AppSessionViewerPaneProps = Pick<
+export interface AppSessionViewerPaneProps extends Pick<
   ComponentProps<typeof SessionViewer>,
   | "session"
   | "onExport"
@@ -15,7 +15,9 @@ export type AppSessionViewerPaneProps = Pick<
   | "customCommand"
   | "resumeCommand"
   | "initialEntryId"
->;
+> {
+  liveSessionIds: Set<string>
+}
 
 function AppSessionViewerPane({
   session,
@@ -27,7 +29,9 @@ function AppSessionViewerPane({
   terminal,
   piPath,
   customCommand,
+  resumeCommand,
   initialEntryId,
+  liveSessionIds,
 }: AppSessionViewerPaneProps) {
   return (
     <SessionViewer
@@ -40,7 +44,9 @@ function AppSessionViewerPane({
       terminal={terminal}
       piPath={piPath}
       customCommand={customCommand}
+      resumeCommand={resumeCommand}
       initialEntryId={initialEntryId}
+      liveSessionIds={liveSessionIds}
     />
   );
 }

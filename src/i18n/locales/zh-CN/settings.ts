@@ -147,6 +147,10 @@ export const settings = {
       search: 'Cmd+Shift+F 切换session树',
       sidebar: 'Cmd+Shift+F 打开session内搜索',
     },
+    scrollMarkersEnabled: '滚动标记',
+    scrollMarkersEnabledHelp: '在侧边显示导航圆点，快速跳转不同message',
+    scrollMarkersGuideSeen: '显示功能引导',
+    scrollMarkersGuideSeenHelp: '首次打开session时显示滚动标记的使用提示',
   },
   search: {
     defaultSearchMode: '默认搜索模式',

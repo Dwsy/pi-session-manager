@@ -27,7 +27,19 @@ pub fn extract_usize(payload: &Value, key: &str) -> Result<usize, String> {
 /// This function contains all pure business logic (no Tauri dependency).
 /// GUI-only commands (terminal, save_session_paths with watcher) are handled
 /// by the caller in ws_adapter.rs.
-pub async fn dispatch(app_state: &Option<crate::app_state::SharedAppState>, command: &str, payload: &Value) -> Result<Value, String> {
+#[cfg(not(feature = "gui"))]
+pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
+    let _ = command;
+    let _ = payload;
+    Err("dispatch unavailable in CLI mode".to_string())
+}
+
+#[cfg(feature = "gui")]
+pub async fn dispatch(
+    app_state: &Option<crate::app_state::SharedAppState>,
+    command: &str,
+    payload: &Value,
+) -> Result<Value, String> {
     match command {
         "scan_sessions" => {
             let result = crate::scanner::scan_sessions().await?;
@@ -664,12 +676,43 @@ pub async fn dispatch(app_state: &Option<crate::app_state::SharedAppState>, comm
             Ok(Value::Null)
         }
         "get_pi_live_sessions" => {
-            if let Some(state) = app_state {
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or("App state not available")?;
                 let sessions = state.pi_agent_registry.list();
                 Ok(serde_json::to_value(sessions).unwrap())
-            } else {
-                Err("get_pi_live_sessions requires GUI mode".to_string())
             }
+            #[cfg(not(feature = "gui"))]
+            {
+                Ok(serde_json::json!([]))
+            }
+        }
+
+        "pi_agent_steering" => {
+            let session_id = extract_string(payload, "session_id")?;
+            let message = extract_string(payload, "message")?;
+            let deliver_as = payload
+                .get("deliver_as")
+                .and_then(|v| v.as_str())
+                .unwrap_or("steer");
+
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or("App state not available")?;
+                let event = crate::app_state::WsEvent {
+                    event_type: "event".to_string(),
+                    event: "steer".to_string(),
+                    payload: serde_json::json!({
+                        "sessionId": session_id,
+                        "message": message,
+                        "deliverAs": deliver_as,
+                    }),
+                };
+                let _ = state.event_tx.send(event);
+            }
+            // In CLI mode the dispatch already forwards steer events via the CLI's
+            // own WsEvent broadcast; nothing extra to do here.
+            Ok(serde_json::json!({ "status": "sent" }))
         }
 
         // Desktop/GUI-only commands

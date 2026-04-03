@@ -153,13 +153,13 @@ impl WsAdapter {
                                         let session_path = register["payload"]["sessionPath"].as_str().map(|s| s.to_string());
                                         let pid = register["payload"]["pid"].as_u64().map(|p| p as u32);
                                         let cwd = register["payload"]["cwd"].as_str().map(|s| s.to_string());
-                                        
+
                                         log::info!("Pi agent registered: session={session_id}, pid={pid:?}");
-                                        
+
                                         self.app_state.pi_agent_registry.register(
                                             session_id.to_string(), session_path, pid, cwd
                                         );
-                                        
+
                                         let ws_event = WsEvent {
                                             event_type: "event".to_string(),
                                             event: "pi-agent:register".to_string(),
@@ -178,9 +178,9 @@ impl WsAdapter {
                                     let session_id = entry["sessionId"].as_str().unwrap_or("");
                                     if !session_id.is_empty() {
                                         let event_type = entry["payload"]["eventType"].as_str().unwrap_or("");
-                                        
+
                                         self.app_state.pi_agent_registry.record_entry(session_id, event_type);
-                                        
+
                                         let ws_event = WsEvent {
                                             event_type: "event".to_string(),
                                             event: "pi-agent:entry".to_string(),

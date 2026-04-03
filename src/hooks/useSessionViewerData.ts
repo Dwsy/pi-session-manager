@@ -7,7 +7,54 @@ import { trimMarkdownCacheOnSessionSwitch } from '../utils/markdown'
 import { getCachedSettings } from '../utils/settingsApi'
 import { parseSessionEntriesWithLineCount } from '../utils/session'
 import { isDemoModeEnabled, readDemoSessionChunk } from '../demo'
-import * as path from 'path'
+
+function extractSessionId(sessionPath: string): string {
+  const base = sessionPath.replace(/\.jsonl$/, '')
+  return base.substring(base.lastIndexOf('/') + 1)
+}
+
+function appendDeltaToMessageContent(
+  existingContent: any[] | undefined,
+  assistantMessageEvent: any,
+): any[] {
+  const content = Array.isArray(existingContent) ? [...existingContent] : []
+  const contentIndex = typeof assistantMessageEvent?.contentIndex === 'number'
+    ? assistantMessageEvent.contentIndex
+    : 0
+  const deltaType = assistantMessageEvent?.type
+
+  const ensureBlock = (type: 'text' | 'thinking') => {
+    while (content.length <= contentIndex) content.push({ type: 'text', text: '' })
+    if (!content[contentIndex] || content[contentIndex].type !== type) {
+      content[contentIndex] = type === 'thinking'
+        ? { type: 'thinking', thinking: '' }
+        : { type: 'text', text: '' }
+    }
+    return content[contentIndex]
+  }
+
+  if (deltaType === 'text_start') {
+    const block = ensureBlock('text')
+    block.text = assistantMessageEvent?.partial?.text || block.text || ''
+  } else if (deltaType === 'text_delta') {
+    const block = ensureBlock('text')
+    block.text = `${block.text || ''}${assistantMessageEvent?.delta || ''}`
+  } else if (deltaType === 'text_end') {
+    const block = ensureBlock('text')
+    block.text = assistantMessageEvent?.content || block.text || ''
+  } else if (deltaType === 'thinking_start') {
+    const block = ensureBlock('thinking')
+    block.thinking = assistantMessageEvent?.partial?.thinking || block.thinking || ''
+  } else if (deltaType === 'thinking_delta') {
+    const block = ensureBlock('thinking')
+    block.thinking = `${block.thinking || ''}${assistantMessageEvent?.delta || ''}`
+  } else if (deltaType === 'thinking_end') {
+    const block = ensureBlock('thinking')
+    block.thinking = assistantMessageEvent?.content || block.thinking || ''
+  }
+
+  return content
+}
 
 interface SessionCacheItem {
   entries: SessionEntry[]
@@ -85,6 +132,7 @@ export interface UseSessionViewerDataOptions {
   initialEntryId?: string
   loadErrorMessage: string
   isAtBottomRef: MutableRefObject<boolean>
+  isLive?: boolean
 }
 
 export interface UseSessionViewerDataResult {
@@ -108,6 +156,7 @@ export function useSessionViewerData({
   initialEntryId,
   loadErrorMessage,
   isAtBottomRef,
+  isLive,
 }: UseSessionViewerDataOptions): UseSessionViewerDataResult {
   const [entries, setEntries] = useState<SessionEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,8 +176,14 @@ export function useSessionViewerData({
   const fileSizeRef = useRef(0)
   const loadingMoreRef = useRef(false)
   const hasMoreHistoryRef = useRef(false)
+  const isLiveRef = useRef(isLive ?? false)
 
   lineCountRef.current = lineCount
+
+  // Sync isLive prop to ref so the effect always has the latest status
+  useEffect(() => {
+    isLiveRef.current = isLive ?? isLiveRef.current
+  }, [isLive])
 
   useEffect(() => {
     if (!sessionPath) {
@@ -157,6 +212,11 @@ export function useSessionViewerData({
       const maxBytes = options?.maxBytes ?? 384 * 1024
 
       if (!sessionPath || loadingMoreRef.current) {
+        return
+      }
+
+      // Skip disk backfill for live sessions to avoid race with WS streaming
+      if (isLiveRef.current) {
         return
       }
 
@@ -255,6 +315,16 @@ export function useSessionViewerData({
       }
     }
 
+    // Skip ALL disk loading for live sessions — content arrives via WebSocket streaming.
+    if (isLiveRef.current) {
+      setLoading(false)
+      setShowLoading(false)
+      setError(null)
+      return () => {
+        cancelled = true
+      }
+    }
+
     const doLoad = async () => {
       try {
         setLoading(true)
@@ -282,6 +352,13 @@ export function useSessionViewerData({
               !initialEntryId && openPosition === 'bottom'
             return
           }
+        }
+
+        // For live sessions, skip disk loading — content arrives via WebSocket streaming.
+        if (isLiveRef.current) {
+          setLoading(false)
+          setShowLoading(false)
+          return
         }
 
         loadingTimerRef.current = setTimeout(() => {
@@ -396,90 +473,143 @@ export function useSessionViewerData({
 
     let unlistenSessionsChanged: (() => void) | null = null
     let unlistenLiveEntry: (() => void) | null = null
+    let unlistenLiveRegister: (() => void) | null = null
 
     const setup = async () => {
-      try {
-        unlistenSessionsChanged = await listen<SessionsDiff>('sessions-changed', (event) => {
-          const diff = event.payload
-          if (!diff?.updated?.length) return
+      const sessionId = extractSessionId(sessionPath)
 
-          const hit = diff.updated.some((session) => session.path === sessionPath)
-          if (hit) {
-            void loadMoreHistory({ asRealtime: true })
-          }
-        })
+      // Track live session registration — when live, skip file-watcher disk reads
+      unlistenLiveRegister = await listen<{ sessionId: string }>('pi-agent:register', ({ payload }) => {
+        if (payload.sessionId === sessionId) isLiveRef.current = true
+      })
 
-        // ── Pi Agent live streaming ──────────────────────────────
-        // Derive sessionId from the current session path for matching
-        const sessionId = path.basename(sessionPath.replace(/\.jsonl$/, ''))
+      // Only listen to file-watcher when NOT live (avoid conflict with real-time WS streaming)
+      unlistenSessionsChanged = await listen<SessionsDiff>('sessions-changed', (event) => {
+        if (isLiveRef.current) return
+        const diff = event.payload
+        if (!diff?.updated?.length) return
 
-        unlistenLiveEntry = await listen<{ sessionId: string; eventType: string; entry: SessionEntry }>(
-          'pi-agent:entry',
-          ({ payload }) => {
-            // Match by sessionId
-            if (payload.sessionId !== sessionId) return
+        const hit = diff.updated.some((session) => session.path === sessionPath)
+        if (hit) {
+          void loadMoreHistory({ asRealtime: true })
+        }
+      })
 
-            // Also double-check by sessionPath if available (as a dynamic property)
-            const entryAsRecord = payload.entry as unknown as Record<string, unknown>
-            if (entryAsRecord._sessionPath && entryAsRecord._sessionPath !== sessionPath) return
+      // Pi Agent live streaming — receives entries via WebSocket
+      unlistenLiveEntry = await listen<{ sessionId: string; eventType: string; entry: any }>(
+        'pi-agent:entry',
+        ({ payload }) => {
+          if (payload.sessionId !== sessionId) return
 
-            const liveEntry = payload.entry as SessionEntry
-            if (!liveEntry || !liveEntry.id) return
+          const raw = payload.entry as Record<string, any>
+          if (raw._sessionPath && raw._sessionPath !== sessionPath) return
 
-            const eventType = payload.eventType
+          const eventType = payload.eventType
 
-            // Only merge message and tool_execution entries into the viewer
-            if (!eventType.startsWith('message_') && !eventType.startsWith('tool_execution_')) {
-              return
+          if (eventType.startsWith('message_')) {
+            const rawMessage = raw.message
+            let messageId = rawMessage?.id
+
+            // Fallback: if messageId is missing (e.g. in some message_update events),
+            // find the last assistant message in the current entries and use its ID.
+            if (!messageId) {
+              setEntries((prev) => {
+                const lastAssistant = prev.filter(
+                  (e: SessionEntry) => e.type === 'message' && e.message?.role === 'assistant'
+                ).pop()
+                if (lastAssistant) messageId = lastAssistant.id
+                return prev
+              })
+            }
+
+            if (!messageId) return
+
+            const nextContent = raw.assistantMessageEvent
+              ? appendDeltaToMessageContent(rawMessage?.content, raw.assistantMessageEvent)
+              : (Array.isArray(rawMessage?.content) ? rawMessage.content : [])
+
+            const liveEntry: SessionEntry = {
+              type: 'message',
+              id: messageId,
+              parentId: raw.parentId,
+              timestamp: raw.timestamp || new Date().toISOString(),
+              message: {
+                ...rawMessage,
+                role: rawMessage?.role || 'assistant',
+                content: nextContent,
+              },
             }
 
             setEntries((prev) => {
-              // Check if entry already exists (from disk or previous live)
-              if (prev.some((e) => e.id === liveEntry.id)) return prev
+              const existingIndex = prev.findIndex((e) => e.id === messageId)
+              if (existingIndex === -1) {
+                return [...prev, liveEntry]
+              }
 
-              const merged = [...prev, liveEntry]
-
-              // Update cache
-              cacheSessionContent(sessionPath, {
-                entries: merged,
-                lineCount: lineCountRef.current,
-                nextOffset: nextOffsetRef.current,
-                fileSize: fileSizeRef.current,
-                hasMore: hasMoreHistoryRef.current,
-              })
-
-              return merged
+              const next = [...prev]
+              const existing = next[existingIndex]
+              next[existingIndex] = {
+                ...existing,
+                ...liveEntry,
+                message: {
+                  ...existing.message,
+                  ...liveEntry.message,
+                  role: liveEntry.message?.role || existing.message?.role || 'assistant',
+                  content: raw.assistantMessageEvent
+                    ? appendDeltaToMessageContent(existing.message?.content as any[], raw.assistantMessageEvent)
+                    : (liveEntry.message?.content || []),
+                },
+              }
+              return next
             })
 
-            // Update active entry and scroll state
-            if (eventType === 'message_start' || eventType === 'message_update') {
-              setActiveEntryId(liveEntry.id)
-
-              if (isAtBottomRef.current) {
-                pendingScrollToBottomRef.current = true
-              } else {
-                setHasNewMessages(true)
-              }
+            setActiveEntryId(messageId)
+            if (isAtBottomRef.current) {
+              pendingScrollToBottomRef.current = true
+            } else {
+              setHasNewMessages(true)
             }
-          },
-        )
-      } catch (listenerError) {
-        console.error(
-          '[useSessionViewerData] Failed to setup listeners:',
-          listenerError,
-        )
-      }
+            return
+          }
+
+          if (eventType.startsWith('tool_execution_')) {
+            const toolCallId = raw.toolCallId
+            if (!toolCallId) return
+
+            if (eventType === 'tool_execution_end') {
+              const resultText = raw.result?.content?.find?.((c: any) => c.type === 'text')?.text || ''
+              const toolResultEntry: SessionEntry = {
+                type: 'message',
+                id: `tool-result-${toolCallId}`,
+                timestamp: raw.timestamp || new Date().toISOString(),
+                message: {
+                  role: 'toolResult',
+                  toolCallId,
+                  isError: !!raw.isError,
+                  content: raw.result?.content || [{ type: 'text', text: resultText }],
+                },
+              }
+
+              setEntries((prev) => {
+                const existingIndex = prev.findIndex((e) => e.id === toolResultEntry.id)
+                if (existingIndex === -1) return [...prev, toolResultEntry]
+                const next = [...prev]
+                next[existingIndex] = toolResultEntry
+                return next
+              })
+            }
+          }
+        },
+      )
     }
 
     void setup()
 
     return () => {
-      if (unlistenSessionsChanged) {
-        unlistenSessionsChanged()
-      }
-      if (unlistenLiveEntry) {
-        unlistenLiveEntry()
-      }
+      isLiveRef.current = false
+      unlistenSessionsChanged?.()
+      unlistenLiveEntry?.()
+      unlistenLiveRegister?.()
     }
   }, [loadMoreHistory, loading, sessionPath, isAtBottomRef])
 

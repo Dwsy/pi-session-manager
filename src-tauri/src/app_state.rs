@@ -1,5 +1,5 @@
-use crate::terminal::TerminalManager;
 use crate::pi_agent_registry::{PiAgentRegistry, SharedPiAgentRegistry};
+use crate::terminal::TerminalManager;
 use std::sync::Arc;
 use std::sync::Mutex;
 use tauri::AppHandle;

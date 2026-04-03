@@ -102,6 +102,10 @@ export const settings = {
       search: 'Cmd+Shift+F alterna el árbol de sesiones',
       sidebar: 'Cmd+Shift+F abre búsqueda en sesión',
     },
+    scrollMarkersEnabled: 'Marcadores de desplazamiento',
+    scrollMarkersEnabledHelp: 'Mostrar puntos de navegación laterales para saltar rápidamente entre mensajes',
+    scrollMarkersGuideSeen: 'Mostrar guía de función',
+    scrollMarkersGuideSeenHelp: 'Mostrar consejos introductorios al abrir una sesión por primera vez',
   },
   search: {
     defaultSearchMode: 'Modo de búsqueda predeterminado',

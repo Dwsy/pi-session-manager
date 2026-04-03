@@ -102,6 +102,10 @@ export const settings = {
       search: 'Cmd+Shift+F schaltet Sitzungsbaum um',
       sidebar: 'Cmd+Shift+F öffnet Sitzungssuche',
     },
+    scrollMarkersEnabled: 'Scroll-Markierungen',
+    scrollMarkersEnabledHelp: 'Navigationspunkte am Rand zum schnellen Springen zwischen Nachrichten anzeigen',
+    scrollMarkersGuideSeen: 'Einführung anzeigen',
+    scrollMarkersGuideSeenHelp: 'Beim ersten Öffnen einer Sitzung Einführungstipps anzeigen',
   },
   search: {
     defaultSearchMode: 'Standard-Suchmodus',

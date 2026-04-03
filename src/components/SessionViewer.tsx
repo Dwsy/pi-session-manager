@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import KbdTooltip from "./KbdTooltip";
 import OpenInTerminalButton from "./OpenInTerminalButton";
+import ChatInput from "./ChatInput";
 import SystemPromptDialog from "./SystemPromptDialog";
 import { type SessionTreeRef } from "./SessionTree";
 import SessionViewerMessages, {
@@ -42,15 +43,13 @@ interface SessionViewerProps {
   customCommand?: string;
   resumeCommand?: string;
   initialEntryId?: string;
+  liveSessionIds?: Set<string>
 }
 
 const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_MAX_WIDTH = 600;
 const SIDEBAR_DEFAULT_WIDTH = 400;
 const SIDEBAR_WIDTH_KEY = "pi-session-manager-sidebar-width";
-
-// Temporary debug switch: set true to disable scroll markers for perf comparison.
-const DEBUG_DISABLE_SCROLL_MARKERS = false;
 
 function SessionViewerContent({
   session,
@@ -64,6 +63,7 @@ function SessionViewerContent({
   customCommand,
   resumeCommand,
   initialEntryId,
+  liveSessionIds,
 }: SessionViewerProps) {
   const { t } = useTranslation();
   const {
@@ -79,6 +79,8 @@ function SessionViewerContent({
   const isMobile = useIsMobile();
   const { getSessionSetting } = useSettings();
   const cmdFBehavior = getSessionSetting('cmdFBehavior') ?? 'inSessionSearch';
+  const scrollMarkersEnabled = getSessionSetting('scrollMarkersEnabled') ?? true;
+  const isLive = liveSessionIds?.has(session.id) ?? false
   const [showSidebar, setShowSidebar] = useState(false);
   const [searchFocusKey, setSearchFocusKey] = useState(0);
   const { sidebarWidth, isResizing, handleMouseDown } = useResizableSidebar({
@@ -119,6 +121,7 @@ function SessionViewerContent({
     initialEntryId,
     loadErrorMessage: t("session.loadError"),
     isAtBottomRef: sessionDataIsAtBottomRef,
+    isLive,
   });
 
   const handleToggleSidebar = useCallback(() => {
@@ -212,7 +215,7 @@ function SessionViewerContent({
   } = useSessionScrollMarkers({
     entries: renderableEntries,
     isMobile,
-    enabled: !DEBUG_DISABLE_SCROLL_MARKERS,
+    enabled: scrollMarkersEnabled,
     onSelectEntry: setScrollTargetId,
     previewFallback: t("session.userMessage", "User message"),
   });
@@ -261,7 +264,7 @@ function SessionViewerContent({
           toolsExpanded={toolsExpanded}
           showScrollMarkers={showScrollMarkers}
           isMobileMenuOpen={showMobileMenu}
-          isScrollMarkersFeatureEnabled={!DEBUG_DISABLE_SCROLL_MARKERS}
+          isScrollMarkersFeatureEnabled={scrollMarkersEnabled}
           isSearchOpen={isSearchOpen}
           onBack={onBack}
           onToggleSidebar={handleToggleSidebar}
@@ -359,7 +362,13 @@ function SessionViewerContent({
           onPointerMove={handleMarkersPointerMove}
           onPointerUp={handleMarkersPointerUp}
           onPointerLeave={handleMarkersPointerLeave}
-          isScrollMarkersFeatureEnabled={!DEBUG_DISABLE_SCROLL_MARKERS}
+          isScrollMarkersFeatureEnabled={scrollMarkersEnabled}
+        />
+
+        <ChatInput
+          sessionId={session.id}
+          isLive={liveSessionIds?.has(session.id) ?? false}
+          onSent={() => setHasNewMessages(false)}
         />
       </div>
       <SystemPromptDialog

@@ -134,6 +134,46 @@ export default function SessionSettings({ settings, onUpdate }: SessionSettingsP
         </label>
       </div>
 
+      <div className="flex items-center justify-between">
+        <div>
+          <label className="text-sm font-medium text-foreground">
+            {t('settings.session.scrollMarkersEnabled', 'Scroll markers')}
+          </label>
+          <p className="text-xs text-muted-foreground">
+            {t('settings.session.scrollMarkersEnabledHelp', 'Show navigation dots on the side for quick jumping between messages')}
+          </p>
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={settings.session.scrollMarkersEnabled !== false}
+            onChange={(e) => onUpdate('session', 'scrollMarkersEnabled', e.target.checked)}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
+        </label>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <label className="text-sm font-medium text-foreground">
+            {t('settings.session.scrollMarkersGuideSeen', 'Show feature guide')}
+          </label>
+          <p className="text-xs text-muted-foreground">
+            {t('settings.session.scrollMarkersGuideSeenHelp', 'Show introductory tips when opening a session for the first time')}
+          </p>
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!settings.session.scrollMarkersGuideSeen}
+            onChange={(e) => onUpdate('session', 'scrollMarkersGuideSeen', !e.target.checked)}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
+        </label>
+      </div>
+
       <div className="space-y-3">
         <label className="text-sm font-medium text-foreground">
           {t('settings.session.openPosition', 'Task positioning open position')}

@@ -102,6 +102,10 @@ export const settings = {
       search: 'Cmd+Shift+F bascule l\'arborescence des sessions',
       sidebar: 'Cmd+Shift+F ouvre la recherche dans la session',
     },
+    scrollMarkersEnabled: 'Marqueurs de défilement',
+    scrollMarkersEnabledHelp: 'Afficher des points de navigation latéraux pour sauter rapidement entre les messages',
+    scrollMarkersGuideSeen: 'Afficher le guide de fonctionnalité',
+    scrollMarkersGuideSeenHelp: 'Afficher des conseils d\'introduction lors de la première ouverture d\'une session',
   },
   search: {
     defaultSearchMode: 'Mode de recherche par défaut',

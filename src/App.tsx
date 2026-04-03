@@ -39,6 +39,7 @@ import AppMobileLayout, { type MobileTab } from "./components/app/AppMobileLayou
 import AppDesktopSidebar from "./components/app/AppDesktopSidebar";
 import AppDesktopContent from "./components/app/AppDesktopContent";
 import AppDesktopSearchBar from "./components/app/AppDesktopSearchBar";
+import { usePiLiveSessions } from "./hooks/usePiLiveSessions";
 import AppDesktopSidebarContent from "./components/app/AppDesktopSidebarContent";
 import AppOverlays from "./components/app/AppOverlays";
 import AppSessionListPane from "./components/app/AppSessionListPane";
@@ -143,6 +144,7 @@ function App() {
   } = useTags();
   useAppearance();
   useToolStyles();
+  const { liveSessionIds } = usePiLiveSessions();
 
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "project" | "kanban">(
@@ -430,6 +432,7 @@ function App() {
     removeTagFromSession,
     createTag,
     selectionModeTrigger,
+    liveSessionIds,
   });
 
   const onRenameSession = async (newName: string) => {
@@ -604,6 +607,7 @@ function App() {
       customCommand={customCommand}
       resumeCommand={resumeCommand}
       initialEntryId={pendingScrollEntryId || undefined}
+      liveSessionIds={liveSessionIds}
     />
   );
 

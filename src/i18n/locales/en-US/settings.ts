@@ -169,6 +169,10 @@ export const settings = {
       search: 'Cmd+Shift+F toggles session tree',
       sidebar: 'Cmd+Shift+F opens in-session search',
     },
+    scrollMarkersEnabled: 'Scroll markers',
+    scrollMarkersEnabledHelp: 'Show navigation dots on the side for quick jumping between messages',
+    scrollMarkersGuideSeen: 'Show feature guide',
+    scrollMarkersGuideSeenHelp: 'Show introductory tips when opening a session for the first time',
   },
   search: {
     defaultSearchMode: 'Default Search Mode',

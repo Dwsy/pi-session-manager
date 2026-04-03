@@ -52,6 +52,7 @@ export interface UseSidebarSessionsOptions {
   ) => Promise<Tag>;
   selectionModeTrigger?: number;
   selectionModeDismissTrigger?: number;
+  liveSessionIds?: Set<string>;
 }
 
 export interface UseSidebarSessionsReturn {
@@ -101,6 +102,7 @@ export function useSidebarSessions({
   createTag,
   selectionModeTrigger,
   selectionModeDismissTrigger,
+  liveSessionIds,
 }: UseSidebarSessionsOptions): UseSidebarSessionsReturn {
   const handleToggleSessionTag = useCallback(
     (sessionId: string, tagId: string, assigned: boolean) => {
@@ -245,6 +247,7 @@ export function useSidebarSessions({
       selectionModeTrigger,
       selectionModeDismissTrigger,
       searchQuery: sidebarSearchQuery,
+      liveSessionIds,
     }),
     [
       selectedSession,

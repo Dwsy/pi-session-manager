@@ -5,15 +5,14 @@ use std::path::PathBuf;
 
 /// Helper to create a test ZIP bundle
 fn create_test_bundle(path: &PathBuf, files: &[(&str, &[u8])]) {
+    use std::io::Cursor;
     use zip::write::SimpleFileOptions;
     use zip::ZipWriter;
-    use std::io::Cursor;
 
     let cursor = Cursor::new(Vec::new());
     let mut zip = ZipWriter::new(cursor);
 
-    let options = SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
     for (name, contents) in files {
         zip.start_file(name, options).unwrap();
@@ -54,7 +53,10 @@ fn test_preview_bundle_valid_file() {
 
     let zip_path = temp_dir.join("preview-test.zip");
     let test_files = vec![
-        ("metadata.json", br#"{"version":"1.0","created_at":"2026-04-03 12:00:00"}"#.as_slice()),
+        (
+            "metadata.json",
+            br#"{"version":"1.0","created_at":"2026-04-03 12:00:00"}"#.as_slice(),
+        ),
         ("models.json", br#"{"providers":{}}"#.as_slice()),
         ("settings.json", br#"{}"#.as_slice()),
     ];
@@ -65,9 +67,15 @@ fn test_preview_bundle_valid_file() {
     let zip_file = fs::File::open(&zip_path).unwrap();
     let mut archive = zip::ZipArchive::new(zip_file).unwrap();
 
-    assert!(archive.by_name("metadata.json").is_ok(), "Should have metadata");
+    assert!(
+        archive.by_name("metadata.json").is_ok(),
+        "Should have metadata"
+    );
     assert!(archive.by_name("models.json").is_ok(), "Should have models");
-    assert!(archive.by_name("settings.json").is_ok(), "Should have settings");
+    assert!(
+        archive.by_name("settings.json").is_ok(),
+        "Should have settings"
+    );
 }
 
 #[test]

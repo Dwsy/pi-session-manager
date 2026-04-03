@@ -55,10 +55,7 @@ const CONFIG_FILES: &[(&str, &str)] = &[
         "session-manager-config.toml",
         "~/.pi/agent/session-manager-config.toml",
     ),
-    (
-        "session-manager.json",
-        "~/.pi/agent/session-manager.json",
-    ),
+    ("session-manager.json", "~/.pi/agent/session-manager.json"),
 ];
 
 /// Resolve a path that may start with ~ to the home directory.
@@ -136,8 +133,8 @@ pub async fn export_config_bundle_internal() -> Result<String, String> {
         notes: None,
     };
 
-    let metadata_json =
-        serde_json::to_string_pretty(&metadata).map_err(|e| format!("Failed to serialize metadata: {e}"))?;
+    let metadata_json = serde_json::to_string_pretty(&metadata)
+        .map_err(|e| format!("Failed to serialize metadata: {e}"))?;
 
     zip.start_file("metadata.json", options)
         .map_err(|e| format!("Failed to write metadata: {e}"))?;
@@ -173,13 +170,13 @@ pub async fn export_config_bundle_internal() -> Result<String, String> {
     }
 
     // Update metadata with actual file count
-    let mut zip = zip.finish()
+    let mut zip = zip
+        .finish()
         .map_err(|e| format!("Failed to finalize ZIP: {e}"))?;
 
     // Write ZIP to disk
     let zip_data = zip.into_inner();
-    fs::write(&zip_path, zip_data)
-        .map_err(|e| format!("Failed to write ZIP file: {e}"))?;
+    fs::write(&zip_path, zip_data).map_err(|e| format!("Failed to write ZIP file: {e}"))?;
 
     Ok(zip_path.to_string_lossy().to_string())
 }
@@ -191,10 +188,9 @@ pub async fn preview_config_bundle_internal(bundle_path: &str) -> Result<BundleP
         return Err(format!("Bundle file not found: {bundle_path}"));
     }
 
-    let zip_file = fs::File::open(&path)
-        .map_err(|e| format!("Failed to open bundle: {e}"))?;
-    let mut archive = zip::ZipArchive::new(zip_file)
-        .map_err(|e| format!("Invalid ZIP file: {e}"))?;
+    let zip_file = fs::File::open(&path).map_err(|e| format!("Failed to open bundle: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(zip_file).map_err(|e| format!("Invalid ZIP file: {e}"))?;
 
     let mut files = Vec::new();
     let mut total_size = 0;
@@ -263,10 +259,9 @@ pub async fn import_config_bundle_internal(
         return Err(format!("Bundle file not found: {bundle_path}"));
     }
 
-    let zip_file = fs::File::open(&path)
-        .map_err(|e| format!("Failed to open bundle: {e}"))?;
-    let mut archive = zip::ZipArchive::new(zip_file)
-        .map_err(|e| format!("Invalid ZIP file: {e}"))?;
+    let zip_file = fs::File::open(&path).map_err(|e| format!("Failed to open bundle: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(zip_file).map_err(|e| format!("Invalid ZIP file: {e}"))?;
 
     let timestamp = format_timestamp(SystemTime::now());
     let mut imported_files = Vec::new();
@@ -355,7 +350,8 @@ pub async fn restore_import_backup_internal() -> Result<String, String> {
     // Find the most recent backup directory
     let mut backups = Vec::new();
     for entry in fs::read_dir(&backup_base)
-        .map_err(|e| format!("Failed to read backup directory: {e}"))?.flatten()
+        .map_err(|e| format!("Failed to read backup directory: {e}"))?
+        .flatten()
     {
         let path = entry.path();
         if path.is_dir() {

@@ -233,6 +233,8 @@ export default function (pi: ExtensionAPI) {
               type: "register",
               payload: { sessionId, sessionPath, pid: process.pid, cwd: process.cwd() },
             });
+            // Send current session state (model, thinking, context)
+            broadcastSessionState();
             break;
           case "reconnecting":
             latestCtx.ui.setStatus("psm", `⏳ Reconnect ${attempt}`);
@@ -249,15 +251,31 @@ export default function (pi: ExtensionAPI) {
         }
       },
       onMessage: (msg: any) => {
-        if (msg.type === "steer" && latestCtx && !latestCtx.isIdle()) {
-          pi.sendUserMessage(msg.payload?.message || "", { deliverAs: "steer" });
-        } else if (msg.type === "abort" && latestCtx) {
+        const eventType = msg?.event_type === "event" ? msg.event : msg.type
+        const payload = msg?.event_type === "event" ? msg.payload : msg.payload
+
+        // Extract UUID from local sessionId for matching
+        const localUuid = sessionId.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0]
+        const matches = payload?.sessionId === sessionId || (localUuid && payload?.sessionId === localUuid)
+
+        if (eventType === "steer" && matches && latestCtx && !latestCtx.isIdle()) {
+          const deliverAs = payload?.deliverAs === "followUp" ? "followUp" : "steer"
+          pi.sendUserMessage(payload?.message || "", { deliverAs })
+        } else if (eventType === "abort" && matches && latestCtx) {
           latestCtx.abort();
         } else if (msg.type === "ping" || msg.ping === true) {
           conn?.send({ type: "pong" });
         } else if (msg.type === "pong" || msg.pong === true || msg.pong === true) {
-          // psm sends {"pong": true} for its keepalive
           conn?.pongReceived();
+        } else if (eventType === "set_model" && payload?.sessionId === sessionId) {
+          void latestCtx?.modelRegistry.getAvailable().then((models: any[]) => {
+            const target = models.find((m: any) => m.provider === payload.provider && m.id === payload.modelId);
+            if (target) pi.setModel(target);
+          });
+        } else if (eventType === "set_thinking" && payload?.sessionId === sessionId) {
+          pi.setThinkingLevel(payload.level);
+        } else if (eventType === "get_state" && payload?.sessionId === sessionId) {
+          broadcastSessionState();
         }
       },
     });
@@ -276,6 +294,19 @@ export default function (pi: ExtensionAPI) {
     conn?.sendEntry(sessionId, sessionPath, { eventType: eventName, entry: event });
   }
 
+  // ── Model / Thinking / Context info ──────────────────
+
+  function broadcastSessionState() {
+    if (!latestCtx || !conn?.state || conn.state !== "connected") return;
+    const model = latestCtx.model;
+    const thinkingLevel = pi.getThinkingLevel();
+    const contextUsage = latestCtx.getContextUsage();
+    conn?.send({
+      type: "session_state",
+      payload: { model, thinkingLevel, contextUsage },
+    });
+  }
+
   const EVENTS = [
     "message_start", "message_update", "message_end",
     "tool_execution_start", "tool_execution_update", "tool_execution_end",
@@ -287,6 +318,10 @@ export default function (pi: ExtensionAPI) {
     pi.on(et as any, async (event: any, ctx: ExtensionContext) => {
       latestCtx = ctx;
       forward(et, event);
+      // After model change or turn end, broadcast full state
+      if (et === "model_select" || et === "turn_end" || et === "turn_start") {
+        broadcastSessionState();
+      }
     });
   }
 
