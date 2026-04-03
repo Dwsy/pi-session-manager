@@ -15,10 +15,21 @@ pub async fn pi_agent_steering(
     message: String,
     deliver_as: Option<String>,
 ) -> Result<(), String> {
+    let is_streaming = state.pi_agent_registry.get_live_session(&session_id)
+        .map(|s| s.is_streaming)
+        .unwrap_or(false);
+
+    let command_type = if is_streaming {
+        deliver_as.unwrap_or_else(|| "steer".to_string())
+    } else {
+        "prompt".to_string()
+    };
+
     let command = json!({
-        "type": deliver_as.unwrap_or_else(|| "steer".to_string()), // "steer" or "follow_up"
+        "type": command_type,
         "message": message,
     });
+    
     state
         .pi_agent_registry
         .send_rpc(&session_id, command)

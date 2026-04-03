@@ -91,6 +91,15 @@ impl PiAgentRegistry {
         self.sessions.lock().unwrap().values().cloned().collect()
     }
 
+    pub fn get_live_session(&self, session_id: &str) -> Option<PiLiveSession> {
+        let guard = self.sessions.lock().unwrap();
+        if let Some(s) = guard.get(session_id) {
+            return Some(s.clone());
+        }
+        // Try partial match
+        guard.values().find(|s| s.session_id.contains(session_id)).cloned()
+    }
+
     // ── Connection management for RPC ───────────────────────
 
     /// Register a bidirectional RPC connection for a Pi CLI session.
@@ -116,13 +125,23 @@ impl PiAgentRegistry {
         session_id: &str,
         command: serde_json::Value,
     ) -> Result<serde_json::Value, String> {
-        let conn = {
+        let (full_id, conn) = {
             let guard = self.connections.lock().unwrap();
-            guard
-                .get(session_id)
-                .cloned()
-                .ok_or_else(|| format!("Session not connected: {}", session_id))?
+            // Try exact match first
+            if let Some(c) = guard.get(session_id) {
+                (session_id.to_string(), c.clone())
+            } else {
+                // Try to find a connection whose id ends with or contains the provided uuid
+                let found = guard.iter().find(|(k, _)| k.contains(session_id));
+                if let Some((k, c)) = found {
+                    (k.clone(), c.clone())
+                } else {
+                    return Err(format!("Session not connected: {}", session_id));
+                }
+            }
         };
+
+        log::debug!("[RPC] Sending command to session {full_id}: {:?}", command["type"]);
 
         let sender = conn
             .sender
@@ -132,15 +151,40 @@ impl PiAgentRegistry {
             .ok_or_else(|| "No response channel for session".to_string())?;
 
         let mut response_rx = response_tx.subscribe();
-        let command_str = serde_json::to_string(&command).map_err(|e| e.to_string())?;
+        let call_id = session_id.to_string(); // Use session_id as correlation id as requested
+        let mut command_val = command.clone();
+        command_val["id"] = serde_json::json!(call_id);
+        
+        let command_str = serde_json::to_string(&command_val).map_err(|e| e.to_string())?;
 
+        log::info!("[RPC] -> [{full_id}] command={:?} id={call_id}", command_val["type"]);
         sender.send(command_str).map_err(|e| e.to_string())?;
 
-        // Wait for response with timeout
-        tokio::time::timeout(std::time::Duration::from_secs(30), response_rx.recv())
-            .await
-            .map_err(|_| "RPC timeout".to_string())?
-            .map_err(|e| e.to_string())
+        // Wait for response with timeout and ID matching
+        let start = std::time::Instant::now();
+        let timeout_duration = std::time::Duration::from_secs(30);
+        
+        loop {
+            let elapsed = start.elapsed();
+            if elapsed >= timeout_duration {
+                return Err(format!("RPC timeout for session {full_id} (id={call_id})"));
+            }
+            
+            match tokio::time::timeout(timeout_duration - elapsed, response_rx.recv()).await {
+                Ok(Ok(resp)) => {
+                    // Check id match. Since we use session_id as id, multiple calls might clash, 
+                    // but we follow user instruction "id就是pi的会话id".
+                    if resp["id"].as_str() == Some(&call_id) || resp["id"].is_null() {
+                        log::info!("[RPC] <- [{full_id}] matched id={call_id}");
+                        return Ok(resp);
+                    } else {
+                        log::debug!("[RPC] skip mismatch response id={:?} for call_id={call_id}", resp["id"]);
+                    }
+                }
+                Ok(Err(e)) => return Err(e.to_string()),
+                Err(_) => return Err(format!("RPC timeout for session {full_id} (id={call_id})")),
+            }
+        }
     }
 
     /// Forward a response from Pi CLI to waiting RPC callers.

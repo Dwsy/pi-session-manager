@@ -219,13 +219,17 @@ impl WsAdapter {
                                 continue;
                             }
 
-                            // ── Pi agent protocol: RPC response ─────────────────
+                             // ── Pi agent protocol: RPC response ─────────────────
                             if text.contains("\"type\"") && text.contains("\"response\"") {
+                                log::info!("[WS] Received potential RPC response: {text}");
                                 if let Ok(resp) = serde_json::from_str::<serde_json::Value>(&text) {
                                     let s_id = resp["sessionId"].as_str().map(|s| s.to_string())
                                         .or_else(|| registered_session_id.clone());
                                     if let Some(session_id) = s_id {
+                                        log::info!("[WS] Forwarding RPC response for session {session_id}, id={:?}, success={:?}", resp["id"], resp["success"]);
                                         self.app_state.pi_agent_registry.forward_response(&session_id, resp);
+                                    } else {
+                                        log::warn!("[WS] Received RPC response but no session_id matched for forwarding: {text}");
                                     }
                                 }
                                 continue;

@@ -176,11 +176,15 @@ async fn handle_ws_connection(
 
                         // ── Pi agent protocol: RPC response ─────────────────
                         if text.contains("\"type\"") && text.contains("\"response\"") {
+                            log::info!("[HTTP-WS] Received potential RPC response: {text}");
                             if let Ok(resp) = serde_json::from_str::<Value>(&text) {
                                 let s_id = resp["sessionId"].as_str().map(|s| s.to_string())
                                     .or_else(|| registered_session_id.clone());
                                 if let Some(session_id) = s_id {
+                                    log::info!("[HTTP-WS] Forwarding RPC response for session {session_id}, id={:?}, success={:?}", resp["id"], resp["success"]);
                                     app_state.pi_agent_registry.forward_response(&session_id, resp);
+                                } else {
+                                    log::warn!("[HTTP-WS] Received RPC response but no session_id matched for forwarding: {text}");
                                 }
                             }
                             continue;
