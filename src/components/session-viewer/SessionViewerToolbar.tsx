@@ -23,6 +23,8 @@ import {
 import KbdTooltip from "../KbdTooltip";
 import { isTauri } from "../../transport";
 import type { SessionViewerToolbarProps } from "./SessionViewerToolbarTypes";
+import SessionViewerOnlineStatusBar from "./SessionViewerOnlineStatusBar";
+import SessionViewerModelControls from "./SessionViewerModelControls";
 
 export default function SessionViewerToolbar({
   isMobile,
@@ -50,6 +52,7 @@ export default function SessionViewerToolbar({
   onExport,
   onResume,
   desktopResumeButton,
+  liveSession,
 }: SessionViewerToolbarProps) {
   const { t } = useTranslation();
   const sidebarToggleLabel = showSidebar
@@ -143,6 +146,9 @@ export default function SessionViewerToolbar({
               <span className="text-base font-semibold tracking-tight truncate">
                 {title}
               </span>
+              {liveSession && (
+                <SessionViewerOnlineStatusBar liveSession={liveSession} />
+              )}
               <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-border/60 bg-background text-[11px] text-muted-foreground flex-shrink-0">
                 {messageCount} {t("session.messages")}
               </span>
@@ -151,6 +157,12 @@ export default function SessionViewerToolbar({
 
           {!isMobile && (
             <div className="flex items-center gap-1 flex-shrink-0">
+              {liveSession && (
+                <>
+                  <SessionViewerModelControls liveSession={liveSession} />
+                  <div className="h-4 w-px bg-border/60 mx-0.5" />
+                </>
+              )}
               <KbdTooltip shortcut="Cmd+F">
                 <button
                   onClick={onOpenSearch}

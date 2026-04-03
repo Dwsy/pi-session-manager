@@ -16,7 +16,6 @@ export interface AppSessionViewerPaneProps extends Pick<
   | "resumeCommand"
   | "initialEntryId"
 > {
-  liveSessionIds: Set<string>
 }
 
 function AppSessionViewerPane({
@@ -31,7 +30,6 @@ function AppSessionViewerPane({
   customCommand,
   resumeCommand,
   initialEntryId,
-  liveSessionIds,
 }: AppSessionViewerPaneProps) {
   return (
     <SessionViewer
@@ -46,7 +44,6 @@ function AppSessionViewerPane({
       customCommand={customCommand}
       resumeCommand={resumeCommand}
       initialEntryId={initialEntryId}
-      liveSessionIds={liveSessionIds}
     />
   );
 }

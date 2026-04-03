@@ -15,6 +15,9 @@ export interface LiveSessionInfo {
   is_streaming: boolean
   entry_count: number
   last_seen: string
+  model?: any
+  thinking_level?: string
+  context_usage?: any
 }
 
 export function usePiLiveSessions() {
@@ -50,6 +53,7 @@ export function usePiLiveSessions() {
     const unsubs: (() => void)[] = []
     listen('pi-agent:register', () => refresh()).then(f => unsubs.push(f))
     listen('pi-agent:entry', () => refresh()).then(f => unsubs.push(f))
+    listen('pi-agent:session_state', () => refresh()).then(f => unsubs.push(f))
 
     return () => { unsubs.forEach(u => u()) }
   }, [refresh])

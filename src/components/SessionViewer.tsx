@@ -25,6 +25,7 @@ import { useSessionViewerDerivedData } from "../hooks/useSessionViewerDerivedDat
 import { useSessionViewerHotkeys } from "../hooks/useSessionViewerHotkeys";
 import { useSessionViewerInMessageSearch } from "../hooks/useSessionViewerInMessageSearch";
 import { useSettings } from "../hooks/useSettings";
+import { usePiLiveSessions } from "../hooks/usePiLiveSessions";
 
 import { getPlatformDefaults } from "./settings/types";
 import type { SessionInfo } from "../types";
@@ -43,7 +44,6 @@ interface SessionViewerProps {
   customCommand?: string;
   resumeCommand?: string;
   initialEntryId?: string;
-  liveSessionIds?: Set<string>
 }
 
 const SIDEBAR_MIN_WIDTH = 200;
@@ -63,7 +63,6 @@ function SessionViewerContent({
   customCommand,
   resumeCommand,
   initialEntryId,
-  liveSessionIds,
 }: SessionViewerProps) {
   const { t } = useTranslation();
   const {
@@ -80,7 +79,11 @@ function SessionViewerContent({
   const { getSessionSetting } = useSettings();
   const cmdFBehavior = getSessionSetting('cmdFBehavior') ?? 'inSessionSearch';
   const scrollMarkersEnabled = getSessionSetting('scrollMarkersEnabled') ?? true;
-  const isLive = liveSessionIds?.has(session.id) ?? false
+
+  const { sessions: liveSessions } = usePiLiveSessions()
+  const liveSession = liveSessions.find(s => s.session_id === session.id) || null
+  const isLive = Boolean(liveSession)
+
   const [showSidebar, setShowSidebar] = useState(false);
   const [searchFocusKey, setSearchFocusKey] = useState(0);
   const { sidebarWidth, isResizing, handleMouseDown } = useResizableSidebar({
@@ -280,6 +283,7 @@ function SessionViewerContent({
           onFork={onFork}
           onExport={onExport}
           onResume={onWebResume}
+          liveSession={liveSession}
           desktopResumeButton={
             <KbdTooltip shortcut="Cmd+R">
               <OpenInTerminalButton
@@ -367,7 +371,7 @@ function SessionViewerContent({
 
         <ChatInput
           sessionId={session.id}
-          isLive={liveSessionIds?.has(session.id) ?? false}
+          isLive={isLive}
           onSent={() => setHasNewMessages(false)}
         />
       </div>

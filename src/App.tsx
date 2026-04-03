@@ -607,7 +607,6 @@ function App() {
       customCommand={customCommand}
       resumeCommand={resumeCommand}
       initialEntryId={pendingScrollEntryId || undefined}
-      liveSessionIds={liveSessionIds}
     />
   );
 

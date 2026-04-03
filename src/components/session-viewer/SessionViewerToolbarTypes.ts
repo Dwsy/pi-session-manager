@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { LiveSessionInfo } from "../../hooks/usePiLiveSessions";
 
 export interface SessionViewerToolbarProps {
   isMobile: boolean;
@@ -26,4 +27,5 @@ export interface SessionViewerToolbarProps {
   onExport: () => void;
   onResume?: () => void;
   desktopResumeButton?: ReactNode;
+  liveSession?: LiveSessionInfo | null;
 }
