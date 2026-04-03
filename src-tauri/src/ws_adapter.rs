@@ -158,11 +158,11 @@ impl WsAdapter {
                                         let session_path = register["payload"]["sessionPath"].as_str().map(|s| s.to_string());
                                         let pid = register["payload"]["pid"].as_u64().map(|p| p as u32);
                                         let cwd = register["payload"]["cwd"].as_str().map(|s| s.to_string());
-
-                                        log::info!("Pi agent registered: session={session_id}, pid={pid:?}");
+                                        let entries = register["payload"]["entries"].as_array().map(|a| a.clone()).unwrap_or_else(|| vec![]);
+                                        log::info!("Pi agent registered: session={session_id}, pid={pid:?}, entries={}", entries.len());
 
                                         self.app_state.pi_agent_registry.register(
-                                            session_id.to_string(), session_path, pid, cwd
+                                            session_id.to_string(), session_path, pid, cwd, entries
                                         );
 
                                         // Register RPC connection channels
@@ -198,6 +198,7 @@ impl WsAdapter {
 
                                         self.app_state.pi_agent_registry.record_entry(session_id, event_type);
 
+                                        log::info!("[WS] Pi agent entry: session={}, event={}", session_id, event_type);
                                         let payload = serde_json::json!({
                                             "sessionId": session_id,
                                             "eventType": entry["payload"]["eventType"],

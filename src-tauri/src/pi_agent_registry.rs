@@ -17,6 +17,7 @@ pub struct PiLiveSession {
     pub model: Option<serde_json::Value>,
     pub thinking_level: Option<String>,
     pub context_usage: Option<serde_json::Value>,
+    pub entries: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +50,7 @@ impl PiAgentRegistry {
         session_path: Option<String>,
         pid: Option<u32>,
         cwd: Option<String>,
+        entries: Vec<serde_json::Value>,
     ) {
         let now = chrono::Utc::now().to_rfc3339();
         self.sessions.lock().unwrap().insert(
@@ -59,11 +61,12 @@ impl PiAgentRegistry {
                 pid,
                 cwd,
                 is_streaming: false,
-                entry_count: 0,
+                entry_count: entries.len() as u64,
                 last_seen: now,
                 model: None,
                 thinking_level: None,
                 context_usage: None,
+                entries,
             },
         );
     }
@@ -214,6 +217,14 @@ impl PiAgentRegistry {
             if context_usage.is_some() {
                 s.context_usage = context_usage;
             }
+        }
+    }
+
+    /// Update the cached session entries.
+    pub fn update_session_entries(&self, session_id: &str, entries: Vec<serde_json::Value>) {
+        if let Some(s) = self.sessions.lock().unwrap().get_mut(session_id) {
+            s.entries = entries;
+            s.entry_count = s.entries.len() as u64;
         }
     }
 

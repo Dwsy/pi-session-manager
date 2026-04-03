@@ -131,8 +131,9 @@ async fn handle_ws_connection(
                                     let session_path = register["payload"]["sessionPath"].as_str().map(|s| s.to_string());
                                     let pid = register["payload"]["pid"].as_u64().map(|p| p as u32);
                                     let cwd = register["payload"]["cwd"].as_str().map(|s| s.to_string());
-                                    log::info!("[HTTP-WS] Pi agent registered: session={session_id}, pid={pid:?}");
-                                    app_state.pi_agent_registry.register(session_id.to_string(), session_path, pid, cwd);
+                                    let entries = register["payload"]["entries"].as_array().map(|a| a.clone()).unwrap_or_else(|| vec![]);
+                                    log::info!("[HTTP-WS] Pi agent registered: session={session_id}, pid={pid:?}, entries={}", entries.len());
+                                    app_state.pi_agent_registry.register(session_id.to_string(), session_path, pid, cwd, entries);
 
                                     // Register RPC connection channels
                                     app_state.pi_agent_registry.register_connection(
@@ -147,6 +148,7 @@ async fn handle_ws_connection(
                                         event: "pi-agent:register".to_string(),
                                         payload: register["payload"].clone(),
                                     });
+                                    let _ = app_state.app_handle.emit("pi-agent:register", &register["payload"]);
                                 }
                             }
                             continue;
@@ -159,6 +161,7 @@ async fn handle_ws_connection(
                                 if !session_id.is_empty() {
                                     let event_type = entry["payload"]["eventType"].as_str().unwrap_or("");
                                     app_state.pi_agent_registry.record_entry(session_id, event_type);
+                                    log::info!("[HTTP-WS] Pi agent entry: session={}, event={}", session_id, event_type);
                                     let payload = json!({
                                         "sessionId": session_id,
                                         "eventType": entry["payload"]["eventType"],
