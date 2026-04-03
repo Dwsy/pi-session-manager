@@ -10,7 +10,7 @@ import type { RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
 import type { SessionInfo, FavoriteItem, Tag } from "../types";
-import { CheckSquare2, Search, Square, Star, Tags, Trash2 } from "lucide-react";
+import { CheckSquare2, Search, Square, Star, Tags, Trash2, Zap } from "lucide-react";
 import { SessionListSkeleton } from "./Skeleton";
 import OpenInBrowserButton from "./OpenInBrowserButton";
 import OpenInTerminalButton from "./OpenInTerminalButton";
@@ -26,6 +26,8 @@ import { getPlatformDefaults } from "./settings/types";
 import { invoke, isTauri } from "../transport";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { isTextEntryTarget } from "../hooks/useKeyboardShortcuts";
+import { useClipboard } from "../hooks/useClipboard";
+import { getCachedSettings } from "../utils/settingsApi";
 
 const ESTIMATED_ROW_HEIGHT = 122;
 const STICKY_SCROLL_TOP_THRESHOLD = 48;
@@ -93,6 +95,7 @@ export default function SessionList({
 }: SessionListProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
+  const { copyText } = useClipboard();
   const listContainerRef = useRef<HTMLDivElement>(null);
   const [columnCount, setColumnCount] = useState(1);
   const [tagPickerSessionId, setTagPickerSessionId] = useState<string | null>(
@@ -761,11 +764,18 @@ export default function SessionList({
                             )}
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5 min-w-0">
-                                <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0">
-                                  {session.name ||
-                                    session.first_message ||
-                                    t("session.list.untitled")}
-                                </h3>
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                  {liveSessionIds?.has(session.id) && (
+                                    <div className="flex items-center justify-center bg-green-500/15 p-0.5 rounded flex-shrink-0" title={t("session.online", "Online")}>
+                                      <Zap className="h-3 w-3 text-green-500 fill-current" />
+                                    </div>
+                                  )}
+                                  <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0">
+                                    {session.name ||
+                                      session.first_message ||
+                                      t("session.list.untitled")}
+                                  </h3>
+                                </div>
                                 {isSelectionMode && isSelectionMarked && (
                                   <span className="rounded-full bg-primary/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-primary">
                                     {t("session.list.selectedBadge", {
@@ -1019,6 +1029,19 @@ export default function SessionList({
                       "Untitled",
                     path: contextMenuSession.path,
                   });
+                }
+              : undefined
+          }
+          onCopyResume={
+            isTauri()
+              ? () => {
+                  const settings = getCachedSettings();
+                  const cmd = settings.terminal?.resumeCommand || resumeCommand || "";
+                  const piCmd = settings.terminal?.piCommandPath || piPath || "pi";
+                  const fullCommand = cmd
+                    ? cmd.replace(/\{cwd\}/g, contextMenuSession.cwd || "").replace(/\{path\}/g, contextMenuSession.path).replace(/\{pi\}/g, piCmd)
+                    : `${piCmd} --session ${contextMenuSession.path}`;
+                  copyText(fullCommand).catch(console.error);
                 }
               : undefined
           }

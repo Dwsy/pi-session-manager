@@ -11,9 +11,10 @@ interface RecentSessionsProps {
   title?: string
   limit?: number
   onSessionSelect?: (session: SessionInfo) => void
+  liveSessionIds?: Set<string>
 }
 
-export default function RecentSessions({ sessions, title, limit = 5, onSessionSelect }: RecentSessionsProps) {
+export default function RecentSessions({ sessions, title, limit = 5, onSessionSelect, liveSessionIds }: RecentSessionsProps) {
   const { t } = useTranslation()
   const displayTitle = title || t('dashboard.recentSessions.title')
   const [showFirstMessage, setShowFirstMessage] = useState(true)
@@ -120,6 +121,9 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
 
                 <div className="flex-1 min-w-0 relative z-10">
                   <div className="flex items-center gap-1.5 mb-0.5">
+                    {liveSessionIds?.has(session.id) && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)] animate-pulse flex-shrink-0" title={t('session.online', 'Online')} />
+                    )}
                     <span className="text-xs font-medium text-foreground truncate" title={displayName}>
                       {displayName}
                     </span>

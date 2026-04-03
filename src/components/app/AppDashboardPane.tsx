@@ -11,7 +11,7 @@ type DashboardProps = ComponentProps<typeof Dashboard>;
 
 export type AppDashboardPaneProps = Pick<
   DashboardProps,
-  "sessions" | "onSessionSelect" | "onProjectSelect" | "projectName" | "loading"
+  "sessions" | "onSessionSelect" | "onProjectSelect" | "projectName" | "loading" | "liveSessionIds"
 > & {
   DashboardComponent: LazyExoticComponent<ComponentType<DashboardProps>>;
   fallback: ReactNode;
@@ -25,6 +25,7 @@ function AppDashboardPane({
   onProjectSelect,
   projectName,
   loading,
+  liveSessionIds,
 }: AppDashboardPaneProps) {
   return (
     <Suspense fallback={fallback}>
@@ -34,6 +35,7 @@ function AppDashboardPane({
         onProjectSelect={onProjectSelect}
         projectName={projectName}
         loading={loading}
+        liveSessionIds={liveSessionIds}
       />
     </Suspense>
   );

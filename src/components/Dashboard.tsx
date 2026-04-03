@@ -25,6 +25,7 @@ interface DashboardProps {
   onProjectSelect?: (projectPath: string) => void
   projectName?: string
   loading?: boolean
+  liveSessionIds?: Set<string>
 }
 
 // Helper function to extract project name from path
@@ -32,7 +33,7 @@ function getProjectName(path: string): string {
   return getPathBasename(path)
 }
 
-export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, projectName, loading: parentLoading = false }: DashboardProps) {
+export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, projectName, loading: parentLoading = false, liveSessionIds }: DashboardProps) {
   const { t } = useTranslation()
   const [stats, setStats] = useState<SessionStats | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -355,7 +356,7 @@ export default function Dashboard({ sessions, onSessionSelect, onProjectSelect, 
           </div>
 
           {/* Recent Sessions */}
-          <RecentSessions sessions={sessions} limit={8} onSessionSelect={onSessionSelect} />
+          <RecentSessions sessions={sessions} limit={8} onSessionSelect={onSessionSelect} liveSessionIds={liveSessionIds} />
         </div>
 
         {/* Right Column - 4 cols */}

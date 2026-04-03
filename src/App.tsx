@@ -586,6 +586,7 @@ function App() {
       onProjectSelect={handleDashboardProjectSelect}
       projectName={selectedProject || undefined}
       loading={loading}
+      liveSessionIds={liveSessionIds}
     />
   );
 
