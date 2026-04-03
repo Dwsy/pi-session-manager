@@ -39,7 +39,7 @@ interface StyleState {
 }
 
 /** Parse SGR params into style directives. */
-function applySgr(codes: number[], state: StyleState): StyleState {
+function applySgr(codes: number[], state: StyleState, stripColor: boolean): StyleState {
   if (codes.length === 0 || codes[0] === 0) {
     return { bold: false, italic: false, underline: false, fgColor: null, bgColor: null }
   }
@@ -63,31 +63,27 @@ function applySgr(codes: number[], state: StyleState): StyleState {
     } else if (c === 24) {
       next.underline = false
     } else if (c === 38 && codes[i + 1] === 2 && i + 3 < codes.length) {
-      // true color: 38;2;R;G;B
       const r = codes[i + 2], g = codes[i + 3], b = codes[i + 4]
-      next.fgColor = `rgb(${r},${g},${b})`
+      next.fgColor = stripColor ? null : `rgb(${r},${g},${b})`
       i += 4
     } else if (c === 38 && codes[i + 1] === 5 && i + 2 < codes.length) {
-      // 256 color
       const idx = codes[i + 2]
-      next.fgColor = XTERM_COLORS[idx] ?? `var(--ansi-5bit-${idx})`
+      next.fgColor = stripColor ? null : (XTERM_COLORS[idx] ?? `var(--ansi-5bit-${idx})`)
       i += 2
     } else if (c === 48 && codes[i + 1] === 2 && i + 3 < codes.length) {
       const r = codes[i + 2], g = codes[i + 3], b = codes[i + 4]
-      next.bgColor = `rgb(${r},${g},${b})`
+      next.bgColor = stripColor ? null : `rgb(${r},${g},${b})`
       i += 4
     } else if (c === 48 && codes[i + 1] === 5 && i + 2 < codes.length) {
       const idx = codes[i + 2]
-      next.bgColor = XTERM_COLORS[idx] ?? `var(--ansi-5bit-${idx})`
+      next.bgColor = stripColor ? null : (XTERM_COLORS[idx] ?? `var(--ansi-5bit-${idx})`)
       i += 2
     } else if (c >= 30 && c <= 37) {
-      // basic 8-color foreground
       const basicFg = ['#000', '#c00', '#0c0', '#cc0', '#00c', '#c0c', '#0cc', '#ccc']
-      next.fgColor = basicFg[c - 30]
+      next.fgColor = stripColor ? null : basicFg[c - 30]
     } else if (c >= 40 && c <= 47) {
-      // basic 8-color background
       const basicBg = ['#000', '#c00', '#0c0', '#cc0', '#00c', '#c0c', '#0cc', '#ccc']
-      next.bgColor = basicBg[c - 40]
+      next.bgColor = stripColor ? null : basicBg[c - 40]
     } else if (c === 39) {
       next.fgColor = null
     } else if (c === 49) {
@@ -101,7 +97,14 @@ function applySgr(codes: number[], state: StyleState): StyleState {
  * Convert one ANSI-escaped text segment into Markdown + inline HTML.
  * Returns the converted string.
  */
-export function ansiToMarkdown(text: string): string {
+export interface AnsiToMarkdownOptions {
+  /** Strip color tags entirely instead of converting to inline HTML. Default: false. */
+  stripColor?: boolean
+}
+
+export function ansiToMarkdown(text: string, opts?: AnsiToMarkdownOptions): string {
+  const stripColor = opts?.stripColor ?? false
+
   // Fast path: no ANSI sequences at all
   if (!text.includes('\x1b')) return text
 
@@ -140,7 +143,7 @@ export function ansiToMarkdown(text: string): string {
     }
 
     const codes = params.split(';').filter(s => s.length > 0).map(Number)
-    const newState = applySgr(codes, state)
+    const newState = applySgr(codes, state, stripColor)
 
     // Emit text between last escape and this one with current open tags
     // Then update open tag stack
@@ -288,12 +291,12 @@ export function getAssistantDisplayedBlocks(
   )
   const thinkingBlocks = content
     .filter((item) => item.type === 'thinking' && item.thinking)
-    .map((item) => ansiToMarkdown(item.thinking as string))
+    .map((item) => ansiToMarkdown(item.thinking as string, { stripColor: true }))
 
   return {
     thinkingBlocks: [
       ...thinkingBlocks,
-      ...extractedBlocks.flatMap((block) => block.thinking.map(ansiToMarkdown)),
+      ...extractedBlocks.flatMap((block) => block.thinking.map((t) => ansiToMarkdown(t, { stripColor: true }))),
     ],
     textBlocks: extractedBlocks.flatMap((block) => block.text),
   }
