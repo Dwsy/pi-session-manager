@@ -234,7 +234,13 @@ export default function (pi: ExtensionAPI) {
             // Re-register after reconnect
             conn?.send({
               type: "register",
-              payload: { sessionId, sessionPath, pid: process.pid, cwd: process.cwd() },
+              payload: { 
+                sessionId, 
+                sessionPath, 
+                pid: process.pid, 
+                cwd: process.cwd(),
+                entries: latestCtx?.sessionManager.getEntries() || [],
+              },
             });
             // Send current session state (model, thinking, context)
             broadcastSessionState();
@@ -384,14 +390,37 @@ export default function (pi: ExtensionAPI) {
     latestCtx = ctx;
     ({ sessionId, sessionPath } = extractSessionId(ctx));
     lastNotifyState = "";
-    doConnect();
-
-    const entries = ctx.sessionManager.getEntries();
-    for (let i = 0; i < Math.min(entries.length, 50); i++) {
-      forward("history", entries[i]);
+    if (conn?.state === "connected") {
+      conn.send({
+        type: "register",
+        payload: { 
+          sessionId, 
+          sessionPath, 
+          pid: process.pid, 
+          cwd: process.cwd(),
+          entries: ctx.sessionManager.getEntries(),
+        },
+      });
+      broadcastSessionState();
+    } else {
+      doConnect();
     }
-    forward("session_meta", { type: "session", id: sessionId, timestamp: Date.now() });
   });
 
   pi.on("session_shutdown", async () => { doDisconnect(); });
+
+  // --- Initial state for mid-session load ---
+  try {
+    // Some versions of Pi API allow getting current context
+    const currentCtx = (pi as any).getCurrentContext?.() || (pi as any).context;
+    if (currentCtx) {
+      latestCtx = currentCtx;
+      ({ sessionId, sessionPath } = extractSessionId(currentCtx));
+      if (sessionId) {
+        doConnect();
+      }
+    }
+  } catch (e) {
+    console.error("[psm-bridge] Failed to initialize mid-session:", e);
+  }
 }
