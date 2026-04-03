@@ -81,7 +81,7 @@ function SessionViewerContent({
   const scrollMarkersEnabled = getSessionSetting('scrollMarkersEnabled') ?? true;
 
   const { sessions: liveSessions } = usePiLiveSessions()
-  const liveSession = liveSessions.find(s => s.session_id === session.id) || null
+  const liveSession = liveSessions.find(s => s.session_id.includes(session.id)) || null
   const isLive = Boolean(liveSession)
 
   const [showSidebar, setShowSidebar] = useState(false);
