@@ -715,6 +715,107 @@ pub async fn dispatch(
             Ok(serde_json::json!({ "status": "sent" }))
         }
 
+        // Pi agent RPC commands
+        "pi_agent_set_model" => {
+            let session_id = extract_string(payload, "session_id")?;
+            let provider = extract_string(payload, "provider")?;
+            let model_id = extract_string(payload, "model_id")?;
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or("App state not available")?;
+                let command = serde_json::json!({
+                    "type": "set_model",
+                    "sessionId": session_id,
+                    "provider": provider,
+                    "modelId": model_id,
+                });
+                state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
+            }
+            Ok(serde_json::json!({ "status": "sent" }))
+        }
+        "pi_agent_set_thinking" => {
+            let session_id = extract_string(payload, "session_id")?;
+            let level = extract_string(payload, "level")?;
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or("App state not available")?;
+                let command = serde_json::json!({
+                    "type": "set_thinking",
+                    "sessionId": session_id,
+                    "level": level,
+                });
+                state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
+            }
+            Ok(serde_json::json!({ "status": "sent" }))
+        }
+        "pi_agent_get_state" => {
+            let session_id = extract_string(payload, "session_id")?;
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or("App state not available")?;
+                let command = serde_json::json!({
+                    "type": "get_state",
+                    "sessionId": session_id,
+                });
+                let result = state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
+                return Ok(result);
+            }
+            #[cfg(not(feature = "gui"))]
+            {
+                Ok(serde_json::json!({}))
+            }
+        }
+        "pi_agent_abort" => {
+            let session_id = extract_string(payload, "session_id")?;
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or("App state not available")?;
+                let command = serde_json::json!({
+                    "type": "abort",
+                    "sessionId": session_id,
+                });
+                state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
+            }
+            Ok(serde_json::json!({ "status": "sent" }))
+        }
+        "pi_agent_send_message" => {
+            let session_id = extract_string(payload, "session_id")?;
+            let message = extract_string(payload, "message")?;
+            let images = payload.get("images").cloned();
+            let streaming_behavior = payload
+                .get("streaming_behavior")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or("App state not available")?;
+                let command = serde_json::json!({
+                    "type": "prompt",
+                    "sessionId": session_id,
+                    "message": message,
+                    "images": images,
+                    "streamingBehavior": streaming_behavior.unwrap_or_else(|| "steer".to_string()),
+                });
+                state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
+            }
+            Ok(serde_json::json!({ "status": "sent" }))
+        }
+
         // Desktop/GUI-only commands
         "terminal_create"
         | "terminal_write"
