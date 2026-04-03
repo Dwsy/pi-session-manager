@@ -268,6 +268,7 @@ export function useSidebarSessions({
       selectionModeTrigger,
       selectionModeDismissTrigger,
       sidebarSearchQuery,
+      liveSessionIds,
     ],
   );
 
