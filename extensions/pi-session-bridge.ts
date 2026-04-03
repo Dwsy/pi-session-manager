@@ -276,6 +276,15 @@ export default function (pi: ExtensionAPI) {
           pi.setThinkingLevel(payload.level);
         } else if (eventType === "get_state" && payload?.sessionId === sessionId) {
           broadcastSessionState();
+        } else if (eventType === "prompt" && payload?.sessionId === sessionId) {
+          if (latestCtx && !latestCtx.isIdle()) {
+            pi.sendUserMessage(payload.message, {
+              deliverAs: payload.streamingBehavior || "steer",
+              images: payload.images
+            });
+          } else {
+            console.warn("[psm] Received prompt but session is idle/inactive");
+          }
         }
       },
     });
@@ -303,7 +312,7 @@ export default function (pi: ExtensionAPI) {
     const contextUsage = latestCtx.getContextUsage();
     conn?.send({
       type: "session_state",
-      payload: { model, thinkingLevel, contextUsage },
+      payload: { sessionId, model, thinkingLevel, contextUsage },
     });
   }
 
