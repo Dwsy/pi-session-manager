@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tauri::Listener;
+use tauri::{Emitter, Listener};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
@@ -126,6 +126,11 @@ impl WsAdapter {
 
         let mut event_rx = self.app_state.subscribe_events();
 
+        // RPC command channel for Pi agent connections
+        let (rpc_cmd_tx, mut rpc_cmd_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let (rpc_resp_tx, _) = tokio::sync::broadcast::channel::<serde_json::Value>(16);
+        let mut registered_session_id: Option<String> = None;
+
         loop {
             tokio::select! {
                 msg = ws_receiver.next() => {
@@ -160,12 +165,24 @@ impl WsAdapter {
                                             session_id.to_string(), session_path, pid, cwd
                                         );
 
+                                        // Register RPC connection channels
+                                        self.app_state.pi_agent_registry.register_connection(
+                                            session_id.to_string(),
+                                            rpc_cmd_tx.clone(),
+                                            rpc_resp_tx.clone(),
+                                        );
+                                        registered_session_id = Some(session_id.to_string());
+
+                                        // Broadcast to WS clients
                                         let ws_event = WsEvent {
                                             event_type: "event".to_string(),
                                             event: "pi-agent:register".to_string(),
                                             payload: register["payload"].clone(),
                                         };
                                         let _ = self.app_state.event_tx.send(ws_event);
+
+                                        // ALSO emit to Tauri frontend so usePiLiveSessions can react
+                                        let _ = self.app_state.app_handle.emit("pi-agent:register", &register["payload"]);
                                     }
                                 }
                                 continue;
@@ -190,9 +207,49 @@ impl WsAdapter {
                                                 "entry": &entry["payload"]["entry"],
                                             }),
                                         };
-                                        let _ = self.app_state.event_tx.send(ws_event);
+                                        let _ = self.app_state.event_tx.send(ws_event.clone());
+
+                                        // ALSO emit to Tauri frontend so useSessionViewerData can receive live entries
+                                        let _ = self.app_state.app_handle.emit("pi-agent:entry", &ws_event.payload);
+
                                         // Also forward to other listeners (session viewer)
                                         let _ = ws_sender.send(Message::Text(r#"{"type":"ack"}"#.to_string())).await;
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // ── Pi agent protocol: RPC response ─────────────────
+                            if text.contains("\"type\"") && text.contains("\"response\"") {
+                                if let Ok(resp) = serde_json::from_str::<serde_json::Value>(&text) {
+                                    if let Some(session_id) = resp["sessionId"].as_str() {
+                                        self.app_state.pi_agent_registry.forward_response(session_id, resp);
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // ── Pi agent protocol: session state update ─────────
+                            if text.contains("\"type\"") && text.contains("\"session_state\"") {
+                                if let Ok(state_msg) = serde_json::from_str::<serde_json::Value>(&text) {
+                                    if let Some(session_id) = state_msg["payload"]["sessionId"].as_str() {
+                                        let model = state_msg["payload"]["model"].clone();
+                                        let thinking_level = state_msg["payload"]["thinkingLevel"].as_str().map(|s| s.to_string());
+                                        let context_usage = state_msg["payload"]["contextUsage"].clone();
+                                        self.app_state.pi_agent_registry.update_session_state(
+                                            session_id,
+                                            if model.is_null() { None } else { Some(model) },
+                                            thinking_level,
+                                            if context_usage.is_null() { None } else { Some(context_usage) },
+                                        );
+                                        // Also broadcast session_state to frontend
+                                        let ws_event = WsEvent {
+                                            event_type: "event".to_string(),
+                                            event: "pi-agent:session_state".to_string(),
+                                            payload: state_msg["payload"].clone(),
+                                        };
+                                        let _ = self.app_state.event_tx.send(ws_event.clone());
+                                        let _ = self.app_state.app_handle.emit("pi-agent:session_state", &ws_event.payload);
                                     }
                                 }
                                 continue;
@@ -277,7 +334,24 @@ impl WsAdapter {
                         }
                     }
                 }
+                // Forward RPC commands from PiAgentRegistry to this WebSocket
+                rpc_cmd = rpc_cmd_rx.recv() => {
+                    match rpc_cmd {
+                        Some(cmd) => {
+                            if ws_sender.send(Message::Text(cmd)).await.is_err() {
+                                break;
+                            }
+                        }
+                        None => break,
+                    }
+                }
             }
+        }
+
+        // Cleanup: remove RPC connection on disconnect
+        if let Some(sid) = &registered_session_id {
+            log::info!("[WS] Pi agent disconnected: session={sid}");
+            self.app_state.pi_agent_registry.remove_connection(sid);
         }
 
         Ok(())
