@@ -11,6 +11,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use tauri::Emitter;
 use tokio::sync::broadcast;
 
 use super::common::{cors_headers, is_authorized};
@@ -299,6 +300,14 @@ async fn handle_ws_connection(
     // Cleanup: remove RPC connection on disconnect
     if let Some(sid) = &registered_session_id {
         log::info!("[HTTP-WS] Pi agent disconnected: session={sid}");
-        app_state.pi_agent_registry.remove_connection(sid);
+        app_state.pi_agent_registry.remove(sid);
+        
+        let ws_event = crate::app_state::WsEvent {
+            event_type: "event".to_string(),
+            event: "pi-agent:disconnect".to_string(),
+            payload: serde_json::json!({ "sessionId": sid }),
+        };
+        let _ = app_state.event_tx.send(ws_event.clone());
+        let _ = app_state.app_handle.emit("pi-agent:disconnect", &ws_event.payload);
     }
 }

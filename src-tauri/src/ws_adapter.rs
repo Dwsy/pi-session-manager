@@ -353,7 +353,15 @@ impl WsAdapter {
         // Cleanup: remove RPC connection on disconnect
         if let Some(sid) = &registered_session_id {
             log::info!("[WS] Pi agent disconnected: session={sid}");
-            self.app_state.pi_agent_registry.remove_connection(sid);
+            self.app_state.pi_agent_registry.remove(sid);
+
+            let ws_event = WsEvent {
+                event_type: "event".to_string(),
+                event: "pi-agent:disconnect".to_string(),
+                payload: serde_json::json!({ "sessionId": sid }),
+            };
+            let _ = self.app_state.event_tx.send(ws_event.clone());
+            let _ = self.app_state.app_handle.emit("pi-agent:disconnect", &ws_event.payload);
         }
 
         Ok(())

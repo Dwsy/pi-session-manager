@@ -52,6 +52,7 @@ export function usePiLiveSessions() {
     // 当有新注册或新条目时刷新
     const unsubs: (() => void)[] = []
     listen('pi-agent:register', () => refresh()).then(f => unsubs.push(f))
+    listen('pi-agent:disconnect', () => refresh()).then(f => unsubs.push(f))
     listen('pi-agent:entry', () => refresh()).then(f => unsubs.push(f))
     listen('pi-agent:session_state', () => refresh()).then(f => unsubs.push(f))
 

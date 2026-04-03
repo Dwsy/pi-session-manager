@@ -215,11 +215,6 @@ export function useSessionViewerData({
         return
       }
 
-      // Skip disk backfill for live sessions to avoid race with WS streaming
-      if (isLiveRef.current) {
-        return
-      }
-
       if (!force && !asRealtime && !hasMoreHistoryRef.current) {
         return
       }
@@ -315,16 +310,6 @@ export function useSessionViewerData({
       }
     }
 
-    // Skip ALL disk loading for live sessions — content arrives via WebSocket streaming.
-    if (isLiveRef.current) {
-      setLoading(false)
-      setShowLoading(false)
-      setError(null)
-      return () => {
-        cancelled = true
-      }
-    }
-
     const doLoad = async () => {
       try {
         setLoading(true)
@@ -352,13 +337,6 @@ export function useSessionViewerData({
               !initialEntryId && openPosition === 'bottom'
             return
           }
-        }
-
-        // For live sessions, skip disk loading — content arrives via WebSocket streaming.
-        if (isLiveRef.current) {
-          setLoading(false)
-          setShowLoading(false)
-          return
         }
 
         loadingTimerRef.current = setTimeout(() => {
@@ -479,9 +457,17 @@ export function useSessionViewerData({
       const sessionId = extractSessionId(sessionPath)
 
       // Track live session registration — when live, skip file-watcher disk reads
-      unlistenLiveRegister = await listen<{ sessionId: string }>('pi-agent:register', ({ payload }) => {
+      const listenReg = await listen<{ sessionId: string }>('pi-agent:register', ({ payload }) => {
         if (payload.sessionId === sessionId) isLiveRef.current = true
       })
+      
+      const listenDisc = await listen<{ sessionId: string }>('pi-agent:disconnect', ({ payload }) => {
+        if (payload.sessionId === sessionId) isLiveRef.current = false
+      })
+      unlistenLiveRegister = () => {
+        listenReg();
+        listenDisc();
+      }
 
       // Only listen to file-watcher when NOT live (avoid conflict with real-time WS streaming)
       unlistenSessionsChanged = await listen<SessionsDiff>('sessions-changed', (event) => {
