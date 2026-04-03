@@ -9,26 +9,21 @@ pub fn get_pi_live_sessions(
 }
 
 #[tauri::command]
-pub fn pi_agent_steering(
+pub async fn pi_agent_steering(
     state: State<'_, crate::app_state::SharedAppState>,
     session_id: String,
     message: String,
     deliver_as: Option<String>,
 ) -> Result<(), String> {
-    let event = crate::app_state::WsEvent {
-        event_type: "event".to_string(),
-        event: "steer".to_string(),
-        payload: json!({
-            "sessionId": session_id,
-            "message": message,
-            "deliverAs": deliver_as.unwrap_or_else(|| "steer".to_string()),
-        }),
-    };
+    let command = json!({
+        "type": deliver_as.unwrap_or_else(|| "steer".to_string()), // "steer" or "follow_up"
+        "message": message,
+    });
     state
-        .event_tx
-        .send(event)
-        .map(|_| ())
-        .map_err(|e| format!("Failed to send steer event: {e}"))
+        .pi_agent_registry
+        .send_rpc(&session_id, command)
+        .await?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -58,7 +53,7 @@ pub async fn pi_agent_set_thinking(
     level: String,
 ) -> Result<(), String> {
     let command = json!({
-        "type": "set_thinking",
+        "type": "set_thinking_level",
         "sessionId": session_id,
         "level": level,
     });

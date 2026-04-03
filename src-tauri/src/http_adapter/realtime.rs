@@ -176,7 +176,9 @@ async fn handle_ws_connection(
                         // ── Pi agent protocol: RPC response ─────────────────
                         if text.contains("\"type\"") && text.contains("\"response\"") {
                             if let Ok(resp) = serde_json::from_str::<Value>(&text) {
-                                if let Some(session_id) = resp["sessionId"].as_str().map(|s| s.to_string()) {
+                                let s_id = resp["sessionId"].as_str().map(|s| s.to_string())
+                                    .or_else(|| registered_session_id.clone());
+                                if let Some(session_id) = s_id {
                                     app_state.pi_agent_registry.forward_response(&session_id, resp);
                                 }
                             }
