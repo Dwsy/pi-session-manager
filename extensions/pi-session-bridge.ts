@@ -107,9 +107,12 @@ class BridgeConnection {
 
   sendEntry(sessionId: string, sessionPath: string, payload: { eventType: string; entry: any }) {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
-    const entryId = payload.entry?.id;
-    if (entryId && this._lastSentId === entryId) return;
-    if (entryId) this._lastSentId = entryId;
+    
+    // Log for debugging - seeing if message_update actually goes out
+    if (payload.eventType.includes("message") || payload.eventType.includes("tool")) {
+      console.log(`[psm-bridge] -> Forwarding ${payload.eventType} for ${sessionId}`);
+    }
+
     this.send({ type: "pi-agent:entry", sessionId, sessionPath, payload });
   }
 
