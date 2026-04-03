@@ -198,21 +198,17 @@ impl WsAdapter {
 
                                         self.app_state.pi_agent_registry.record_entry(session_id, event_type);
 
-                                        let ws_event = WsEvent {
+                                        let payload = serde_json::json!({
+                                            "sessionId": session_id,
+                                            "eventType": entry["payload"]["eventType"],
+                                            "entry": &entry["payload"]["entry"],
+                                        });
+                                        let _ = self.app_state.event_tx.send(WsEvent {
                                             event_type: "event".to_string(),
                                             event: "pi-agent:entry".to_string(),
-                                            payload: serde_json::json!({
-                                                "sessionId": session_id,
-                                                "eventType": entry["payload"]["eventType"],
-                                                "entry": &entry["payload"]["entry"],
-                                            }),
-                                        };
-                                        let _ = self.app_state.event_tx.send(ws_event.clone());
-
-                                        // ALSO emit to Tauri frontend so useSessionViewerData can receive live entries
-                                        let _ = self.app_state.app_handle.emit("pi-agent:entry", &ws_event.payload);
-
-                                        // Also forward to other listeners (session viewer)
+                                            payload: payload.clone(),
+                                        });
+                                        let _ = self.app_state.app_handle.emit("pi-agent:entry", &payload);
                                         let _ = ws_sender.send(Message::Text(r#"{"type":"ack"}"#.to_string())).await;
                                     }
                                 }

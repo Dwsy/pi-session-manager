@@ -159,15 +159,17 @@ async fn handle_ws_connection(
                                 if !session_id.is_empty() {
                                     let event_type = entry["payload"]["eventType"].as_str().unwrap_or("");
                                     app_state.pi_agent_registry.record_entry(session_id, event_type);
+                                    let payload = json!({
+                                        "sessionId": session_id,
+                                        "eventType": entry["payload"]["eventType"],
+                                        "entry": &entry["payload"]["entry"],
+                                    });
                                     let _ = app_state.event_tx.send(crate::app_state::WsEvent {
                                         event_type: "event".to_string(),
                                         event: "pi-agent:entry".to_string(),
-                                        payload: json!({
-                                            "sessionId": session_id,
-                                            "eventType": entry["payload"]["eventType"],
-                                            "entry": &entry["payload"]["entry"],
-                                        }),
+                                        payload: payload.clone(),
                                     });
+                                    let _ = app_state.app_handle.emit("pi-agent:entry", &payload);
                                     let _ = tx.send(AxumWsMsg::Text(r#"{"type":"ack"}"#.into())).await;
                                 }
                             }
@@ -209,6 +211,7 @@ async fn handle_ws_connection(
                                         event: "pi-agent:session_state".to_string(),
                                         payload: state_msg["payload"].clone(),
                                     });
+                                    let _ = app_state.app_handle.emit("pi-agent:session_state", &state_msg["payload"]);
                                 }
                             }
                             continue;

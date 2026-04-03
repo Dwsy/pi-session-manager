@@ -486,6 +486,8 @@ export function useSessionViewerData({
         'pi-agent:entry',
         ({ payload }) => {
           if (payload.sessionId !== sessionId) return
+          
+          console.log(`[useSessionViewerData] Live event: ${payload.eventType}`, payload.entry);
 
           const raw = payload.entry as Record<string, any>
           if (raw._sessionPath && raw._sessionPath !== sessionPath) return
@@ -493,7 +495,8 @@ export function useSessionViewerData({
           const eventType = payload.eventType
 
           if (eventType.startsWith('message_')) {
-            const rawMessage = raw.message
+            // Support both wrapped { message: ... } and flat message structures
+            const rawMessage = raw.message || raw
             let messageId = rawMessage?.id
 
             // Fallback: if messageId is missing (e.g. in some message_update events),
