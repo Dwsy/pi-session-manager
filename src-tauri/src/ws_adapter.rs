@@ -136,6 +136,45 @@ impl WsAdapter {
                                 continue;
                             }
 
+                            // Pi agent protocol: register with sessionId
+                            if text.contains("\"type\"") && text.contains("\"register\"") {
+                                if let Ok(register) = serde_json::from_str::<serde_json::Value>(&text) {
+                                    let session_id = register["payload"]["sessionId"].as_str().unwrap_or("");
+                                    if !session_id.is_empty() {
+                                        log::info!("Pi agent registered: session={session_id}, pid={:?}", register["payload"]["pid"]);
+                                        let ws_event = WsEvent {
+                                            event_type: "event".to_string(),
+                                            event: "pi-agent:register".to_string(),
+                                            payload: register["payload"].clone(),
+                                        };
+                                        let _ = self.app_state.event_tx.send(ws_event);
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // Pi agent protocol: live entry stream
+                            if text.contains("\"type\"") && text.contains("\"pi-agent:entry\"") {
+                                if let Ok(entry) = serde_json::from_str::<serde_json::Value>(&text) {
+                                    let session_id = entry["sessionId"].as_str().unwrap_or("");
+                                    if !session_id.is_empty() {
+                                        let ws_event = WsEvent {
+                                            event_type: "event".to_string(),
+                                            event: "pi-agent:entry".to_string(),
+                                            payload: serde_json::json!({
+                                                "sessionId": session_id,
+                                                "eventType": entry["payload"]["eventType"],
+                                                "entry": &entry["payload"]["entry"],
+                                            }),
+                                        };
+                                        let _ = self.app_state.event_tx.send(ws_event);
+                                        // Also forward to other listeners (session viewer)
+                                        let _ = ws_sender.send(Message::Text(r#"{"type":"ack"}"#.to_string())).await;
+                                    }
+                                }
+                                continue;
+                            }
+
                             match serde_json::from_str::<WsRequest>(&text) {
                                 Ok(mut request) => {
                                     // Handle compressed request payload

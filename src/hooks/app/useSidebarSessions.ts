@@ -244,6 +244,7 @@ export function useSidebarSessions({
       onCreateTag: createTag,
       selectionModeTrigger,
       selectionModeDismissTrigger,
+      searchQuery: sidebarSearchQuery,
     }),
     [
       selectedSession,
@@ -263,6 +264,7 @@ export function useSidebarSessions({
       createTag,
       selectionModeTrigger,
       selectionModeDismissTrigger,
+      sidebarSearchQuery,
     ],
   );
 

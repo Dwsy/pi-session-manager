@@ -1,1 +1,442 @@
-# cmdk 快速开始指南## 🚀 快速开始本指南帮助你快速了解 cmdk 全局搜索功能的设计和实施步骤。---## 📖 5 分钟了解设计### 核心概念1. **命令面板**: 使用 `Cmd+K` 快速打开的全局搜索界面2. **插件系统**: 可扩展的搜索功能架构3. **高性能**: 防抖、虚拟滚动、缓存优化4. **美观 UI**: 现代化设计，流畅动画### 用户体验```用户按下 Cmd+K    ↓弹出命令面板（居中，半透明背景）    ↓输入 "auth"    ↓实时显示搜索结果（防抖 300ms）    ├─ 💬 消息搜索: "auth implementation..."    ├─ 📁 项目搜索: "/auth-service"    └─ 📄 会话搜索: "auth session"    ↓按 ↑↓ 导航，Enter 选择    ↓打开对应的会话/项目```### 技术栈- **cmdk**: 命令面板核心库- **React + TypeScript**: UI 框架- **Tailwind CSS**: 样式系统- **@tanstack/react-virtual**: 虚拟滚动---## 📁 文件结构速览```src/├── components/command/          # UI 组件│   ├── CommandPalette.tsx       # 容器（快捷键、遮罩）│   ├── CommandMenu.tsx          # 主组件（搜索框、结果列表）│   ├── CommandItem.tsx          # 结果项│   ├── CommandEmpty.tsx         # 空状态│   └── CommandLoading.tsx       # 加载状态│├── hooks/                       # 状态管理│   ├── useCommandMenu.ts        # 面板状态（open/close/query）│   ├── useSearchPlugins.ts      # 插件管理（search/registry）│   └── useSearchCache.ts        # 搜索缓存（LRU）│├── plugins/                     # 插件系统│   ├── types.ts                 # 接口定义│   ├── registry.ts              # 插件注册表│   ├── base/│   │   └── BaseSearchPlugin.ts  # 插件基类│   ├── message/│   │   └── MessageSearchPlugin.ts│   ├── project/│   │   └── ProjectSearchPlugin.ts│   └── session/│       └── SessionSearchPlugin.ts│└── utils/                       # 工具函数    ├── highlight.ts             # 高亮匹配文本    └── search.ts                # 搜索工具```---## 🔌 插件系统速览### 插件接口```typescriptinterface SearchPlugin {  id: string                     // 唯一标识  name: string                   // 显示名称  icon: React.ComponentType      // 图标  priority: number               // 优先级（0-100）  // 核心方法  search(query, context): Promise<SearchPluginResult[]>  onSelect(result, context): void}```### 内置插件| 插件 | ID | 优先级 | 功能 ||------|----|----|------|| 💬 消息搜索 | message-search | 80 | 搜索用户消息和助手回复 || 📁 项目搜索 | project-search | 70 | 搜索项目路径 || 📄 会话搜索 | session-search | 60 | 搜索会话名称和元数据 |### 创建自定义插件```typescript// 1. 继承基类class MyPlugin extends BaseSearchPlugin {  id = 'my-plugin'  name = 'My Plugin'  icon = MyIcon  priority = 50  // 2. 实现搜索  async search(query: string, context: SearchContext) {    // 你的搜索逻辑    return [      {        id: 'result-1',        pluginId: this.id,        title: 'Result 1',        score: 0.9      }    ]  }  // 3. 实现选中处理  onSelect(result: SearchPluginResult, context: SearchContext) {    // 你的处理逻辑    console.log('Selected:', result)  }}// 4. 注册插件pluginRegistry.register(new MyPlugin())```---## ⚡ 性能优化速览### 搜索优化```typescript// 防抖 300msuseEffect(() => {  const timer = setTimeout(() => {    search(query)  }, 300)  return () => clearTimeout(timer)}, [query])// 取消未完成的搜索const abortController = new AbortController()// ... 搜索逻辑abortController.abort()// 并行搜索const results = await Promise.all([  plugin1.search(query, context),  plugin2.search(query, context),  plugin3.search(query, context)])```### 渲染优化```typescript// 虚拟滚动（超过 50 条）const virtualizer = useVirtualizer({  count: results.length,  estimateSize: () => 60,  enabled: results.length > 50})// React.memoconst CommandItem = React.memo(({ result }) => {  // ...})```### 缓存优化```typescript// LRU 缓存const cache = new Map<string, CacheEntry>()function get(query: string) {  const entry = cache.get(query)  if (entry && Date.now() - entry.timestamp < 5 * 60 * 1000) {    return entry.results  }  return null}function set(query: string, results: SearchPluginResult[]) {  if (cache.size >= 100) {    const firstKey = cache.keys().next().value    cache.delete(firstKey)  }  cache.set(query, { results, timestamp: Date.now() })}```---## 🎨 UI 设计速览### 布局```tsx<div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] bg-black/50">  <div className="w-full max-w-2xl max-h-[60vh] bg-[#1a1b26] rounded-lg">    <CommandMenu />  </div></div>```### 颜色```css/* 暗色主题 */--background: #1a1b26--border: #2a2b36--input: #252636--selected: #2a2b36--text: #c0caf5--muted: #565f89--highlight: #7aa2f7```### 动画```css/* 打开动画 */.animate-in {  animation: fadeIn 200ms ease-out, zoomIn 200ms ease-out;}/* 高亮 */mark {  background: rgba(122, 162, 247, 0.2);  color: #7aa2f7;}```---## 🛠️ 实施步骤### Phase 1: 准备（已完成 ✅）- [x] 设计架构- [x] 编写文档- [x] 制定计划### Phase 2: 核心架构（1 天）```bash# 1. 安装依赖pnpm add cmdk# 2. 创建目录mkdir -p src/components/commandmkdir -p src/plugins/{base,message,project,session}mkdir -p src/hooks# 3. 创建文件touch src/plugins/types.tstouch src/plugins/registry.tstouch src/hooks/useCommandMenu.tstouch src/components/command/CommandPalette.tsx```### Phase 3: 内置插件（1 天）```typescript// 实现 MessageSearchPluginexport class MessageSearchPlugin extends BaseSearchPlugin {  // ...}// 实现 ProjectSearchPluginexport class ProjectSearchPlugin extends BaseSearchPlugin {  // ...}// 实现 SessionSearchPluginexport class SessionSearchPlugin extends BaseSearchPlugin {  // ...}```### Phase 4: UI/UX（0.5 天）```css/* 创建 command.css */[cmdk-root] { /* ... */ }[cmdk-input] { /* ... */ }[cmdk-list] { /* ... */ }```### Phase 5: 性能优化（0.5 天）```typescript// 实现虚拟滚动const virtualizer = useVirtualizer({ /* ... */ })// 实现缓存const cache = useSearchCache()```### Phase 6: 集成测试（1 天）```typescript// App.tsximport CommandPalette from './components/command/CommandPalette'import { registerBuiltinPlugins } from './plugins'function App() {  useEffect(() => {    registerBuiltinPlugins()  }, [])  return (    <>      {/* 现有组件 */}      <CommandPalette />    </>  )}```### Phase 7: 文档交付（0.5 天）```bash# 更新文档vim README.mdvim docs/PLUGIN_DEVELOPMENT.md# 创建 PRbun ~/.pi/agent/skills/workhub/lib.ts create pr "Add cmdk global search"```---## ✅ 验收清单### 功能测试- [ ] 按 Cmd+K 打开命令面板- [ ] 输入查询显示结果- [ ] 选择结果导航正确- [ ] 按 ESC 关闭面板- [ ] 键盘导航流畅### 性能测试- [ ] 搜索响应 < 300ms（1000 条数据）- [ ] 首次渲染 < 100ms- [ ] 虚拟滚动流畅（60fps）- [ ] 内存占用 < 50MB### UI 测试- [ ] 面板居中显示- [ ] 背景遮罩半透明- [ ] 动画流畅- [ ] 高亮匹配文本- [ ] 响应式设计### 国际化测试- [ ] 中英文切换- [ ] 所有文本已翻译---## 📚 相关文档| 文档 | 描述 ||------|------|| [Issue](./issues/20260131-Add%20cmdk%20global%20search%20with%20plugin%20architecture.md) | 任务追踪 || [架构设计](./architecture/cmdk-plugin-system.md) | 详细架构设计 || [实施计划](./CMDK_IMPLEMENTATION_PLAN.md) | 分阶段实施计划 || [设计总结](./CMDK_DESIGN_SUMMARY.md) | 设计概览 || [架构图](./CMDK_ARCHITECTURE_DIAGRAM.md) | 可视化架构图 |---## 🎯 下一步1. **开始实施**: Phase 2（核心架构）2. **安装依赖**: `pnpm add cmdk`3. **创建文件**: 按照文件结构创建4. **实现插件**: 从 MessageSearchPlugin 开始**预计完成**: 2026-02-05---## 💡 提示### 开发技巧1. **先实现核心，再优化**: 先让功能跑起来，再做性能优化2. **测试驱动**: 每完成一个 Phase 就测试3. **参考设计**: 参考 Vercel、Linear 的命令面板设计4. **性能监控**: 使用 React DevTools Profiler 监控性能### 常见问题**Q: 如何调试插件？**A: 在插件的 `search()` 方法中添加 `console.log`，查看搜索过程。**Q: 如何优化搜索速度？**A: 使用防抖、缓存、并行搜索，参考 Phase 5。**Q: 如何自定义样式？**A: 修改 `command.css` 和 Tailwind 类名。**Q: 如何添加新插件？**A: 继承 `BaseSearchPlugin`，实现 `search()` 和 `onSelect()`，然后注册。---## 🎉 总结本设计提供了一个完整的、可扩展的 cmdk 全局搜索系统：- ✅ 插件式架构，易于扩展- ✅ 高性能优化- ✅ 美观的 UI 设计- ✅ 完善的文档**开始实施吧！** 🚀---*快速开始指南 - 2026-01-31*
+# cmdk Quick Start Guide
+
+## 🚀 Quick Start
+
+This guide helps you quickly understand the design and implementation steps for the cmdk global search feature.
+
+---
+
+## 📖 Understanding the Design in 5 Minutes
+
+### Core Concepts
+
+1. **Command Palette**: A global search interface quickly opened with `Cmd+K`
+2. **Plugin System**: An extensible search functionality architecture
+3. **High Performance**: Debouncing, virtual scrolling, cache optimization
+4. **Beautiful UI**: Modern design with smooth animations
+
+### User Experience
+
+```
+User presses Cmd+K
+    ↓
+Command palette pops up (centered, semi-transparent background)
+    ↓
+Type "auth"
+    ↓
+Real-time search results display (300ms debounce)
+    ├─ 💬 Message Search: "auth implementation..."
+    ├─ 📁 Project Search: "/auth-service"
+    └─ 📄 Session Search: "auth session"
+    ↓
+Navigate with ↑↓, select with Enter
+    ↓
+Open corresponding session/project
+```
+
+### Tech Stack
+
+- **cmdk**: Core command palette library
+- **React + TypeScript**: UI framework
+- **Tailwind CSS**: Styling system
+- **@tanstack/react-virtual**: Virtual scrolling
+
+---
+
+## 📁 File Structure Overview
+
+```
+src/
+├── components/command/          # UI Components
+│   ├── CommandPalette.tsx       # Container (shortcuts, overlay)
+│   ├── CommandMenu.tsx          # Main component (search box, result list)
+│   ├── CommandItem.tsx          # Result item
+│   ├── CommandEmpty.tsx         # Empty state
+│   └── CommandLoading.tsx       # Loading state
+│
+├── hooks/                       # State Management
+│   ├── useCommandMenu.ts        # Panel state (open/close/query)
+│   ├── useSearchPlugins.ts      # Plugin management (search/registry)
+│   └── useSearchCache.ts        # Search cache (LRU)
+│
+├── plugins/                     # Plugin System
+│   ├── types.ts                 # Interface definitions
+│   ├── registry.ts              # Plugin registry
+│   ├── base/
+│   │   └── BaseSearchPlugin.ts  # Plugin base class
+│   ├── message/
+│   │   └── MessageSearchPlugin.ts
+│   ├── project/
+│   │   └── ProjectSearchPlugin.ts
+│   └── session/
+│       └── SessionSearchPlugin.ts
+│
+└── utils/                       # Utility Functions
+    ├── highlight.ts             # Highlight matched text
+    └── search.ts                # Search utilities
+```
+
+---
+
+## 🔌 Plugin System Overview
+
+### Plugin Interface
+
+```typescript
+interface SearchPlugin {
+  id: string                     // Unique identifier
+  name: string                   // Display name
+  icon: React.ComponentType      // Icon
+  priority: number               // Priority (0-100)
+  
+  // Core methods
+  search(query, context): Promise<SearchPluginResult[]>
+  onSelect(result, context): void
+}
+```
+
+### Built-in Plugins
+
+| Plugin | ID | Priority | Function |
+|--------|----|----------|----------|
+| 💬 Message Search | message-search | 80 | Search user messages and assistant replies |
+| 📁 Project Search | project-search | 70 | Search project paths |
+| 📄 Session Search | session-search | 60 | Search session names and metadata |
+
+### Creating Custom Plugins
+
+```typescript
+// 1. Extend base class
+class MyPlugin extends BaseSearchPlugin {
+  id = 'my-plugin'
+  name = 'My Plugin'
+  icon = MyIcon
+  priority = 50
+  
+  // 2. Implement search
+  async search(query: string, context: SearchContext) {
+    // Your search logic
+    return [
+      {
+        id: 'result-1',
+        pluginId: this.id,
+        title: 'Result 1',
+        score: 0.9
+      }
+    ]
+  }
+  
+  // 3. Implement selection handler
+  onSelect(result: SearchPluginResult, context: SearchContext) {
+    // Your handler logic
+    console.log('Selected:', result)
+  }
+}
+
+// 4. Register plugin
+pluginRegistry.register(new MyPlugin())
+```
+
+---
+
+## ⚡ Performance Optimization Overview
+
+### Search Optimization
+
+```typescript
+// Debounce 300ms
+useEffect(() => {
+  const timer = setTimeout(() => {
+    search(query)
+  }, 300)
+  return () => clearTimeout(timer)
+}, [query])
+
+// Cancel unfinished searches
+const abortController = new AbortController()
+// ... search logic
+abortController.abort()
+
+// Parallel search
+const results = await Promise.all([
+  plugin1.search(query, context),
+  plugin2.search(query, context),
+  plugin3.search(query, context)
+])
+```
+
+### Rendering Optimization
+
+```typescript
+// Virtual scrolling (over 50 items)
+const virtualizer = useVirtualizer({
+  count: results.length,
+  estimateSize: () => 60,
+  enabled: results.length > 50
+})
+
+// React.memo
+const CommandItem = React.memo(({ result }) => {
+  // ...
+})
+```
+
+### Cache Optimization
+
+```typescript
+// LRU cache
+const cache = new Map<string, CacheEntry>()
+
+function get(query: string) {
+  const entry = cache.get(query)
+  if (entry && Date.now() - entry.timestamp < 5 * 60 * 1000) {
+    return entry.results
+  }
+  return null
+}
+
+function set(query: string, results: SearchPluginResult[]) {
+  if (cache.size >= 100) {
+    const firstKey = cache.keys().next().value
+    cache.delete(firstKey)
+  }
+  cache.set(query, { results, timestamp: Date.now() })
+}
+```
+
+---
+
+## 🎨 UI Design Overview
+
+### Layout
+
+```tsx
+<div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] bg-black/50">
+  <div className="w-full max-w-2xl max-h-[60vh] bg-[#1a1b26] rounded-lg">
+    <CommandMenu />
+  </div>
+</div>
+```
+
+### Colors
+
+```css
+/* Dark theme */
+--background: #1a1b26
+--border: #2a2b36
+--input: #252636
+--selected: #2a2b36
+--text: #c0caf5
+--muted: #565f89
+--highlight: #7aa2f7
+```
+
+### Animations
+
+```css
+/* Open animation */
+.animate-in {
+  animation: fadeIn 200ms ease-out, zoomIn 200ms ease-out;
+}
+
+/* Highlight */
+mark {
+  background: rgba(122, 162, 247, 0.2);
+  color: #7aa2f7;
+}
+```
+
+---
+
+## 🛠️ Implementation Steps
+
+### Phase 1: Preparation (Completed ✅)
+
+- [x] Design architecture
+- [x] Write documentation
+- [x] Create plan
+
+### Phase 2: Core Architecture (1 day)
+
+```bash
+# 1. Install dependencies
+pnpm add cmdk
+
+# 2. Create directories
+mkdir -p src/components/command
+mkdir -p src/plugins/{base,message,project,session}
+mkdir -p src/hooks
+
+# 3. Create files
+touch src/plugins/types.ts
+touch src/plugins/registry.ts
+touch src/hooks/useCommandMenu.ts
+touch src/components/command/CommandPalette.tsx
+```
+
+### Phase 3: Built-in Plugins (1 day)
+
+```typescript
+// Implement MessageSearchPlugin
+export class MessageSearchPlugin extends BaseSearchPlugin {
+  // ...
+}
+
+// Implement ProjectSearchPlugin
+export class ProjectSearchPlugin extends BaseSearchPlugin {
+  // ...
+}
+
+// Implement SessionSearchPlugin
+export class SessionSearchPlugin extends BaseSearchPlugin {
+  // ...
+}
+```
+
+### Phase 4: UI/UX (0.5 day)
+
+```css
+/* Create command.css */
+[cmdk-root] { /* ... */ }
+[cmdk-input] { /* ... */ }
+[cmdk-list] { /* ... */ }
+```
+
+### Phase 5: Performance Optimization (0.5 day)
+
+```typescript
+// Implement virtual scrolling
+const virtualizer = useVirtualizer({ /* ... */ })
+
+// Implement cache
+const cache = useSearchCache()
+```
+
+### Phase 6: Integration Testing (1 day)
+
+```typescript
+// App.tsx
+import CommandPalette from './components/command/CommandPalette'
+import { registerBuiltinPlugins } from './plugins'
+
+function App() {
+  useEffect(() => {
+    registerBuiltinPlugins()
+  }, [])
+  
+  return (
+    <>
+      {/* Existing components */}
+      <CommandPalette />
+    </>
+  )
+}
+```
+
+### Phase 7: Documentation Delivery (0.5 day)
+
+```bash
+# Update documentation
+vim README.md
+vim docs/PLUGIN_DEVELOPMENT.md
+
+# Create PR
+bun ~/.pi/agent/skills/workhub/lib.ts create pr "Add cmdk global search"
+```
+
+---
+
+## ✅ Acceptance Checklist
+
+### Functional Testing
+
+- [ ] Press Cmd+K to open command palette
+- [ ] Enter query to display results
+- [ ] Select result to navigate correctly
+- [ ] Press ESC to close panel
+- [ ] Keyboard navigation is smooth
+
+### Performance Testing
+
+- [ ] Search response < 300ms (1000 items)
+- [ ] First render < 100ms
+- [ ] Virtual scrolling smooth (60fps)
+- [ ] Memory usage < 50MB
+
+### UI Testing
+
+- [ ] Panel displays centered
+- [ ] Background overlay is semi-transparent
+- [ ] Animations are smooth
+- [ ] Match text is highlighted
+- [ ] Responsive design
+
+### Internationalization Testing
+
+- [ ] Chinese/English switching
+- [ ] All text is translated
+
+---
+
+## 📚 Related Documents
+
+| Document | Description |
+|----------|-------------|
+| [Issue](./issues/20260131-Add%20cmdk%20global%20search%20with%20plugin%20architecture.md) | Task tracking |
+| [Architecture Design](./architecture/cmdk-plugin-system.md) | Detailed architecture design |
+| [Implementation Plan](./CMDK_IMPLEMENTATION_PLAN.md) | Phased implementation plan |
+| [Design Summary](./CMDK_DESIGN_SUMMARY.md) | Design overview |
+| [Architecture Diagram](./CMDK_ARCHITECTURE_DIAGRAM.md) | Visual architecture diagrams |
+
+---
+
+## 🎯 Next Steps
+
+1. **Start Implementation**: Phase 2 (Core Architecture)
+2. **Install Dependencies**: `pnpm add cmdk`
+3. **Create Files**: Follow file structure
+4. **Implement Plugins**: Start with MessageSearchPlugin
+
+**Estimated Completion**: 2026-02-05
+
+---
+
+## 💡 Tips
+
+### Development Tips
+
+1. **Core first, optimize later**: Get functionality working first, then optimize performance
+2. **Test-driven**: Test after each Phase completion
+3. **Reference designs**: Look at Vercel, Linear command palettes for inspiration
+4. **Performance monitoring**: Use React DevTools Profiler to monitor performance
+
+### FAQ
+
+**Q: How to debug plugins?**
+A: Add `console.log` in the plugin's `search()` method to view the search process.
+
+**Q: How to optimize search speed?**
+A: Use debouncing, caching, and parallel search. Reference Phase 5.
+
+**Q: How to customize styles?**
+A: Modify `command.css` and Tailwind class names.
+
+**Q: How to add new plugins?**
+A: Extend `BaseSearchPlugin`, implement `search()` and `onSelect()`, then register.
+
+---
+
+## 🎉 Summary
+
+This design provides a complete, extensible cmdk global search system:
+
+- ✅ Plugin-based architecture, easy to extend
+- ✅ High-performance optimization
+- ✅ Beautiful UI design
+- ✅ Comprehensive documentation
+
+**Start implementing!** 🚀
+
+---
+
+*Quick Start Guide - 2026-01-31*

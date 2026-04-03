@@ -1,1 +1,262 @@
-# cmdk 全局搜索 - 文档索引## 📚 文档导航本索引帮助你快速找到 cmdk 全局搜索功能的相关文档。---## 🚀 快速开始**推荐阅读顺序**：1. **[快速开始指南](./CMDK_QUICK_START.md)** ⭐ 推荐首读   - 5 分钟了解设计   - 文件结构速览   - 插件系统速览   - 实施步骤速览   - 大小：9.3K2. **[设计总结](./CMDK_DESIGN_SUMMARY.md)**   - 项目概览   - 架构设计   - 插件系统   - 性能优化   - 验收标准   - 大小：8.9K3. **[架构图](./CMDK_ARCHITECTURE_DIAGRAM.md)**   - 系统架构图   - 数据流图   - 插件系统架构图   - 性能优化架构   - 组件层次结构   - 大小：24K---## 📖 详细文档### 规划文档1. **[Issue 文档](./issues/20260131-Add%20cmdk%20global%20search%20with%20plugin%20architecture.md)**   - 任务追踪   - 背景和问题   - 验收标准   - 实施阶段   - 关键决策   - 大小：12K2. **[实施计划](./CMDK_IMPLEMENTATION_PLAN.md)**   - 7 个 Phase 的详细步骤   - 技术栈   - 关键决策   - 风险和缓解   - 验收标准总结   - 大小：8.8K### 技术文档3. **[架构设计](./architecture/cmdk-plugin-system.md)** ⭐ 最详细   - 14 个章节   - 完整的技术设计   - 接口定义   - 组件设计   - 性能优化   - 样式设计   - 国际化   - 集成步骤   - 测试策略   - 未来扩展   - 大小：47K---## 📊 文档统计| 文档 | 大小 | 章节数 | 用途 ||------|------|--------|------|| CMDK_QUICK_START.md | 9.3K | 9 | 快速入门 || CMDK_DESIGN_SUMMARY.md | 8.9K | 11 | 设计概览 || CMDK_ARCHITECTURE_DIAGRAM.md | 24K | 9 | 可视化架构 || CMDK_IMPLEMENTATION_PLAN.md | 8.8K | 10 | 实施计划 || architecture/cmdk-plugin-system.md | 47K | 14 | 完整技术设计 || issues/20260131-Add cmdk... | 12K | 11 | 任务追踪 || **总计** | **110K** | **64** | - |---## 🎯 按需求查找### 我想快速了解设计→ 阅读 [CMDK_QUICK_START.md](./CMDK_QUICK_START.md)（5 分钟）### 我想了解架构设计→ 阅读 [CMDK_ARCHITECTURE_DIAGRAM.md](./CMDK_ARCHITECTURE_DIAGRAM.md)（可视化）### 我想开始实施→ 阅读 [CMDK_IMPLEMENTATION_PLAN.md](./CMDK_IMPLEMENTATION_PLAN.md)（详细步骤）### 我想了解插件系统→ 阅读 [architecture/cmdk-plugin-system.md](./architecture/cmdk-plugin-system.md) 第 3 章### 我想了解性能优化→ 阅读 [architecture/cmdk-plugin-system.md](./architecture/cmdk-plugin-system.md) 第 8 章### 我想了解 UI 设计→ 阅读 [architecture/cmdk-plugin-system.md](./architecture/cmdk-plugin-system.md) 第 9 章### 我想追踪任务进度→ 阅读 [issues/20260131-Add cmdk...](./issues/20260131-Add%20cmdk%20global%20search%20with%20plugin%20architecture.md)---## 📝 文档内容概览### 1. 快速开始指南 (CMDK_QUICK_START.md)```📖 5 分钟了解设计📁 文件结构速览🔌 插件系统速览⚡ 性能优化速览🎨 UI 设计速览🛠️ 实施步骤✅ 验收清单📚 相关文档🎯 下一步💡 提示```### 2. 设计总结 (CMDK_DESIGN_SUMMARY.md)```📋 项目概览🎯 核心目标🏗️ 架构设计🔌 插件系统⚡ 性能优化🎨 UI/UX 设计🌍 国际化📦 技术栈📝 实施计划✅ 验收标准🔮 未来扩展📚 相关文档🎉 总结```### 3. 架构图 (CMDK_ARCHITECTURE_DIAGRAM.md)```系统架构图数据流图插件系统架构性能优化架构组件层次结构状态管理架构缓存架构```### 4. 实施计划 (CMDK_IMPLEMENTATION_PLAN.md)```快速概览实施阶段（Phase 1-7）技术栈关键决策风险和缓解验收标准总结下一步行动参考资源```### 5. 架构设计 (architecture/cmdk-plugin-system.md)```1. 概述2. 系统架构3. 插件系统设计4. 核心组件设计5. Hooks 设计6. 内置插件实现7. 工具函数8. 性能优化9. 样式设计10. 国际化11. 集成步骤12. 测试策略13. 未来扩展14. 总结```### 6. Issue 文档 (issues/20260131-Add cmdk...)```Goal背景/问题验收标准实施阶段架构设计关键决策技术栈性能优化策略UI 设计规范国际化文案遇到的错误相关资源NotesStatus 更新日志```---## 🔗 外部资源- [cmdk 官方文档](https://cmdk.paco.me/)- [Vercel 设计系统](https://vercel.com/design)- [Linear 命令面板](https://linear.app/)- [@tanstack/react-virtual](https://tanstack.com/virtual/latest)---## 📅 更新日志| 日期 | 更新内容 ||------|---------|| 2026-01-31 | 创建所有设计文档 || 2026-01-31 | 完成 Phase 1（规划和准备） |---## 🎯 下一步1. **阅读快速开始指南**   ```bash   bat docs/CMDK_QUICK_START.md   ```2. **查看架构图**   ```bash   bat docs/CMDK_ARCHITECTURE_DIAGRAM.md   ```3. **开始实施**   ```bash   pnpm add cmdk   mkdir -p src/components/command src/plugins src/hooks   ```---## 💡 提示- 📖 **首次阅读**：从快速开始指南开始- 🏗️ **实施开发**：参考实施计划和架构设计- 🐛 **问题排查**：查看 Issue 文档的错误记录- 📊 **性能优化**：参考架构设计第 8 章- 🎨 **UI 设计**：参考架构设计第 9 章---*文档索引 - 2026-01-31*
+# cmdk Global Search - Documentation Index
+
+## 📚 Documentation Navigation
+
+This index helps you quickly find documentation related to the cmdk global search feature.
+
+---
+
+## 🚀 Quick Start
+
+**Recommended Reading Order**:
+
+1. **[Quick Start Guide](./CMDK_QUICK_START.md)** ⭐ Recommended first read
+   - 5 minutes to understand the design
+   - File structure overview
+   - Plugin system overview
+   - Implementation steps overview
+   - Size: 9.3K
+
+2. **[Design Summary](./CMDK_DESIGN_SUMMARY.md)**
+   - Project overview
+   - Architecture design
+   - Plugin system
+   - Performance optimization
+   - Acceptance criteria
+   - Size: 8.9K
+
+3. **[Architecture Diagram](./CMDK_ARCHITECTURE_DIAGRAM.md)**
+   - System architecture diagram
+   - Data flow diagram
+   - Plugin system architecture diagram
+   - Performance optimization architecture
+   - Component hierarchy
+   - Size: 24K
+
+---
+
+## 📖 Detailed Documentation
+
+### Planning Documents
+
+1. **[Issue Document](./issues/20260131-Add%20cmdk%20global%20search%20with%20plugin%20architecture.md)**
+   - Task tracking
+   - Background and problems
+   - Acceptance criteria
+   - Implementation phases
+   - Key decisions
+   - Size: 12K
+
+2. **[Implementation Plan](./CMDK_IMPLEMENTATION_PLAN.md)**
+   - Detailed steps for 7 Phases
+   - Tech stack
+   - Key decisions
+   - Risks and mitigation
+   - Acceptance criteria summary
+   - Size: 8.8K
+
+### Technical Documents
+
+3. **[Architecture Design](./architecture/cmdk-plugin-system.md)** ⭐ Most detailed
+   - 14 chapters
+   - Complete technical design
+   - Interface definitions
+   - Component design
+   - Performance optimization
+   - Style design
+   - Internationalization
+   - Integration steps
+   - Testing strategy
+   - Future extensions
+   - Size: 47K
+
+---
+
+## 📊 Documentation Statistics
+
+| Document | Size | Chapters | Purpose |
+|----------|------|----------|---------|
+| CMDK_QUICK_START.md | 9.3K | 9 | Quick start |
+| CMDK_DESIGN_SUMMARY.md | 8.9K | 11 | Design overview |
+| CMDK_ARCHITECTURE_DIAGRAM.md | 24K | 9 | Visual architecture |
+| CMDK_IMPLEMENTATION_PLAN.md | 8.8K | 10 | Implementation plan |
+| architecture/cmdk-plugin-system.md | 47K | 14 | Complete technical design |
+| issues/20260131-Add cmdk... | 12K | 11 | Task tracking |
+| **Total** | **110K** | **64** | - |
+
+---
+
+## 🎯 Find by Need
+
+### I want a quick understanding of the design
+→ Read [CMDK_QUICK_START.md](./CMDK_QUICK_START.md) (5 minutes)
+
+### I want to understand the architecture design
+→ Read [CMDK_ARCHITECTURE_DIAGRAM.md](./CMDK_ARCHITECTURE_DIAGRAM.md) (visual)
+
+### I want to start implementation
+→ Read [CMDK_IMPLEMENTATION_PLAN.md](./CMDK_IMPLEMENTATION_PLAN.md) (detailed steps)
+
+### I want to understand the plugin system
+→ Read [architecture/cmdk-plugin-system.md](./architecture/cmdk-plugin-system.md) Chapter 3
+
+### I want to understand performance optimization
+→ Read [architecture/cmdk-plugin-system.md](./architecture/cmdk-plugin-system.md) Chapter 8
+
+### I want to understand UI design
+→ Read [architecture/cmdk-plugin-system.md](./architecture/cmdk-plugin-system.md) Chapter 9
+
+### I want to track task progress
+→ Read [issues/20260131-Add cmdk...](./issues/20260131-Add%20cmdk%20global%20search%20with%20plugin%20architecture.md)
+
+---
+
+## 📝 Documentation Content Overview
+
+### 1. Quick Start Guide (CMDK_QUICK_START.md)
+
+```
+📖 5 minutes to understand the design
+📁 File structure overview
+🔌 Plugin system overview
+⚡ Performance optimization overview
+🎨 UI design overview
+🛠️ Implementation steps
+✅ Acceptance checklist
+📚 Related documents
+🎯 Next steps
+💡 Tips
+```
+
+### 2. Design Summary (CMDK_DESIGN_SUMMARY.md)
+
+```
+📋 Project overview
+🎯 Core goals
+🏗️ Architecture design
+🔌 Plugin system
+⚡ Performance optimization
+🎨 UI/UX design
+🌍 Internationalization
+📦 Tech stack
+📝 Implementation plan
+✅ Acceptance criteria
+🔮 Future extensions
+📚 Related documents
+🎉 Summary
+```
+
+### 3. Architecture Diagram (CMDK_ARCHITECTURE_DIAGRAM.md)
+
+```
+System architecture diagram
+Data flow diagram
+Plugin system architecture
+Performance optimization architecture
+Component hierarchy
+State management architecture
+Cache architecture
+```
+
+### 4. Implementation Plan (CMDK_IMPLEMENTATION_PLAN.md)
+
+```
+Quick overview
+Implementation phases (Phase 1-7)
+Tech stack
+Key decisions
+Risks and mitigation
+Acceptance criteria summary
+Next actions
+Reference resources
+```
+
+### 5. Architecture Design (architecture/cmdk-plugin-system.md)
+
+```
+1. Overview
+2. System architecture
+3. Plugin system design
+4. Core component design
+5. Hooks design
+6. Built-in plugin implementation
+7. Utility functions
+8. Performance optimization
+9. Style design
+10. Internationalization
+11. Integration steps
+12. Testing strategy
+13. Future extensions
+14. Summary
+```
+
+### 6. Issue Document (issues/20260131-Add cmdk...)
+
+```
+Goal
+Background/Problems
+Acceptance criteria
+Implementation phases
+Architecture design
+Key decisions
+Tech stack
+Performance optimization strategy
+UI design specification
+Internationalization copy
+Errors encountered
+Related resources
+Notes
+Status update log
+```
+
+---
+
+## 🔗 External Resources
+
+- [cmdk Official Documentation](https://cmdk.paco.me/)
+- [Vercel Design System](https://vercel.com/design)
+- [Linear Command Palette](https://linear.app/)
+- [@tanstack/react-virtual](https://tanstack.com/virtual/latest)
+
+---
+
+## 📅 Changelog
+
+| Date | Update Content |
+|------|----------------|
+| 2026-01-31 | Created all design documents |
+| 2026-01-31 | Completed Phase 1 (planning and preparation) |
+
+---
+
+## 🎯 Next Steps
+
+1. **Read the Quick Start Guide**
+   ```bash
+   bat docs/CMDK_QUICK_START.md
+   ```
+
+2. **View Architecture Diagram**
+   ```bash
+   bat docs/CMDK_ARCHITECTURE_DIAGRAM.md
+   ```
+
+3. **Start Implementation**
+   ```bash
+   pnpm add cmdk
+   mkdir -p src/components/command src/plugins src/hooks
+   ```
+
+---
+
+## 💡 Tips
+
+- 📖 **First-time reading**: Start with the Quick Start Guide
+- 🏗️ **Implementation development**: Reference Implementation Plan and Architecture Design
+- 🐛 **Troubleshooting**: Check Issue Document error records
+- 📊 **Performance optimization**: Reference Architecture Design Chapter 8
+- 🎨 **UI design**: Reference Architecture Design Chapter 9
+
+---
+
+*Documentation Index - 2026-01-31*

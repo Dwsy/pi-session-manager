@@ -6,6 +6,7 @@ import { TransportProvider } from './contexts/TransportContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import ClipboardBridge from './components/ClipboardBridge'
+import { PiLiveProvider } from './contexts/PiLiveContext'
 import './i18n'
 import './index.css'
 import { isTauri } from './transport'
@@ -109,7 +110,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <TransportProvider>
           <SettingsProvider>
             <ClipboardBridge />
-            <App />
+            <PiLiveProvider>
+              <App />
+            </PiLiveProvider>
           </SettingsProvider>
         </TransportProvider>
       </AuthGate>

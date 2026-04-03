@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
@@ -12,7 +19,7 @@ import TagBadge from "./TagBadge";
 import TagPicker from "./TagPicker";
 import SessionContextMenu from "./SessionContextMenu";
 import DeleteSessionPopover from "./DeleteSessionPopover";
-import { formatShortSessionId, getSessionSourceTag } from "../utils/session";
+import { formatShortSessionId, MIN_SESSION_ID_PREFIX_LENGTH, getSessionSourceTag } from "../utils/session";
 import { formatDirectory, formatShortTime } from "../utils/sessionDisplay";
 import type { TerminalType } from "./settings/types";
 import { getPlatformDefaults } from "./settings/types";
@@ -80,6 +87,7 @@ export default function SessionList({
   onCreateTag,
   selectionModeTrigger,
   selectionModeDismissTrigger,
+  searchQuery,
 }: SessionListProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -128,7 +136,8 @@ export default function SessionList({
     [sessions],
   );
   const sessionIndexById = useMemo(
-    () => new Map(sessions.map((session, index) => [session.id, index] as const)),
+    () =>
+      new Map(sessions.map((session, index) => [session.id, index] as const)),
     [sessions],
   );
   const totalRows = Math.ceil(sessions.length / Math.max(1, columnCount));
@@ -328,7 +337,13 @@ export default function SessionList({
 
   useEffect(() => {
     rowVirtualizer.measure();
-  }, [columnCount, isSelectionMode, rowVirtualizer, sessions.length, showDirectory]);
+  }, [
+    columnCount,
+    isSelectionMode,
+    rowVirtualizer,
+    sessions.length,
+    showDirectory,
+  ]);
   const virtualRows = rowVirtualizer.getVirtualItems();
 
   useLayoutEffect(() => {
@@ -341,9 +356,8 @@ export default function SessionList({
       anchor &&
       scrollElement.scrollTop > STICKY_SCROLL_TOP_THRESHOLD
     ) {
-      const renderedCards = scrollElement.querySelectorAll<HTMLElement>(
-        "[data-session-id]",
-      );
+      const renderedCards =
+        scrollElement.querySelectorAll<HTMLElement>("[data-session-id]");
       const anchorElement = Array.from(renderedCards).find(
         (element) => element.dataset.sessionId === anchor.sessionId,
       );
@@ -624,7 +638,10 @@ export default function SessionList({
         >
           {virtualRows.map((virtualRow) => {
             const startIndex = virtualRow.index * columnCount;
-            const rowSessions = sessions.slice(startIndex, startIndex + columnCount);
+            const rowSessions = sessions.slice(
+              startIndex,
+              startIndex + columnCount,
+            );
 
             return (
               <div
@@ -655,12 +672,15 @@ export default function SessionList({
                       ? isSelectionMarked
                       : selectedSession?.id === session.id;
                     const hasPreview =
-                      session.last_message || (session.first_message && !session.name);
+                      session.last_message ||
+                      (session.first_message && !session.name);
                     const sourceTag = getSessionSourceTag(session.path);
                     const sessionTags = getTagsForSession
                       ? getTagsForSession(session.id)
                       : [];
-                    const badgeType = getBadgeType ? getBadgeType(session.id) : null;
+                    const badgeType = getBadgeType
+                      ? getBadgeType(session.id)
+                      : null;
 
                     return (
                       <div
@@ -752,17 +772,19 @@ export default function SessionList({
                                   </span>
                                 )}
                               </div>
-                              <div className="mt-1 flex items-center gap-1.5 min-w-0">
-                                <span
-                                  className="inline-flex max-w-full items-center rounded border border-border/60 bg-muted/30 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
-                                  title={session.id}
-                                  aria-label={t("session.header.session", {
-                                    defaultValue: "Session",
-                                  })}
-                                >
-                                  {formatShortSessionId(session.id)}
-                                </span>
-                              </div>
+                              {searchQuery && searchQuery.trim().length >= MIN_SESSION_ID_PREFIX_LENGTH && session.id.toLowerCase().startsWith(searchQuery.trim().toLowerCase()) && (
+                                <div className="mt-1 flex items-center gap-1.5 min-w-0">
+                                  <span
+                                    className="inline-flex max-w-full items-center rounded border border-border/60 bg-muted/30 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                                    title={session.id}
+                                    aria-label={t("session.header.session", {
+                                      defaultValue: "Session",
+                                    })}
+                                  >
+                                    {formatShortSessionId(session.id)}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-muted-foreground flex-shrink-0 pt-0.5 whitespace-nowrap">
@@ -872,7 +894,10 @@ export default function SessionList({
                                 size="sm"
                                 variant="ghost"
                                 onError={(error) =>
-                                  console.error("Failed to open in terminal:", error)
+                                  console.error(
+                                    "Failed to open in terminal:",
+                                    error,
+                                  )
                                 }
                               />
                             )}
@@ -882,13 +907,21 @@ export default function SessionList({
                                 size="sm"
                                 variant="ghost"
                                 onError={(error) =>
-                                  console.error("Failed to open in browser:", error)
+                                  console.error(
+                                    "Failed to open in browser:",
+                                    error,
+                                  )
                                 }
                               />
                             )}
                             {!isSelectionMode && onDeleteSession && (
                               <button
-                                ref={pendingDeleteSession?.sessions[0].id === session.id ? deleteButtonRef : null}
+                                ref={
+                                  pendingDeleteSession?.sessions[0].id ===
+                                  session.id
+                                    ? deleteButtonRef
+                                    : null
+                                }
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setPendingDeleteSession({
@@ -925,7 +958,9 @@ export default function SessionList({
           tags={tags}
           selectedTagIds={tagPickerSessionTags.map((tag) => tag.id)}
           onToggle={(tagId) => {
-            const assigned = tagPickerSessionTags.some((tag) => tag.id === tagId);
+            const assigned = tagPickerSessionTags.some(
+              (tag) => tag.id === tagId,
+            );
             onToggleTag(tagPickerSessionId, tagId, assigned);
           }}
           onCreateTag={onCreateTag}

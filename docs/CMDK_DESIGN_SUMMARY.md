@@ -1,1 +1,376 @@
-# cmdk 全局搜索设计总结## 📋 项目概览为 Pi Session Manager 添加基于 cmdk 库的全局搜索功能，采用插件式架构设计。**状态**: ✅ 设计完成，待实施**复杂度**: L3（复杂任务）**预计工期**: 3-5 天**创建日期**: 2026-01-31---## 🎯 核心目标1. **全局访问**: `Cmd+K` / `Ctrl+K` 快捷键快速打开2. **多源搜索**: 支持搜索用户消息、项目、会话3. **可扩展性**: 插件式架构，方便添加新功能4. **高性能**: 防抖、虚拟滚动、缓存优化5. **美观 UI**: 现代化设计，流畅动画---## 🏗️ 架构设计### 系统分层```┌─────────────────────────────────────┐│         CommandPalette              │  ← UI 容器层│  ┌───────────────────────────────┐  ││  │       CommandMenu             │  │  ← cmdk 组件层│  └───────────────────────────────┘  │└─────────────────────────────────────┘              ↓┌─────────────────────────────────────┐│      useCommandMenu Hook            │  ← 状态管理层│      useSearchPlugins Hook          │└─────────────────────────────────────┘              ↓┌─────────────────────────────────────┐│       PluginRegistry                │  ← 插件系统层│  ┌─────┐  ┌─────┐  ┌─────┐         ││  │Msg  │  │Proj │  │Sess │  ...    │  ← 插件实现层│  └─────┘  └─────┘  └─────┘         │└─────────────────────────────────────┘```### 目录结构```src/├── components/command/          # cmdk 组件│   ├── CommandPalette.tsx       # 容器│   ├── CommandMenu.tsx          # 主组件│   ├── CommandItem.tsx          # 结果项│   ├── CommandEmpty.tsx         # 空状态│   └── CommandLoading.tsx       # 加载状态├── hooks/│   ├── useCommandMenu.ts        # 状态管理│   ├── useSearchPlugins.ts      # 插件管理│   └── useSearchCache.ts        # 搜索缓存├── plugins/│   ├── types.ts                 # 插件接口│   ├── registry.ts              # 插件注册表│   ├── base/│   │   └── BaseSearchPlugin.ts  # 插件基类│   ├── message/│   │   └── MessageSearchPlugin.ts│   ├── project/│   │   └── ProjectSearchPlugin.ts│   └── session/│       └── SessionSearchPlugin.ts└── utils/    ├── highlight.ts             # 高亮工具    └── search.ts                # 搜索工具```---## 🔌 插件系统### 核心接口```typescriptinterface SearchPlugin {  // 元数据  id: string  name: string  icon: React.ComponentType  description: string  keywords: string[]  priority: number  // 核心方法  search(query: string, context: SearchContext): Promise<SearchPluginResult[]>  onSelect(result: SearchPluginResult, context: SearchContext): void  // 可选方法  renderItem?(result: SearchPluginResult): React.ReactNode  isEnabled?(context: SearchContext): boolean}```### 内置插件| 插件 | 功能 | 优先级 ||------|------|--------|| MessageSearchPlugin | 搜索用户消息和助手回复 | 80 || ProjectSearchPlugin | 搜索项目 | 70 || SessionSearchPlugin | 搜索会话名称和元数据 | 60 |### 扩展性- ✅ 支持注册自定义插件- ✅ 插件隔离，互不影响- ✅ 插件优先级控制- ✅ 插件启用/禁用控制---## ⚡ 性能优化### 搜索优化- **防抖**: 300ms 延迟，避免频繁搜索- **取消请求**: 使用 AbortController 取消未完成的搜索- **并行搜索**: 所有插件并行执行，使用 Promise.all()### 渲染优化- **虚拟滚动**: 超过 50 条结果使用 @tanstack/react-virtual- **懒加载**: 插件按需加载- **React.memo**: 优化组件重渲染### 缓存策略- **LRU Cache**: 缓存最近 100 次搜索结果- **缓存键**: `${pluginId}:${query}`- **缓存时间**: 5 分钟- **自动清理**: 关闭面板时清理过期缓存### 性能指标| 指标 | 目标 ||------|------|| 搜索响应时间 | < 300ms（1000 条数据） || 首次渲染时间 | < 100ms || 虚拟滚动帧率 | 60fps || 内存占用 | < 50MB（10000 条缓存） |---## 🎨 UI/UX 设计### 布局- **面板宽度**: 640px (max-w-2xl)- **面板高度**: 最大 60vh- **位置**: 垂直居中，距顶部 20vh- **背景遮罩**: rgba(0, 0, 0, 0.5)### 颜色（暗色主题）| 元素 | 颜色 ||------|------|| 背景 | #1a1b26 || 边框 | #2a2b36 || 输入框 | #252636 || 选中项 | #2a2b36 || 文本 | #c0caf5 || 次要文本 | #565f89 || 高亮 | #7aa2f7 |### 动画- **打开/关闭**: fade + scale (200ms ease-out)- **结果列表**: fade + slide-up (150ms ease-out)- **加载状态**: spin (1s linear infinite)### 快捷键| 快捷键 | 功能 ||--------|------|| Cmd+K / Ctrl+K | 打开命令面板 || ESC | 关闭命令面板 || ↑ / ↓ | 导航结果 || Enter | 选择结果 |---## 🌍 国际化### 支持语言- ✅ 中文（简体）- ✅ 英文### 翻译文案```json{  "command": {    "placeholder": "搜索会话、项目、消息...",    "empty": "未找到结果",    "loading": "搜索中...",    "plugins": {      "messageSearch": "消息搜索",      "projectSearch": "项目搜索",      "sessionSearch": "会话搜索"    }  }}```---## 📦 技术栈| 技术 | 版本 | 用途 ||------|------|------|| cmdk | ^1.0.0 | 命令面板核心库 || React | ^18.3.1 | UI 框架 || TypeScript | ^5.6.3 | 类型系统 || @tanstack/react-virtual | ^3.10.8 | 虚拟滚动 || Tailwind CSS | ^3.4.0 | 样式系统 || i18next | ^25.8.0 | 国际化 |---## 📝 实施计划### Phase 2: 核心架构（1 天）- 安装 cmdk 依赖- 创建插件系统基础设施- 实现 Hooks（useCommandMenu, useSearchPlugins, useSearchCache）- 创建核心组件（CommandPalette, CommandMenu, CommandItem）### Phase 3: 内置插件（1 天）- 实现 MessageSearchPlugin- 实现 ProjectSearchPlugin- 实现 SessionSearchPlugin### Phase 4: UI/UX 优化（0.5 天）- 设计样式（command.css）- 实现高亮匹配文本- 优化键盘导航### Phase 5: 性能优化（0.5 天）- 实现虚拟滚动- 优化搜索性能- 实现缓存策略### Phase 6: 集成和测试（1 天）- 集成到 App.tsx- 添加国际化翻译- 功能测试- 性能测试### Phase 7: 文档和交付（0.5 天）- 更新 README.md- 编写插件开发指南- 创建 PR- 代码审查**预计完成时间**: 2026-02-05---## ✅ 验收标准### 功能性- [ ] Cmd+K / Ctrl+K 打开命令面板- [ ] 实时搜索（防抖 300ms）- [ ] 搜索用户消息、项目、会话- [ ] 选择结果导航- [ ] ESC 关闭面板### 性能- [ ] 搜索响应时间 < 300ms（1000 条数据）- [ ] 首次渲染时间 < 100ms- [ ] 虚拟滚动流畅（60fps）- [ ] 内存占用 < 50MB### UI/UX- [ ] 面板居中显示- [ ] 半透明背景遮罩- [ ] 平滑动画- [ ] 高亮匹配文本- [ ] 键盘导航流畅### 国际化- [ ] 中英文切换- [ ] 所有文本已翻译---## 🔮 未来扩展### 命令插件- 导出会话- 删除会话- 切换主题- 打开设置### AI 搜索- 语义搜索- 向量相似度- 自然语言查询### 搜索历史- 最近搜索- 热门搜索- 搜索建议### 自定义插件- 插件 API 文档- 插件市场- 插件配置界面---## 📚 相关文档- **Issue**: `docs/issues/20260131-Add cmdk global search with plugin architecture.md`- **架构设计**: `docs/architecture/cmdk-plugin-system.md`- **实施计划**: `docs/CMDK_IMPLEMENTATION_PLAN.md`- **cmdk 官方文档**: https://cmdk.paco.me/---## 🎉 总结本设计提供了一个完整的、可扩展的 cmdk 全局搜索系统：**核心优势**:- ✅ 插件式架构，易于扩展- ✅ 高性能优化（防抖、虚拟滚动、缓存）- ✅ 美观的 UI 设计- ✅ 完善的类型系统- ✅ 国际化支持- ✅ 良好的用户体验**技术亮点**:- 使用 cmdk 库提供专业的命令面板体验- 插件系统基于接口设计，符合 SOLID 原则- 性能优化策略全面- 组件设计模块化，职责清晰- 完善的错误处理和边界情况考虑**下一步**: 开始 Phase 2（核心架构实现）---*设计完成日期: 2026-01-31**设计者: Pi Agent*
+# cmdk Global Search Design Summary
+
+## 📋 Project Overview
+
+Add global search functionality based on the cmdk library to Pi Session Manager, adopting a plugin-based architecture design.
+
+**Status**: ✅ Design complete, pending implementation
+
+**Complexity**: L3 (Complex task)
+
+**Estimated Duration**: 3-5 days
+
+**Creation Date**: 2026-01-31
+
+---
+
+## 🎯 Core Goals
+
+1. **Global Access**: `Cmd+K` / `Ctrl+K` shortcut for quick opening
+2. **Multi-source Search**: Support searching user messages, projects, sessions
+3. **Extensibility**: Plugin-based architecture for easy feature additions
+4. **High Performance**: Debouncing, virtual scrolling, cache optimization
+5. **Beautiful UI**: Modern design with smooth animations
+
+---
+
+## 🏗️ Architecture Design
+
+### System Layers
+
+```
+┌─────────────────────────────────────┐
+│         CommandPalette              │  ← UI Container Layer
+│  ┌───────────────────────────────┐  │
+│  │       CommandMenu             │  │  ← cmdk Component Layer
+│  └───────────────────────────────┘  │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│      useCommandMenu Hook            │  ← State Management Layer
+│      useSearchPlugins Hook          │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│       PluginRegistry                │  ← Plugin System Layer
+│  ┌─────┐  ┌─────┐  ┌─────┐         │
+│  │Msg  │  │Proj │  │Sess │  ...    │  ← Plugin Implementation Layer
+│  └─────┘  └─────┘  └─────┘         │
+└─────────────────────────────────────┘
+```
+
+### Directory Structure
+
+```
+src/
+├── components/command/          # cmdk components
+│   ├── CommandPalette.tsx       # Container
+│   ├── CommandMenu.tsx          # Main component
+│   ├── CommandItem.tsx          # Result item
+│   ├── CommandEmpty.tsx         # Empty state
+│   └── CommandLoading.tsx       # Loading state
+├── hooks/
+│   ├── useCommandMenu.ts        # State management
+│   ├── useSearchPlugins.ts      # Plugin management
+│   └── useSearchCache.ts        # Search cache
+├── plugins/
+│   ├── types.ts                 # Plugin interfaces
+│   ├── registry.ts              # Plugin registry
+│   ├── base/
+│   │   └── BaseSearchPlugin.ts  # Plugin base class
+│   ├── message/
+│   │   └── MessageSearchPlugin.ts
+│   ├── project/
+│   │   └── ProjectSearchPlugin.ts
+│   └── session/
+│       └── SessionSearchPlugin.ts
+└── utils/
+    ├── highlight.ts             # Highlight utilities
+    └── search.ts                # Search utilities
+```
+
+---
+
+## 🔌 Plugin System
+
+### Core Interface
+
+```typescript
+interface SearchPlugin {
+  // Metadata
+  id: string
+  name: string
+  icon: React.ComponentType
+  description: string
+  keywords: string[]
+  priority: number
+  
+  // Core methods
+  search(query: string, context: SearchContext): Promise<SearchPluginResult[]>
+  onSelect(result: SearchPluginResult, context: SearchContext): void
+  
+  // Optional methods
+  renderItem?(result: SearchPluginResult): React.ReactNode
+  isEnabled?(context: SearchContext): boolean
+}
+```
+
+### Built-in Plugins
+
+| Plugin | Function | Priority |
+|--------|----------|----------|
+| MessageSearchPlugin | Search user messages and assistant replies | 80 |
+| ProjectSearchPlugin | Search projects | 70 |
+| SessionSearchPlugin | Search session names and metadata | 60 |
+
+### Extensibility
+
+- ✅ Support for registering custom plugins
+- ✅ Plugin isolation, no interference between plugins
+- ✅ Plugin priority control
+- ✅ Plugin enable/disable control
+
+---
+
+## ⚡ Performance Optimization
+
+### Search Optimization
+
+- **Debounce**: 300ms delay to avoid frequent searches
+- **Cancel Requests**: Use AbortController to cancel unfinished searches
+- **Parallel Search**: All plugins execute in parallel using Promise.all()
+
+### Rendering Optimization
+
+- **Virtual Scrolling**: Use @tanstack/react-virtual for results over 50 items
+- **Lazy Loading**: Plugins load on demand
+- **React.memo**: Optimize component re-rendering
+
+### Cache Strategy
+
+- **LRU Cache**: Cache the most recent 100 search results
+- **Cache Key**: `${pluginId}:${query}`
+- **Cache Time**: 5 minutes
+- **Auto Cleanup**: Clean expired cache when closing panel
+
+### Performance Metrics
+
+| Metric | Target |
+|--------|--------|
+| Search response time | < 300ms (1000 items) |
+| First render time | < 100ms |
+| Virtual scrolling frame rate | 60fps |
+| Memory usage | < 50MB (10000 cached items) |
+
+---
+
+## 🎨 UI/UX Design
+
+### Layout
+
+- **Panel Width**: 640px (max-w-2xl)
+- **Panel Height**: Maximum 60vh
+- **Position**: Vertically centered, 20vh from top
+- **Background Overlay**: rgba(0, 0, 0, 0.5)
+
+### Colors (Dark Theme)
+
+| Element | Color |
+|---------|-------|
+| Background | #1a1b26 |
+| Border | #2a2b36 |
+| Input | #252636 |
+| Selected | #2a2b36 |
+| Text | #c0caf5 |
+| Muted text | #565f89 |
+| Highlight | #7aa2f7 |
+
+### Animations
+
+- **Open/Close**: fade + scale (200ms ease-out)
+- **Result list**: fade + slide-up (150ms ease-out)
+- **Loading state**: spin (1s linear infinite)
+
+### Shortcuts
+
+| Shortcut | Function |
+|----------|----------|
+| Cmd+K / Ctrl+K | Open command palette |
+| ESC | Close command palette |
+| ↑ / ↓ | Navigate results |
+| Enter | Select result |
+
+---
+
+## 🌍 Internationalization
+
+### Supported Languages
+
+- ✅ Chinese (Simplified)
+- ✅ English
+
+### Translation Copy
+
+```json
+{
+  "command": {
+    "placeholder": "Search sessions, projects, messages...",
+    "empty": "No results found",
+    "loading": "Searching...",
+    "plugins": {
+      "messageSearch": "Message Search",
+      "projectSearch": "Project Search",
+      "sessionSearch": "Session Search"
+    }
+  }
+}
+```
+
+---
+
+## 📦 Tech Stack
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| cmdk | ^1.0.0 | Command palette core library |
+| React | ^18.3.1 | UI framework |
+| TypeScript | ^5.6.3 | Type system |
+| @tanstack/react-virtual | ^3.10.8 | Virtual scrolling |
+| Tailwind CSS | ^3.4.0 | Styling system |
+| i18next | ^25.8.0 | Internationalization |
+
+---
+
+## 📝 Implementation Plan
+
+### Phase 2: Core Architecture (1 day)
+
+- Install cmdk dependency
+- Create plugin system infrastructure
+- Implement Hooks (useCommandMenu, useSearchPlugins, useSearchCache)
+- Create core components (CommandPalette, CommandMenu, CommandItem)
+
+### Phase 3: Built-in Plugins (1 day)
+
+- Implement MessageSearchPlugin
+- Implement ProjectSearchPlugin
+- Implement SessionSearchPlugin
+
+### Phase 4: UI/UX Optimization (0.5 day)
+
+- Design styles (command.css)
+- Implement matched text highlighting
+- Optimize keyboard navigation
+
+### Phase 5: Performance Optimization (0.5 day)
+
+- Implement virtual scrolling
+- Optimize search performance
+- Implement cache strategy
+
+### Phase 6: Integration and Testing (1 day)
+
+- Integrate into App.tsx
+- Add internationalization translations
+- Functional testing
+- Performance testing
+
+### Phase 7: Documentation and Delivery (0.5 day)
+
+- Update README.md
+- Write plugin development guide
+- Create PR
+- Code review
+
+**Estimated Completion**: 2026-02-05
+
+---
+
+## ✅ Acceptance Criteria
+
+### Functional
+
+- [ ] Cmd+K / Ctrl+K opens command palette
+- [ ] Real-time search (300ms debounce)
+- [ ] Search user messages, projects, sessions
+- [ ] Select result to navigate
+- [ ] ESC closes panel
+
+### Performance
+
+- [ ] Search response time < 300ms (1000 items)
+- [ ] First render time < 100ms
+- [ ] Virtual scrolling smooth (60fps)
+- [ ] Memory usage < 50MB
+
+### UI/UX
+
+- [ ] Panel displays centered
+- [ ] Semi-transparent background overlay
+- [ ] Smooth animations
+- [ ] Highlight matched text
+- [ ] Smooth keyboard navigation
+
+### Internationalization
+
+- [ ] Chinese/English switching
+- [ ] All text translated
+
+---
+
+## 🔮 Future Extensions
+
+### Command Plugins
+
+- Export session
+- Delete session
+- Switch theme
+- Open settings
+
+### AI Search
+
+- Semantic search
+- Vector similarity
+- Natural language queries
+
+### Search History
+
+- Recent searches
+- Popular searches
+- Search suggestions
+
+### Custom Plugins
+
+- Plugin API documentation
+- Plugin marketplace
+- Plugin configuration interface
+
+---
+
+## 📚 Related Documents
+
+- **Issue**: `docs/issues/20260131-Add cmdk global search with plugin architecture.md`
+- **Architecture Design**: `docs/architecture/cmdk-plugin-system.md`
+- **Implementation Plan**: `docs/CMDK_IMPLEMENTATION_PLAN.md`
+- **cmdk Official Documentation**: https://cmdk.paco.me/
+
+---
+
+## 🎉 Summary
+
+This design provides a complete, extensible cmdk global search system:
+
+**Core Advantages**:
+
+- ✅ Plugin-based architecture, easy to extend
+- ✅ High-performance optimization (debounce, virtual scrolling, cache)
+- ✅ Beautiful UI design
+- ✅ Complete type system
+- ✅ Internationalization support
+- ✅ Good user experience
+
+**Technical Highlights**:
+
+- Uses cmdk library for professional command palette experience
+- Plugin system based on interface design, following SOLID principles
+- Comprehensive performance optimization strategy
+- Modular component design with clear responsibilities
+- Comprehensive error handling and edge case considerations
+
+**Next Step**: Start Phase 2 (Core Architecture Implementation)
+
+---
+
+*Design Completion Date: 2026-01-31*
+
+*Designer: Pi Agent*

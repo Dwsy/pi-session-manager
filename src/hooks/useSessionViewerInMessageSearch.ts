@@ -5,8 +5,9 @@ import { parseMarkdown } from '../utils/markdown'
 import { getAssistantDisplayedBlocks } from '../utils/assistantContent'
 import {
   getSearchableToolCallRenderedHtmlSegments,
-  resolveToolCallDisplayData,
-} from '../utils/toolCallDisplay'
+} from '../plugins/tools-render/utils/searchSegments'
+import { toolRenderRegistry } from '../plugins/tools-render/registry'
+import { defaultResolveData } from '../plugins/tools-render/utils/resolveData'
 import { countSearchHighlightsInHTML } from '../utils/search'
 
 export type SessionSearchScope = 'all' | 'messages' | 'user'
@@ -116,14 +117,17 @@ function getAssistantSearchMatches(
   const toolMatches = entry.message.content
     .filter((item) => item.type === 'toolCall')
     .flatMap((toolCall, index) => {
-      const resolvedToolCall = resolveToolCallDisplayData(
+      // Use plugin system to resolve entryId
+      const plugin = toolRenderRegistry.findPlugin(toolCall)
+      const resolvedData = plugin.resolveData?.(
         toolCall,
         index,
-        toolResultByCallId,
-      )
+        toolResultByCallId
+      ) ?? defaultResolveData(toolCall, index, toolResultByCallId)
+
       return getSearchMatchEntries(
         entry.id,
-        resolvedToolCall.entryId,
+        resolvedData.entryId,
         getSearchableToolCallRenderedHtmlSegments(
           toolCall,
           index,

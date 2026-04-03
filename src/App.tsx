@@ -4,6 +4,7 @@ import {
   useRef,
   useCallback,
   lazy,
+  useEffect,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
@@ -24,8 +25,10 @@ import { useUpdateChecker } from "./hooks/app/useUpdateChecker";
 import { useDesktopSidebarActions } from "./hooks/app/useDesktopSidebarActions";
 import { useFavorites } from "./hooks/app/useFavorites";
 import { useSidebarSessions } from "./hooks/app/useSidebarSessions";
+import { registerBuiltinToolPlugins, registerExtensionToolPlugins } from "./plugins/tools-render";
 import ConnectionBanner from "./components/ConnectionBanner";
 import UpdateNoticeToast from "./components/UpdateNoticeToast";
+import PiLivePanel from "./components/PiLivePanel";
 import { useTags } from "./hooks/useTags";
 import type { SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
@@ -86,6 +89,12 @@ const LoadingSpinner = () => (
 
 function App() {
   const { t } = useTranslation();
+
+  // Register tool render plugins
+  useEffect(() => {
+    registerBuiltinToolPlugins();
+    registerExtensionToolPlugins();
+  }, []);
   const isMobile = useIsMobile();
 
   const [mobileTab, setMobileTab] = useState<MobileTab>("list");
@@ -172,6 +181,11 @@ function App() {
     }
   });
   const [showTerminal, setShowTerminal] = useState(false);
+  const [showPiLive, setShowPiLive] = useState(false);
+  const togglePiLive = useCallback(() => {
+    setShowPiLive((prev) => !prev);
+    if (showFavorites) setShowFavorites(false);
+  }, [showFavorites]);
   const [pendingScrollEntryId, setPendingScrollEntryId] = useState<
     string | null
   >(null);
@@ -708,7 +722,9 @@ function App() {
     />
   );
 
-  const desktopSidebarContent = (
+  const desktopSidebarContent = showPiLive
+    ? (<PiLivePanel />)
+    : (
     <AppDesktopSidebarContent
       showFavorites={showFavorites}
       viewMode={viewMode}
@@ -781,6 +797,8 @@ function App() {
           showFavorites={showFavorites}
           terminalEnabled={terminalConfig.enabled}
           showTerminal={showTerminal}
+          showPiLive={showPiLive}
+          onTogglePiLive={togglePiLive}
           onShowDashboard={handleSidebarShowDashboard}
           onSelectListView={handleSidebarSelectListView}
           onSelectProjectView={handleSidebarSelectProjectView}

@@ -1,11 +1,12 @@
-import type { Content, SessionEntry, SubagentDetails, TintinwebAgentDetails } from '../types'
-import BashExecution from './BashExecution'
-import ReadExecution from './ReadExecution'
-import WriteExecution from './WriteExecution'
-import EditExecution from './EditExecution'
-import GenericToolCall from './GenericToolCall'
-import SubagentToolCall from './SubagentToolCall'
-import { resolveToolCallDisplayData } from '../utils/toolCallDisplay'
+import { memo } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { Content, SessionEntry } from '../types'
+import { toolRenderRegistry } from '../plugins/tools-render/registry'
+import { defaultResolveData } from '../plugins/tools-render/utils/resolveData'
+import { useSessionView } from '../contexts/SessionViewContext'
+import { useIsMobile } from '../hooks/useIsMobile'
+import { useAppearance } from '../hooks/useAppearance'
+import { useClipboard } from '../hooks/useClipboard'
 
 interface ToolCallListProps {
   toolCalls: Content[]
@@ -18,118 +19,64 @@ function ToolCallList({
   toolResultByCallId = new Map(),
   searchQuery = '',
 }: ToolCallListProps) {
+  const { t } = useTranslation()
+  const { theme } = useAppearance()
+  const isMobile = useIsMobile()
+  const {
+    isToolExpanded,
+    toggleToolExpanded,
+    ensureToolExpandedForSearch
+  } = useSessionView()
+  const { copyText } = useClipboard()
+
   return (
     <div className="tool-call-list">
       {toolCalls.map((toolCall, index) => {
-        const {
-          name,
-          args,
-          entryId,
-          result,
-          output,
-          diff,
-          isError,
-          images,
-        } = resolveToolCallDisplayData(toolCall, index, toolResultByCallId)
+        // Find matching plugin for this tool call
+        const plugin = toolRenderRegistry.findPlugin(toolCall)
 
-        switch (name) {
-          case 'bash':
-            return (
-              <BashExecution
-                key={index}
-                command={args.command || ''}
-                output={output}
-                exitCode={result?.message?.exitCode}
-                cancelled={result?.message?.cancelled}
-                entryId={entryId}
-                searchQuery={searchQuery}
-              />
-            )
+        // Resolve data (prefer plugin's resolver, fallback to default)
+        const resolvedData = plugin.resolveData?.(
+          toolCall,
+          index,
+          toolResultByCallId
+        ) ?? defaultResolveData(toolCall, index, toolResultByCallId)
 
-          case 'read':
-            return (
-              <ReadExecution
-                key={index}
-                filePath={args.file_path || args.path || ''}
-                offset={args.offset}
-                limit={args.limit}
-                output={output}
-                images={images}
-                entryId={entryId}
-                searchQuery={searchQuery}
-              />
-            )
-
-          case 'write':
-            return (
-              <WriteExecution
-                key={index}
-                filePath={args.file_path || args.path || ''}
-                content={args.content || ''}
-                output={output}
-                entryId={entryId}
-                searchQuery={searchQuery}
-              />
-            )
-
-          case 'edit':
-            return (
-              <EditExecution
-                key={index}
-                filePath={args.file_path || args.path || ''}
-                diff={diff}
-                output={output}
-                isError={isError}
-                entryId={entryId}
-                searchQuery={searchQuery}
-              />
-            )
-
-          case 'Agent':
-          case 'subagent':
-            // Only render as SubagentToolCall if this is actually a subagent call
-            // (has subagent_type in arguments or has details)
-            if (args?.subagent_type || result?.message?.details) {
-              return (
-                <SubagentToolCall
-                  key={index}
-                  arguments={args}
-                  details={result?.message?.details as SubagentDetails | TintinwebAgentDetails | undefined}
-                  output={output}
-                  entryId={entryId}
-                  searchQuery={searchQuery}
-                />
-              )
-            }
-            // Fall through to GenericToolCall for regular Agent calls without subagent details
-            return (
-              <GenericToolCall
-                key={index}
-                name={name}
-                arguments={args}
-                output={output}
-                isError={isError}
-                entryId={entryId}
-                searchQuery={searchQuery}
-              />
-            )
-
-          default:
-            return (
-              <GenericToolCall
-                key={index}
-                name={name}
-                arguments={args}
-                output={output}
-                isError={isError}
-                entryId={entryId}
-                searchQuery={searchQuery}
-              />
-            )
+        // If plugin resolver returns null, use default
+        if (!resolvedData) {
+          console.warn(`[ToolCallList] Plugin ${plugin.id} returned null data, using default`)
         }
+
+        const data = resolvedData || defaultResolveData(toolCall, index, toolResultByCallId)
+        const entryId = data.entryId
+
+        // Build render context
+        const context = {
+          isExpanded: isToolExpanded(entryId),
+          toggleExpanded: () => toggleToolExpanded(entryId),
+          ensureExpanded: () => ensureToolExpandedForSearch(entryId),
+          theme: theme === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : theme as 'light' | 'dark',
+          isMobile,
+          t,
+          copyToClipboard: copyText,
+        }
+
+        const Component = plugin.component
+
+        return (
+          <Component
+            key={entryId}
+            toolCall={toolCall}
+            resolvedData={data}
+            searchQuery={searchQuery}
+            context={context}
+          />
+        )
       })}
     </div>
   )
 }
 
-export default ToolCallList
+export default memo(ToolCallList)

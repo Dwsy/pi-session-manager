@@ -1,1 +1,186 @@
-# 看板功能 UX 深度分析与 BBD 测试> 「問題は見えないところにある」— 問題往往藏在看不见的地方## 一、当前架构链路分析### 1.1 视图模式切换逻辑```App.tsx 视图状态机├── viewMode='list'│   ├── 左侧: TagFilter + SessionList (所有会话)│   └── 右侧: Dashboard (统计面板)│├── viewMode='project'│   ├── 左侧: ProjectList (项目列表)│   │   └── 点击项目 → SessionList (该项目会话)│   └── 右侧: Dashboard│└── viewMode='kanban'    ├── 左侧: TagFilter (标签筛选) ← 问题 A    └── 右侧: KanbanBoard (按标签分组的看板)```### 1.2 问题诊断#### 问题 A：看板模式左侧显示 TagFilter 很奇怪- **现象**: 看板模式左侧仍然显示标签筛选器（待处理/进行中/已完成等）- **困惑点**: 右侧看板本身就是按标签分组的列，左侧标签筛选的意义是什么？- **用户认知冲突**: "我想按项目筛选，但左侧是标签"#### 问题 B：看板模式无法按项目筛选- **现象**: 看板显示所有项目的会话混在一起- **用户期望**: "我想看某个特定项目的看板视图"- **缺失功能**: 没有项目维度的筛选器#### 问题 C：筛选逻辑不一致- **list 模式**: TagFilter 筛选会话列表- **kanban 模式**: TagFilter 筛选看板中显示的会话，但列标题仍然是所有标签- **用户体验断裂**: 不同模式下 TagFilter 行为不一致## 二、用户场景 BBD 测试用例### 场景 1: 项目维度的看板视图```gherkinFeature: 看板模式下的项目筛选  Scenario: 用户想查看特定项目的看板    Given 用户在看板视图    And 有多个项目存在（project-a, project-b）    When 用户在左侧选择 project-a    Then 看板只显示 project-a 的会话    And 看板列仍然是按标签分组（待处理/进行中/已完成）  Scenario: 用户想查看所有项目的看板    Given 用户在看板视图    When 用户不选择任何项目（"全部项目"）    Then 看板显示所有项目的会话    And 每个会话卡片显示其所属项目```### 场景 2: 看板左侧边栏的期望```gherkinFeature: 看板模式左侧边栏内容  Scenario: 切换到看板模式    Given 用户在列表视图    When 用户切换到看板视图    Then 左侧边栏显示项目列表    And 不包含 TagFilter 组件  Scenario: 在看板模式选择项目    Given 用户在看板视图    And 左侧显示项目列表    When 用户点击某个项目    Then 该项目被高亮选中    And 看板内容更新为该项目会话```### 场景 3: 跨视图状态一致性```gherkinFeature: 项目选择在视图间保持一致  Scenario: 从项目视图切换到看板视图    Given 用户在项目视图    And 已选择 project-a    When 用户切换到看板视图    Then 看板默认只显示 project-a 的会话    And 左侧项目列表中 project-a 被选中  Scenario: 从看板视图切换到列表视图    Given 用户在看板视图    And 已选择 project-a    When 用户切换到列表视图    Then 列表视图显示 project-a 的会话```## 三、改进方案设计### 3.1 架构调整```改进后的看板模式├── 左侧边栏│   ├── 顶部工具栏│   └── 项目筛选列表 (ProjectFilterList) ← 新增│       ├── "全部项目" 选项│       └── 各项目列表项（显示会话数量）│└── 右侧主区域    └── KanbanBoard        ├── 顶部标签筛选器 (TagFilterBar) ← 移至此处        └── 看板列（按标签分组）```### 3.2 数据结构扩展```typescript// App.tsx 新增状态const [kanbanProjectFilter, setKanbanProjectFilter] = useState<string | null>(null)// KanbanBoard 接收项目筛选interface KanbanBoardProps {  // ... existing props  projectFilter?: string | null  // null = 全部项目}// 过滤逻辑const kanbanSessions = useMemo(() => {  if (!kanbanProjectFilter) return sessions  return sessions.filter(s => s.cwd === kanbanProjectFilter)}, [sessions, kanbanProjectFilter])```### 3.3 组件调整| 组件 | 当前行为 | 改进行为 ||------|----------|----------|| App.tsx (左侧) | kanban 模式显示 TagFilter | kanban 模式显示 ProjectFilterList || KanbanBoard.tsx | 接收所有 sessions | 接收 projectFilter，内部过滤 || TagFilter.tsx | 在左侧边栏 | 移至看板顶部作为 TagFilterBar |## 四、实施计划### Phase 1: 项目筛选器组件- [ ] 创建 `ProjectFilterList` 组件- [ ] 支持 "全部项目" 选项- [ ] 显示各项目会话数量### Phase 2: 看板模式左侧改造- [ ] App.tsx 条件渲染：kanban 模式显示 ProjectFilterList- [ ] 隐藏 kanban 模式下的 TagFilter### Phase 3: 看板接收项目筛选- [ ] KanbanBoard 接收 projectFilter prop- [ ] 内部根据 projectFilter 过滤 sessions- [ ] TagFilterBar 移至看板顶部### Phase 4: 跨视图状态同步- [ ] 项目选择在 viewMode 切换时保持一致- [ ] 从 project 视图切换到 kanban 视图保留项目选择## 五、验收标准- [ ] 看板模式左侧显示项目列表，而非标签筛选- [ ] 选择项目后看板只显示该项目的会话- [ ] "全部项目" 选项显示所有项目的会话- [ ] 会话卡片在看板中显示所属项目（当选择全部项目时）- [ ] 从其他视图切换到看板视图保留项目选择状态- [ ] 标签筛选器移至看板顶部，只影响看板内容---> 「整理は、未来の自分への贈り物」— 整理，是给未来自己的礼物
+# Kanban Feature UX Deep Analysis and BBD Tests
+
+> 「問題は見えないところにある」— Problems often hide in unseen places
+
+## 1. Current Architecture Link Analysis
+
+### 1.1 View Mode Switching Logic
+
+```
+App.tsx View State Machine
+├── viewMode='list'
+│   ├── Left: TagFilter + SessionList (all sessions)
+│   └── Right: Dashboard (statistics panel)
+│
+├── viewMode='project'
+│   ├── Left: ProjectList (project list)
+│   │   └── Click project → SessionList (sessions for that project)
+│   └── Right: Dashboard
+│
+└── viewMode='kanban'
+    ├── Left: TagFilter (tag filtering) ← Issue A
+    └── Right: KanbanBoard (tag-grouped kanban)
+```
+
+### 1.2 Problem Diagnosis
+
+#### Issue A: Left panel showing TagFilter in kanban mode is strange
+
+- **Phenomenon**: Kanban mode still shows tag filter on the left (todo/in-progress/done, etc.)
+- **Confusion**: The right kanban is already grouped by tags, what's the point of tag filtering on the left?
+- **User cognitive conflict**: "I want to filter by project, but the left side shows tags"
+
+#### Issue B: Kanban mode cannot filter by project
+
+- **Phenomenon**: Kanban shows sessions from all projects mixed together
+- **User expectation**: "I want to see the kanban view for a specific project"
+- **Missing feature**: No project dimension filter
+
+#### Issue C: Inconsistent filtering logic
+
+- **list mode**: TagFilter filters the session list
+- **kanban mode**: TagFilter filters sessions shown in kanban, but column headers still show all tags
+- **User experience disconnect**: TagFilter behaves inconsistently across different modes
+
+## 2. User Scenario BBD Test Cases
+
+### Scenario 1: Project-based Kanban View
+
+```gherkin
+Feature: Project filtering in kanban mode
+
+  Scenario: User wants to view kanban for a specific project
+    Given User is in kanban view
+    And Multiple projects exist (project-a, project-b)
+    When User selects project-a on the left
+    Then Kanban only shows sessions from project-a
+    And Kanban columns are still grouped by tags (todo/in-progress/done)
+
+  Scenario: User wants to view kanban for all projects
+    Given User is in kanban view
+    When User doesn't select any project ("All Projects")
+    Then Kanban shows sessions from all projects
+    And Each session card shows its project
+```
+
+### Scenario 2: Expected Left Sidebar in Kanban Mode
+
+```gherkin
+Feature: Left sidebar content in kanban mode
+
+  Scenario: Switch to kanban mode
+    Given User is in list view
+    When User switches to kanban view
+    Then Left sidebar shows project list
+    And TagFilter component is not included
+
+  Scenario: Select project in kanban mode
+    Given User is in kanban view
+    And Project list is shown on the left
+    When User clicks a project
+    Then The project is highlighted as selected
+    And Kanban content updates to that project's sessions
+```
+
+### Scenario 3: Cross-view State Consistency
+
+```gherkin
+Feature: Project selection remains consistent across views
+
+  Scenario: Switch from project view to kanban view
+    Given User is in project view
+    And project-a is selected
+    When User switches to kanban view
+    Then Kanban defaults to only showing project-a's sessions
+    And project-a is selected in the project list on the left
+
+  Scenario: Switch from kanban view to list view
+    Given User is in kanban view
+    And project-a is selected
+    When User switches to list view
+    Then List view shows project-a's sessions
+```
+
+## 3. Improvement Solution Design
+
+### 3.1 Architecture Adjustment
+
+```
+Improved Kanban Mode
+├── Left Sidebar
+│   ├── Top Toolbar
+│   └── Project Filter List (ProjectFilterList) ← New
+│       ├── "All Projects" option
+│       └── Project list items (show session counts)
+│
+└── Right Main Area
+    └── KanbanBoard
+        ├── Top Tag Filter (TagFilterBar) ← Moved here
+        └── Kanban columns (grouped by tags)
+```
+
+### 3.2 Data Structure Extension
+
+```typescript
+// App.tsx new state
+const [kanbanProjectFilter, setKanbanProjectFilter] = useState<string | null>(null)
+
+// KanbanBoard receives project filter
+interface KanbanBoardProps {
+  // ... existing props
+  projectFilter?: string | null
+  // null = all projects
+}
+
+// Filtering logic
+const kanbanSessions = useMemo(() => {
+  if (!kanbanProjectFilter) return sessions
+  return sessions.filter(s => s.cwd === kanbanProjectFilter)
+}, [sessions, kanbanProjectFilter])
+```
+
+### 3.3 Component Adjustments
+
+| Component | Current Behavior | Improved Behavior |
+|-----------|-----------------|-------------------|
+| App.tsx (left panel) | kanban mode shows TagFilter | kanban mode shows ProjectFilterList |
+| KanbanBoard.tsx | Receives all sessions | Receives projectFilter, filters internally |
+| TagFilter.tsx | In left sidebar | Moved to kanban top as TagFilterBar |
+
+## 4. Implementation Plan
+
+### Phase 1: Project Filter Component
+
+- [ ] Create `ProjectFilterList` component
+- [ ] Support "All Projects" option
+- [ ] Show session counts for each project
+
+### Phase 2: Kanban Mode Left Panel Transformation
+
+- [ ] App.tsx conditional rendering: kanban mode shows ProjectFilterList
+- [ ] Hide TagFilter in kanban mode
+
+### Phase 3: Kanban Receives Project Filter
+
+- [ ] KanbanBoard receives projectFilter prop
+- [ ] Internal filtering based on projectFilter
+- [ ] Move TagFilterBar to kanban top
+
+### Phase 4: Cross-view State Synchronization
+
+- [ ] Project selection persists when switching viewMode
+- [ ] From project view to kanban view retains project selection
+- [ ] From kanban view to list view retains project selection
+
+## 5. Acceptance Criteria
+
+- [ ] Kanban mode left panel shows project list instead of tag filter
+- [ ] After selecting a project, kanban only shows that project's sessions
+- [ ] "All Projects" option shows sessions from all projects
+- [ ] Session cards in kanban show their project (when All Projects is selected)
+- [ ] Switching from other views to kanban view retains project selection state
+- [ ] Tag filter moved to kanban top, only affects kanban content
+
+---
+
+> 「整理は、未来の自分への贈り物」— Organization is a gift to your future self

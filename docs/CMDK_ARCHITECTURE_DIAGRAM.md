@@ -1,1 +1,341 @@
-# cmdk 架构图## 系统架构图```┌─────────────────────────────────────────────────────────────────────┐│                            App.tsx                                   ││  ┌───────────────────────────────────────────────────────────────┐  ││  │                    CommandPalette                              │  ││  │  ┌─────────────────────────────────────────────────────────┐  │  ││  │  │                  CommandMenu                             │  │  ││  │  │  ┌───────────────────────────────────────────────────┐  │  │  ││  │  │  │  🔍 Input (搜索框)                                │  │  │  ││  │  │  └───────────────────────────────────────────────────┘  │  │  ││  │  │  ┌───────────────────────────────────────────────────┐  │  │  ││  │  │  │  📋 CommandList (结果列表)                        │  │  │  ││  │  │  │    ┌─────────────────────────────────────────┐    │  │  │  ││  │  │  │    │  💬 Message Search Results              │    │  │  │  ││  │  │  │    │    - CommandItem                        │    │  │  │  ││  │  │  │    │    - CommandItem                        │    │  │  │  ││  │  │  │    └─────────────────────────────────────────┘    │  │  │  ││  │  │  │    ┌─────────────────────────────────────────┐    │  │  │  ││  │  │  │    │  📁 Project Search Results              │    │  │  │  ││  │  │  │    │    - CommandItem                        │    │  │  │  ││  │  │  │    └─────────────────────────────────────────┘    │  │  │  ││  │  │  │    ┌─────────────────────────────────────────┐    │  │  │  ││  │  │  │    │  📄 Session Search Results              │    │  │  │  ││  │  │  │    │    - CommandItem                        │    │  │  │  ││  │  │  │    └─────────────────────────────────────────┘    │  │  │  ││  │  │  └───────────────────────────────────────────────────┘  │  │  ││  │  └─────────────────────────────────────────────────────────┘  │  ││  └───────────────────────────────────────────────────────────────┘  │└─────────────────────────────────────────────────────────────────────┘                                  ↓┌─────────────────────────────────────────────────────────────────────┐│                         Hooks Layer                                  ││  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ││  │ useCommandMenu   │  │ useSearchPlugins │  │ useSearchCache   │  ││  │                  │  │                  │  │                  │  ││  │ - isOpen         │  │ - registry       │  │ - get()          │  ││  │ - query          │  │ - search()       │  │ - set()          │  ││  │ - results        │  │ - isSearching    │  │ - clear()        │  ││  │ - open()         │  │                  │  │                  │  ││  │ - close()        │  │                  │  │ LRU Cache:       │  ││  │ - setQuery()     │  │                  │  │ - 100 entries    │  ││  │                  │  │                  │  │ - 5 min TTL      │  ││  │ 防抖: 300ms      │  │ 并行搜索         │  │                  │  ││  │ 取消请求         │  │                  │  │                  │  ││  └──────────────────┘  └──────────────────┘  └──────────────────┘  │└─────────────────────────────────────────────────────────────────────┘                                  ↓┌─────────────────────────────────────────────────────────────────────┐│                      Plugin System Layer                             ││  ┌───────────────────────────────────────────────────────────────┐  ││  │                     PluginRegistry                             │  ││  │                                                                │  ││  │  - register(plugin)                                            │  ││  │  - unregister(pluginId)                                        │  ││  │  - get(pluginId)                                               │  ││  │  - getAll()                                                    │  ││  │  - search(query, context) → Promise<SearchPluginResult[]>     │  ││  │                                                                │  ││  │  并行执行所有插件搜索 → 合并结果 → 按分数排序                    │  ││  └───────────────────────────────────────────────────────────────┘  │└─────────────────────────────────────────────────────────────────────┘                                  ↓┌─────────────────────────────────────────────────────────────────────┐│                       Plugin Implementations                         ││  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ││  │ 💬 Message       │  │ 📁 Project       │  │ 📄 Session       │  ││  │ SearchPlugin     │  │ SearchPlugin     │  │ SearchPlugin     │  ││  │                  │  │                  │  │                  │  ││  │ Priority: 80     │  │ Priority: 70     │  │ Priority: 60     │  ││  │                  │  │                  │  │                  │  ││  │ search():        │  │ search():        │  │ search():        │  ││  │ - 调用 Tauri API │  │ - 提取项目列表   │  │ - 搜索会话名称   │  ││  │ - 搜索消息内容   │  │ - 模糊匹配       │  │ - 搜索路径       │  ││  │ - 格式化结果     │  │ - 显示会话数     │  │ - 显示元数据     │  ││  │                  │  │                  │  │                  │  ││  │ onSelect():      │  │ onSelect():      │  │ onSelect():      │  ││  │ - 打开会话       │  │ - 切换项目视图   │  │ - 打开会话       │  ││  └──────────────────┘  └──────────────────┘  └──────────────────┘  ││                                                                      ││  ┌──────────────────────────────────────────────────────────────┐  ││  │                  BaseSearchPlugin                             │  ││  │                                                               │  ││  │  - fuzzyMatch(query, text) → score                           │  ││  │  - calculateHighlights(query, text) → HighlightRange[]       │  ││  │  - isEnabled(context) → boolean                              │  ││  └──────────────────────────────────────────────────────────────┘  │└─────────────────────────────────────────────────────────────────────┘```## 数据流图```用户按下 Cmd+K    ↓CommandPalette.open()    ↓useCommandMenu.open()    ↓显示命令面板    ↓用户输入查询 "auth"    ↓useCommandMenu.setQuery("auth")    ↓防抖 300ms    ↓useSearchPlugins.search("auth")    ↓检查缓存    ├─ 命中 → 返回缓存结果    └─ 未命中 ↓         PluginRegistry.search("auth", context)              ↓         Promise.all([           MessageSearchPlugin.search("auth", context),           ProjectSearchPlugin.search("auth", context),           SessionSearchPlugin.search("auth", context)         ])              ↓         [           { id: "msg-1", title: "auth implementation", score: 0.9, pluginId: "message-search" },           { id: "proj-1", title: "/auth-service", score: 0.8, pluginId: "project-search" },           { id: "sess-1", title: "auth session", score: 0.7, pluginId: "session-search" }         ]              ↓         合并结果 + 排序（按 score × priority）              ↓         缓存结果（key: "message-search:auth", "project-search:auth", ...）              ↓         返回结果    ↓useCommandMenu.setResults(results)    ↓CommandMenu 渲染结果    ├─ 按插件分组    ├─ 高亮匹配文本    └─ 虚拟滚动（如果 > 50 条）    ↓用户选择结果（按 Enter）    ↓plugin.onSelect(result, context)    ├─ MessageSearchPlugin → 打开会话    ├─ ProjectSearchPlugin → 切换项目视图    └─ SessionSearchPlugin → 打开会话    ↓CommandPalette.close()```## 插件系统架构```┌─────────────────────────────────────────────────────────────┐│                      SearchPlugin Interface                  ││                                                              ││  interface SearchPlugin {                                    ││    // 元数据                                                 ││    id: string                                                ││    name: string                                              ││    icon: React.ComponentType                                 ││    description: string                                       ││    keywords: string[]                                        ││    priority: number                                          ││                                                              ││    // 核心方法                                               ││    search(query, context): Promise<SearchPluginResult[]>    ││    onSelect(result, context): void                           ││                                                              ││    // 可选方法                                               ││    renderItem?(result): React.ReactNode                      ││    isEnabled?(context): boolean                              ││    onMount?(): void                                          ││    onUnmount?(): void                                        ││  }                                                           │└─────────────────────────────────────────────────────────────┘                          ↓ implements┌─────────────────────────────────────────────────────────────┐│                    BaseSearchPlugin                          ││                                                              ││  abstract class BaseSearchPlugin implements SearchPlugin {  ││    // 抽象属性（子类必须实现）                                ││    abstract id: string                                       ││    abstract name: string                                     ││    abstract icon: React.ComponentType                        ││                                                              ││    // 默认实现                                               ││    priority: number = 50                                     ││                                                              ││    // 工具方法                                               ││    protected fuzzyMatch(query, text): number                 ││    protected calculateHighlights(query, text): Range[]       ││                                                              ││    // 默认实现（可覆盖）                                      ││    onSelect(result, context): void                           ││    isEnabled(context): boolean                               ││  }                                                           │└─────────────────────────────────────────────────────────────┘                          ↓ extends┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐│ MessageSearch    │  │ ProjectSearch    │  │ SessionSearch    ││ Plugin           │  │ Plugin           │  │ Plugin           ││                  │  │                  │  │                  ││ id: "message-    │  │ id: "project-    │  │ id: "session-    ││      search"     │  │      search"     │  │      search"     ││ priority: 80     │  │ priority: 70     │  │ priority: 60     ││                  │  │                  │  │                  ││ search():        │  │ search():        │  │ search():        ││ - Tauri API      │  │ - 提取项目       │  │ - 搜索会话       ││                  │  │                  │  │                  ││ onSelect():      │  │ onSelect():      │  │ onSelect():      ││ - 打开会话       │  │ - 切换项目       │  │ - 打开会话       │└──────────────────┘  └──────────────────┘  └──────────────────┘```## 性能优化架构```┌─────────────────────────────────────────────────────────────┐│                      Performance Layer                       ││                                                              ││  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐││  │   防抖搜索      │  │   虚拟滚动      │  │   LRU 缓存     │││  │                │  │                │  │                │││  │ 延迟: 300ms    │  │ 阈值: 50 条    │  │ 大小: 100 条   │││  │ 取消未完成请求  │  │ 项高度: 60px   │  │ TTL: 5 分钟    │││  │                │  │ 帧率: 60fps    │  │                │││  └────────────────┘  └────────────────┘  └────────────────┘││                                                              ││  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐││  │   并行搜索      │  │   懒加载插件    │  │   React.memo   │││  │                │  │                │  │                │││  │ Promise.all()  │  │ 按需加载       │  │ 优化重渲染     │││  │ 所有插件并行    │  │ 减少初始加载    │  │                │││  └────────────────┘  └────────────────┘  └────────────────┘│└─────────────────────────────────────────────────────────────┘```## 组件层次结构```App└── CommandPalette    ├── 背景遮罩 (onClick → close)    └── 面板容器 (max-w-2xl, max-h-60vh)        └── CommandMenu            ├── 搜索框区域            │   ├── Search Icon            │   ├── Input (cmdk)            │   ├── Loading Spinner (条件渲染)            │   └── ESC 提示            │            └── 结果列表区域 (cmdk-list)                ├── CommandLoading (isSearching)                ├── CommandEmpty (无结果)                └── CommandGroup[] (按插件分组)                    ├── Group Heading (插件名称)                    └── CommandItem[]                        ├── Icon                        ├── Content                        │   ├── Title (高亮)                        │   ├── Subtitle (高亮)                        │   └── Description (高亮)                        └── Score (开发模式)```## 状态管理架构```┌─────────────────────────────────────────────────────────────┐│                    useCommandMenu Store                      ││                                                              ││  State:                                                      ││  ├── isOpen: boolean                                         ││  ├── query: string                                           ││  ├── results: SearchPluginResult[]                           ││  ├── isSearching: boolean                                    ││  └── selectedIndex: number                                   ││                                                              ││  Actions:                                                    ││  ├── open()                                                  ││  ├── close()                                                 ││  ├── toggle()                                                ││  ├── setQuery(query)                                         ││  ├── setResults(results)                                     ││  ├── setIsSearching(isSearching)                             ││  ├── setSelectedIndex(index)                                 ││  └── reset()                                                 ││                                                              ││  Side Effects:                                               ││  ├── 监听 query 变化 → 防抖搜索                               ││  ├── 监听 isOpen 变化 → 清理状态                              ││  └── 取消未完成的搜索请求                                      │└─────────────────────────────────────────────────────────────┘```## 缓存架构```┌─────────────────────────────────────────────────────────────┐│                      LRU Cache                               ││                                                              ││  Map<string, CacheEntry>                                     ││  ├── "message-search:auth" → { results: [...], ts: ... }    ││  ├── "project-search:auth" → { results: [...], ts: ... }    ││  ├── "session-search:auth" → { results: [...], ts: ... }    ││  └── ...                                                     ││                                                              ││  配置:                                                        ││  ├── 最大条目: 100                                            ││  ├── TTL: 5 分钟                                              ││  └── 淘汰策略: LRU (Least Recently Used)                      ││                                                              ││  操作:                                                        ││  ├── get(query) → results | null                             ││  │   ├── 检查是否存在                                         ││  │   ├── 检查是否过期                                         ││  │   └── 返回结果或 null                                      ││  │                                                            ││  ├── set(query, results)                                     ││  │   ├── 检查缓存是否满                                       ││  │   ├── 如果满，删除最旧的条目                                ││  │   └── 添加新条目                                           ││  │                                                            ││  └── clear()                                                 ││      └── 清空所有缓存                                         │└─────────────────────────────────────────────────────────────┘```---*架构图生成日期: 2026-01-31*
+# cmdk Architecture Diagrams
+
+## System Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                            App.tsx                                   │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                    CommandPalette                              │  │
+│  │  ┌─────────────────────────────────────────────────────────┐  │  │
+│  │  │                  CommandMenu                             │  │  │
+│  │  │  ┌───────────────────────────────────────────────────┐  │  │  │
+│  │  │  │  🔍 Input (Search Box)                            │  │  │  │
+│  │  │  └───────────────────────────────────────────────────┘  │  │  │
+│  │  │  ┌───────────────────────────────────────────────────┐  │  │  │
+│  │  │  │  📋 CommandList (Result List)                     │  │  │  │
+│  │  │  │    ┌─────────────────────────────────────────┐    │  │  │  │
+│  │  │  │    │  💬 Message Search Results              │    │  │  │  │
+│  │  │  │    │    - CommandItem                        │    │  │  │  │
+│  │  │  │    │    - CommandItem                        │    │  │  │  │
+│  │  │  │    └─────────────────────────────────────────┘    │  │  │  │
+│  │  │  │    ┌─────────────────────────────────────────┐    │  │  │  │
+│  │  │  │    │  📁 Project Search Results              │    │  │  │  │
+│  │  │  │    │    - CommandItem                        │    │  │  │  │
+│  │  │  │    └─────────────────────────────────────────┘    │  │  │  │
+│  │  │  │    ┌─────────────────────────────────────────┐    │  │  │  │
+│  │  │  │    │  📄 Session Search Results              │    │  │  │  │
+│  │  │  │    │    - CommandItem                        │    │  │  │  │
+│  │  │  │    └─────────────────────────────────────────┘    │  │  │  │
+│  │  │  └───────────────────────────────────────────────────┘  │  │  │
+│  │  └─────────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+                                  ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Hooks Layer                                  │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
+│  │ useCommandMenu   │  │ useSearchPlugins │  │ useSearchCache   │  │
+│  │                  │  │                  │  │                  │  │
+│  │ - isOpen         │  │ - registry       │  │ - get()          │  │
+│  │ - query          │  │ - search()       │  │ - set()          │  │
+│  │ - results        │  │ - isSearching    │  │ - clear()        │  │
+│  │ - open()         │  │                  │  │                  │  │
+│  │ - close()        │  │                  │  │ LRU Cache:       │  │
+│  │ - setQuery()     │  │                  │  │ - 100 entries    │  │
+│  │                  │  │                  │  │ - 5 min TTL      │  │
+│  │ Debounce: 300ms  │  │ Parallel search  │  │                  │  │
+│  │ Cancel requests  │  │                  │  │                  │  │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+                                  ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Plugin System Layer                             │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                     PluginRegistry                             │  │
+│  │                                                                │  │
+│  │  - register(plugin)                                            │  │
+│  │  - unregister(pluginId)                                        │  │
+│  │  - get(pluginId)                                               │  │
+│  │  - getAll()                                                    │  │
+│  │  - search(query, context) → Promise<SearchPluginResult[]>     │  │
+│  │                                                                │  │
+│  │  Execute all plugin searches in parallel → Merge results → Sort by score │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+                                  ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│                       Plugin Implementations                         │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
+│  │ 💬 Message       │  │ 📁 Project       │  │ 📄 Session       │  │
+│  │ SearchPlugin     │  │ SearchPlugin     │  │ SearchPlugin     │  │
+│  │                  │  │                  │  │                  │  │
+│  │ Priority: 80     │  │ Priority: 70     │  │ Priority: 60     │  │
+│  │                  │  │                  │  │                  │  │
+│  │ search():        │  │ search():        │  │ search():        │  │
+│  │ - Call Tauri API │  │ - Extract project│  │ - Search session │  │
+│  │ - Search message │  │   list           │  │   name           │  │
+│  │   content        │  │ - Fuzzy match    │  │ - Search path    │  │
+│  │ - Format results │  │ - Show count     │  │ - Show metadata  │  │
+│  │                  │  │                  │  │                  │  │
+│  │ onSelect():      │  │ onSelect():      │  │ onSelect():      │  │
+│  │ - Open session   │  │ - Switch project │  │ - Open session   │  │
+│  │                  │  │   view           │  │                  │  │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘  │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                  BaseSearchPlugin                             │  │
+│  │                                                               │  │
+│  │  - fuzzyMatch(query, text) → score                           │  │
+│  │  - calculateHighlights(query, text) → HighlightRange[]       │  │
+│  │  - isEnabled(context) → boolean                              │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Data Flow Diagram
+
+```
+User presses Cmd+K
+    ↓
+CommandPalette.open()
+    ↓
+useCommandMenu.open()
+    ↓
+Display command palette
+    ↓
+User enters query "auth"
+    ↓
+useCommandMenu.setQuery("auth")
+    ↓
+Debounce 300ms
+    ↓
+useSearchPlugins.search("auth")
+    ↓
+Check cache
+    ├─ Hit → Return cached results
+    └─ Miss ↓
+         PluginRegistry.search("auth", context)
+              ↓
+         Promise.all([
+           MessageSearchPlugin.search("auth", context),
+           ProjectSearchPlugin.search("auth", context),
+           SessionSearchPlugin.search("auth", context)
+         ])
+              ↓
+         [
+           { id: "msg-1", title: "auth implementation", score: 0.9, pluginId: "message-search" },
+           { id: "proj-1", title: "/auth-service", score: 0.8, pluginId: "project-search" },
+           { id: "sess-1", title: "auth session", score: 0.7, pluginId: "session-search" }
+         ]
+              ↓
+         Merge results + Sort (by score × priority)
+              ↓
+         Cache results (key: "message-search:auth", "project-search:auth", ...)
+              ↓
+         Return results
+    ↓
+useCommandMenu.setResults(results)
+    ↓
+CommandMenu renders results
+    ├─ Group by plugin
+    ├─ Highlight matched text
+    └─ Virtual scrolling (if > 50 items)
+    ↓
+User selects result (press Enter)
+    ↓
+plugin.onSelect(result, context)
+    ├─ MessageSearchPlugin → Open session
+    ├─ ProjectSearchPlugin → Switch project view
+    └─ SessionSearchPlugin → Open session
+    ↓
+CommandPalette.close()
+```
+
+## Plugin System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      SearchPlugin Interface                  │
+│                                                              │
+│  interface SearchPlugin {                                    │
+│    // Metadata                                               │
+│    id: string                                                │
+│    name: string                                              │
+│    icon: React.ComponentType                                 │
+│    description: string                                       │
+│    keywords: string[]                                        │
+│    priority: number                                          │
+│                                                              │
+│    // Core methods                                           │
+│    search(query, context): Promise<SearchPluginResult[]>    │
+│    onSelect(result, context): void                           │
+│                                                              │
+│    // Optional methods                                       │
+│    renderItem?(result): React.ReactNode                      │
+│    isEnabled?(context): boolean                              │
+│    onMount?(): void                                          │
+│    onUnmount?(): void                                        │
+│  }                                                           │
+└─────────────────────────────────────────────────────────────┘
+                          ↓ implements
+┌─────────────────────────────────────────────────────────────┐
+│                    BaseSearchPlugin                          │
+│                                                              │
+│  abstract class BaseSearchPlugin implements SearchPlugin {  │
+│    // Abstract properties (subclasses must implement)        │
+│    abstract id: string                                       │
+│    abstract name: string                                     │
+│    abstract icon: React.ComponentType                        │
+│                                                              │
+│    // Default implementation                                 │
+│    priority: number = 50                                     │
+│                                                              │
+│    // Utility methods                                        │
+│    protected fuzzyMatch(query, text): number                 │
+│    protected calculateHighlights(query, text): Range[]       │
+│                                                              │
+│    // Default implementation (can be overridden)             │
+│    onSelect(result, context): void                           │
+│    isEnabled(context): boolean                               │
+│  }                                                           │
+└─────────────────────────────────────────────────────────────┘
+                          ↓ extends
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│ MessageSearch    │  │ ProjectSearch    │  │ SessionSearch    │
+│ Plugin           │  │ Plugin           │  │ Plugin           │
+│                  │  │                  │  │                  │
+│ id: "message-    │  │ id: "project-    │  │ id: "session-    │
+│      search"     │  │      search"     │  │      search"     │
+│ priority: 80     │  │ priority: 70     │  │ priority: 60     │
+│                  │  │                  │  │                  │
+│ search():        │  │ search():        │  │ search():        │
+│ - Tauri API      │  │ - Extract project│  │ - Search session │
+│                  │  │                  │  │                  │
+│ onSelect():      │  │ onSelect():      │  │ onSelect():      │
+│ - Open session   │  │ - Switch project │  │ - Open session   │
+└──────────────────┘  └──────────────────┘  └──────────────────┘
+```
+
+## Performance Optimization Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Performance Layer                       │
+│                                                              │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐│
+│  │   Debounce     │  │   Virtual      │  │   LRU Cache    ││
+│  │   Search       │  │   Scroll       │  │                ││
+│  │                │  │                │  │                ││
+│  │ Delay: 300ms   │  │ Threshold: 50  │  │ Size: 100      ││
+│  │ Cancel pending │  │ Item height:   │  │ TTL: 5 min     ││
+│  │ requests       │  │ 60px           │  │                ││
+│  │                │  │ Frame rate:    │  │                ││
+│  │                │  │ 60fps          │  │                ││
+│  └────────────────┘  └────────────────┘  └────────────────┘│
+│                                                              │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐│
+│  │   Parallel     │  │   Lazy Plugin  │  │   React.memo   ││
+│  │   Search       │  │   Loading      │  │                ││
+│  │                │  │                │  │                ││
+│  │ Promise.all()  │  │ Load on demand │  │ Optimize       ││
+│  │ All plugins    │  │ Reduce initial │  │ re-renders     ││
+│  │ in parallel    │  │ load           │  │                ││
+│  └────────────────┘  └────────────────┘  └────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Component Hierarchy
+
+```
+App
+└── CommandPalette
+    ├── Background overlay (onClick → close)
+    └── Panel container (max-w-2xl, max-h-60vh)
+        └── CommandMenu
+            ├── Search box area
+            │   ├── Search Icon
+            │   ├── Input (cmdk)
+            │   ├── Loading Spinner (conditional render)
+            │   └── ESC hint
+            │
+            └── Result list area (cmdk-list)
+                ├── CommandLoading (isSearching)
+                ├── CommandEmpty (no results)
+                └── CommandGroup[] (grouped by plugin)
+                    ├── Group Heading (plugin name)
+                    └── CommandItem[]
+                        ├── Icon
+                        ├── Content
+                        │   ├── Title (highlighted)
+                        │   ├── Subtitle (highlighted)
+                        │   └── Description (highlighted)
+                        └── Score (dev mode)
+```
+
+## State Management Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    useCommandMenu Store                      │
+│                                                              │
+│  State:                                                      │
+│  ├── isOpen: boolean                                         │
+│  ├── query: string                                           │
+│  ├── results: SearchPluginResult[]                           │
+│  ├── isSearching: boolean                                    │
+│  └── selectedIndex: number                                   │
+│                                                              │
+│  Actions:                                                    │
+│  ├── open()                                                  │
+│  ├── close()                                                 │
+│  ├── toggle()                                                │
+│  ├── setQuery(query)                                         │
+│  ├── setResults(results)                                     │
+│  ├── setIsSearching(isSearching)                             │
+│  ├── setSelectedIndex(index)                                 │
+│  └── reset()                                                 │
+│                                                              │
+│  Side Effects:                                               │
+│  ├── Listen for query changes → Debounce search              │
+│  ├── Listen for isOpen changes → Clear state                 │
+│  └── Cancel unfinished search requests                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Cache Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      LRU Cache                               │
+│                                                              │
+│  Map<string, CacheEntry>                                     │
+│  ├── "message-search:auth" → { results: [...], ts: ... }    │
+│  ├── "project-search:auth" → { results: [...], ts: ... }    │
+│  ├── "session-search:auth" → { results: [...], ts: ... }    │
+│  └── ...                                                     │
+│                                                              │
+│  Configuration:                                              │
+│  ├── Max entries: 100                                        │
+│  ├── TTL: 5 minutes                                          │
+│  └── Eviction policy: LRU (Least Recently Used)              │
+│                                                              │
+│  Operations:                                                 │
+│  ├── get(query) → results | null                             │
+│  │   ├── Check if exists                                     │
+│  │   ├── Check if expired                                     │
+│  │   └── Return result or null                               │
+│  │                                                            │
+│  ├── set(query, results)                                     │
+│  │   ├── Check if cache is full                              │
+│  │   ├── If full, delete oldest entry                        │
+│  │   └── Add new entry                                       │
+│  │                                                            │
+│  └── clear()                                                 │
+│      └── Clear all cache                                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+*Architecture Diagrams Generated: 2026-01-31*

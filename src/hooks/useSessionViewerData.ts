@@ -7,6 +7,7 @@ import { trimMarkdownCacheOnSessionSwitch } from '../utils/markdown'
 import { getCachedSettings } from '../utils/settingsApi'
 import { parseSessionEntriesWithLineCount } from '../utils/session'
 import { isDemoModeEnabled, readDemoSessionChunk } from '../demo'
+import * as path from 'path'
 
 interface SessionCacheItem {
   entries: SessionEntry[]
@@ -393,11 +394,12 @@ export function useSessionViewerData({
     if (!sessionPath || loading) return
     if (isDemoModeEnabled()) return
 
-    let unlisten: (() => void) | null = null
+    let unlistenSessionsChanged: (() => void) | null = null
+    let unlistenLiveEntry: (() => void) | null = null
 
     const setup = async () => {
       try {
-        unlisten = await listen<SessionsDiff>('sessions-changed', (event) => {
+        unlistenSessionsChanged = await listen<SessionsDiff>('sessions-changed', (event) => {
           const diff = event.payload
           if (!diff?.updated?.length) return
 
@@ -406,9 +408,64 @@ export function useSessionViewerData({
             void loadMoreHistory({ asRealtime: true })
           }
         })
+
+        // ── Pi Agent live streaming ──────────────────────────────
+        // Derive sessionId from the current session path for matching
+        const sessionId = path.basename(sessionPath.replace(/\.jsonl$/, ''))
+
+        unlistenLiveEntry = await listen<{ sessionId: string; eventType: string; entry: SessionEntry }>(
+          'pi-agent:entry',
+          ({ payload }) => {
+            // Match by sessionId
+            if (payload.sessionId !== sessionId) return
+
+            // Also double-check by sessionPath if available (as a dynamic property)
+            const entryAsRecord = payload.entry as unknown as Record<string, unknown>
+            if (entryAsRecord._sessionPath && entryAsRecord._sessionPath !== sessionPath) return
+
+            const liveEntry = payload.entry as SessionEntry
+            if (!liveEntry || !liveEntry.id) return
+
+            const eventType = payload.eventType
+
+            // Only merge message and tool_execution entries into the viewer
+            if (!eventType.startsWith('message_') && !eventType.startsWith('tool_execution_')) {
+              return
+            }
+
+            setEntries((prev) => {
+              // Check if entry already exists (from disk or previous live)
+              if (prev.some((e) => e.id === liveEntry.id)) return prev
+
+              const merged = [...prev, liveEntry]
+
+              // Update cache
+              cacheSessionContent(sessionPath, {
+                entries: merged,
+                lineCount: lineCountRef.current,
+                nextOffset: nextOffsetRef.current,
+                fileSize: fileSizeRef.current,
+                hasMore: hasMoreHistoryRef.current,
+              })
+
+              return merged
+            })
+
+            // Update active entry and scroll state
+            if (eventType === 'message_start' || eventType === 'message_update') {
+              setActiveEntryId(liveEntry.id)
+
+              if (isAtBottomRef.current) {
+                pendingScrollToBottomRef.current = true
+              } else {
+                setHasNewMessages(true)
+              }
+            }
+          },
+        )
       } catch (listenerError) {
         console.error(
-          '[useSessionViewerData] Failed to setup sessions-changed listener:',
+          '[useSessionViewerData] Failed to setup listeners:',
           listenerError,
         )
       }
@@ -417,11 +474,14 @@ export function useSessionViewerData({
     void setup()
 
     return () => {
-      if (unlisten) {
-        unlisten()
+      if (unlistenSessionsChanged) {
+        unlistenSessionsChanged()
+      }
+      if (unlistenLiveEntry) {
+        unlistenLiveEntry()
       }
     }
-  }, [loadMoreHistory, loading, sessionPath])
+  }, [loadMoreHistory, loading, sessionPath, isAtBottomRef])
 
   return {
     entries,

@@ -18,6 +18,11 @@
     "release:version:sync": "node scripts/release-version.mjs sync",
     "prepare": "husky"
   },
+  "pi": {
+    "extensions": [
+      "./extensions/pi-session-bridge.ts"
+    ]
+  },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
@@ -39,7 +44,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-i18next": "^16.5.4",
-    "recharts": "^3.7.0"
+    "recharts": "^3.7.0",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.0",
@@ -47,12 +53,14 @@
     "@types/node": "^25.1.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.23",
     "code-inspector-plugin": "^1.4.2",
     "husky": "^9.1.7",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.0",
+    "tau-mirror": "^1.0.7",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "vite-plugin-pwa": "^1.2.0"
