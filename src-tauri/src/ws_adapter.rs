@@ -222,8 +222,8 @@ impl WsAdapter {
                             // ── Pi agent protocol: RPC response ─────────────────
                             if text.contains("\"type\"") && text.contains("\"response\"") {
                                 if let Ok(resp) = serde_json::from_str::<serde_json::Value>(&text) {
-                                    if let Some(session_id) = resp["sessionId"].as_str() {
-                                        self.app_state.pi_agent_registry.forward_response(session_id, resp);
+                                    if let Some(session_id) = resp["sessionId"].as_str().map(|s| s.to_string()) {
+                                        self.app_state.pi_agent_registry.forward_response(&session_id, resp);
                                     }
                                 }
                                 continue;
