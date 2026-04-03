@@ -20,7 +20,8 @@ function ToolCallList({
   searchQuery = '',
 }: ToolCallListProps) {
   const { t } = useTranslation()
-  const { theme } = useAppearance()
+  const { appearance } = useAppearance()
+  const theme = appearance.theme
   const isMobile = useIsMobile()
   const {
     isToolExpanded,

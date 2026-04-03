@@ -442,7 +442,7 @@ async fn init_http_adapter(
     }
 
     async fn cli_dispatch(command: &str, payload: Value) -> Result<Value, String> {
-        pi_session_manager::dispatch::dispatch(command, &payload).await
+        pi_session_manager::dispatch::dispatch(&None, command, &payload).await
     }
 
     fn json_error(error: readonly::ApiReadonlyError) -> Json<Value> {
@@ -461,7 +461,7 @@ async fn init_http_adapter(
     }
 
     async fn api_handler(Json(body): Json<CmdReq>) -> Json<Value> {
-        match pi_session_manager::dispatch::dispatch(&body.command, &body.payload).await {
+        match pi_session_manager::dispatch::dispatch(&None, &body.command, &body.payload).await {
             Ok(data) => Json(serde_json::json!({ "success": true, "data": data })),
             Err(error) => Json(serde_json::json!({ "success": false, "error": error })),
         }
@@ -482,7 +482,7 @@ async fn init_http_adapter(
             payload["q"] = serde_json::json!(text);
         }
 
-        match pi_session_manager::dispatch::dispatch("scan_sessions", &payload).await {
+        match pi_session_manager::dispatch::dispatch(&None, "scan_sessions", &payload).await {
             Ok(sessions) => Json(serde_json::json!({ "success": true, "data": sessions })),
             Err(error) => Json(serde_json::json!({ "success": false, "error": error })),
         }

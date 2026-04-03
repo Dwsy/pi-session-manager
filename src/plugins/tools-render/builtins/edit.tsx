@@ -249,7 +249,7 @@ function EditExecution({
  * Generate search segments for edit tool
  * Includes diff content and error output
  */
-function getEditSearchSegments(toolCall: Content, resolvedData: ResolvedToolData): string[] {
+function getEditSearchSegments(_toolCall: Content, resolvedData: ResolvedToolData): string[] {
   const segments: string[] = []
 
   if (resolvedData.diff) {
@@ -272,7 +272,7 @@ export const editToolPlugin: ToolRenderPlugin = {
   component: EditExecution,
   resolveData: defaultResolveData,
   getSearchSegments: getEditSearchSegments,
-  getPreview: (toolCall, data) => {
+  getPreview: (_toolCall, data) => {
     const path = data.args.file_path || data.args.path || ''
     return `Edit: ${path}`
   },

@@ -186,7 +186,7 @@ function GenericToolCall({
  * Generate search segments for generic tool
  * Includes formatted arguments and output
  */
-function getGenericSearchSegments(toolCall: Content, resolvedData: ResolvedToolData): string[] {
+function getGenericSearchSegments(_toolCall: Content, resolvedData: ResolvedToolData): string[] {
   const segments: string[] = []
 
   const normalizedArgs = normalizeToolArguments(resolvedData.args)
@@ -210,7 +210,7 @@ export const genericToolPlugin: ToolRenderPlugin = {
   component: GenericToolCall,
   resolveData: defaultResolveData,
   getSearchSegments: getGenericSearchSegments,
-  getPreview: (toolCall, data) => {
+  getPreview: (_toolCall, data) => {
     return `${data.name}: ${JSON.stringify(data.args).slice(0, 50)}`
   },
 }

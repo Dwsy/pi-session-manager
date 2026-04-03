@@ -563,6 +563,7 @@ fn main() {
             pi_session_manager::list_model_config_versions,
             pi_session_manager::test_model_http,
             pi_session_manager::read_resource_file,
+            pi_session_manager::get_pi_live_sessions,
             pi_session_manager::list_config_versions,
             pi_session_manager::get_config_version,
             pi_session_manager::restore_config_version

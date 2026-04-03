@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
 import type { Content } from '../../../types'
 import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '../types'
 import { defaultResolveData } from '../utils/resolveData'
@@ -19,7 +18,6 @@ function BashExecution({
   searchQuery,
   context,
 }: ToolRenderProps) {
-  const { t } = useTranslation()
   const { args, output, result, entryId } = resolvedData
   const { isExpanded, toggleExpanded, copyToClipboard } = context
 
@@ -126,7 +124,7 @@ function BashExecution({
  * Generate search segments for bash tool
  * Includes highlighted command and output
  */
-function getBashSearchSegments(toolCall: Content, resolvedData: ResolvedToolData): string[] {
+function getBashSearchSegments(_toolCall: Content, resolvedData: ResolvedToolData): string[] {
   const segments: string[] = []
 
   if (resolvedData.args.command) {
@@ -149,7 +147,7 @@ export const bashToolPlugin: ToolRenderPlugin = {
   component: BashExecution,
   resolveData: defaultResolveData,
   getSearchSegments: getBashSearchSegments,
-  getPreview: (toolCall, data) => {
+  getPreview: (_toolCall, data) => {
     const cmd = data.args.command || ''
     return `$ ${cmd.length > 50 ? cmd.slice(0, 50) + '...' : cmd}`
   },

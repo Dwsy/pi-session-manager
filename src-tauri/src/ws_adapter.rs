@@ -136,12 +136,30 @@ impl WsAdapter {
                                 continue;
                             }
 
+                            // Debug: log raw message start for pi-agent detection
+                            let has_type = text.contains("\"type\"");
+                            let has_register = text.contains("\"register\"");
+                            let has_entry = text.contains("\"pi-agent:entry\"");
+                            if has_type || has_register || has_entry {
+                                log::info!("[WS] Pi agent msg detected: type={} reg={} entry={} len={}", has_type, has_register, has_entry, text.len());
+                            }
+
                             // Pi agent protocol: register with sessionId
                             if text.contains("\"type\"") && text.contains("\"register\"") {
+                                log::info!("[WS] Pi register message detected, len={}", text.len());
                                 if let Ok(register) = serde_json::from_str::<serde_json::Value>(&text) {
                                     let session_id = register["payload"]["sessionId"].as_str().unwrap_or("");
                                     if !session_id.is_empty() {
-                                        log::info!("Pi agent registered: session={session_id}, pid={:?}", register["payload"]["pid"]);
+                                        let session_path = register["payload"]["sessionPath"].as_str().map(|s| s.to_string());
+                                        let pid = register["payload"]["pid"].as_u64().map(|p| p as u32);
+                                        let cwd = register["payload"]["cwd"].as_str().map(|s| s.to_string());
+                                        
+                                        log::info!("Pi agent registered: session={session_id}, pid={pid:?}");
+                                        
+                                        self.app_state.pi_agent_registry.register(
+                                            session_id.to_string(), session_path, pid, cwd
+                                        );
+                                        
                                         let ws_event = WsEvent {
                                             event_type: "event".to_string(),
                                             event: "pi-agent:register".to_string(),
@@ -155,9 +173,14 @@ impl WsAdapter {
 
                             // Pi agent protocol: live entry stream
                             if text.contains("\"type\"") && text.contains("\"pi-agent:entry\"") {
+                                log::info!("[WS] Pi entry message detected, len={}", text.len());
                                 if let Ok(entry) = serde_json::from_str::<serde_json::Value>(&text) {
                                     let session_id = entry["sessionId"].as_str().unwrap_or("");
                                     if !session_id.is_empty() {
+                                        let event_type = entry["payload"]["eventType"].as_str().unwrap_or("");
+                                        
+                                        self.app_state.pi_agent_registry.record_entry(session_id, event_type);
+                                        
                                         let ws_event = WsEvent {
                                             event_type: "event".to_string(),
                                             event: "pi-agent:entry".to_string(),
@@ -438,11 +461,15 @@ pub async fn dispatch(
         "get_available_shells" => {
             return Ok(serde_json::json!(crate::commands::terminal::scan_shells()));
         }
+        "get_pi_live_sessions" => {
+            let sessions = app_state.pi_agent_registry.list();
+            return Ok(serde_json::to_value(sessions).unwrap());
+        }
         _ => {}
     }
 
     // Delegate to shared dispatch (pure business logic)
-    crate::dispatch::dispatch(command, payload).await
+    crate::dispatch::dispatch(&None, command, payload).await
 }
 
 pub async fn init_ws_adapter(

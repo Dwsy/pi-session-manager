@@ -54,4 +54,13 @@ export const stats = {
   achievements: {
     title: 'Achievements',
   },
+  tabs: {
+    overview: 'Overview',
+    activity: 'Activity',
+    projects: 'Projects',
+    time: 'Time',
+    tokens: 'Tokens',
+    productivity: 'Productivity',
+    achievements: 'Achievements',
+  },
 } as const

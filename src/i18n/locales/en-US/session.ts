@@ -115,4 +115,5 @@ export const session = {
     },
   },
   newMessages: 'New messages',
+  userMessage: 'User message',
 } as const

@@ -1,4 +1,5 @@
 use crate::terminal::TerminalManager;
+use crate::pi_agent_registry::{PiAgentRegistry, SharedPiAgentRegistry};
 use std::sync::Arc;
 use std::sync::Mutex;
 use tauri::AppHandle;
@@ -15,6 +16,7 @@ pub struct AppState {
     pub app_handle: AppHandle,
     pub event_tx: broadcast::Sender<WsEvent>,
     pub terminal_manager: Mutex<TerminalManager>,
+    pub pi_agent_registry: SharedPiAgentRegistry,
 }
 
 impl AppState {
@@ -24,6 +26,7 @@ impl AppState {
             app_handle,
             event_tx,
             terminal_manager: Mutex::new(TerminalManager::new()),
+            pi_agent_registry: Arc::new(PiAgentRegistry::new()),
         }
     }
 

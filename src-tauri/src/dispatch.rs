@@ -27,7 +27,7 @@ pub fn extract_usize(payload: &Value, key: &str) -> Result<usize, String> {
 /// This function contains all pure business logic (no Tauri dependency).
 /// GUI-only commands (terminal, save_session_paths with watcher) are handled
 /// by the caller in ws_adapter.rs.
-pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
+pub async fn dispatch(app_state: &Option<crate::app_state::SharedAppState>, command: &str, payload: &Value) -> Result<Value, String> {
     match command {
         "scan_sessions" => {
             let result = crate::scanner::scan_sessions().await?;
@@ -662,6 +662,14 @@ pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
             let key_preview = extract_string(payload, "keyPreview")?;
             crate::revoke_api_key(key_preview).await?;
             Ok(Value::Null)
+        }
+        "get_pi_live_sessions" => {
+            if let Some(state) = app_state {
+                let sessions = state.pi_agent_registry.list();
+                Ok(serde_json::to_value(sessions).unwrap())
+            } else {
+                Err("get_pi_live_sessions requires GUI mode".to_string())
+            }
         }
 
         // Desktop/GUI-only commands

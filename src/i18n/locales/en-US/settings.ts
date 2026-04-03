@@ -29,6 +29,7 @@ export const settings = {
     shortcuts: 'Shortcuts',
     advanced: 'Advanced',
     apiTest: 'API Test',
+    importExport: 'Import/Export',
   },
   terminal: {
     // Resume Mode
@@ -69,6 +70,7 @@ export const settings = {
     exampleDefault: 'Default (empty)',
     exampleTmux: 'tmux session',
     exampleTmuxWithCmd: 'tmux with custom command',
+    exampleTmuxWithCwd: 'tmux with working dir',
     // Built-in Terminal
     builtinEnabled: 'Built-in Terminal',
     builtinEnabledHelp: 'Use integrated terminal panel inside the app (Ctrl+`)',
@@ -78,15 +80,29 @@ export const settings = {
     // Shortcuts
     shortcutResume: 'Resume',
     shortcutToggle: 'Toggle Terminal',
+    // Optional label
+    optional: 'Optional',
+    // Resume Command Description
+    resumeCommandDesc: 'Leave empty for default: cd {cwd} && {pi} --session {path}',
     // Legacy
     collapse: 'Collapse',
     expandSettings: 'Expand settings',
     // Terminal Options
     options: {
+      auto: { name: 'Auto', description: 'Auto detect' },
+      vscode: { name: 'VS Code', description: 'Visual Studio Code terminal' },
       iterm2: { name: 'iTerm2', description: 'Recommended macOS terminal' },
       terminal: { name: 'Terminal.app', description: 'Built-in macOS terminal' },
-      vscode: { name: 'VS Code', description: 'Visual Studio Code terminal' },
       custom: { name: 'Custom', description: 'Use custom command' },
+      powershell: { name: 'PowerShell', description: 'Windows PowerShell' },
+      cmd: { name: 'cmd', description: 'Command Prompt' },
+      gnomeTerminal: { name: 'GNOME Terminal', description: 'GNOME Terminal' },
+      konsole: { name: 'Konsole', description: 'KDE Konsole' },
+      kitty: { name: 'kitty', description: 'kitty terminal' },
+      alacritty: { name: 'Alacritty', description: 'Alacritty terminal' },
+      wezterm: { name: 'WezTerm', description: 'WezTerm terminal' },
+      windowsTerminal: { name: 'Windows Terminal', description: 'Windows Terminal' },
+      tmux: { name: 'tmux', description: 'tmux session (pi)' },
     },
   },
   appearance: {
@@ -363,6 +379,59 @@ export const settings = {
     help2: 'Check service address and port are correct',
     help3: 'Ensure APIs return JSON instead of frontend HTML fallback',
     help4: 'Only session retrieval APIs are exposed for now; embedding is disabled',
+  },
+  importExport: {
+    title: 'Import/Export Configuration',
+    description: 'Backup and restore all Pi Agent settings',
+    exportSection: {
+      title: 'Export Configuration',
+      description: 'Package all configuration files into a ZIP archive',
+      includes: 'Includes: models.json, settings.json, session-manager-config.toml',
+      button: 'Export Configuration',
+      success: 'Configuration exported to {{path}}',
+      failed: 'Export failed: {{reason}}',
+    },
+    importSection: {
+      title: 'Import Configuration',
+      description: 'Import configuration from a ZIP archive (auto-backup current config)',
+      autoBackup: 'Current configuration will be automatically backed up before import',
+      button: 'Select File',
+      success: 'Successfully imported {{count}} files',
+      failed: 'Import failed: {{reason}}',
+      warnings: '{{count}} warnings',
+    },
+    history: {
+      title: 'Import History',
+      description: 'Recent import operations',
+      noHistory: 'No import history yet',
+      records: '{{count}} records',
+      clearHistory: 'Clear History',
+      clearConfirm: 'This will clear all import history. Continue?',
+      cleared: 'History cleared',
+      restore: 'Restore',
+      restoreConfirm: 'This will overwrite current configuration with the backup from {{timestamp}}. Continue?',
+      restored: 'Configuration restored',
+      restoreFailed: 'Restore failed: {{reason}}',
+      noBackup: 'No backup available',
+    },
+    preview: {
+      title: 'Bundle Preview',
+      files: '{{count}} files, {{size}} total',
+      created: 'Created at {{time}}',
+      file: 'File',
+      size: 'Size',
+      status: 'Status',
+      willOverwrite: 'Will overwrite',
+      new: 'New',
+      cancel: 'Cancel',
+      import: 'Import & Backup',
+    },
+    lastResult: {
+      title: 'Last Import Result',
+      files: 'Imported files',
+      backup: 'Backup location',
+      warnings: '{{count}} warnings',
+    },
   },
   models: {
     searchPlaceholder: 'Search models...',

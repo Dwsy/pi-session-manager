@@ -39,6 +39,7 @@ import AdvancedSettings from './sections/AdvancedSettings'
 import ShortcutSettings from './sections/ShortcutSettings'
 import TagManagerSettings from './sections/TagManagerSettings'
 import APITestSettings from './sections/APITestSettings'
+import { ConfigBundleManager } from './sections/ConfigBundleManager'
 
 interface SettingsPanelProps {
   isOpen: boolean
@@ -209,6 +210,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     { id: 'shortcuts', icon: <Keyboard className="h-4 w-4" />, label: t('settings.sections.shortcuts', 'Shortcuts') },
     { id: 'advanced', icon: <Shield className="h-4 w-4" />, label: t('settings.sections.advanced', 'Advanced') },
     { id: 'api-test', icon: <Activity className="h-4 w-4" />, label: t('settings.sections.apiTest', 'API Test') },
+    { id: 'import-export', icon: <Download className="h-4 w-4" />, label: t('settings.sections.importExport', 'Import/Export') },
   ]
 
   return (
@@ -319,6 +321,7 @@ function MobileSettings({
       case 'shortcuts': return <ShortcutSettings />
       case 'advanced': return <AdvancedSettings settings={settings} onUpdate={onUpdate} />
       case 'api-test': return <APITestSettings />
+      case 'import-export': return <ConfigBundleManager />
       default: return null
     }
   }
@@ -556,6 +559,7 @@ function SettingsContent({
             {activeSection === 'shortcuts' && <ShortcutSettings />}
             {activeSection === 'advanced' && <AdvancedSettings settings={settings} onUpdate={onUpdate} />}
             {activeSection === 'api-test' && <APITestSettings />}
+            {activeSection === 'import-export' && <ConfigBundleManager />}
           </div>
         )}
       </div>

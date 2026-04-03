@@ -60,6 +60,7 @@ interface SessionListProps {
   onCreateTag?: (name: string, color: string) => void;
   selectionModeTrigger?: number;
   selectionModeDismissTrigger?: number;
+  liveSessionIds?: Set<string>;
 }
 
 export default function SessionList({
@@ -88,6 +89,7 @@ export default function SessionList({
   selectionModeTrigger,
   selectionModeDismissTrigger,
   searchQuery,
+  liveSessionIds,
 }: SessionListProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -803,6 +805,10 @@ export default function SessionList({
                             <span className="px-1.5 py-0.5 rounded bg-muted/40 text-[9px] sm:text-[10px] tabular-nums font-medium text-muted-foreground flex-shrink-0">
                               {session.message_count}
                             </span>
+
+                            {liveSessionIds?.has(session.id) && (
+                              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" title="Live" />
+                            )}
 
                             {sourceTag && (
                               <span className="px-1.5 py-0.5 rounded border border-blue-500/20 bg-blue-500/10 text-[9px] sm:text-[10px] text-blue-500/90 font-medium flex-shrink-0 flex items-center">

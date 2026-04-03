@@ -37,5 +37,6 @@ export const search = {
     sortNewest: 'Newest',
     sortOldest: 'Oldest',
     sortTitle: 'Sort by',
+    sessionIdMatch: 'session id',
   },
 } as const

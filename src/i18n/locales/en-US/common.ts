@@ -1,5 +1,6 @@
 export const common = {
   loading: 'Loading...',
+  clear: 'Clear',
   cancel: 'Cancel',
   save: 'Save',
   delete: 'Delete',

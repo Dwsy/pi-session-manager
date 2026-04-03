@@ -32,6 +32,8 @@ export const dashboard = {
     sessionsUnavailable: 'Session list unavailable in lightweight mode',
     projectsUnavailable: 'No project breakdown for this day',
     moreProjects: 'more projects',
+    detailedMode: 'Detailed mode',
+    lightweightMode: 'Lightweight mode',
   },
   activityTrend: {
     title: 'Activity Trend',
@@ -47,6 +49,7 @@ export const dashboard = {
     assistantMessages: 'Assistant Messages',
     ratio: 'User/Assistant Ratio',
     total: 'Total',
+    userAssistantRatio: 'User/Assistant Ratio',
   },
   projectsChart: {
     title: 'Top Projects',
@@ -128,6 +131,7 @@ export const dashboard = {
     veryHigh: 'Very High',
   },
   msgs: 'msgs',
+  noRecentSessions: 'No recent sessions',
   title: 'Dashboard',
   subtitle: 'Session insights and activity metrics',
   projectSubtitle: 'Project-level session insights and activity metrics',

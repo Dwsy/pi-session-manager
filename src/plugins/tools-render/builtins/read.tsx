@@ -4,6 +4,8 @@ import { defaultResolveData } from '../utils/resolveData'
 import { escapeHtml, getLanguageFromPath, renderCodeHtml } from '../../../utils/markdown'
 import { shortenPath } from '../../../utils/format'
 import CodeBlock from '../../../components/CodeBlock'
+import { useTranslation } from 'react-i18next'
+import type { CSSProperties } from 'react'
 
 /** Maximum height for tool output in pixels */
 const OUTPUT_MAX_HEIGHT = 300
@@ -118,7 +120,7 @@ function ReadExecution({
  * Generate search segments for read tool
  * Includes file content with syntax highlighting
  */
-function getReadSearchSegments(toolCall: Content, resolvedData: ResolvedToolData): string[] {
+function getReadSearchSegments(_toolCall: Content, resolvedData: ResolvedToolData): string[] {
   const segments: string[] = []
   const filePath = String(resolvedData.args.file_path || resolvedData.args.path || '')
 
@@ -138,7 +140,7 @@ export const readToolPlugin: ToolRenderPlugin = {
   component: ReadExecution,
   resolveData: defaultResolveData,
   getSearchSegments: getReadSearchSegments,
-  getPreview: (toolCall, data) => {
+  getPreview: (_toolCall, data) => {
     const path = data.args.file_path || data.args.path || ''
     return `Read: ${path}`
   },

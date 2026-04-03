@@ -371,7 +371,7 @@ function SubagentToolCall({
  * Generate search segments for subagent tool
  * Includes output and result metadata
  */
-function getSubagentSearchSegments(toolCall: Content, resolvedData: ResolvedToolData): string[] {
+function getSubagentSearchSegments(_toolCall: Content, resolvedData: ResolvedToolData): string[] {
   const segments: string[] = []
 
   if (resolvedData.output) {
@@ -398,7 +398,7 @@ export const subagentToolPlugin: ToolRenderPlugin = {
   component: SubagentToolCall,
   resolveData: defaultResolveData,
   getSearchSegments: getSubagentSearchSegments,
-  getPreview: (toolCall, data) => {
+  getPreview: (_toolCall, data) => {
     const agent = data.args?.agent || 'Subagent'
     return `${agent}: ${data.args?.task?.slice(0, 50) || ''}`
   },

@@ -1,5 +1,4 @@
 import type { CSSProperties } from 'react'
-import { useTranslation } from 'react-i18next'
 import type { Content } from '../../../types'
 import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '../types'
 import { defaultResolveData } from '../utils/resolveData'
@@ -19,7 +18,6 @@ function WriteExecution({
   searchQuery,
   context,
 }: ToolRenderProps) {
-  const { t } = useTranslation()
   const { args, output, entryId } = resolvedData
   const { isExpanded, toggleExpanded, isMobile } = context
 
@@ -100,7 +98,7 @@ function WriteExecution({
  * Generate search segments for write tool
  * Includes written content with syntax highlighting
  */
-function getWriteSearchSegments(toolCall: Content, resolvedData: ResolvedToolData): string[] {
+function getWriteSearchSegments(_toolCall: Content, resolvedData: ResolvedToolData): string[] {
   const segments: string[] = []
   const filePath = String(resolvedData.args.file_path || resolvedData.args.path || '')
 
@@ -124,7 +122,7 @@ export const writeToolPlugin: ToolRenderPlugin = {
   component: WriteExecution,
   resolveData: defaultResolveData,
   getSearchSegments: getWriteSearchSegments,
-  getPreview: (toolCall, data) => {
+  getPreview: (_toolCall, data) => {
     const path = data.args.file_path || data.args.path || ''
     return `Write: ${path}`
   },

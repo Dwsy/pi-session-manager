@@ -70,36 +70,28 @@ class BridgeConnection {
     this.intentionallyClosed = false;
 
     const url = PSM_TOKEN ? `${PSM_URL}?token=${PSM_TOKEN}` : PSM_URL;
-    console.log(`[psm-bridge] Connecting to ${url}`);
     this.ws = new WebSocket(url);
 
     this.ws.on("open", () => {
-      console.log("[psm-bridge] WebSocket connected");
       this.reconnectAttempts = 0;
       this.lastPongAt = Date.now();
       this.setState("connected");
     });
 
     this.ws.on("message", (data: Buffer) => {
-      const raw = data.toString();
-      console.log(`[psm-bridge] Received: ${raw.substring(0, 120)}`);
-      try { this.cb.onMessage(JSON.parse(raw)); } catch { /* skip */ }
+      try { this.cb.onMessage(JSON.parse(data.toString())); } catch { /* skip */ }
     });
 
     this.ws.on("close", (code, reason) => {
       this.stopHeartbeat();
-      console.log(`[psm-bridge] WebSocket closed: code=${code}, reason=${reason}`);
       const wasTimeout = Date.now() - this.lastPongAt > HB_TIMEOUT;
       if (wasTimeout) {
-        console.log("[psm-bridge] Close was due to heartbeat timeout");
         this.setState("disconnected");
       }
       if (!this.intentionallyClosed) this.scheduleReconnect();
     });
 
-    this.ws.on("error", (err) => {
-      console.log(`[psm-bridge] WebSocket error: ${err.message}`);
-    });
+    this.ws.on("error", () => { /* onclose fires after */ });
   }
 
   private scheduleReconnect() {
@@ -126,22 +118,17 @@ class BridgeConnection {
   startHeartbeat() {
     this.stopHeartbeat();
     this.lastPongAt = Date.now();
-    // Send first ping immediately so we don't timeout before first interval
     if (this.ws?.readyState === WebSocket.OPEN) {
       try { this.ws.send(JSON.stringify({ ping: true })); } catch {}
-      console.log("[psm-bridge] Initial ping sent");
     }
     this.hbTimer = setInterval(() => {
       if (this.ws?.readyState !== WebSocket.OPEN) { this.stopHeartbeat(); return; }
       const elapsed = Date.now() - this.lastPongAt;
-      console.log(`[psm-bridge] Heartbeat check: ${elapsed}ms since last pong`);
       if (elapsed > HB_TIMEOUT) {
-        console.log(`[psm-bridge] HEARTBEAT TIMEOUT (${elapsed}ms > ${HB_TIMEOUT}ms)`);
         this.setState("disconnected");
         this.cleanup();
         return;
       }
-      console.log("[psm-bridge] Sending ping");
       try { this.ws.send(JSON.stringify({ ping: true })); } catch {}
     }, HB_INTERVAL);
   }
@@ -151,8 +138,6 @@ class BridgeConnection {
   }
 
   pongReceived() {
-    const gap = Date.now() - this.lastPongAt;
-    console.log(`[psm-bridge] Pong received, gap=${gap}ms`);
     this.lastPongAt = Date.now();
   }
 

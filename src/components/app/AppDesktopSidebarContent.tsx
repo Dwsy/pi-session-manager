@@ -40,6 +40,7 @@ export type AppDesktopSidebarSessionListCommonProps = Pick<
   | "selectionModeTrigger"
   | "selectionModeDismissTrigger"
   | "searchQuery"
+  | "liveSessionIds"
 >;
 
 export interface AppDesktopSidebarContentProps {

@@ -141,7 +141,8 @@ function extractTranslationKeys(content: string, filePath: string): KeyUsage[] {
   // 匹配各种 t() 调用模式
   const patterns = [
     // t('key') 或 t('key', 'default') 或 t('key', {...})
-    /t\(\s*['"]([^'"]+)['"]\s*(?:,\s*['"]([^'"]*)['"])?\s*\)/g,
+    // 使用负向后瞻确保 t 不是单词的一部分（避免匹配 split 等）
+    /(?<![a-zA-Z0-9_])t\(\s*['"]([^'"]+)['"]\s*(?:,\s*['"]([^'"]*)['"])?\s*\)/g,
     // i18n.t('key') 或 context?.t('key')
     /(?:i18n|context)\??\.t\(\s*['"]([^'"]+)['"]\s*\)/g,
   ];
@@ -219,23 +220,52 @@ function extractTranslationFileKeys(obj: any, prefix = '', namespace = ''): Tran
 }
 
 /**
- * 加载翻译文件
+ * 加载翻译文件（使用动态 import 支持 ES 模块）
  */
-function loadTranslations(langDir: string): TranslationKey[] {
+async function loadTranslations(langDir: string): Promise<TranslationKey[]> {
   const allKeys: TranslationKey[] = [];
   
+  // 首先加载 index.ts 获取内联定义的 key（如 connection）
+  const indexPath = path.join(langDir, 'index.ts');
+  try {
+    const fileUrl = 'file://' + indexPath;
+    const indexModule = await import(fileUrl);
+    
+    // 处理 index.ts 的导出（enUS 对象）
+    if (indexModule.enUS) {
+      const enUS = indexModule.enUS;
+      for (const key in enUS) {
+        if (key === 'default' || key === '__esModule') continue;
+        
+        const value = enUS[key];
+        // 只处理内联定义的对象（不是从其他文件导入的模块）
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          // 检查是否是内联定义（有直接的字符串值）
+          const isInline = Object.values(value).some(v => typeof v === 'string');
+          if (isInline) {
+            const keys = extractTranslationFileKeys({ [key]: value }, '', key);
+            allKeys.push(...keys);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️ 无法加载 index.ts: ${indexPath}`, err);
+  }
+  
+  // 然后加载其他单独的 .ts 文件
   const files = fs.readdirSync(langDir)
     .filter(f => f.endsWith('.ts') && f !== 'index.ts');
   
   for (const file of files) {
     const filePath = path.join(langDir, file);
     try {
-      // 清除缓存
-      delete require.cache[require.resolve(filePath)];
-      const module = require(filePath);
+      // 使用动态 import 加载 ES 模块
+      const fileUrl = 'file://' + filePath;
+      const module = await import(fileUrl);
       
-      // 获取模块的默认导出或命名导出
-      const translations = module.default || module;
+      // 获取模块的命名导出（如 common, app 等）
+      const translations = module;
       
       // 获取 namespace（文件名）
       const namespace = file.replace('.ts', '');
@@ -243,7 +273,7 @@ function loadTranslations(langDir: string): TranslationKey[] {
       const keys = extractTranslationFileKeys(translations, '', namespace);
       allKeys.push(...keys);
     } catch (err) {
-      console.warn(`⚠️ 无法加载翻译文件: ${filePath}`);
+      console.warn(`⚠️ 无法加载翻译文件: ${filePath}`, err);
     }
   }
   
@@ -252,7 +282,7 @@ function loadTranslations(langDir: string): TranslationKey[] {
 
 // ============ 主扫描逻辑 ============
 
-function scan(): ScanReport {
+async function scan(): Promise<ScanReport> {
   console.log('🔍 正在扫描源代码...');
   
   // 1. 获取所有源文件
@@ -283,7 +313,7 @@ function scan(): ScanReport {
   // 3. 加载翻译文件
   console.log('\n📚 正在加载翻译文件...');
   const mainLangDir = path.join(I18N_DIR, MAIN_LANG);
-  const translationKeys = loadTranslations(mainLangDir);
+  const translationKeys = await loadTranslations(mainLangDir);
   console.log(`   📖 主语言 (${MAIN_LANG}) 包含 ${translationKeys.length} 个 key`);
   
   // 4. 对比分析
@@ -427,7 +457,7 @@ function exportJson(report: ScanReport) {
 // ============ 主函数 ============
 
 async function main() {
-  const report = scan();
+  const report = await scan();
   printReport(report);
   
   if (process.argv.includes('--json')) {

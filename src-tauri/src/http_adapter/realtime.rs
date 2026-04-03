@@ -113,6 +113,48 @@ async fn handle_ws_connection(
                             continue;
                         }
 
+                        // ── Pi agent protocol: register ─────────────────────
+                        if text.contains("\"type\"") && text.contains("\"register\"") {
+                            if let Ok(register) = serde_json::from_str::<Value>(&text) {
+                                let session_id = register["payload"]["sessionId"].as_str().unwrap_or("");
+                                if !session_id.is_empty() {
+                                    let session_path = register["payload"]["sessionPath"].as_str().map(|s| s.to_string());
+                                    let pid = register["payload"]["pid"].as_u64().map(|p| p as u32);
+                                    let cwd = register["payload"]["cwd"].as_str().map(|s| s.to_string());
+                                    log::info!("[HTTP-WS] Pi agent registered: session={session_id}, pid={pid:?}");
+                                    app_state.pi_agent_registry.register(session_id.to_string(), session_path, pid, cwd);
+                                    let _ = app_state.event_tx.send(crate::app_state::WsEvent {
+                                        event_type: "event".to_string(),
+                                        event: "pi-agent:register".to_string(),
+                                        payload: register["payload"].clone(),
+                                    });
+                                }
+                            }
+                            continue;
+                        }
+
+                        // ── Pi agent protocol: live entry ───────────────────
+                        if text.contains("\"type\"") && text.contains("\"pi-agent:entry\"") {
+                            if let Ok(entry) = serde_json::from_str::<Value>(&text) {
+                                let session_id = entry["sessionId"].as_str().unwrap_or("");
+                                if !session_id.is_empty() {
+                                    let event_type = entry["payload"]["eventType"].as_str().unwrap_or("");
+                                    app_state.pi_agent_registry.record_entry(session_id, event_type);
+                                    let _ = app_state.event_tx.send(crate::app_state::WsEvent {
+                                        event_type: "event".to_string(),
+                                        event: "pi-agent:entry".to_string(),
+                                        payload: json!({
+                                            "sessionId": session_id,
+                                            "eventType": entry["payload"]["eventType"],
+                                            "entry": &entry["payload"]["entry"],
+                                        }),
+                                    });
+                                    let _ = tx.send(AxumWsMsg::Text(r#"{"type":"ack"}"#.into())).await;
+                                }
+                            }
+                            continue;
+                        }
+
                         #[derive(Deserialize)]
                         struct WsReq {
                             id: String,

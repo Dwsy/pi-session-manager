@@ -1,5 +1,5 @@
 import type { ToolRenderPlugin, BaseToolData } from './types'
-import type { Content, SessionEntry } from '../../types'
+import type { Content } from '../../types'
 import { matchTool } from './types'
 
 /**
@@ -22,7 +22,7 @@ export class ToolRenderRegistry {
       return
     }
 
-    this.plugins.set(plugin.id, plugin as ToolRenderPlugin)
+    this.plugins.set(plugin.id, plugin as unknown as ToolRenderPlugin)
     this.sortedCache = null // Clear cache for re-sort
 
     plugin.onMount?.()
@@ -47,7 +47,7 @@ export class ToolRenderRegistry {
    * @param plugin - Fallback plugin (lowest priority)
    */
   setFallback<TData extends BaseToolData = BaseToolData>(plugin: ToolRenderPlugin<TData>): void {
-    this.fallbackPlugin = plugin as ToolRenderPlugin
+    this.fallbackPlugin = plugin as unknown as ToolRenderPlugin
   }
 
   /**

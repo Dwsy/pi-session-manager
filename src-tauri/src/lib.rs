@@ -21,6 +21,8 @@ pub mod stats;
 pub mod subagent;
 pub mod tantivy_search;
 pub mod write_buffer;
+#[cfg(feature = "gui")]
+pub mod pi_agent_registry;
 
 #[cfg(feature = "gui")]
 pub mod app_state;
@@ -130,9 +132,14 @@ pub fn run() {
             list_model_config_versions,
             test_model_http,
             read_resource_file,
+            get_pi_live_sessions,
             list_config_versions,
             get_config_version,
-            restore_config_version
+            restore_config_version,
+            export_config_bundle,
+            preview_config_bundle,
+            import_config_bundle,
+            restore_import_backup
         ])
         .setup(|app| {
             // Create and manage app state

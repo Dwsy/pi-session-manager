@@ -65,6 +65,8 @@ export const components = {
   userMessage: {
     you: 'You',
     imageAlt: 'Message image',
+    copied: 'Copied',
+    copyText: 'Copy text',
   },
   sessionHeader: {
     createdAt: 'Created at',

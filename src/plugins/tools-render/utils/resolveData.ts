@@ -1,4 +1,4 @@
-import type { Content, SessionEntry, ToolResultContent } from '../../../types'
+import type { Content, SessionEntry } from '../../../types'
 import type { ResolvedToolData } from '../types'
 
 /**
@@ -18,7 +18,7 @@ export function defaultResolveData(
   const args = toolCall.arguments || {}
   const toolCallId = toolCall.id || ''
   const result = toolCallId ? toolResultByCallId.get(toolCallId) : undefined
-  const toolResultContent = (result?.message?.content?.[0] || null) as ToolResultContent | null
+  const toolResultContent = (result?.message?.content?.[0] || null) as any | null
 
   const isError = result?.message?.isError ||
     toolResultContent?.isError ||
@@ -80,7 +80,7 @@ function collectRenderableContent(value: unknown, segments: string[]): void {
     return
   }
 
-  const content = value as ToolResultContent
+  const content = value as any
   if (content.text) segments.push(content.text)
   if (content.output) segments.push(content.output)
 
@@ -114,7 +114,7 @@ function collectImages(
     return
   }
 
-  const content = value as ToolResultContent
+  const content = value as any
   if (
     content.type === 'image' &&
     typeof content.mimeType === 'string' &&
