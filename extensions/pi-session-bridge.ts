@@ -251,40 +251,81 @@ export default function (pi: ExtensionAPI) {
         }
       },
       onMessage: (msg: any) => {
-        const eventType = msg?.event_type === "event" ? msg.event : msg.type
-        const payload = msg?.event_type === "event" ? msg.payload : msg.payload
+        const id = msg.id; // RPC correlation ID
+        const eventType = msg?.event_type === "event" ? msg.event : msg.type;
+        // If it's a flat RPC command, the "payload" is the message itself
+        const payload = msg?.event_type === "event" ? msg.payload : msg;
 
-        // Extract UUID from local sessionId for matching
-        const localUuid = sessionId.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0]
-        const matches = payload?.sessionId === sessionId || (localUuid && payload?.sessionId === localUuid)
+        // Matching logic: either direct session match or UUID match from the payload
+        const localUuid = sessionId.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0];
+        const payloadSessionId = payload?.sessionId || payload?.session_id || "";
+        const sessionMatches = payloadSessionId === sessionId || (localUuid && payloadSessionId === localUuid);
 
-        if (eventType === "steer" && matches && latestCtx && !latestCtx.isIdle()) {
-          const deliverAs = payload?.deliverAs === "followUp" ? "followUp" : "steer"
-          pi.sendUserMessage(payload?.message || "", { deliverAs })
-        } else if (eventType === "abort" && matches && latestCtx) {
-          latestCtx.abort();
-        } else if (msg.type === "ping" || msg.ping === true) {
-          conn?.send({ type: "pong" });
-        } else if (msg.type === "pong" || msg.pong === true || msg.pong === true) {
-          conn?.pongReceived();
-        } else if (eventType === "set_model" && payload?.sessionId === sessionId) {
-          void latestCtx?.modelRegistry.getAvailable().then((models: any[]) => {
-            const target = models.find((m: any) => m.provider === payload.provider && m.id === payload.modelId);
-            if (target) pi.setModel(target);
-          });
-        } else if (eventType === "set_thinking" && payload?.sessionId === sessionId) {
-          pi.setThinkingLevel(payload.level);
-        } else if (eventType === "get_state" && payload?.sessionId === sessionId) {
-          broadcastSessionState();
-        } else if (eventType === "prompt" && payload?.sessionId === sessionId) {
-          if (latestCtx && !latestCtx.isIdle()) {
-            pi.sendUserMessage(payload.message, {
-              deliverAs: payload.streamingBehavior || "steer",
-              images: payload.images
+        console.log(`[psm-bridge] Received ${eventType} (id: ${id}), matches: ${sessionMatches}`);
+
+        // Define a helper to send success response back
+        const sendResponse = (success = true, data?: any) => {
+          if (id) {
+            conn?.send({
+              type: "response",
+              command: eventType,
+              success,
+              id,
+              sessionId: sessionId,
+              data
             });
-          } else {
-            console.warn("[psm] Received prompt but session is idle/inactive");
           }
+        };
+
+        if (msg.type === "ping" || msg.ping === true) {
+          conn?.send({ type: "pong" });
+          return;
+        } 
+        if (msg.type === "pong" || msg.pong === true) {
+          conn?.pongReceived();
+          return;
+        }
+
+        // --- RPC Commands ---
+        // If it's a multi-client PSM, it sends RPCs to specific clients. 
+        // We check matches here to be safe.
+        if (!sessionMatches && id) {
+          console.warn(`[psm-bridge] Session mismatch: expected ${sessionId}/${localUuid}, got ${payloadSessionId}`);
+          return;
+        }
+
+        if (eventType === "steer" && latestCtx && !latestCtx.isIdle()) {
+          const deliverAs = payload?.deliverAs === "followUp" ? "followUp" : "steer";
+          pi.sendUserMessage(payload?.message || "", { deliverAs });
+          sendResponse(true);
+        } else if (eventType === "abort" && latestCtx) {
+          latestCtx.abort();
+          sendResponse(true);
+        } else if (eventType === "set_model") {
+          latestCtx?.modelRegistry.getAvailable().then((models: any[]) => {
+            const target = models.find((m: any) => m.provider === payload.provider && m.id === payload.modelId);
+            if (target) {
+              pi.setModel(target);
+              sendResponse(true);
+            } else {
+              sendResponse(false, "Model not found");
+            }
+          }).catch(e => sendResponse(false, e.toString()));
+        } else if (eventType === "set_thinking_level") {
+          pi.setThinkingLevel(payload.level);
+          sendResponse(true);
+        } else if (eventType === "get_state") {
+          broadcastSessionState();
+          sendResponse(true);
+        } else if (eventType === "prompt") {
+          if (latestCtx && !latestCtx.isIdle()) {
+            const behavior = payload.streamingBehavior || (payload.deliverAs === "followUp" ? "followUp" : "steer");
+            pi.sendUserMessage(payload.message || "", { deliverAs: behavior as any });
+          } else {
+            // If idle, just send a normal message
+            pi.sendUserMessage(payload.message || "");
+          }
+          sendResponse(true);
         }
       },
     });
