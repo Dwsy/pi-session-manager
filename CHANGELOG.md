@@ -53,558 +53,255 @@ All notable changes to Pi Session Manager will be documented in this file.
   - Changed default `ws_port` from `52130` to `52131` (same as `http_port`)
   - GUI mode now uses HTTP `/ws` path instead of standalone WebSocket server
   - Both GUI and CLI modes now share the same single-port architecture
-  - Updated default configurations in:
-    - `src-tauri/src/commands/settings.rs` (`ServerSettings::default()`)
-    - `src/components/settings/sections/AdvancedSettings.tsx`
-    - `src/components/Onboarding.tsx`
-  - Updated documentation: `README.md`, `AGENTS.md`
-  - Legacy `ws_adapter.rs` remains for backward compatibility but is no longer used by default
 
 ### Added
 
 - **Session viewer in-message search navigation**
-  - Added inline search UI for the open session with match highlighting across rendered user/assistant message content and generic/custom tool result output
-  - Added a compact in-search scope filter with `All`, `User + Assistant Messages`, and `User Messages` modes so tool-heavy sessions can be narrowed back to conversation text while still respecting visible thinking blocks
-  - Added previous/next result paging with a current/total counter, exact current-match scrolling inside the virtualized message list, and `Cmd/Ctrl + G` / `Shift + Cmd/Ctrl + G` navigation alongside `Enter` / `Shift+Enter`
-  - Added close/reset behavior via toolbar action, close button, and `Esc`, so leaving search returns the viewer to its normal unhighlighted state and default scope
-  - Updated shortcut copy/docs to reflect `Cmd/Ctrl + F` as the viewer search entry point and `Cmd/Ctrl + Shift + F` as global full-text search
+  - Added inline search UI with match highlighting across user/assistant messages and tool results
+  - Added in-search scope filter with `All`, `User + Assistant Messages`, and `User Messages` modes
+  - Added previous/next result paging with `Cmd/Ctrl + G` / `Shift + Cmd/Ctrl + G`
+  - Close/reset via toolbar action, close button, or `Esc`
 
 ### Refactor
 
 - **HTTP adapter decomposition and readonly API deduplication**
-  - Split the former monolithic `src-tauri/src/http_adapter.rs` into a facade + modular implementation:
-    - facade: `src-tauri/src/http_adapter.rs`
-    - aggregator: `src-tauri/src/http_adapter_impl.rs`
-    - extracted modules under `src-tauri/src/http_adapter/`: `common`, `readonly_routes`, `sessions`, `realtime`, `static_assets`, `embedding`
-  - Added shared readonly service layer `src-tauri/src/api_readonly.rs` for full-text search, memory recall, unified memory, experience extraction, workflow suggestion, analytics, observability, and embedding helpers
-  - Rewired `src-tauri/src/main-cli.rs` to reuse the shared readonly service and removed duplicated read-only HTTP handler logic
-  - Kept existing route paths, auth semantics, CORS behavior, and `http_adapter -> ws_adapter::dispatch` behavior unchanged while reducing file size and maintenance overhead
-  - Verified with `cargo fmt`, `cargo check --workspace`, `cargo check -p pi-session-manager --features gui --all-targets`, and focused regression suites:
-    - `migration_test`
-    - `fts_message_integrity_test`
-    - `full_text_search_integration_test`
+  - Split monolithic `http_adapter.rs` into facade + modular implementation
+  - Added shared readonly service layer for full-text search, memory recall, analytics
+  - Verified with `cargo fmt`, `cargo check --workspace`, and regression suites
 
 - **SQLite cache module decomposition for maintainability**
-  - Split the former monolithic `src-tauri/src/sqlite_cache.rs` into a facade + modular implementation:
-    - facade: `src-tauri/src/sqlite_cache.rs`
-    - aggregator: `src-tauri/src/sqlite_cache_impl.rs`
-    - extracted modules under `src-tauri/src/sqlite_cache/`: `bootstrap`, `schema`, `migrations`, `sessions`, `message_index`, `details_cache`, `subagent_meta`, `favorites`, `tags`, `maintenance`, `legacy_fts`, `types`, `util`, `deps`
-  - Kept public API compatibility (`crate::sqlite_cache::*`) and preserved existing database schema/behavior
-  - Preserved message FTS backfill guard semantics (`MESSAGE_ENTRIES_BACKFILL_ONCE`) and `upsert_session` orchestration behavior
-  - Verified with `cargo check` and focused regression suites:
-    - `migration_test`
-    - `fts_message_integrity_test`
-    - `full_text_search_integration_test`
-    - `full_text_search_pagination_test`
-    - `delete_session_recoverable_test`
+  - Split monolithic `sqlite_cache.rs` into facade + modular implementation
+  - Extracted modules: `bootstrap`, `schema`, `migrations`, `sessions`, `message_index`, etc.
+
 - **Command skills module decomposition for maintainability**
-  - Split the former multi-responsibility `src-tauri/src/commands/skills.rs` into focused command modules:
-    - `src-tauri/src/commands/skills.rs` now keeps only skills/prompt-related commands
-    - `src-tauri/src/commands/pi_resources.rs` handles resource scanning and resource file reads
-    - `src-tauri/src/commands/pi_settings.rs` handles `~/.pi/agent/settings.json` reads and writes
-    - `src-tauri/src/commands/model_config.rs` handles `models.json`, backups, import/export, and HTTP model tests
-    - `src-tauri/src/commands/config_versions.rs` handles config version history and restore flows
-  - Kept existing Tauri command names, dispatch `_internal` entry points, and serialized payload shapes unchanged
-  - Verified with `cargo check` and focused regression suites:
-    - `migration_test`
-    - `fts_message_integrity_test`
-    - `full_text_search_integration_test`
+  - Split `commands/skills.rs` into focused modules: `skills.rs`, `pi_resources.rs`, `pi_settings.rs`, `model_config.rs`, `config_versions.rs`
 
 ### Demo & Docs
 
 - **Demo mode defaults are now deterministic**
-  - Added a dedicated static demo entry (`demo.html`) and demo build output (`dist-demo`)
+  - Added `demo.html` and `dist-demo` build output
   - Added demo scripts: `dev:demo`, `build:demo`, `preview:demo`
-  - Runtime now force-enables demo mode when using `mode=demo` or `demo.html`
-  - Demo bootstrap now hardens localStorage parsing and clears stale service-worker/cache state
-- **Demo onboarding behavior aligned with presentation mode**
-  - Demo mode now sets `onboarding-completed=true` during bootstrap
-  - App startup now suppresses initialization onboarding in demo mode
-- **Demo data set upgraded**
-  - Replaced demo content with richer English session data and expanded sample coverage
-- **README accuracy rewrite**
-  - Rewrote `README.md` and `README.zh.md` to align with current code behavior
-  - Corrected runtime paths/ports, language pack list, and demo build usage
+
+- **Demo mock full-capability data engine**
+  - Modular providers under `src/demo/*` (seed, content, search, stats, store, mode, types)
+  - Render-ready JSONL coverage for bash, read, write, edit, subagent tools
 
 ### Platform & Tooling
 
 - **Windows compatibility hardening (frontend + backend)**
-  - Unified path-separator handling (`/` and `\`) in key UI surfaces (dashboard, session tree/tool labels, search plugins, command surfaces)
-  - Improved Rust-side path normalization for project/session matching, including Windows case-insensitive matching behavior
-  - Expanded Windows shell detection to support PATH/PATHEXT discovery (`powershell.exe`, `pwsh.exe`, `cmd.exe`, `bash.exe`)
-  - Updated export command resolution to support `pi`/`pi.cmd`/`pi.exe` discovery without Unix-only assumptions
-  - Updated CLI build command flow to cross-platform Node entry (`npm run build:cli` -> `scripts/build-cli.mjs`)
+  - Unified path-separator handling (`/` and `\`)
+  - Expanded Windows shell detection (powershell.exe, pwsh.exe, cmd.exe, bash.exe)
+  - Updated CLI build to cross-platform Node entry (`scripts/build-cli.mjs`)
+
 - **Cross-platform script runtime (`.mjs`)**
-  - Added shared helper module `scripts/script-utils.mjs` for command execution, file checks, path handling, and cross-platform open behavior
-  - Replaced former `scripts/*.sh` and `website/scripts/postbuild.sh` with Node-based `.mjs` scripts
+  - Added `scripts/script-utils.mjs` for command execution, file checks, path handling
 
 ### Added
 
-- **GitHub Releases update checker** — added a built-in update detection flow based on repository releases
-  - Automatic check runs once per day by default (non-intrusive)
-  - New **Settings → Updates** section supports manual "Check Now"
-  - New bottom-right update toast can be dismissed per version to avoid repeated interruption
-  - Release notes now support Markdown rendering in a dedicated modal opened from the toast
-- **Demo mock full-capability data engine** — expanded demo mode to support end-to-end realistic rendering flows
-  - Refactored demo data into modular providers under `src/demo/*` (`seed`, `content`, `search`, `stats`, `store`, `mode`, `types`)
-  - Demo mode now drives paginated sessions, session chunk reads, favorites/tags operations, search/FTS, and dashboard/day stats without backend dependency
-  - Added render-ready JSONL conversation coverage for specialized tool cards (`bash`, `read`, `write`, `edit`, `subagent`) in addition to generic tool calls
-  - Added tool-result payload variants required by UI branches (e.g. `exitCode`, image content for `read`, and `diff/details.diff` for `edit`)
-  - Added kanban/tag mappings for new demo sessions to keep board rendering coherent with list/search/detail views
+- **GitHub Releases update checker**
+  - Automatic check once per day (non-intrusive)
+  - Settings → Updates section with manual "Check Now"
+  - Update toast dismissible per version, release notes in modal
 
-### Changed
-
-- **App version source for update comparison** — switched from runtime `package.json` reads to build-time injected version
-  - Vite now injects `__APP_VERSION__` at build time
-  - Version resolution prefers CI/tag context and `git tag --points-at HEAD`, then falls back to package version
-  - Prevents false update prompts caused by source `package.json` version drifting from release tag
+- **App version source for update comparison**
+  - Vite injects `__APP_VERSION__` at build time
+  - Version resolution prefers CI/tag context and `git tag --points-at HEAD`
 
 ### Fixed
 
-- **Session Viewer desktop toolbar dragging regression** — restored window dragging in Tauri desktop mode
-  - Root cause: drag-region cascading (`[data-tauri-drag-region] *`) made toolbar descendants effectively non-draggable in practice
-  - Added explicit desktop drag fallback on toolbar `mousedown` via `getCurrentWindow().startDragging()` when clicking non-interactive areas
-  - Preserved normal interactions for buttons/inputs/links so toolbar actions are not affected
+- **Session Viewer desktop toolbar dragging regression**
+  - Restored window dragging in Tauri desktop mode
+  - Added explicit `getCurrentWindow().startDragging()` fallback on toolbar `mousedown`
 
-- **Mobile Outline layering and overlap regression**: fixed severe header/toolbar overlap when opening Outline in Session Viewer
-  - Root cause: mobile sidebar used absolute positioning in the same stacking context as the main toolbar, causing top-area content collisions after toolbar height/layout updates
-  - Mobile Outline now renders as a true left side drawer (`fixed`, constrained width) with dedicated overlay and independent header/close controls
-  - Opening Outline now closes the mobile "More actions" sheet first to avoid multi-layer interaction conflicts
-  - Result: no more duplicated top bars, clipped filters, or unreadable stacked controls in mobile session view
+- **Mobile Outline layering and overlap regression**
+  - Mobile Outline now renders as true left side drawer (`fixed`, constrained width)
+  - Opening Outline closes "More actions" sheet first
 
-- **External terminal launch is now production-usable across macOS/Linux/Windows** — replaced hardcoded launcher paths with runtime availability detection and fallback chaining
-  - `open_session_in_terminal` now validates session file existence, resolves invalid `cwd` to a safe fallback directory, and reports detailed per-attempt failures
-  - Added platform-specific installed-terminal probing and ordered fallback attempts (user-selected terminal first, then known available candidates)
-  - Custom terminal command now works as an actual launcher path/template with placeholders: `{command}`, `{cwd}`, `{path}`, `{pi}`
-  - Added support for additional real-world terminal IDs used in settings and launch routing (`auto`, `wezterm`, `kitty`, `alacritty`, `xfce4-terminal`, `tilix`, `mate-terminal`, `lxterminal`, `x-terminal-emulator`)
-  - External terminal default changed to `auto`, so new installs prefer an actually installed terminal instead of a platform hardcoded guess
-  - Added unit tests for fallback order and custom command placeholder rendering
+- **External terminal launch is now production-usable across macOS/Linux/Windows**
+  - Platform-specific terminal probing with ordered fallback attempts
+  - Custom terminal command supports placeholders: `{command}`, `{cwd}`, `{path}`, `{pi}`
+  - External terminal default changed to `auto`
 
-- **Sidebar paginated sessions loading regression** — fixed duplicate `scan_sessions_paginated` calls and skeleton lock after successful responses
-  - Prevented `silent` refresh requests from hijacking foreground loading lifecycle, so `loading` always clears correctly after the active foreground request completes
-  - Added in-flight request de-duplication for identical pagination/filter parameters to avoid concurrent duplicate scans
-  - Delayed sidebar `silent` refresh until the first paginated load has completed, removing startup-time duplicate requests triggered by upstream session/tag updates
-  - Updated sidebar loading source selection in paged mode to rely on paginated loading state, preventing unrelated full-scan loading from blocking rendered list data
+- **Sidebar paginated sessions loading regression**
+  - Prevented `silent` refresh from hijacking foreground loading lifecycle
+  - Added in-flight request de-duplication
 
-- **Session viewer open-position hydration regression** — restored deterministic full-history hydration for `top` open mode while keeping chunked incremental behavior for `bottom` mode
-  - Root cause: chunk-first loading introduced partial initial trees/anchors in top mode, causing delayed completion and missing initial scroll markers
-  - Top mode now eagerly loads all remaining chunks on session open before rendering final tree state
-  - Bottom mode remains optimized for fast first paint with incremental chunk loading on demand
-  - Added chunk merge de-duplication (`mergeEntriesWithUniqueIds`) to prevent entry ID collisions across chunk boundaries
-  - Synchronized `hasMoreHistory` state/ref updates to avoid stale closure gating and inconsistent load-more behavior
-  - Cache behavior updated: if cached session is partial and open mode is `top`, cache is invalidated and fully re-hydrated
+- **Session viewer open-position hydration regression**
+  - Top mode now eagerly loads all remaining chunks on session open
+  - Added chunk merge de-duplication (`mergeEntriesWithUniqueIds`)
 
 - **Session viewer scroll performance and virtualization stability**
-  - Moved virtual-scroll state updates from `SessionViewer` to `SessionViewerMessages` to reduce parent-level re-renders while scrolling
-  - Kept toolbar scroll actions via ref-based `scrollToTop`/`scrollToBottom` bridge after the refactor
-  - Tuned message virtualizer overscan from `12` to `8` for lighter per-frame rendering cost
-  - Added memoization for `SessionHeader`, `SessionScrollMarkers`, and `SessionEntryRenderer` to reduce avoidable re-renders
-  - Improved dynamic row measurement stability with `useAnimationFrameWithResizeObserver` and edge-triggered `onReachBottom` load-more behavior
-  - Fixed cached height estimation bug that double-counted message gaps and could cause layout drift
-  - Reverted an over-aggressive “skip measure while scrolling” optimization that caused text overlap artifacts under fast scroll
+  - Moved virtual-scroll state to `SessionViewerMessages` to reduce parent-level re-renders
+  - Tuned message virtualizer overscan from `12` to `8`
 
 - **Command Palette readability and tag contrast**
-  - Increased tab count badge readability with stronger contrast, larger numeric text, and clearer selected state
-  - Refined message result role chip from point-like `AI` tag to icon+label pill for faster scanning
-  - Improved focus ring contrast for command palette keyboard navigation
+  - Increased tab count badge readability
+  - Refined message result role chip to icon+label pill
 
 ### Changed
 
 - **Command Palette search UX and interaction architecture**
-  - Expanded the `Cmd/Ctrl + K` panel size and result viewport for better long-list browsing
-  - Tabs now work as true search scopes (plugin-scoped search), not just post-render filtering
-  - Added request sequencing guard to prevent stale async search responses from overriding newer queries
-  - Updated search cache key composition to include tab scope and project filter state, preventing cross-scope cache pollution
-  - Added inline result summary and tab-switch hint (`Alt + 1/2/3/4`)
-  - Message search now renders message-level highlighted snippets with multi-line context
-  - Selecting a message hit now jumps directly to the matched entry in Session Viewer
+  - Expanded `Cmd/Ctrl + K` panel size and result viewport
+  - Tabs work as true search scopes (plugin-scoped search)
+  - Added request sequencing guard and search cache key improvements
 
 - **Command Palette message-search performance optimization**
   - Reduced default FTS fetch window from `48` to `40` hits per query
-  - Added in-memory session metadata cache to reduce repeated `get_session_by_path` calls
-  - Limited eager session prefetch for missing metadata (bounded prefetch in global mode; full prefetch only when current-project-only filter is enabled)
-  - Deferred expensive per-path session resolution to selection-time fallback when necessary
+  - Added in-memory session metadata cache
 
 - **Session Viewer mobile toolbar UX and readability refresh**
-  - Reworked mobile top actions into clear primary controls (Outline / Thinking / More) with larger touch targets and stronger visual hierarchy
-  - Thinking toggle icon semantics updated from eye visibility metaphor to brain thinking metaphor for clearer intent
-  - Improved active/inactive state contrast and consistency across mobile and desktop toolbar buttons
-  - Upgraded mobile more-actions panel readability with clearer grouping and action rows
+  - Reworked mobile top actions into clear primary controls (Outline / Thinking / More)
 
-- **Atomic commit sync (latest)** — synchronized changelog entries for recent backend and frontend refactors
-  - Backend: added paginated session scanning (`scan_sessions_paginated`) with offset/limit, query, project, and tag filters
-  - Backend: added byte-offset incremental reader (`read_session_file_incremental_offset`) for large session file streaming
-  - Backend: dispatch now accepts both snake_case and camelCase pagination/filter params from frontend (`searchQuery`, `projectFilter`, `filterTagIds`)
-  - Backend: project filter matching now correctly supports parent/child path scope (cwd and session file path), with unit tests
-  - Backend: HTTP static fallback no longer masks missing API routes; `/api` and `/v1/*` now return explicit not-found JSON instead of SPA HTML
-  - Backend: CLI embedding startup changed to opt-in via `embedding_enabled` setting
-  - Backend: stats aggregation refactored to shared hour/weekday helper to reduce duplicated counting logic
-  - Frontend: App container modularized into `components/app/*` panes and extracted orchestration hooks (`useAppBootstrap`, `useDesktopSidebarActions`)
-  - Frontend: SessionViewer split into focused modules (`components/session-viewer/*`) with dedicated data/virtual-scroll/hotkey hooks
-  - Frontend: added paginated session loading hook (`usePaginatedSessions`) and integrated incremental load-more flow in session list
-  - Frontend: settings/onboarding UI unified through reusable setting field/input/select/toggle components
-  - Frontend: API test panel upgraded to schema-aware response validation and clearer troubleshooting feedback
-  - Frontend: synchronized locale keys for new settings/session options (including task navigation open position)
-  - Frontend: removed duplicated inline bootstrap/sidebar handlers in `App.tsx` after hook migration
+### Changed
+
+- **Atomic commit sync** — synchronized changelog entries for recent refactors
+  - Backend: paginated session APIs, byte-offset incremental reader, project filter matching
+  - Frontend: App container modularized, SessionViewer split, paginated session loading hook
 
 ### Added
 
 - **Heatmap enhancements** — interactive day detail modal and rich tooltips
   - Click any heatmap day to open modal with project breakdown, session list, hourly distribution
-  - Tooltips show message count, token count, session count, top project
-  - Backend `get_day_stats` API aggregates per-day metrics with local timezone conversion
-  - Activity level labels (none/low/medium/high/veryHigh) in i18n
 
 - **Subagent usage stats** — track subagent costs in Dashboard
-  - New `SubagentSummary` and `AgentStats` types mirror backend Rust structs
-  - Dashboard StatCards display combined cost (main session + subagents)
-  - Combined token count reflects work done by scout/worker/reviewer subagents
-  - Graceful degradation for cached sessions without subagent data
+  - `SubagentSummary` and `AgentStats` types mirror backend Rust structs
+  - Combined token count reflects main session + subagents
 
 - **Kanban preview modal FLIP animation** — smooth card-to-modal transition
   - FLIP (First, Last, Invert, Play) animation from KanbanCard to SessionPreviewModal
-  - Close animation returns modal to original card position
-  - Focus trap with Tab/Shift+Tab cycling
-  - Mobile responsive: full-screen on small viewports
-  - Reduced motion preference support
-  - Rapid-click prevention during animation
+  - Focus trap, mobile responsive, reduced motion support
 
-- **Embedding Service** — local GGUF model inference for shared embedding across pi processes
-  - New Rust module `embedding_service.rs` manages node-llama-cpp child process
-  - ES module `embedding-server.mjs` provides HTTP API for text embeddings
-  - Endpoints: `POST /v1/embedding`, `POST /v1/embedding/batch`, `GET /v1/embedding/status`
-  - Model: EmbeddingGemma 300M Q8_0 (768 dims, ~435MB RAM, ~4-8ms inference)
-  - Auto-release after 5 min idle to free memory
-  - Solves: multiple pi processes each loading model = 1.3GB waste → shared 435MB
+- **Embedding Service** — local GGUF model inference for shared embedding
+  - EmbeddingGemma 300M Q8_0 (768 dims, ~435MB RAM, ~4-8ms inference)
+  - Auto-release after 5 min idle
 
 - **API Test Panel** — online diagnostics in Settings
-  - New settings section for testing pi-session-manager backend connection
   - Tests all endpoints: embedding, sessions, memory recall, analytics
-  - Latency measurement with color-coded results (<100ms green, <500ms yellow, >500ms red)
-  - Auto-runs on panel open with retry support for individual endpoints
-  - Displays embedding service status (model, dimensions, ready state)
-  - Troubleshooting help section for common issues
+  - Latency measurement with color-coded results
 
 - **Session Intel Module** — `session_intel.rs` for memory/experience analytics
   - Structured recall with intent detection and confidence scoring
-  - Experience extraction from session entries
-  - SQLite overview for analytics dashboard
 
 ### Changed
 
-- **Exact phrase search with quotes** — search now supports exact contiguous phrase matching via double quotes across frontend filters, command palette plugins, Rust non-FTS search, and SQLite FTS query construction
-  - Example: `"foo bar baz"` matches only contiguous `foo bar baz` occurrences
-  - Unquoted behavior remains unchanged for existing search flows
-  - Added and updated focused tests for FullTextSearch highlighting and Rust quoted-phrase search behavior
-  - Improved incremental typing behavior for quoted queries in sidebar and in-session (tree/flow) search inputs
+- **Exact phrase search with quotes** — search supports exact contiguous phrase matching via double quotes
+  - Example: `"foo bar baz"` matches only contiguous occurrences
 
-- **Internationalization** — All Chinese code comments translated to English for global collaboration
-  - Rust backend (`src-tauri/src/`): 10 files translated (search.rs, scanner.rs, sqlite_cache.rs, http_adapter.rs, ws_adapter.rs, write_buffer.rs, stats.rs, export.rs, lib.rs, main-cli.rs)
-  - TypeScript/React frontend (`src/`): 17 files translated (components, hooks, utils, plugins)
-  - Quality assurance: ✅ `cargo fmt`, ✅ `cargo clippy --no-deps`, ✅ `npm run build`
-  - UI labels in `sqlite_cache.rs` preserved (conditional on user language setting)
-  - Translation style: Professional, technical English matching codebase conventions
+- **Internationalization** — All Chinese code comments translated to English
+  - Rust backend: 10 files translated
+  - TypeScript/React frontend: 17 files translated
 
 - **Theme alignment for diff cards** — light theme colors now match tool card background
-  - Light theme `toolSuccessBg` changed from `#ecfdf5` to minty `#E6F0E7`
-  - `.tool-diff` background made transparent to inherit card color
-  - Custom `card-light`/`card-dark` themes registered for `@pierre/diffs` overriding `editor.background`
-  - HMR guard prevents duplicate theme registration errors
+  - Light theme `toolSuccessBg` changed to minty `#E6F0E7`
 
 - **Scroll markers enhanced** — compaction markers and glassmorphic tooltips
-  - Compaction entries (type=compaction or customType=compaction) render as purple scroll markers
-  - Tooltips upgraded to glassmorphic style: backdrop-blur, larger font, rounded corners
-  - Simplified position calculation using virtualizer `totalSize` directly
-  - Removed ResizeObserver and scroll listener overhead
-
-- **Time distribution layout** — refined peak hour display
-  - Peak hour star indicator moved inline before hour label
-  - Message values formatted with `toLocaleString` for readability
-  - Wider value column to accommodate formatted numbers
+  - Compaction entries render as purple scroll markers
+  - Tooltips upgraded to glassmorphic style
 
 ### Added
 
-- **Appearance customization** — add custom Pi theme mode and configurable UI/monospace fonts
-  - Theme mode now supports `dark | light | system | custom`, with custom presets loaded from `~/.pi/agent/themes`
-  - Custom mode derives dark/light behavior from the selected theme, while `system` remains OS-driven
-  - New font controls split UI text (`fontFamily`) and code-like text (`fontFamilyMono`) for better readability
-  - Added defensive theme-name sanitization and async de-racing to prevent stale theme re-application during rapid toggles
+- **Appearance customization** — custom Pi theme mode and configurable UI/monospace fonts
+  - Theme mode supports `dark | light | system | custom`
+  - New font controls split UI text (`fontFamily`) and code (`fontFamilyMono`)
 
 - **Subagent session viewer** — view full subagent conversations inline
-  - Clickable subagent tool call cards showing agent name, model, duration, tokens, task preview
-  - Modal with scale+fade animation renders the complete subagent JSONL session (reuses UserMessage, AssistantMessage, ToolCallList, etc.)
-  - Supports single, parallel, chain, and management (list/get) action modes
-  - Nested subagent support — subagent within subagent opens stacked modals with incremental z-index
-  - Thinking/Tools toggle buttons (⌘T / ⌘O) in both main SessionViewer toolbar and SubagentModal toolbar
-  - Capture-phase keyboard interception prevents shortcuts from leaking between modal and parent view
-  - JSONL cache (10 entries) with fallback path resolution (artifactPaths → sessionFile)
-  - `exitCode === 0` is now the sole success indicator — ignores benign "terminated" error from pi-subagents
-  - File watcher filters out `subagent-artifacts/` paths to prevent ghost sessions in main list
-  - Portal-rendered modal avoids parent overflow clipping; mobile responsive
+  - Clickable subagent tool call cards showing agent name, model, duration, tokens
+  - Modal renders complete subagent JSONL session
+  - Nested subagent support with stacked modals
 
 - **Tauri drag region fix** — toolbar buttons now clickable on macOS overlay title bar
-  - SessionViewer and KanbanBoard toolbars carry their own `data-tauri-drag-region` at `z-20`
-  - Background overlay lowered to `z-10` for Dashboard fallback
-  - Empty toolbar space remains draggable; buttons use `no-drag` via existing CSS rule
+  - SessionViewer and KanbanBoard toolbars carry own `data-tauri-drag-region` at `z-20`
 
-- **Pi Config TUI settings panel** — unified resource management and settings editor aligned with pi source
-  - Resources tab: scan and manage extensions/skills/prompts/themes with user+project scope grouping
-  - `scan_all_resources` backend: scans `~/.pi/agent/` and `.pi/` for all resource types with metadata
-  - YAML frontmatter parsing for SKILL.md descriptions (handles `>`, `|`, quoted, unquoted formats)
-  - Resource toggle via `+/-` prefix mechanism matching pi's enable/disable pattern
-  - Resource viewer modal: click Eye icon to preview SKILL.md/README.md content rendered as markdown
-  - Settings tab: full alignment with pi source `settings-manager.js` — 25+ settings across 5 groups (Model, Behavior, Advanced, Terminal, Appearance)
-  - Nested settings support via dot-notation (`compaction.enabled`, `retry.maxRetries`, etc.)
-  - Progressive model loading: fast from `models.json`, then full from `pi --list-models`
-  - Provider/Model as dropdowns with background refresh
-  - Version History as standalone third tab with preview/restore UI
-  - `read_resource_file` command with path traversal security guard
-  - `load_pi_settings_full`, `save_pi_setting`, `toggle_resource` backend commands
+- **Pi Config TUI settings panel** — unified resource management aligned with pi source
+  - Resources tab: scan and manage extensions/skills/prompts/themes
+  - Settings tab: 25+ settings across 5 groups (Model, Behavior, Advanced, Terminal, Appearance)
 
 ### Fixed
 
 - **Compaction component styling** — collapsed/expanded states now render correctly
-  - Added CSS rules for `.compaction`, `.compaction-collapsed`, `.compaction-content`
-  - Collapsed view shows token count summary by default; expanded view reveals full summary markdown
-  - Also added matching styles for `BranchSummary` component (header, background, border)
-  - Previously, both states displayed simultaneously due to missing CSS
-- **Session deletion safety and recoverability** — session deletion now requires explicit in-app confirmation before invoking backend deletion, and backend deletion now attempts Trash/Recycling Bin first with permanent delete fallback only when recoverable delete is unavailable
-
-- **Appearance font sizing consistency** — font size settings now apply consistently across the UI
-  - Small/Medium/Large now scales session content, tool calls (commands/outputs/arguments/diffs/metadata), subagent surfaces, and related code-like rendering instead of leaving parts at hardcoded sizes
-  - Typography variables are propagated through root CSS so runtime appearance changes are reflected immediately and uniformly
-
-- **Dashboard flash-on-update** — incremental session updates no longer trigger full skeleton screen
-  - Only show `DashboardSkeleton` on first load (stats === null); subsequent updates refresh data silently in background
-  - Refresh button spins (`animate-spin`) during background reload as lightweight visual feedback
-  - Project switch correctly resets state to show skeleton for the new context
-  - Removed the 300ms minimum skeleton timer that was adding unnecessary delay
+- **Session deletion safety and recoverability** — explicit confirmation, Trash first
+- **Appearance font sizing consistency** — Small/Medium/Large now scales consistently
+- **Dashboard flash-on-update** — incremental updates no longer trigger full skeleton screen
 
 ### Fixed
 
-- **Project filter state persistence** — filter state now preserved when switching between project list and detail views
-  - `filteredSessions` used instead of raw `sessions` in `ProjectList` and project detail `SessionList`
-  - Tag filters and search queries persist when navigating project views
-  - Independent `projectScrollRef` for separate scrolling between list and project views
-  - Added `sidebarSearchQuery` state for search filtering support
-
+- **Project filter state persistence** — filter state preserved when switching views
 - **Mobile viewport height** — fixed iOS Safari address bar causing layout overflow
-  - Added `viewport-fit=cover` to enable `env(safe-area-inset-*)` on iOS
-  - Introduced `.h-screen-safe` utility using `100dvh` with `100vh` fallback, replacing raw `h-screen` on all root containers (App, AuthGate)
-  - `html, body, #root` use `height: 100% + overflow: hidden` to prevent whole-page scrolling
-  - Added `overscroll-behavior: none` to prevent iOS bounce scroll
-- **Mobile safe area insets** — top/bottom/left/right safe area padding classes now available
-  - Mobile session detail and tab layout apply `safe-area-top` to avoid notch overlap
-  - Bottom nav already had `safe-area-bottom`; added `safe-area-left/right/all` for landscape
-- **Desktop drag region conditional** — Tauri title bar drag region only renders in desktop app, not web
-  - Sidebar toolbar adapts height: fixed `h-8` with drag in Tauri, auto-height without drag in web
-  - Right-side transparent drag overlay only renders when `isTauri()` is true
-  - `--titlebar-height` CSS variable set to `32px` in Tauri, `0px` in web
-  - Drag overlay hidden when terminal is maximized to prevent click blocking
+- **Mobile safe area insets** — top/bottom/left/right safe area padding classes
+- **Desktop drag region conditional** — Tauri title bar drag region only renders in desktop app
 - **Mobile SessionViewer toolbar overflow** — redesigned with overflow menu
-  - Toolbar now shows: back + title + search + thinking + tools + ⋮ (overflow menu)
-  - Overflow menu contains: system prompt, scroll top/bottom, rename, export, resume
-  - Click-outside-to-close with proper ref-based detection
 
 ### Changed
 
 - **SessionTree user messages** — two-line layout with "User:" label
-  - User message nodes now display a small "User:" label on the first line and message preview on the second
-  - Preview text increased from 50 to 80 characters
-  - Tree node alignment switches to `flex-start` for user messages via `:has()` selector
+- **SessionTree tool call colorization** — different tools display in distinct colors
 
 ### Added
 
-- **SessionTree tool call colorization** — different tools display in distinct colors
-  - Fixed colors for core tools: read (blue), edit (yellow), write (purple), bash (green), search (cyan), web_fetch (orange)
-  - Other tools auto-assigned from an 8-color palette via deterministic hash
-  - Dark and light theme variants via CSS variables for proper contrast in both modes
-  - Toggleable in Settings → Session → "Colorize Tool Calls" (enabled by default)
+- **SessionTree tool call colorization** — colorized by tool type
+  - Fixed colors: read (blue), edit (yellow), write (purple), bash (green), search (cyan), web_fetch (orange)
+  - Other tools auto-assigned from 8-color palette
 
 ### Fixed
 
-- **SessionTree text truncation** — replaced JS hard-truncation (`slice + '...'`) with CSS `text-overflow: ellipsis`
-  - Tool call text (bash commands, file paths) now uses native `…` instead of ugly `...`
-  - Added `min-width: 0; flex: 1` to `.tree-content` for correct ellipsis in flex layout
-
-- **Pi Config settings default values** — boolean settings now use correct defaults from pi source code
-  - `compaction.enabled`, `retry.enabled`, `enableSkillCommands`, `terminal.showImages`, `images.autoResize` default to `true` when absent
-  - `hideThinkingBlock`, `quietStartup`, `collapseChangelog`, `terminal.clearOnShrink`, `images.blockImages`, `showHardwareCursor` default to `false`
-  - Enum/number settings also respect their pi source defaults (`steeringMode` → `one-at-a-time`, `autocompleteMaxVisible` → `5`, etc.)
-- **Resource viewer modal clipping** — modal now renders via `createPortal` to `#portal-root` outside React tree, preventing overflow clipping by Settings panel ancestors
+- **SessionTree text truncation** — CSS `text-overflow: ellipsis` instead of JS hard-truncation
+- **Pi Config settings default values** — boolean settings now use correct defaults
+- **Resource viewer modal clipping** — modal now renders via `createPortal` to `#portal-root`
 
 ### Added
 
 - **Unified SearchFilterBar component** — reusable search + tag filter bar shared across all views
-  - New `SearchFilterBar` component combining inline search input with `LabelFilter` dropdown
-  - Desktop sidebar: search + tag filter always visible for list, project, and kanban views
-  - Kanban board header: integrated search box next to project badge and session count
-  - Mobile: filter bar with search + tags on list, project, and kanban tabs
-  - Context-aware placeholder: "搜索会话..." for list/kanban, "搜索项目..." for project view
-  - Search filters by session name, first/last message, and project directory
-  - Added i18n keys: `common.searchProjectsPlaceholder` (en-US / zh-CN)
-
 - **Full-text search (FTS)** — message-level search across all sessions
-  - New `full_text_search` Tauri command with SQLite FTS5 virtual table for fast full-text search
-  - Supports role filtering (user/assistant/all), path glob patterns, pagination, and scoring
-  - Integrated into UI: press `Cmd+Shift+F` to open search modal from anywhere
-  - Results show role icons, snippets, timestamps; click to jump to entry with automatic scroll and highlight
-  - Incremental indexing during scanning writes to `message_entries` and `message_fts` virtual table
-  - Backfill migration automatically indexes existing sessions on first run
-  - Corruption recovery: automatically rebuilds database if FTS triggers corruption
-  - Updated i18n with full-text search keys across 6 locales (en-US, zh-CN, de-DE, es-ES, fr-FR, ja-JP)
+  - SQLite FTS5 virtual table, role filtering, pagination, scoring
+  - Incremental indexing during scanning, corruption recovery
 
 ### Fixed
 
-- **i18n hardcoded strings cleanup** — fixed ~50 hardcoded Chinese/English strings across 19 component files
-  - Settings sections: `TerminalSettings` (收起/展开), `AppearanceSettings` (紧凑/舒适/宽松), `SessionSettings` (列表/目录/项目), `AdvancedSettings` (option labels), `ModelSettings` (快/中/慢, test prompt)
-  - Dashboard: `StatsPanel` (stat labels & time titles), `WeeklyComparison` (vs last week), `ActivityHeatmap` (Less/More), `TokenTrendChart` (no data text)
-  - Viewer: `TreeNode` (Session Start, Model, tool calls), `SessionTree` (Loading), `SessionFlowView` (toolbar titles)
-  - Subagent: `SubagentModal` (Thinking/Tools/Close/Show/Hide), `SubagentToolCall` (click to view)
-  - Terminal: `TerminalPanel` (New terminal/Select shell/Hide panel)
-  - Other: `SessionListByDirectory` (tooltip labels), `TagManagerSettings` (Add child), `PiConfigSettings` (View), `Onboarding` (WebSocket/HTTP API)
-  - Added missing `settings.sections.tags` key to both en-US and zh-CN locale files
-  - Added new i18n keys: `session.tree.*`, `session.tooltip.*`, `settings.terminal.collapse/expandSettings`, `settings.advanced.bindAddrLocal/bindAddrAll`, `settings.models.speed.*`, `settings.models.testPrompt`, `dashboard.weeklyComparison.vsLastWeek`, `components.subagent.*`, `components.sessionFlow.*`, `components.terminalPanel.*`, `components.tokenTrend.*`, `components.tagManager.*`, `components.piConfig.*`, `onboarding.steps.services.websocket/httpApi`
+- **i18n hardcoded strings cleanup** — fixed ~50 hardcoded strings across 19 component files
 
 ### Fixed
 
 - **GUI dev mode now correctly uses Vite dev server** — fixed `tauri://localhost` white screen issue
-  - Removed `custom-protocol` from default `gui` feature in `Cargo.toml` (only needed for production builds)
-  - Added `init_http_adapter_with_options()` to control static file serving based on runtime mode
-  - GUI dev mode: HTTP adapter serves API only, Tauri connects to `http://localhost:1420` (Vite)
-  - CLI mode: HTTP adapter serves API + embedded frontend from `dist/`
-  - Hot module replacement (HMR) now works correctly in development
 
 ### Added
 
-- **Unified single-port architecture (CLI)** — API, WebSocket, and embedded frontend all served on one port (52131)
-  - `src-tauri-cli/src/main.rs` rewritten with axum Router: `POST /api`, `GET /ws`, `GET /health`, SPA fallback
-  - Eliminates need for separate WS/HTTP ports; single tunnel/proxy sufficient for remote access
-  - rust-embed serves built frontend assets with SPA fallback to `index.html`
+- **Unified single-port architecture (CLI)** — API, WebSocket, and frontend on port 52131
+  - `src-tauri-cli/src/main.rs` rewritten with axum Router
 
 - **Remote auth gate** — frontend authentication for non-local access
-  - `AuthGate` component wraps app; detects non-localhost access and prompts for API token
-  - Backend `GET /api/auth-check` endpoint returns `{ needsAuth, authenticated }`
-  - Token stored in localStorage (`psm.apiToken`), sent as `Bearer` header
-  - Show/hide toggle on password input, loading spinner, error feedback
-  - `X-Forwarded-For` header support so auth works behind reverse proxies (ngrok, etc.)
+  - `AuthGate` component wraps app, detects non-localhost access
 
 - **Remote config via URL params** — `?server=`, `?token=`, `?transport=` query parameters
-  - `readRemoteConfig()` in transport.ts reads URL params → localStorage → env vars
-  - WS/HTTP URLs derived from `location.protocol`/`hostname`/`port` (no hardcoded ports)
-  - WS path changed to `/ws` on same port as HTTP (merged architecture)
 
 ### Changed
-
-- `http_adapter.rs` — unified auth via `is_authorized()` (Bearer header + `?token=` query param), SSE auth added
-- `vite.config.ts` — `allowedHosts: true` for tunnel/proxy access, proxy config for `/api` and `/ws`
-- axum dependency gains `ws` feature in both `src-tauri/Cargo.toml` and `src-tauri-cli/Cargo.toml`
 
 - **Mobile adaptation** — full responsive support for < 768px screens
-  - `useIsMobile` hook (matchMedia-based, 768px breakpoint)
-  - Full-screen page switching with bottom navigation bar (5 tabs: list, projects, kanban, dashboard, settings)
-  - Session detail takes over full screen with back arrow navigation
-  - Diff view switches to unified (single-column) mode on mobile
-  - Kanban board uses top-tab single-column layout instead of horizontal scroll
-  - Dashboard stat grid: 5th card spans full width to avoid orphan half-row
-  - StatCard label text bumped to 11px on mobile for readability
-  - Settings panel: animated list → detail page navigation on mobile
-  - Dialogs (export, rename) expand to 95vw on mobile
-  - Long-press context menu on session list (touch devices)
-  - CSS: 36px min touch targets, safe-area-bottom padding, kanban snap scroll
+  - Full-screen page switching with bottom navigation bar (5 tabs)
+  - Diff view switches to unified mode on mobile
 
 - **Connection status banner** — real-time transport health indicator
-  - Red banner when WS/HTTP transport disconnects ("无法连接到服务")
-  - Amber "正在重新连接…" during reconnection attempts
-  - Green "已重新连接" flash (2s) on recovery, then auto-hide
-  - Skips initial connecting state to avoid flash on first load
-  - Works on both mobile and desktop layouts
+  - Red/amber/green banners for disconnected/reconnecting/connected states
 
 - **Incremental session scanning** — backend cache + diff-based updates
-  - Scanner: persistent cache (no TTL), `CACHE_VERSION` atomic counter, `get_session_digest()`
-  - `rescan_changed_files()`: re-parse only changed .jsonl files, merge into cache
-  - File watcher: accumulate changed paths, batch rescan, emit `SessionsDiff` payload
-  - Frontend: `patchSessions()` merges diffs into session list without full reload
-  - `useFileWatcher` receives diffs and accumulates within debounce window
-  - SessionViewer: event-driven incremental update replaces 1s polling interval
-  - `all_messages_text` no longer serialized from backend (skip_serializing)
+  - Scanner: persistent cache, `CACHE_VERSION` counter, `get_session_digest()`
 
 - **HTTP transport + SSE** — mobile-friendly alternative to WebSocket
-  - `HttpTransport`: POST `/api` for commands, SSE `/api/events` for real-time diffs
-  - Auto-detect mobile web → use HTTP transport instead of WebSocket
-  - Backend: SSE endpoint via axum + async-stream
+  - `HttpTransport`: POST `/api` + SSE `/api/events`
 
 - **Auth token management** — API key CRUD for remote access
-  - `list_tokens` / `create_token` / `revoke_token` / `update_last_used` in auth.rs
-  - Tauri IPC commands + WS/HTTP dispatch for list/create/revoke
-  - Advanced Settings UI: key list, create with name, copy notice, revoke with confirm
-
 - **Configurable bind address** — control network exposure
-  - `bind_addr` field in ServerSettings (default `127.0.0.1`)
-  - WS/HTTP adapters bind to configured address
-  - Onboarding: bind address selector with local/remote hints and mobile access instructions
-  - Remote warning badge when `0.0.0.0` selected
-
-- **Session content cache** — faster back-navigation in SessionViewer
-  - LRU cache (5 entries) keyed by path + modified timestamp
-  - Cache hit skips file read entirely, StrictMode double-mount also hits cache
-
-- **Terminal resume command** — resume sessions from web terminal
-  - `buildResumeCommand()` generates `cd + pi --session` command
-  - `TerminalPanel` accepts `pendingCommand` prop, writes to shell after 500ms
+- **Session content cache** — faster back-navigation (LRU, 5 entries)
 
 ### Changed
-
-- WebSocket `invoke()` waits for connection (connectWaiters queue + 10s timeout) instead of throwing immediately
-- WebSocketTransport uses `location.hostname` instead of hardcoded `localhost`
-- TransportContext simplified to singleton via `getTransport()`, removed `wsUrl`/`forceWebSocket` props
-- Onboarding dialog responsive (95vw on mobile), shows bind_addr config in Services step
-- Session load error: silent console.error instead of blocking `alert()`
 
 - **Flow view** — new graph visualization mode for conversation trees
-  - React Flow (`@xyflow/react`) based node graph with compact tree algorithm
-  - Collapses linear tool call chains, shows skipped tool names on edges (e.g. `bash x2, read, edit`)
-  - Role-based node icons: User / Bot / Wrench / Settings
-  - Toolbar: zoom in/out, fit view, focus active node
-  - MiniMap with role-based coloring
-  - Click node to navigate to corresponding conversation branch
-  - Shares filter bar with tree view (Default / No Tools / User / All / Read / Edit / Write)
-  - Theme-aware via CSS variables, follows light/dark mode
+  - React Flow based node graph with compact tree algorithm
+  - Role-based node icons, MiniMap, toolbar with zoom controls
 
 - **Multi-path session directories** — scan sessions from multiple locations
-  - Backend: `Config.session_paths` + `get_all_session_dirs()` multi-directory scanning
-  - Frontend: `sessionDirs` array in Advanced Settings with add/remove UI
-  - New commands: `get_session_paths`, `save_session_paths`, `get_all_session_dirs`
-  - File watcher monitors all configured directories with dynamic reload
-  - Legacy `sessionDir` (string) auto-migrated to `sessionDirs` (string[])
-
 - **Hierarchical labels** — parent-child tag relationships
-  - Backend: `parent_id` column on tags table, wired through create/update
-  - Frontend: `getDescendantIds`, `getRootTags`, `getChildTags` in useTags hook
-  - TagPicker renders tree structure with expand/collapse
-  - TagManagerSettings groups statuses vs custom labels
-  - New LabelFilter component with search, grouped sections, descendant filtering
-  - Renamed "tag" → "label" across en-US/zh-CN i18n
-
-- **Kanban UX improvements**
-  - Project-based filtering via new ProjectFilterList sidebar
-  - Untagged column moved to first position
-  - Context menu on right-click: terminal, browser, favorite, labels, delete
-  - Project selection persists across view switches
-
-- **Tree view improvements**
-  - `findNewestLeaf` navigation — clicking any node follows newest child chain
-  - Write tool filter button alongside Read/Edit
-  - Collapse toggle only on branch points (nodes with >1 children)
-
-### Changed
-- HTTP adapter uses `rust-embed` to serve frontend assets from binary instead of runtime `ServeDir`
-- Session tree sidebar floats over content with smooth transition animation
-
-### Fixed
-- Tree view: clicking a node now switches the conversation branch (previously only scrolled)
-- Flow view: fixed broken parent chain when filtering toolResult entries — build tree from all entries, let compactTree handle skipping
-- Flow view: filter out session/thinking_level_change/label metadata nodes
+- **Kanban UX improvements** — project filtering, context menu, untagged first
+- **Tree view improvements** — `findNewestLeaf` navigation, Write filter
 
 ## [0.5.1] - 2026-03-31
 
@@ -612,45 +309,301 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 - **Terminal resume command** — resume sessions from web terminal with full workflow
   - `buildResumeCommand()` generates `cd + pi --session` command
-  - `TerminalPanel` accepts `pendingCommand` prop, writes to shell after 500ms
   - Custom resume command template with placeholders: `{command}`, `{cwd}`, `{path}`, `{pi}`
   - `resumeCommand` stored in settings, editable via Terminal Settings
-  - Works with external terminal launch and embedded terminal panel
 
 - **Configurable Cmd+F behavior** — toggle between in-session search and sidebar focus
-  - New setting to control whether `Cmd/Ctrl + F` opens in-session search or focuses sidebar
-  - Allows disabling sidebar search shortcut when viewer search is preferred
 
 - **In-session search navigation** — enhanced search within open session
-  - `Cmd/Ctrl + F` toggles search input in session viewer
-  - Previous/next result paging with `Cmd/Ctrl + G` / `Shift + Cmd/Ctrl + G`
-  - Capture phase event handling for reliable shortcut detection
-  - Works alongside global `Cmd/Ctrl + Shift + F` for full-text search
+  - `Cmd/Ctrl + F` toggles search input
+  - Previous/next paging with `Cmd/Ctrl + G` / `Shift + Cmd/Ctrl + G`
 
 ### Fixed
 
-- **Session viewer toolbar window dragging** — restored draggable title bar in Tauri desktop mode
+- **Session viewer toolbar window dragging** — restored draggable title bar
 - **Global keyboard shortcuts** — allow app-level shortcuts from text inputs
-- **Window size clamping** — initial window size now respects monitor work area (#27)
+- **Window size clamping** — initial window size respects monitor work area (#27)
 
 ### Changed
 
-- **Terminal launcher auto-detection** — improved cross-platform terminal detection
-  - Added fallback chain for terminal detection
-  - Support for `auto` mode that prefers available system terminal
+- **Terminal launcher auto-detection** — improved cross-platform detection
 
 ## [0.5.0] - 2026-03-27
 
 ### Performance
 
-- **SQLite message entry ingest optimization** — major performance improvements for FTS indexing
-  - Batched multi-row `INSERT OR REPLACE` statements (42% faster ingest: 457ms → 215ms)
+- **SQLite message entry ingest optimization** — major performance improvements
+  - Batched multi-row `INSERT OR REPLACE` (42% faster: 457ms → 215ms)
   - Eliminated duplicate `DELETE FROM message_entries` per upsert
-  - Reused `session_path` function argument instead of cloning
-  - Optimized chunk size from 64 to 32 rows for better SQLite execute/parse tradeoff
-  - Joined `sessions` directly in FTS query to eliminate per-hit `get_session()` lookups
-  - Folded `total_hits` into paged query via `COUNT(*) OVER ()` (eliminates separate count query)
-  - Benchmark: median total time reduced from 604ms to 278ms (~54% improvement)
+  - Optimized chunk size from 64 to 32 rows
+  - Joined `sessions` directly in FTS query
+  - Folded `total_hits` via `COUNT(*) OVER ()`
+  - Benchmark: 604ms → 278ms (~54% improvement)
+
+## [0.4.9] - 2026-03-14
+
+### Added
+
+- **Session fork functionality** — branch existing sessions
+- **Cmd+F behavior setting** — toggle between in-session search and sidebar
+- **ModelConfigCenter** — visual model management component
+- **Model config and Pi settings commands** — backend support
+- **Thinking text indexing and CJK support** — improved search
+- **Scoped in-session search** — search within open session
+
+### Refactor
+
+- **HTTP adapter decomposition** — modular submodules
+- **SQLite cache module decomposition** — modular submodules
+- **Session commands split** — focused command modules
+
+### Fixed
+
+- **Fallback default for cmdFBehavior** — setting behavior
+- **Search cache and plugin hooks** — improved performance
+
+## [0.4.8] - 2026-03-05
+
+### Added
+
+- **Demo mode polish** — pending UI improvements shipped
+- **Deterministic static demo mode** — demo.html with dist-demo
+
+### Fixed
+
+- **Demo auth gate bypass** — demo mode authentication
+- **Desktop toolbar window dragging** — restored functionality
+
+## [0.4.7] - 2026-03-04
+
+### Added
+
+- **Session UX and dashboard polish** — interaction improvements
+- **Update-check flow** — GitHub Releases integration
+- **Cross-platform runtime hardening** — Windows/Linux support
+- **Session multi-select from filter bars** — UX improvement
+
+### Fixed
+
+- **Terminal launcher clippy** — needless_return issue
+
+## [0.4.6] - 2026-03-04
+
+### Added
+
+- **Terminal resume compatibility** — enhanced auto-detection and fallback
+
+### Fixed
+
+- **Sidebar pagination stability** — refresh and scroll anchor preservation
+
+### Refactor
+
+- **Session viewer scroll decoupling** — message list scroll/render separation
+
+## [0.4.5] - 2026-03-03
+
+### Added
+
+- **Session sorting and batch delete** — workflow improvements
+- **Session list sort and chunked APIs** — backend support
+
+### Fixed
+
+- **Session viewer hydration** — deterministic restore
+
+## [0.4.4] - 2026-03-03
+
+*No changes in this release.*
+
+## [0.4.3] - 2026-03-03
+
+### Added
+
+- **Paginated session APIs** — safer HTTP fallback
+- **Configurable task navigation open position** — top/bottom mode
+- **Subagent modal polish** — progressive rendering (#19)
+- **Thinking blocks as markdown** — improved rendering
+- **Tool output expand/collapse animation** — UI enhancement
+- **Dynamic tool-based session filters** — filtering options
+
+### Refactor
+
+- **App shell modularization** — UI side-effects extraction
+- **Session viewer flows** — modular component design
+
+## [0.4.2] - 2026-02-27
+
+### Added
+
+- **Compaction scroll markers** — glassmorphic tooltips
+- **Heatmap day detail modal** — interactive heatmap
+- **Heatmap data model** — day stats API
+- **Exact phrase search** — quoted query support
+- **Scrollable code blocks** — max height support
+- **Kanban FLIP animation** — card-to-modal transition
+- **Session preview modal** — preview state management
+
+### Fixed
+
+- **Session deletion confirmation** — explicit in-app confirmation
+- **Duplicate ID handling** — parseSessionEntries fix
+- **Kanban animation flicker** — useLayoutEffect fix
+
+## [0.4.1] - 2026-02-23
+
+### Added
+
+- **Subagent usage stats** — Dashboard integration
+- **Subagent meta scanning** — cost aggregation
+- **Flow View enhancements** — interactive minimap
+- **Terminal-focused keyboard shortcuts** — priority handling
+
+### Fixed
+
+- **SQLite connection reuse** — review findings addressed
+- **Cold start session display** — show all sessions instead of last 2 days
+
+## [0.4.0] - 2026-02-17
+
+### Added
+
+- **PWA support** — vite-plugin-pwa integration
+
+### Fixed
+
+- **Legacy database NULL handling** — SQLite compatibility
+
+## [0.3.4] - 2026-02-17
+
+### Added
+
+- **Screenshot light/dark auto-switch** — theme-aware screenshots
+
+### Fixed
+
+- **Website routing** — MDX relative links, language switcher
+- **GitHub Pages deployment** — trailingSlash, basePath
+
+## [0.3.3] - 2026-02-15
+
+### Added
+
+- **Mobile safe area** — notch handling
+- **Tool colorization** — SessionTree UX
+- **Command palette z-index** — overlay conflict fix
+
+## [0.3.2] - 2026-02-14
+
+### Added
+
+- **Terminal watcher** — CLI mode support
+- **Manual API key mode** — authentication option
+
+### Fixed
+
+- **Gzip Content-Type header** — HTTP responses
+- **CLI clippy gates** — watcher and terminal modules
+
+## [0.3.1] - 2026-02-14
+
+### Fixed
+
+- **Gzip response** — explicit Response builder
+- **CompressionStream typing** — BufferSource compatibility
+- **pnpm frozen lockfile** — CI consistency
+
+## [0.3.0] - 2026-02-14
+
+### Added
+
+- **Multi-language support** — German, Spanish, French translations
+- **Toggle and SettingsCard components** — reusable UI
+- **Subagent session viewer** — modal with toolbar
+- **Pi Config TUI** — resource management and settings
+- **SearchFilterBar** — unified search + tag filter
+- **Unified single-port server** — HTTP + WS + auth
+- **Connection status banner** — transport health indicator
+- **Mobile adaptation** — responsive < 768px
+- **Incremental session scanning** — cache-based diff
+- **HTTP transport + SSE** — mobile alternative
+- **Auth token management** — configurable bind address
+
+### Fixed
+
+- **GUI dev mode** — Vite dev server integration
+- **Onboarding UX** — bind_addr config
+
+### Refactor
+
+- **AdvancedSettings redesign** — card layout
+- **Incremental scanning** — cache architecture
+
+## [0.2.2] - 2026-02-13
+
+### Added
+
+- **Project filtering** — Kanban UX
+- **Hierarchical labels** — parent-child tags
+- **Multi-path session directories** — multiple locations
+- **Flow view mode** — React Flow visualization
+- **Toolbar with zoom controls** — flow view
+- **Role icons on nodes** — User/Bot/Wrench/Settings
+
+### Fixed
+
+- **Flow view parent chain** — filtering toolResult entries
+- **Tree view branch switching** — node click navigation
+
+### Refactor
+
+- **rust-embed frontend assets** — binary embedding
+- **Kanban rewrite** — @dnd-kit → react-kanban-kit
+
+## [0.2.1] - 2026-02-12
+
+### Fixed
+
+- **TransportProvider hook** — invalid hook call fix
+- **Export HTML test** — skip when pi CLI unavailable
+- **CI build failures** — general fixes
+
+## [0.2.0] - 2026-02-11
+
+### Added
+
+- **Windows and Linux support** — cross-platform terminal
+- **Platform-aware terminal defaults** — shell detection
+- **Services configuration step** — onboarding
+- **Cache clear command** — maintenance
+- **Embedded PTY terminal** — backend + frontend
+- **GUI/CLI dual-mode startup** — flexible launch
+- **Triple-stack communication** — WebSocket + HTTP + Tauri IPC
+
+### Fixed
+
+- **Theme-aware diff viewer** — light/dark mode
+- **Tool output overflow** — scrollable containers
+
+### Refactor
+
+- **CSS custom properties theme** — semantic tokens
+- **Appearance hooks** — streamlined implementation
+- **Settings hooks** — simplified architecture
+
+## [0.1.2] - 2026-02-10
+
+### Added
+
+- **Collapsible tree nodes** — session view
+- **System locale auto-detection** — i18n
+- **Keyboard shortcuts section** — settings
+- **Onboarding guide** — new users
+- **Favorites with project selection** — filtering
+
+## [0.1.1] - 2026-02-04
+
+*Bug fixes and minor improvements.*
 
 ## [0.1.0] - 2026-01-30
 
@@ -666,67 +619,37 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 #### Phase 2 - Session Management
 - Delete sessions with confirmation dialog
-- Export sessions to HTML format
-- Export sessions to Markdown format
-- Export sessions to JSON format
+- Export sessions to HTML/Markdown/JSON format
 - Rename sessions
 - Export dialog with format selection
-- Rename dialog
 
 #### Phase 2 - Search & Analytics
 - Search result match count badges
-- Statistics dashboard with:
-  - Total sessions count
-  - Total messages count
-  - User vs assistant message breakdown
-  - Average messages per session
-  - Top projects list
+- Statistics dashboard (sessions, messages, top projects)
 
 #### Phase 2 - UX Improvements
-- Keyboard shortcuts:
-  - `Cmd/Ctrl + R` - Refresh sessions
-  - `Cmd/Ctrl + F` - Focus search
-  - `Cmd/Ctrl + Shift + S` - Open statistics
-  - `Esc` - Clear selection/close dialogs
-- Hover delete button on session items
-- Export button in SessionViewer toolbar
-- Rename button in SessionViewer toolbar
+- Keyboard shortcuts: `Cmd/Ctrl + R/F/Shift+S`, `Esc`
+- Hover delete button, export/rename buttons
 - Stats button in sidebar header
 
 ### Technical
 
 #### Backend (Rust)
-- Added `export.rs` module for export functionality
-- Added `stats.rs` module for statistics calculation
-- Added `tantivy_search.rs` module (placeholder for future)
-- Added `delete_session` Tauri command
-- Added `export_session` Tauri command
-- Added `rename_session` Tauri command
-- Added `get_session_stats` Tauri command
-- Added `tauri-plugin-dialog` dependency
-- Added `tantivy` dependency
-- Added `lazy_static` dependency
+- `export.rs`, `stats.rs`, `tantivy_search.rs` modules
+- `delete_session`, `export_session`, `rename_session`, `get_session_stats` commands
+- Dependencies: `tauri-plugin-dialog`, `tantivy`, `lazy_static`
 
 #### Frontend (TypeScript/React)
-- Added `ExportDialog.tsx` component
-- Added `RenameDialog.tsx` component
-- Added `StatsPanel.tsx` component
-- Added `useKeyboardShortcuts.ts` hook
-- Added `SessionStats` type
-- Added `DailyActivity` type
-- Updated `SessionViewer.tsx` with export/rename buttons
-- Updated `SessionList.tsx` with delete button and match badges
-- Added `@tauri-apps/plugin-dialog` dependency
+- `ExportDialog.tsx`, `RenameDialog.tsx`, `StatsPanel.tsx` components
+- `useKeyboardShortcuts.ts` hook
+- `SessionStats`, `DailyActivity` types
 
 ### Fixed
-
-- Fixed SessionViewer empty body issue - now correctly renders messages
-- Fixed search functionality - now properly searches session content
-- Fixed JSON parsing in SessionViewer to handle Pi session format
-- Fixed search result mapping to display correct match counts
+- SessionViewer empty body rendering
+- Search functionality and JSON parsing
+- Search result match count display
 
 ### Changed
-
-- Improved SessionViewer to generate HTML server-side for better performance
-- Enhanced search to support tool call filtering
-- Updated UI styling with consistent dark theme colors
+- HTML server-side generation for performance
+- Tool call filtering in search
+- Consistent dark theme colors
