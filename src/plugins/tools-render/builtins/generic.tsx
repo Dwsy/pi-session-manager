@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { Content } from '../../../types'
 import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '../types'
 import { defaultResolveData } from '../utils/resolveData'
-import MarkdownContent from '../../../components/MarkdownContent'
+import MarkdownContent from '../../../components/ui/MarkdownContent'
 import { escapeHtml } from '../../../utils/markdown'
 import { highlightSearchInHTML } from '../../../utils/search'
 

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useSessionView } from '../../contexts/SessionViewContext'
-import MarkdownContent from '../MarkdownContent'
+import MarkdownContent from '../ui/MarkdownContent'
 import { escapeHtml } from '../../utils/markdown'
 import { highlightSearchInHTML } from '../../utils/search'
 import {

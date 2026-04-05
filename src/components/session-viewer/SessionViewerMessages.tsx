@@ -11,8 +11,8 @@ import {
 import { ArrowDown, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import SessionHeader from "../SessionHeader";
-import SessionScrollMarkers from "../SessionScrollMarkers";
+import SessionHeader from "../session-viewer/SessionHeader";
+import SessionScrollMarkers from "../session-viewer/SessionScrollMarkers";
 import { useSessionView } from "../../contexts/SessionViewContext";
 import type { SessionSearchTarget } from "../../hooks/useSessionViewerInMessageSearch";
 import { useSessionViewerVirtualScroll } from "../../hooks/useSessionViewerVirtualScroll";

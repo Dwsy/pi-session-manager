@@ -7,7 +7,7 @@ import type { SessionInfo } from '../../types'
 import { MessageSquare, Calendar, Trash2, FolderOpen, ChevronDown, ChevronRight, Search } from 'lucide-react'
 import { DirectoryListSkeleton } from '../ui/Skeleton'
 import OpenInTerminalButton from '../OpenInTerminalButton'
-import { SessionBadge } from '../SessionBadge'
+import { SessionBadge } from '../session-viewer/SessionBadge'
 import type { TerminalType } from '../settings/types'
 import { getPlatformDefaults } from '../settings/types'
 

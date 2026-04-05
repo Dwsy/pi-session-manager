@@ -28,7 +28,7 @@ import { useSidebarSessions } from "./hooks/app/useSidebarSessions";
 import { registerBuiltinToolPlugins, registerExtensionToolPlugins } from "./plugins/tools-render";
 import ConnectionBanner from "./components/ConnectionBanner";
 import UpdateNoticeToast from "./components/UpdateNoticeToast";
-import PiLivePanel from "./components/PiLivePanel";
+import PiLivePanel from "./components/pi-live/PiLivePanel";
 import { useTags } from "./hooks/useTags";
 import type { SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
@@ -74,10 +74,10 @@ const GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY = [
 ];
 
 // Lazy load heavy components
-const Dashboard = lazy(() => import("./components/Dashboard"));
+const Dashboard = lazy(() => import("./components/dashboard/Dashboard"));
 const KanbanBoard = lazy(() => import("./components/kanban/KanbanBoard"));
 const SettingsPanel = lazy(() => import("./components/settings/SettingsPanel"));
-const TerminalPanel = lazy(() => import("./components/TerminalPanel"));
+const TerminalPanel = lazy(() => import("./components/terminal/TerminalPanel"));
 const CommandPalette = lazy(() =>
   import("./components/command").then((m) => ({ default: m.CommandPalette })),
 );

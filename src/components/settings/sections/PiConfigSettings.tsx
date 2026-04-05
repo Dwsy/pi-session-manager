@@ -6,7 +6,7 @@ import {
   Paintbrush, X, Check, History, RotateCcw, Eye,
 } from 'lucide-react'
 import { invoke } from '../../../transport'
-import MarkdownContent from '../../MarkdownContent'
+import MarkdownContent from '../../ui/MarkdownContent'
 import SettingsInput from '../SettingsInput'
 import SettingsSelect from '../SettingsSelect'
 import type { ResourceInfo, ResourceType, PiSettingsFull, ModelOption, ConfigVersionMeta } from '../../../types'

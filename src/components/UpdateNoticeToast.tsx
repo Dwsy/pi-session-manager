@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Download, ExternalLink, FileText, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { AvailableUpdateInfo } from '../utils/updateChecker'
-import MarkdownContent from './MarkdownContent'
+import MarkdownContent from './ui/MarkdownContent'
 
 interface UpdateNoticeToastProps {
   update: AvailableUpdateInfo | null

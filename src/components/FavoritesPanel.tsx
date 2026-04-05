@@ -1,7 +1,7 @@
 import { Star, FolderOpen, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo, FavoriteItem } from '../types'
-import { SessionBadge } from './SessionBadge'
+import { SessionBadge } from './session-viewer/SessionBadge'
 import { FavoritesSkeleton } from './ui/Skeleton'
 import { getPathBasename } from '../utils/path'
 

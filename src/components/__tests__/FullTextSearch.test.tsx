@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import FullTextSearch from '../FullTextSearch';
+import FullTextSearch from '../search/FullTextSearch';
 import { invoke } from '@tauri-apps/api/core';
 import i18n from '../../i18n';
 import { I18nextProvider } from 'react-i18next';

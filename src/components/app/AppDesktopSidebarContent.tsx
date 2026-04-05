@@ -2,8 +2,8 @@ import type { ComponentProps, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
 import FavoritesPanel from "../FavoritesPanel";
-import ProjectFilterList from "../ProjectFilterList";
-import ProjectList from "../ProjectList";
+import ProjectFilterList from "../project/ProjectFilterList";
+import ProjectList from "../project/ProjectList";
 import SessionList from "../session-list/SessionList";
 import SelectedProjectHeader from "../project/SelectedProjectHeader";
 import type { FavoriteItem, SessionInfo } from "../../types";

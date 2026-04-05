@@ -5,7 +5,7 @@ import Compaction from "../messages/Compaction";
 import CustomMessage from "../messages/CustomMessage";
 import LabelEntry from "../tags/LabelEntry";
 import ModelChange from "../messages/ModelChange";
-import SessionInfoEntry from "../SessionInfoEntry";
+import SessionInfoEntry from "../session-viewer/SessionInfoEntry";
 import ThinkingLevelChange from "../messages/ThinkingLevelChange";
 import UserMessage from "../messages/UserMessage";
 

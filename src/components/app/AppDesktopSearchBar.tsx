@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { CheckSquare2 } from "lucide-react";
 
-import SearchFilterBar from "../SearchFilterBar";
-import SessionSortSelect from "../SessionSortSelect";
+import SearchFilterBar from "../search/SearchFilterBar";
+import SessionSortSelect from "../session-viewer/SessionSortSelect";
 import type { SessionTag, Tag } from "../../types";
 import type { SessionSortBy, SessionSortOrder } from "../../types/sessionSort";
 

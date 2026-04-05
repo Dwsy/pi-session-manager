@@ -1,5 +1,5 @@
-import SearchFilterBar from "../SearchFilterBar";
-import SessionSortSelect from "../SessionSortSelect";
+import SearchFilterBar from "../search/SearchFilterBar";
+import SessionSortSelect from "../session-viewer/SessionSortSelect";
 import { CheckSquare2 } from "lucide-react";
 import type { SessionTag, Tag } from "../../types";
 import type { SessionSortBy, SessionSortOrder } from "../../types/sessionSort";

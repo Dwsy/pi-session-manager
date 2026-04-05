@@ -22,10 +22,10 @@ import {
 import { SessionListSkeleton } from "../ui/Skeleton";
 import OpenInBrowserButton from "../OpenInBrowserButton";
 import OpenInTerminalButton from "../OpenInTerminalButton";
-import { SessionBadge } from "../SessionBadge";
+import { SessionBadge } from "../session-viewer/SessionBadge";
 import TagBadge from "../tags/TagBadge";
 import TagPicker from "../tags/TagPicker";
-import SessionContextMenu from "../SessionContextMenu";
+import SessionContextMenu from "../session-viewer/SessionContextMenu";
 import DeleteSessionPopover from "../dialogs/DeleteSessionPopover";
 import {
   formatShortSessionId,

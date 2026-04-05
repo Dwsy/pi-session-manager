@@ -1,5 +1,5 @@
 import type { Content, SessionEntry } from '../../types'
-import MarkdownContent from '../MarkdownContent'
+import MarkdownContent from '../ui/MarkdownContent'
 import ThinkingBlock from './ThinkingBlock'
 import ToolCallList from '../tool-calls/ToolCallList'
 import { useSessionView } from '../../contexts/SessionViewContext'

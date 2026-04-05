@@ -54,7 +54,7 @@ function getToolColorVar(toolName: string): string {
   return `var(--tool-palette-${hashToolName(toolName) % TOOL_PALETTE_SIZE})`;
 }
 
-const SessionFlowView = lazy(() => import("../SessionFlowView"));
+const SessionFlowView = lazy(() => import("../session-viewer/SessionFlowView"));
 
 // Highlight search keywords
 function highlightText(text: string, tokens: string[]): ReactNode {

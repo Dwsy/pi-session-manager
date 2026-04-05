@@ -1,6 +1,6 @@
 import { formatDate } from '../../utils/format'
 import { useTranslation } from 'react-i18next'
-import MarkdownContent from '../MarkdownContent'
+import MarkdownContent from '../ui/MarkdownContent'
 
 interface CustomMessageProps {
   customType?: string

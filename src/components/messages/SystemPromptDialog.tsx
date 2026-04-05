@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { invoke } from '../../transport';
 import { useTranslation } from 'react-i18next';
 import { X, Terminal, Wrench } from 'lucide-react';
-import MarkdownContent from '../MarkdownContent';
+import MarkdownContent from '../ui/MarkdownContent';
 import type { SessionEntry } from '../../types';
 
 interface SystemPromptDialogProps {

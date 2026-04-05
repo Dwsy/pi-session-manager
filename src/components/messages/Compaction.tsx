@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import MarkdownContent from '../MarkdownContent'
+import MarkdownContent from '../ui/MarkdownContent'
 import { formatTokens } from '../../utils/format'
 import { useClipboard } from '../../hooks/useClipboard'
 import { Copy, Check } from 'lucide-react'

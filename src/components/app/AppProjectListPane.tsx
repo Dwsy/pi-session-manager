@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode, RefObject } from "react";
 
-import ProjectList from "../ProjectList";
+import ProjectList from "../project/ProjectList";
 import SessionList from "../session-list/SessionList";
 import SelectedProjectHeader from "../project/SelectedProjectHeader";
 import type { SessionInfo } from "../../types";
