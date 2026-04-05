@@ -1,9 +1,9 @@
-use crate::embedding_service::{
+use crate::data::search::embedding::{
     EmbeddingBatchRequest, EmbeddingData, EmbeddingRequest, EmbeddingResponse, EmbeddingService,
     EmbeddingStatusResponse,
 };
-use crate::models::{FullTextSearchHit, FullTextSearchResponse, SessionInfo};
-use crate::session_intel::{ExperienceItem, RecallEvidence};
+use crate::types::{FullTextSearchHit, FullTextSearchResponse, SessionInfo};
+use crate::core::intel::{ExperienceItem, RecallEvidence};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -289,7 +289,7 @@ where
 async fn load_session_entries<D, Fut>(
     dispatch: &D,
     path: String,
-) -> Result<Vec<crate::models::SessionEntry>, ApiReadonlyError>
+) -> Result<Vec<crate::types::SessionEntry>, ApiReadonlyError>
 where
     D: Fn(&'static str, Value) -> Fut,
     Fut: Future<Output = Result<Value, String>>,
@@ -369,9 +369,9 @@ where
     .await?;
 
     let total_hits = response.hits.len();
-    let structured = crate::session_intel::build_structured_recall(&req.query, response.hits);
+    let structured = crate::core::intel::build_structured_recall(&req.query, response.hits);
     let suggested_actions =
-        crate::session_intel::suggest_workflow(&structured.intent, structured.confidence);
+        crate::core::intel::suggest_workflow(&structured.intent, structured.confidence);
 
     Ok(MemoryRecallResult {
         query: req.query,
@@ -411,7 +411,7 @@ where
             Ok(entries) => entries,
             Err(_) => continue,
         };
-        let mut extracted = crate::session_intel::extract_experiences(&session.id, &entries, limit);
+        let mut extracted = crate::core::intel::extract_experiences(&session.id, &entries, limit);
         items.append(&mut extracted);
         if items.len() >= limit {
             items.truncate(limit);
@@ -495,7 +495,7 @@ where
 }
 
 pub fn analytics_overview() -> Result<Value, ApiReadonlyError> {
-    crate::session_intel::collect_sqlite_overview().map_err(ApiReadonlyError::internal)
+    crate::core::intel::collect_sqlite_overview().map_err(ApiReadonlyError::internal)
 }
 
 pub fn readonly_capabilities(checkout_apply: bool, milestone_create: bool) -> Value {

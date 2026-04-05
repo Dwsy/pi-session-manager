@@ -11,7 +11,6 @@ import Compaction from '@/components/messages/Compaction'
 import BranchSummary from '@/components/BranchSummary'
 import CustomMessage from '@/components/messages/CustomMessage'
 import { SessionViewProvider, useSessionView } from '@/contexts/SessionViewContext'
-import '../../styles/subagent.css'
 
 interface SubagentModalProps {
   result: SubagentResult

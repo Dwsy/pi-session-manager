@@ -1,4 +1,4 @@
-use crate::models::SessionEntry;
+use crate::types::SessionEntry;
 use serde_json::Value;
 use std::cmp;
 use std::collections::HashSet;
@@ -228,10 +228,10 @@ pub(super) async fn get_session_entries_impl(path: String) -> Result<Vec<Session
 
 pub(super) async fn get_session_by_path_impl(
     path: String,
-) -> Result<Option<crate::models::SessionInfo>, String> {
+) -> Result<Option<crate::types::SessionInfo>, String> {
     let config = config::load_config()?;
-    let conn = sqlite_cache::init_db_with_config(&config)?;
-    sqlite_cache::get_session(&conn, &path)
+    let conn = crate::data::sqlite::init_db_with_config(&config)?;
+    crate::data::sqlite::get_session(&conn, &path)
 }
 
 pub(super) async fn delete_sessions_impl(
@@ -250,7 +250,7 @@ pub(super) async fn delete_sessions_impl(
             continue;
         }
 
-        match crate::session_delete::delete_session_file_and_cache(trimmed) {
+        match crate::core::delete::delete_session_file_and_cache(trimmed) {
             Ok(_) => deleted_count += 1,
             Err(error) => failed.push(super::session::DeleteSessionFailure {
                 path: trimmed.to_string(),
@@ -316,8 +316,8 @@ async fn rename_session_impl_with_db_path(
     // Sync update to database cache to avoid waiting for file watcher
     let config = config::load_config().map_err(|e| format!("Failed to load config: {e}"))?;
     let conn = match db_path {
-        Some(db_path) => sqlite_cache::init_db_with_path(db_path, &config)?,
-        None => sqlite_cache::init_db_with_config(&config)?,
+        Some(db_path) => crate::data::sqlite::init_db_with_path(db_path, &config)?,
+        None => crate::data::sqlite::init_db_with_config(&config)?,
     };
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
@@ -336,7 +336,7 @@ pub(super) async fn rename_session_impl(path: String, new_name: String) -> Resul
 pub async fn fork_session_impl(
     source_path: String,
     target_name: Option<String>,
-) -> Result<crate::models::SessionInfo, String> {
+) -> Result<crate::types::SessionInfo, String> {
     // Read source session file
     let content = fs::read_to_string(&source_path)
         .map_err(|e| format!("Failed to read source session: {e}"))?;
@@ -424,16 +424,16 @@ pub async fn fork_session_impl(
         .map_err(|e| format!("Failed to write forked session: {e}"))?;
 
     // Parse the new session info
-    let (session_info, _) = crate::scanner::parse_session_info(&target_path)?;
+    let (session_info, _) = crate::core::scanner::parse_session_info(&target_path)?;
 
     // Update cache
     let config = config::load_config().map_err(|e| format!("Failed to load config: {e}"))?;
-    let conn = sqlite_cache::init_db_with_config(&config)?;
+    let conn = crate::data::sqlite::init_db_with_config(&config)?;
     let file_modified = now;
-    sqlite_cache::upsert_session(&conn, &session_info, file_modified, None)?;
+    crate::data::sqlite::upsert_session(&conn, &session_info, file_modified, None)?;
 
     // Invalidate scanner cache so next scan picks up the new session
-    crate::scanner::invalidate_cache();
+    crate::core::scanner::invalidate_cache();
 
     Ok(session_info)
 }

@@ -1,4 +1,4 @@
-use crate::models::SessionInfo;
+use crate::types::SessionInfo;
 use crate::{config, scanner, search, sqlite_cache};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -267,12 +267,13 @@ pub(super) async fn scan_sessions_paginated_impl(
     if let Some(tag_ids) = filter_tag_ids.as_ref().filter(|ids| !ids.is_empty()) {
         let tag_filter: HashSet<&str> = tag_ids.iter().map(String::as_str).collect();
         let config = config::load_config()?;
-        let conn = sqlite_cache::init_db_with_config(&config)?;
-        let matched_session_ids: HashSet<String> = sqlite_cache::get_all_session_tags(&conn)?
-            .into_iter()
-            .filter(|item| tag_filter.contains(item.tag_id.as_str()))
-            .map(|item| item.session_id)
-            .collect();
+        let conn = crate::data::sqlite::init_db_with_config(&config)?;
+        let matched_session_ids: HashSet<String> =
+            crate::data::sqlite::get_all_session_tags(&conn)?
+                .into_iter()
+                .filter(|item| tag_filter.contains(item.tag_id.as_str()))
+                .map(|item| item.session_id)
+                .collect();
         sessions.retain(|session| matched_session_ids.contains(session.id.as_str()));
     }
 
@@ -286,7 +287,7 @@ mod tests {
         build_paginated_result, session_matches_project_filter, session_matches_search_query,
         sort_sessions, strip_session_list_payload,
     };
-    use crate::models::SessionInfo;
+    use crate::types::SessionInfo;
     use chrono::{DateTime, Utc};
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};

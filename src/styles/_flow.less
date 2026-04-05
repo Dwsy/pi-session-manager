@@ -1,0 +1,153 @@
+// =====================================================
+// ========== Flow View ==========
+// =====================================================
+
+// Flow Toolbar
+.flow-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: flex;
+  gap: 2px;
+  background: rgb(var(--color-card));
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.flow-toolbar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.flow-toolbar button:hover {
+  background: rgb(var(--color-secondary));
+  color: rgb(var(--color-foreground));
+}
+
+// Flow Nodes
+.flow-node {
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  cursor: pointer;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.3;
+  background: rgb(var(--color-card));
+  border: 1.5px solid rgb(var(--color-border));
+  color: rgb(var(--color-muted-foreground));
+}
+
+.flow-node-user {
+  background: var(--userMessageBg, rgba(86, 156, 214, 0.12));
+  border-color: var(--borderAccent, rgb(86, 156, 214));
+  color: var(--userMessageText, var(--accent, rgb(86, 156, 214)));
+}
+
+.flow-node-assistant {
+  background: rgb(var(--color-card));
+  border-color: var(--borderMuted, rgb(var(--color-border)));
+  color: var(--text, rgb(var(--color-foreground)));
+}
+
+.flow-node-tool {
+  background: var(--toolPendingBg, rgba(126, 231, 135, 0.12));
+  border-color: var(--border, rgb(126, 231, 135));
+  color: var(--toolTitle, var(--accent, rgb(126, 231, 135)));
+}
+
+.flow-node-meta {
+  background: var(--customMessageBg, rgba(255, 166, 87, 0.12));
+  border-color: var(--customMessageLabel, rgb(255, 166, 87));
+  color: var(--customMessageLabel, rgb(255, 166, 87));
+}
+
+.flow-node-active {
+  border-color: var(--accent, rgb(255, 166, 87)) !important;
+  box-shadow: 0 0 0 1px var(--selectedBg, var(--accent, rgb(255, 166, 87)));
+}
+
+.flow-node-in-path:not(.flow-node-active) {
+  border-color: var(--selectedBg, var(--accent, rgb(255, 166, 87))) !important;
+}
+
+.flow-node-icon {
+  flex-shrink: 0;
+  margin-right: 5px;
+  display: flex;
+  align-items: center;
+  opacity: 0.8;
+}
+
+.flow-node-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.flow-node-skip {
+  margin-left: 4px;
+  font-size: 9px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+// Flow Edges
+.flow-edge .react-flow__edge-path {
+  stroke: rgb(var(--color-border));
+  stroke-width: 1;
+}
+
+.flow-edge-active .react-flow__edge-path {
+  stroke: var(--accent, rgb(255, 166, 87));
+  stroke-width: 2;
+}
+
+// Edge Labels
+.react-flow__edge-text {
+  fill: rgb(var(--color-muted-foreground));
+}
+
+.react-flow__edge-textbg {
+  fill: rgb(var(--color-card));
+  fill-opacity: 0.9;
+}
+
+// React Flow Container
+.react-flow__background {
+  background: rgb(var(--color-background)) !important;
+}
+
+.react-flow__background pattern line {
+  stroke: rgba(var(--color-border), 0.3) !important;
+}
+
+.react-flow__minimap {
+  background: rgb(var(--color-card)) !important;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(var(--color-shadow), 0.15);
+}
+
+.react-flow__minimap-mask {
+  fill: rgb(var(--color-background));
+  fill-opacity: 0.6;
+  cursor: move;
+}
+
+.react-flow__minimap-node {
+  cursor: pointer;
+}

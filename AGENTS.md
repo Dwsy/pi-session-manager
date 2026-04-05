@@ -211,6 +211,16 @@ Core idea: **protocol adapters + shared business dispatch**
   - Table creation, indexing, schema migration (current `LATEST_SCHEMA_VERSION = 3`)
   - Corruption recovery (backup then rebuild)
 
+## 6.5 Pi CLI Live Session (Mirror Sync)
+
+To handle high-frequency event streams from Pi CLI without message loss or duplication:
+- **Backend Registry (`pi_agent_registry.rs`)**: Maintains an in-memory `entries` cache for each live session. Bridges sync full history on registration.
+- **Frontend Mirror Sync (`useSessionViewerData.ts`)**: 
+  - Prioritizes Registry cache over disk-scan when `isLive` is true.
+  - Uses `lastResponseIdRef` to track active messages and prevent ID collision/deletion.
+  - Merges `message_update` and `turn_end` content to preserve Thinking blocks.
+- **Sidebar Integration (`usePaginatedSessions.ts`)**: Merges live registry sessions into the paginated list instantly.
+
 ## 6.4 Network Service Ports (Code Defaults)
 
 ### GUI Main Program (`src-tauri/src/main.rs` + settings)
@@ -288,6 +298,10 @@ Core idea: **protocol adapters + shared business dispatch**
   - `create_model_config_backup` / `list_model_config_backups` / `restore_model_config_backup` / `delete_model_config_backup`
   - `list_model_config_versions`
   - `test_model_http`
+- Pi Agent commands in `src-tauri/src/commands/pi_live.rs`:
+  - `get_pi_live_sessions`: List active registry sessions.
+  - `get_pi_agent_entries`: Fetch cached history for a live session.
+  - `send_pi_agent_rpc`: Send prompt/command to Pi CLI.
 
 ---
 

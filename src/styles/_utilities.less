@@ -1,0 +1,221 @@
+// =====================================================
+// ========== Utilities ==========
+// =====================================================
+
+@layer utilities {
+  // Motion Utilities
+  .motion-color {
+    transition-property: color, background-color, border-color, fill, stroke, opacity;
+    transition-duration: var(--motion-duration-fast);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .motion-opacity {
+    transition-property: opacity;
+    transition-duration: var(--motion-duration-fast);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .motion-surface {
+    transition-property: background-color, border-color, box-shadow, opacity;
+    transition-duration: var(--motion-duration-base);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .motion-press {
+    transition-property: transform, opacity;
+    transition-duration: var(--motion-duration-instant);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .motion-press:active {
+    transform: scale(var(--motion-scale-press));
+    opacity: 0.9;
+  }
+
+  .motion-width {
+    transition-property: width;
+    transition-duration: var(--motion-duration-data);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .motion-transform {
+    transition-property: transform;
+    transition-duration: var(--motion-duration-base);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .motion-transform-opacity {
+    transition-property: transform, opacity;
+    transition-duration: var(--motion-duration-base);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  // Focus Ring
+  .focus-ring {
+    outline: none;
+  }
+
+  .focus-ring:focus-visible {
+    box-shadow:
+      0 0 0 2px rgb(var(--color-ring) / 0.62),
+      0 0 0 1px rgb(var(--color-background) / 0.9);
+  }
+
+  // UI Animations
+  .ui-enter-fade {
+    animation: ui-fade-in var(--motion-duration-overlay) var(--motion-ease-enter) both;
+  }
+
+  .ui-enter-zoom {
+    animation: ui-zoom-in var(--motion-duration-overlay) var(--motion-ease-enter) both;
+  }
+
+  .ui-exit-fade {
+    animation: ui-fade-out var(--motion-duration-fast) var(--motion-ease-exit) both;
+  }
+
+  .ui-exit-zoom {
+    animation: ui-zoom-out var(--motion-duration-fast) var(--motion-ease-exit) both;
+  }
+
+  // Glassmorphism
+  .glass {
+    background: rgba(var(--glass-rgb), 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(var(--highlight-rgb), 0.08);
+  }
+
+  .glass-card {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(var(--highlight-rgb), 0.06);
+    box-shadow:
+      0 4px 24px rgba(var(--shadow-rgb), 0.2),
+      0 1px 2px rgba(var(--highlight-rgb), 0.03) inset;
+  }
+
+  .glass-card-hover {
+    transition-property: transform, box-shadow, border-color, background-color;
+    transition-duration: var(--motion-duration-base);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .glass-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 8px 32px rgba(var(--shadow-rgb), 0.3),
+      0 1px 2px rgba(var(--highlight-rgb), 0.05) inset,
+      0 0 0 1px rgba(var(--highlight-rgb), 0.08);
+  }
+
+  // Glow Effects
+  .glow-blue {
+    box-shadow: 0 0 20px rgba(var(--info-rgb), 0.15);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 20px rgba(var(--success-rgb), 0.15);
+  }
+
+  .glow-orange {
+    box-shadow: 0 0 20px rgba(var(--warning-rgb), 0.15);
+  }
+
+  .glow-red {
+    box-shadow: 0 0 20px rgba(var(--destructive-rgb), 0.15);
+  }
+
+  // Text Gradient
+  .text-gradient {
+    background: linear-gradient(135deg, rgb(var(--color-foreground)) 0%, rgb(var(--color-muted-foreground)) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  // Inner Shadow
+  .inner-shadow {
+    box-shadow: inset 0 1px 2px rgba(var(--highlight-rgb), 0.05);
+  }
+
+  // Custom Scrollbar
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.4);
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(128, 128, 128, 0.6);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  // Hide scrollbar visually on touch devices
+  @media (hover: none) and (pointer: coarse) {
+    .custom-scrollbar {
+      scrollbar-width: none;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  // Safe Areas
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  .safe-area-all {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+}
+
+// Highlights
+mark {
+  background-color: rgba(250, 204, 21, 0.2);
+  color: #facc15;
+  border-radius: 0.125rem;
+  padding: 0 0.125rem;
+}
+
+// FTS Snippet
+.fts-snippet b {
+  background-color: #fbbf24;
+  color: black;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 600;
+}

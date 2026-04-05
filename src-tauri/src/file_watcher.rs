@@ -134,7 +134,7 @@ pub fn start_watcher_for_all_dirs(app_handle: AppHandle) -> Result<FileWatcherSt
     let state = FileWatcherState::new();
 
     let config = crate::config::load_config().unwrap_or_default();
-    let all_dirs = crate::scanner::get_all_session_dirs(&config);
+    let all_dirs = crate::core::scanner::get_all_session_dirs(&config);
 
     state.restart(all_dirs, app_handle)?;
 
@@ -147,7 +147,7 @@ pub fn restart_watcher_with_config(
     app_handle: AppHandle,
 ) -> Result<(), String> {
     let config = crate::config::load_config().unwrap_or_default();
-    let all_dirs = crate::scanner::get_all_session_dirs(&config);
+    let all_dirs = crate::core::scanner::get_all_session_dirs(&config);
 
     info!(
         "Restarting file watcher with {} directories",
@@ -219,7 +219,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
             info!("Incremental rescan: {} changed files", changed.len());
 
             // Update backend cache, get diff
-            match rt.block_on(crate::scanner::rescan_changed_files(changed)) {
+            match rt.block_on(crate::core::scanner::rescan_changed_files(changed)) {
                 Ok(diff) => {
                     if diff.updated.is_empty() && diff.removed.is_empty() {
                         // Nothing actually changed, skip notification

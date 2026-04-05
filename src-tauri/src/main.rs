@@ -302,7 +302,7 @@ fn main() {
                     // In GUI mode, don't serve static files (use Vite dev server)
                     // In CLI mode, serve embedded static files
                     if let Err(e) =
-                        pi_session_manager::http_adapter::init_http_adapter_with_options(
+                        pi_session_manager::server::http::init_http_adapter_with_options(
                             http_state, &http_bind, http_port, is_cli,
                         )
                         .await
@@ -321,7 +321,7 @@ fn main() {
                 loop {
                     interval.tick().await;
                     if let Some((sessions, details)) =
-                        pi_session_manager::write_buffer::check_and_take_flush_data()
+                        pi_session_manager::core::write_buffer::check_and_take_flush_data()
                     {
                         let sessions_count = sessions.len();
                         let details_count = details.len();
@@ -329,7 +329,7 @@ fn main() {
                         // Reuse connection or create new one
                         let conn = match last_conn.take() {
                             Some(c) => c,
-                            None => match pi_session_manager::sqlite_cache::init_db() {
+                            None => match pi_session_manager::data::sqlite::init_db() {
                                 Ok(c) => c,
                                 Err(e) => {
                                     log::error!("Failed to init DB for flush: {e}");
@@ -340,7 +340,7 @@ fn main() {
 
                         let mut flush_error = false;
                         for entry in &sessions {
-                            if let Err(e) = pi_session_manager::sqlite_cache::upsert_session(
+                            if let Err(e) = pi_session_manager::data::sqlite::upsert_session(
                                 &conn,
                                 &entry.session,
                                 entry.file_modified,
@@ -352,7 +352,7 @@ fn main() {
                         }
                         for entry in &details {
                             if let Err(e) =
-                                pi_session_manager::sqlite_cache::upsert_session_details_cache(
+                                pi_session_manager::data::sqlite::upsert_session_details_cache(
                                     &conn,
                                     &entry.path,
                                     entry.file_modified,
@@ -379,13 +379,13 @@ fn main() {
             // Flush write buffer on app exit
             app.handle().clone().listen("tauri://exit", |_| {
                 if let Some((sessions, details)) =
-                    pi_session_manager::write_buffer::force_flush_all()
+                    pi_session_manager::core::write_buffer::force_flush_all()
                 {
-                    match pi_session_manager::sqlite_cache::init_db() {
+                    match pi_session_manager::data::sqlite::init_db() {
                         Ok(conn) => {
                             let mut flush_error = false;
                             for entry in &sessions {
-                                if let Err(e) = pi_session_manager::sqlite_cache::upsert_session(
+                                if let Err(e) = pi_session_manager::data::sqlite::upsert_session(
                                     &conn,
                                     &entry.session,
                                     entry.file_modified,
@@ -397,7 +397,7 @@ fn main() {
                             }
                             for entry in &details {
                                 if let Err(e) =
-                                    pi_session_manager::sqlite_cache::upsert_session_details_cache(
+                                    pi_session_manager::data::sqlite::upsert_session_details_cache(
                                         &conn,
                                         &entry.path,
                                         entry.file_modified,

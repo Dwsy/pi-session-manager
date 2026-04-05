@@ -7,7 +7,7 @@ import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
 import { escapeHtml } from '@/utils/markdown'
 import { highlightSearchInHTML } from '@/utils/search'
 import SubagentModal from '@/components/tool-calls/SubagentModal'
-import '../../../styles/subagent.css'
+import '@/components/tool-calls/SubagentModal'
 
 /** Maximum length for error preview text */
 const SUBAGENT_ERROR_PREVIEW_LIMIT = 80

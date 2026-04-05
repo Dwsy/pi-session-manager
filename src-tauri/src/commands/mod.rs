@@ -1,5 +1,4 @@
-mod auth_cmds;
-mod cache;
+mod auth;
 pub mod config_bundle;
 mod config_versions;
 mod favorites;
@@ -7,8 +6,6 @@ mod model_config;
 mod models;
 #[cfg(feature = "gui")]
 mod pi_live;
-pub mod pi_resources;
-mod pi_settings;
 pub mod search;
 mod session;
 pub(super) mod session_file;
@@ -20,8 +17,7 @@ mod tags;
 #[cfg(feature = "gui")]
 pub mod terminal;
 
-pub use auth_cmds::*;
-pub use cache::*;
+pub use auth::*;
 pub use config_bundle::*;
 pub use config_versions::*;
 pub use favorites::*;
@@ -29,10 +25,11 @@ pub use model_config::*;
 pub use models::*;
 #[cfg(feature = "gui")]
 pub use pi_live::*;
-pub use pi_resources::*;
-pub use pi_settings::*;
 pub use search::*;
 pub use session::*;
+pub use session_file::*;
+pub use session_list::*;
+pub use session_open::*;
 pub use settings::*;
 pub use skills::*;
 pub use tags::*;

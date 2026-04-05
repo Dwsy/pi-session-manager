@@ -1,0 +1,150 @@
+// =====================================================
+// ========== Code Block ==========
+// =====================================================
+
+// Code Block Wrapper
+.code-block-wrapper {
+  background: var(--bg-inset);
+  border-radius: 8px;
+  margin: 16px 0;
+  overflow: hidden;
+}
+
+// Code Block Header
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 11px;
+}
+
+.code-filename,
+.code-language {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.code-copy-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.code-copy-button:hover {
+  color: var(--text-secondary);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+.code-copy-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.code-copy-text {
+  font-family: inherit;
+}
+
+// Code Block Content
+.code-block-content {
+  display: flex;
+  overflow-x: auto;
+}
+
+.code-line-numbers {
+  flex-shrink: 0;
+  padding: 12px 0;
+  background: transparent;
+  user-select: none;
+  text-align: right;
+}
+
+.code-line-number {
+  padding: 0 12px;
+  font-size: 11px;
+  line-height: var(--line-height);
+  color: rgb(var(--color-muted-foreground));
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+}
+
+.code-block {
+  flex: 1;
+  margin: 0;
+  padding: 12px;
+  background: transparent;
+  overflow-x: auto;
+  font-size: 11px;
+  line-height: var(--line-height);
+}
+
+.code-block code {
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+}
+
+// Scrollbar for code blocks
+.code-block-content::-webkit-scrollbar,
+.code-block::-webkit-scrollbar {
+  height: 8px;
+}
+
+.code-block-content::-webkit-scrollbar-track,
+.code-block::-webkit-scrollbar-track {
+  background: var(--bg-inset);
+}
+
+.code-block-content::-webkit-scrollbar-thumb,
+.code-block::-webkit-scrollbar-thumb {
+  background: rgba(var(--accent-rgb), 0.3);
+  border-radius: 4px;
+}
+
+.code-block-content::-webkit-scrollbar-thumb:hover,
+.code-block::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--accent-rgb), 0.5);
+}
+
+// Code Block Scrollable (inner scrolling)
+.code-block-scrollable {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.code-block-scrollable .code-block-content {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--accent-rgb), 0.35) transparent;
+}
+
+.code-block-scrollable .code-block-content::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.code-block-scrollable .code-block-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.code-block-scrollable .code-block-content::-webkit-scrollbar-thumb {
+  background: rgba(var(--accent-rgb), 0.35);
+  border-radius: 4px;
+}
+
+.code-block-scrollable .code-block-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--accent-rgb), 0.55);
+}
+
+.code-block-scrollable .code-block {
+  overflow: visible;
+}

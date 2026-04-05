@@ -1,0 +1,41 @@
+// =====================================================
+// ========== Filters ==========
+// =====================================================
+
+.sidebar-filters {
+  display: flex;
+  padding: 10px 12px 12px 12px;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.sidebar-filters-view-mode {
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.08);
+}
+
+.filter-btn {
+  padding: 4px 10px;
+  font-size: 10px;
+  font-family: inherit;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-btn:hover {
+  color: var(--text-secondary);
+  background: rgba(var(--accent-rgb), 0.05);
+}
+
+.filter-btn.active {
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent);
+  font-weight: 500;
+}

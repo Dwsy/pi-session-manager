@@ -1,0 +1,201 @@
+// =====================================================
+// ========== Tree View ==========
+// =====================================================
+
+// Tree Container
+.tree-container {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 0;
+}
+
+.tree-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tree-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tree-container::-webkit-scrollbar-thumb {
+  background: rgba(var(--accent-rgb), 0.2);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.tree-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--accent-rgb), 0.4);
+  background-clip: content-box;
+}
+
+// Tree Node
+.tree-node {
+  padding: 2px 8px;
+  margin: 1px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.01em;
+  border-radius: 4px;
+}
+
+.tree-node:has(.tree-content-user) {
+  align-items: flex-start;
+}
+
+.tree-node:hover {
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+.tree-node.active {
+  background: rgba(var(--accent-rgb), 0.12);
+}
+
+.tree-node.active .tree-content {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+// Tree Prefix
+.tree-prefix {
+  color: var(--muted);
+  flex-shrink: 0;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  white-space: pre;
+  opacity: 0.5;
+}
+
+// Tree Marker
+.tree-marker {
+  color: var(--accent);
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+// Tree Toggle
+.tree-toggle {
+  color: rgb(var(--color-muted-foreground));
+  flex-shrink: 0;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 16px;
+  transition: color 0.15s ease;
+  user-select: none;
+}
+
+.tree-toggle:hover {
+  color: var(--accent);
+}
+
+// Tree Collapsed Hint
+.tree-collapsed-hint {
+  color: rgb(var(--color-muted-foreground));
+  font-size: 10px;
+  margin-left: 4px;
+  opacity: 0.6;
+}
+
+// Tree Content
+.tree-content {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+// Tree Role Colors
+.tree-role-user {
+  color: var(--accent);
+}
+
+.tree-role-assistant {
+  color: var(--success);
+}
+
+.tree-role-tool {
+  color: rgb(var(--color-muted-foreground));
+}
+
+// Tree State Colors
+.tree-muted {
+  color: rgb(var(--color-muted-foreground));
+}
+
+.tree-error {
+  color: var(--error);
+}
+
+.tree-compaction {
+  color: var(--borderAccent);
+}
+
+.tree-branch-summary {
+  color: var(--mdHeading);
+}
+
+.tree-custom-message {
+  color: var(--customMessageLabel);
+}
+
+// User Message Layout in Tree
+.tree-content-user {
+  display: flex;
+  flex-direction: column;
+  line-height: 14px;
+  gap: 1px;
+  white-space: normal;
+}
+
+.tree-user-label {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.tree-user-text {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Tree Status Bar
+.tree-status {
+  padding: 8px 12px;
+  font-size: 10px;
+  color: rgb(var(--color-muted-foreground));
+  flex-shrink: 0;
+  border-top: 1px solid rgba(var(--accent-rgb), 0.1);
+  background: var(--bg-subtle);
+}
+
+// Search Match in Tree
+.tree-node.search-match {
+  flex-wrap: wrap;
+}
+
+.tree-node.search-match .tree-prefix {
+  display: none;
+}
+
+.tree-node.search-match:hover {
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.tree-node.search-match-current:hover {
+  background: rgba(34, 211, 238, 0.15);
+}
+
+// Highlight Effect
+.user-message.highlight,
+.assistant-message.highlight {
+  animation: highlight-pulse 2s ease-out;
+}

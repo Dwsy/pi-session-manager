@@ -42,7 +42,7 @@ pub async fn dispatch(
 ) -> Result<Value, String> {
     match command {
         "scan_sessions" => {
-            let result = crate::scanner::scan_sessions().await?;
+            let result = crate::core::scanner::scan_sessions().await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "scan_sessions_paginated" => {
@@ -82,7 +82,7 @@ pub async fn dispatch(
             Ok(serde_json::to_value(result).unwrap())
         }
         "session_digest" => {
-            let (version, count) = crate::scanner::get_session_digest();
+            let (version, count) = crate::core::scanner::get_session_digest();
             Ok(serde_json::json!({ "version": version, "count": count }))
         }
         "read_session_file" => {
@@ -154,7 +154,7 @@ pub async fn dispatch(
         }
         "delete_session" => {
             let path = extract_string(payload, "path")?;
-            crate::session_delete::delete_session_file_and_cache(&path)?;
+            crate::core::delete::delete_session_file_and_cache(&path)?;
             Ok(Value::Null)
         }
         "delete_sessions" => {
@@ -192,7 +192,7 @@ pub async fn dispatch(
             Ok(serde_json::to_value(result).unwrap())
         }
         "get_session_stats" => {
-            let sessions: Vec<crate::models::SessionInfo> = serde_json::from_value(
+            let sessions: Vec<crate::types::SessionInfo> = serde_json::from_value(
                 payload
                     .get("sessions")
                     .cloned()
@@ -214,7 +214,7 @@ pub async fn dispatch(
             Ok(serde_json::to_value(result).unwrap())
         }
         "search_sessions" => {
-            let sessions: Vec<crate::models::SessionInfo> = serde_json::from_value(
+            let sessions: Vec<crate::types::SessionInfo> = serde_json::from_value(
                 payload
                     .get("sessions")
                     .cloned()
@@ -787,7 +787,7 @@ pub async fn dispatch(
                     .pi_agent_registry
                     .send_rpc(&session_id, command)
                     .await?;
-                return Ok(result);
+                Ok(result)
             }
             #[cfg(not(feature = "gui"))]
             {

@@ -1,0 +1,161 @@
+// =====================================================
+// ========== CSS Variables ==========
+// =====================================================
+
+:root {
+  // Typography
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', Arial, sans-serif;
+  --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  --font-size-base: 16px;
+  --line-height: 18px;
+
+  // Motion
+  --motion-duration-instant: 80ms;
+  --motion-duration-fast: 140ms;
+  --motion-duration-base: 220ms;
+  --motion-duration-overlay: 320ms;
+  --motion-duration-data: 480ms;
+  --motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --motion-scale-press: 0.96;
+  --motion-lift-y: -2px;
+
+  // Semantic Colors (RGB space-separated for alpha)
+  --color-background: 26 27 38;
+  --color-foreground: 229 229 231;
+  --color-card: 36 37 54;
+  --color-card-foreground: 229 229 231;
+  --color-popover: 36 37 54;
+  --color-popover-foreground: 229 229 231;
+  --color-primary: 229 229 231;
+  --color-primary-foreground: 26 27 38;
+  --color-secondary: 44 45 59;
+  --color-secondary-foreground: 229 229 231;
+  --color-muted: 44 45 59;
+  --color-muted-foreground: 106 111 133;
+  --color-accent: 44 45 59;
+  --color-accent-foreground: 229 229 231;
+  --color-destructive: 239 68 68;
+  --color-destructive-foreground: 229 229 231;
+  --color-border: 44 45 59;
+  --color-input: 44 45 59;
+  --color-ring: 138 190 183;
+  --color-info: 86 156 214;
+  --color-success: 126 231 135;
+  --color-warning: 255 166 87;
+  --color-surface: 37 38 54;
+  --color-surface-dark: 30 31 46;
+  --color-secondary-hover: 60 61 75;
+  --color-border-hover: 58 59 79;
+  --color-purple: 199 146 234;
+
+  // RGB Variables for rgba() usage
+  --accent-rgb: 138, 190, 183;
+  --border-rgb: 44, 45, 59;
+  --shadow-rgb: 0, 0, 0;
+  --highlight-rgb: 255, 255, 255;
+  --info-rgb: 86, 156, 214;
+  --success-rgb: 126, 231, 135;
+  --warning-rgb: 255, 166, 87;
+  --destructive-rgb: 239, 68, 68;
+  --foreground-rgb: 229, 229, 231;
+  --muted-fg-rgb: 106, 111, 133;
+  --glass-rgb: 44, 45, 59;
+
+  // Text & Background
+  --text-secondary: #d4d4d8;
+  --bg-subtle: rgba(0, 0, 0, 0.12);
+  --bg-inset: rgba(0, 0, 0, 0.2);
+  --bg-inset-hover: rgba(0, 0, 0, 0.3);
+
+  // Component Colors (Legacy)
+  --accent: #8abeb7;
+  --border: #5f87ff;
+  --borderAccent: #00d7ff;
+  --borderMuted: #505050;
+  --success: #b5bd68;
+  --error: #cc6666;
+  --warning: #ffff00;
+  --muted: #808080;
+  --dim: #666666;
+  --text: #e5e5e7;
+  --thinkingText: #9ca3af;
+  --selectedBg: #3a3a4a;
+  --userMessageBg: #343541;
+  --userMessageText: #e5e5e7;
+  --customMessageBg: #2d2838;
+  --customMessageText: #e5e5e7;
+  --customMessageLabel: #9575cd;
+  --toolPendingBg: #282832;
+  --toolSuccessBg: #283228;
+  --toolErrorBg: #3c2828;
+  --toolTitle: #e5e5e7;
+  --toolOutput: #808080;
+
+  // Markdown Colors
+  --mdHeading: #f0c674;
+  --mdLink: #81a2be;
+  --mdLinkUrl: #666666;
+  --mdCode: #8abeb7;
+  --mdCodeBlock: #b5bd68;
+  --mdCodeBlockBorder: #808080;
+  --mdQuote: #808080;
+  --mdQuoteBorder: #808080;
+  --mdHr: #808080;
+  --mdListBullet: #8abeb7;
+
+  // Diff Colors
+  --toolDiffAdded: #b5bd68;
+  --toolDiffRemoved: #cc6666;
+  --toolDiffContext: #808080;
+
+  // Syntax Colors
+  --syntaxComment: #6A9955;
+  --syntaxKeyword: #569CD6;
+  --syntaxFunction: #DCDCAA;
+  --syntaxVariable: #9CDCFE;
+  --syntaxString: #CE9178;
+  --syntaxNumber: #B5CEA8;
+  --syntaxType: #4EC9B0;
+  --syntaxOperator: #D4D4D4;
+  --syntaxPunctuation: #D4D4D4;
+
+  // Thinking Levels
+  --thinkingOff: #505050;
+  --thinkingMinimal: #6e6e6e;
+  --thinkingLow: #5f87af;
+  --thinkingMedium: #81a2be;
+  --thinkingHigh: #b294bb;
+  --thinkingXhigh: #d183e8;
+
+  // Misc
+  --bashMode: #b5bd68;
+  --body-bg: rgb(26, 27, 38);
+  --container-bg: rgb(44, 45, 59);
+  --info-bg: rgb(72, 68, 65);
+
+  // Tool Call Colors
+  --tool-color-read: #61afef;
+  --tool-color-edit: #e5c07b;
+  --tool-color-write: #c678dd;
+  --tool-color-bash: #98c379;
+  --tool-color-search: #56b6c2;
+  --tool-color-web-fetch: #d19a66;
+  --tool-palette-0: #e06c75;
+  --tool-palette-1: #d19a66;
+  --tool-palette-2: #56b6c2;
+  --tool-palette-3: #c678dd;
+  --tool-palette-4: #98c379;
+  --tool-palette-5: #ff6ac1;
+  --tool-palette-6: #9cdcfe;
+  --tool-palette-7: #e5c07b;
+
+  // Viewport
+  --app-height: 100vh;
+  --titlebar-height: 0px;
+
+  @supports (height: 100dvh) {
+    --app-height: 100dvh;
+  }
+}

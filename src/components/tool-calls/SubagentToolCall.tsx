@@ -9,7 +9,7 @@ import {
   getSubagentResultErrorPreview,
   getSubagentResultTaskPreview,
 } from '@/utils/toolCallDisplay'
-import '../styles/subagent.css'
+import '../utils/markdown'
 
 interface SubagentToolCallProps {
   arguments?: Record<string, any>

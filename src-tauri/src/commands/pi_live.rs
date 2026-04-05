@@ -27,7 +27,9 @@ pub async fn pi_agent_steering(
     message: String,
     deliver_as: Option<String>,
 ) -> Result<(), String> {
-    let is_streaming = state.pi_agent_registry.get_live_session(&session_id)
+    let is_streaming = state
+        .pi_agent_registry
+        .get_live_session(&session_id)
         .map(|s| s.is_streaming)
         .unwrap_or(false);
 
@@ -42,7 +44,7 @@ pub async fn pi_agent_steering(
         "sessionId": session_id,
         "message": message,
     });
-    
+
     state
         .pi_agent_registry
         .send_rpc(&session_id, command)
@@ -97,10 +99,7 @@ pub async fn pi_agent_get_state(
         "type": "get_state",
         "sessionId": session_id,
     });
-    state
-        .pi_agent_registry
-        .send_rpc(&session_id, command)
-        .await
+    state.pi_agent_registry.send_rpc(&session_id, command).await
 }
 
 #[tauri::command]

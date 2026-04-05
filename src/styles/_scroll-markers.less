@@ -1,0 +1,301 @@
+// =====================================================
+// ========== Scroll Markers ==========
+// =====================================================
+
+.session-scroll-markers {
+  position: absolute;
+  right: 6px;
+  top: 12px;
+  bottom: 12px;
+  width: 18px;
+  pointer-events: none;
+  z-index: 48;
+}
+
+.session-scroll-markers::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--accent-rgb), 0.06) 0%,
+    rgba(var(--accent-rgb), 0.22) 35%,
+    rgba(var(--accent-rgb), 0.12) 100%
+  );
+  opacity: 0.9;
+}
+
+// Mobile variant
+.session-scroll-markers.mobile {
+  right: 10px;
+  top: 10px;
+  bottom: 10px;
+  width: 42px;
+  padding: 10px 8px;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--color-card), 0.78) 0%,
+    rgba(var(--color-card), 0.52) 100%
+  );
+  border-radius: 18px;
+  border: 1px solid rgba(var(--accent-rgb), 0.18);
+  box-shadow:
+    0 14px 30px rgba(var(--shadow-rgb), 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px) saturate(1.25);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.session-scroll-markers.mobile::before {
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--accent-rgb), 0.12) 0%,
+    rgba(var(--accent-rgb), 0.34) 45%,
+    rgba(var(--accent-rgb), 0.16) 100%
+  );
+}
+
+.session-scroll-markers.mobile::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  pointer-events: none;
+}
+
+.session-scroll-markers.mobile.has-active-marker {
+  border-color: rgba(var(--accent-rgb), 0.28);
+  box-shadow:
+    0 18px 36px rgba(var(--shadow-rgb), 0.22),
+    0 0 0 1px rgba(var(--accent-rgb), 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+// Marker
+.session-scroll-marker {
+  position: absolute;
+  left: 50%;
+  width: 18px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.session-scroll-markers.mobile .session-scroll-marker {
+  width: 26px;
+  height: 18px;
+}
+
+// Marker Dot
+.session-scroll-marker-dot {
+  width: 12px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), 0.4);
+  box-shadow:
+    0 0 0 1px rgba(var(--accent-rgb), 0.14),
+    0 3px 10px rgba(var(--shadow-rgb), 0.14);
+  transition:
+    width 0.18s ease,
+    height 0.18s ease,
+    background 0.12s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.session-scroll-markers.mobile .session-scroll-marker-dot {
+  width: 14px;
+  height: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(var(--accent-rgb), 0.54) 0%,
+    rgba(var(--accent-rgb), 0.84) 100%
+  );
+  box-shadow:
+    0 0 0 1px rgba(var(--accent-rgb), 0.18),
+    0 6px 16px rgba(var(--shadow-rgb), 0.18);
+}
+
+.session-scroll-marker:hover .session-scroll-marker-dot {
+  background: rgba(var(--accent-rgb), 0.88);
+  transform: scaleX(1.08);
+}
+
+// Compaction marker
+.session-scroll-marker--compaction .session-scroll-marker-dot {
+  background: rgba(168, 139, 250, 0.56);
+  box-shadow:
+    0 0 0 1px rgba(168, 139, 250, 0.18),
+    0 3px 10px rgba(91, 33, 182, 0.18);
+}
+
+.session-scroll-markers.mobile .session-scroll-marker--compaction .session-scroll-marker-dot {
+  background: linear-gradient(
+    90deg,
+    rgba(168, 139, 250, 0.62) 0%,
+    rgba(196, 181, 253, 0.92) 100%
+  );
+}
+
+.session-scroll-marker--compaction:hover .session-scroll-marker-dot {
+  background: rgba(196, 181, 253, 0.92);
+}
+
+// Active marker
+.session-scroll-marker.active {
+  z-index: 3;
+}
+
+.session-scroll-marker.active .session-scroll-marker-dot {
+  width: 18px;
+  height: 8px;
+  background: rgba(var(--accent-rgb), 0.98);
+  box-shadow:
+    0 0 0 1px rgba(var(--accent-rgb), 0.2),
+    0 10px 22px rgba(var(--accent-rgb), 0.2),
+    0 4px 12px rgba(var(--shadow-rgb), 0.18);
+}
+
+.session-scroll-markers.mobile .session-scroll-marker.active {
+  transform: translate(-50%, -50%) scale(1.02);
+}
+
+.session-scroll-markers.mobile .session-scroll-marker.active .session-scroll-marker-dot {
+  width: 18px;
+  height: 9px;
+}
+
+.session-scroll-marker--compaction.active .session-scroll-marker-dot {
+  background: rgba(196, 181, 253, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(168, 139, 250, 0.22),
+    0 10px 22px rgba(168, 139, 250, 0.24),
+    0 4px 12px rgba(91, 33, 182, 0.2);
+}
+
+// Focus
+.session-scroll-marker:focus-visible {
+  outline: none;
+}
+
+.session-scroll-marker:focus-visible .session-scroll-marker-dot {
+  box-shadow:
+    0 0 0 2px rgba(var(--color-card), 0.85),
+    0 0 0 4px rgba(var(--accent-rgb), 0.28);
+}
+
+// Tooltip
+.session-scroll-marker-tooltip {
+  position: absolute;
+  right: 24px;
+  top: 50%;
+  --tooltip-shift-x: -10px;
+  --tooltip-offset-y: -50%;
+  transform: translate(var(--tooltip-shift-x), var(--tooltip-offset-y));
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(var(--color-card), 0.94);
+  backdrop-filter: blur(20px) saturate(1.45);
+  -webkit-backdrop-filter: blur(20px) saturate(1.45);
+  color: rgb(var(--color-card-foreground));
+  border: 1px solid rgba(var(--accent-rgb), 0.24);
+  border-radius: 14px;
+  padding: 12px 14px;
+  min-width: 220px;
+  width: 296px;
+  max-width: min(360px, calc(100vw - 96px));
+  text-align: left;
+  white-space: normal;
+  word-break: break-word;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 3;
+  box-shadow:
+    0 18px 36px rgba(var(--shadow-rgb), 0.24),
+    0 6px 16px rgba(var(--shadow-rgb), 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.session-scroll-marker-tooltip-accent {
+  width: 3px;
+  min-width: 3px;
+  align-self: stretch;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), 0.8);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.2);
+}
+
+.session-scroll-marker--compaction .session-scroll-marker-tooltip-accent {
+  background: rgba(168, 139, 250, 0.92);
+  box-shadow: 0 0 12px rgba(168, 139, 250, 0.22);
+}
+
+.session-scroll-marker-tooltip-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+}
+
+// Tooltip placement
+.session-scroll-marker[data-tooltip-placement='top'] .session-scroll-marker-tooltip {
+  top: auto;
+  bottom: calc(100% + 10px);
+  --tooltip-offset-y: 0;
+}
+
+.session-scroll-marker[data-tooltip-placement='bottom'] .session-scroll-marker-tooltip {
+  top: calc(100% + 10px);
+  --tooltip-offset-y: 0;
+}
+
+.session-scroll-marker[data-tooltip-placement='center'] .session-scroll-marker-tooltip {
+  top: 50%;
+  --tooltip-offset-y: -50%;
+}
+
+// Tooltip visibility
+.session-scroll-marker.active .session-scroll-marker-tooltip,
+.session-scroll-marker:hover .session-scroll-marker-tooltip {
+  opacity: 1;
+  --tooltip-shift-x: 0;
+}
+
+// Mobile tooltip
+.session-scroll-markers.mobile .session-scroll-marker-tooltip {
+  right: 30px;
+  min-width: 188px;
+  width: 272px;
+  max-width: min(320px, calc(100vw - 132px));
+  padding: 12px 13px;
+}
+
+.session-scroll-markers.mobile .session-scroll-marker-tooltip-text {
+  font-size: 13px;
+  line-height: 1.6;
+}

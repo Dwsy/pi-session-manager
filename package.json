@@ -58,6 +58,7 @@
     "autoprefixer": "^10.4.23",
     "code-inspector-plugin": "^1.4.2",
     "husky": "^9.1.7",
+    "less": "^4.6.4",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.0",
     "tau-mirror": "^1.0.7",

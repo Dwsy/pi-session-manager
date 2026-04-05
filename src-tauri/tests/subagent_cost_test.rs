@@ -1,8 +1,8 @@
 use chrono::Utc;
+use pi_session_manager::subagent::{aggregate_runs, parse_meta_json, scan_subagent_artifacts};
 /// Subagent Cost Integration Test
 /// Validate the full flow of subagent cost scanning, aggregation, and statistics
-use pi_session_manager::models::{AgentStats, SubagentRunInfo, SubagentSummary};
-use pi_session_manager::subagent::{aggregate_runs, parse_meta_json, scan_subagent_artifacts};
+use pi_session_manager::{AgentStats, SubagentRunInfo, SubagentSummary};
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;

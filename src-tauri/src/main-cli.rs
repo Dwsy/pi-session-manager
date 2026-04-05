@@ -1,4 +1,4 @@
-use pi_session_manager::embedding_service::{
+use pi_session_manager::data::search::embedding::{
     EmbeddingBatchRequest, EmbeddingConfig, EmbeddingData, EmbeddingRequest, EmbeddingResponse,
     EmbeddingService, EmbeddingStatusResponse,
 };
@@ -414,7 +414,7 @@ async fn init_http_adapter(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use axum::extract::Query;
     use axum::{routing::get, routing::post, Json, Router};
-    use pi_session_manager::api_readonly as readonly;
+    use pi_session_manager::api_readonly;
     use serde::Deserialize;
     use serde_json::Value;
 
@@ -445,14 +445,14 @@ async fn init_http_adapter(
         pi_session_manager::dispatch::dispatch(&None, command, &payload).await
     }
 
-    fn json_error(error: readonly::ApiReadonlyError) -> Json<Value> {
+    fn json_error(error: api_readonly::ApiReadonlyError) -> Json<Value> {
         Json(serde_json::json!({
             "success": false,
             "error": error.to_string(),
         }))
     }
 
-    fn embedding_error(error: readonly::ApiReadonlyError) -> Json<EmbeddingResponse> {
+    fn embedding_error(error: api_readonly::ApiReadonlyError) -> Json<EmbeddingResponse> {
         Json(EmbeddingResponse {
             success: false,
             data: None,
@@ -488,15 +488,15 @@ async fn init_http_adapter(
         }
     }
 
-    async fn v1_memory_recall(Json(req): Json<readonly::SearchRequest>) -> Json<Value> {
-        let query_text = match readonly::require_query(req.query.clone()) {
+    async fn v1_memory_recall(Json(req): Json<api_readonly::SearchRequest>) -> Json<Value> {
+        let query_text = match api_readonly::require_query(req.query.clone()) {
             Ok(query) => query,
             Err(error) => return json_error(error),
         };
 
-        match readonly::memory_recall(
+        match api_readonly::memory_recall(
             &cli_dispatch,
-            readonly::MemoryRecallRequest {
+            api_readonly::MemoryRecallRequest {
                 query: query_text,
                 top_k: req.top_k,
                 role_filter: req.role_filter,
@@ -522,15 +522,15 @@ async fn init_http_adapter(
         }
     }
 
-    async fn v1_memory_unified(Json(req): Json<readonly::SearchRequest>) -> Json<Value> {
-        let query_text = match readonly::require_query(req.query.clone()) {
+    async fn v1_memory_unified(Json(req): Json<api_readonly::SearchRequest>) -> Json<Value> {
+        let query_text = match api_readonly::require_query(req.query.clone()) {
             Ok(query) => query,
             Err(error) => return json_error(error),
         };
 
-        match readonly::memory_unified(
+        match api_readonly::memory_unified(
             &cli_dispatch,
-            readonly::MemoryUnifiedRequest {
+            api_readonly::MemoryUnifiedRequest {
                 query: query_text,
                 top_k: req.top_k,
                 role_filter: req.role_filter,
@@ -559,10 +559,10 @@ async fn init_http_adapter(
         }
     }
 
-    async fn v1_experience_extract(Json(req): Json<readonly::SearchRequest>) -> Json<Value> {
-        match readonly::experience_extract(
+    async fn v1_experience_extract(Json(req): Json<api_readonly::SearchRequest>) -> Json<Value> {
+        match api_readonly::experience_extract(
             &cli_dispatch,
-            readonly::ExperienceExtractRequest {
+            api_readonly::ExperienceExtractRequest {
                 session_id: None,
                 limit: req.experience_limit,
                 project: req.project,
@@ -584,15 +584,15 @@ async fn init_http_adapter(
         }
     }
 
-    async fn v1_workflow_route(Json(req): Json<readonly::SearchRequest>) -> Json<Value> {
-        let query_text = match readonly::require_query(req.query.clone()) {
+    async fn v1_workflow_route(Json(req): Json<api_readonly::SearchRequest>) -> Json<Value> {
+        let query_text = match api_readonly::require_query(req.query.clone()) {
             Ok(query) => query,
             Err(error) => return json_error(error),
         };
 
-        match readonly::workflow_route_suggest(
+        match api_readonly::workflow_route_suggest(
             &cli_dispatch,
-            readonly::WorkflowRouteSuggestRequest {
+            api_readonly::WorkflowRouteSuggestRequest {
                 query: query_text,
                 top_k: req.top_k,
                 role_filter: req.role_filter,
@@ -619,14 +619,14 @@ async fn init_http_adapter(
     }
 
     async fn v1_analytics() -> Json<Value> {
-        match readonly::analytics_overview() {
+        match api_readonly::analytics_overview() {
             Ok(data) => Json(serde_json::json!({ "success": true, "data": data })),
             Err(error) => json_error(error),
         }
     }
 
     async fn v1_observability() -> Json<Value> {
-        match readonly::analytics_overview() {
+        match api_readonly::analytics_overview() {
             Ok(overview) => Json(serde_json::json!({
                 "success": true,
                 "data": {
@@ -645,16 +645,16 @@ async fn init_http_adapter(
         }
     }
 
-    async fn v1_search_fulltext(Json(req): Json<readonly::SearchRequest>) -> Json<Value> {
-        let query_text = match readonly::require_query(req.query.clone()) {
+    async fn v1_search_fulltext(Json(req): Json<api_readonly::SearchRequest>) -> Json<Value> {
+        let query_text = match api_readonly::require_query(req.query.clone()) {
             Ok(query) => query,
             Err(error) => return json_error(error),
         };
         let top_k = req.top_k.unwrap_or(10).clamp(1, 100);
 
-        match readonly::full_text_search(
+        match api_readonly::full_text_search(
             &cli_dispatch,
-            readonly::FullTextSearchRequest {
+            api_readonly::FullTextSearchRequest {
                 query: query_text.clone(),
                 role_filter: req.role_filter,
                 glob_pattern: req.glob_pattern,
@@ -693,7 +693,7 @@ pi_sessions_total 0
         axum::Extension(svc): axum::Extension<Arc<EmbeddingService>>,
         Json(req): Json<EmbeddingRequest>,
     ) -> Json<EmbeddingResponse> {
-        match readonly::embedding(svc, req).await {
+        match api_readonly::embedding(svc, req).await {
             Ok(response) => Json(response),
             Err(error) => embedding_error(error),
         }
@@ -703,7 +703,7 @@ pi_sessions_total 0
         axum::Extension(svc): axum::Extension<Arc<EmbeddingService>>,
         Json(req): Json<EmbeddingBatchRequest>,
     ) -> Json<Value> {
-        match readonly::embedding_batch(svc, req).await {
+        match api_readonly::embedding_batch(svc, req).await {
             Ok(data) => Json(serde_json::json!({ "success": true, "data": data })),
             Err(error) => json_error(error),
         }
@@ -712,7 +712,7 @@ pi_sessions_total 0
     async fn v1_embedding_status(
         axum::Extension(svc): axum::Extension<Arc<EmbeddingService>>,
     ) -> Json<EmbeddingStatusResponse> {
-        Json(readonly::embedding_status(svc).await)
+        Json(api_readonly::embedding_status(svc).await)
     }
 
     let mut app = Router::new()

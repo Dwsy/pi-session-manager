@@ -1,0 +1,241 @@
+// =====================================================
+// ========== Markdown Content ==========
+// =====================================================
+
+.markdown-content {
+  color: var(--text);
+  line-height: 1.65;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.markdown-content > :first-child {
+  margin-top: 0;
+}
+
+.markdown-content > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--mdHeading);
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 1.25em 0 0.6em;
+}
+
+.markdown-content h1 { font-size: 1.5em; }
+.markdown-content h2 { font-size: 1.35em; }
+.markdown-content h3 { font-size: 1.2em; }
+.markdown-content h4 { font-size: 1.1em; }
+.markdown-content h5 { font-size: 1em; }
+.markdown-content h6 { font-size: 0.95em; }
+
+.markdown-content p {
+  margin: 0.75em 0;
+}
+
+// Assistant message readability
+.assistant-text .markdown-content p {
+  line-height: 1.6;
+}
+
+.markdown-content a {
+  color: var(--mdLink);
+  text-decoration: underline;
+}
+
+.markdown-content :not(pre) > code {
+  background: rgba(var(--muted-fg-rgb), 0.2);
+  color: var(--mdCode);
+  padding: 0.12em 0.4em;
+  border-radius: 3px;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: 0.92em;
+}
+
+.markdown-content pre {
+  background: transparent;
+  margin: 1em 0;
+  overflow-x: auto;
+}
+
+.markdown-content pre code {
+  display: block;
+  background: none;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.9em;
+  line-height: 1.55;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid var(--mdQuoteBorder);
+  padding-left: 0.9em;
+  margin: 1em 0;
+  color: var(--mdQuote);
+  font-style: italic;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.8em 0;
+  padding-left: 1.5em;
+}
+
+.markdown-content li {
+  margin: 0.2em 0;
+}
+
+.markdown-content li > ul,
+.markdown-content li > ol {
+  margin: 0.35em 0;
+}
+
+.markdown-content li::marker {
+  color: var(--mdListBullet);
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid var(--mdHr);
+  margin: 1em 0;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+  display: block;
+  overflow-x: auto;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--mdCodeBlockBorder);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-content th {
+  background: rgba(var(--muted-fg-rgb), 0.1);
+  font-weight: bold;
+}
+
+.markdown-content img {
+  display: block;
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 0.75em 0;
+}
+
+// Code Syntax Highlighting
+.hljs {
+  background: transparent;
+  color: var(--text);
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--syntaxComment);
+}
+
+.hljs-keyword,
+.hljs-selector-tag {
+  color: var(--syntaxKeyword);
+}
+
+.hljs-number,
+.hljs-literal {
+  color: var(--syntaxNumber);
+}
+
+.hljs-string,
+.hljs-doctag {
+  color: var(--syntaxString);
+}
+
+.hljs-function,
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-name {
+  color: var(--syntaxFunction);
+}
+
+.hljs-type,
+.hljs-class,
+.hljs-title.class_,
+.hljs-built_in {
+  color: var(--syntaxType);
+}
+
+.hljs-attr,
+.hljs-variable,
+.hljs-variable.language_,
+.hljs-params,
+.hljs-property {
+  color: var(--syntaxVariable);
+}
+
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-meta .hljs-string {
+  color: var(--syntaxKeyword);
+}
+
+.hljs-operator {
+  color: var(--syntaxOperator);
+}
+
+.hljs-punctuation {
+  color: var(--syntaxPunctuation);
+}
+
+.hljs-subst {
+  color: var(--text);
+}
+
+// Code Theme Overrides
+[data-code-theme="monokai"] {
+  --syntaxComment: #75715E;
+  --syntaxKeyword: #F92672;
+  --syntaxFunction: #A6E22E;
+  --syntaxVariable: #FD971F;
+  --syntaxString: #E6DB74;
+  --syntaxNumber: #AE81FF;
+  --syntaxType: #66D9EF;
+  --syntaxOperator: #F92672;
+  --syntaxPunctuation: #F8F8F2;
+}
+
+[data-code-theme="dracula"] {
+  --syntaxComment: #6272A4;
+  --syntaxKeyword: #FF79C6;
+  --syntaxFunction: #50FA7B;
+  --syntaxVariable: #FFB86C;
+  --syntaxString: #F1FA8C;
+  --syntaxNumber: #BD93F9;
+  --syntaxType: #8BE9FD;
+  --syntaxOperator: #FF79C6;
+  --syntaxPunctuation: #F8F8F2;
+}
+
+[data-code-theme="one-dark"] {
+  --syntaxComment: #5C6370;
+  --syntaxKeyword: #C678DD;
+  --syntaxFunction: #61AFEF;
+  --syntaxVariable: #E06C75;
+  --syntaxString: #98C379;
+  --syntaxNumber: #D19A66;
+  --syntaxType: #E5C07B;
+  --syntaxOperator: #56B6C2;
+  --syntaxPunctuation: #ABB2BF;
+}

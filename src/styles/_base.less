@@ -1,0 +1,125 @@
+// =====================================================
+// ========== Base Styles ==========
+// =====================================================
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', Arial, sans-serif);
+  }
+
+  body,
+  #root {
+    font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', Arial, sans-serif);
+  }
+
+  .theme-dark { color-scheme: dark; }
+  .theme-light { color-scheme: light; }
+  :root:not(.theme-dark):not(.theme-light) { color-scheme: light dark; }
+
+  @media (prefers-color-scheme: light) {
+    :root:not(.theme-dark):not(.theme-light) { color-scheme: light; }
+  }
+}
+
+code,
+pre,
+.font-mono {
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+}
+
+// Reset & Box Sizing
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', Arial, sans-serif);
+  font-size: var(--font-size-base, 16px);
+  line-height: var(--line-height);
+  color: var(--text);
+  background: var(--body-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+html {
+  font-size: var(--font-size-base, 16px);
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+// Tauri Drag Region
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+  app-region: drag;
+  user-select: none;
+  cursor: default;
+}
+
+[data-tauri-drag-region] * {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag !important;
+  app-region: no-drag !important;
+}
+
+.tauri-drag-handle {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.tauri-drag-handle * {
+  -webkit-app-region: inherit;
+  app-region: inherit;
+}
+
+// Safe Heights
+.h-screen-safe {
+  height: 100vh;
+  height: 100dvh;
+}
+
+// Mobile modal
+body.mobile-modal-open {
+  overflow: hidden;
+  touch-action: none;
+}
+
+// Button & Link Base
+button, a {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+// Touch Feedback
+@media (hover: none) and (pointer: coarse) {
+  button:not(:disabled):active,
+  a:not([disabled]):active,
+  .interactive:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+    transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.1s ease !important;
+  }
+}

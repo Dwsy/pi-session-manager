@@ -1,5 +1,5 @@
-use crate::models::{AgentStats, SubagentRunInfo, SubagentSummary};
-use crate::sqlite_cache;
+use crate::data::sqlite;
+use crate::types::{AgentStats, SubagentRunInfo, SubagentSummary};
 use chrono::{DateTime, TimeZone, Utc};
 use std::collections::HashMap;
 use std::fs;
@@ -141,7 +141,7 @@ pub fn scan_subagent_artifacts(
             // Check cache
             if let (Some(mtime), Some(c)) = (file_mtime, conn) {
                 if let Ok(Some((cached_mtime, run_info))) =
-                    sqlite_cache::get_cached_subagent_meta(c, &path_str)
+                    crate::data::sqlite::get_cached_subagent_meta(c, &path_str)
                 {
                     if cached_mtime >= mtime {
                         all_runs.push(run_info);
@@ -163,9 +163,9 @@ pub fn scan_subagent_artifacts(
                 Some(run_info) => {
                     // Write to cache if we have a connection and mtime
                     if let (Some(mtime), Some(c)) = (file_mtime, conn) {
-                        if let Err(err) =
-                            sqlite_cache::upsert_subagent_meta(c, &path_str, mtime, &run_info)
-                        {
+                        if let Err(err) = crate::data::sqlite::upsert_subagent_meta(
+                            c, &path_str, mtime, &run_info,
+                        ) {
                             warn!("Failed to cache subagent meta {:?}: {}", path, err);
                         }
                     }

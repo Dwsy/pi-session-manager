@@ -10,7 +10,6 @@
  * - Protocol parsing
  * - Event type handling
  */
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -108,7 +107,10 @@ impl PiAgentRegistry {
     pub fn get_live_session(&self, session_id: &str) -> Option<PiLiveSession> {
         let guard = self.sessions.lock().unwrap();
         guard.get(session_id).cloned().or_else(|| {
-            guard.values().find(|s| s.session_id.contains(session_id)).cloned()
+            guard
+                .values()
+                .find(|s| s.session_id.contains(session_id))
+                .cloned()
         })
     }
 
@@ -139,17 +141,35 @@ impl PiAgentRegistry {
     ) -> Result<serde_json::Value, String> {
         let (full_id, conn) = {
             let guard = self.connections.lock().unwrap();
-            let conn = guard.get(session_id).cloned()
-                .or_else(|| guard.iter().find(|(k, _)| k.contains(session_id)).map(|(_, v)| v.clone()))
-                .ok_or_else(|| format!("Session not connected: {}", session_id))?;
-            let key = guard.get(session_id).map(|_| session_id.to_string())
-                .or_else(|| guard.iter().find(|(k, _)| k.contains(session_id)).map(|(k, _)| k.clone()))
+            let conn = guard
+                .get(session_id)
+                .cloned()
+                .or_else(|| {
+                    guard
+                        .iter()
+                        .find(|(k, _)| k.contains(session_id))
+                        .map(|(_, v)| v.clone())
+                })
+                .ok_or_else(|| format!("Session not connected: {session_id}"))?;
+            let key = guard
+                .get(session_id)
+                .map(|_| session_id.to_string())
+                .or_else(|| {
+                    guard
+                        .iter()
+                        .find(|(k, _)| k.contains(session_id))
+                        .map(|(k, _)| k.clone())
+                })
                 .unwrap_or_else(|| session_id.to_string());
             (key, conn)
         };
 
-        let sender = conn.sender.ok_or_else(|| "No sender for session".to_string())?;
-        let response_tx = conn.response_tx.ok_or_else(|| "No response channel for session".to_string())?;
+        let sender = conn
+            .sender
+            .ok_or_else(|| "No sender for session".to_string())?;
+        let response_tx = conn
+            .response_tx
+            .ok_or_else(|| "No response channel for session".to_string())?;
 
         let mut response_rx = response_tx.subscribe();
         let call_id = session_id.to_string();
@@ -158,7 +178,10 @@ impl PiAgentRegistry {
 
         let command_str = serde_json::to_string(&command_val).map_err(|e| e.to_string())?;
 
-        log::info!("[RPC] -> [{full_id}] command={:?} id={call_id}", command_val["type"]);
+        log::info!(
+            "[RPC] -> [{full_id}] command={:?} id={call_id}",
+            command_val["type"]
+        );
         sender.send(command_str).map_err(|e| e.to_string())?;
 
         // Wait for response with timeout
@@ -202,9 +225,15 @@ impl PiAgentRegistry {
         context_usage: Option<serde_json::Value>,
     ) {
         if let Some(s) = self.sessions.lock().unwrap().get_mut(session_id) {
-            if model.is_some() { s.model = model; }
-            if thinking_level.is_some() { s.thinking_level = thinking_level; }
-            if context_usage.is_some() { s.context_usage = context_usage; }
+            if model.is_some() {
+                s.model = model;
+            }
+            if thinking_level.is_some() {
+                s.thinking_level = thinking_level;
+            }
+            if context_usage.is_some() {
+                s.context_usage = context_usage;
+            }
         }
     }
 

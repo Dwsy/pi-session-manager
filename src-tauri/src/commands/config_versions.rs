@@ -23,7 +23,7 @@ pub struct ConfigVersionMeta {
 }
 
 fn get_config_db() -> Result<rusqlite::Connection, String> {
-    let db_path = crate::sqlite_cache::get_db_path()?;
+    let db_path = crate::data::sqlite::get_db_path()?;
     let conn = rusqlite::Connection::open(&db_path).map_err(|e| format!("Open config DB: {e}"))?;
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS config_versions (

@@ -1,5 +1,5 @@
 use crate::metrics;
-use crate::models::{FullTextSearchHit, FullTextSearchResponse, SessionInfo};
+use crate::types::{FullTextSearchHit, FullTextSearchResponse, SessionInfo};
 use crate::{config, search, sqlite_cache};
 use chrono::{DateTime, Utc};
 use rusqlite::ToSql;
@@ -13,7 +13,7 @@ pub async fn search_sessions(
     search_mode: String,
     role_filter: String,
     include_tools: bool,
-) -> Result<Vec<crate::models::SearchResult>, String> {
+) -> Result<Vec<crate::types::SearchResult>, String> {
     let mode = match search_mode.as_str() {
         "name" => search::SearchMode::Name,
         _ => search::SearchMode::Content,
@@ -37,13 +37,13 @@ pub async fn search_sessions(
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn search_sessions_fts(query: String, limit: usize) -> Result<Vec<SessionInfo>, String> {
     let config = config::load_config()?;
-    let conn = sqlite_cache::init_db_with_config(&config)?;
+    let conn = crate::data::sqlite::init_db_with_config(&config)?;
 
-    let paths = sqlite_cache::search_fts5(&conn, &query, limit)?;
+    let paths = crate::data::sqlite::search_fts5(&conn, &query, limit)?;
 
     let mut sessions = Vec::new();
     for path in paths {
-        if let Some(session) = sqlite_cache::get_session(&conn, &path)? {
+        if let Some(session) = crate::data::sqlite::get_session(&conn, &path)? {
             sessions.push(session);
         }
     }
@@ -86,7 +86,7 @@ pub async fn full_text_search(
             let config = config::load_config()
                 .map_err(|e| format!("Failed to load config: {e}"))?;
             // Open database
-            let conn = sqlite_cache::init_db_with_config(&config)
+            let conn = crate::data::sqlite::init_db_with_config(&config)
                 .map_err(|e| format!("Failed to init database: {e}"))?;
             // Set query timeout at SQLite level (in milliseconds)
             conn.execute("PRAGMA query_timeout = 5000", [])

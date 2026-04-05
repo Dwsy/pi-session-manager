@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use pi_session_manager::commands::{scan_sessions, search_sessions as search_sessions_cmd};
-use pi_session_manager::models::SessionInfo;
 use pi_session_manager::search::{search_sessions, RoleFilter, SearchMode};
+use pi_session_manager::SessionInfo;
 use std::fs;
 
 /// Create a mock session file in the test directory

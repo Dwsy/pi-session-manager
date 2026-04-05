@@ -1,0 +1,364 @@
+// =====================================================
+// ========== Messages ==========
+// =====================================================
+
+// Message Timestamp
+.message-timestamp {
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
+  color: rgb(var(--color-muted-foreground));
+  opacity: 0.7;
+}
+
+// User Message
+.user-message {
+  background: var(--userMessageBg);
+  color: var(--userMessageText);
+  padding: 12px 14px;
+  border-radius: 10px;
+  position: relative;
+  max-height: 380px;
+  overflow-y: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(var(--accent-rgb), 0.12);
+}
+
+.user-message-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.user-message-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.user-message-role {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+}
+
+.user-message-copy-button {
+  flex-shrink: 0;
+  opacity: 0.72;
+}
+
+.user-message:hover .user-message-copy-button,
+.user-message-copy-button:focus-visible {
+  opacity: 1;
+}
+
+.user-message-body {
+  line-height: 1.6;
+}
+
+.user-message-body > :first-child {
+  margin-top: 0;
+}
+
+.user-message-body > :last-child {
+  margin-bottom: 0;
+}
+
+// Assistant Message
+.assistant-message {
+  padding: 0;
+  position: relative;
+}
+
+.assistant-message > .message-timestamp {
+  padding-left: var(--line-height);
+}
+
+.assistant-text {
+  padding: var(--line-height);
+  padding-bottom: 0;
+  line-height: 1.6;
+}
+
+.message-timestamp + .assistant-text,
+.message-timestamp + .thinking-block {
+  padding-top: 0;
+}
+
+.thinking-block + .assistant-text {
+  padding-top: 0;
+}
+
+// Thinking Block
+.thinking-block {
+  position: relative;
+}
+
+.thinking-text {
+  padding: var(--line-height);
+  color: var(--thinkingText);
+  line-height: 1.4;
+}
+
+.message-timestamp + .thinking-block .thinking-text,
+.message-timestamp + .thinking-block .thinking-collapsed {
+  padding-top: 0;
+}
+
+.thinking-collapsed {
+  display: none;
+  padding: var(--line-height);
+  color: var(--thinkingText);
+  font-style: italic;
+}
+
+.thinking-block.expanded .thinking-text {
+  display: block;
+}
+
+.thinking-block.expanded .thinking-collapsed {
+  display: none;
+}
+
+// Ultra-compact markdown styles for thinking blocks
+.thinking-text .markdown-content {
+  font-size: 0.95em;
+  color: var(--thinkingText);
+}
+
+.thinking-text .markdown-content strong,
+.thinking-text .markdown-content b {
+  color: var(--thinkingText);
+}
+
+.thinking-text .markdown-content p {
+  margin: 0;
+  line-height: 1.4;
+  color: inherit;
+}
+
+.thinking-text .markdown-content p + p {
+  margin-top: 0.5em;
+}
+
+.thinking-text .markdown-content ul,
+.thinking-text .markdown-content ol {
+  margin: 0.3em 0;
+  padding-left: 1.5em;
+}
+
+.thinking-text .markdown-content li {
+  margin: 0.1em 0;
+  line-height: 1.4;
+  color: inherit;
+}
+
+.thinking-text .markdown-content h1,
+.thinking-text .markdown-content h2,
+.thinking-text .markdown-content h3,
+.thinking-text .markdown-content h4,
+.thinking-text .markdown-content h5,
+.thinking-text .markdown-content h6 {
+  margin: 0.5em 0 0.2em 0;
+  line-height: 1.3;
+  color: var(--thinkingText);
+}
+
+.thinking-text .markdown-content pre {
+  margin: 0.3em 0;
+}
+
+.thinking-text .code-block-wrapper {
+  margin: 0.45em 0;
+  border: 1px dashed rgba(var(--accent-rgb), 0.3);
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+.thinking-text .code-block-header {
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+.thinking-text .code-language,
+.thinking-text .code-filename {
+  color: var(--thinkingText);
+}
+
+.thinking-text .code-line-number {
+  opacity: 0.75;
+}
+
+.thinking-text .markdown-content blockquote {
+  margin: 0.3em 0;
+  padding-left: 0.75em;
+  color: inherit;
+}
+
+.thinking-text .markdown-content a {
+  color: var(--thinkingText);
+  text-decoration: underline;
+  opacity: 0.9;
+}
+
+.thinking-text .markdown-content code {
+  font-size: 0.9em;
+  color: inherit;
+}
+
+.thinking-text .markdown-content :not(pre) > code {
+  background: rgba(var(--accent-rgb), 0.14);
+  color: inherit;
+}
+
+// Assistant text + tool execution
+.assistant-text + .tool-execution {
+  margin-top: var(--line-height);
+}
+
+// Hook/Custom Messages
+.hook-message {
+  background: var(--customMessageBg);
+  color: var(--customMessageText);
+  padding: var(--line-height);
+  border-radius: 4px;
+}
+
+.hook-type {
+  color: var(--customMessageLabel);
+  font-weight: bold;
+}
+
+// Model Change
+.model-change {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin: 4px 0;
+  font-size: 12px;
+  color: rgb(var(--color-muted-foreground));
+  opacity: 0.75;
+}
+
+.model-change-icon {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.model-change-text {
+  line-height: 1.4;
+}
+
+.model-change-name {
+  font-weight: 600;
+  color: var(--borderAccent);
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', monospace);
+}
+
+// Compaction
+.compaction {
+  background: var(--bg-subtle);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  transition: all 0.2s ease;
+}
+
+.compaction:hover {
+  background: var(--bg-inset-hover);
+}
+
+.compaction-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.compaction-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--borderAccent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.compaction-collapsed {
+  font-size: 12px;
+  color: rgb(var(--color-muted-foreground));
+  cursor: pointer;
+}
+
+.compaction-content {
+  display: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+.compaction-content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.compaction-copy-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.compaction-copy-button:hover {
+  background: var(--bg-inset-hover);
+  border-color: rgba(var(--accent-rgb), 0.4);
+}
+
+.compaction-copy-text {
+  font-size: 11px;
+}
+
+.compaction.expanded .compaction-header {
+  display: none;
+}
+
+.compaction.expanded .compaction-content {
+  display: block;
+}
+
+// Branch Summary
+.branch-summary {
+  background: var(--bg-subtle);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 8px 0;
+}
+
+.branch-summary-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mdHeading);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}

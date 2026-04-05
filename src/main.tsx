@@ -7,7 +7,7 @@ import { SettingsProvider } from './contexts/SettingsContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import ClipboardBridge from './components/ClipboardBridge'
 import './i18n'
-import './index.css'
+import './styles/index.less'
 import { isTauri } from './transport'
 
 const SETTINGS_CACHE_KEY = 'pi-session-manager-settings'

@@ -1,0 +1,477 @@
+// =====================================================
+// ========== Tool Execution ==========
+// =====================================================
+
+.tool-execution {
+  margin: 16px 0;
+  border-radius: 8px;
+  background: var(--toolExecutionBg, var(--bg-subtle));
+  overflow: hidden;
+  border: 1px solid rgba(var(--accent-rgb), 0.12);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.tool-execution > .message-timestamp {
+  padding-left: 12px;
+  padding-top: 8px;
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
+  color: rgb(var(--color-muted-foreground));
+  opacity: 0.7;
+}
+
+.tool-execution.pending {
+  background: var(--toolPendingBg, var(--bg-subtle));
+}
+
+.tool-execution.success {
+  background: var(--toolSuccessBgOverride, rgba(var(--success-rgb), 0.08));
+  border-color: var(--toolSuccessBorderOverride, rgba(var(--success-rgb), 0.22));
+}
+
+.tool-execution.error {
+  background: var(--toolErrorBg, rgba(var(--destructive-rgb), 0.08));
+  border-color: rgba(var(--destructive-rgb), 0.22);
+}
+
+// Tool Header
+.tool-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  min-width: 0;
+}
+
+.tool-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.tool-header-meta .message-timestamp {
+  white-space: nowrap;
+}
+
+.tool-name {
+  font-weight: 500;
+  color: var(--toolTitle, var(--accent));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tool-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.tool-expand-indicator {
+  color: rgb(var(--color-muted-foreground));
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  user-select: none;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.tool-header:hover .tool-expand-indicator {
+  opacity: 1;
+}
+
+.tool-expand-indicators-hidden .tool-expand-indicator {
+  display: none;
+}
+
+.tool-path {
+  color: var(--toolTitle, var(--text));
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-meta {
+  color: rgb(var(--color-muted-foreground));
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
+  margin-left: auto;
+}
+
+// Tool Toggle Button
+.tool-toggle-button {
+  padding: 4px 8px;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+}
+
+.tool-toggle-button:hover {
+  color: var(--text-secondary);
+  background: rgba(var(--accent-rgb), 0.05);
+}
+
+.tool-toggle-button:active {
+  transform: scale(0.98);
+}
+
+// Tool Command
+.tool-command {
+  padding: 12px 16px;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+  color: var(--toolOutput, var(--text-secondary));
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.tool-command-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-inset);
+  border-radius: 6px;
+  margin: 0 12px 8px 12px;
+  padding-right: 8px;
+  overflow: hidden;
+}
+
+.tool-command-wrapper .tool-command {
+  padding: 12px 40px 12px 16px;
+  background: transparent;
+}
+
+// Tool Diff Wrapper
+.tool-diff-wrapper {
+  position: relative;
+  margin: 0 12px;
+  overflow: hidden;
+}
+
+.tool-diff-wrapper.collapsible {
+  margin-bottom: 0;
+}
+
+.tool-diff-wrapper.expanded,
+.tool-diff-wrapper.collapsible.expanded {
+  margin-bottom: 8px;
+}
+
+// Tool Output Wrapper
+.tool-output-wrapper {
+  position: relative;
+  margin: 0 12px 8px 12px;
+  overflow: hidden;
+}
+
+.tool-output-wrapper.collapsible {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.tool-output-wrapper.collapsible.expanded {
+  margin-top: var(--toolOutputExpandedMargin, 8px);
+  margin-bottom: var(--toolOutputExpandedMargin, 8px);
+}
+
+// Tool Expand Content
+.tool-expand-content {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.15s ease;
+}
+
+.tool-expand-content.expanded {
+  max-height: 2000px;
+  opacity: 1;
+}
+
+.tool-expand-content .tool-output,
+.tool-expand-content .tool-diff,
+.tool-expand-content .tool-arguments {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+// Tool Output Header
+.tool-output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.tool-output-header:hover {
+  color: var(--text-secondary);
+}
+
+.tool-output-header:hover .tool-output-label {
+  color: var(--accent);
+}
+
+.tool-output-label {
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
+  color: rgb(var(--color-muted-foreground));
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+// Tool Copy Button
+.tool-copy-button {
+  padding: 4px;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tool-copy-button:hover {
+  color: var(--text-secondary);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+.tool-copy-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+// Tool Output
+.tool-output {
+  padding: 8px 0;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  color: var(--toolOutput, var(--text-secondary));
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tool-output .code-block-wrapper {
+  margin: 0;
+}
+
+// Tool Arguments
+.tool-arguments {
+  padding: 12px;
+  background: var(--bg-inset);
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.15);
+}
+
+.tool-arguments pre {
+  margin: 0;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  color: var(--text-secondary);
+}
+
+.tool-arguments code {
+  font-family: inherit;
+}
+
+.tool-arguments-title {
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
+  color: rgb(var(--color-muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.tool-arguments-content {
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  color: var(--text-secondary);
+}
+
+// Tool Images
+.tool-images {
+  padding: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tool-image {
+  max-width: 300px;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+}
+
+// Tool Diff
+.tool-diff {
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  overflow-x: auto;
+  white-space: pre;
+  padding: 12px;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  background: transparent;
+}
+
+.diff-added { color: var(--toolDiffAdded); }
+.diff-removed { color: var(--toolDiffRemoved); }
+.diff-context { color: var(--toolDiffContext); }
+
+.tool-diff.expandable {
+  cursor: pointer;
+}
+
+.tool-diff.expandable:hover {
+  opacity: 0.9;
+}
+
+.tool-diff.expandable .diff-preview {
+  display: block;
+}
+
+.tool-diff.expandable .diff-full {
+  display: none;
+}
+
+.tool-diff.expandable.expanded .diff-preview {
+  display: none;
+}
+
+.tool-diff.expandable.expanded .diff-full {
+  display: block;
+}
+
+// Pierre Diffs overrides
+.tool-diff [class*='pierre-'] {
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+}
+
+.tool-diff .pierre-dark {
+  --pierre-bg-primary: var(--toolExecutionBg, #1e1e2e);
+  --pierre-bg-secondary: var(--toolExecutionBg, #282838);
+  --pierre-border: rgba(255, 255, 255, 0.1);
+  --pierre-text: #e5e5e7;
+  --pierre-text-muted: #808080;
+  --pierre-diff-add-bg: rgba(181, 189, 104, 0.15);
+  --pierre-diff-add-text: #b5bd68;
+  --pierre-diff-remove-bg: rgba(204, 102, 102, 0.15);
+  --pierre-diff-remove-text: #cc6666;
+  --pierre-line-number: #666666;
+}
+
+.tool-diff .pierre-light {
+  --pierre-bg-primary: var(--toolExecutionBg, #ffffff);
+  --pierre-bg-secondary: var(--toolExecutionBg, #f8f9fa);
+  --pierre-border: rgba(0, 0, 0, 0.1);
+  --pierre-text: #1a1b2e;
+  --pierre-text-muted: #6b7280;
+  --pierre-diff-add-bg: rgba(22, 163, 74, 0.1);
+  --pierre-diff-add-text: #16a34a;
+  --pierre-diff-remove-bg: rgba(220, 38, 38, 0.1);
+  --pierre-diff-remove-text: #dc2626;
+  --pierre-line-number: #9ca3af;
+}
+
+// Expand Hint
+.expand-hint {
+  padding: 8px 0;
+  text-align: left;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-style: italic;
+}
+
+.expand-hint:hover {
+  color: var(--accent);
+}
+
+// Bash Command Highlight
+.tool-header-bash {
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.tool-header-bash .tool-meta,
+.tool-header-bash .bash-inline-copy-button {
+  flex-shrink: 0;
+}
+
+.bash-command-inline {
+  margin: 0;
+  padding: 4px 10px;
+  min-width: 0;
+  flex: 1;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  background: var(--bg-inset);
+  border-radius: 6px;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+  line-height: 1.5;
+}
+
+.bash-command-prefix {
+  user-select: none;
+  pointer-events: none;
+  color: var(--toolTitle, var(--accent));
+}
+
+.bash-command-inline code {
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+  color: var(--text-secondary);
+  white-space: inherit;
+  overflow-wrap: inherit;
+  word-break: inherit;
+}
+
+// Bash syntax highlighting
+.bash-command-inline .hljs-keyword {
+  color: var(--syntaxKeyword);
+}
+
+.bash-command-inline .hljs-string {
+  color: var(--syntaxString);
+}
+
+.bash-command-inline .hljs-number {
+  color: var(--syntaxNumber);
+}
+
+.bash-command-inline .hljs-comment {
+  color: var(--syntaxComment);
+}
+
+.bash-command-inline .hljs-operator,
+.bash-command-inline .hljs-punctuation {
+  color: var(--text-secondary);
+}

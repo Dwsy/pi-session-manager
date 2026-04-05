@@ -30,7 +30,6 @@ import { usePiLiveSessions } from "@/hooks/usePiLiveSessions";
 import { getPlatformDefaults } from "./settings/types";
 import type { SessionInfo } from "@/types";
 import type { TerminalType } from "./settings/types";
-import "../styles/session.css";
 
 interface SessionViewerProps {
   session: SessionInfo;

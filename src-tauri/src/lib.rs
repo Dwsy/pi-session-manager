@@ -1,41 +1,54 @@
+pub mod commands;
+pub mod core;
+pub mod data;
+pub mod server;
+pub mod types;
+
+// Infrastructure (stay at root)
 pub mod api_readonly;
 pub mod auth;
-pub mod commands;
+pub mod dispatch;
 pub mod compression;
 pub mod config;
-pub mod dispatch;
-pub mod embedding_service;
 pub mod export;
 pub mod metrics;
-pub mod models;
-#[cfg(feature = "gui")]
-pub mod pi_agent_registry;
-pub mod scanner;
-pub mod scanner_scheduler;
-pub mod search;
-pub mod search_index;
-pub mod session_delete;
-pub mod session_intel;
-pub mod session_parser;
 pub mod settings_store;
-pub mod sqlite_cache;
 pub mod stats;
 pub mod subagent;
-pub mod tantivy_search;
-pub mod write_buffer;
 
+// GUI-only
 #[cfg(feature = "gui")]
 pub mod app_state;
 #[cfg(feature = "gui")]
 pub mod file_watcher;
 #[cfg(feature = "gui")]
-pub mod http_adapter;
+pub mod pi_agent_registry;
 #[cfg(feature = "gui")]
 pub mod terminal;
-#[cfg(feature = "gui")]
-pub mod ws_adapter;
 
+// Backward-compat re-exports
 pub use commands::*;
+pub use types::*;
+
+// Module aliases for external consumers (main.rs, src-tauri-cli, etc.)
+pub use core::delete as session_delete;
+pub use core::intel as session_intel;
+pub use core::parser as session_parser;
+pub use core::scanner;
+pub use core::write_buffer;
+pub mod scanner_scheduler {
+    pub use crate::core::scanner::ScannerScheduler;
+}
+pub use data::search::client as search;
+pub use data::search::embedding as embedding_service;
+pub use data::search::index as search_index;
+pub use data::search::tantivy as tantivy_search;
+pub use data::sqlite as sqlite_cache;
+#[cfg(feature = "gui")]
+pub use server::http as http_adapter;
+#[cfg(feature = "gui")]
+pub use server::ws as ws_adapter;
+
 #[cfg(feature = "gui")]
 use std::sync::Mutex;
 #[cfg(feature = "gui")]
@@ -149,11 +162,8 @@ pub fn run() {
             restore_import_backup
         ])
         .setup(|app| {
-            // Create and manage app state
             let app_state = app_state::create_app_state(app.handle().clone());
             app.manage(app_state.clone());
-            // Start periodic buffer flush task
-            let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
                 loop {
@@ -186,7 +196,6 @@ pub fn run() {
                 }
             });
 
-            // Force flush on application exit
             let app_handle_clone = app.handle().clone();
             app_handle_clone.listen("tauri://exit", |_| {
                 if let Some((sessions, details)) = write_buffer::force_flush_all() {

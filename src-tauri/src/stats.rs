@@ -1,8 +1,8 @@
-use crate::models::{SessionInfo, SubagentSummary};
-use crate::session_parser::{parse_session_details, SessionModelUsage};
-use crate::sqlite_cache;
+use crate::core::parser::{parse_session_details, SessionModelUsage};
+use crate::core::write_buffer;
+use crate::data::sqlite;
 use crate::subagent;
-use crate::write_buffer;
+use crate::types::{SessionInfo, SubagentSummary};
 use chrono::{Datelike, Local, Timelike, Weekday};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -217,7 +217,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
 
     log::trace!("Calculating stats for {total_sessions} sessions");
 
-    let conn = sqlite_cache::init_db().ok();
+    let conn = crate::data::sqlite::init_db().ok();
 
     let mut sessions_by_project: HashMap<String, usize> = HashMap::new();
     let mut sessions_by_model: HashMap<String, usize> = HashMap::new();
@@ -250,7 +250,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         *sessions_by_project.entry(project.clone()).or_insert(0) += 1;
 
         // 1. Check memory buffer first (fastest)
-        let memory_cached = write_buffer::get_buffered_details(&session.path)
+        let memory_cached = crate::core::write_buffer::get_buffered_details(&session.path)
             .filter(|(_, file_modified)| *file_modified >= session_modified);
 
         if let Some((details, _)) = memory_cached {
@@ -303,7 +303,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
 
         // 2. Then check database cache
         let cached_details = conn.as_ref().and_then(|conn| {
-            sqlite_cache::get_session_details_cache(conn, &session.path)
+            crate::data::sqlite::get_session_details_cache(conn, &session.path)
                 .ok()
                 .flatten()
                 .filter(|cached| cached.file_modified >= session_modified)
@@ -328,7 +328,7 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
                     if let Ok(content) = std::fs::read_to_string(&session.path) {
                         let parsed = parse_session_details(&content);
                         if !parsed.model_usage.is_empty() {
-                            write_buffer::buffer_details_write(
+                            crate::core::write_buffer::buffer_details_write(
                                 &session.path,
                                 session_modified,
                                 &parsed,
@@ -398,7 +398,11 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             let session_stats = parse_session_details(&content);
 
             // Use memory buffer to reduce database write frequency
-            write_buffer::buffer_details_write(&session.path, session_modified, &session_stats);
+            crate::core::write_buffer::buffer_details_write(
+                &session.path,
+                session_modified,
+                &session_stats,
+            );
 
             if session_stats.model_usage.is_empty() {
                 record_model_presence(
@@ -623,16 +627,16 @@ fn generate_time_distribution(
 
 /// Get detailed statistics for a specific day
 pub fn get_day_stats(date: &str, sessions: &[SessionInfo]) -> Result<DayStats, String> {
-    use crate::session_parser::parse_session_details;
-    use crate::sqlite_cache;
-    use crate::write_buffer;
+    use crate::core::parser::parse_session_details;
+    use crate::core::write_buffer;
+    use crate::data::sqlite;
 
     let target_date = match chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
         Ok(d) => d,
         Err(e) => return Err(format!("Invalid date format: {e}")),
     };
 
-    let conn = sqlite_cache::init_db().ok();
+    let conn = crate::data::sqlite::init_db().ok();
     let mut day_sessions: Vec<DaySession> = Vec::new();
     let mut project_stats: HashMap<String, (String, usize, usize, usize)> = HashMap::new(); // path -> (name, sessions, messages, tokens)
     let mut models_used: HashMap<String, usize> = HashMap::new();
@@ -653,7 +657,7 @@ pub fn get_day_stats(date: &str, sessions: &[SessionInfo]) -> Result<DayStats, S
 
         // Try to get detailed stats from cache or parse
         let (messages, tokens, model) = if let Some((details, _)) =
-            write_buffer::get_buffered_details(&session.path)
+            crate::core::write_buffer::get_buffered_details(&session.path)
                 .filter(|(_, fm)| *fm >= session_modified)
         {
             let msg_count = details.user_messages + details.assistant_messages;
@@ -665,7 +669,7 @@ pub fn get_day_stats(date: &str, sessions: &[SessionInfo]) -> Result<DayStats, S
                 .unwrap_or_else(|| "unknown".to_string());
             (msg_count, tok_count, primary_model)
         } else if let Some(cached) = conn.as_ref().and_then(|c| {
-            sqlite_cache::get_session_details_cache(c, &session.path)
+            crate::data::sqlite::get_session_details_cache(c, &session.path)
                 .ok()
                 .flatten()
                 .filter(|c| c.file_modified >= session_modified)
@@ -787,7 +791,7 @@ fn parse_modified(value: &str) -> chrono::DateTime<chrono::Utc> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::SessionInfo;
+    use crate::types::SessionInfo;
     use chrono::TimeZone;
 
     #[test]

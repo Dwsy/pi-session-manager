@@ -1,0 +1,114 @@
+// =====================================================
+// ========== Layout ==========
+// =====================================================
+
+// Sidebar
+.session-sidebar {
+  background: rgb(var(--color-card));
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(var(--accent-rgb), 0.15);
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+  box-shadow: 4px 0 12px rgba(var(--shadow-rgb), 0.4);
+}
+
+// Session Viewer
+.session-viewer {
+  padding: 20px;
+}
+
+.session-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.15);
+}
+
+.session-header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 11px;
+  color: rgb(var(--color-muted-foreground));
+}
+
+.messages {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.messages > * + * {
+  margin-top: 16px;
+}
+
+.empty-state {
+  text-align: center;
+  color: rgb(var(--color-muted-foreground));
+  padding: 40px 20px;
+  font-size: 14px;
+}
+
+// Resize Handle
+.sidebar-resize-handle {
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: transparent;
+  transition: background 0.2s ease;
+  z-index: 30;
+}
+
+.sidebar-resize-handle:hover {
+  background: rgba(var(--accent-rgb), 0.05);
+}
+
+.sidebar-resize-handle.resizing {
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+.sidebar-resize-handle-inner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 1px;
+  height: 32px;
+  background: rgba(var(--accent-rgb), 0.2);
+  border-radius: 1px;
+  opacity: 0;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-resize-handle:hover .sidebar-resize-handle-inner {
+  opacity: 1;
+  background: rgba(var(--accent-rgb), 0.6);
+  height: 48px;
+  width: 2px;
+}
+
+.sidebar-resize-handle.resizing .sidebar-resize-handle-inner {
+  opacity: 1;
+  background: var(--accent);
+  height: 64px;
+  width: 2px;
+}
+
+// Sidebar Controls
+.sidebar-controls {
+  padding: 12px;
+}

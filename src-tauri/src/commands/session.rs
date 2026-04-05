@@ -1,4 +1,4 @@
-use crate::models::{SessionEntry, SessionInfo};
+use crate::types::{SessionEntry, SessionInfo};
 use crate::{export, scanner, stats};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -104,7 +104,7 @@ pub async fn get_session_entries(path: String) -> Result<Vec<SessionEntry>, Stri
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn delete_session(path: String) -> Result<(), String> {
-    crate::session_delete::delete_session_file_and_cache(&path)?;
+    crate::core::delete::delete_session_file_and_cache(&path)?;
     Ok(())
 }
 
