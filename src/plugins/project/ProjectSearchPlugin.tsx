@@ -15,11 +15,11 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
   priority = 70
 
   get name(): string {
-    return this.context?.t('plugins.project.name', 'Project Search') || 'project搜索'
+    return this.context?.t('plugins.project.name', 'Project Search') || 'Project search'
   }
 
   get description(): string {
-    return this.context?.t('plugins.project.description', 'Search project paths') || '搜索project路径'
+    return this.context?.t('plugins.project.description', 'Search project paths') || 'Search project paths'
   }
 
   async search(

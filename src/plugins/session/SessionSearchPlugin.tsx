@@ -16,11 +16,11 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
   priority = 60
 
   get name(): string {
-    return this.context?.t('plugins.session.name', 'Session Search') || 'session搜索'
+    return this.context?.t('plugins.session.name', 'Session Search') || 'Session search'
   }
 
   get description(): string {
-    return this.context?.t('plugins.session.description', 'Search session names and metadata') || '搜索sessionName和元数据'
+    return this.context?.t('plugins.session.description', 'Search session names and metadata') || 'Search session names and metadata'
   }
 
   async search(
@@ -206,7 +206,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
       }
 
       // Show date
-      return date.toLocaleDateString('zh-CN', {
+      return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'

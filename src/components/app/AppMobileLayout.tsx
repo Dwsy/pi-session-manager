@@ -59,7 +59,7 @@ function AppMobileLayout({
       {
         id: "list",
         icon: <List className="h-5 w-5" />,
-        label: t("app.viewMode.list", "列表"),
+        label: t("app.viewMode.list", "List"),
       },
       {
         id: "projects",
@@ -69,17 +69,17 @@ function AppMobileLayout({
       {
         id: "kanban",
         icon: <Columns3 className="h-5 w-5" />,
-        label: t("tags.kanban.title", "看板"),
+        label: t("tags.kanban.title", "Kanban"),
       },
       {
         id: "dashboard",
         icon: <LayoutDashboard className="h-5 w-5" />,
-        label: t("dashboard.title", "概览"),
+        label: t("dashboard.title", "Overview"),
       },
       {
         id: "settings",
         icon: <Settings className="h-5 w-5" />,
-        label: t("settings.title", "设置"),
+        label: t("settings.title", "Settings"),
       },
     ],
     [t],

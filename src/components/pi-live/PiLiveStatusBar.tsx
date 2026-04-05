@@ -1,5 +1,5 @@
 /**
- * Pi Live Status Bar - 显示连接状态
+ * Pi Live Status Bar - Displays connection status
  */
 
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react'

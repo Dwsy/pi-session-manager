@@ -59,18 +59,18 @@ export default function SessionViewerToolbar({
     ? t("session.hideSidebar")
     : t("session.showSidebar");
   const thinkingToggleLabel = showThinking
-    ? t("session.toolbar.hideThinking", "隐藏思考")
-    : t("session.toolbar.showThinking", "显示思考");
+    ? t("session.toolbar.hideThinking", "Hide thinking")
+    : t("session.toolbar.showThinking", "Show thinking");
   const toolsToggleLabel = toolsExpanded
-    ? t("session.toolbar.collapseTools", "收起工具")
-    : t("session.toolbar.expandTools", "展开工具");
+    ? t("session.toolbar.collapseTools", "Collapse tools")
+    : t("session.toolbar.expandTools", "Expand tools");
   const searchToggleLabel = t(
     "session.toolbar.searchMessages",
     "Search messages",
   );
   const scrollMarkersToggleLabel = showScrollMarkers
-    ? t("session.toolbar.hideUserMarkers", "隐藏message锚点")
-    : t("session.toolbar.showUserMarkers", "显示message锚点");
+    ? t("session.toolbar.hideUserMarkers", "Hide message markers")
+    : t("session.toolbar.showUserMarkers", "Show message markers");
   const toggleButtonBase =
     "rounded border transition-colors text-foreground";
   const toggleButtonActive =
@@ -203,24 +203,24 @@ export default function SessionViewerToolbar({
               <button
                 onClick={onOpenSystemPromptDialog}
                 className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
-                title={t("session.systemPromptAndTools", "系统提示词和工具")}
-                aria-label={t("session.systemPromptAndTools", "系统提示词和工具")}
+                title={t("session.systemPromptAndTools", "System prompt & tools")}
+                aria-label={t("session.systemPromptAndTools", "System prompt & tools")}
               >
                 <Bot className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={onScrollToTop}
                 className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
-                title={t("session.scrollToTop", "滚动到顶部")}
-                aria-label={t("session.scrollToTop", "滚动到顶部")}
+                title={t("session.scrollToTop", "Scroll to top")}
+                aria-label={t("session.scrollToTop", "Scroll to top")}
               >
                 <ArrowUp className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={onScrollToBottom}
                 className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
-                title={t("session.scrollToBottom", "滚动到底部")}
-                aria-label={t("session.scrollToBottom", "滚动到底部")}
+                title={t("session.scrollToBottom", "Scroll to bottom")}
+                aria-label={t("session.scrollToBottom", "Scroll to bottom")}
               >
                 <ArrowDown className="h-3.5 w-3.5" />
               </button>
@@ -254,10 +254,10 @@ export default function SessionViewerToolbar({
                     <button
                       onClick={onResume}
                       className="px-3 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors flex items-center gap-1.5"
-                      title={t("session.resume", "恢复")}
+                      title={t("session.resume", "Resume")}
                     >
                       <Play className="h-3.5 w-3.5" />
-                      <span>{t("session.resume", "恢复")}</span>
+                      <span>{t("session.resume", "Resume")}</span>
                     </button>
                   </KbdTooltip>
                 ))}
@@ -281,7 +281,7 @@ export default function SessionViewerToolbar({
                   <PanelLeftOpen className="h-3.5 w-3.5 flex-shrink-0" />
                 )}
                 <span className="truncate">
-                  {t("session.toolbar.outline", "Large纲")}
+                  {t("session.toolbar.outline", "Outline")}
                 </span>
               </button>
               <button
@@ -297,41 +297,41 @@ export default function SessionViewerToolbar({
                   <Brain className="h-3.5 w-3.5 flex-shrink-0" />
                 )}
                 <span className="truncate">
-                  {t("session.toolbar.thinking", "思考")}
+                  {t("session.toolbar.thinking", "Thinking")}
                 </span>
               </button>
               <button
                 onClick={onScrollToTop}
                 className={`${mobileQuickActionBase} ${mobileQuickActionInactive}`}
-                title={t("session.scrollToTop", "滚动到顶部")}
-                aria-label={t("session.scrollToTop", "滚动到顶部")}
+                title={t("session.scrollToTop", "Scroll to top")}
+                aria-label={t("session.scrollToTop", "Scroll to top")}
               >
                 <ArrowUp className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="truncate">
-                  {t("session.toolbar.top", "顶部")}
+                  {t("session.toolbar.top", "Top")}
                 </span>
               </button>
               <button
                 onClick={onScrollToBottom}
                 className={`${mobileQuickActionBase} ${mobileQuickActionInactive}`}
-                title={t("session.scrollToBottom", "滚动到底部")}
-                aria-label={t("session.scrollToBottom", "滚动到底部")}
+                title={t("session.scrollToBottom", "Scroll to bottom")}
+                aria-label={t("session.scrollToBottom", "Scroll to bottom")}
               >
                 <ArrowDown className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="truncate">
-                  {t("session.toolbar.bottom", "底部")}
+                  {t("session.toolbar.bottom", "Bottom")}
                 </span>
               </button>
               <button
                 onClick={() => onMobileMenuOpenChange(!isMobileMenuOpen)}
                 className={`${mobileQuickActionBase} ${isMobileMenuOpen ? mobileQuickActionActive : mobileQuickActionInactive}`}
-                title={t("session.toolbar.moreActions", "更多操作")}
-                aria-label={t("session.toolbar.moreActions", "更多操作")}
+                title={t("session.toolbar.moreActions", "More actions")}
+                aria-label={t("session.toolbar.moreActions", "More actions")}
                 aria-expanded={isMobileMenuOpen}
               >
                 <MoreVertical className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="truncate">
-                  {t("session.toolbar.more", "更多")}
+                  {t("session.toolbar.more", "More")}
                 </span>
               </button>
             </div>
@@ -350,7 +350,7 @@ export default function SessionViewerToolbar({
           <div className="absolute inset-x-0 bottom-0 rounded-t-[20px] border border-border/70 bg-popover/95 shadow-[0_-18px_48px_rgba(0,0,0,0.28)] p-2 pb-[max(0.875rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-4 duration-200 backdrop-blur-md">
             <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border" />
             <div className="px-1 pb-2 text-xs font-medium text-muted-foreground">
-              {t("session.toolbar.moreActions", "更多操作")}
+              {t("session.toolbar.moreActions", "More actions")}
             </div>
             <button
               onClick={() => {
@@ -380,7 +380,7 @@ export default function SessionViewerToolbar({
               className={mobileSheetItemClass}
             >
               <Bot className="h-4 w-4 text-muted-foreground" />
-              {t("session.systemPromptAndTools", "系统提示词和工具")}
+              {t("session.systemPromptAndTools", "System prompt & tools")}
             </button>
             {isScrollMarkersFeatureEnabled && onToggleScrollMarkers && (
               <button
@@ -402,7 +402,7 @@ export default function SessionViewerToolbar({
               className={mobileSheetItemClass}
             >
               <ArrowUp className="h-4 w-4 text-muted-foreground" />
-              {t("session.scrollToTop", "滚动到顶部")}
+              {t("session.scrollToTop", "Scroll to top")}
             </button>
             <button
               onClick={() => {
@@ -412,7 +412,7 @@ export default function SessionViewerToolbar({
               className={mobileSheetItemClass}
             >
               <ArrowDown className="h-4 w-4 text-muted-foreground" />
-              {t("session.scrollToBottom", "滚动到底部")}
+              {t("session.scrollToBottom", "Scroll to bottom")}
             </button>
             <div className="border-t border-border my-1" />
             <button
@@ -456,7 +456,7 @@ export default function SessionViewerToolbar({
                 className={mobileSheetItemClass}
               >
                 <Play className="h-4 w-4 text-muted-foreground" />
-                {t("session.resume", "恢复")}
+                {t("session.resume", "Resume")}
               </button>
             )}
           </div>

@@ -353,7 +353,7 @@ export function ConfigBundleManager() {
                   <div>
                     <div className="font-medium">{entry.timestamp}</div>
                     <div className="text-sm text-muted">
-                      {entry.fileCount} 个文件: {entry.files.join(', ')}
+                      {entry.fileCount} files: {entry.files.join(', ')}
                     </div>
                   </div>
                   <button

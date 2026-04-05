@@ -197,7 +197,7 @@ function App() {
   });
   const [showTerminal, setShowTerminal] = useState(false);
 
-  // 实际显示 Pi Live 需要: 功能启用 + 侧边栏显示 + 用户切换
+  // Actually display Pi Live requires: feature enabled + sidebar visible + user toggled
   const showPiLivePanel = piLiveEnabled && showPiLiveInSidebar;
 
   const [pendingScrollEntryId, setPendingScrollEntryId] = useState<

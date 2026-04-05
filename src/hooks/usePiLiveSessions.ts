@@ -1,7 +1,7 @@
 /**
- * Pi Live Sessions Hook - 兼容层
+ * Pi Live Sessions Hook - Compatibility layer
  *
- * @deprecated 请使用 usePiLive from './usePiLive'
+ * @deprecated Please use usePiLive from './usePiLive'
  */
 
 export { usePiLive, usePiLiveSessions } from './usePiLive'

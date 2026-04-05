@@ -249,7 +249,7 @@ function SessionViewerContent({
         treeRef={treeRef}
         sidebarRef={sidebarRef}
         resizeHandleRef={resizeHandleRef}
-        outlineTitle={t("session.toolbar.outline", "Large纲")}
+        outlineTitle={t("session.toolbar.outline", "Outline")}
         hideSidebarTitle={t("session.hideSidebar")}
       />
 
@@ -295,7 +295,7 @@ function SessionViewerContent({
                 resumeCommand={resumeCommand}
                 size="sm"
                 variant="ghost"
-                label={t("session.resume", "恢复")}
+                label={t("session.resume", "Resume")}
                 showLabel={true}
                 className="px-3 py-1"
                 onWebResume={onWebResume}

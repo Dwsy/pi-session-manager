@@ -75,11 +75,11 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
   private highlightCache = new Map<string, string>()
 
   get name(): string {
-    return this.context?.t('plugins.message.name', 'Message Search') || 'message搜索'
+    return this.context?.t('plugins.message.name', 'Message Search') || 'Message search'
   }
 
   get description(): string {
-    return this.context?.t('plugins.message.description', 'Search user messages and assistant replies') || '搜索用户message和助手回复'
+    return this.context?.t('plugins.message.description', 'Search user messages and assistant replies') || 'Search user messages and assistant replies'
   }
 
   private truncateText(text: string, maxLength: number): string {

@@ -17,7 +17,7 @@ export default function CommandEmpty({ query }: CommandEmptyProps) {
       </p>
       {query && (
         <p className="text-xs text-muted-foreground/70 mt-1">
-          {t('command.emptyHint', { query, defaultValue: `尝试使用不同的关键词搜索` })}
+          {t('command.emptyHint', { query, defaultValue: `Try searching with different keywords` })}
         </p>
       )}
     </Command.Empty>

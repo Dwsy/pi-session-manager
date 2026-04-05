@@ -1,5 +1,5 @@
 /**
- * Pi Live Session Card - 显示单个会话信息
+ * Pi Live Session Card - Displays a single session info
  */
 
 import { Circle, CircleDot, Cpu, Brain, HardDrive } from 'lucide-react'

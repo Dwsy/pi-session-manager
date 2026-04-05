@@ -127,7 +127,7 @@ function AppDesktopSidebar({
             <button
               onClick={onOpenCommandPalette}
               className="p-1 rounded motion-color motion-press focus-ring ml-0.5 text-muted-foreground hover:text-foreground hover:bg-secondary group relative"
-              title={t("app.shortcuts.searchAll", "搜索所有session") + " (Cmd+K)"}
+              title={t("app.shortcuts.searchAll", "Search all sessions") + " (Cmd+K)"}
             >
               <Search className="h-3.5 w-3.5" />
             </button>
