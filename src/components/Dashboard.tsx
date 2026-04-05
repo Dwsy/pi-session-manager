@@ -15,7 +15,7 @@ import TopModelsChart from './dashboard/TopModelsChart'
 import TimeDistribution from './dashboard/TimeDistribution'
 import DashboardInsightModal from './dashboard/DashboardInsightModal'
 import TokenTrendChart from './dashboard/TokenTrendChart'
-import { DashboardSkeleton } from './Skeleton'
+import { DashboardSkeleton } from './ui/Skeleton'
 import { isDemoModeEnabled } from '../demo'
 import { getPathBasename, hasPathSeparator } from '../utils/path'
 

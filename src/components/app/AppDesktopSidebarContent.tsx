@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import FavoritesPanel from "../FavoritesPanel";
 import ProjectFilterList from "../ProjectFilterList";
 import ProjectList from "../ProjectList";
-import SessionList from "../SessionList";
+import SessionList from "../session-list/SessionList";
 import SelectedProjectHeader from "../project/SelectedProjectHeader";
 import type { FavoriteItem, SessionInfo } from "../../types";
 import type { AppDesktopSidebarViewMode } from "./AppDesktopSidebar";

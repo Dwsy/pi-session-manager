@@ -108,7 +108,7 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
     term.attachCustomKeyEventHandler((e) => {
       // Ctrl+` toggle terminal - let app handle it
       if (e.ctrlKey && e.key === '`') return false
-      
+
       // Terminal-focused shortcuts: prevent global shortcuts from firing
       // Cmd/Ctrl+K - Clear screen (instead of command palette)
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -116,14 +116,14 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
         term.clear()
         return false
       }
-      
+
       // Cmd/Ctrl+L - Clear screen (alternative)
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') {
         e.preventDefault()
         term.clear()
         return false
       }
-      
+
       // Cmd/Ctrl+C - Copy (when text selected)
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c' && term.hasSelection()) {
         e.preventDefault()
@@ -131,7 +131,7 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
         copyText(selectedText).catch(() => {})
         return false
       }
-      
+
       // Cmd/Ctrl+V - Paste
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'v') {
         e.preventDefault()
@@ -140,13 +140,13 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
         }).catch(() => {})
         return false
       }
-      
+
       // Cmd/Ctrl+A - Select all (optional, can be disabled)
       // if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
       //   e.preventDefault()
       //   return false
       // }
-      
+
       return true
     })
 

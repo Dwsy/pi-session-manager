@@ -31,7 +31,7 @@ export function defaultResolveData(
     toolResultContent?.diff ||
     detailsWithDiff?.diff
 
-  const entryId = result?.id || `tool-${toolCallId || index}`
+  const entryId = toolCallId ? `tool-result-${toolCallId}` : (result?.id || `tool-${index}`)
   const images = getToolImages(result)
 
   return {

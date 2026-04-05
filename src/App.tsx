@@ -39,7 +39,7 @@ import AppMobileLayout, { type MobileTab } from "./components/app/AppMobileLayou
 import AppDesktopSidebar from "./components/app/AppDesktopSidebar";
 import AppDesktopContent from "./components/app/AppDesktopContent";
 import AppDesktopSearchBar from "./components/app/AppDesktopSearchBar";
-import { usePiLiveSessions } from "./hooks/usePiLiveSessions";
+import { usePiLive } from "./hooks/usePiLive";
 import AppDesktopSidebarContent from "./components/app/AppDesktopSidebarContent";
 import AppOverlays from "./components/app/AppOverlays";
 import AppSessionListPane from "./components/app/AppSessionListPane";
@@ -50,6 +50,7 @@ import AppSessionViewerPane from "./components/app/AppSessionViewerPane";
 import AppMobileFilterBar from "./components/app/AppMobileFilterBar";
 import AppSettingsPane from "./components/app/AppSettingsPane";
 import AppTerminalPane from "./components/app/AppTerminalPane";
+import DeleteSessionPopover from "./components/dialogs/DeleteSessionPopover";
 import {
   DEFAULT_SESSION_SORT_BY,
   DEFAULT_SESSION_SORT_ORDER,
@@ -124,6 +125,9 @@ function App() {
     handleDeleteSessions,
     handleRenameSession,
     forkSession,
+    pendingDeleteSession,
+    confirmDeleteSession,
+    cancelDeleteSession,
   } = useSessions();
 
   const { terminal, piPath, customCommand, resumeCommand, loadSettings } = useAppSettings();
@@ -132,6 +136,15 @@ function App() {
     sessions,
     selectedSession?.id ?? null,
   );
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+
+  const handleDeleteSessionsWithRef = useCallback(
+    async (sessions: import("./types").SessionInfo[]) => {
+      await handleDeleteSessions(sessions, deleteButtonRef);
+    },
+    [handleDeleteSessions],
+  );
+
   const {
     tags,
     sessionTags,
@@ -144,7 +157,7 @@ function App() {
   } = useTags();
   useAppearance();
   useToolStyles();
-  const { liveSessionIds } = usePiLiveSessions();
+  const { liveSessionIds, isEnabled: piLiveEnabled, showInSidebar: showPiLiveInSidebar } = usePiLive();
 
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "project" | "kanban">(
@@ -188,6 +201,10 @@ function App() {
     setShowPiLive((prev) => !prev);
     if (showFavorites) setShowFavorites(false);
   }, [showFavorites]);
+
+  // 实际显示 Pi Live 需要: 功能启用 + 侧边栏显示 + 用户切换
+  const showPiLivePanel = piLiveEnabled && showPiLiveInSidebar && showPiLive;
+
   const [pendingScrollEntryId, setPendingScrollEntryId] = useState<
     string | null
   >(null);
@@ -417,7 +434,7 @@ function App() {
     getDescendantIds,
     onSelectSession: handleSelectSession,
     onDeleteSession: handleDeleteSession,
-    onDeleteSessions: handleDeleteSessions,
+    onDeleteSessions: handleDeleteSessionsWithRef,
     getBadgeType,
     terminal,
     piPath,
@@ -726,7 +743,7 @@ function App() {
     />
   );
 
-  const desktopSidebarContent = showPiLive
+  const desktopSidebarContent = showPiLivePanel
     ? (<PiLivePanel />)
     : (
     <AppDesktopSidebarContent
@@ -825,6 +842,15 @@ function App() {
         />
 
         {renderOverlays()}
+
+        {pendingDeleteSession && (
+          <DeleteSessionPopover
+            sessions={pendingDeleteSession.sessions}
+            anchorRef={pendingDeleteSession.anchorRef || deleteButtonRef}
+            onConfirm={confirmDeleteSession}
+            onCancel={cancelDeleteSession}
+          />
+        )}
       </div>
       <UpdateNoticeToast
         update={updateInfo}

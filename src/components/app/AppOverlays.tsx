@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import type { ComponentType, LazyExoticComponent } from "react";
 
-import ExportDialog from "../ExportDialog";
-import RenameDialog from "../RenameDialog";
-import ForkDialog from "../ForkDialog";
+import ExportDialog from "../dialogs/ExportDialog";
+import RenameDialog from "../dialogs/RenameDialog";
+import ForkDialog from "../dialogs/ForkDialog";
 import Onboarding from "../Onboarding";
 import type { SearchContext } from "../../plugins/types";
 import type { SessionInfo } from "../../types";

@@ -20,7 +20,7 @@ import {
   Search,
 } from "lucide-react";
 
-import KbdTooltip from "../KbdTooltip";
+import KbdTooltip from "../ui/KbdTooltip";
 import { isTauri } from "../../transport";
 import type { SessionViewerToolbarProps } from "./SessionViewerToolbarTypes";
 import SessionViewerOnlineStatusBar from "./SessionViewerOnlineStatusBar";

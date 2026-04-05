@@ -20,12 +20,12 @@ export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendC
   const generateDailyTokenData = () => {
     const today = new Date()
     const dailyData: { date: string; tokens: number; cost: number; displayDate: string }[] = []
-    
+
     // Estimate tokens per message (rough average)
-    const avgTokensPerMessage = stats.total_messages > 0 
-      ? stats.total_tokens / stats.total_messages 
+    const avgTokensPerMessage = stats.total_messages > 0
+      ? stats.total_tokens / stats.total_messages
       : 0
-    
+
     const avgCostPerMessage = stats.total_messages > 0
       ? stats.token_details.total_cost / stats.total_messages
       : 0

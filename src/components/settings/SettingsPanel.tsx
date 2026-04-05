@@ -20,6 +20,7 @@ import {
   Tags,
   Activity,
   Download,
+  Bot,
 } from 'lucide-react'
 import type { AppSettings, SettingsSection } from './types'
 import { defaultSettings } from './types'
@@ -39,6 +40,7 @@ import AdvancedSettings from './sections/AdvancedSettings'
 import ShortcutSettings from './sections/ShortcutSettings'
 import TagManagerSettings from './sections/TagManagerSettings'
 import APITestSettings from './sections/APITestSettings'
+import PiLiveSettings from './sections/PiLiveSettings'
 import { ConfigBundleManager } from './sections/ConfigBundleManager'
 
 interface SettingsPanelProps {
@@ -206,6 +208,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     { id: 'export', icon: <ChevronRight className="h-4 w-4" />, label: t('settings.sections.export', 'Export') },
     { id: 'updates', icon: <Download className="h-4 w-4" />, label: t('settings.sections.updates', 'Update') },
     { id: 'pi-config', icon: <Puzzle className="h-4 w-4" />, label: t('settings.sections.piConfig', 'Pi Config') },
+    { id: 'pi-live', icon: <Bot className="h-4 w-4" />, label: 'Pi Live' },
     { id: 'models', icon: <Cpu className="h-4 w-4" />, label: t('settings.sections.models', 'Models') },
     { id: 'shortcuts', icon: <Keyboard className="h-4 w-4" />, label: t('settings.sections.shortcuts', 'Shortcuts') },
     { id: 'advanced', icon: <Shield className="h-4 w-4" />, label: t('settings.sections.advanced', 'Advanced') },
@@ -555,6 +558,7 @@ function SettingsContent({
             {activeSection === 'export' && <ExportSettings settings={settings} onUpdate={onUpdate} />}
             {activeSection === 'updates' && <UpdateSettings settings={settings} onUpdate={onUpdate} />}
             {activeSection === 'pi-config' && <PiConfigSettings />}
+            {activeSection === 'pi-live' && <PiLiveSettings settings={settings.piLive} onUpdate={onUpdate} />}
             {activeSection === 'models' && <ModelSettings />}
             {activeSection === 'shortcuts' && <ShortcutSettings />}
             {activeSection === 'advanced' && <AdvancedSettings settings={settings} onUpdate={onUpdate} />}

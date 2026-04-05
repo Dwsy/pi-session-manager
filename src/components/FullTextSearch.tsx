@@ -455,7 +455,7 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 mb-0.5">
-                              <h3 
+                              <h3
                                 className="text-sm font-semibold text-foreground truncate group-hover:text-blue-300 motion-color"
                                 title={`Session: ${title}\nID: ${hit.session_id}\nPath: ${hit.session_path}`}
                               >

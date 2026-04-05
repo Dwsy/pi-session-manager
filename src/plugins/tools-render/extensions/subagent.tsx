@@ -6,7 +6,7 @@ import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '../typ
 import { defaultResolveData } from '../utils/resolveData'
 import { escapeHtml } from '../../../utils/markdown'
 import { highlightSearchInHTML } from '../../../utils/search'
-import SubagentModal from '../../../components/SubagentModal'
+import SubagentModal from '../../../components/tool-calls/SubagentModal'
 import '../../../styles/subagent.css'
 
 /** Maximum length for error preview text */

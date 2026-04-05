@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 
 import PullToRefresh from "../PullToRefresh";
-import SessionList from "../SessionList";
+import SessionList from "../session-list/SessionList";
 import type {
   AppDesktopSidebarContentProps,
   AppDesktopSidebarSessionListCommonProps,

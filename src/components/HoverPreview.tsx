@@ -23,23 +23,23 @@ export default function HoverPreview({
 
   const handleMouseEnter = (e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    
+
     // Calculate preview position
     let x = rect.left
     let y = rect.bottom + 8
-    
+
     // If there is not enough space on the right, align left
     if (x + maxWidth > window.innerWidth) {
       x = window.innerWidth - maxWidth - 16
     }
-    
+
     // If there is not enough space below, show above
     if (y + maxHeight > window.innerHeight) {
       y = rect.top - maxHeight - 8
     }
-    
+
     setPosition({ x, y })
-    
+
     // Show with delay
     timeoutRef.current = setTimeout(() => {
       setIsVisible(true)
@@ -72,7 +72,7 @@ export default function HoverPreview({
       >
         {content}
       </div>
-      
+
       {isVisible && createPortal(
         <div
           className="hover-preview"

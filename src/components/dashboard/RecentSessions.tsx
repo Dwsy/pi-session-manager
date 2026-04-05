@@ -53,10 +53,10 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
     if (session.name && session.name.trim() !== '' && session.name !== t('common.untitled')) {
       return session.name
     }
-    
+
     // Use first or last message based on toggle
     const message = showFirstMessage ? session.first_message : session.last_message
-    
+
     if (message && message.trim() !== '') {
       const msg = message.trim()
       return msg.length > 45 ? msg.substring(0, 45) + '...' : msg

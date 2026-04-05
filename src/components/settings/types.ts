@@ -26,7 +26,10 @@ export function getPlatformDefaults(): { defaultTerminal: TerminalType; defaultS
   }
 }
 
+import { defaultPiLiveSettings, type PiLiveSettings } from '../../types/pi-live'
+
 export interface AppSettings {
+  piLive: PiLiveSettings
   terminal: {
     defaultTerminal: TerminalType
     customTerminalCommand?: string
@@ -103,6 +106,7 @@ function getDefaultLocale(): string {
 const platformDefaults = getPlatformDefaults()
 
 export const defaultSettings: AppSettings = {
+  piLive: defaultPiLiveSettings,
   terminal: {
     defaultTerminal: platformDefaults.defaultTerminal,
     piCommandPath: 'pi',
@@ -170,6 +174,7 @@ export type SettingsSection =
   | 'export'
   | 'updates'
   | 'pi-config'
+  | 'pi-live'
   | 'models'
   | 'shortcuts'
   | 'advanced'
@@ -189,3 +194,4 @@ export interface SearchSettingsProps extends SettingsProps<'search'> {}
 export interface ExportSettingsProps extends SettingsProps<'export'> {}
 export interface UpdateSettingsProps extends SettingsProps<'update'> {}
 export interface AdvancedSettingsProps extends SettingsProps<'advanced'> {}
+export interface PiLiveSettingsProps extends SettingsProps<'piLive'> {}

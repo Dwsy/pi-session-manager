@@ -1,13 +1,13 @@
 import { memo } from "react";
-import AssistantMessage from "../AssistantMessage";
+import AssistantMessage from "../messages/AssistantMessage";
 import BranchSummary from "../BranchSummary";
-import Compaction from "../Compaction";
-import CustomMessage from "../CustomMessage";
-import LabelEntry from "../LabelEntry";
-import ModelChange from "../ModelChange";
+import Compaction from "../messages/Compaction";
+import CustomMessage from "../messages/CustomMessage";
+import LabelEntry from "../tags/LabelEntry";
+import ModelChange from "../messages/ModelChange";
 import SessionInfoEntry from "../SessionInfoEntry";
-import ThinkingLevelChange from "../ThinkingLevelChange";
-import UserMessage from "../UserMessage";
+import ThinkingLevelChange from "../messages/ThinkingLevelChange";
+import UserMessage from "../messages/UserMessage";
 
 import type { SessionEntry } from "../../types";
 
@@ -17,12 +17,14 @@ export interface SessionEntryRendererProps {
   entry: SessionEntry;
   toolResultByCallId?: Map<string, SessionEntry>;
   searchQuery?: string;
+  isStreaming?: boolean;
 }
 
 export function renderSessionEntry(
   entry: SessionEntry,
   toolResultByCallId: Map<string, SessionEntry> = EMPTY_TOOL_RESULTS,
   searchQuery = "",
+  isStreaming = false,
 ): JSX.Element | null {
   switch (entry.type) {
     case "message": {
@@ -50,6 +52,7 @@ export function renderSessionEntry(
             entryId={entry.id}
             toolResultByCallId={toolResultByCallId}
             searchQuery={searchQuery}
+            isStreaming={isStreaming}
           />
         );
       }
@@ -132,8 +135,9 @@ export const SessionEntryRenderer = memo(
     entry,
     toolResultByCallId = EMPTY_TOOL_RESULTS,
     searchQuery = "",
+    isStreaming = false,
   }: SessionEntryRendererProps): JSX.Element | null {
-    return renderSessionEntry(entry, toolResultByCallId, searchQuery);
+    return renderSessionEntry(entry, toolResultByCallId, searchQuery, isStreaming);
   },
   (prev, next) =>
     prev.entry === next.entry &&

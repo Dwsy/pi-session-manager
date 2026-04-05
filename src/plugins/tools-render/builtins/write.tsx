@@ -4,7 +4,7 @@ import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '../typ
 import { defaultResolveData } from '../utils/resolveData'
 import { escapeHtml, getLanguageFromPath, renderCodeHtml } from '../../../utils/markdown'
 import { shortenPath } from '../../../utils/format'
-import CodeBlock from '../../../components/CodeBlock'
+import CodeBlock from '../../../components/ui/CodeBlock'
 
 /** Maximum height for tool output in pixels */
 const OUTPUT_MAX_HEIGHT = 300

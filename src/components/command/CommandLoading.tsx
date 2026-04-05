@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 export default function CommandLoading() {
   const { t } = useTranslation()
-  
+
   return (
     <div className="flex items-center justify-center py-12">
       <Loader2 className="w-6 h-6 text-muted-foreground animate-spin mr-2" />

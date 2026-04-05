@@ -43,6 +43,7 @@ export interface SessionViewerMessagesProps {
   scrollTargetId: string | null;
   setScrollTargetId: Dispatch<SetStateAction<string | null>>;
   setHasNewMessages: Dispatch<SetStateAction<boolean>>;
+  streamingId: string | null;
   pendingScrollToBottomRef: MutableRefObject<boolean>;
   expandedToolIds: Set<string>;
   toolsExpanded: boolean;
@@ -80,6 +81,7 @@ const SessionViewerMessages = forwardRef<
   scrollTargetId,
   setScrollTargetId,
   setHasNewMessages,
+  streamingId,
   pendingScrollToBottomRef,
   expandedToolIds,
   toolsExpanded,
@@ -287,6 +289,7 @@ const SessionViewerMessages = forwardRef<
                       entry={entry}
                       toolResultByCallId={toolResultByCallId}
                       searchQuery={searchQuery}
+                      isStreaming={entry.id === streamingId}
                     />
                   </div>
                 );

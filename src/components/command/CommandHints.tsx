@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 export default function CommandHints() {
   const { t } = useTranslation()
-  
+
   const hints = [
     {
       icon: MessageSquare,
@@ -30,7 +30,7 @@ export default function CommandHints() {
       ]
     }
   ]
-  
+
   return (
     <div className="p-4">
       <div className="flex items-center gap-2 mb-4">
@@ -39,7 +39,7 @@ export default function CommandHints() {
           {t('command.hints.title', 'Search tips')}
         </h3>
       </div>
-      
+
       <div className="space-y-4">
         {hints.map((hint, index) => (
           <div key={index} className="space-y-2">
@@ -59,7 +59,7 @@ export default function CommandHints() {
           </div>
         ))}
       </div>
-      
+
       <div className="mt-4 pt-4 border-t border-border">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>{t('command.hints.navigate', 'Use ↑↓ to navigate')}</span>

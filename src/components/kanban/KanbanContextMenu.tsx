@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Terminal, Globe, Star, Trash2, Tag, X, Copy } from 'lucide-react'
 import type { SessionInfo, Tag as TagType, FavoriteItem } from '../../types'
-import TagBadge from '../TagBadge'
+import TagBadge from '../tags/TagBadge'
 
 interface ContextMenuItem {
   id: string

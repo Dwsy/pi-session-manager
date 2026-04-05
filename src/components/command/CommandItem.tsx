@@ -22,7 +22,7 @@ export default function CommandItem({ result, plugin, onSelect }: CommandItemPro
       </Command.Item>
     )
   }
-  
+
   // Default rendering
   return (
     <Command.Item
@@ -37,21 +37,21 @@ export default function CommandItem({ result, plugin, onSelect }: CommandItemPro
             {result.icon}
           </div>
         )}
-        
+
         {/* Content */}
         <div className="flex-1 min-w-0">
           {/* Title */}
           <div className="text-sm font-medium text-foreground truncate">
             {result.title}
           </div>
-          
+
           {/* Subtitle */}
           {result.subtitle && (
             <div className="text-xs text-muted-foreground truncate mt-0.5">
               {result.subtitle}
             </div>
           )}
-          
+
           {/* Description */}
           {result.description && (
             <div className="text-xs text-muted-foreground line-clamp-2 mt-1">
@@ -59,7 +59,7 @@ export default function CommandItem({ result, plugin, onSelect }: CommandItemPro
             </div>
           )}
         </div>
-        
+
         {/* Score (development mode) */}
         {process.env.NODE_ENV === 'development' && (
           <div className="flex-shrink-0 text-xs text-muted-foreground">

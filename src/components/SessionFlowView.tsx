@@ -377,13 +377,13 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default
 
   const { layoutNodes, layoutEdges } = useMemo(() => {
     const rawTree = buildTree(entries)
-    
+
     // Hierarchy mode: show all nodes without compacting
     if (viewMode === 'hierarchy') {
       const { nodes, edges } = layoutHierarchy(rawTree, activePathIds, activeLeafId)
       return { layoutNodes: nodes, layoutEdges: edges }
     }
-    
+
     // Flow mode: compact linear chains
     const compact = compactTree(rawTree, filter)
     const { nodes, edges } = layoutTree(compact, activePathIds, activeLeafId)

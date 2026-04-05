@@ -6,11 +6,12 @@ import { useTranslation } from 'react-i18next'
 import type { SessionInfo, Tag, FavoriteItem } from '../../types'
 import KanbanCard from './KanbanCard'
 import KanbanContextMenu from './KanbanContextMenu'
-import DeleteSessionPopover from '../DeleteSessionPopover'
-import { getColorClass, getColorStyle } from '../TagBadge'
+import DeleteSessionPopover from '../dialogs/DeleteSessionPopover'
+import { getColorClass, getColorStyle } from '../tags/TagBadge'
 import { invoke, isTauri } from '../../transport'
 import { getCachedSettings } from '../../utils/settingsApi'
 import { getPlatformDefaults } from '../settings/types'
+import { useClipboard } from '../../hooks/useClipboard'
 
 interface KanbanColumnProps {
   id: string
@@ -27,6 +28,7 @@ interface KanbanColumnProps {
   terminal?: string
   piPath?: string
   customCommand?: string
+  resumeCommand?: string
   isMobile?: boolean
 }
 
@@ -49,9 +51,11 @@ export default function KanbanColumn({
   terminal: propTerminal,
   piPath: propPiPath,
   customCommand: propCustomCommand,
+  resumeCommand: propResumeCommand,
   isMobile,
 }: KanbanColumnProps) {
   const { t } = useTranslation()
+  const { copyText } = useClipboard()
   const { setNodeRef, isOver } = useDroppable({ id })
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -243,6 +247,19 @@ export default function KanbanColumn({
           onToggleTag={(tagId, assigned) => {
             onToggleTag(contextMenu.session.id, tagId, assigned)
           }}
+          onCopyResume={
+            isTauri()
+              ? () => {
+                  const settings = getCachedSettings()
+                  const cmd = settings.terminal?.resumeCommand || propResumeCommand || ''
+                  const piCmd = settings.terminal?.piCommandPath || propPiPath || 'pi'
+                  const fullCommand = cmd
+                    ? cmd.replace(/\{cwd\}/g, contextMenu.session.cwd || '').replace(/\{path\}/g, contextMenu.session.path).replace(/\{pi\}/g, piCmd)
+                    : `${piCmd} --session ${contextMenu.session.path}`
+                  copyText(fullCommand).catch(console.error)
+                }
+              : undefined
+          }
           onDelete={() => {
             setPendingDeleteSession({
               sessions: [contextMenu.session],

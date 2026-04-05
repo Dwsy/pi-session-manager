@@ -1,11 +1,11 @@
 import type { RefObject } from "react";
 import type { SessionInfo, FavoriteItem } from "../types";
 import { FolderOpen, Star } from "lucide-react";
-import { ProjectListSkeleton } from "./Skeleton";
+import { ProjectListSkeleton } from "./ui/Skeleton";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import SessionList from "./SessionList";
+import SessionList from "./session-list/SessionList";
 import SelectedProjectHeader from "./project/SelectedProjectHeader";
 import type { TerminalType } from "./settings/types";
 import { getPlatformDefaults } from "./settings/types";

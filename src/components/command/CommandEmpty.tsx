@@ -8,7 +8,7 @@ interface CommandEmptyProps {
 
 export default function CommandEmpty({ query }: CommandEmptyProps) {
   const { t } = useTranslation()
-  
+
   return (
     <Command.Empty className="flex flex-col items-center justify-center py-12 text-center">
       <SearchX className="w-12 h-12 text-muted-foreground/50 mb-3" />

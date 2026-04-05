@@ -218,7 +218,7 @@ export default function KanbanBoard({
     onMoveSession(sessionId, fromTagId, toColId, position)
   }, [columns, findColumnForSession, onMoveSession, onToggleTag])
 
-  
+
   const blockPreviewOpen = useCallback(() => {
     suppressPreviewOpenUntilRef.current = Date.now() + PREVIEW_CLICK_THROUGH_GUARD_MS
   }, [])

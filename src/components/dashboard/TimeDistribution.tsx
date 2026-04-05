@@ -61,7 +61,7 @@ export default function TimeDistribution({
                     ? 'bg-gradient-to-r from-warning to-destructive'
                     : 'bg-gradient-to-r from-info/60 to-info'
                 }`}
-                style={{ 
+                style={{
                   width: `${Math.min((item.value / maxValue) * 100, 100)}%`,
                   boxShadow: item.isPeak ? '0 0 8px rgba(255, 166, 87, 0.4)' : 'none'
                 }}

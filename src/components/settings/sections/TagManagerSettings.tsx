@@ -10,7 +10,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useTags } from '../../../hooks/useTags'
-import { getColorClass, getColorStyle } from '../../TagBadge'
+import { getColorClass, getColorStyle } from '../../tags/TagBadge'
 import type { AutoRule, Tag } from '../../../types'
 
 const PRESET_COLORS = [

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Terminal, Globe, Star, Trash2, Check, Copy } from 'lucide-react'
 import type { Tag } from '../types'
-import { getColorClass, getColorStyle } from './TagBadge'
+import { getColorClass, getColorStyle } from './tags/TagBadge'
 
 interface SessionContextMenuProps {
   x: number

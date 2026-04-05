@@ -7,7 +7,7 @@ interface CommandErrorProps {
 
 export default function CommandError({ error }: CommandErrorProps) {
   const { t } = useTranslation()
-  
+
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
       <AlertCircle className="w-12 h-12 text-red-400 mb-3" />

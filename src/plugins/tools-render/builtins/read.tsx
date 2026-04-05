@@ -3,7 +3,7 @@ import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '../typ
 import { defaultResolveData } from '../utils/resolveData'
 import { escapeHtml, getLanguageFromPath, renderCodeHtml } from '../../../utils/markdown'
 import { shortenPath } from '../../../utils/format'
-import CodeBlock from '../../../components/CodeBlock'
+import CodeBlock from '../../../components/ui/CodeBlock'
 import { useTranslation } from 'react-i18next'
 import type { CSSProperties } from 'react'
 

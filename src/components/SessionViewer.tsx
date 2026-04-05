@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import KbdTooltip from "./KbdTooltip";
+import KbdTooltip from "./ui/KbdTooltip";
 import OpenInTerminalButton from "./OpenInTerminalButton";
-import ChatInput from "./ChatInput";
-import SystemPromptDialog from "./SystemPromptDialog";
-import { type SessionTreeRef } from "./SessionTree";
+import ChatInput from "./pi-live/PiLiveChatInput";
+import SystemPromptDialog from "./messages/SystemPromptDialog";
+import { type SessionTreeRef } from "./session-tree/SessionTree";
 import SessionViewerMessages, {
   type SessionViewerMessagesRef,
 } from "./session-viewer/SessionViewerMessages";
@@ -116,6 +116,7 @@ function SessionViewerContent({
     setScrollTargetId,
     hasNewMessages,
     setHasNewMessages,
+    streamingId,
     pendingScrollToBottomRef,
     hasMoreHistory,
     loadMoreHistory,
@@ -144,7 +145,7 @@ function SessionViewerContent({
     stats,
     headerEntry,
     messageEntries,
-  } = useSessionViewerDerivedData(entries, activeEntryId);
+  } = useSessionViewerDerivedData(entries, activeEntryId, isLive);
 
   const {
     isSearchOpen,
@@ -349,6 +350,7 @@ function SessionViewerContent({
           scrollTargetId={scrollTargetId}
           setScrollTargetId={setScrollTargetId}
           setHasNewMessages={setHasNewMessages}
+          streamingId={streamingId}
           pendingScrollToBottomRef={pendingScrollToBottomRef}
           expandedToolIds={expandedToolIds}
           toolsExpanded={toolsExpanded}

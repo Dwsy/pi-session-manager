@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Clock, MessageSquare } from 'lucide-react'
 import type { SessionInfo, Tag } from '../../types'
-import TagBadge from '../TagBadge'
+import TagBadge from '../tags/TagBadge'
 import { getLastPathSegments } from '../../utils/path'
 
 interface KanbanCardProps {
