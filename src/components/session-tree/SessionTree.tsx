@@ -438,7 +438,153 @@ const SessionTree = memo(
       return prefixChars.join("");
     };
 
-    // Filter nodes
+    // Recalculate visual structure for filtered view
+    // When nodes are filtered, children attach to nearest visible ancestor
+    // This keeps tree structure intact without visual drift
+    const recalculateVisualStructure = useCallback(
+      (
+        filteredNodes: FlatNode[],
+        allFlatNodes: FlatNode[],
+      ): FlatNode[] => {
+        if (filteredNodes.length === 0) return filteredNodes;
+
+        const visibleIds = new Set(filteredNodes.map((n) => n.node.entry.id));
+
+        // Build entry map for parent lookup (using full tree)
+        const entryMap = new Map<string, FlatNode>();
+        for (const flatNode of allFlatNodes) {
+          entryMap.set(flatNode.node.entry.id, flatNode);
+        }
+
+        // Find nearest visible ancestor for a node
+        function findVisibleAncestor(nodeId: string): string | null {
+          const flatNode = entryMap.get(nodeId);
+          if (!flatNode) return null;
+          let currentId = flatNode.node.entry.parentId;
+          while (currentId != null) {
+            if (visibleIds.has(currentId)) {
+              return currentId;
+            }
+            const parentFlatNode = entryMap.get(currentId);
+            if (!parentFlatNode) break;
+            currentId = parentFlatNode.node.entry.parentId;
+          }
+          return null;
+        }
+
+        // Build visible tree structure
+        const visibleChildren = new Map<string | null, string[]>();
+        visibleChildren.set(null, []); // root-level nodes
+
+        for (const flatNode of filteredNodes) {
+          const nodeId = flatNode.node.entry.id;
+          const ancestorId = findVisibleAncestor(nodeId);
+          if (!visibleChildren.has(ancestorId ?? null)) {
+            visibleChildren.set(ancestorId ?? null, []);
+          }
+          visibleChildren.get(ancestorId ?? null)!.push(nodeId);
+        }
+
+        // Update multipleRoots based on visible roots
+        const visibleRootIds = visibleChildren.get(null) ?? [];
+        const multipleRoots = visibleRootIds.length > 1;
+
+        // Build a map for quick lookup: nodeId → FlatNode
+        const filteredNodeMap = new Map<string, FlatNode>();
+        for (const flatNode of filteredNodes) {
+          filteredNodeMap.set(flatNode.node.entry.id, flatNode);
+        }
+
+        // DFS traversal of visible tree, applying same indentation rules as flattenTree()
+        // Stack items: [nodeId, indent, justBranched, showConnector, isLast, gutters, isVirtualRootChild]
+        const stack: Array<
+          [string, number, boolean, boolean, boolean, Array<{ position: number; show: boolean }>, boolean]
+        > = [];
+
+        // Add visible roots in reverse order (to process in forward order via stack)
+        for (let i = visibleRootIds.length - 1; i >= 0; i--) {
+          const isLast = i === visibleRootIds.length - 1;
+          stack.push([
+            visibleRootIds[i],
+            multipleRoots ? 1 : 0,
+            multipleRoots,
+            multipleRoots,
+            isLast,
+            [],
+            multipleRoots,
+          ]);
+        }
+
+        while (stack.length > 0) {
+          const [
+            nodeId,
+            indent,
+            justBranched,
+            showConnector,
+            isLast,
+            gutters,
+            isVirtualRootChild,
+          ] = stack.pop()!;
+
+          const flatNode = filteredNodeMap.get(nodeId);
+          if (!flatNode) continue;
+
+          // Update this node's visual properties
+          flatNode.indent = indent;
+          flatNode.showConnector = showConnector;
+          flatNode.isLast = isLast;
+          flatNode.gutters = gutters;
+          flatNode.isVirtualRootChild = isVirtualRootChild;
+          flatNode.multipleRoots = multipleRoots;
+
+          // Get visible children of this node
+          const children = visibleChildren.get(nodeId) ?? [];
+          const multipleChildren = children.length > 1;
+
+          // Calculate child indent using same rules as flattenTree():
+          // - Parent branches (multiple children): children get +1
+          // - Just branched and indent > 0: children get +1 for visual grouping
+          // - Single-child chain: stay flat
+          let childIndent: number;
+          if (multipleChildren) {
+            childIndent = indent + 1;
+          } else if (justBranched && indent > 0) {
+            childIndent = indent + 1;
+          } else {
+            childIndent = indent;
+          }
+
+          // Build gutters for children (same logic as flattenTree)
+          const connectorDisplayed = showConnector && !isVirtualRootChild;
+          const currentDisplayIndent = multipleRoots
+            ? Math.max(0, indent - 1)
+            : indent;
+          const connectorPosition = Math.max(0, currentDisplayIndent - 1);
+          const childGutters = connectorDisplayed
+            ? [...gutters, { position: connectorPosition, show: !isLast }]
+            : gutters;
+
+          // Add children in reverse order (to process in forward order via stack)
+          for (let i = children.length - 1; i >= 0; i--) {
+            const childIsLast = i === children.length - 1;
+            stack.push([
+              children[i],
+              childIndent,
+              multipleChildren,
+              multipleChildren,
+              childIsLast,
+              childGutters,
+              false,
+            ]);
+          }
+        }
+
+        return filteredNodes;
+      },
+      [],
+    );
+
+    // Filter nodes with visual structure recalculation
     const filteredNodes = useMemo(() => {
       const isSettingsEntry = (entry: SessionEntry) => {
         if (TREE_SETTINGS_TYPES.has(entry.type)) {
@@ -503,7 +649,7 @@ const SessionTree = memo(
         return parts.join(" ").toLowerCase();
       };
 
-      return flatNodes.filter((flatNode) => {
+      const baseFiltered = flatNodes.filter((flatNode) => {
         const entry = flatNode.node.entry;
         const label = flatNode.node.label;
 
@@ -558,7 +704,17 @@ const SessionTree = memo(
             return true;
         }
       });
-    }, [flatNodes, searchTerms, currentFilter]);
+
+      // Recalculate visual structure when filtering (only if not default view)
+      if (
+        searchTerms.length > 0 ||
+        currentFilter !== "no-tools"
+      ) {
+        return recalculateVisualStructure(baseFiltered, flatNodes);
+      }
+
+      return baseFiltered;
+    }, [flatNodes, searchTerms, currentFilter, recalculateVisualStructure]);
 
     // Get node display text
     const getNodeDisplayText = (

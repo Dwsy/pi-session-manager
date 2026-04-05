@@ -203,6 +203,44 @@
   }
 }
 
+// Hover Preview
+.hover-preview {
+  background: rgb(var(--color-surface));
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.4);
+  overflow: hidden;
+  animation: ui-fade-in var(--motion-duration-fast) var(--motion-ease-enter);
+}
+
+.hover-preview-content {
+  padding: 12px;
+  overflow: auto;
+  max-height: inherit;
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: var(--line-height);
+}
+
+.hover-preview-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.hover-preview-content::-webkit-scrollbar-track {
+  background: var(--bg-inset);
+}
+
+.hover-preview-content::-webkit-scrollbar-thumb {
+  background: rgba(var(--accent-rgb), 0.3);
+  border-radius: 4px;
+}
+
+.hover-preview-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--accent-rgb), 0.5);
+}
+
 // Highlights
 mark {
   background-color: rgba(250, 204, 21, 0.2);

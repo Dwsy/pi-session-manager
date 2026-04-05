@@ -8,6 +8,10 @@ mod models;
 mod pi_live;
 pub mod search;
 mod session;
+// session_file is pub(super) to restrict direct access from outside commands/.
+// Its public items are re-exported via `pub use session_file::*;` below for
+// external consumers. Direct path `commands::session_file::X` is intentionally
+// blocked to prevent tight coupling to internal fork/parse helpers.
 pub(super) mod session_file;
 mod session_list;
 mod session_open;
