@@ -4,6 +4,49 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Pi Live session integration** — real-time session sync with pi agent
+  - Unified TypeScript type definitions for live sessions
+  - Live session indicator in sidebar and dashboard
+  - Session viewer online status and model controls
+  - Robust frontend parsing for live session entries
+  - Full RPC command set for pi agent steering
+  - Connection management via PiAgentRegistry
+
+- **Pluggable tool render system** — extensible tool rendering architecture
+  - Custom tool card rendering support
+  - Toggle to disable tool success styling
+
+- **ANSI escape sequence conversion** — convert ANSI codes to Markdown in thinking content
+  - `ansiToMarkdown` with configurable `stripColor` flag
+
+### Performance
+
+- **recalculateVisualStructure optimization** — precomputed ancestor paths for faster tree recalculation
+  - Reduced time complexity from O(n²) to O(n) for large session trees
+  - Pre-computed ancestor paths avoid redundant tree traversals
+
+### Refactor
+
+- **Components directory reorganization** — complete refactor of flat `src/components/` into logical subdirectories
+  - Split into: `app/`, `settings/`, `kanban/`, `dashboard/`, `session-viewer/`, `session-list/`, `command-palette/`, `search/`, `terminal/`
+  - All imports updated, barrel exports added
+
+- **Rust backend restructure** — improved maintainability
+  - Reorganized `src-tauri/src/` into logical modules
+  - Updated `lib.rs` exports and dispatch routing
+
+- **TypeScript path aliases** — replaced relative imports with `@/*` aliases
+
+### Fixed
+
+- **CSS import paths** — corrected after directory reorganization
+  - `SubagentModal` CSS import path
+  - `SessionFlowView` CSS import path
+- **Pi Live toggle button** — removed unused sidebar toggle
+- **TypeScript errors** — resolved 2 pre-existing errors
+
 ### Changed
 
 - **Unified single-port architecture for GUI mode**
@@ -562,6 +605,52 @@ All notable changes to Pi Session Manager will be documented in this file.
 - Tree view: clicking a node now switches the conversation branch (previously only scrolled)
 - Flow view: fixed broken parent chain when filtering toolResult entries — build tree from all entries, let compactTree handle skipping
 - Flow view: filter out session/thinking_level_change/label metadata nodes
+
+## [0.5.1] - 2026-03-31
+
+### Added
+
+- **Terminal resume command** — resume sessions from web terminal with full workflow
+  - `buildResumeCommand()` generates `cd + pi --session` command
+  - `TerminalPanel` accepts `pendingCommand` prop, writes to shell after 500ms
+  - Custom resume command template with placeholders: `{command}`, `{cwd}`, `{path}`, `{pi}`
+  - `resumeCommand` stored in settings, editable via Terminal Settings
+  - Works with external terminal launch and embedded terminal panel
+
+- **Configurable Cmd+F behavior** — toggle between in-session search and sidebar focus
+  - New setting to control whether `Cmd/Ctrl + F` opens in-session search or focuses sidebar
+  - Allows disabling sidebar search shortcut when viewer search is preferred
+
+- **In-session search navigation** — enhanced search within open session
+  - `Cmd/Ctrl + F` toggles search input in session viewer
+  - Previous/next result paging with `Cmd/Ctrl + G` / `Shift + Cmd/Ctrl + G`
+  - Capture phase event handling for reliable shortcut detection
+  - Works alongside global `Cmd/Ctrl + Shift + F` for full-text search
+
+### Fixed
+
+- **Session viewer toolbar window dragging** — restored draggable title bar in Tauri desktop mode
+- **Global keyboard shortcuts** — allow app-level shortcuts from text inputs
+- **Window size clamping** — initial window size now respects monitor work area (#27)
+
+### Changed
+
+- **Terminal launcher auto-detection** — improved cross-platform terminal detection
+  - Added fallback chain for terminal detection
+  - Support for `auto` mode that prefers available system terminal
+
+## [0.5.0] - 2026-03-27
+
+### Performance
+
+- **SQLite message entry ingest optimization** — major performance improvements for FTS indexing
+  - Batched multi-row `INSERT OR REPLACE` statements (42% faster ingest: 457ms → 215ms)
+  - Eliminated duplicate `DELETE FROM message_entries` per upsert
+  - Reused `session_path` function argument instead of cloning
+  - Optimized chunk size from 64 to 32 rows for better SQLite execute/parse tradeoff
+  - Joined `sessions` directly in FTS query to eliminate per-hit `get_session()` lookups
+  - Folded `total_hits` into paged query via `COUNT(*) OVER ()` (eliminates separate count query)
+  - Benchmark: median total time reduced from 604ms to 278ms (~54% improvement)
 
 ## [0.1.0] - 2026-01-30
 
