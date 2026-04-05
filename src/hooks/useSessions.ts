@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { invoke } from '../transport'
+import { invoke, listen } from '@/transport'
 import { useTranslation } from 'react-i18next'
-import type { SessionInfo, SessionsDiff } from '../types'
+import type { SessionInfo, SessionsDiff } from '@/types'
 import { useDemoMode } from './useDemoMode'
-import { deleteDemoSessions, renameDemoSession } from '../demo'
+import { deleteDemoSessions, renameDemoSession } from '@/demo'
 
 export interface PendingDeleteSession {
   sessions: SessionInfo[]
   requestedAt: number
+  anchorRef?: React.RefObject<HTMLElement>
 }
 
 interface DeleteSessionsResult {
@@ -23,7 +24,7 @@ export interface UseSessionsReturn {
   loadSessions: () => Promise<void>
   patchSessions: (diff: SessionsDiff) => void
   handleDeleteSession: (session: SessionInfo) => Promise<void>
-  handleDeleteSessions: (sessions: SessionInfo[]) => Promise<void>
+  handleDeleteSessions: (sessions: SessionInfo[], anchorRef?: React.RefObject<HTMLElement>) => Promise<void>
   pendingDeleteSession: PendingDeleteSession | null
   confirmDeleteSession: () => Promise<void>
   cancelDeleteSession: () => void
@@ -50,7 +51,44 @@ export function useSessions(): UseSessionsReturn {
       if (isDemoMode) {
         loadedSessions = getDemoSessions()
       } else {
-        loadedSessions = await invoke<SessionInfo[]>('scan_sessions')
+        const [scanned, live] = await Promise.all([
+          invoke<SessionInfo[]>('scan_sessions'),
+          invoke<any[]>('get_pi_live_sessions')
+        ])
+
+        // Merge scanned with live
+        const liveMap = new Map(live.map(l => [l.session_id, l]))
+        const visitedLiveIds = new Set<string>()
+
+        loadedSessions = scanned.map(s => {
+          const liveInfo = liveMap.get(s.id)
+          if (liveInfo) {
+            visitedLiveIds.add(s.id)
+            return { ...s, isLive: true, pid: liveInfo.pid }
+          }
+          return s
+        })
+
+        // Add live sessions that aren't scanned yet (new sessions)
+        for (const l of live) {
+          if (!visitedLiveIds.has(l.session_id)) {
+            loadedSessions.push({
+              id: l.session_id,
+              path: l.session_path || l.session_id,
+              name: l.session_id,
+              modified: l.last_seen,
+              message_count: l.entry_count,
+              last_message: "",
+              last_message_role: "assistant",
+              isLive: true,
+              pid: l.pid,
+              cwd: l.cwd || "",
+              first_message: "",
+            })
+          }
+        }
+
+        loadedSessions.sort((a, b) => b.modified.localeCompare(a.modified))
       }
       setSessions(loadedSessions)
 
@@ -147,7 +185,7 @@ export function useSessions(): UseSessionsReturn {
     }
   }, [])
 
-  const handleDeleteSessions = useCallback(async (targets: SessionInfo[]) => {
+  const handleDeleteSessions = useCallback(async (targets: SessionInfo[], anchorRef?: React.RefObject<HTMLElement>) => {
     const nextTargets: SessionInfo[] = []
     const seen = new Set<string>()
 
@@ -166,11 +204,12 @@ export function useSessions(): UseSessionsReturn {
     setPendingDeleteSession({
       sessions: nextTargets,
       requestedAt: Date.now(),
+      anchorRef,
     })
   }, [])
 
-  const handleDeleteSession = useCallback(async (session: SessionInfo) => {
-    await handleDeleteSessions([session])
+  const handleDeleteSession = useCallback(async (session: SessionInfo, anchorRef?: React.RefObject<HTMLElement>) => {
+    await handleDeleteSessions([session], anchorRef)
   }, [handleDeleteSessions])
 
   const confirmDeleteSession = useCallback(async () => {
@@ -281,6 +320,21 @@ export function useSessions(): UseSessionsReturn {
       return null
     }
   }, [isDemoMode, t])
+
+  useEffect(() => {
+    if (isDemoMode) return
+
+    let unlisten: (() => void) | null = null
+    const setupSubscriptions = async () => {
+      const u1 = await listen('pi-agent:register', () => loadSessions())
+      const u2 = await listen('pi-agent:disconnect', () => loadSessions())
+      const u3 = await listen('sessions-changed', () => loadSessions())
+      unlisten = () => { if (u1) u1(); if (u2) u2(); if (u3) u3() }
+    }
+
+    setupSubscriptions()
+    return () => { if (unlisten) unlisten() }
+  }, [isDemoMode, loadSessions])
 
   return {
     sessions,

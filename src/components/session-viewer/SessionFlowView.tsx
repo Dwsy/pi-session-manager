@@ -17,7 +17,7 @@ import {
 import { User, Bot, Wrench, Settings, FileText, ZoomIn, ZoomOut, Maximize, LocateFixed, GitBranch, List } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import '../styles/flow.css'
-import type { SessionEntry } from '../../types'
+import type { SessionEntry } from '@/types'
 
 type FilterMode = 'default' | 'no-tools' | 'user-only' | 'labeled-only' | 'all' | `tool-${string}`
 

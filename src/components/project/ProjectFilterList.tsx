@@ -1,10 +1,10 @@
-import type { SessionInfo } from '../../types'
+import type { SessionInfo } from '@/types'
 import { FolderOpen, Folder, Check } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { RefObject } from 'react'
-import { getDirectoryName } from '../../utils/sessionDisplay'
+import { getDirectoryName } from '@/utils/sessionDisplay'
 
 interface ProjectFilterListProps {
   sessions: SessionInfo[]

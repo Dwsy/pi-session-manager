@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { escapeHtml } from '../../utils/markdown'
+import { escapeHtml } from '@/utils/markdown'
 
 interface ModelChangeProps {
   provider?: string

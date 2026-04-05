@@ -15,6 +15,8 @@ export interface SessionInfo {
   last_message_role: string
   isFavorite?: boolean
   parent_session_path?: string
+  isLive?: boolean
+  pid?: number
 }
 
 export interface SessionsDiff {

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { invoke } from '../transport'
-import type { SessionInfo } from '../types'
+import { invoke, listen } from '@/transport'
+import type { SessionInfo } from '@/types'
 import {
   DEFAULT_SESSION_SORT_BY,
   DEFAULT_SESSION_SORT_ORDER,
-} from '../types/sessionSort'
-import type { SessionSortBy, SessionSortOrder } from '../types/sessionSort'
-import { isDemoModeEnabled, listDemoSessionsPaginated } from '../demo'
+} from '@/types/sessionSort'
+import type { SessionSortBy, SessionSortOrder } from '@/types/sessionSort'
+import { isDemoModeEnabled, listDemoSessionsPaginated } from '@/demo'
 
 const DEFAULT_PAGE_SIZE = 100
 
@@ -210,35 +210,77 @@ export function usePaginatedSessions({
       }
 
       try {
-        const response = shouldUseBackend
-          ? await invoke<ScanSessionsPaginatedResponse>(
-            'scan_sessions_paginated',
-            {
+        const [response, live] = await Promise.all([
+          shouldUseBackend
+            ? invoke<ScanSessionsPaginatedResponse>(
+              'scan_sessions_paginated',
+              {
+                offset,
+                limit,
+                searchQuery: normalizedSearchQuery || null,
+                projectFilter: normalizedProjectFilter,
+                filterTagIds: normalizedTagIds.length > 0 ? normalizedTagIds : null,
+                sortBy: normalizedSortKey,
+                sort_by: normalizedSortKey,
+              },
+            )
+            : Promise.resolve(listDemoSessionsPaginated({
               offset,
               limit,
               searchQuery: normalizedSearchQuery || null,
               projectFilter: normalizedProjectFilter,
               filterTagIds: normalizedTagIds.length > 0 ? normalizedTagIds : null,
-              sortBy: normalizedSortKey,
-              sort_by: normalizedSortKey,
-            },
-          )
-          : listDemoSessionsPaginated({
-            offset,
-            limit,
-            searchQuery: normalizedSearchQuery || null,
-            projectFilter: normalizedProjectFilter,
-            filterTagIds: normalizedTagIds.length > 0 ? normalizedTagIds : null,
-            sortBy: normalizedSortBy,
-            sortOrder: normalizedSortOrder,
-          })
+              sortBy: normalizedSortBy,
+              sortOrder: normalizedSortOrder,
+            })),
+          (shouldUseBackend && offset === 0)
+            ? invoke<any[]>('get_pi_live_sessions')
+            : Promise.resolve([])
+        ])
 
         if (requestId !== requestIdRef.current) {
           return
         }
 
+        let finalSessions = response.sessions
+        if (offset === 0 && live.length > 0) {
+          const liveMap = new Map(live.map(l => [l.session_id, l]))
+          const visitedLiveIds = new Set<string>()
+
+          const mergedScanned = response.sessions.map(s => {
+            const liveInfo = liveMap.get(s.id)
+            if (liveInfo) {
+              visitedLiveIds.add(s.id)
+              return { ...s, isLive: true, pid: liveInfo.pid }
+            }
+            return s
+          })
+
+          const newLive = live
+            .filter(l => !visitedLiveIds.has(l.session_id))
+            .map(l => ({
+              id: l.session_id,
+              path: l.session_path || l.session_id,
+              name: l.session_id,
+              modified: l.last_seen,
+              message_count: l.entry_count,
+              last_message: "",
+              last_message_role: "assistant",
+              isLive: true,
+              pid: l.pid,
+              cwd: l.cwd || "",
+              first_message: "",
+            } as SessionInfo))
+
+          finalSessions = [...newLive, ...mergedScanned]
+          // Re-sort if we added new items to ensure temporal order
+          if (newLive.length > 0) {
+             finalSessions.sort((a, b) => b.modified.localeCompare(a.modified))
+          }
+        }
+
         setSessions((prev) =>
-          mergePaginatedSessions(prev, response.sessions, append),
+          mergePaginatedSessions(prev, finalSessions, append),
         )
         setTotal(response.total)
         setHasMore(response.has_more)
@@ -313,7 +355,17 @@ export function usePaginatedSessions({
     }
 
     void requestPage(0, { append: false })
-  }, [enabled, requestPage])
+
+    // Auto-refresh on live events
+    if (shouldUseBackend) {
+      const u1 = listen('pi-agent:register', () => refresh({ silent: true }))
+      const u2 = listen('pi-agent:disconnect', () => refresh({ silent: true }))
+      return () => {
+        u1.then(f => f())
+        u2.then(f => f())
+      }
+    }
+  }, [enabled, requestPage, shouldUseBackend, refresh])
 
   return {
     sessions,

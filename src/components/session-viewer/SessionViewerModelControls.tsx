@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Settings2, Loader2, BrainCircuit, Bot } from "lucide-react";
-import type { LiveSessionInfo } from "../../hooks/usePiLiveSessions";
-import { invoke } from "../../transport";
+import type { LiveSessionInfo } from "@/hooks/usePiLiveSessions";
+import { invoke } from "@/transport";
 import { useTranslation } from "react-i18next";
 
 interface SessionViewerModelControlsProps {

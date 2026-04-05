@@ -16,19 +16,19 @@ import SessionViewerToolbar from "./session-viewer/SessionViewerToolbar";
 import {
   SessionViewProvider,
   useSessionView,
-} from "../contexts/SessionViewContext";
-import { useIsMobile } from "../hooks/useIsMobile";
-import { useResizableSidebar } from "../hooks/useResizableSidebar";
-import { useSessionScrollMarkers } from "../hooks/useSessionScrollMarkers";
-import { useSessionViewerData } from "../hooks/useSessionViewerData";
-import { useSessionViewerDerivedData } from "../hooks/useSessionViewerDerivedData";
-import { useSessionViewerHotkeys } from "../hooks/useSessionViewerHotkeys";
-import { useSessionViewerInMessageSearch } from "../hooks/useSessionViewerInMessageSearch";
-import { useSettings } from "../hooks/useSettings";
-import { usePiLiveSessions } from "../hooks/usePiLiveSessions";
+} from "@/contexts/SessionViewContext";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { useResizableSidebar } from "@/hooks/useResizableSidebar";
+import { useSessionScrollMarkers } from "@/hooks/useSessionScrollMarkers";
+import { useSessionViewerData } from "@/hooks/useSessionViewerData";
+import { useSessionViewerDerivedData } from "@/hooks/useSessionViewerDerivedData";
+import { useSessionViewerHotkeys } from "@/hooks/useSessionViewerHotkeys";
+import { useSessionViewerInMessageSearch } from "@/hooks/useSessionViewerInMessageSearch";
+import { useSettings } from "@/hooks/useSettings";
+import { usePiLiveSessions } from "@/hooks/usePiLiveSessions";
 
 import { getPlatformDefaults } from "./settings/types";
-import type { SessionInfo } from "../types";
+import type { SessionInfo } from "@/types";
 import type { TerminalType } from "./settings/types";
 import "../styles/session.css";
 

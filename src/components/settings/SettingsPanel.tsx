@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useIsMobile } from '../../hooks/useIsMobile'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { useTranslation } from 'react-i18next'
 import {
   X,
@@ -24,9 +24,9 @@ import {
 } from 'lucide-react'
 import type { AppSettings, SettingsSection } from './types'
 import { defaultSettings } from './types'
-import { loadAppSettings, saveAppSettings } from '../../utils/settingsApi'
-import { applyPiChatTheme, resolvePiThemeColorScheme } from '../../utils/piTheme'
-import { useSettings as useAppSettingsContext } from '../../hooks/useSettings'
+import { loadAppSettings, saveAppSettings } from '@/utils/settingsApi'
+import { applyPiChatTheme, resolvePiThemeColorScheme } from '@/utils/piTheme'
+import { useSettings as useAppSettingsContext } from '@/hooks/useSettings'
 import TerminalSettings from './sections/TerminalSettings'
 import AppearanceSettings from './sections/AppearanceSettings'
 import LanguageSettings from './sections/LanguageSettings'

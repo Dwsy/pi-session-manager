@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
-import type { Content } from '../../../types'
-import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '../types'
-import { defaultResolveData } from '../utils/resolveData'
-import { renderCodeHtml } from '../../../utils/markdown'
-import { highlightSearchInHTML } from '../../../utils/search'
-import CodeBlock from '../../../components/ui/CodeBlock'
+import type { Content } from '@/types'
+import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '@/plugins/tools-render/types'
+import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
+import { renderCodeHtml } from '@/utils/markdown'
+import { highlightSearchInHTML } from '@/utils/search'
+import CodeBlock from '@/components/ui/CodeBlock'
 
 /** Maximum height for tool output in pixels */
 const OUTPUT_MAX_HEIGHT = 300

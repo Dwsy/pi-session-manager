@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
-import { pluginRegistry } from '../plugins/registry'
-import type { SearchPluginResult, SearchContext } from '../plugins/types'
+import { pluginRegistry } from '@/plugins/registry'
+import type { SearchPluginResult, SearchContext } from '@/plugins/types'
 import { useSearchCache } from './useSearchCache'
 
 interface SearchPluginOptions {
@@ -16,7 +16,7 @@ export function useSearchPlugins(context: SearchContext) {
   const contextRef = useRef(context)
   const sessionsRef = useRef(context.sessions)
   const sessionsVersionRef = useRef(0)
-  
+
   // Update context ref
   contextRef.current = context
 
@@ -24,7 +24,7 @@ export function useSearchPlugins(context: SearchContext) {
     sessionsRef.current = context.sessions
     sessionsVersionRef.current += 1
   }
-  
+
   /**
    * Execute search
    * @param query Query string
@@ -50,26 +50,26 @@ export function useSearchPlugins(context: SearchContext) {
       `sessions_v${sessionsVersionRef.current}`,
       ...extraParts,
     ].join('::')
-    
+
     // Check cache
     const cached = cache.get(cacheKey)
     if (cached) {
       return cached
     }
-    
+
     // Execute search
     const results = await pluginRegistry.search(
       query,
       contextRef.current,
       scopedPluginIds,
     )
-    
+
     // Cache results
     cache.set(cacheKey, results)
-    
+
     return results
   }, [cache])
-  
+
   return {
     registry: pluginRegistry,
     search

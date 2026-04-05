@@ -1,4 +1,4 @@
-import type { SessionInfo, SessionTag } from "../types";
+import type { SessionInfo, SessionTag } from "@/types";
 import { getSessionIdMatchKind, normalizeSessionIdQuery } from "./session";
 import { parseQuotedQuery } from "./search";
 

@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useIsMobile } from '../../hooks/useIsMobile'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   DndContext,
   DragOverlay,
@@ -13,14 +13,14 @@ import {
   type DragOverEvent,
 } from '@dnd-kit/core'
 // arrayMove available if needed for reordering within column
-import type { SessionInfo, Tag, SessionTag, FavoriteItem } from '../../types'
-import type { TerminalType } from '../settings/types'
+import type { SessionInfo, Tag, SessionTag, FavoriteItem } from '@/types'
+import type { TerminalType } from '@/components/settings/types'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
-import SearchFilterBar from '../search/SearchFilterBar'
+import SearchFilterBar from '@/components/search/SearchFilterBar'
 import SessionPreviewModal from './SessionPreviewModal'
-import { filterSessions } from '../../utils/sessionFilters'
-import { getPathBasename } from '../../utils/path'
+import { filterSessions } from '@/utils/sessionFilters'
+import { getPathBasename } from '@/utils/path'
 
 interface KanbanBoardProps {
   sessions: SessionInfo[]

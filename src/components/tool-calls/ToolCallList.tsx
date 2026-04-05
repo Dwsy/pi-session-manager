@@ -1,12 +1,12 @@
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { Content, SessionEntry } from '../../types'
-import { toolRenderRegistry } from '../../plugins/tools-render/registry'
-import { defaultResolveData } from '../../plugins/tools-render/utils/resolveData'
-import { useSessionView } from '../../contexts/SessionViewContext'
-import { useIsMobile } from '../../hooks/useIsMobile'
-import { useAppearance } from '../../hooks/useAppearance'
-import { useClipboard } from '../../hooks/useClipboard'
+import type { Content, SessionEntry } from '@/types'
+import { toolRenderRegistry } from '@/plugins/tools-render/registry'
+import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
+import { useSessionView } from '@/contexts/SessionViewContext'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { useAppearance } from '@/hooks/useAppearance'
+import { useClipboard } from '@/hooks/useClipboard'
 
 interface ToolCallListProps {
   toolCalls: Content[]

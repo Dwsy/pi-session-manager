@@ -1,6 +1,6 @@
-import { toolRenderRegistry } from '../registry'
+import { toolRenderRegistry } from '@/plugins/tools-render/registry'
 import { defaultResolveData } from './resolveData'
-import type { Content, SessionEntry } from '../../../types'
+import type { Content, SessionEntry } from '@/types'
 
 /**
  * Get searchable HTML segments for a tool call

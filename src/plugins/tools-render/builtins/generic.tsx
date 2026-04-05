@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
-import type { Content } from '../../../types'
-import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '../types'
-import { defaultResolveData } from '../utils/resolveData'
-import MarkdownContent from '../../../components/ui/MarkdownContent'
-import { escapeHtml } from '../../../utils/markdown'
-import { highlightSearchInHTML } from '../../../utils/search'
+import type { Content } from '@/types'
+import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '@/plugins/tools-render/types'
+import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
+import MarkdownContent from '@/components/ui/MarkdownContent'
+import { escapeHtml } from '@/utils/markdown'
+import { highlightSearchInHTML } from '@/utils/search'
 
 /** Maximum height for tool output/arguments in pixels */
 const OUTPUT_MAX_HEIGHT = 300

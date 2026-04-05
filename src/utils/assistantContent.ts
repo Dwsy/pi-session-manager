@@ -1,4 +1,4 @@
-import type { Content } from '../types'
+import type { Content } from '@/types'
 
 /**
  * Convert ANSI SGR escape sequences to Markdown + inline HTML.

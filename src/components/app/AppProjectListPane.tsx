@@ -1,9 +1,9 @@
 import type { ComponentProps, ReactNode, RefObject } from "react";
 
-import ProjectList from "../project/ProjectList";
-import SessionList from "../session-list/SessionList";
-import SelectedProjectHeader from "../project/SelectedProjectHeader";
-import type { SessionInfo } from "../../types";
+import ProjectList from "@/components/project/ProjectList";
+import SessionList from "@/components/session-list/SessionList";
+import SelectedProjectHeader from "@/components/project/SelectedProjectHeader";
+import type { SessionInfo } from "@/types";
 
 type SessionListProps = ComponentProps<typeof SessionList>;
 type ProjectListProps = ComponentProps<typeof ProjectList>;

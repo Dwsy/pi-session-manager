@@ -34,6 +34,7 @@ export const tags = {
     openTerminal: 'ターミナルで開く',
     openBrowser: 'ブラウザで開く',
     favorite: 'お気に入り',
+    copyResume: '再開コマンドをコピー',
     delete: '削除',
   },
   filter: {

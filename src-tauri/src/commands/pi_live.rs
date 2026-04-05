@@ -9,6 +9,18 @@ pub fn get_pi_live_sessions(
 }
 
 #[tauri::command]
+pub fn get_pi_agent_entries(
+    state: State<'_, crate::app_state::SharedAppState>,
+    session_id: String,
+) -> Result<Vec<serde_json::Value>, String> {
+    if let Some(session) = state.pi_agent_registry.get_live_session(&session_id) {
+        Ok(session.entries)
+    } else {
+        Err(format!("Live session not found: {session_id}"))
+    }
+}
+
+#[tauri::command]
 pub async fn pi_agent_steering(
     state: State<'_, crate::app_state::SharedAppState>,
     session_id: String,
@@ -27,6 +39,7 @@ pub async fn pi_agent_steering(
 
     let command = json!({
         "type": command_type,
+        "sessionId": session_id,
         "message": message,
     });
     

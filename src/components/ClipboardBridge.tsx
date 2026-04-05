@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useClipboard } from '../hooks/useClipboard'
+import { useClipboard } from '@/hooks/useClipboard'
 
 export default function ClipboardBridge() {
   const { copyText } = useClipboard()

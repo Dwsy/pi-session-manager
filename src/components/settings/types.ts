@@ -26,7 +26,7 @@ export function getPlatformDefaults(): { defaultTerminal: TerminalType; defaultS
   }
 }
 
-import { defaultPiLiveSettings, type PiLiveSettings } from '../../types/pi-live'
+import { defaultPiLiveSettings, type PiLiveSettings } from '@/types/pi-live'
 
 export interface AppSettings {
   piLive: PiLiveSettings

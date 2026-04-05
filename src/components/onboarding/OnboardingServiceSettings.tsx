@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
-import SettingsSelect from '../settings/SettingsSelect'
-import SettingsToggleRow from '../settings/SettingsToggleRow'
+import SettingsSelect from '@/components/settings/SettingsSelect'
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
 import type { OpenPosition, ServerSettings } from './types'
 
 interface OnboardingServiceSettingsProps {

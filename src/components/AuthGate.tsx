@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react'
-import { isDemoModeEnabled } from '../demo'
+import { isDemoModeEnabled } from '@/demo'
 
 interface AuthGateProps {
   children: React.ReactNode

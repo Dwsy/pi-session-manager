@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import type { LegacySessionStats, SessionEntry } from '../types'
-import { computeStats } from '../utils/session'
+import type { LegacySessionStats, SessionEntry } from '@/types'
+import { computeStats } from '@/utils/session'
 
 export interface SessionViewerDerivedData {
   renderableEntries: SessionEntry[]
@@ -33,9 +33,10 @@ function resolvePathEntryIds(
 function isRenderableMessageEntry(
   entry: SessionEntry,
   pathEntryIds: Set<string> | null,
+  isLive?: boolean,
 ): boolean {
   if (entry.type !== 'message') return false
-  if (pathEntryIds && !pathEntryIds.has(entry.id)) return false
+  if (!isLive && pathEntryIds && !pathEntryIds.has(entry.id)) return false
 
   const role = entry.message?.role
   return role === 'user' || role === 'assistant'
@@ -53,6 +54,7 @@ function isRenderableNonMessageEntry(entry: SessionEntry): boolean {
 export function useSessionViewerDerivedData(
   entries: SessionEntry[],
   activeEntryId: string | null,
+  isLive?: boolean,
 ): SessionViewerDerivedData {
   return useMemo(() => {
     const entryById = new Map<string, SessionEntry>()
@@ -78,7 +80,7 @@ export function useSessionViewerDerivedData(
           toolResultByCallId.set(entry.message.toolCallId, entry)
         }
 
-        if (!isRenderableMessageEntry(entry, pathEntryIds)) {
+        if (!isRenderableMessageEntry(entry, pathEntryIds, isLive)) {
           continue
         }
 

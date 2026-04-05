@@ -1,6 +1,6 @@
 import { Ruler, BarChart3 } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts'
-import type { SessionInfo } from '../../types'
+import type { SessionInfo } from '@/types'
 
 interface SessionLengthChartProps {
   sessions: SessionInfo[]

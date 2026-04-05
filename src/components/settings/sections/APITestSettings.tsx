@@ -10,8 +10,8 @@ import {
   XCircle,
   AlertTriangle,
 } from 'lucide-react'
-import SettingsCard from '../SettingsCard'
-import { invoke } from '../../../transport'
+import SettingsCard from '@/components/settings/SettingsCard'
+import { invoke } from '@/transport'
 
 type TestStatus = 'success' | 'error' | 'warning' | 'pending'
 

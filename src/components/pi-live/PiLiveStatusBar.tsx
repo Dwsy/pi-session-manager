@@ -3,7 +3,7 @@
  */
 
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react'
-import type { PiLiveConnectionState } from '../../types/pi-live'
+import type { PiLiveConnectionState } from '@/types/pi-live'
 
 interface PiLiveStatusBarProps {
   connectionState: PiLiveConnectionState

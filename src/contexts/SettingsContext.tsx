@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { AppSettings } from '../components/settings/types'
-import { defaultSettings } from '../components/settings/types'
-import { loadAppSettings, saveAppSettings } from '../utils/settingsApi'
+import type { AppSettings } from '@/components/settings/types'
+import { defaultSettings } from '@/components/settings/types'
+import { loadAppSettings, saveAppSettings } from '@/utils/settingsApi'
 
 interface SettingsContextType {
   settings: AppSettings

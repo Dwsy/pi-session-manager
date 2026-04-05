@@ -3,10 +3,10 @@
  */
 
 import { useTranslation } from 'react-i18next'
-import SettingsField from '../SettingsField'
-import SettingsOptionGroup from '../SettingsOptionGroup'
-import SettingsToggleRow from '../SettingsToggleRow'
-import type { SearchSettingsProps } from '../types'
+import SettingsField from '@/components/settings/SettingsField'
+import SettingsOptionGroup from '@/components/settings/SettingsOptionGroup'
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
+import type { SearchSettingsProps } from '@/components/settings/types'
 
 export default function SearchSettings({ settings, onUpdate }: SearchSettingsProps) {
   const { t } = useTranslation()

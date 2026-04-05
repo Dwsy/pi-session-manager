@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 
-import type KanbanBoard from "../kanban/KanbanBoard";
+import type KanbanBoard from "@/components/kanban/KanbanBoard";
 
 type KanbanBoardProps = ComponentProps<typeof KanbanBoard>;
 

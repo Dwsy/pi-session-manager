@@ -8,7 +8,7 @@ const renderer = new marked.Renderer()
 renderer.code = function({ text, lang }: { text: string; lang?: string }): string {
   const language = lang || ''
   const validLang = language && hljs.getLanguage(language) ? language : ''
-  
+
   // Highlight code
   let highlightedCode = escapeHtml(text)
   if (validLang) {
@@ -18,16 +18,16 @@ renderer.code = function({ text, lang }: { text: string; lang?: string }): strin
       highlightedCode = escapeHtml(text)
     }
   }
-  
+
   // Calculate line count
   const lines = text.split('\n')
   const lineCount = lines.length
-  
+
   // Generate line numbers
-  const lineNumbers = Array.from({ length: lineCount }, (_, i) => 
+  const lineNumbers = Array.from({ length: lineCount }, (_, i) =>
     `<div class="code-line-number">${i + 1}</div>`
   ).join('')
-  
+
   // Return complete code block HTML
   return `
     <div class="code-block-wrapper">

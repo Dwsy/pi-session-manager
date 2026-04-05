@@ -1,4 +1,4 @@
-import { toolRenderRegistry } from '../registry'
+import { toolRenderRegistry } from '@/plugins/tools-render/registry'
 import { subagentToolPlugin } from './subagent'
 
 /**

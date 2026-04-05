@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, X } from 'lucide-react'
-import LabelFilter from '../tags/LabelFilter'
-import type { Tag, SessionTag } from '../../types'
+import LabelFilter from '@/components/tags/LabelFilter'
+import type { Tag, SessionTag } from '@/types'
 
 interface SearchFilterBarProps {
   searchQuery: string

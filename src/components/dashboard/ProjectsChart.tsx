@@ -1,8 +1,8 @@
 import { Folder } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import DashboardCardShell from './DashboardCardShell'
-import type { SessionStats, SessionInfo } from '../../types'
-import { getPathBasename } from '../../utils/path'
+import type { SessionStats, SessionInfo } from '@/types'
+import { getPathBasename } from '@/utils/path'
 
 interface ProjectsChartProps {
   stats: SessionStats

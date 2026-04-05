@@ -1,4 +1,4 @@
-import type { Content, SessionEntry } from '../../types'
+import type { Content, SessionEntry } from '@/types'
 import type { CSSProperties } from 'react'
 
 // ========== Core Data Structures ==========

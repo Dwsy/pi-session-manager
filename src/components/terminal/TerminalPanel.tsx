@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { invoke, listen } from '../../transport'
+import { invoke, listen } from '@/transport'
 import { X, Plus, ChevronDown, Maximize2, Minimize2 } from 'lucide-react'
-import { getPlatformDefaults } from '../settings/types'
-import { useResolvedTheme } from '../../hooks/useResolvedTheme'
-import { getPathBasename } from '../../utils/path'
-import { useClipboard } from '../../hooks/useClipboard'
+import { getPlatformDefaults } from '@/components/settings/types'
+import { useResolvedTheme } from '@/hooks/useResolvedTheme'
+import { getPathBasename } from '@/utils/path'
+import { useClipboard } from '@/hooks/useClipboard'
 
 interface ShellInfo { label: string; path: string }
 

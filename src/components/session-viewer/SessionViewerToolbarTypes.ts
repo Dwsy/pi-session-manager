@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { LiveSessionInfo } from "../../hooks/usePiLiveSessions";
+import type { LiveSessionInfo } from "@/hooks/usePiLiveSessions";
 
 export interface SessionViewerToolbarProps {
   isMobile: boolean;

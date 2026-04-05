@@ -1,5 +1,5 @@
-import type { Content, SessionEntry } from '../../../types'
-import type { ResolvedToolData } from '../types'
+import type { Content, SessionEntry } from '@/types'
+import type { ResolvedToolData } from '@/plugins/tools-render/types'
 
 /**
  * Default data resolver for tool calls

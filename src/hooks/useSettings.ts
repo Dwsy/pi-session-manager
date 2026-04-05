@@ -7,9 +7,9 @@
 
 
 
-import { useSettings as useSettingsContext } from '../contexts/SettingsContext'
+import { useSettings as useSettingsContext } from '@/contexts/SettingsContext'
 
-import type { AppSettings } from '../components/settings/types'
+import type { AppSettings } from '@/components/settings/types'
 
 
 

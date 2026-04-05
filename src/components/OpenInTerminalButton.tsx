@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { invoke, isTauri } from '../transport'
+import { invoke, isTauri } from '@/transport'
 import { Terminal, Loader2 } from 'lucide-react'
-import type { SessionInfo } from '../types'
+import type { SessionInfo } from '@/types'
 import type { TerminalType } from './settings/types'
 import { getPlatformDefaults } from './settings/types'
-import { getCachedSettings } from '../utils/settingsApi'
+import { getCachedSettings } from '@/utils/settingsApi'
 
 interface OpenInTerminalButtonProps {
   session: SessionInfo

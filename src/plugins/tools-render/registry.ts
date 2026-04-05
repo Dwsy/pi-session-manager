@@ -1,5 +1,5 @@
 import type { ToolRenderPlugin, BaseToolData } from './types'
-import type { Content } from '../../types'
+import type { Content } from '@/types'
 import { matchTool } from './types'
 
 /**

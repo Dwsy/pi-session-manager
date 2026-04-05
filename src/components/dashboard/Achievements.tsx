@@ -1,6 +1,6 @@
 import { Trophy, Star, Flame, Target, Zap, Award, CheckCircle2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { SessionStats, HeatmapPoint } from '../../types'
+import type { SessionStats, HeatmapPoint } from '@/types'
 
 interface Achievement {
   id: string

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ListFilter, Check, Plus, X, Search } from 'lucide-react'
-import type { Tag as TagType, SessionTag } from '../../types'
+import type { Tag as TagType, SessionTag } from '@/types'
 
 const COLOR_CSS: Record<string, string> = {
   info: '#3b82f6', success: '#22c55e', warning: '#f97316', destructive: '#ef4444',

@@ -4,9 +4,9 @@
 
 import { useTranslation } from 'react-i18next'
 import { Check } from 'lucide-react'
-import SettingsField from '../SettingsField'
-import SettingsRadioCardGroup from '../SettingsRadioCardGroup'
-import type { LanguageSettingsProps } from '../types'
+import SettingsField from '@/components/settings/SettingsField'
+import SettingsRadioCardGroup from '@/components/settings/SettingsRadioCardGroup'
+import type { LanguageSettingsProps } from '@/components/settings/types'
 
 export default function LanguageSettings({ settings, onUpdate }: LanguageSettingsProps) {
   const { t, i18n } = useTranslation()

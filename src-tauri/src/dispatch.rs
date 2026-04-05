@@ -687,9 +687,27 @@ pub async fn dispatch(
                 Ok(serde_json::json!([]))
             }
         }
+        "get_pi_agent_entries" => {
+            let session_id = extract_string(payload, "session_id")
+                .or_else(|_| extract_string(payload, "sessionId"))?;
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or("App state not available")?;
+                if let Some(session) = state.pi_agent_registry.get_live_session(&session_id) {
+                    Ok(serde_json::to_value(session.entries).unwrap())
+                } else {
+                    Err(format!("Live session not found: {session_id}"))
+                }
+            }
+            #[cfg(not(feature = "gui"))]
+            {
+                Err("pi_agent_get_entries unavailable in CLI mode".to_string())
+            }
+        }
 
         "pi_agent_steering" => {
-            let session_id = extract_string(payload, "session_id")?;
+            let session_id = extract_string(payload, "session_id")
+                .or_else(|_| extract_string(payload, "sessionId"))?;
             let message = extract_string(payload, "message")?;
             let deliver_as = payload
                 .get("deliver_as")
@@ -717,7 +735,8 @@ pub async fn dispatch(
 
         // Pi agent RPC commands
         "pi_agent_set_model" => {
-            let session_id = extract_string(payload, "session_id")?;
+            let session_id = extract_string(payload, "session_id")
+                .or_else(|_| extract_string(payload, "sessionId"))?;
             let provider = extract_string(payload, "provider")?;
             let model_id = extract_string(payload, "model_id")?;
             #[cfg(feature = "gui")]
@@ -737,7 +756,8 @@ pub async fn dispatch(
             Ok(serde_json::json!({ "status": "sent" }))
         }
         "pi_agent_set_thinking" => {
-            let session_id = extract_string(payload, "session_id")?;
+            let session_id = extract_string(payload, "session_id")
+                .or_else(|_| extract_string(payload, "sessionId"))?;
             let level = extract_string(payload, "level")?;
             #[cfg(feature = "gui")]
             {

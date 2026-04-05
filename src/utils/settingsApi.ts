@@ -1,6 +1,6 @@
-import { invoke } from '../transport'
-import type { AppSettings } from '../components/settings/types'
-import { defaultSettings } from '../components/settings/types'
+import { invoke } from '@/transport'
+import type { AppSettings } from '@/components/settings/types'
+import { defaultSettings } from '@/components/settings/types'
 
 const CACHE_KEY = 'pi-session-manager-settings'
 
@@ -42,6 +42,7 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
   }
 
   return {
+    piLive: { ...defaultSettings.piLive, ...raw.piLive },
     terminal: { ...defaultSettings.terminal, ...raw.terminal },
     appearance,
     language: { ...defaultSettings.language, ...raw.language },

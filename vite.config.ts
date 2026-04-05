@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import path from 'path'
 import react from '@vitejs/plugin-react'
 import { codeInspectorPlugin } from 'code-inspector-plugin'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -98,6 +99,19 @@ export default defineConfig(({ mode }) => {
             'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
           },
         },
+      },
+    },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+        '@components': path.resolve(__dirname, './src/components'),
+        '@hooks': path.resolve(__dirname, './src/hooks'),
+        '@utils': path.resolve(__dirname, './src/utils'),
+        '@types': path.resolve(__dirname, './src/types'),
+        '@contexts': path.resolve(__dirname, './src/contexts'),
+        '@plugins': path.resolve(__dirname, './src/plugins'),
+        '@demo': path.resolve(__dirname, './src/demo'),
+        '@styles': path.resolve(__dirname, './src/styles'),
       },
     },
     clearScreen: false,

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
-import { useIsMobile } from '../../hooks/useIsMobile'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 const isMac = navigator.platform.toUpperCase().includes('MAC')
   || navigator.userAgent.includes('Macintosh')

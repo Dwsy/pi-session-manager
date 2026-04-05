@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
-import { useSessionView } from '../../contexts/SessionViewContext'
-import CodeBlock from '../ui/CodeBlock'
-import { renderCodeHtml } from '../../utils/markdown'
-import { highlightSearchInHTML } from '../../utils/search'
-import { useClipboard } from '../../hooks/useClipboard'
+import { useSessionView } from '@/contexts/SessionViewContext'
+import CodeBlock from '@/components/ui/CodeBlock'
+import { renderCodeHtml } from '@/utils/markdown'
+import { highlightSearchInHTML } from '@/utils/search'
+import { useClipboard } from '@/hooks/useClipboard'
 
 interface BashExecutionProps {
   command: string

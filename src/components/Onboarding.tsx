@@ -11,8 +11,8 @@ import {
   Sparkles,
   Server,
 } from 'lucide-react'
-import { invoke } from '../transport'
-import { useIsMobile } from '../hooks/useIsMobile'
+import { invoke } from '@/transport'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface OnboardingProps {
   onComplete: () => void

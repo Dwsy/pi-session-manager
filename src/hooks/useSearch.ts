@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react'
-import { invoke } from '../transport'
-import { getCachedSettings } from '../utils/settingsApi'
-import type { SessionInfo, SearchResult } from '../types'
-import { isDemoModeEnabled, searchDemoSessions } from '../demo'
+import { invoke } from '@/transport'
+import { getCachedSettings } from '@/utils/settingsApi'
+import type { SessionInfo, SearchResult } from '@/types'
+import { isDemoModeEnabled, searchDemoSessions } from '@/demo'
 
 export interface UseSearchReturn {
   searchResults: SearchResult[]

@@ -1,18 +1,18 @@
 import type { ReactNode } from 'react'
 import { MessageSquare, Bot, User } from 'lucide-react'
-import { invoke } from '../../transport'
-import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
-import type { SearchContext, SearchPluginResult } from '../types'
+import { invoke } from '@/transport'
+import { BaseSearchPlugin } from '@/plugins/base/BaseSearchPlugin'
+import type { SearchContext, SearchPluginResult } from '@/plugins/types'
 import type {
   SessionInfo,
   FullTextSearchHit,
   FullTextSearchResponse,
-} from '../../types'
-import { getPathBasename, getPathParentName } from '../../utils/path'
-import { parseQuotedQuery } from '../../utils/search'
-import { formatShortSessionId } from '../../utils/session'
-import { getCachedSettings } from '../../utils/settingsApi'
-import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '../../demo'
+} from '@/types'
+import { getPathBasename, getPathParentName } from '@/utils/path'
+import { parseQuotedQuery } from '@/utils/search'
+import { formatShortSessionId } from '@/utils/session'
+import { getCachedSettings } from '@/utils/settingsApi'
+import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '@/demo'
 
 interface MessageResultMetadata {
   sessionId: string

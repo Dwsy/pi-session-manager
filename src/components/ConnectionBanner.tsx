@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { WifiOff, Loader2 } from 'lucide-react'
-import { useConnectionStatus } from '../hooks/useConnectionStatus'
-import { isDemoModeEnabled } from '../demo'
+import { useConnectionStatus } from '@/hooks/useConnectionStatus'
+import { isDemoModeEnabled } from '@/demo'
 
 /**
  * Shows a top banner when transport is disconnected or connecting.

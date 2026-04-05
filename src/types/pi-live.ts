@@ -1,8 +1,8 @@
 /**
- * Pi Live Types - 统一类型定义
+ * Pi Live Types - Unified Type Definitions
  *
- * 这些类型用于 PSM 前端与 Pi Live 会话功能的交互。
- * Pi (TS) → WS → PSM Rust (透传) → 前端 TS (业务)
+ * Types for PSM frontend interacting with Pi Live session features.
+ * Pi (TS) -> WS -> PSM Rust (pass-through) -> Frontend TS (business)
  */
 
 // ── Session ──────────────────────────────────────────────

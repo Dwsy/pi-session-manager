@@ -8,7 +8,7 @@ import type {
 import { measureElement, useVirtualizer } from '@tanstack/react-virtual'
 import type { Virtualizer } from '@tanstack/react-virtual'
 
-import type { SessionEntry } from '../types'
+import type { SessionEntry } from '@/types'
 
 type ScrollAlignment = 'auto' | 'center' | 'end' | 'start'
 
@@ -147,7 +147,12 @@ export function useSessionViewerVirtualScroll({
 
     const rafId = requestAnimationFrame(() => {
       const lastIndex = renderableEntries.length - 1
-      rowVirtualizer.scrollToIndex(lastIndex, { align: 'end' })
+      // If we are already very close to the bottom, we can just jump to keep it "sticky"
+      // Performance: 'auto' is faster, but we can try to make it feel smooth by proper timing.
+      rowVirtualizer.scrollToIndex(lastIndex, {
+        align: 'end',
+        behavior: 'auto' // 'smooth' can be too slow for fast streaming, 'auto' is more responsive.
+      })
       pendingScrollToBottomRef.current = false
     })
 
@@ -155,7 +160,7 @@ export function useSessionViewerVirtualScroll({
   }, [
     loading,
     error,
-    renderableEntries.length,
+    renderableEntries, // Watch for content updates too (typewriter effect)
     rowVirtualizer,
     pendingScrollToBottomRef,
   ])

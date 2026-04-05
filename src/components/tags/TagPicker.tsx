@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, Plus, Check, ChevronRight, ChevronDown } from 'lucide-react'
-import type { Tag } from '../../types'
+import type { Tag } from '@/types'
 import { getColorClass, getColorStyle } from './TagBadge'
 
 interface TagPickerProps {

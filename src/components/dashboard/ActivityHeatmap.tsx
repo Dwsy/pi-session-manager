@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { getDay } from 'date-fns'
 import DashboardCardShell from './DashboardCardShell'
 import HeatmapTooltip from './HeatmapTooltip'
-import type { HeatmapPoint } from '../../types'
+import type { HeatmapPoint } from '@/types'
 
 interface ActivityHeatmapProps {
   data: HeatmapPoint[]

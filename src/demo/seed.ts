@@ -1,4 +1,4 @@
-import type { FavoriteItem, SessionTag, Tag } from '../types'
+import type { FavoriteItem, SessionTag, Tag } from '@/types'
 
 export interface DemoTokenUsageSeed {
   input: number

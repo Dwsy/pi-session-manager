@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { invoke } from '../../transport'
-import type { FavoriteItem } from '../../types'
-import { getDemoFavorites, isDemoModeEnabled, removeDemoFavorite, toggleDemoFavorite } from '../../demo'
+import { invoke } from '@/transport'
+import type { FavoriteItem } from '@/types'
+import { getDemoFavorites, isDemoModeEnabled, removeDemoFavorite, toggleDemoFavorite } from '@/demo'
 
 interface SqliteFavoriteItem {
   id: string

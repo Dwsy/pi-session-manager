@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useSettings } from './useSettings'
-import type { AppSettings } from '../components/settings/types'
-import { applyPiChatTheme } from '../utils/piTheme'
+import type { AppSettings } from '@/components/settings/types'
+import { applyPiChatTheme } from '@/utils/piTheme'
 
 export type AppearanceSettings = AppSettings['appearance']
 

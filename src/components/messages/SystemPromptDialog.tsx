@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { invoke } from '../../transport';
+import { invoke } from '@/transport';
 import { useTranslation } from 'react-i18next';
 import { X, Terminal, Wrench } from 'lucide-react';
-import MarkdownContent from '../ui/MarkdownContent';
-import type { SessionEntry } from '../../types';
+import MarkdownContent from '@/components/ui/MarkdownContent';
+import type { SessionEntry } from '@/types';
 
 interface SystemPromptDialogProps {
   isOpen: boolean;

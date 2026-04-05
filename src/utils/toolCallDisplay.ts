@@ -1,4 +1,4 @@
-import type { Content, SessionEntry, SubagentResult, SubagentDetails, TintinwebAgentDetails } from '../types'
+import type { Content, SessionEntry, SubagentResult, SubagentDetails, TintinwebAgentDetails } from '@/types'
 
 import {
   escapeHtml,

@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo } from 'react'
 import type { ReactNode } from 'react'
-import type { Transport } from '../transport'
-import { getTransport, HttpTransport } from '../transport'
+import type { Transport } from '@/transport'
+import { getTransport, HttpTransport } from '@/transport'
 
 type TransportType = 'ws' | 'http' | 'tauri'
 

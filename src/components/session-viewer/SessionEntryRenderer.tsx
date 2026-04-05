@@ -1,15 +1,15 @@
 import { memo } from "react";
-import AssistantMessage from "../messages/AssistantMessage";
-import BranchSummary from "../BranchSummary";
-import Compaction from "../messages/Compaction";
-import CustomMessage from "../messages/CustomMessage";
-import LabelEntry from "../tags/LabelEntry";
-import ModelChange from "../messages/ModelChange";
-import SessionInfoEntry from "../session-viewer/SessionInfoEntry";
-import ThinkingLevelChange from "../messages/ThinkingLevelChange";
-import UserMessage from "../messages/UserMessage";
+import AssistantMessage from "@/components/messages/AssistantMessage";
+import BranchSummary from "@/components/BranchSummary";
+import Compaction from "@/components/messages/Compaction";
+import CustomMessage from "@/components/messages/CustomMessage";
+import LabelEntry from "@/components/tags/LabelEntry";
+import ModelChange from "@/components/messages/ModelChange";
+import SessionInfoEntry from "@/components/session-viewer/SessionInfoEntry";
+import ThinkingLevelChange from "@/components/messages/ThinkingLevelChange";
+import UserMessage from "@/components/messages/UserMessage";
 
-import type { SessionEntry } from "../../types";
+import type { SessionEntry } from "@/types";
 
 const EMPTY_TOOL_RESULTS = new Map<string, SessionEntry>();
 

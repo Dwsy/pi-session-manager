@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import type { SessionEntry } from "../types";
+import type { SessionEntry } from "@/types";
 
 interface ToolCallMeta {
   assistantId: string;

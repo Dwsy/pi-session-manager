@@ -34,6 +34,7 @@ export const tags = {
     openTerminal: 'Open in Terminal',
     openBrowser: 'Open in Browser',
     favorite: 'Favorite',
+    copyResume: 'Copy Resume Command',
     delete: 'Delete',
   },
   filter: {

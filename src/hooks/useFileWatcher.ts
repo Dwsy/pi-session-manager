@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { listen } from '../transport'
-import type { SessionsDiff } from '../types'
+import { listen } from '@/transport'
+import type { SessionsDiff } from '@/types'
 
 interface UseFileWatcherOptions {
   enabled?: boolean

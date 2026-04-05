@@ -133,6 +133,7 @@ pub fn run() {
             test_model_http,
             read_resource_file,
             get_pi_live_sessions,
+            get_pi_agent_entries,
             pi_agent_steering,
             pi_agent_set_model,
             pi_agent_set_thinking,

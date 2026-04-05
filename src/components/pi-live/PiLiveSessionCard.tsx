@@ -3,8 +3,8 @@
  */
 
 import { Circle, CircleDot, Cpu, Brain, HardDrive } from 'lucide-react'
-import type { PiLiveSession } from '../../types/pi-live'
-import { usePiLive } from '../../hooks/usePiLive'
+import type { PiLiveSession } from '@/types/pi-live'
+import { usePiLive } from '@/hooks/usePiLive'
 
 interface PiLiveSessionCardProps {
   session: PiLiveSession

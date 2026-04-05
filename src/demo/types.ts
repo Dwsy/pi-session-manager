@@ -4,8 +4,8 @@ import type {
   SessionInfo,
   SessionTag,
   Tag,
-} from '../types'
-import type { SessionSortBy, SessionSortOrder } from '../types/sessionSort'
+} from '@/types'
+import type { SessionSortBy, SessionSortOrder } from '@/types/sessionSort'
 
 import type { DemoSessionSeed } from './seed'
 

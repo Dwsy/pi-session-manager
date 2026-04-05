@@ -21,7 +21,7 @@ export function formatDirectory(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
   if (parts.length <= 2) return path;
 
-  return ".../" + parts.slice(-2).join("/");
+  return ".../" + parts.slice(2).join("/");
 }
 
 export function getDirectoryName(cwd: string): string {

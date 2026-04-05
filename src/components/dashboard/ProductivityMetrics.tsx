@@ -1,5 +1,5 @@
 import { Target, Clock, Zap, Award, TrendingUp, Calendar } from 'lucide-react'
-import type { SessionStats } from '../../types'
+import type { SessionStats } from '@/types'
 
 interface ProductivityMetricsProps {
   stats: SessionStats

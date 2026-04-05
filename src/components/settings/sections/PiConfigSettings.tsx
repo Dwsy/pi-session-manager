@@ -5,11 +5,11 @@ import {
   Loader2, Search, Puzzle, FileText, Settings2, Blocks,
   Paintbrush, X, Check, History, RotateCcw, Eye,
 } from 'lucide-react'
-import { invoke } from '../../../transport'
-import MarkdownContent from '../../ui/MarkdownContent'
-import SettingsInput from '../SettingsInput'
-import SettingsSelect from '../SettingsSelect'
-import type { ResourceInfo, ResourceType, PiSettingsFull, ModelOption, ConfigVersionMeta } from '../../../types'
+import { invoke } from '@/transport'
+import MarkdownContent from '@/components/ui/MarkdownContent'
+import SettingsInput from '@/components/settings/SettingsInput'
+import SettingsSelect from '@/components/settings/SettingsSelect'
+import type { ResourceInfo, ResourceType, PiSettingsFull, ModelOption, ConfigVersionMeta } from '@/types'
 
 type PiConfigTab = 'resources' | 'settings' | 'versions'
 

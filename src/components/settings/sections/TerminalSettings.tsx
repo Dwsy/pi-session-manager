@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Monitor, Terminal, Copy, Check, ChevronDown, ChevronUp, Keyboard } from 'lucide-react'
-import SettingsField from '../SettingsField'
-import SettingsInput from '../SettingsInput'
-import SettingsToggleRow from '../SettingsToggleRow'
-import SettingsVisualSliderField from '../SettingsVisualSliderField'
-import { detectPlatform } from '../types'
-import type { TerminalSettingsProps } from '../types'
+import SettingsField from '@/components/settings/SettingsField'
+import SettingsInput from '@/components/settings/SettingsInput'
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
+import SettingsVisualSliderField from '@/components/settings/SettingsVisualSliderField'
+import { detectPlatform } from '@/components/settings/types'
+import type { TerminalSettingsProps } from '@/components/settings/types'
 
 const platform = detectPlatform()
 

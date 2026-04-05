@@ -3,10 +3,10 @@
  */
 
 import { useTranslation } from 'react-i18next'
-import SettingsField from '../SettingsField'
-import SettingsOptionGroup from '../SettingsOptionGroup'
-import SettingsToggleRow from '../SettingsToggleRow'
-import type { ExportSettingsProps } from '../types'
+import SettingsField from '@/components/settings/SettingsField'
+import SettingsOptionGroup from '@/components/settings/SettingsOptionGroup'
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
+import type { ExportSettingsProps } from '@/components/settings/types'
 
 export default function ExportSettings({ settings, onUpdate }: ExportSettingsProps) {
   const { t } = useTranslation()

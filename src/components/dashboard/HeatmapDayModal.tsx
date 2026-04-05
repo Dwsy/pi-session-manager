@@ -12,8 +12,8 @@ import {
   ArrowUpRight,
   ChevronRight,
 } from 'lucide-react'
-import type { HeatmapPoint, DayStats } from '../../types'
-import { getPathBasename } from '../../utils/path'
+import type { HeatmapPoint, DayStats } from '@/types'
+import { getPathBasename } from '@/utils/path'
 
 interface HeatmapDayModalProps {
   point: HeatmapPoint

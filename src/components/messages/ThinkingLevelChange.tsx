@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Brain } from 'lucide-react'
-import { formatDate } from '../../utils/format'
+import { formatDate } from '@/utils/format'
 
 interface ThinkingLevelChangeProps {
   thinkingLevel?: string

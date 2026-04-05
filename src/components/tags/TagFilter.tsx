@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import type { Tag, SessionTag } from '../../types'
+import type { Tag, SessionTag } from '@/types'
 import { getColorClass, getColorStyle } from './TagBadge'
 
 interface TagFilterProps {

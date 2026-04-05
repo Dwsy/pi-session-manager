@@ -3,8 +3,8 @@ import { Clock, MessageSquare, Folder, Zap, MessageCircle, MessageCircleReply } 
 import { formatDistanceToNow } from 'date-fns'
 import { useTranslation } from 'react-i18next'
 import DashboardCardShell from './DashboardCardShell'
-import type { SessionInfo } from '../../types'
-import { getPathBasename } from '../../utils/path'
+import type { SessionInfo } from '@/types'
+import { getPathBasename } from '@/utils/path'
 
 interface RecentSessionsProps {
   sessions: SessionInfo[]

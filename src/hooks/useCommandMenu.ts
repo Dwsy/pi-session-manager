@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import type { SearchPluginResult } from '../plugins/types'
+import type { SearchPluginResult } from '@/plugins/types'
 
 interface UseCommandMenuReturn {
   isOpen: boolean
@@ -26,11 +26,11 @@ export function useCommandMenu(): UseCommandMenuReturn {
   const [results, setResults] = useState<SearchPluginResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
-  
+
   const open = useCallback(() => {
     setIsOpen(true)
   }, [])
-  
+
   const close = useCallback(() => {
     setIsOpen(false)
     // Delay state reset, wait for close animation to complete
@@ -41,23 +41,23 @@ export function useCommandMenu(): UseCommandMenuReturn {
       setIsSearching(false)
     }, 200)
   }, [])
-  
+
   const toggle = useCallback(() => {
     setIsOpen(prev => !prev)
   }, [])
-  
+
   const reset = useCallback(() => {
     setQuery('')
     setResults([])
     setSelectedIndex(0)
     setIsSearching(false)
   }, [])
-  
+
   // Reset selected index when results change
   useEffect(() => {
     setSelectedIndex(0)
   }, [results])
-  
+
   return {
     isOpen,
     open,

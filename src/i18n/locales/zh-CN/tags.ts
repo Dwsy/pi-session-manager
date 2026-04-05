@@ -34,6 +34,7 @@ export const tags = {
     openTerminal: '在终端打开',
     openBrowser: '在浏览器打开',
     favorite: '收藏',
+    copyResume: '复制恢复命令',
     delete: '删除',
   },
   filter: {

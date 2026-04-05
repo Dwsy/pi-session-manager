@@ -1,14 +1,14 @@
 #!/usr/bin/env npx tsx
 /**
  * i18n 翻译调用扫描脚本
- * 
+ *
  * 功能：
  * 1. 扫描 src/ 目录下所有 TypeScript/TSX 文件中的 t() 调用
  * 2. 提取所有翻译 key
  * 3. 与翻译文件对比，找出：
  *    - 使用了但不存在于翻译文件的 key（缺失）
  *    - 存在于翻译文件但未被使用的 key（废弃/未使用）
- * 
+ *
  * 使用方法：
  *   npx tsx scripts/scan-i18n-usage.ts
  *   npx tsx scripts/scan-i18n-usage.ts --json    # 输出 JSON 报告
@@ -63,11 +63,11 @@ interface ScanReport {
   totalCalls: number;
   uniqueKeys: number;
   filesScanned: number;
-  
+
   // 缺失和未使用的 key
   missingKeys: string[]; // 使用了但翻译文件中没有
   unusedKeys: string[];  // 翻译文件中有但未被使用
-  
+
   // 翻译文件中的所有 key
   allTranslationKeys: TranslationKey[];
 }
@@ -81,16 +81,16 @@ interface ScanReport {
 function isValidTranslationKey(key: string): boolean {
   // 过滤单字符（如 split('.') 中的 .）
   if (key.length <= 1) return false;
-  
+
   // 过滤路径（如 import("./components/Dashboard")）
   if (key.startsWith('./') || key.startsWith('../')) return false;
-  
+
   // 过滤纯数字
   if (/^\d+$/.test(key)) return false;
-  
+
   // 过滤特殊符号组成的
   if (/^[^a-zA-Z]+$/.test(key)) return false;
-  
+
   return true;
 }
 
@@ -106,12 +106,12 @@ function shouldIgnore(filePath: string): boolean {
  */
 function getAllFiles(dir: string, extensions: string[]): string[] {
   const files: string[] = [];
-  
+
   const items = fs.readdirSync(dir);
   for (const item of items) {
     const fullPath = path.join(dir, item);
     const stat = fs.statSync(fullPath);
-    
+
     if (stat.isDirectory() && !shouldIgnore(fullPath)) {
       files.push(...getAllFiles(fullPath, extensions));
     } else if (stat.isFile() && extensions.some(ext => fullPath.endsWith(ext))) {
@@ -120,13 +120,13 @@ function getAllFiles(dir: string, extensions: string[]): string[] {
       }
     }
   }
-  
+
   return files;
 }
 
 /**
  * 从代码中提取 t() 调用的 key
- * 
+ *
  * 支持的调用模式：
  * - t('key')
  * - t("key")
@@ -137,7 +137,7 @@ function getAllFiles(dir: string, extensions: string[]): string[] {
  */
 function extractTranslationKeys(content: string, filePath: string): KeyUsage[] {
   const usages: Map<string, KeyUsage> = new Map();
-  
+
   // 匹配各种 t() 调用模式
   const patterns = [
     // t('key') 或 t('key', 'default') 或 t('key', {...})
@@ -146,36 +146,36 @@ function extractTranslationKeys(content: string, filePath: string): KeyUsage[] {
     // i18n.t('key') 或 context?.t('key')
     /(?:i18n|context)\??\.t\(\s*['"]([^'"]+)['"]\s*\)/g,
   ];
-  
+
   const lines = content.split('\n');
-  
+
   for (const pattern of patterns) {
     let match;
     while ((match = pattern.exec(content)) !== null) {
       const key = match[1];
       const defaultValue = match[2];
-      
+
       // 过滤无效的翻译 key
       if (!isValidTranslationKey(key)) continue;
-      
+
       // 计算行号和列号
       const upToMatch = content.substring(0, match.index);
       const lineIndex = upToMatch.split('\n').length - 1;
       const line = lines[lineIndex];
       const column = match.index - upToMatch.lastIndexOf('\n') - 1;
-      
+
       // 获取代码上下文（前后 30 字符）
       const contextStart = Math.max(0, column - 30);
       const contextEnd = Math.min(line.length, column + match[0].length + 30);
       const context = line.substring(contextStart, contextEnd).trim();
-      
+
       const location: KeyLocation = {
         file: path.relative(SRC_DIR, filePath),
         line: lineIndex + 1,
         column: column + 1,
         context,
       };
-      
+
       if (usages.has(key)) {
         usages.get(key)!.locations.push(location);
       } else {
@@ -187,7 +187,7 @@ function extractTranslationKeys(content: string, filePath: string): KeyUsage[] {
       }
     }
   }
-  
+
   return Array.from(usages.values());
 }
 
@@ -196,13 +196,13 @@ function extractTranslationKeys(content: string, filePath: string): KeyUsage[] {
  */
 function extractTranslationFileKeys(obj: any, prefix = '', namespace = ''): TranslationKey[] {
   const keys: TranslationKey[] = [];
-  
+
   for (const key in obj) {
     if (key === 'default' || key === '__esModule') continue;
-    
+
     const fullKey = prefix ? `${prefix}.${key}` : key;
     const value = obj[key];
-    
+
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       // 第一层是 namespace
       const ns = prefix ? namespace : key;
@@ -215,7 +215,7 @@ function extractTranslationFileKeys(obj: any, prefix = '', namespace = ''): Tran
       });
     }
   }
-  
+
   return keys;
 }
 
@@ -224,19 +224,19 @@ function extractTranslationFileKeys(obj: any, prefix = '', namespace = ''): Tran
  */
 async function loadTranslations(langDir: string): Promise<TranslationKey[]> {
   const allKeys: TranslationKey[] = [];
-  
+
   // 首先加载 index.ts 获取内联定义的 key（如 connection）
   const indexPath = path.join(langDir, 'index.ts');
   try {
     const fileUrl = 'file://' + indexPath;
     const indexModule = await import(fileUrl);
-    
+
     // 处理 index.ts 的导出（enUS 对象）
     if (indexModule.enUS) {
       const enUS = indexModule.enUS;
       for (const key in enUS) {
         if (key === 'default' || key === '__esModule') continue;
-        
+
         const value = enUS[key];
         // 只处理内联定义的对象（不是从其他文件导入的模块）
         if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
@@ -252,31 +252,31 @@ async function loadTranslations(langDir: string): Promise<TranslationKey[]> {
   } catch (err) {
     console.warn(`⚠️ 无法加载 index.ts: ${indexPath}`, err);
   }
-  
+
   // 然后加载其他单独的 .ts 文件
   const files = fs.readdirSync(langDir)
     .filter(f => f.endsWith('.ts') && f !== 'index.ts');
-  
+
   for (const file of files) {
     const filePath = path.join(langDir, file);
     try {
       // 使用动态 import 加载 ES 模块
       const fileUrl = 'file://' + filePath;
       const module = await import(fileUrl);
-      
+
       // 获取模块的命名导出（如 common, app 等）
       const translations = module;
-      
+
       // 获取 namespace（文件名）
       const namespace = file.replace('.ts', '');
-      
+
       const keys = extractTranslationFileKeys(translations, '', namespace);
       allKeys.push(...keys);
     } catch (err) {
       console.warn(`⚠️ 无法加载翻译文件: ${filePath}`, err);
     }
   }
-  
+
   return allKeys;
 }
 
@@ -284,22 +284,22 @@ async function loadTranslations(langDir: string): Promise<TranslationKey[]> {
 
 async function scan(): Promise<ScanReport> {
   console.log('🔍 正在扫描源代码...');
-  
+
   // 1. 获取所有源文件
   const sourceFiles = getAllFiles(SRC_DIR, FILE_EXTENSIONS);
   console.log(`   📁 找到 ${sourceFiles.length} 个源文件`);
-  
+
   // 2. 扫描每个文件中的 t() 调用
   const usedKeys: Map<string, KeyUsage> = new Map();
   let totalCalls = 0;
-  
+
   for (const file of sourceFiles) {
     const content = fs.readFileSync(file, 'utf-8');
     const usages = extractTranslationKeys(content, file);
-    
+
     for (const usage of usages) {
       totalCalls += usage.locations.length;
-      
+
       if (usedKeys.has(usage.key)) {
         usedKeys.get(usage.key)!.locations.push(...usage.locations);
       } else {
@@ -307,29 +307,29 @@ async function scan(): Promise<ScanReport> {
       }
     }
   }
-  
+
   console.log(`   📝 发现 ${totalCalls} 处翻译调用，${usedKeys.size} 个唯一 key`);
-  
+
   // 3. 加载翻译文件
   console.log('\n📚 正在加载翻译文件...');
   const mainLangDir = path.join(I18N_DIR, MAIN_LANG);
   const translationKeys = await loadTranslations(mainLangDir);
   console.log(`   📖 主语言 (${MAIN_LANG}) 包含 ${translationKeys.length} 个 key`);
-  
+
   // 4. 对比分析
   const usedKeySet = new Set(usedKeys.keys());
   const translationKeySet = new Set(translationKeys.map(k => k.fullPath));
-  
+
   // 缺失的 key：使用了但翻译文件中没有
   const missingKeys = Array.from(usedKeySet)
     .filter(k => !translationKeySet.has(k))
     .sort();
-  
+
   // 未使用的 key：翻译文件中有但未被使用
   const unusedKeys = Array.from(translationKeySet)
     .filter(k => !usedKeySet.has(k))
     .sort();
-  
+
   return {
     usedKeys,
     totalCalls,
@@ -346,7 +346,7 @@ async function scan(): Promise<ScanReport> {
 function printReport(report: ScanReport) {
   console.log('\n' + '═'.repeat(70));
   console.log('🌍 i18n 翻译调用扫描报告\n');
-  
+
   // 概览
   console.log('📊 概览');
   console.log('─'.repeat(70));
@@ -355,13 +355,13 @@ function printReport(report: ScanReport) {
   console.log(`   唯一 key 数量:  ${report.uniqueKeys}`);
   console.log(`   翻译文件 keys:  ${report.allTranslationKeys.length}`);
   console.log(`   覆盖率:         ${((report.uniqueKeys / report.allTranslationKeys.length) * 100).toFixed(1)}%`);
-  
+
   // 缺失的 key
   console.log('\n' + '═'.repeat(70));
   console.log(`❌ 缺失的 Key (${report.missingKeys.length})`);
   console.log('─'.repeat(70));
   console.log('   这些 key 在代码中被使用，但翻译文件中不存在：\n');
-  
+
   if (report.missingKeys.length === 0) {
     console.log('   ✅ 没有缺失的 key！');
   } else {
@@ -381,13 +381,13 @@ function printReport(report: ScanReport) {
       console.log('');
     }
   }
-  
+
   // 未使用的 key
   console.log('\n' + '═'.repeat(70));
   console.log(`⚠️ 未使用的 Key (${report.unusedKeys.length})`);
   console.log('─'.repeat(70));
   console.log('   这些 key 存在于翻译文件中，但代码中未被引用：\n');
-  
+
   if (report.unusedKeys.length === 0) {
     console.log('   ✅ 所有 key 都被使用了！');
   } else {
@@ -400,7 +400,7 @@ function printReport(report: ScanReport) {
       }
       byNamespace.get(ns)!.push(key);
     }
-    
+
     for (const [ns, keys] of byNamespace) {
       console.log(`   📁 ${ns} (${keys.length})`);
       for (const key of keys.slice(0, 10)) {
@@ -412,11 +412,11 @@ function printReport(report: ScanReport) {
       console.log('');
     }
   }
-  
+
   // 建议
   console.log('\n' + '═'.repeat(70));
   console.log('💡 建议\n');
-  
+
   if (report.missingKeys.length > 0) {
     console.log(`   1. 添加 ${report.missingKeys.length} 个缺失的 key 到翻译文件`);
   }
@@ -426,13 +426,13 @@ function printReport(report: ScanReport) {
   if (report.missingKeys.length === 0 && report.unusedKeys.length === 0) {
     console.log('   🎉 翻译文件与代码完全匹配！');
   }
-  
+
   console.log('\n');
 }
 
 function exportJson(report: ScanReport) {
   const outputPath = path.resolve(__dirname, '../i18n-usage-report.json');
-  
+
   const data = {
     summary: {
       filesScanned: report.filesScanned,
@@ -449,7 +449,7 @@ function exportJson(report: ScanReport) {
     })),
     unusedKeys: report.unusedKeys,
   };
-  
+
   fs.writeFileSync(outputPath, JSON.stringify(data, null, 2));
   console.log(`📄 JSON 报告已保存: ${outputPath}\n`);
 }
@@ -459,7 +459,7 @@ function exportJson(report: ScanReport) {
 async function main() {
   const report = await scan();
   printReport(report);
-  
+
   if (process.argv.includes('--json')) {
     exportJson(report);
   }

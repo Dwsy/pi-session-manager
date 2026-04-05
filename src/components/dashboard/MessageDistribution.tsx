@@ -1,6 +1,6 @@
 import { MessageSquare, User, Bot } from 'lucide-react'
 import DashboardCardShell from './DashboardCardShell'
-import type { SessionStats } from '../../types'
+import type { SessionStats } from '@/types'
 
 interface MessageDistributionProps {
   stats: SessionStats

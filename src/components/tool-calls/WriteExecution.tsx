@@ -1,12 +1,12 @@
 import type { CSSProperties } from 'react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { escapeHtml, getLanguageFromPath } from '../../utils/markdown'
-import { shortenPath } from '../../utils/format'
-import { useIsMobile } from '../../hooks/useIsMobile'
-import { useSessionView } from '../../contexts/SessionViewContext'
-import { highlightSearchInHTML } from '../../utils/search'
-import CodeBlock from '../ui/CodeBlock'
+import { escapeHtml, getLanguageFromPath } from '@/utils/markdown'
+import { shortenPath } from '@/utils/format'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { useSessionView } from '@/contexts/SessionViewContext'
+import { highlightSearchInHTML } from '@/utils/search'
+import CodeBlock from '@/components/ui/CodeBlock'
 
 interface WriteExecutionProps {
   filePath: string

@@ -11,13 +11,13 @@ import {
 import { ArrowDown, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import SessionHeader from "../session-viewer/SessionHeader";
-import SessionScrollMarkers from "../session-viewer/SessionScrollMarkers";
-import { useSessionView } from "../../contexts/SessionViewContext";
-import type { SessionSearchTarget } from "../../hooks/useSessionViewerInMessageSearch";
-import { useSessionViewerVirtualScroll } from "../../hooks/useSessionViewerVirtualScroll";
-import type { ScrollMarker } from "../../hooks/useSessionScrollMarkers";
-import type { LegacySessionStats, SessionEntry } from "../../types";
+import SessionHeader from "@/components/session-viewer/SessionHeader";
+import SessionScrollMarkers from "@/components/session-viewer/SessionScrollMarkers";
+import { useSessionView } from "@/contexts/SessionViewContext";
+import type { SessionSearchTarget } from "@/hooks/useSessionViewerInMessageSearch";
+import { useSessionViewerVirtualScroll } from "@/hooks/useSessionViewerVirtualScroll";
+import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
+import type { LegacySessionStats, SessionEntry } from "@/types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
 
 const MESSAGE_ITEM_GAP = 16;

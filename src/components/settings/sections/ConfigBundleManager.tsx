@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { useTranslation } from 'react-i18next';
-import { invoke } from '../../../transport';
-import SettingsCard from '../SettingsCard';
+import { invoke } from '@/transport';
+import SettingsCard from '@/components/settings/SettingsCard';
 
 interface BundleFileInfo {
   name: string;

@@ -8,8 +8,8 @@ import type {
   SessionInfo,
   SessionStats,
   TimeDistributionPoint,
-} from '../types'
-import { getPathBasename } from '../utils/path'
+} from '@/types'
+import { getPathBasename } from '@/utils/path'
 
 import { estimateCost } from './content'
 import type { DemoStore } from './types'

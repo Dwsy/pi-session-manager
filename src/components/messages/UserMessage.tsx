@@ -1,11 +1,11 @@
-import type { Content } from '../../types'
+import type { Content } from '@/types'
 import { useTranslation } from 'react-i18next'
-import { parseMarkdown } from '../../utils/markdown'
-import { highlightSearchInHTML } from '../../utils/search'
-import { formatDate } from '../../utils/format'
+import { parseMarkdown } from '@/utils/markdown'
+import { highlightSearchInHTML } from '@/utils/search'
+import { formatDate } from '@/utils/format'
 import { Copy, Check } from 'lucide-react'
 import { memo, useMemo, useState } from 'react'
-import { useClipboard } from '../../hooks/useClipboard'
+import { useClipboard } from '@/hooks/useClipboard'
 
 interface UserMessageProps {
   id: string

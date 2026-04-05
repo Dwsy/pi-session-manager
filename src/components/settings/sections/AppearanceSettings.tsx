@@ -4,12 +4,12 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import SettingsField from '../SettingsField'
-import SettingsInput from '../SettingsInput'
-import SettingsOptionGroup from '../SettingsOptionGroup'
-import SettingsSelect from '../SettingsSelect'
-import { listUserPiThemes } from '../../../utils/piTheme'
-import type { AppearanceSettingsProps } from '../types'
+import SettingsField from '@/components/settings/SettingsField'
+import SettingsInput from '@/components/settings/SettingsInput'
+import SettingsOptionGroup from '@/components/settings/SettingsOptionGroup'
+import SettingsSelect from '@/components/settings/SettingsSelect'
+import { listUserPiThemes } from '@/utils/piTheme'
+import type { AppearanceSettingsProps } from '@/components/settings/types'
 
 export default function AppearanceSettings({ settings, onUpdate }: AppearanceSettingsProps) {
   const { t } = useTranslation()

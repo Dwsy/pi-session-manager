@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 import type { ComponentType, LazyExoticComponent } from "react";
 
-import ExportDialog from "../dialogs/ExportDialog";
-import RenameDialog from "../dialogs/RenameDialog";
-import ForkDialog from "../dialogs/ForkDialog";
-import Onboarding from "../Onboarding";
-import type { SearchContext } from "../../plugins/types";
-import type { SessionInfo } from "../../types";
+import ExportDialog from "@/components/dialogs/ExportDialog";
+import RenameDialog from "@/components/dialogs/RenameDialog";
+import ForkDialog from "@/components/dialogs/ForkDialog";
+import Onboarding from "@/components/Onboarding";
+import type { SearchContext } from "@/plugins/types";
+import type { SessionInfo } from "@/types";
 
 type ExportFormat = "html" | "md" | "json";
 

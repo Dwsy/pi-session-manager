@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import type { FavoriteItem, SearchResult, SessionInfo } from '../types'
+import type { FavoriteItem, SearchResult, SessionInfo } from '@/types'
 import {
   getDemoFavorites,
   getDemoSessionContent,
@@ -9,7 +9,7 @@ import {
   getDemoDayStats,
   isDemoModeEnabled,
   searchDemoSessions,
-} from '../demo'
+} from '@/demo'
 
 interface UseDemoModeReturn {
   isDemoMode: boolean

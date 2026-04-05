@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Zap } from "lucide-react";
-import type { LiveSessionInfo } from "../../hooks/usePiLiveSessions";
+import type { LiveSessionInfo } from "@/hooks/usePiLiveSessions";
 
 interface SessionViewerOnlineStatusBarProps {
   liveSession: LiveSessionInfo | null;

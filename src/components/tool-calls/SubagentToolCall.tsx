@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Bot, Clock, Cpu, Wrench, AlertCircle, CheckCircle2, ChevronRight, Users, Link2, Loader2 } from 'lucide-react'
-import type { SubagentDetails, SubagentResult, TintinwebAgentDetails } from '../../types'
+import type { SubagentDetails, SubagentResult, TintinwebAgentDetails } from '@/types'
 import SubagentModal from './SubagentModal'
-import { escapeHtml } from '../../utils/markdown'
-import { highlightSearchInHTML } from '../../utils/search'
+import { escapeHtml } from '@/utils/markdown'
+import { highlightSearchInHTML } from '@/utils/search'
 import {
   getSubagentResultErrorPreview,
   getSubagentResultTaskPreview,
-} from '../../utils/toolCallDisplay'
+} from '@/utils/toolCallDisplay'
 import '../styles/subagent.css'
 
 interface SubagentToolCallProps {

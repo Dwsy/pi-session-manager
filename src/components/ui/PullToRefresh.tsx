@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
-import { triggerHaptic } from "../../utils/haptics";
+import { triggerHaptic } from "@/utils/haptics";
 
 interface PullToRefreshProps {
   onRefresh: () => Promise<void>;

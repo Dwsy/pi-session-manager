@@ -1,13 +1,13 @@
-import type { Content, SessionEntry } from '../../types'
-import MarkdownContent from '../ui/MarkdownContent'
+import type { Content, SessionEntry } from '@/types'
+import MarkdownContent from '@/components/ui/MarkdownContent'
 import ThinkingBlock from './ThinkingBlock'
-import ToolCallList from '../tool-calls/ToolCallList'
-import { useSessionView } from '../../contexts/SessionViewContext'
-import { formatDate } from '../../utils/format'
-import { getAssistantDisplayedBlocks } from '../../utils/assistantContent'
+import ToolCallList from '@/components/tool-calls/ToolCallList'
+import { useSessionView } from '@/contexts/SessionViewContext'
+import { formatDate } from '@/utils/format'
+import { getAssistantDisplayedBlocks } from '@/utils/assistantContent'
 import { Copy, Check } from 'lucide-react'
 import { memo, useMemo, useState } from 'react'
-import { useClipboard } from '../../hooks/useClipboard'
+import { useClipboard } from '@/hooks/useClipboard'
 
 interface AssistantMessageProps {
   content: Content[]

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useCommandMenu } from '../../hooks/useCommandMenu'
-import type { SearchContext } from '../../plugins/types'
+import { useCommandMenu } from '@/hooks/useCommandMenu'
+import type { SearchContext } from '@/plugins/types'
 import CommandMenu from './CommandMenu'
-import type { MessageSearchPluginOptions } from '../../plugins/message/MessageSearchPlugin'
+import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
 
 interface CommandPaletteProps {
   context: SearchContext

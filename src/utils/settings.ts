@@ -2,8 +2,8 @@
  * Settings utility functions
  */
 
-import i18n from '../i18n'
-import type { AppSettings } from '../components/settings/types'
+import i18n from '@/i18n'
+import type { AppSettings } from '@/components/settings/types'
 
 export interface ValidationError {
   field: string
@@ -57,6 +57,7 @@ export function validateSettings(settings: AppSettings): ValidationError[] {
  */
 export function mergeSettings(base: AppSettings, override: Partial<AppSettings>): AppSettings {
   return {
+    piLive: { ...base.piLive, ...override.piLive },
     terminal: { ...base.terminal, ...override.terminal },
     appearance: { ...base.appearance, ...override.appearance },
     language: { ...base.language, ...override.language },

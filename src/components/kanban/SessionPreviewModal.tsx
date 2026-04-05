@@ -1,10 +1,10 @@
 import { useLayoutEffect, useCallback, useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, Maximize2 } from 'lucide-react'
-import type { SessionInfo } from '../../types'
-import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
-import type { TerminalType } from '../settings/types'
-import SessionViewer from '../SessionViewer'
+import type { SessionInfo } from '@/types'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import type { TerminalType } from '@/components/settings/types'
+import SessionViewer from '@/components/SessionViewer'
 
 export type SessionPreviewAnimationMode = 'stable' | 'origin-point'
 

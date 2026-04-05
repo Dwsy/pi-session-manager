@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
-import type { SessionInfo } from "../../types";
+import type { SessionInfo } from "@/types";
 import type { AppSidebarViewMode } from "./useSidebarSessions";
 
 export interface UseDesktopSidebarActionsOptions {

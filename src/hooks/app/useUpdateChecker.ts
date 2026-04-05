@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getCachedSettings } from '../../utils/settingsApi'
+import { getCachedSettings } from '@/utils/settingsApi'
 import {
   checkForUpdates,
   dismissUpdateVersion,
   getDismissedUpdateVersion,
   shouldRunDailyUpdateCheck,
   type AvailableUpdateInfo,
-} from '../../utils/updateChecker'
+} from '@/utils/updateChecker'
 
 interface UseUpdateCheckerResult {
   updateInfo: AvailableUpdateInfo | null

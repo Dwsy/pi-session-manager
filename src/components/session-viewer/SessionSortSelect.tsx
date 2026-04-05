@@ -8,7 +8,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { SessionSortBy, SessionSortOrder } from '../../types/sessionSort'
+import type { SessionSortBy, SessionSortOrder } from '@/types/sessionSort'
 
 interface SessionSortSelectProps {
   value: SessionSortBy

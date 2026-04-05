@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Search, X, Loader2, User, Bot, FileText, Globe, ArrowUpDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { invoke } from '../../transport';
-import { shortenPath } from '../../utils/format';
-import { getPathParentName } from '../../utils/path';
-import { parseQuotedQuery } from '../../utils/search';
-import { getCachedSettings } from '../../utils/settingsApi';
-import type { FullTextSearchHit, FullTextSearchResponse, SessionInfo } from '../../types';
-import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '../../demo';
-import { formatShortSessionId } from '../../utils/session';
+import { invoke } from '@/transport';
+import { shortenPath } from '@/utils/format';
+import { getPathParentName } from '@/utils/path';
+import { parseQuotedQuery } from '@/utils/search';
+import { getCachedSettings } from '@/utils/settingsApi';
+import type { FullTextSearchHit, FullTextSearchResponse, SessionInfo } from '@/types';
+import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '@/demo';
+import { formatShortSessionId } from '@/utils/session';
 
 const HIGHLIGHT_CACHE_MAX_ENTRIES = 500;
 const HTML_ESCAPE_MAP: Record<string, string> = {

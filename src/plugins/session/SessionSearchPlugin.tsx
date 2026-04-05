@@ -1,9 +1,9 @@
 import { FileText } from 'lucide-react'
-import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
-import type { SearchContext, SearchPluginResult } from '../types'
-import { getPathBasename } from '../../utils/path'
-import { parseQuotedQuery } from '../../utils/search'
-import { formatShortSessionId, getSessionIdMatchKind } from '../../utils/session'
+import { BaseSearchPlugin } from '@/plugins/base/BaseSearchPlugin'
+import type { SearchContext, SearchPluginResult } from '@/plugins/types'
+import { getPathBasename } from '@/utils/path'
+import { parseQuotedQuery } from '@/utils/search'
+import { formatShortSessionId, getSessionIdMatchKind } from '@/utils/session'
 
 /**
  * Session search plugin
@@ -14,30 +14,30 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
   icon = FileText
   keywords = ['session', 'file', 'conversation', 'session', 'file', 'conversation']
   priority = 60
-  
+
   get name(): string {
     return this.context?.t('plugins.session.name', 'Session Search') || 'session搜索'
   }
-  
+
   get description(): string {
     return this.context?.t('plugins.session.description', 'Search session names and metadata') || '搜索sessionName和元数据'
   }
-  
+
   async search(
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]> {
     // Save context for i18n access
     this.setContext(context)
-    
+
     try {
       const results: SearchPluginResult[] = []
-      
+
       // Filter session list if 'Search current project only' is enabled
       const sessionsToSearch = context.searchCurrentProjectOnly && context.selectedProject
         ? context.sessions.filter(s => s.cwd === context.selectedProject)
         : context.sessions
-      
+
       const parsedQuery = parseQuotedQuery(query)
       const phraseTerms = parsedQuery.phrases.map(phrase => phrase.toLowerCase())
       const remainderTerms = parsedQuery.remainderTokens.map(term => term.toLowerCase())
@@ -127,7 +127,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
           })
         }
       }
-      
+
       const finalResults = results.sort((a, b) => b.score - a.score).slice(0, 20)
       return finalResults
     } catch (error) {
@@ -135,76 +135,76 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
       return []
     }
   }
-  
+
   onSelect(result: SearchPluginResult, context: SearchContext): void {
     // Open session
     const session = result.metadata?.session
-    
+
     if (session) {
       context.setSelectedSession(session)
       context.closeCommandMenu()
     }
   }
-  
+
   /**
    * Get session description
    */
   private getSessionDescription(session: any, context: SearchContext): string {
     const parts: string[] = []
-    
+
     // Message count
     parts.push(context.t('session.messageCount', {
       count: session.message_count,
       defaultValue: 'messages'
     }))
-    
+
     // Modified time
     parts.push(this.formatRelativeTime(session.modified))
-    
+
     return parts.join(' • ')
   }
-  
+
   /**
    * Format relative time
    */
   private formatRelativeTime(timestamp: string): string {
     if (!this.context) return timestamp
-    
+
     try {
       const date = new Date(timestamp)
       const now = new Date()
       const diff = now.getTime() - date.getTime()
       const seconds = Math.floor(diff / 1000)
-      
+
       // Less than 1 minute
       if (seconds < 60) {
         return this.context.t('time.justNow')
       }
-      
+
       // Less than 1 hour
       const minutes = Math.floor(seconds / 60)
       if (minutes < 60) {
         return this.context.t('time.minutesAgo', { count: minutes })
       }
-      
+
       // Less than 24 hours
       const hours = Math.floor(minutes / 60)
       if (hours < 24) {
         return this.context.t('time.hoursAgo', { count: hours })
       }
-      
+
       // Less than 7 days
       const days = Math.floor(hours / 24)
       if (days < 7) {
         return this.context.t('time.daysAgo', { count: days })
       }
-      
+
       // Less than 30 days
       const weeks = Math.floor(days / 7)
       if (weeks < 4) {
         return this.context.t('time.weeksAgo', { count: weeks })
       }
-      
+
       // Show date
       return date.toLocaleDateString('zh-CN', {
         year: 'numeric',
@@ -215,7 +215,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
       return timestamp
     }
   }
-  
+
   /**
    * Truncate text
    */
@@ -223,7 +223,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
     if (text.length <= maxLength) return text
     return text.slice(0, maxLength) + '...'
   }
-  
+
   /**
    * Get project name
    */

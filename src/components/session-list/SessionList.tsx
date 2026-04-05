@@ -9,7 +9,7 @@ import {
 import type { RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
-import type { SessionInfo, FavoriteItem, Tag } from "../../types";
+import type { SessionInfo, FavoriteItem, Tag } from "@/types";
 import {
   CheckSquare2,
   Search,
@@ -19,27 +19,27 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import { SessionListSkeleton } from "../ui/Skeleton";
-import OpenInBrowserButton from "../OpenInBrowserButton";
-import OpenInTerminalButton from "../OpenInTerminalButton";
-import { SessionBadge } from "../session-viewer/SessionBadge";
-import TagBadge from "../tags/TagBadge";
-import TagPicker from "../tags/TagPicker";
-import SessionContextMenu from "../session-viewer/SessionContextMenu";
-import DeleteSessionPopover from "../dialogs/DeleteSessionPopover";
+import { SessionListSkeleton } from "@/components/ui/Skeleton";
+import OpenInBrowserButton from "@/components/OpenInBrowserButton";
+import OpenInTerminalButton from "@/components/OpenInTerminalButton";
+import { SessionBadge } from "@/components/session-viewer/SessionBadge";
+import TagBadge from "@/components/tags/TagBadge";
+import TagPicker from "@/components/tags/TagPicker";
+import SessionContextMenu from "@/components/session-viewer/SessionContextMenu";
+import DeleteSessionPopover from "@/components/dialogs/DeleteSessionPopover";
 import {
   formatShortSessionId,
   MIN_SESSION_ID_PREFIX_LENGTH,
   getSessionSourceTag,
-} from "../../utils/session";
-import { formatDirectory, formatShortTime } from "../../utils/sessionDisplay";
-import type { TerminalType } from "../settings/types";
-import { getPlatformDefaults } from "../settings/types";
-import { invoke, isTauri } from "../../transport";
-import { useIsMobile } from "../../hooks/useIsMobile";
-import { isTextEntryTarget } from "../../hooks/useKeyboardShortcuts";
-import { useClipboard } from "../../hooks/useClipboard";
-import { getCachedSettings } from "../../utils/settingsApi";
+} from "@/utils/session";
+import { formatDirectory, formatShortTime } from "@/utils/sessionDisplay";
+import type { TerminalType } from "@/components/settings/types";
+import { getPlatformDefaults } from "@/components/settings/types";
+import { invoke, isTauri } from "@/transport";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { isTextEntryTarget } from "@/hooks/useKeyboardShortcuts";
+import { useClipboard } from "@/hooks/useClipboard";
+import { getCachedSettings } from "@/utils/settingsApi";
 
 const ESTIMATED_ROW_HEIGHT = 122;
 const STICKY_SCROLL_TOP_THRESHOLD = 48;

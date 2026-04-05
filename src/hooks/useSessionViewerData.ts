@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 
-import { invoke, listen } from '../transport'
-import type { SessionChunk, SessionEntry, SessionsDiff } from '../types'
-import { trimMarkdownCacheOnSessionSwitch } from '../utils/markdown'
-import { getCachedSettings } from '../utils/settingsApi'
-import { parseSessionEntriesWithLineCount } from '../utils/session'
-import { isDemoModeEnabled, readDemoSessionChunk } from '../demo'
+import { invoke, listen } from '@/transport'
+import type { SessionChunk, SessionEntry, SessionsDiff } from '@/types'
+import { trimMarkdownCacheOnSessionSwitch } from '@/utils/markdown'
+import { getCachedSettings } from '@/utils/settingsApi'
+import { parseSessionEntriesWithLineCount } from '@/utils/session'
+import { isDemoModeEnabled, readDemoSessionChunk } from '@/demo'
 
 function extractSessionId(sessionPath: string): string {
   const base = sessionPath.replace(/\.jsonl$/, '')
@@ -146,6 +146,7 @@ export interface UseSessionViewerDataResult {
   setScrollTargetId: Dispatch<SetStateAction<string | null>>
   hasNewMessages: boolean
   setHasNewMessages: Dispatch<SetStateAction<boolean>>
+  streamingId: string | null
   pendingScrollToBottomRef: MutableRefObject<boolean>
   hasMoreHistory: boolean
   loadMoreHistory: () => Promise<void>
@@ -167,6 +168,7 @@ export function useSessionViewerData({
   const [scrollTargetId, setScrollTargetId] = useState<string | null>(null)
   const [hasNewMessages, setHasNewMessages] = useState(false)
   const [hasMoreHistory, setHasMoreHistory] = useState(false)
+  const [streamingId, setStreamingId] = useState<string | null>(null)
 
   const pendingScrollToBottomRef = useRef(false)
   const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -177,6 +179,7 @@ export function useSessionViewerData({
   const loadingMoreRef = useRef(false)
   const hasMoreHistoryRef = useRef(false)
   const isLiveRef = useRef(isLive ?? false)
+  const lastResponseIdRef = useRef<string | null>(null)
 
   lineCountRef.current = lineCount
 
@@ -262,6 +265,12 @@ export function useSessionViewerData({
         })
 
         if (asRealtime) {
+          // In Live mode, we prefer WebSocket events for real-time updates to avoid duplicates and ID drifting.
+          // File-watcher (asRealtime: true) should only load historical chunks, not the tip of the stream.
+          if (isLiveRef.current) {
+            return;
+          }
+
           const nextActiveEntryId = getDefaultActiveEntryId(newEntries)
           if (nextActiveEntryId) {
             setActiveEntryId(nextActiveEntryId)
@@ -344,6 +353,21 @@ export function useSessionViewerData({
             setShowLoading(true)
           }
         }, 300)
+
+        if (isLiveRef.current) {
+          try {
+            const liveEntries = await invoke<any[]>('get_pi_agent_entries', { sessionId: sessionPath.split('/').pop()?.replace('.jsonl', '') || sessionPath });
+            if (liveEntries && liveEntries.length > 0) {
+              setEntries(liveEntries);
+              setLineCount(liveEntries.length);
+              setLoading(false);
+              setShowLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.warn('[useSessionViewerData] Failed to fetch live entries, falling back to disk:', e);
+          }
+        }
 
         let chunk = isDemoModeEnabled()
           ? readDemoSessionChunk(sessionPath, 0, 384 * 1024)
@@ -457,10 +481,16 @@ export function useSessionViewerData({
       const sessionId = extractSessionId(sessionPath)
 
       // Track live session registration — when live, skip file-watcher disk reads
-      const listenReg = await listen<{ sessionId: string }>('pi-agent:register', ({ payload }) => {
-        if (payload.sessionId === sessionId) isLiveRef.current = true
-      })
-      
+      const listenReg = await listen<any>('pi-agent:register', (event) => {
+        const payload = event.payload;
+        if (payload.sessionId.includes(sessionPath) || sessionPath.includes(payload.sessionId)) {
+          isLiveRef.current = true;
+          // When bridge connects/reconnects, it sends the full entries list. Sync it!
+          if (Array.isArray(payload.entries) && payload.entries.length > 0) {
+             setEntries(payload.entries);
+          }
+        }
+      });
       const listenDisc = await listen<{ sessionId: string }>('pi-agent:disconnect', ({ payload }) => {
         if (payload.sessionId === sessionId) isLiveRef.current = false
       })
@@ -485,85 +515,222 @@ export function useSessionViewerData({
       unlistenLiveEntry = await listen<{ sessionId: string; eventType: string; entry: any }>(
         'pi-agent:entry',
         ({ payload }) => {
-          if (payload.sessionId !== sessionId) return
-          
+          // Robust sessionId matching: could be full ID or just the UUID
+          const matches = payload.sessionId === sessionId ||
+                         (payload.sessionId && sessionId.includes(payload.sessionId)) ||
+                         (sessionId && payload.sessionId.includes(sessionId));
+          if (!matches) return;
+
           console.log(`[useSessionViewerData] Live event: ${payload.eventType}`, payload.entry);
 
           const raw = payload.entry as Record<string, any>
           if (raw._sessionPath && raw._sessionPath !== sessionPath) return
 
-          const eventType = payload.eventType
+            const eventType = payload.eventType
 
-          if (eventType.startsWith('message_')) {
-            // Support both wrapped { message: ... } and flat message structures
-            const rawMessage = raw.message || raw
-            let messageId = rawMessage?.id
+            if (eventType.startsWith('message_')) {
+              const rawMessage = raw.message || raw
+              const isUser = rawMessage?.role === 'user'
+              const messageIdFromRaw = rawMessage?.id || rawMessage?.responseId || rawMessage?.response_id
 
-            // Fallback: if messageId is missing (e.g. in some message_update events),
-            // find the last assistant message in the current entries and use its ID.
-            if (!messageId) {
+              // Case A: message_start -> Register a new ID or use raw one
+              if (eventType === 'message_start') {
+                if (messageIdFromRaw) {
+                  lastResponseIdRef.current = messageIdFromRaw
+                } else if (!isUser) {
+                  // Generate a stable ID for this turn if backend didn't provide one
+                  lastResponseIdRef.current = `assistant-msg-${Date.now()}`
+                }
+              }
+
+              // Case B: message_update -> Use the tracked active ID
+              let messageId = messageIdFromRaw || (isUser ? null : lastResponseIdRef.current)
+
               setEntries((prev) => {
-                const lastAssistant = prev.filter(
-                  (e: SessionEntry) => e.type === 'message' && e.message?.role === 'assistant'
-                ).pop()
-                if (lastAssistant) messageId = lastAssistant.id
-                return prev
+                // Deduplication for user messages (content fingerprinting)
+                if (isUser && !messageId) {
+                  const rawText = Array.isArray(rawMessage.content)
+                    ? rawMessage.content.find((c: any) => c.text)?.text
+                    : (typeof rawMessage.content === 'string' ? rawMessage.content : '')
+
+                  const duplicate = prev.slice(-5).find(e =>
+                    e.type === 'message' &&
+                    e.message?.role === 'user' &&
+                    (Array.isArray(e.message.content) ? e.message.content.some((c: any) => c.text === rawText) : e.message.content === rawText)
+                  )
+                  if (duplicate) {
+                    messageId = duplicate.id
+                  } else {
+                    messageId = `user-msg-${rawText.substring(0, 10)}-${Date.now()}`
+                  }
+                }
+
+                if (!messageId) return prev
+
+                const existingIndex = prev.findIndex((e) => e.id === messageId)
+                let nextContent = Array.isArray(rawMessage?.content) ? [...rawMessage.content] : []
+
+                // Delta merging if applicable
+                if (raw.assistantMessageEvent && existingIndex !== -1) {
+                  const existingContent = prev[existingIndex].message?.content || []
+                  if (nextContent.length === 0 || (nextContent.length === 1 && nextContent[0].text === "")) {
+                    nextContent = appendDeltaToMessageContent(existingContent as any[], raw.assistantMessageEvent)
+                  }
+                }
+
+                let parentId = raw.parentId
+                if (!parentId && existingIndex === -1 && prev.length > 0) {
+                  parentId = prev[prev.length - 1].id
+                }
+
+                const liveEntry: SessionEntry = {
+                  type: 'message',
+                  id: messageId,
+                  parentId: parentId || (existingIndex !== -1 ? prev[existingIndex].parentId : undefined),
+                  timestamp: raw.timestamp || (existingIndex !== -1 ? prev[existingIndex].timestamp : new Date().toISOString()),
+                  message: {
+                    ...rawMessage,
+                    role: rawMessage?.role || (existingIndex !== -1 ? prev[existingIndex].message?.role : 'assistant'),
+                    content: nextContent.length > 0 ? nextContent : (existingIndex !== -1 ? prev[existingIndex].message?.content : []),
+                  },
+                }
+
+                let next = [...prev]
+                if (existingIndex === -1) {
+                  next.push(liveEntry)
+                } else {
+                  // Merge carefully
+                  next[existingIndex] = {
+                    ...next[existingIndex],
+                    ...liveEntry,
+                    message: {
+                      ...next[existingIndex].message,
+                      ...liveEntry.message,
+                      // Keep existing content if new content is empty (prevent wipeouts)
+                      content: liveEntry.message?.content?.length ? liveEntry.message.content : next[existingIndex].message?.content
+                    }
+                  }
+                }
+
+                // Sort stably
+                next.sort((a, b) => {
+                  const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0
+                  const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0
+                  if (ta !== tb) return ta - tb
+                  return 0 // Keep stable for same-ms events
+                })
+
+                return next
+              })
+
+              if (messageId) {
+                setActiveEntryId(messageId)
+                if (eventType === 'message_start' || eventType === 'message_update') {
+                  setStreamingId(messageId)
+                }
+              }
+              if (eventType === 'message_end') {
+                setStreamingId(null)
+              }
+
+              if (isAtBottomRef.current) {
+                pendingScrollToBottomRef.current = true
+              } else {
+                setHasNewMessages(true)
+              }
+              return
+            }
+
+          if (eventType === 'turn_end' && raw.message) {
+            const m = raw.message
+            const mid = m.id || m.responseId || m.response_id
+            if (mid) {
+              setEntries(prev => {
+                const existingIdx = prev.findIndex(e => e.id === mid)
+                if (existingIdx === -1) {
+                  return [...prev, {
+                    type: 'message',
+                    id: mid,
+                    timestamp: m.timestamp || new Date().toISOString(),
+                    message: { ...m }
+                  }]
+                }
+                const next = [...prev]
+                // Merge carefully: don't overwrite with empty content if we already have it
+                next[existingIdx] = {
+                  ...next[existingIdx],
+                  message: {
+                    ...next[existingIdx].message,
+                    ...m,
+                    content: (m.content?.length > 0) ? m.content : next[existingIdx].message?.content
+                  }
+                }
+                return next
               })
             }
-
-            if (!messageId) return
-
-            const nextContent = raw.assistantMessageEvent
-              ? appendDeltaToMessageContent(rawMessage?.content, raw.assistantMessageEvent)
-              : (Array.isArray(rawMessage?.content) ? rawMessage.content : [])
-
-            const liveEntry: SessionEntry = {
-              type: 'message',
-              id: messageId,
-              parentId: raw.parentId,
-              timestamp: raw.timestamp || new Date().toISOString(),
-              message: {
-                ...rawMessage,
-                role: rawMessage?.role || 'assistant',
-                content: nextContent,
-              },
-            }
-
-            setEntries((prev) => {
-              const existingIndex = prev.findIndex((e) => e.id === messageId)
-              if (existingIndex === -1) {
-                return [...prev, liveEntry]
-              }
-
-              const next = [...prev]
-              const existing = next[existingIndex]
-              next[existingIndex] = {
-                ...existing,
-                ...liveEntry,
-                message: {
-                  ...existing.message,
-                  ...liveEntry.message,
-                  role: liveEntry.message?.role || existing.message?.role || 'assistant',
-                  content: raw.assistantMessageEvent
-                    ? appendDeltaToMessageContent(existing.message?.content as any[], raw.assistantMessageEvent)
-                    : (liveEntry.message?.content || []),
-                },
-              }
-              return next
-            })
-
-            setActiveEntryId(messageId)
-            if (isAtBottomRef.current) {
-              pendingScrollToBottomRef.current = true
-            } else {
-              setHasNewMessages(true)
-            }
-            return
           }
 
           if (eventType.startsWith('tool_execution_')) {
             const toolCallId = raw.toolCallId
             if (!toolCallId) return
+
+            if (eventType === 'tool_execution_update') {
+              setEntries((prev) => {
+                // Find message that has this toolCall
+                const msgIdx = prev.findIndex(e =>
+                  e.type === 'message' &&
+                  e.message?.role === 'assistant' &&
+                  e.message.content?.some((c: any) => c.type === 'toolCall' && c.toolCallId === toolCallId)
+                )
+
+                if (msgIdx === -1) return prev
+
+                const next = [...prev]
+                const msg = { ...next[msgIdx] }
+                const content = [...(msg.message?.content || [])]
+                const toolIdx = content.findIndex((c: any) => c.type === 'toolCall' && c.toolCallId === toolCallId)
+
+                if (toolIdx !== -1) {
+                  content[toolIdx] = {
+                    ...content[toolIdx],
+                    // Merge update: name, status, arguments etc.
+                    ...raw,
+                    // !!! CRITICAL: Ensure we don't overwrite "toolCall" type with "tool_execution_update"
+                    // Otherwise it gets filtered out from toolCalls list in AssistantMessage
+                    type: 'toolCall',
+                    // Ensure args are stringified into arguments if they arrive as object
+                    arguments: raw.args ? JSON.stringify(raw.args) : (raw.arguments || content[toolIdx].arguments)
+                  }
+                  msg.message = { ...msg.message!, content }
+                  next[msgIdx] = msg
+                }
+
+                // Additionally, if there is partialResult, create/update a toolResult entry
+                // so the ToolCallList can render the intermediate output.
+                if (raw.partialResult || raw.result) {
+                  const resultData = raw.partialResult || raw.result
+                  const toolResultEntry: SessionEntry = {
+                    type: 'message',
+                    id: `tool-result-${toolCallId}`,
+                    timestamp: raw.timestamp || new Date().toISOString(),
+                    message: {
+                      role: 'toolResult',
+                      toolCallId,
+                      isError: !!raw.isError,
+                      content: resultData.content || [],
+                    },
+                  }
+                  const resIdx = next.findIndex(e => e.id === toolResultEntry.id)
+                  if (resIdx === -1) {
+                    next.push(toolResultEntry)
+                  } else {
+                    next[resIdx] = toolResultEntry
+                  }
+                }
+
+                return next
+              })
+            }
 
             if (eventType === 'tool_execution_end') {
               const resultText = raw.result?.content?.find?.((c: any) => c.type === 'text')?.text || ''
@@ -613,6 +780,7 @@ export function useSessionViewerData({
     setScrollTargetId,
     hasNewMessages,
     setHasNewMessages,
+    streamingId,
     pendingScrollToBottomRef,
     hasMoreHistory,
     loadMoreHistory: async () => {

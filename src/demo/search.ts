@@ -1,7 +1,7 @@
-import type { FullTextSearchHit, Match, SearchResult, SessionEntry, SessionInfo } from '../types'
-import { filterSessionsBySearchQuery } from '../utils/sessionFilters'
-import { getSessionIdMatchKind } from '../utils/session'
-import { parseQuotedQuery } from '../utils/search'
+import type { FullTextSearchHit, Match, SearchResult, SessionEntry, SessionInfo } from '@/types'
+import { filterSessionsBySearchQuery } from '@/utils/sessionFilters'
+import { getSessionIdMatchKind } from '@/utils/session'
+import { parseQuotedQuery } from '@/utils/search'
 
 import type {
   DemoFullTextSearchOptions,

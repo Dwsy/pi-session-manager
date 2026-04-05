@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
-import type { SessionInfo } from '../types'
-import { filterSessionsBySearchQuery } from '../utils/sessionFilters'
+import type { SessionInfo } from '@/types'
+import { filterSessionsBySearchQuery } from '@/utils/sessionFilters'
 
 export interface UseSimpleSearchReturn {
   searchQuery: string

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
-import type { MobileTab } from "../../components/app/AppMobileLayout";
-import type { SessionInfo } from "../../types";
+import type { MobileTab } from "@/components/app/AppMobileLayout";
+import type { SessionInfo } from "@/types";
 
 export interface UseAppUiEffectsOptions {
   isMobile: boolean;

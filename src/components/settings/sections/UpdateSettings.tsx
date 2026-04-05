@@ -7,10 +7,10 @@ import {
   ExternalLink,
   RefreshCw,
 } from 'lucide-react'
-import SettingsCard from '../SettingsCard'
-import SettingsToggleRow from '../SettingsToggleRow'
-import type { UpdateSettingsProps } from '../types'
-import { checkForUpdates, getLastUpdateCheckAt } from '../../../utils/updateChecker'
+import SettingsCard from '@/components/settings/SettingsCard'
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
+import type { UpdateSettingsProps } from '@/components/settings/types'
+import { checkForUpdates, getLastUpdateCheckAt } from '@/utils/updateChecker'
 
 type CheckMessage =
   | { type: 'success'; text: string }

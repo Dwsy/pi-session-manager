@@ -8,9 +8,9 @@ import {
   Settings,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import ConnectionBanner from "../ConnectionBanner";
-import { triggerHaptic } from "../../utils/haptics";
-import type { SessionInfo } from "../../types";
+import ConnectionBanner from "@/components/ConnectionBanner";
+import { triggerHaptic } from "@/utils/haptics";
+import type { SessionInfo } from "@/types";
 
 export type MobileTab =
   | "list"

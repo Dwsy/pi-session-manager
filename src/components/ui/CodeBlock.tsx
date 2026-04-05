@@ -1,8 +1,8 @@
 import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getLanguageFromPath, renderCodeHtml } from '../../utils/markdown'
-import { highlightSearchInHTML } from '../../utils/search'
-import { useClipboard } from '../../hooks/useClipboard'
+import { getLanguageFromPath, renderCodeHtml } from '@/utils/markdown'
+import { highlightSearchInHTML } from '@/utils/search'
+import { useClipboard } from '@/hooks/useClipboard'
 
 interface CodeBlockProps {
   code: string

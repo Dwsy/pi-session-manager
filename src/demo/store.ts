@@ -4,7 +4,7 @@ import type {
   SessionInfo,
   SessionTag,
   Tag,
-} from '../types'
+} from '@/types'
 
 import { buildInitialStoreData, toJsonl } from './content'
 import {

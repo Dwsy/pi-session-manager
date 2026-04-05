@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy } from 'lucide-react'
-import type { SessionInfo } from '../../types'
-import { useIsMobile } from '../../hooks/useIsMobile'
+import type { SessionInfo } from '@/types'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface ForkDialogProps {
   session: SessionInfo

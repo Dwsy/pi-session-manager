@@ -1,6 +1,6 @@
 import { Activity, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import type { SessionStats } from '../../types'
+import type { SessionStats } from '@/types'
 
 interface ActivityTrendProps {
   stats: SessionStats

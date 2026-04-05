@@ -1,4 +1,4 @@
-import type { Tag } from '../../types'
+import type { Tag } from '@/types'
 
 const COLOR_MAP: Record<string, string> = {
   info: 'bg-blue-500',

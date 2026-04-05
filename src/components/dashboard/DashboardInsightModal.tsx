@@ -8,8 +8,8 @@ import {
   Sparkles,
   ChevronsDown,
 } from 'lucide-react'
-import type { SessionStats } from '../../types'
-import { getPathBasename } from '../../utils/path'
+import type { SessionStats } from '@/types'
+import { getPathBasename } from '@/utils/path'
 
 interface DashboardInsightModalProps {
   open: boolean

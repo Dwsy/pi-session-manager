@@ -1,4 +1,4 @@
-import type { FavoriteItem, SessionEntry, SessionInfo, SessionTag, Tag } from '../types'
+import type { FavoriteItem, SessionEntry, SessionInfo, SessionTag, Tag } from '@/types'
 
 import {
   DEMO_FAVORITES,

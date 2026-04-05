@@ -1,5 +1,5 @@
-import { invoke } from '../transport'
-import type { ResourceInfo } from '../types'
+import { invoke } from '@/transport'
+import type { ResourceInfo } from '@/types'
 
 interface PiThemeFile {
   name?: string

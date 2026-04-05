@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { format, parseISO } from 'date-fns'
 import { ExternalLink, Filter } from 'lucide-react'
-import type { HeatmapPoint } from '../../types'
+import type { HeatmapPoint } from '@/types'
 
 interface HeatmapTooltipProps {
   point: HeatmapPoint

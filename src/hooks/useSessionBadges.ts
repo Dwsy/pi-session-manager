@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { SessionInfo } from '../types'
+import type { SessionInfo } from '@/types'
 
 interface BadgeState {
   type: 'new' | 'updated'

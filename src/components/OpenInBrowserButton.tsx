@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { invoke, isTauri } from '../transport'
+import { invoke, isTauri } from '@/transport'
 import { ExternalLink, Loader2 } from 'lucide-react'
-import type { SessionInfo } from '../types'
+import type { SessionInfo } from '@/types'
 
 interface OpenInBrowserButtonProps {
   session: SessionInfo

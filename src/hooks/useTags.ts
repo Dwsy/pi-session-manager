@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
-import { invoke } from '../transport'
-import type { Tag, SessionTag } from '../types'
+import { invoke } from '@/transport'
+import type { Tag, SessionTag } from '@/types'
 import {
   assignDemoTag,
   createDemoTag,
@@ -14,7 +14,7 @@ import {
   reorderDemoTags,
   updateDemoTag,
   updateDemoTagAutoRules,
-} from '../demo'
+} from '@/demo'
 
 export function useTags() {
   const [tags, setTags] = useState<Tag[]>([])

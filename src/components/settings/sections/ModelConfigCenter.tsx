@@ -22,13 +22,13 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import { invoke } from '../../../transport'
-import { useClipboard } from '../../../hooks/useClipboard'
-import SettingsCard from '../SettingsCard'
-import SettingsField from '../SettingsField'
-import SettingsInput from '../SettingsInput'
-import SettingsSelect from '../SettingsSelect'
-import SettingsToggleRow from '../SettingsToggleRow'
+import { invoke } from '@/transport'
+import { useClipboard } from '@/hooks/useClipboard'
+import SettingsCard from '@/components/settings/SettingsCard'
+import SettingsField from '@/components/settings/SettingsField'
+import SettingsInput from '@/components/settings/SettingsInput'
+import SettingsSelect from '@/components/settings/SettingsSelect'
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
 
 type JsonValue = Record<string, unknown>
 

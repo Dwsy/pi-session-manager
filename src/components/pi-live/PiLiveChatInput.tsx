@@ -4,7 +4,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { ArrowUp, Loader2, Zap } from 'lucide-react'
-import { usePiLive } from '../../hooks/usePiLive'
+import { usePiLive } from '@/hooks/usePiLive'
 
 interface PiLiveChatInputProps {
   sessionId: string

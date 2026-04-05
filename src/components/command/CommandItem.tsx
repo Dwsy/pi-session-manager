@@ -1,5 +1,5 @@
 import { Command } from 'cmdk'
-import type { SearchPluginResult, SearchPlugin } from '../../plugins/types'
+import type { SearchPluginResult, SearchPlugin } from '@/plugins/types'
 
 interface CommandItemProps {
   result: SearchPluginResult

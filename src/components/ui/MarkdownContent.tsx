@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react'
-import { parseMarkdown } from '../../utils/markdown'
-import { highlightSearchInHTML } from '../../utils/search'
+import { parseMarkdown } from '@/utils/markdown'
+import { highlightSearchInHTML } from '@/utils/search'
 
 interface MarkdownContentProps {
   content: string

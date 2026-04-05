@@ -1,7 +1,7 @@
 import { memo } from 'react'
-import type { LegacySessionStats } from '../../types'
-import { formatDate, formatTokens } from '../../utils/format'
-import { escapeHtml } from '../../utils/markdown'
+import type { LegacySessionStats } from '@/types'
+import { formatDate, formatTokens } from '@/utils/format'
+import { escapeHtml } from '@/utils/markdown'
 import { useTranslation } from 'react-i18next'
 
 interface SessionHeaderProps {

@@ -3,8 +3,8 @@ import { TrendingUp, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import DashboardCardShell from './DashboardCardShell'
-import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
-import type { SessionStats } from '../../types'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import type { SessionStats } from '@/types'
 
 interface TokenTrendChartProps {
   stats: SessionStats

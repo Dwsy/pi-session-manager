@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Production-grade file moving tool based on ts-morph
- * 
+ *
  * Features:
  * - Moves files and auto-updates all references
  * - Supports batch operations

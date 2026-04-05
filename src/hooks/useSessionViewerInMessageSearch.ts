@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { Content, SessionEntry } from '../types'
-import { parseMarkdown } from '../utils/markdown'
-import { getAssistantDisplayedBlocks } from '../utils/assistantContent'
+import type { Content, SessionEntry } from '@/types'
+import { parseMarkdown } from '@/utils/markdown'
+import { getAssistantDisplayedBlocks } from '@/utils/assistantContent'
 import {
   getSearchableToolCallRenderedHtmlSegments,
-} from '../plugins/tools-render/utils/searchSegments'
-import { toolRenderRegistry } from '../plugins/tools-render/registry'
-import { defaultResolveData } from '../plugins/tools-render/utils/resolveData'
-import { countSearchHighlightsInHTML } from '../utils/search'
+} from '@/plugins/tools-render/utils/searchSegments'
+import { toolRenderRegistry } from '@/plugins/tools-render/registry'
+import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
+import { countSearchHighlightsInHTML } from '@/utils/search'
 
 export type SessionSearchScope = 'all' | 'messages' | 'user'
 

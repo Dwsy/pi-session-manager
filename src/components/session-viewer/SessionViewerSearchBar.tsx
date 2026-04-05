@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 
-import type { SessionSearchScope } from "../../hooks/useSessionViewerInMessageSearch";
+import type { SessionSearchScope } from "@/hooks/useSessionViewerInMessageSearch";
 
 const SEARCH_SCOPE_OPTIONS: Array<{
   value: SessionSearchScope;

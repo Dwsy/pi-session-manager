@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { invoke } from '../../transport'
+import { invoke } from '@/transport'
 import { useTranslation } from 'react-i18next'
 import { BarChart3, Clock, RefreshCw, Activity, Zap, DollarSign } from 'lucide-react'
 
-import type { HeatmapPoint, SessionInfo, SessionStats, SessionStatsInput, DayStats } from '../../types'
-import { getDemoDayStats, getDemoStats } from '../../hooks/useDemoMode'
+import type { HeatmapPoint, SessionInfo, SessionStats, SessionStatsInput, DayStats } from '@/types'
+import { getDemoDayStats, getDemoStats } from '@/hooks/useDemoMode'
 import StatCard from './StatCard'
 import ActivityHeatmap from './ActivityHeatmap'
 import HeatmapDayModal from './HeatmapDayModal'
@@ -15,9 +15,9 @@ import TopModelsChart from './TopModelsChart'
 import TimeDistribution from './TimeDistribution'
 import DashboardInsightModal from './DashboardInsightModal'
 import TokenTrendChart from './TokenTrendChart'
-import { DashboardSkeleton } from '../ui/Skeleton'
-import { isDemoModeEnabled } from '../../demo'
-import { getPathBasename, hasPathSeparator } from '../../utils/path'
+import { DashboardSkeleton } from '@/components/ui/Skeleton'
+import { isDemoModeEnabled } from '@/demo'
+import { getPathBasename, hasPathSeparator } from '@/utils/path'
 
 interface DashboardProps {
   sessions: SessionInfo[]

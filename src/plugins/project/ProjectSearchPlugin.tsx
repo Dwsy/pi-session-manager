@@ -1,8 +1,8 @@
 import { FolderOpen } from 'lucide-react'
-import { BaseSearchPlugin } from '../base/BaseSearchPlugin'
-import type { SearchContext, SearchPluginResult } from '../types'
-import { getPathBasename } from '../../utils/path'
-import { parseQuotedQuery } from '../../utils/search'
+import { BaseSearchPlugin } from '@/plugins/base/BaseSearchPlugin'
+import type { SearchContext, SearchPluginResult } from '@/plugins/types'
+import { getPathBasename } from '@/utils/path'
+import { parseQuotedQuery } from '@/utils/search'
 
 /**
  * Project search plugin
@@ -13,31 +13,31 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
   icon = FolderOpen
   keywords = ['project', 'folder', 'directory', 'project', 'folder', 'directory']
   priority = 70
-  
+
   get name(): string {
     return this.context?.t('plugins.project.name', 'Project Search') || 'project搜索'
   }
-  
+
   get description(): string {
     return this.context?.t('plugins.project.description', 'Search project paths') || '搜索project路径'
   }
-  
+
   async search(
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]> {
     // Save context for i18n access
     this.setContext(context)
-    
+
     try {
       // Extract project list from sessions
       const projectMap = new Map<string, number>()
-      
+
       context.sessions.forEach(session => {
         const project = session.cwd
         projectMap.set(project, (projectMap.get(project) || 0) + 1)
       })
-      
+
       // Search matching projects
       const results: SearchPluginResult[] = []
       const parsedQuery = parseQuotedQuery(query)
@@ -105,7 +105,7 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
           })
         }
       }
-      
+
       const finalResults = results.sort((a, b) => b.score - a.score).slice(0, 10)
       return finalResults
     } catch (error) {
@@ -113,17 +113,17 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
       return []
     }
   }
-  
+
   onSelect(result: SearchPluginResult, context: SearchContext): void {
     // Switch to project view
     const project = result.metadata?.project
-    
+
     if (project) {
       context.setSelectedProject(project)
       context.closeCommandMenu()
     }
   }
-  
+
   /**
    * Get project name (last part of path)
    */

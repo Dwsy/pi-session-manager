@@ -1,7 +1,7 @@
 import { Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import DashboardCardShell from './DashboardCardShell'
-import type { SessionStats } from '../../types'
+import type { SessionStats } from '@/types'
 
 interface TimeDistributionProps {
   stats: SessionStats

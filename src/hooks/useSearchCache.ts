@@ -1,5 +1,5 @@
 import { useRef, useMemo } from 'react'
-import type { SearchPluginResult } from '../plugins/types'
+import type { SearchPluginResult } from '@/plugins/types'
 
 interface CacheEntry {
   results: SearchPluginResult[]
@@ -12,13 +12,13 @@ const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 /**
  * Search cache hook
  * Caches search results using LRU strategy
- * 
+ *
  * ⚠️ Important: Use useMemo to ensure returned object reference is stable
  * Otherwise will cause useSearchPlugins' search function to change on every call, triggering infinite loop
  */
 export function useSearchCache() {
   const cacheRef = useRef<Map<string, CacheEntry>>(new Map())
-  
+
   // Use useMemo to ensure returned object is a stable reference
   // Empty dependency array means create only once, avoid infinite loops
   return useMemo(() => ({
@@ -29,18 +29,18 @@ export function useSearchCache() {
      */
     get: (query: string): SearchPluginResult[] | null => {
       const entry = cacheRef.current.get(query)
-      
+
       if (!entry) return null
-      
+
       // Check if expired
       if (Date.now() - entry.timestamp > CACHE_TTL) {
         cacheRef.current.delete(query)
         return null
       }
-      
+
       return entry.results
     },
-    
+
     /**
      * Set cached results
      * @param query Query string
@@ -59,13 +59,13 @@ export function useSearchCache() {
           cacheRef.current.delete(firstKey)
         }
       }
-      
+
       cacheRef.current.set(query, {
         results,
         timestamp: Date.now()
       })
     },
-    
+
     /**
      * Clear cache
      */

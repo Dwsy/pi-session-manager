@@ -5,7 +5,7 @@ import type {
   LazyExoticComponent,
   ReactNode,
 } from "react";
-import type Dashboard from "../dashboard/Dashboard";
+import type Dashboard from "@/components/dashboard/Dashboard";
 
 type DashboardProps = ComponentProps<typeof Dashboard>;
 

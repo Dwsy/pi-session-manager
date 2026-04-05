@@ -1,4 +1,4 @@
-import type { SearchPlugin, SearchContext, SearchPluginResult, HighlightRange } from '../types'
+import type { SearchPlugin, SearchContext, SearchPluginResult, HighlightRange } from '@/plugins/types'
 
 /**
  * Base search plugin
@@ -10,19 +10,19 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
   abstract icon: React.ComponentType<{ className?: string }>
   abstract description: string
   abstract keywords: string[]
-  
+
   priority: number = 50 // Default priority
-  
+
   // Store context for subclass i18n access
   protected context?: SearchContext
-  
+
   /**
    * Set search context (includes i18n)
    */
   setContext(context: SearchContext): void {
     this.context = context
   }
-  
+
   /**
    * Abstract search method, must be implemented by subclasses
    */
@@ -30,21 +30,21 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]>
-  
+
   /**
    * Default selection handling (can be overridden)
    */
   onSelect(_result: SearchPluginResult, _context: SearchContext): void {
     // Default: do nothing, subclasses should override
   }
-  
+
   /**
    * Default enable check (can be overridden)
    */
   isEnabled(_context: SearchContext): boolean {
     return true
   }
-  
+
   /**
    * Utility method: fuzzy match
    * @param query Query string
@@ -54,22 +54,22 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
   protected fuzzyMatch(query: string, text: string): number {
     const lowerQuery = query.toLowerCase()
     const lowerText = text.toLowerCase()
-    
+
     // Exact match
     if (lowerText === lowerQuery) return 1.0
-    
+
     // Contains match
     if (lowerText.includes(lowerQuery)) {
       const position = lowerText.indexOf(lowerQuery)
       const positionScore = 1 - (position / lowerText.length)
       return 0.8 * positionScore
     }
-    
+
     // Fuzzy match (character order)
     let queryIndex = 0
     let textIndex = 0
     let matches = 0
-    
+
     while (queryIndex < lowerQuery.length && textIndex < lowerText.length) {
       if (lowerQuery[queryIndex] === lowerText[textIndex]) {
         matches++
@@ -77,14 +77,14 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
       }
       textIndex++
     }
-    
+
     if (matches === lowerQuery.length) {
       return 0.5 * (matches / lowerText.length)
     }
-    
+
     return 0
   }
-  
+
   /**
    * Utility method: calculate highlight ranges
    * @param query Query string
@@ -100,7 +100,7 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
     const lowerQuery = query.toLowerCase()
     const lowerText = text.toLowerCase()
     const highlights: HighlightRange[] = []
-    
+
     let index = lowerText.indexOf(lowerQuery)
     while (index !== -1) {
       highlights.push({
@@ -110,7 +110,7 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
       })
       index = lowerText.indexOf(lowerQuery, index + 1)
     }
-    
+
     return highlights
   }
 }

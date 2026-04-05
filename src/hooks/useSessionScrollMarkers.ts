@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent, RefObject } from "react";
-import type { SessionEntry } from "../types";
+import type { SessionEntry } from "@/types";
 
 const MAX_MARKERS_DESKTOP = 180;
 const MAX_MARKERS_MOBILE = 120;

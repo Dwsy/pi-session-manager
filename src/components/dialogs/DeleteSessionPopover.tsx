@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Loader2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { SessionInfo } from '../../types'
+import type { SessionInfo } from '@/types'
 
 interface DeleteSessionPopoverProps {
   sessions: SessionInfo[]

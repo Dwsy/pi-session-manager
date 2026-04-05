@@ -1,8 +1,8 @@
-import SearchFilterBar from "../search/SearchFilterBar";
-import SessionSortSelect from "../session-viewer/SessionSortSelect";
+import SearchFilterBar from "@/components/search/SearchFilterBar";
+import SessionSortSelect from "@/components/session-viewer/SessionSortSelect";
 import { CheckSquare2 } from "lucide-react";
-import type { SessionTag, Tag } from "../../types";
-import type { SessionSortBy, SessionSortOrder } from "../../types/sessionSort";
+import type { SessionTag, Tag } from "@/types";
+import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
 import { useTranslation } from "react-i18next";
 
 export interface AppMobileFilterBarProps {

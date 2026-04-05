@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react'
-import i18n from '../i18n'
-import type { AppSettings } from '../components/settings/types'
-import { defaultSettings } from '../components/settings/types'
-import { loadAppSettings, saveAppSettings } from '../utils/settingsApi'
+import i18n from '@/i18n'
+import type { AppSettings } from '@/components/settings/types'
+import { defaultSettings } from '@/components/settings/types'
+import { loadAppSettings, saveAppSettings } from '@/utils/settingsApi'
 
 export interface UseAllSettingsReturn {
   settings: AppSettings

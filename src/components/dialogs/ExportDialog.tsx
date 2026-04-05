@@ -1,8 +1,8 @@
-import type { SessionInfo } from '../../types'
+import type { SessionInfo } from '@/types'
 import { FileText, FileCode, Database, Download, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { getCachedSettings } from '../../utils/settingsApi'
-import { useIsMobile } from '../../hooks/useIsMobile'
+import { getCachedSettings } from '@/utils/settingsApi'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface ExportDialogProps {
   session: SessionInfo

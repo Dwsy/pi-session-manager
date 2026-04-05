@@ -1,4 +1,4 @@
-import { getCachedSettings } from '../utils/settingsApi'
+import { getCachedSettings } from '@/utils/settingsApi'
 
 function isDemoPage(): boolean {
   if (typeof window === 'undefined') {

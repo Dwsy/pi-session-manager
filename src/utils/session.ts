@@ -1,4 +1,4 @@
-import type { SessionEntry, LegacySessionStats } from '../types'
+import type { SessionEntry, LegacySessionStats } from '@/types'
 import { parseQuotedQuery } from './search'
 
 export const SHORT_SESSION_ID_LENGTH = 12
@@ -118,7 +118,7 @@ export function getSessionSourceTag(sessionPath: string): string | null {
   // Normalize path separators
   const normalizedPath = sessionPath.replace(/\\/g, '/');
   const parts = normalizedPath.split('/').filter(Boolean);
-  
+
   // Find the last "sessions" directory
   const sessionsIndex = parts.lastIndexOf('sessions');
   if (sessionsIndex > 0) {

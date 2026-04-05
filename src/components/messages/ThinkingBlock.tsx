@@ -1,5 +1,5 @@
 import { memo, useState } from 'react'
-import MarkdownContent from '../ui/MarkdownContent'
+import MarkdownContent from '@/components/ui/MarkdownContent'
 
 interface ThinkingBlockProps {
   content: string

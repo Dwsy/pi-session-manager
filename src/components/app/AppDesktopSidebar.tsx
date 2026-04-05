@@ -2,7 +2,7 @@ import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Columns3, LayoutDashboard, Search, Settings, Star, Terminal } from "lucide-react";
 
-import KbdTooltip from "../ui/KbdTooltip";
+import KbdTooltip from "@/components/ui/KbdTooltip";
 
 export type AppDesktopSidebarViewMode = "list" | "project" | "kanban" | "pi-live";
 

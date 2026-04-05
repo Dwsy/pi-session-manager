@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { getTransport } from '../transport'
-import type { ConnectionStatus } from '../transport'
+import { getTransport } from '@/transport'
+import type { ConnectionStatus } from '@/transport'
 
 /**
  * Track transport connection status.

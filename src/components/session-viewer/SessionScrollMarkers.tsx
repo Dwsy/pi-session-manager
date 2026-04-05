@@ -1,5 +1,5 @@
 import { memo, type PointerEvent, type RefObject } from 'react'
-import type { ScrollMarker } from '../../hooks/useSessionScrollMarkers'
+import type { ScrollMarker } from '@/hooks/useSessionScrollMarkers'
 
 interface SessionScrollMarkersProps {
   markers: ScrollMarker[]

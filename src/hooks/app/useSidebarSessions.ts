@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import type { AppDesktopSidebarSessionListCommonProps } from "../../components/app/AppDesktopSidebarContent";
-import type { MobileTab } from "../../components/app/AppMobileLayout";
-import type { TerminalType } from "../../components/settings/types";
-import type { FavoriteItem, SessionInfo, SessionTag, Tag } from "../../types";
-import type { SessionSortBy, SessionSortOrder } from "../../types/sessionSort";
-import { filterSessions } from "../../utils/sessionFilters";
-import { getDirectoryName } from "../../utils/sessionDisplay";
-import { usePaginatedSessions } from "../usePaginatedSessions";
+import type { AppDesktopSidebarSessionListCommonProps } from "@/components/app/AppDesktopSidebarContent";
+import type { MobileTab } from "@/components/app/AppMobileLayout";
+import type { TerminalType } from "@/components/settings/types";
+import type { FavoriteItem, SessionInfo, SessionTag, Tag } from "@/types";
+import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
+import { filterSessions } from "@/utils/sessionFilters";
+import { getDirectoryName } from "@/utils/sessionDisplay";
+import { usePaginatedSessions } from "@/hooks/usePaginatedSessions";
 
 export type AppSidebarViewMode = "list" | "project" | "kanban";
 

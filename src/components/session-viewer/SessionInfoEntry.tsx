@@ -1,5 +1,5 @@
 import { Pencil } from 'lucide-react'
-import { formatDate } from '../../utils/format'
+import { formatDate } from '@/utils/format'
 
 interface SessionInfoEntryProps {
   name?: string

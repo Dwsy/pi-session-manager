@@ -1,8 +1,8 @@
 import type { CSSProperties, MouseEventHandler, RefObject } from "react";
 
-import SessionTree, { type SessionTreeRef } from "../session-tree/SessionTree";
+import SessionTree, { type SessionTreeRef } from "@/components/session-tree/SessionTree";
 
-import type { SessionEntry } from "../../types";
+import type { SessionEntry } from "@/types";
 
 export interface SessionViewerSidebarProps {
   showSidebar: boolean;

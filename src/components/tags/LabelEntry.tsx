@@ -1,5 +1,5 @@
 import { Bookmark } from 'lucide-react'
-import { formatDate } from '../../utils/format'
+import { formatDate } from '@/utils/format'
 
 interface LabelEntryProps {
   label?: string

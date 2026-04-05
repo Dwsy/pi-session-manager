@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import Toggle from '../ui/Toggle'
+import Toggle from '@/components/ui/Toggle'
 
 interface SettingsToggleRowProps {
   title: ReactNode

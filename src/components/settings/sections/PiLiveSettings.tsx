@@ -1,7 +1,7 @@
 import { Bot } from 'lucide-react'
-import SettingsCard from '../SettingsCard'
-import SettingsToggleRow from '../SettingsToggleRow'
-import type { PiLiveSettings } from '../../../types/pi-live'
+import SettingsCard from '@/components/settings/SettingsCard'
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
+import type { PiLiveSettings } from '@/types/pi-live'
 
 interface PiLiveSettingsProps {
   settings: PiLiveSettings

@@ -1,10 +1,10 @@
 import { useTranslation } from "react-i18next";
 import { CheckSquare2 } from "lucide-react";
 
-import SearchFilterBar from "../search/SearchFilterBar";
-import SessionSortSelect from "../session-viewer/SessionSortSelect";
-import type { SessionTag, Tag } from "../../types";
-import type { SessionSortBy, SessionSortOrder } from "../../types/sessionSort";
+import SearchFilterBar from "@/components/search/SearchFilterBar";
+import SessionSortSelect from "@/components/session-viewer/SessionSortSelect";
+import type { SessionTag, Tag } from "@/types";
+import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
 
 export type AppDesktopSearchBarViewMode = "list" | "project" | "kanban";
 

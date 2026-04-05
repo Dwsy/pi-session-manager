@@ -12,14 +12,14 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
-import type { SessionEntry } from "../../types";
+import type { SessionEntry } from "@/types";
 import SessionTreeSearch, {
   type SessionTreeSearchRef,
 } from "./SessionTreeSearch";
-import { getCachedSettings } from "../../utils/settingsApi";
-import { parseQuotedQuery } from "../../utils/search";
-import { getPathBasename } from "../../utils/path";
-import { useSessionTreeLookup } from "../../hooks/useSessionTreeLookup";
+import { getCachedSettings } from "@/utils/settingsApi";
+import { parseQuotedQuery } from "@/utils/search";
+import { getPathBasename } from "@/utils/path";
+import { useSessionTreeLookup } from "@/hooks/useSessionTreeLookup";
 
 // Known tools map to CSS variable names: var(--tool-color-<name>)
 // Unknown tools use palette variables: var(--tool-palette-<N>)

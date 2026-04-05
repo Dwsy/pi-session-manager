@@ -4,7 +4,7 @@
  * Shows Pi Agent sessions currently streaming via WebSocket bridge.
  */
 
-import { usePiLive } from '../../hooks/usePiLive'
+import { usePiLive } from '@/hooks/usePiLive'
 import { Bot, WifiOff } from 'lucide-react'
 import PiLiveSessionCard from './PiLiveSessionCard'
 

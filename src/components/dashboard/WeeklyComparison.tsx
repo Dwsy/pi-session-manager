@@ -1,7 +1,7 @@
 import { Calendar, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { format, parseISO, startOfWeek, endOfWeek, subWeeks } from 'date-fns'
-import type { SessionStats } from '../../types'
+import type { SessionStats } from '@/types'
 
 interface WeeklyComparisonProps {
   stats: SessionStats

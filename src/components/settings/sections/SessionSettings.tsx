@@ -3,7 +3,7 @@
  */
 
 import { useTranslation } from 'react-i18next'
-import type { SessionSettingsProps } from '../types'
+import type { SessionSettingsProps } from '@/components/settings/types'
 
 export default function SessionSettings({ settings, onUpdate }: SessionSettingsProps) {
   const { t } = useTranslation()

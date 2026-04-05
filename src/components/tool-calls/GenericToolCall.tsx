@@ -1,13 +1,13 @@
 import { useMemo } from 'react'
-import { useSessionView } from '../../contexts/SessionViewContext'
-import MarkdownContent from '../ui/MarkdownContent'
-import { escapeHtml } from '../../utils/markdown'
-import { highlightSearchInHTML } from '../../utils/search'
+import { useSessionView } from '@/contexts/SessionViewContext'
+import MarkdownContent from '@/components/ui/MarkdownContent'
+import { escapeHtml } from '@/utils/markdown'
+import { highlightSearchInHTML } from '@/utils/search'
 import {
   formatToolValue,
   looksLikeMarkdownByFirstChars,
   normalizeToolArguments,
-} from '../../utils/toolCallDisplay'
+} from '@/utils/toolCallDisplay'
 
 interface GenericToolCallProps {
   name: string

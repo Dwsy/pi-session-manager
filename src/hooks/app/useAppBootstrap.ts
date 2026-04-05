@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getPlatformDefaults } from "../../components/settings/types";
-import { useFileWatcher } from "../useFileWatcher";
-import { registerBuiltinPlugins } from "../../plugins";
-import { invoke, isTauri } from "../../transport";
-import type { SessionsDiff } from "../../types";
-import { getCachedSettings } from "../../utils/settingsApi";
-import { applyPiChatTheme } from "../../utils/piTheme";
+import { getPlatformDefaults } from "@/components/settings/types";
+import { useFileWatcher } from "@/hooks/useFileWatcher";
+import { registerBuiltinPlugins } from "@/plugins";
+import { invoke, isTauri } from "@/transport";
+import type { SessionsDiff } from "@/types";
+import { getCachedSettings } from "@/utils/settingsApi";
+import { applyPiChatTheme } from "@/utils/piTheme";
 
 export interface AppTerminalConfig {
   enabled: boolean;

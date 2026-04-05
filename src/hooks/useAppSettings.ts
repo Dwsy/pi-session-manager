@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
-import i18n from '../i18n'
-import { loadAppSettings } from '../utils/settingsApi'
-import { type TerminalType, getPlatformDefaults } from '../components/settings/types'
+import i18n from '@/i18n'
+import { loadAppSettings } from '@/utils/settingsApi'
+import { type TerminalType, getPlatformDefaults } from '@/components/settings/types'
 
 export type { TerminalType }
 

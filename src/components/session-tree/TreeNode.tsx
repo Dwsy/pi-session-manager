@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { SessionEntry } from '../../types'
+import type { SessionEntry } from '@/types'
 
 interface TreeNodeProps {
   entry: SessionEntry

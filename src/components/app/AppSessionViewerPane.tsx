@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 
-import SessionViewer from "../SessionViewer";
+import SessionViewer from "@/components/SessionViewer";
 
 export interface AppSessionViewerPaneProps extends Pick<
   ComponentProps<typeof SessionViewer>,

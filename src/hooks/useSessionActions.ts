@@ -1,8 +1,8 @@
 import { useCallback } from 'react'
-import { invoke } from '../transport'
+import { invoke } from '@/transport'
 import { save } from '@tauri-apps/plugin-dialog'
 import { useTranslation } from 'react-i18next'
-import type { SessionInfo } from '../types'
+import type { SessionInfo } from '@/types'
 
 export interface UseSessionActionsReturn {
   handleExportSession: (session: SessionInfo, format: 'html' | 'md' | 'json') => Promise<void>
