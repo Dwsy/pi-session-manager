@@ -196,14 +196,9 @@ function App() {
     }
   });
   const [showTerminal, setShowTerminal] = useState(false);
-  const [showPiLive, setShowPiLive] = useState(false);
-  const togglePiLive = useCallback(() => {
-    setShowPiLive((prev) => !prev);
-    if (showFavorites) setShowFavorites(false);
-  }, [showFavorites]);
 
   // 实际显示 Pi Live 需要: 功能启用 + 侧边栏显示 + 用户切换
-  const showPiLivePanel = piLiveEnabled && showPiLiveInSidebar && showPiLive;
+  const showPiLivePanel = piLiveEnabled && showPiLiveInSidebar;
 
   const [pendingScrollEntryId, setPendingScrollEntryId] = useState<
     string | null
@@ -818,8 +813,6 @@ function App() {
           showFavorites={showFavorites}
           terminalEnabled={terminalConfig.enabled}
           showTerminal={showTerminal}
-          showPiLive={showPiLive}
-          onTogglePiLive={togglePiLive}
           onShowDashboard={handleSidebarShowDashboard}
           onSelectListView={handleSidebarSelectListView}
           onSelectProjectView={handleSidebarSelectProjectView}

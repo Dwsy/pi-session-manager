@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { Bot, Columns3, LayoutDashboard, Search, Settings, Star, Terminal } from "lucide-react";
+import { Columns3, LayoutDashboard, Search, Settings, Star, Terminal } from "lucide-react";
 
 import KbdTooltip from "../ui/KbdTooltip";
 
@@ -13,8 +13,6 @@ export interface AppDesktopSidebarProps {
   showFavorites: boolean;
   terminalEnabled: boolean;
   showTerminal: boolean;
-  showPiLive: boolean;
-  onTogglePiLive: () => void;
   onShowDashboard: () => void;
   onSelectListView: () => void;
   onSelectProjectView: () => void;
@@ -36,8 +34,6 @@ function AppDesktopSidebar({
   terminalEnabled,
   showTerminal,
   onShowDashboard,
-  showPiLive,
-  onTogglePiLive,
   onSelectListView,
   onSelectProjectView,
   onSelectKanbanView,
@@ -60,23 +56,6 @@ function AppDesktopSidebar({
           : {})}
       >
         <div className="flex items-center gap-0.5 ml-auto no-drag">
-          {showPiLive && (
-            <button
-              className="p-1 rounded motion-color motion-press focus-ring mr-1 text-amber-400 bg-secondary"
-              title="Pi Live Sessions"
-            >
-              <Bot className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <KbdTooltip shortcut="Cmd+D" label="Pi Live">
-            <button
-              onClick={onTogglePiLive}
-              className={`p-1 rounded motion-color motion-press focus-ring mr-1 ${showPiLive ? "text-amber-400 bg-secondary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
-              title="Pi Live Sessions (Cmd+D)"
-            >
-              <Bot className="h-3.5 w-3.5" />
-            </button>
-          </KbdTooltip>
           <button
             onClick={onShowDashboard}
             className="p-1 rounded motion-color motion-press focus-ring mr-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
