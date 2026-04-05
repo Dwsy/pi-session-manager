@@ -7,9 +7,9 @@ pub mod types;
 // Infrastructure (stay at root)
 pub mod api_readonly;
 pub mod auth;
-pub mod dispatch;
 pub mod compression;
 pub mod config;
+pub mod dispatch;
 pub mod export;
 pub mod metrics;
 pub mod settings_store;

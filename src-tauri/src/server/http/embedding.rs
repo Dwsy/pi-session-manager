@@ -1,9 +1,9 @@
+#[cfg(feature = "gui")]
+use crate::api_readonly;
 use crate::data::search::embedding::{
     EmbeddingBatchRequest, EmbeddingRequest, EmbeddingResponse, EmbeddingService,
     EmbeddingStatusResponse,
 };
-#[cfg(feature = "gui")]
-use crate::api_readonly;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;

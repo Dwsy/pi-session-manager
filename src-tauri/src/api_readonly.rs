@@ -1,9 +1,9 @@
+use crate::core::intel::{ExperienceItem, RecallEvidence};
 use crate::data::search::embedding::{
     EmbeddingBatchRequest, EmbeddingData, EmbeddingRequest, EmbeddingResponse, EmbeddingService,
     EmbeddingStatusResponse,
 };
 use crate::types::{FullTextSearchHit, FullTextSearchResponse, SessionInfo};
-use crate::core::intel::{ExperienceItem, RecallEvidence};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

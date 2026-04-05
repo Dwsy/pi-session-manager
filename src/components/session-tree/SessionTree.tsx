@@ -438,47 +438,59 @@ const SessionTree = memo(
       return prefixChars.join("");
     };
 
+    // Build ancestor path map for efficient nearest-visible-ancestor lookup
+    // Key insight: instead of walking up the tree for each node, precompute all ancestor paths
+    const ancestorPathMap = useMemo(() => {
+      const map = new Map<string, string[]>(); // nodeId -> array of ancestors [root, ..., parent]
+
+      function buildPaths(node: TreeNodeData, path: string[]) {
+        const currentPath = [...path, node.entry.id];
+        map.set(node.entry.id, currentPath);
+        for (const child of node.children) {
+          buildPaths(child, currentPath);
+        }
+      }
+
+      for (const root of treeData) {
+        buildPaths(root, []);
+      }
+
+      return map;
+    }, [treeData]);
+
+    // Find nearest visible ancestor using precomputed paths (O(depth) instead of O(n))
+    const findNearestVisibleAncestor = useCallback(
+      (nodeId: string, visibleIds: Set<string>): string | null => {
+        const path = ancestorPathMap.get(nodeId);
+        if (!path) return null;
+
+        // Walk backwards from parent to root, find first visible
+        for (let i = path.length - 2; i >= 0; i--) {
+          if (visibleIds.has(path[i])) {
+            return path[i];
+          }
+        }
+        return null; // No visible ancestor (root-level)
+      },
+      [ancestorPathMap],
+    );
+
     // Recalculate visual structure for filtered view
     // When nodes are filtered, children attach to nearest visible ancestor
     // This keeps tree structure intact without visual drift
     const recalculateVisualStructure = useCallback(
-      (
-        filteredNodes: FlatNode[],
-        allFlatNodes: FlatNode[],
-      ): FlatNode[] => {
+      (filteredNodes: FlatNode[]): FlatNode[] => {
         if (filteredNodes.length === 0) return filteredNodes;
 
         const visibleIds = new Set(filteredNodes.map((n) => n.node.entry.id));
 
-        // Build entry map for parent lookup (using full tree)
-        const entryMap = new Map<string, FlatNode>();
-        for (const flatNode of allFlatNodes) {
-          entryMap.set(flatNode.node.entry.id, flatNode);
-        }
-
-        // Find nearest visible ancestor for a node
-        function findVisibleAncestor(nodeId: string): string | null {
-          const flatNode = entryMap.get(nodeId);
-          if (!flatNode) return null;
-          let currentId = flatNode.node.entry.parentId;
-          while (currentId != null) {
-            if (visibleIds.has(currentId)) {
-              return currentId;
-            }
-            const parentFlatNode = entryMap.get(currentId);
-            if (!parentFlatNode) break;
-            currentId = parentFlatNode.node.entry.parentId;
-          }
-          return null;
-        }
-
-        // Build visible tree structure
+        // Build visible tree structure using precomputed ancestor paths (O(n))
         const visibleChildren = new Map<string | null, string[]>();
         visibleChildren.set(null, []); // root-level nodes
 
         for (const flatNode of filteredNodes) {
           const nodeId = flatNode.node.entry.id;
-          const ancestorId = findVisibleAncestor(nodeId);
+          const ancestorId = findNearestVisibleAncestor(nodeId, visibleIds);
           if (!visibleChildren.has(ancestorId ?? null)) {
             visibleChildren.set(ancestorId ?? null, []);
           }
@@ -541,10 +553,7 @@ const SessionTree = memo(
           const children = visibleChildren.get(nodeId) ?? [];
           const multipleChildren = children.length > 1;
 
-          // Calculate child indent using same rules as flattenTree():
-          // - Parent branches (multiple children): children get +1
-          // - Just branched and indent > 0: children get +1 for visual grouping
-          // - Single-child chain: stay flat
+          // Calculate child indent using same rules as flattenTree()
           let childIndent: number;
           if (multipleChildren) {
             childIndent = indent + 1;
@@ -581,7 +590,7 @@ const SessionTree = memo(
 
         return filteredNodes;
       },
-      [],
+      [findNearestVisibleAncestor],
     );
 
     // Filter nodes with visual structure recalculation
@@ -710,7 +719,7 @@ const SessionTree = memo(
         searchTerms.length > 0 ||
         currentFilter !== "no-tools"
       ) {
-        return recalculateVisualStructure(baseFiltered, flatNodes);
+        return recalculateVisualStructure(baseFiltered);
       }
 
       return baseFiltered;
