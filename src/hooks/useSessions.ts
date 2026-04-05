@@ -84,6 +84,7 @@ export function useSessions(): UseSessionsReturn {
               pid: l.pid,
               cwd: l.cwd || "",
               first_message: "",
+              created: "",
             })
           }
         }

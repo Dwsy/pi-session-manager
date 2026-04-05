@@ -604,10 +604,11 @@ export function useSessionViewerData({
                     ...next[existingIndex],
                     ...liveEntry,
                     message: {
+                      role: liveEntry.message?.role ?? next[existingIndex].message?.role ?? "unknown",
                       ...next[existingIndex].message,
                       ...liveEntry.message,
                       // Keep existing content if new content is empty (prevent wipeouts)
-                      content: liveEntry.message?.content?.length ? liveEntry.message.content : next[existingIndex].message?.content
+                      content: liveEntry.message?.content?.length ? liveEntry.message.content : next[existingIndex].message?.content ?? [],
                     }
                   }
                 }
