@@ -130,7 +130,13 @@ export default defineConfig(({ mode }) => {
         },
       },
       watch: {
-        ignored: ['**/src-tauri/**'],
+        ignored: [
+          '**/src-tauri/**',
+          '**/target/**',
+          '**/*.rs',
+          '**/Cargo.toml',
+          '**/Cargo.lock',
+        ],
       },
       hmr: {
         overlay: false,

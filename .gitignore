@@ -31,6 +31,9 @@ Cargo.lock
 # Tauri
 src-tauri/target/
 src-tauri/gen/
+src-tauri/*/target/
+**/target/release/
+**/target/debug/
 
 # Environment
 .env

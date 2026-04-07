@@ -278,7 +278,8 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
 
         // Load all sessions from DB first (O(1) lookup by path)
         let db_sessions = sqlite::get_all_sessions(&conn)?;
-        let db_paths: std::collections::HashSet<&str> = db_sessions.iter().map(|s| s.path.as_str()).collect();
+        let db_paths: std::collections::HashSet<&str> =
+            db_sessions.iter().map(|s| s.path.as_str()).collect();
 
         // Identify files that need parsing: new files or files modified after DB's file_modified
         let files_to_parse: Vec<PathBuf> = files
@@ -290,9 +291,15 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                     true
                 } else {
                     // Existing file, check if modified
-                    if let Ok(Some(cached_modified)) = sqlite::get_cached_file_modified(&conn, &path_str) {
-                        if let Ok(metadata) = std::fs::metadata(&path) {
-                            let file_modified: chrono::DateTime<chrono::Utc> = DateTime::from(metadata.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH));
+                    if let Ok(Some(cached_modified)) =
+                        sqlite::get_cached_file_modified(&conn, &path_str)
+                    {
+                        if let Ok(metadata) = std::fs::metadata(path) {
+                            let file_modified: chrono::DateTime<chrono::Utc> = DateTime::from(
+                                metadata
+                                    .modified()
+                                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH),
+                            );
                             file_modified > cached_modified
                         } else {
                             false
@@ -305,7 +312,12 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             })
             .collect();
 
-        info!("Need to parse {} files ({} cached, {} to parse)", total_files, total_files - files_to_parse.len(), files_to_parse.len());
+        info!(
+            "Need to parse {} files ({} cached, {} to parse)",
+            total_files,
+            total_files - files_to_parse.len(),
+            files_to_parse.len()
+        );
 
         // Parse only files that need updates
         let parsed_results = if files_to_parse.is_empty() {
