@@ -704,7 +704,7 @@ impl ScannerScheduler {
 
             // Buffer realtime files for stats
             if file_modified > realtime_cutoff {
-                write_buffer::buffer_session_write(&sessions.last().unwrap(), file_modified);
+                write_buffer::buffer_session_write(sessions.last().unwrap(), file_modified);
             }
         }
 
