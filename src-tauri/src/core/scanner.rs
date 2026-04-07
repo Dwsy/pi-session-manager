@@ -625,7 +625,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
         }
     }
 
-    info!(
+    debug!(
         "Incremental rescan: {} updated, {} removed",
         diff.updated.len(),
         diff.removed.len()

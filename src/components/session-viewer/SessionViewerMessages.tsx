@@ -215,6 +215,17 @@ const SessionViewerMessages = forwardRef<
 
   const virtualRows = rowVirtualizer.getVirtualItems();
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>{t("session.loading")}</span>
+        </div>
+      </div>
+    );
+  }
+
   if (showLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
