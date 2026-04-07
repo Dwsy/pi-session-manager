@@ -20,6 +20,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -27,5 +28,15 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUwQURCNEM1Mzc2MzczQUYKUldTdmMyTTN4YlN0VUJsb3EyUm9LeHg3Wk1qQlJmVHpsbS96ZnRoY1p5cWs3dGUzTGJtNWZoZUEK",
+      "endpoints": [
+        "https://github.com/dwsy/pi-session-manager/releases/latest/download/updater.json"
+      ],
+      "dialog": true
+    }
   }
 }

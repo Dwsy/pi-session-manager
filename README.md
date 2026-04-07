@@ -198,3 +198,13 @@ See [agent-docs/03-backend.md](agent-docs/03-backend.md) for detailed tutorial.
 ## License
 
 MIT
+
+## macOS Installation Note
+
+If macOS shows "App is damaged and can't be opened", run:
+
+```bash
+sudo xattr -rd com.apple.quarantine "/Applications/Pi Session Manager.app"
+```
+
+This is a standard Gatekeeper behavior for non-App-Store apps. No certificate is required for personal use.
