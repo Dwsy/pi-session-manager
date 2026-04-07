@@ -67,10 +67,7 @@ pub fn session_matches_project_filter(session: &SessionInfo, raw_project: &str) 
     path_is_same_or_child(&session_path, &project)
 }
 
-pub fn filter_by_tags(
-    sessions: &mut Vec<SessionInfo>,
-    tag_ids: &[String],
-) -> Result<(), String> {
+pub fn filter_by_tags(sessions: &mut Vec<SessionInfo>, tag_ids: &[String]) -> Result<(), String> {
     if tag_ids.is_empty() {
         return Ok(());
     }

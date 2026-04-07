@@ -22,7 +22,12 @@ fn build_unix_resume_command(cwd: &str, path: &str, pi_cmd: &str) -> String {
 }
 
 /// Build resume command, using custom template if provided
-pub fn build_resume_command(cwd: &str, path: &str, pi_cmd: &str, custom_template: Option<&str>) -> String {
+pub fn build_resume_command(
+    cwd: &str,
+    path: &str,
+    pi_cmd: &str,
+    custom_template: Option<&str>,
+) -> String {
     match custom_template {
         Some(template) if !template.trim().is_empty() => template
             .replace("{cwd}", cwd)
@@ -145,7 +150,12 @@ pub fn has_custom_terminal_placeholder(template: &str) -> bool {
 }
 
 #[cfg(target_os = "windows")]
-pub fn render_custom_terminal_command(template: &str, cwd: &str, path: &str, pi_cmd: &str) -> String {
+pub fn render_custom_terminal_command(
+    template: &str,
+    cwd: &str,
+    path: &str,
+    pi_cmd: &str,
+) -> String {
     let resume_cmd = build_windows_cmd_resume_command(cwd, path, pi_cmd);
     let has_any_placeholder = has_custom_terminal_placeholder(template);
     let mut rendered = template
@@ -162,7 +172,12 @@ pub fn render_custom_terminal_command(template: &str, cwd: &str, path: &str, pi_
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn render_custom_terminal_command(template: &str, cwd: &str, path: &str, pi_cmd: &str) -> String {
+pub fn render_custom_terminal_command(
+    template: &str,
+    cwd: &str,
+    path: &str,
+    pi_cmd: &str,
+) -> String {
     let resume_cmd = build_unix_resume_command(cwd, path, pi_cmd);
     let has_any_placeholder = has_custom_terminal_placeholder(template);
     let mut rendered = template

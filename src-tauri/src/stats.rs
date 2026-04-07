@@ -5,16 +5,16 @@
 pub use crate::domain::stats::*;
 
 // Re-export for backward compatibility
-pub use crate::domain::stats::types::{
-    DailyActivity, DayProjectBreakdown, DaySession, DayStats, HeatmapPoint, ModelTokenStats,
-    SessionStats, SessionStatsInput, TimeDistributionPoint, TokenDetails,
-};
 pub use crate::domain::stats::aggregator::{
     calculate_stats, calculate_stats_from_inputs, extract_project_name, merge_model_usage,
     parse_modified, record_model_presence, DailyStatsCollector,
 };
-pub use crate::domain::stats::heatmap::{generate_heatmap_data, generate_time_distribution};
 pub use crate::domain::stats::day_stats::{get_activity_timeline, get_day_stats};
+pub use crate::domain::stats::heatmap::{generate_heatmap_data, generate_time_distribution};
+pub use crate::domain::stats::types::{
+    DailyActivity, DayProjectBreakdown, DaySession, DayStats, HeatmapPoint, ModelTokenStats,
+    SessionStats, SessionStatsInput, TimeDistributionPoint, TokenDetails,
+};
 
 #[cfg(test)]
 mod tests {
@@ -28,13 +28,19 @@ mod tests {
             SessionStatsInput {
                 path: "/tmp/does-not-exist-1.jsonl".to_string(),
                 cwd: "/Users/example/project-alpha".to_string(),
-                modified: chrono::Utc.with_ymd_and_hms(2025, 1, 2, 10, 0, 0).unwrap().to_rfc3339(),
+                modified: chrono::Utc
+                    .with_ymd_and_hms(2025, 1, 2, 10, 0, 0)
+                    .unwrap()
+                    .to_rfc3339(),
                 message_count: 5,
             },
             SessionStatsInput {
                 path: "/tmp/does-not-exist-2.jsonl".to_string(),
                 cwd: "/Users/example/project-beta".to_string(),
-                modified: chrono::Utc.with_ymd_and_hms(2025, 1, 3, 16, 0, 0).unwrap().to_rfc3339(),
+                modified: chrono::Utc
+                    .with_ymd_and_hms(2025, 1, 3, 16, 0, 0)
+                    .unwrap()
+                    .to_rfc3339(),
                 message_count: 3,
             },
         ];
@@ -152,9 +158,18 @@ mod tests {
 
     #[test]
     fn extract_project_name_supports_windows_path_separator() {
-        assert_eq!(extract_project_name(r"C:\Users\demo\workspace\alpha"), "alpha");
-        assert_eq!(extract_project_name(r"C:\Users\demo\workspace\beta\"), "beta");
-        assert_eq!(extract_project_name(r"C:/Users/demo/workspace/gamma"), "gamma");
+        assert_eq!(
+            extract_project_name(r"C:\Users\demo\workspace\alpha"),
+            "alpha"
+        );
+        assert_eq!(
+            extract_project_name(r"C:\Users\demo\workspace\beta\"),
+            "beta"
+        );
+        assert_eq!(
+            extract_project_name(r"C:/Users/demo/workspace/gamma"),
+            "gamma"
+        );
         assert_eq!(extract_project_name(""), "unknown");
     }
 }

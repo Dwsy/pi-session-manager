@@ -13,6 +13,12 @@ pub(super) async fn scan_sessions_paginated_impl(
     sort_by: Option<String>,
 ) -> Result<session_list::PaginatedSessionsResult, String> {
     session_list::scan_sessions_paginated_impl(
-        offset, limit, search_query, project_filter, filter_tag_ids, sort_by,
-    ).await
+        offset,
+        limit,
+        search_query,
+        project_filter,
+        filter_tag_ids,
+        sort_by,
+    )
+    .await
 }

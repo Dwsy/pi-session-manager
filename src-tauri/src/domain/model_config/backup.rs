@@ -114,8 +114,7 @@ pub fn restore_model_config_backup_internal(id: String) -> Result<(), String> {
         return Err(format!("Backup not found: {id}"));
     }
 
-    let content =
-        fs::read_to_string(&backup_path).map_err(|e| format!("Read backup file: {e}"))?;
+    let content = fs::read_to_string(&backup_path).map_err(|e| format!("Read backup file: {e}"))?;
     let imported: serde_json::Value =
         serde_json::from_str(&content).map_err(|e| format!("Parse backup JSON: {e}"))?;
     crate::domain::model_config::writer::write_models_config_internal(imported, true)

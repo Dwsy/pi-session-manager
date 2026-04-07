@@ -7,17 +7,17 @@
 //! - backup.rs: Backup management
 //! - http_tester.rs: HTTP model testing logic
 
-pub mod types;
-pub mod reader;
-pub mod writer;
 pub mod backup;
 pub mod http_tester;
+pub mod reader;
+pub mod types;
+pub mod writer;
 
-pub use types::*;
-pub use reader::*;
-pub use writer::*;
 pub use backup::*;
 pub use http_tester::*;
+pub use reader::*;
+pub use types::*;
+pub use writer::*;
 
 /// List model options from config (fast path)
 pub async fn list_model_options_fast_internal() -> Result<Vec<types::ModelOption>, String> {
@@ -142,8 +142,8 @@ pub async fn import_model_config_from_path_internal(
 }
 
 /// List model config versions
-pub async fn list_model_config_versions_internal()
-    -> Result<Vec<crate::commands::config_versions::ConfigVersionMeta>, String> {
+pub async fn list_model_config_versions_internal(
+) -> Result<Vec<crate::commands::config_versions::ConfigVersionMeta>, String> {
     let file_path = get_models_json_path()?.to_string_lossy().to_string();
     crate::commands::config_versions::list_config_versions_internal(Some(file_path)).await
 }

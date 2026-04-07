@@ -2,7 +2,7 @@
 //!
 //! All heavy logic moved to `domain/model_config/`
 
-use crate::commands::config_versions::{ConfigVersionMeta, list_config_versions_internal};
+use crate::commands::config_versions::{list_config_versions_internal, ConfigVersionMeta};
 use crate::domain::model_config as domain;
 use crate::domain::model_config::types::{ModelConfigBackupMeta, ModelHttpTestResult, ModelOption};
 

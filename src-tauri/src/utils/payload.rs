@@ -32,18 +32,16 @@ pub fn extract_i64(payload: &Value, key: &str) -> Result<i64, String> {
 }
 
 pub fn extract_bool(payload: &Value, key: &str, default: bool) -> bool {
-    payload.get(key).and_then(|v| v.as_bool()).unwrap_or(default)
+    payload
+        .get(key)
+        .and_then(|v| v.as_bool())
+        .unwrap_or(default)
 }
 
 pub fn extract_array<T: serde::de::DeserializeOwned>(
     payload: &Value,
     key: &str,
 ) -> Result<Vec<T>, String> {
-    serde_json::from_value(
-        payload
-            .get(key)
-            .cloned()
-            .unwrap_or(Value::Array(vec![])),
-    )
-    .map_err(|e| format!("Invalid {key}: {e}"))
+    serde_json::from_value(payload.get(key).cloned().unwrap_or(Value::Array(vec![])))
+        .map_err(|e| format!("Invalid {key}: {e}"))
 }

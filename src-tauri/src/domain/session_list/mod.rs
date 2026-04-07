@@ -6,15 +6,15 @@
 //! - filtering.rs: Search, project, and tag filtering
 //! - pagination.rs: Pagination and payload stripping
 
-pub mod types;
-pub mod sorting;
 pub mod filtering;
 pub mod pagination;
+pub mod sorting;
+pub mod types;
 
-pub use types::*;
-pub use sorting::*;
 pub use filtering::*;
 pub use pagination::*;
+pub use sorting::*;
+pub use types::*;
 
 /// Main entry point: scan sessions with pagination, filtering, and sorting
 pub async fn scan_sessions_paginated_impl(
@@ -65,9 +65,9 @@ pub async fn scan_sessions_paginated_impl(
 
 #[cfg(test)]
 mod tests {
-    use super::sorting::sort_sessions;
     use super::filtering::{session_matches_project_filter, session_matches_search_query};
     use super::pagination::{build_paginated_result, strip_session_list_payload};
+    use super::sorting::sort_sessions;
     use crate::types::SessionInfo;
     use chrono::{DateTime, Utc};
     use std::fs;

@@ -206,9 +206,7 @@ async fn parallel_parse_files(files: Vec<PathBuf>) -> Vec<ParsedFileResult> {
             let path_str = file_path.to_string_lossy().to_string();
             let metadata = fs::metadata(&file_path);
             let file_modified: DateTime<Utc> = match metadata {
-                Ok(m) => DateTime::from(
-                    m.modified().unwrap_or(std::time::SystemTime::now()),
-                ),
+                Ok(m) => DateTime::from(m.modified().unwrap_or(std::time::SystemTime::now())),
                 Err(e) => {
                     warn!("Failed to get metadata for {}: {}", path_str, e);
                     return None;
@@ -297,7 +295,10 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                     result.file_modified,
                     Some(&result.entries),
                 ) {
-                    error!("Failed to upsert historical session {}: {}", result.path_str, e);
+                    error!(
+                        "Failed to upsert historical session {}: {}",
+                        result.path_str, e
+                    );
                 }
             }
         }
@@ -384,7 +385,12 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
         let line = match line_result {
             Ok(l) => l,
             Err(e) => {
-                warn!("Failed to read line {} in {}: {}", line_num, path.display(), e);
+                warn!(
+                    "Failed to read line {} in {}: {}",
+                    line_num,
+                    path.display(),
+                    e
+                );
                 continue;
             }
         };
@@ -396,7 +402,12 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
         let entry: Value = match serde_json::from_str(&line) {
             Ok(e) => e,
             Err(e) => {
-                warn!("Failed to parse JSON at line {} in {}: {}", line_num, path.display(), e);
+                warn!(
+                    "Failed to parse JSON at line {} in {}: {}",
+                    line_num,
+                    path.display(),
+                    e
+                );
                 trace!("Problematic line content: {}", &line[..line.len().min(200)]);
                 continue;
             }
@@ -670,11 +681,21 @@ impl ScannerScheduler {
                     skipped += 1;
                 }
                 Some(_) => {
-                    sqlite::upsert_session(&conn, &result.info, file_modified, Some(&result.entries))?;
+                    sqlite::upsert_session(
+                        &conn,
+                        &result.info,
+                        file_modified,
+                        Some(&result.entries),
+                    )?;
                     updated += 1;
                 }
                 None => {
-                    sqlite::upsert_session(&conn, &result.info, file_modified, Some(&result.entries))?;
+                    sqlite::upsert_session(
+                        &conn,
+                        &result.info,
+                        file_modified,
+                        Some(&result.entries),
+                    )?;
                     added += 1;
                 }
             }

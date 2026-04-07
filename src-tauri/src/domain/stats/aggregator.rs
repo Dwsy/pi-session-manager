@@ -183,8 +183,18 @@ fn process_session_data(
         let msg_count = details.user_messages + details.assistant_messages;
         let date = session_modified.format("%Y-%m-%d").to_string();
         *messages_by_date.entry(date.clone()).or_insert(0) += msg_count;
-        daily_stats.add_session(&date, project, msg_count, (details.input_tokens + details.output_tokens) as usize);
-        add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, msg_count);
+        daily_stats.add_session(
+            &date,
+            project,
+            msg_count,
+            (details.input_tokens + details.output_tokens) as usize,
+        );
+        add_time_and_weekday_counts(
+            messages_by_hour,
+            messages_by_day_of_week,
+            session_modified,
+            msg_count,
+        );
 
         return (
             details.user_messages,
@@ -192,7 +202,10 @@ fn process_session_data(
             details.input_tokens as usize,
             details.output_tokens as usize,
             details.cache_read_tokens as usize + details.cache_write_tokens as usize,
-            details.input_cost + details.output_cost + details.cache_read_cost + details.cache_write_cost,
+            details.input_cost
+                + details.output_cost
+                + details.cache_read_cost
+                + details.cache_write_cost,
         );
     }
 
@@ -232,11 +245,24 @@ fn process_session_data(
                             tokens_by_model,
                             model_usage_by_project,
                         );
-                    } else if let Ok(models) = serde_json::from_str::<Vec<String>>(&cached.models_json) {
-                        record_model_presence(&models, project_path, sessions_by_model, model_usage_by_project);
+                    } else if let Ok(models) =
+                        serde_json::from_str::<Vec<String>>(&cached.models_json)
+                    {
+                        record_model_presence(
+                            &models,
+                            project_path,
+                            sessions_by_model,
+                            model_usage_by_project,
+                        );
                     }
-                } else if let Ok(models) = serde_json::from_str::<Vec<String>>(&cached.models_json) {
-                    record_model_presence(&models, project_path, sessions_by_model, model_usage_by_project);
+                } else if let Ok(models) = serde_json::from_str::<Vec<String>>(&cached.models_json)
+                {
+                    record_model_presence(
+                        &models,
+                        project_path,
+                        sessions_by_model,
+                        model_usage_by_project,
+                    );
                 }
             }
         }
@@ -244,8 +270,18 @@ fn process_session_data(
         let msg_count = cached.user_messages + cached.assistant_messages;
         let date = session_modified.format("%Y-%m-%d").to_string();
         *messages_by_date.entry(date.clone()).or_insert(0) += msg_count;
-        daily_stats.add_session(&date, project, msg_count, cached.input_tokens + cached.output_tokens);
-        add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, msg_count);
+        daily_stats.add_session(
+            &date,
+            project,
+            msg_count,
+            cached.input_tokens + cached.output_tokens,
+        );
+        add_time_and_weekday_counts(
+            messages_by_hour,
+            messages_by_day_of_week,
+            session_modified,
+            msg_count,
+        );
 
         return (
             cached.user_messages,
@@ -253,14 +289,21 @@ fn process_session_data(
             cached.input_tokens,
             cached.output_tokens,
             cached.cache_read_tokens + cached.cache_write_tokens,
-            cached.input_cost + cached.output_cost + cached.cache_read_cost + cached.cache_write_cost,
+            cached.input_cost
+                + cached.output_cost
+                + cached.cache_read_cost
+                + cached.cache_write_cost,
         );
     }
 
     // 3. Parse session file (cache miss or stale)
     if let Ok(content) = std::fs::read_to_string(&session.path) {
         let session_stats = parse_session_details(&content);
-        crate::core::write_buffer::buffer_details_write(&session.path, session_modified, &session_stats);
+        crate::core::write_buffer::buffer_details_write(
+            &session.path,
+            session_modified,
+            &session_stats,
+        );
 
         if session_stats.model_usage.is_empty() {
             record_model_presence(
@@ -282,8 +325,18 @@ fn process_session_data(
         let msg_count = session_stats.user_messages + session_stats.assistant_messages;
         let date = session_modified.format("%Y-%m-%d").to_string();
         *messages_by_date.entry(date.clone()).or_insert(0) += msg_count;
-        daily_stats.add_session(&date, project, msg_count, (session_stats.input_tokens + session_stats.output_tokens) as usize);
-        add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, msg_count);
+        daily_stats.add_session(
+            &date,
+            project,
+            msg_count,
+            (session_stats.input_tokens + session_stats.output_tokens) as usize,
+        );
+        add_time_and_weekday_counts(
+            messages_by_hour,
+            messages_by_day_of_week,
+            session_modified,
+            msg_count,
+        );
 
         return (
             session_stats.user_messages,
@@ -291,7 +344,10 @@ fn process_session_data(
             session_stats.input_tokens as usize,
             session_stats.output_tokens as usize,
             session_stats.cache_read_tokens as usize + session_stats.cache_write_tokens as usize,
-            session_stats.input_cost + session_stats.output_cost + session_stats.cache_read_cost + session_stats.cache_write_cost,
+            session_stats.input_cost
+                + session_stats.output_cost
+                + session_stats.cache_read_cost
+                + session_stats.cache_write_cost,
         );
     }
 
@@ -300,8 +356,18 @@ fn process_session_data(
     *sessions_by_model.entry("unknown".to_string()).or_insert(0) += 1;
     let date = session_modified.format("%Y-%m-%d").to_string();
     *messages_by_date.entry(date.clone()).or_insert(0) += session.message_count;
-    daily_stats.add_session(&date, project, session.message_count, session.message_count * 100);
-    add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, session.message_count);
+    daily_stats.add_session(
+        &date,
+        project,
+        session.message_count,
+        session.message_count * 100,
+    );
+    add_time_and_weekday_counts(
+        messages_by_hour,
+        messages_by_day_of_week,
+        session_modified,
+        session.message_count,
+    );
 
     (0, 0, 0, 0, 0, 0.0)
 }
@@ -373,7 +439,8 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
-    let subagent_summary = crate::subagent::scan_subagent_artifacts(&unique_session_dirs, conn.as_ref());
+    let subagent_summary =
+        crate::subagent::scan_subagent_artifacts(&unique_session_dirs, conn.as_ref());
 
     let average_messages_per_session = if total_sessions > 0 {
         total_messages as f32 / total_sessions as f32
@@ -381,8 +448,10 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         0.0
     };
 
-    let heatmap_data = crate::domain::stats::heatmap::generate_heatmap_data(&messages_by_date, &daily_stats);
-    let time_distribution = crate::domain::stats::heatmap::generate_time_distribution(&messages_by_hour);
+    let heatmap_data =
+        crate::domain::stats::heatmap::generate_heatmap_data(&messages_by_date, &daily_stats);
+    let time_distribution =
+        crate::domain::stats::heatmap::generate_time_distribution(&messages_by_hour);
 
     log::trace!(
         "Stats: {} user messages, {} assistant messages, {} total tokens",

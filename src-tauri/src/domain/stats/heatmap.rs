@@ -49,8 +49,14 @@ pub fn generate_time_distribution(
     let mut distribution = Vec::new();
 
     for hour in 0..24 {
-        let message_count = messages_by_hour.get(&hour.to_string()).copied().unwrap_or(0);
-        distribution.push(TimeDistributionPoint { hour, message_count });
+        let message_count = messages_by_hour
+            .get(&hour.to_string())
+            .copied()
+            .unwrap_or(0);
+        distribution.push(TimeDistributionPoint {
+            hour,
+            message_count,
+        });
     }
 
     distribution

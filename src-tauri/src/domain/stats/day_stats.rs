@@ -44,9 +44,10 @@ pub fn get_day_stats(date: &str, sessions: &[SessionInfo]) -> Result<DayStats, S
         hourly_distribution[hour] += messages;
         *models_used.entry(model.clone()).or_insert(0) += 1;
 
-        let entry = project_stats
-            .entry(project_path.clone())
-            .or_insert((project_name.clone(), 0, 0, 0));
+        let entry =
+            project_stats
+                .entry(project_path.clone())
+                .or_insert((project_name.clone(), 0, 0, 0));
         entry.1 += 1;
         entry.2 += messages;
         entry.3 += tokens;
@@ -67,13 +68,15 @@ pub fn get_day_stats(date: &str, sessions: &[SessionInfo]) -> Result<DayStats, S
 
     let mut project_breakdown: Vec<DayProjectBreakdown> = project_stats
         .into_iter()
-        .map(|(path, (name, sessions, messages, tokens))| DayProjectBreakdown {
-            project_path: path,
-            project_name: name,
-            session_count: sessions,
-            message_count: messages,
-            token_count: tokens,
-        })
+        .map(
+            |(path, (name, sessions, messages, tokens))| DayProjectBreakdown {
+                project_path: path,
+                project_name: name,
+                session_count: sessions,
+                message_count: messages,
+                token_count: tokens,
+            },
+        )
         .collect();
 
     project_breakdown.sort_by(|a, b| b.message_count.cmp(&a.message_count));
@@ -104,7 +107,11 @@ fn get_session_detailed_stats(
         return (
             details.user_messages + details.assistant_messages,
             (details.input_tokens + details.output_tokens) as usize,
-            details.models.first().cloned().unwrap_or_else(|| "unknown".to_string()),
+            details
+                .models
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string()),
         );
     }
 
@@ -119,7 +126,10 @@ fn get_session_detailed_stats(
         return (
             cached.user_messages + cached.assistant_messages,
             cached.input_tokens + cached.output_tokens,
-            models.first().cloned().unwrap_or_else(|| "unknown".to_string()),
+            models
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string()),
         );
     }
 
@@ -129,15 +139,25 @@ fn get_session_detailed_stats(
         return (
             details.user_messages + details.assistant_messages,
             (details.input_tokens + details.output_tokens) as usize,
-            details.models.first().cloned().unwrap_or_else(|| "unknown".to_string()),
+            details
+                .models
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string()),
         );
     }
 
     // Fallback
-    (fallback_message_count, fallback_message_count * 100, "unknown".to_string())
+    (
+        fallback_message_count,
+        fallback_message_count * 100,
+        "unknown".to_string(),
+    )
 }
 
-pub fn get_activity_timeline(sessions: &[SessionInfo]) -> Vec<crate::domain::stats::types::DailyActivity> {
+pub fn get_activity_timeline(
+    sessions: &[SessionInfo],
+) -> Vec<crate::domain::stats::types::DailyActivity> {
     use crate::domain::stats::types::DailyActivity;
 
     let mut activity: HashMap<String, (usize, usize)> = HashMap::new();

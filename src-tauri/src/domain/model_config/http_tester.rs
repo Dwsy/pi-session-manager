@@ -9,7 +9,10 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 fn build_masked_curl_command(url: &str, headers: &HeaderMap, body: &str) -> String {
-    let mut parts = vec!["curl -sS -X POST".to_string(), format!("'{}'", shell_escape_single_quotes(url))];
+    let mut parts = vec![
+        "curl -sS -X POST".to_string(),
+        format!("'{}'", shell_escape_single_quotes(url)),
+    ];
 
     for (name, value) in headers {
         let key = name.as_str().to_ascii_lowercase();
@@ -92,9 +95,17 @@ fn is_openai_reasoning_model(model: &str) -> bool {
         || normalized.starts_with("gpt-5")
 }
 
-fn build_openai_chat_attempts(base_url: &str, model: &str, prompt_text: &str) -> Vec<HttpTestAttempt> {
+fn build_openai_chat_attempts(
+    base_url: &str,
+    model: &str,
+    prompt_text: &str,
+) -> Vec<HttpTestAttempt> {
     let mut attempts = Vec::with_capacity(2);
-    let max_completion_tokens = if is_openai_reasoning_model(model) { 256 } else { 128 };
+    let max_completion_tokens = if is_openai_reasoning_model(model) {
+        256
+    } else {
+        128
+    };
 
     attempts.push(HttpTestAttempt {
         request_style: "chat-completions:max_completion_tokens",
@@ -123,7 +134,11 @@ fn build_openai_chat_attempts(base_url: &str, model: &str, prompt_text: &str) ->
     attempts
 }
 
-fn build_openai_responses_attempts(base_url: &str, model: &str, prompt_text: &str) -> Vec<HttpTestAttempt> {
+fn build_openai_responses_attempts(
+    base_url: &str,
+    model: &str,
+    prompt_text: &str,
+) -> Vec<HttpTestAttempt> {
     vec![
         HttpTestAttempt {
             request_style: "responses:input_string",
@@ -154,7 +169,11 @@ fn build_openai_responses_attempts(base_url: &str, model: &str, prompt_text: &st
     ]
 }
 
-fn build_anthropic_messages_attempts(base_url: &str, model: &str, prompt_text: &str) -> Vec<HttpTestAttempt> {
+fn build_anthropic_messages_attempts(
+    base_url: &str,
+    model: &str,
+    prompt_text: &str,
+) -> Vec<HttpTestAttempt> {
     let version_header = (
         HeaderName::from_static("anthropic-version"),
         HeaderValue::from_static("2023-06-01"),
@@ -374,7 +393,10 @@ pub async fn test_model_http_internal(
         "openai-responses" => build_openai_responses_attempts(&base_url, &model, &prompt_text),
         "anthropic-messages" => build_anthropic_messages_attempts(&base_url, &model, &prompt_text),
         "google-generative-ai" => {
-            return Err("google-generative-ai testing is not supported yet in model HTTP tester".to_string())
+            return Err(
+                "google-generative-ai testing is not supported yet in model HTTP tester"
+                    .to_string(),
+            )
         }
         other => return Err(format!("Unsupported api type for HTTP test: {other}")),
     };

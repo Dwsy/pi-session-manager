@@ -73,7 +73,12 @@ end tell"#,
             }
 
             let mut command = Command::new("kitty");
-            command.arg("--directory").arg(cwd).arg("sh").arg("-lc").arg(&resume_cmd);
+            command
+                .arg("--directory")
+                .arg(cwd)
+                .arg("sh")
+                .arg("-lc")
+                .arg(&resume_cmd);
             spawn_command(&mut command, "kitty")?;
             Ok(true)
         }
@@ -302,7 +307,12 @@ pub fn try_launch_known_terminal_linux(
                 return Ok(false);
             }
             let mut command = Command::new("kitty");
-            command.arg("--directory").arg(cwd).arg("sh").arg("-lc").arg(&resume_cmd);
+            command
+                .arg("--directory")
+                .arg(cwd)
+                .arg("sh")
+                .arg("-lc")
+                .arg(&resume_cmd);
             spawn_command(&mut command, "kitty")?;
             Ok(true)
         }

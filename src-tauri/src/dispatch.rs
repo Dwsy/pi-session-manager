@@ -9,12 +9,10 @@
 use serde_json::Value;
 
 // Re-export for backward compatibility
-pub use crate::utils::payload::{
-    extract_optional_string as extract_optional,
-    extract_string as extract,
-    extract_usize,
-};
 use crate::utils::payload::extract_optional_string;
+pub use crate::utils::payload::{
+    extract_optional_string as extract_optional, extract_string as extract, extract_usize,
+};
 
 /// Dispatch a command to the appropriate handler.
 /// GUI-only commands (terminal, save_session_paths with watcher) are handled
@@ -41,8 +39,14 @@ pub async fn dispatch(
             Ok(serde_json::to_value(result).unwrap())
         }
         "scan_sessions_paginated" => {
-            let offset = payload.get("offset").and_then(|v| v.as_u64()).map(|v| v as usize);
-            let limit = payload.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+            let offset = payload
+                .get("offset")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+            let limit = payload
+                .get("limit")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
             let search_query = extract_optional_string(payload, "search_query")
                 .or_else(|| extract_optional_string(payload, "searchQuery"));
             let project_filter = extract_optional_string(payload, "project_filter")
@@ -60,8 +64,14 @@ pub async fn dispatch(
             let sort_by = extract_optional_string(payload, "sort_by")
                 .or_else(|| extract_optional_string(payload, "sortBy"));
             let result = crate::scan_sessions_paginated(
-                offset, limit, search_query, project_filter, filter_tag_ids, sort_by,
-            ).await?;
+                offset,
+                limit,
+                search_query,
+                project_filter,
+                filter_tag_ids,
+                sort_by,
+            )
+            .await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "session_digest" => {
@@ -81,7 +91,10 @@ pub async fn dispatch(
         "read_session_file_chunk" => {
             let path = extract(payload, "path")?;
             let offset = payload.get("offset").and_then(|v| v.as_u64());
-            let max_bytes = payload.get("maxBytes").and_then(|v| v.as_u64()).map(|v| v as usize);
+            let max_bytes = payload
+                .get("maxBytes")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
             let result = crate::read_session_file_chunk(path, offset, max_bytes).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
@@ -101,7 +114,9 @@ pub async fn dispatch(
         }
         "read_session_file_incremental_offset" => {
             let path = extract(payload, "path")?;
-            let from_offset = payload.get("fromOffset").and_then(|v| v.as_u64())
+            let from_offset = payload
+                .get("fromOffset")
+                .and_then(|v| v.as_u64())
                 .ok_or_else(|| "Missing or invalid field: fromOffset".to_string())?;
             let (new_offset, new_content) =
                 crate::read_session_file_incremental_offset(path, from_offset).await?;
@@ -111,9 +126,11 @@ pub async fn dispatch(
             let path = extract(payload, "path")?;
             let metadata = std::fs::metadata(&path)
                 .map_err(|e| format!("Failed to get file metadata: {e}"))?;
-            let modified = metadata.modified()
+            let modified = metadata
+                .modified()
                 .map_err(|e| format!("Failed to get modified time: {e}"))?;
-            let modified_at = modified.duration_since(std::time::UNIX_EPOCH)
+            let modified_at = modified
+                .duration_since(std::time::UNIX_EPOCH)
                 .map_err(|e| format!("Failed to convert modified time: {e}"))?
                 .as_millis() as u64;
             Ok(serde_json::json!({
@@ -143,8 +160,12 @@ pub async fn dispatch(
         }
         "delete_sessions" => {
             let paths: Vec<String> = serde_json::from_value(
-                payload.get("paths").cloned().unwrap_or(Value::Array(vec![])),
-            ).map_err(|e| format!("Invalid paths: {e}"))?;
+                payload
+                    .get("paths")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
+            )
+            .map_err(|e| format!("Invalid paths: {e}"))?;
             let result = crate::delete_sessions(paths).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
@@ -163,8 +184,12 @@ pub async fn dispatch(
         }
         "fork_session" => {
             let source_path = extract(payload, "sourcePath")?;
-            let target_name = payload.get("targetName").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let result = crate::commands::session_file::fork_session_impl(source_path, target_name).await?;
+            let target_name = payload
+                .get("targetName")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let result =
+                crate::commands::session_file::fork_session_impl(source_path, target_name).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
 
@@ -173,15 +198,23 @@ pub async fn dispatch(
         // ═══════════════════════════════════════════════════════════════
         "get_session_stats" => {
             let sessions: Vec<crate::types::SessionInfo> = serde_json::from_value(
-                payload.get("sessions").cloned().unwrap_or(Value::Array(vec![])),
-            ).map_err(|e| format!("Invalid sessions: {e}"))?;
+                payload
+                    .get("sessions")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
+            )
+            .map_err(|e| format!("Invalid sessions: {e}"))?;
             let result = crate::stats::calculate_stats(&sessions);
             Ok(serde_json::to_value(result).unwrap())
         }
         "get_session_stats_light" => {
             let sessions: Vec<crate::stats::SessionStatsInput> = serde_json::from_value(
-                payload.get("sessions").cloned().unwrap_or(Value::Array(vec![])),
-            ).map_err(|e| format!("Invalid sessions: {e}"))?;
+                payload
+                    .get("sessions")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
+            )
+            .map_err(|e| format!("Invalid sessions: {e}"))?;
             let result = crate::stats::calculate_stats_from_inputs(&sessions);
             Ok(serde_json::to_value(result).unwrap())
         }
@@ -191,13 +224,23 @@ pub async fn dispatch(
         // ═══════════════════════════════════════════════════════════════
         "search_sessions" => {
             let sessions: Vec<crate::types::SessionInfo> = serde_json::from_value(
-                payload.get("sessions").cloned().unwrap_or(Value::Array(vec![])),
-            ).map_err(|e| format!("Invalid sessions: {e}"))?;
+                payload
+                    .get("sessions")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
+            )
+            .map_err(|e| format!("Invalid sessions: {e}"))?;
             let query = extract(payload, "query")?;
-            let search_mode = extract(payload, "searchMode").unwrap_or_else(|_| "content".to_string());
+            let search_mode =
+                extract(payload, "searchMode").unwrap_or_else(|_| "content".to_string());
             let role_filter = extract(payload, "roleFilter").unwrap_or_else(|_| "all".to_string());
-            let include_tools = payload.get("includeTools").and_then(|v| v.as_bool()).unwrap_or(false);
-            let result = crate::search_sessions(sessions, query, search_mode, role_filter, include_tools).await?;
+            let include_tools = payload
+                .get("includeTools")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let result =
+                crate::search_sessions(sessions, query, search_mode, role_filter, include_tools)
+                    .await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "search_sessions_fts" => {
@@ -211,20 +254,43 @@ pub async fn dispatch(
             let role_filter = extract(payload, "role_filter")
                 .or_else(|_| extract(payload, "roleFilter"))
                 .map_err(|_| "Missing required field: role_filter or roleFilter")?;
-            let glob_pattern = payload.get("glob_pattern").or_else(|| payload.get("globPattern"))
-                .and_then(|v| v.as_str()).map(String::from);
-            let project_path = payload.get("project_path").or_else(|| payload.get("projectPath"))
-                .and_then(|v| v.as_str()).map(String::from);
+            let glob_pattern = payload
+                .get("glob_pattern")
+                .or_else(|| payload.get("globPattern"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let project_path = payload
+                .get("project_path")
+                .or_else(|| payload.get("projectPath"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
             let page = payload.get("page").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-            let page_size = payload.get("page_size").or_else(|| payload.get("pageSize"))
-                .and_then(|v| v.as_u64()).unwrap_or(20) as usize;
-            let match_mode = payload.get("match_mode").or_else(|| payload.get("matchMode"))
-                .and_then(|v| v.as_str()).map(String::from);
-            let sort_order = payload.get("sort_order").or_else(|| payload.get("sortOrder"))
-                .and_then(|v| v.as_str()).map(String::from);
+            let page_size = payload
+                .get("page_size")
+                .or_else(|| payload.get("pageSize"))
+                .and_then(|v| v.as_u64())
+                .unwrap_or(20) as usize;
+            let match_mode = payload
+                .get("match_mode")
+                .or_else(|| payload.get("matchMode"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let sort_order = payload
+                .get("sort_order")
+                .or_else(|| payload.get("sortOrder"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
             let result = crate::full_text_search(
-                query, role_filter, glob_pattern, project_path, page, page_size, match_mode, sort_order,
-            ).await?;
+                query,
+                role_filter,
+                glob_pattern,
+                project_path,
+                page,
+                page_size,
+                match_mode,
+                sort_order,
+            )
+            .await?;
             Ok(serde_json::to_value(result).unwrap())
         }
 
@@ -304,8 +370,12 @@ pub async fn dispatch(
         }
         "save_pi_settings" => {
             let settings = serde_json::from_value(
-                payload.get("settings").cloned().unwrap_or(Value::Object(Default::default())),
-            ).map_err(|e| format!("Invalid settings: {e}"))?;
+                payload
+                    .get("settings")
+                    .cloned()
+                    .unwrap_or(Value::Object(Default::default())),
+            )
+            .map_err(|e| format!("Invalid settings: {e}"))?;
             crate::save_pi_settings(settings).await?;
             Ok(Value::Null)
         }
@@ -327,7 +397,10 @@ pub async fn dispatch(
         "toggle_resource" => {
             let resource_type = extract(payload, "resource_type")?;
             let path = extract(payload, "path")?;
-            let enabled = payload.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+            let enabled = payload
+                .get("enabled")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
             let scope = extract(payload, "scope").unwrap_or_else(|_| "user".to_string());
             crate::toggle_resource_internal(resource_type, path, enabled, scope).await?;
             Ok(Value::Null)
@@ -356,31 +429,42 @@ pub async fn dispatch(
         }
         "save_model_config" => {
             let content = payload.get("content").cloned().ok_or("Missing content")?;
-            let create_backup = payload.get("create_backup").or_else(|| payload.get("createBackup"))
+            let create_backup = payload
+                .get("create_backup")
+                .or_else(|| payload.get("createBackup"))
                 .and_then(|v| v.as_bool());
             crate::domain::model_config::save_model_config_internal(content, create_backup).await?;
             Ok(Value::Null)
         }
         "export_model_config_content" => {
-            let result = crate::domain::model_config::export_model_config_content_internal().await?;
+            let result =
+                crate::domain::model_config::export_model_config_content_internal().await?;
             Ok(Value::String(result))
         }
         "export_model_config_to_path" => {
             let path = extract(payload, "path")?;
-            let result = crate::domain::model_config::export_model_config_to_path_internal(path).await?;
+            let result =
+                crate::domain::model_config::export_model_config_to_path_internal(path).await?;
             Ok(Value::String(result))
         }
         "import_model_config_content" => {
-            let content = payload.get("content").and_then(|v| v.as_str())
-                .ok_or("Missing content")?.to_string();
+            let content = payload
+                .get("content")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing content")?
+                .to_string();
             let mode = extract_optional_string(payload, "mode");
-            let result = crate::domain::model_config::import_model_config_content_internal(content, mode).await?;
+            let result =
+                crate::domain::model_config::import_model_config_content_internal(content, mode)
+                    .await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "import_model_config_from_path" => {
             let path = extract(payload, "path")?;
             let mode = extract_optional_string(payload, "mode");
-            let result = crate::domain::model_config::import_model_config_from_path_internal(path, mode).await?;
+            let result =
+                crate::domain::model_config::import_model_config_from_path_internal(path, mode)
+                    .await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "create_model_config_backup" => {
@@ -410,9 +494,14 @@ pub async fn dispatch(
             let provider = extract(payload, "provider")?;
             let model = extract(payload, "model")?;
             let prompt = extract_optional_string(payload, "prompt");
-            let timeout_ms = payload.get("timeout_ms").or_else(|| payload.get("timeoutMs"))
+            let timeout_ms = payload
+                .get("timeout_ms")
+                .or_else(|| payload.get("timeoutMs"))
                 .and_then(|v| v.as_u64());
-            let result = crate::domain::model_config::test_model_http_internal(provider, model, prompt, timeout_ms).await?;
+            let result = crate::domain::model_config::test_model_http_internal(
+                provider, model, prompt, timeout_ms,
+            )
+            .await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
 
@@ -420,17 +509,26 @@ pub async fn dispatch(
         // Config versions
         // ═══════════════════════════════════════════════════════════════
         "list_config_versions" => {
-            let file_path = payload.get("file_path").and_then(|v| v.as_str()).map(String::from);
+            let file_path = payload
+                .get("file_path")
+                .and_then(|v| v.as_str())
+                .map(String::from);
             let result = crate::list_config_versions_internal(file_path).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "get_config_version" => {
-            let id = payload.get("id").and_then(|v| v.as_i64()).ok_or("Missing id")?;
+            let id = payload
+                .get("id")
+                .and_then(|v| v.as_i64())
+                .ok_or("Missing id")?;
             let result = crate::get_config_version_internal(id).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "restore_config_version" => {
-            let id = payload.get("id").and_then(|v| v.as_i64()).ok_or("Missing id")?;
+            let id = payload
+                .get("id")
+                .and_then(|v| v.as_i64())
+                .ok_or("Missing id")?;
             crate::restore_config_version_internal(id).await?;
             Ok(Value::Null)
         }
@@ -440,7 +538,9 @@ pub async fn dispatch(
         // ═══════════════════════════════════════════════════════════════
         "load_app_settings" => crate::load_app_settings_internal().await,
         "save_app_settings" => {
-            let settings = payload.get("settings").cloned()
+            let settings = payload
+                .get("settings")
+                .cloned()
                 .unwrap_or(Value::Object(Default::default()));
             crate::save_app_settings(settings).await?;
             Ok(Value::Null)
@@ -451,8 +551,12 @@ pub async fn dispatch(
         }
         "save_server_settings" => {
             let settings = serde_json::from_value(
-                payload.get("settings").cloned().unwrap_or(Value::Object(Default::default())),
-            ).map_err(|e| format!("Invalid settings: {e}"))?;
+                payload
+                    .get("settings")
+                    .cloned()
+                    .unwrap_or(Value::Object(Default::default())),
+            )
+            .map_err(|e| format!("Invalid settings: {e}"))?;
             crate::save_server_settings(settings).await?;
             Ok(Value::Null)
         }
@@ -462,8 +566,12 @@ pub async fn dispatch(
         }
         "save_session_paths" => {
             let paths: Vec<String> = serde_json::from_value(
-                payload.get("paths").cloned().unwrap_or(Value::Array(vec![])),
-            ).map_err(|e| format!("Invalid paths: {e}"))?;
+                payload
+                    .get("paths")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
+            )
+            .map_err(|e| format!("Invalid paths: {e}"))?;
             crate::save_session_paths_core(paths).await?;
             Ok(Value::Null)
         }
@@ -489,8 +597,12 @@ pub async fn dispatch(
         }
         "test_models_batch" => {
             let models: Vec<(String, String)> = serde_json::from_value(
-                payload.get("models").cloned().unwrap_or(Value::Array(vec![])),
-            ).map_err(|e| format!("Invalid models: {e}"))?;
+                payload
+                    .get("models")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
+            )
+            .map_err(|e| format!("Invalid models: {e}"))?;
             let prompt = extract_optional_string(payload, "prompt");
             let result = crate::test_models_batch(models, prompt).await?;
             Ok(serde_json::to_value(result).unwrap())
@@ -550,14 +662,21 @@ pub async fn dispatch(
             let session_id = extract(payload, "sessionId")?;
             let from_tag_id = extract_optional_string(payload, "fromTagId");
             let to_tag_id = extract(payload, "toTagId")?;
-            let position = payload.get("position").and_then(|v| v.as_i64()).unwrap_or(0);
+            let position = payload
+                .get("position")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
             crate::move_session_tag(session_id, from_tag_id, to_tag_id, position).await?;
             Ok(Value::Null)
         }
         "reorder_tags" => {
             let tag_ids: Vec<String> = serde_json::from_value(
-                payload.get("tagIds").cloned().unwrap_or(Value::Array(vec![])),
-            ).map_err(|e| format!("Invalid tagIds: {e}"))?;
+                payload
+                    .get("tagIds")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
+            )
+            .map_err(|e| format!("Invalid tagIds: {e}"))?;
             crate::reorder_tags(tag_ids).await?;
             Ok(Value::Null)
         }
@@ -610,8 +729,8 @@ pub async fn dispatch(
             }
         }
         "get_pi_agent_entries" => {
-            let session_id = extract(payload, "session_id")
-                .or_else(|_| extract(payload, "sessionId"))?;
+            let session_id =
+                extract(payload, "session_id").or_else(|_| extract(payload, "sessionId"))?;
             #[cfg(feature = "gui")]
             {
                 let state = app_state.as_ref().ok_or("App state not available")?;
@@ -627,10 +746,13 @@ pub async fn dispatch(
             }
         }
         "pi_agent_steering" => {
-            let session_id = extract(payload, "session_id")
-                .or_else(|_| extract(payload, "sessionId"))?;
+            let session_id =
+                extract(payload, "session_id").or_else(|_| extract(payload, "sessionId"))?;
             let message = extract(payload, "message")?;
-            let deliver_as = payload.get("deliver_as").and_then(|v| v.as_str()).unwrap_or("steer");
+            let deliver_as = payload
+                .get("deliver_as")
+                .and_then(|v| v.as_str())
+                .unwrap_or("steer");
 
             #[cfg(feature = "gui")]
             {
@@ -653,8 +775,8 @@ pub async fn dispatch(
         // Pi agent RPC
         // ═══════════════════════════════════════════════════════════════
         "pi_agent_set_model" => {
-            let session_id = extract(payload, "session_id")
-                .or_else(|_| extract(payload, "sessionId"))?;
+            let session_id =
+                extract(payload, "session_id").or_else(|_| extract(payload, "sessionId"))?;
             let provider = extract(payload, "provider")?;
             let model_id = extract(payload, "model_id")?;
             #[cfg(feature = "gui")]
@@ -663,13 +785,16 @@ pub async fn dispatch(
                 let command = serde_json::json!({
                     "type": "set_model", "sessionId": session_id, "provider": provider, "modelId": model_id,
                 });
-                state.pi_agent_registry.send_rpc(&session_id, command).await?;
+                state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
             }
             Ok(serde_json::json!({ "status": "sent" }))
         }
         "pi_agent_set_thinking" => {
-            let session_id = extract(payload, "session_id")
-                .or_else(|_| extract(payload, "sessionId"))?;
+            let session_id =
+                extract(payload, "session_id").or_else(|_| extract(payload, "sessionId"))?;
             let level = extract(payload, "level")?;
             #[cfg(feature = "gui")]
             {
@@ -677,7 +802,10 @@ pub async fn dispatch(
                 let command = serde_json::json!({
                     "type": "set_thinking", "sessionId": session_id, "level": level,
                 });
-                state.pi_agent_registry.send_rpc(&session_id, command).await?;
+                state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
             }
             Ok(serde_json::json!({ "status": "sent" }))
         }
@@ -687,7 +815,10 @@ pub async fn dispatch(
             {
                 let state = app_state.as_ref().ok_or("App state not available")?;
                 let command = serde_json::json!({ "type": "get_state", "sessionId": session_id });
-                let result = state.pi_agent_registry.send_rpc(&session_id, command).await?;
+                let result = state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
                 Ok(result)
             }
             #[cfg(not(feature = "gui"))]
@@ -701,7 +832,10 @@ pub async fn dispatch(
             {
                 let state = app_state.as_ref().ok_or("App state not available")?;
                 let command = serde_json::json!({ "type": "abort", "sessionId": session_id });
-                state.pi_agent_registry.send_rpc(&session_id, command).await?;
+                state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
             }
             Ok(serde_json::json!({ "status": "sent" }))
         }
@@ -709,7 +843,9 @@ pub async fn dispatch(
             let session_id = extract(payload, "session_id")?;
             let message = extract(payload, "message")?;
             let images = payload.get("images").cloned();
-            let streaming_behavior = payload.get("streaming_behavior").and_then(|v| v.as_str())
+            let streaming_behavior = payload
+                .get("streaming_behavior")
+                .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
             #[cfg(feature = "gui")]
             {
@@ -718,7 +854,10 @@ pub async fn dispatch(
                     "type": "prompt", "sessionId": session_id, "message": message,
                     "images": images, "streamingBehavior": streaming_behavior.unwrap_or_else(|| "steer".to_string()),
                 });
-                state.pi_agent_registry.send_rpc(&session_id, command).await?;
+                state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
             }
             Ok(serde_json::json!({ "status": "sent" }))
         }
@@ -731,14 +870,12 @@ pub async fn dispatch(
         | "terminal_resize"
         | "terminal_close"
         | "get_default_shell"
-        | "get_available_shells" =>
-            Err(format!("Command '{command}' requires GUI mode (terminal not available in CLI)")),
-        "open_session_in_browser" =>
-            Err("open_session_in_browser is desktop-only".to_string()),
-        "open_session_in_terminal" =>
-            Err("open_session_in_terminal is desktop-only".to_string()),
-        "toggle_devtools" =>
-            Err("toggle_devtools is not supported via WebSocket".to_string()),
+        | "get_available_shells" => Err(format!(
+            "Command '{command}' requires GUI mode (terminal not available in CLI)"
+        )),
+        "open_session_in_browser" => Err("open_session_in_browser is desktop-only".to_string()),
+        "open_session_in_terminal" => Err("open_session_in_terminal is desktop-only".to_string()),
+        "toggle_devtools" => Err("toggle_devtools is not supported via WebSocket".to_string()),
 
         _ => Err(format!("Unknown command: {command}")),
     }

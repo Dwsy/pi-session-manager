@@ -6,10 +6,10 @@
 //! - launch.rs: Platform-specific terminal launch implementations
 //! - api.rs: Public API for commands layer
 
+pub mod api;
+pub mod launch;
 pub mod types;
 pub mod utils;
-pub mod launch;
-pub mod api;
 
 pub use api::*;
 pub use types::*;
