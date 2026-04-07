@@ -1,6 +1,6 @@
 ---
 title: 搜索系统
-description: 跨所有会话的全文搜索，支持角色过滤、工具过滤和片段高亮。
+description: 跨所有会话的全文搜索，支持角色过滤、片段高亮和多模式匹配。
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -13,23 +13,48 @@ Pi Session Manager 提供强大的全文搜索功能，基于双引擎架构，�
 
 ### SQLite FTS5
 
-主搜索引擎。所有会话内容被索引到 SQLite 数据库（`~/.pi/agent/session-manager.db`）中的 FTS5 虚拟表。提供：
+主搜索引擎。所有会话内容被索引到 SQLite 数据库（`~/.pi/agent/sessions/sessions.db`）中的 `message_fts` FTS5 虚拟表。提供：
 
 - 快速前缀和短语匹配
-- BM25 排序
+- BM25 排序（通过 `bm25()` 函数）
 - 低内存占用
+- 自动同步（`content='message_entries'`，无需手动触发器）
 
 可通过[配置文件](./configuration)中的 `enable_fts5` 设置开关 FTS5。
 
 ### Tantivy
 
-一个 Rust 原生的全文搜索库（类似 Lucene），作为辅助索引使用。Tantivy 提供：
+Rust 原生的全文搜索库（类似 Lucene），作为辅助索引在 `data/search/tantivy.rs` 中实现。Tantivy 提供：
 
-- 更精细的分词处理
+- 更精细的分词处理（unicode61）
 - 对复杂查询更好的相关性评分
-- 并发索引
+- 通过 `data/search/index.rs` 并发索引
 
-两个引擎并行运行，结果合并返回。
+两个引擎都可通过统一的搜索客户端（`data/search/client.rs`）访问。
+
+## 会话 ID 匹配
+
+除了 FTS 搜索，搜索系统还支持会话 ID 的精确匹配和前缀匹配：
+- 精确匹配：得分 1,000,000
+- 前缀匹配（≥3 字符）：得分 999,000
+- 会话 ID 结果始终排在内容匹配之前
+
+## 内容搜索
+
+### 消息级 FTS5
+
+会话中的每条消息都在 `message_entries` 中单独索引：
+- `entry_id` — 唯一消息标识符
+- `session_path` — 父会话路径
+- `role` — user 或 assistant
+- `source_type` — user、assistant 或 thinking
+- `content` — 消息文本
+
+搜索结果按 `(session_path, entry_id)` 去重，每个会话最多限制 3 条命中。
+
+### 中日韩（CJK）支持
+
+对于中文/日文/韩文文本，FTS5 unicode61 分词不可靠。当检测到查询中包含 CJK 字符时，搜索会回退到 `LIKE` 子串匹配。
 
 ## 过滤器
 
@@ -42,20 +67,20 @@ Pi Session Manager 提供强大的全文搜索功能，基于双引擎架构，�
 | 全部 | 搜索所有消息 |
 | 用户 | 仅用户消息 |
 | 助手 | 仅 AI 回复 |
-| 工具 | 仅工具调用结果 |
 
-### 工具过滤
+### 排序方式
 
-按会话中使用的特定工具类型过滤：
+结果可按以下方式排序：
 
-- `bash` — Shell 命令
-- `read` / `edit` / `write` — 文件操作
-- `search` — 代码搜索调用
-- 自定义工具名称
+| 排序 | 说明 |
+|------|------|
+| 相关性（默认） | 按 FTS5 BM25 得分排序 |
+| 最新 | 最新消息优先 |
+| 最旧 | 最早消息优先 |
 
 ## 片段高亮
 
-搜索结果会显示高亮片段，展示匹配文本的上下文。点击结果可直接跳转到[会话查看器](./session-viewer)中对应的消息。
+搜索结果会显示匹配文本的上下文。点击结果可直接跳转到[会话查看器](./session-viewer)中对应的消息。
 
 <Callout type="info">
 当匹配内容位于 `toolResult` 条目中时，查看器会自动解析到包含匹配工具调用的父级助手消息，然后滚动到正确位置。

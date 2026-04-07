@@ -128,6 +128,9 @@ Streams the same events as WebSocket in SSE format. Used by the mobile web front
 | `get_session_paths` | `{}` | Get configured session directories |
 | `save_session_paths` | `{ "paths": ["..."] }` | Update session directories |
 | `get_all_session_dirs` | `{}` | Get all resolved scan directories |
+| `get_config_bundle` | `{}` | Get full config bundle |
+| `save_config_bundle` | `{ ... }` | Save config bundle |
+| `list_config_versions` | `{}` | List config version history |
 
 ### Authentication
 
@@ -142,6 +145,42 @@ Streams the same events as WebSocket in SSE format. Used by the mobile web front
 | Command | Payload | Description |
 |---------|---------|-------------|
 | `get_session_stats` | `{}` | Get aggregated session statistics |
+
+### Model Configuration
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `load_model_config` | `{}` | Load current model config |
+| `save_model_config` | `{ ... }` | Save model config |
+| `import_model_config_from_path` | `{ "path": "..." }` | Import model config from file |
+| `export_model_config_to_path` | `{ "path": "..." }` | Export model config to file |
+| `list_model_config_backups` | `{}` | List model config backups |
+| `restore_model_config_backup` | `{ "backup_name": "..." }` | Restore a backup |
+
+### Skills & Resources
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `list_skills` | `{}` | List Pi skills |
+| `list_prompts` | `{}` | List Pi prompts |
+| `list_themes` | `{}` | List Pi themes |
+
+### Pi Live
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `get_pi_live_sessions` | `{}` | List active Pi CLI sessions |
+| `get_pi_agent_entries` | `{ "session_id": "..." }` | Fetch cached history for live session |
+| `send_pi_agent_rpc` | `{ "session_id": "...", "prompt": "..." }` | Send prompt to Pi CLI |
+
+### Terminal
+
+| Command | Payload | Description |
+|---------|---------|-------------|
+| `create_terminal` | `{ "cwd": "..." }` | Create new PTY session |
+| `terminal_write` | `{ "id": "...", "data": "..." }` | Write to PTY |
+| `terminal_resize` | `{ "id": "...", "cols": N, "rows": N }` | Resize terminal |
+| `terminal_close` | `{ "id": "..." }` | Close PTY session |
 
 ### Health
 

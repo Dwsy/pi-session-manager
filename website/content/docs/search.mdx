@@ -7,29 +7,54 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 > "Searching is half of finding." — Senegalese proverb
 
-Pi Session Manager provides powerful full-text search across all your sessions, powered by a dual-engine architecture.
+Pi Session Manager provides powerful full-text search across all your sessions, powered by a dual-engine architecture combining SQLite FTS5 and Tantivy.
 
 ## Search Engines
 
 ### SQLite FTS5
 
-The primary search engine. All session content is indexed into an FTS5 virtual table inside the SQLite database (`~/.pi/agent/session-manager.db`). This provides:
+The primary search engine. All session content is indexed into an FTS5 virtual table (`message_fts`) inside the SQLite database (`~/.pi/agent/sessions/sessions.db`). This provides:
 
 - Fast prefix and phrase matching
-- BM25 ranking
+- BM25 ranking (via `bm25()` function)
 - Low memory footprint
+- Auto-sync via `content='message_entries'` (no manual triggers needed)
 
 FTS5 can be toggled via the `enable_fts5` setting in the [configuration file](./configuration).
 
 ### Tantivy
 
-A Rust-native full-text search library (similar to Lucene) used as a secondary index. Tantivy provides:
+A Rust-native full-text search library (similar to Lucene) used as a secondary index in `data/search/tantivy.rs`. Tantivy provides:
 
-- More sophisticated tokenization
+- More sophisticated tokenization (unicode61)
 - Better relevance scoring for complex queries
-- Concurrent indexing
+- Concurrent indexing via `data/search/index.rs`
 
-Both engines run in parallel and results are merged.
+Both engines are accessible through the unified search client (`data/search/client.rs`).
+
+## Session ID Matching
+
+In addition to FTS, the search system supports exact and prefix matching on session IDs:
+- Exact match: score 1,000,000
+- Prefix match (≥3 chars): score 999,000
+- Session ID results are always ranked above content matches
+
+## Content Search
+
+### Message-Level FTS5
+
+Each message in a session is indexed individually in `message_entries`:
+- `entry_id` — unique message identifier
+- `session_path` — path to parent session
+- `role` — user or assistant
+- `source_type` — user, assistant, or thinking
+- `content` — message text
+
+Search results are deduplicated per `(session_path, entry_id)` and limited to 3 hits per session.
+
+### CJK Support
+
+For Chinese/Japanese/Korean text, FTS5 unicode61 tokenization is unreliable. The search falls back to `LIKE` substring matching when CJK characters are detected in the query.
 
 ## Filters
 
@@ -42,20 +67,20 @@ Narrow results to specific message roles:
 | All | Search across all messages |
 | User | Only user messages |
 | Assistant | Only AI responses |
-| Tool | Only tool call results |
 
-### Tool Filter
+### Sort Order
 
-Filter by specific tool types used in sessions:
+Results can be sorted by:
 
-- `bash` — shell commands
-- `read` / `edit` / `write` — file operations
-- `search` — code search calls
-- Custom tool names
+| Sort | Description |
+|------|-------------|
+| Relevance (default) | Ranked by FTS5 BM25 score |
+| Newest | Most recent messages first |
+| Oldest | Oldest messages first |
 
 ## Snippet Highlighting
 
-Search results display highlighted snippets showing the matching text in context. Click a result to jump directly to the matching message in the [Session Viewer](./session-viewer).
+Search results display content with matching text context. Click a result to jump directly to the matching message in the [Session Viewer](./session-viewer).
 
 <Callout type="info">
 When a match is inside a `toolResult` entry, the viewer automatically resolves it to the parent assistant message containing the matching tool call, then scrolls to the correct position.

@@ -30,8 +30,9 @@ CLI 模式将 Pi Session Manager 作为无头后端服务运行——没有 GUI 
 这将在端口 52131 启动一个 axum 服务器，提供：
 
 - `POST /api` — 命令端点
-- `GET /ws` — WebSocket 端点
+- `/ws` — WebSocket 端点（从 HTTP 升级）
 - `GET /health` — 健康检查
+- `GET /metrics` — Prometheus 风格指标
 - `GET /` — 嵌入式前端（SPA）
 
 ## 配置

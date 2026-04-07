@@ -30,8 +30,9 @@ A dedicated `pi-session-cli` binary is available that doesn't require Tauri or a
 This starts a single axum server on port 52131 serving:
 
 - `POST /api` — command endpoint
-- `GET /ws` — WebSocket endpoint
+- `/ws` — WebSocket endpoint (upgraded from HTTP)
 - `GET /health` — health check
+- `GET /metrics` — Prometheus-style metrics
 - `GET /` — embedded frontend (SPA)
 
 ## Configuration

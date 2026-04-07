@@ -25,7 +25,7 @@ Pi Session Manager 基于三层架构构建：React 前端、Rust 后端，以�
 ┌───────────────────────────▼─────────────────────────────────────────┐
 │                    前端 (React 18 / TypeScript / Vite)               │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  99+ 组件 · 19 Hooks · 插件系统 · i18n · xterm.js           │   │
+│  │  172 组件 · 41 Hooks · 插件系统 · i18n (6 语言)            │   │
 │  │  React Flow · Recharts · dnd-kit · cmdk · 虚拟滚动          │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 ├───────────────────────────┬───────────────────┬─────────────────────┤
@@ -38,7 +38,7 @@ Pi Session Manager 基于三层架构构建：React 前端、Rust 后端，以�
 │  ┌─────────────────────────────────────────────────────────────┐   │
 │  │  扫描器 · SQLite 缓存 · FTS5 · Tantivy · 文件监听器         │   │
 │  │  PTY 终端 · 认证 · 导出 · 配置 · 统计 · 标签               │   │
-│  │  WebSocket/HTTP 适配器 · 增量更新                            │   │
+│  │  Pi 实时注册 · Subagent 追踪 · 写入缓冲                     │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -48,10 +48,10 @@ Pi Session Manager 基于三层架构构建：React 前端、Rust 后端，以�
 | 技术 | 用途 |
 |------|------|
 | React 18 | UI 框架，支持 Hooks 和并发特性 |
-| TypeScript | 99+ 组件的类型安全 |
+| TypeScript | 172 组件的类型安全 |
 | Vite | 构建工具，开发时支持 HMR |
 | Tailwind CSS | 原子化样式，通过 CSS 自定义属性实现主题 |
-| i18next | 国际化（en-US、zh-CN） |
+| i18next | 国际化（en-US、zh-CN、ja-JP、de-DE、fr-FR、es-ES） |
 | xterm.js | 浏览器内终端模拟器 |
 | React Flow | 流程视图的图形可视化 |
 | Recharts | 仪表板图表 |
@@ -64,7 +64,7 @@ Pi Session Manager 基于三层架构构建：React 前端、Rust 后端，以�
 - **传输层抽象** — `transport.ts` 提供统一接口，自动检测运行环境（Tauri IPC vs. WebSocket vs. HTTP）并路由命令
 - **插件系统** — `src/plugins/` 中的搜索插件允许扩展搜索源
 - **Context 提供者** — `TransportContext`、`SettingsContext`、`SessionViewContext` 管理共享状态
-- **19 个自定义 Hooks** — 封装可复用逻辑（快捷键、文件监听、移动端检测等）
+- **41 个自定义 Hooks** — 封装可复用逻辑（快捷键、文件监听、移动端检测、Pi 实时同步、会话查看器虚拟滚动、消息内搜索、会话树查找等）
 
 ## 后端
 
@@ -75,7 +75,7 @@ Pi Session Manager 基于三层架构构建：React 前端、Rust 后端，以�
 | Tokio | 异步运行时，支持并发 I/O |
 | Axum | HTTP/WebSocket 服务器框架 |
 | SQLite (rusqlite) | 持久化缓存、设置、标签、收藏 |
-| Tantivy | 全文搜索索引 |
+| Tantivy | 辅助全文搜索索引（类 Lucene，结果与 FTS5 合并） |
 | portable-pty | PTY 终端会话 |
 | rust-embed | 将前端资源嵌入二进制文件 |
 | notify | 文件系统监听器 |
@@ -84,20 +84,77 @@ Pi Session Manager 基于三层架构构建：React 前端、Rust 后端，以�
 
 ```
 src-tauri/src/
-├── main.rs              # 入口：CLI 参数、窗口、适配器启动
-├── lib.rs               # 模块声明、命令注册
-├── ws_adapter.rs        # WebSocket 服务 + dispatch() 路由
-├── http_adapter.rs      # HTTP 服务、嵌入式前端 (rust-embed)
-├── app_state.rs         # SharedAppState (Arc)
-├── scanner.rs           # 会话文件扫描器（多路径、增量）
-├── scanner_scheduler.rs # 后台扫描调度
-├── terminal.rs          # PTY 会话管理
-├── sqlite_cache.rs      # 双层缓存（文件系统 + SQLite）
-├── tantivy_search.rs    # 全文搜索索引
-├── file_watcher.rs      # 文件系统监听器（增量更新）
-├── write_buffer.rs      # 异步写入批处理
-├── dispatch.rs          # 纯业务逻辑，WS/HTTP/CLI 共享
-└── commands/            # Tauri IPC 命令处理器（12 个模块）
+├── main.rs                   # 入口：CLI 参数、窗口、适配器启动
+├── lib.rs                    # 模块声明、命令注册
+├── dispatch.rs               # 纯业务逻辑，WS/HTTP/CLI 共享
+├── config.rs                 # TOML 配置加载器
+├── auth.rs                   # 非本地访问的 Token 认证
+├── export.rs                 # 会话导出（HTML、Markdown、JSON）
+├── stats.rs                  # 聚合会话统计
+├── subagent.rs               # Subagent 成本追踪
+├── settings_store.rs         # 基于 SQLite 的应用设置
+├── compression.rs            # Gzip 压缩工具
+├── metrics.rs                # Prometheus 风格指标收集
+├── api_readonly.rs           # 面向外部消费者的只读 HTTP API
+├── commands/                 # Tauri IPC 命令处理器（17 个模块）
+│   ├── auth.rs               # API Token 管理
+│   ├── config_bundle.rs      # 配置导入/导出
+│   ├── config_versions.rs    # 设置版本历史
+│   ├── favorites.rs          # 收藏会话
+│   ├── model_config.rs       # 模型配置 CRUD + 备份/恢复
+│   ├── models.rs             # 旧版模型设置
+│   ├── pi_live.rs            # Pi CLI 实时会话注册表
+│   ├── search.rs             # 全文搜索（会话 + 消息 FTS）
+│   ├── session.rs            # 会话重命名、删除、打开
+│   ├── session_file.rs       # 文件级会话操作
+│   ├── session_list.rs       # 分页会话列表
+│   ├── session_open.rs       # 在编辑器中打开会话
+│   ├── settings.rs           # 应用设置 CRUD
+│   ├── skills.rs             # 技能/模型/Pi 资源管理
+│   ├── tags.rs               # 层级标签管理
+│   └── terminal.rs           # PTY 终端管理
+├── core/                     # 纯业务逻辑（无 Tauri 依赖）
+│   ├── delete.rs             # 会话删除逻辑
+│   ├── intel.rs              # 结构化召回 / 意图检测
+│   ├── parser.rs             # JSONL 会话解析器
+│   ├── scanner.rs            # 多路径会话扫描器 + 增量重扫
+│   └── write_buffer.rs       # SQLite 异步写入批处理
+├── data/
+│   ├── search/               # 搜索引擎层
+│   │   ├── client.rs         # 统一搜索客户端（FTS5 + Tantivy 合并）
+│   │   ├── embedding.rs      # 语义搜索嵌入服务
+│   │   ├── index.rs          # Tantivy 索引管理
+│   │   └── tantivy.rs        # Tantivy 全文搜索实现
+│   └── sqlite/               # SQLite 数据访问层
+│       ├── bootstrap.rs      # 数据库初始化、WAL 模式、Schema 创建
+│       ├── deps.rs           # 共享 SQLite 依赖
+│       ├── details_cache.rs  # 会话详情缓存
+│       ├── favorites.rs      # 收藏表操作
+│       ├── legacy_fts.rs     # 旧版会话级 FTS（已弃用）
+│       ├── maintenance.rs    # Vacuum、清理、预加载
+│       ├── message_index.rs  # message_entries + FTS5 触发器
+│       ├── migrations.rs     # 版本化 Schema 迁移
+│       ├── schema.rs         # Schema 版本管理（v6）
+│       ├── sessions.rs       # 会话 upsert / 查询
+│       ├── subagent_meta.rs  # Subagent 元数据缓存
+│       ├── tags.rs           # 标签表操作
+│       ├── types.rs          # SQLite 类型定义
+│       └── util.rs           # SQLite 工具
+├── domain/                   # 领域模型和业务规则
+├── server/                   # 协议适配器
+│   ├── http/                 # HTTP 服务（Axum）
+│   │   ├── mod.rs            # 路由设置、中间件、CORS
+│   │   ├── common.rs         # 共享 HTTP 处理器
+│   │   ├── readonly_routes.rs# 只读 API 路由
+│   │   ├── realtime.rs       # WebSocket / SSE 事件处理
+│   │   ├── embedding.rs      # 嵌入 API 端点
+│   │   ├── sessions.rs       # 会话 HTTP 路由
+│   │   └── static_assets.rs  # 嵌入式前端（rust-embed）
+│   └── ws.rs                 # 独立 WebSocket 服务（旧版）
+└── utils/                    # 工具函数
+    ├── mod.rs
+    ├── payload.rs
+    └── string.rs
 ```
 
 ### 纯模块
@@ -112,11 +169,11 @@ src-tauri/src/
 |------|------|----------|
 | Tauri IPC | `invoke()` | 桌面应用（仅 GUI 模式） |
 | WebSocket | `ws://127.0.0.1:52131/ws` | 实时双向通信（浏览器） |
+| HTTP POST | `http://127.0.0.1:52131/api` | 无状态单次调用（curl、集成） |
 
 <Callout type="info">
 **单端口架构**：WebSocket 现在通过 `/ws` 路径在与 HTTP 相同的端口上提供，简化了部署和配置。
 </Callout>
-| HTTP POST | `http://127.0.0.1:52131/api` | 无状态单次调用（curl、集成） |
 
 添加新命令只需在 `dispatch()` 中增加一个 `match` 分支。WebSocket 和 HTTP 自动继承。
 

@@ -25,7 +25,7 @@ Pi Session Manager is built on a three-layer architecture: a React frontend, a R
 ┌───────────────────────────▼─────────────────────────────────────────┐
 │                    Frontend (React 18 / TypeScript / Vite)          │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  99+ Components · 19 Hooks · Plugin System · i18n · xterm.js │   │
+│  │  172 Components · 41 Hooks · Plugin System · i18n (6 langs) │   │
 │  │  React Flow · Recharts · dnd-kit · cmdk · Virtual Scroll    │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 ├───────────────────────────┬───────────────────┬─────────────────────┤
@@ -38,7 +38,7 @@ Pi Session Manager is built on a three-layer architecture: a React frontend, a R
 │  ┌─────────────────────────────────────────────────────────────┐   │
 │  │  Scanner · SQLite Cache · FTS5 · Tantivy · File Watcher     │   │
 │  │  PTY Terminal · Auth · Export · Config · Stats · Tags       │   │
-│  │  WebSocket/HTTP Adapters · Incremental Updates              │   │
+│  │  Pi Live Registry · Subagent Tracking · Write Buffer        │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -48,10 +48,10 @@ Pi Session Manager is built on a three-layer architecture: a React frontend, a R
 | Technology | Purpose |
 |-----------|---------|
 | React 18 | UI framework with hooks and concurrent features |
-| TypeScript | Type safety across 99+ components |
+| TypeScript | Type safety across 172 components |
 | Vite | Build tool with HMR for development |
 | Tailwind CSS | Utility-first styling with CSS custom properties for theming |
-| i18next | Internationalization (en-US, zh-CN) |
+| i18next | Internationalization (en-US, zh-CN, ja-JP, de-DE, fr-FR, es-ES) |
 | xterm.js | Terminal emulator in the browser |
 | React Flow | Graph visualization for flow view |
 | Recharts | Charts for the dashboard |
@@ -64,7 +64,7 @@ Pi Session Manager is built on a three-layer architecture: a React frontend, a R
 - **Transport abstraction** — `transport.ts` provides a unified interface that auto-detects the runtime (Tauri IPC vs. WebSocket vs. HTTP) and routes commands accordingly
 - **Plugin system** — search plugins in `src/plugins/` allow extending search sources
 - **Context providers** — `TransportContext`, `SettingsContext`, `SessionViewContext` manage shared state
-- **19 custom hooks** — encapsulate reusable logic (keyboard shortcuts, file watcher, mobile detection, etc.)
+- **41 custom hooks** — encapsulate reusable logic (keyboard shortcuts, file watcher, mobile detection, Pi live sync, session viewer virtual scroll, in-message search, session tree lookup, etc.)
 
 ## Backend
 
@@ -75,7 +75,7 @@ Pi Session Manager is built on a three-layer architecture: a React frontend, a R
 | Tokio | Async runtime for concurrent I/O |
 | Axum | HTTP/WebSocket server framework |
 | SQLite (rusqlite) | Persistent cache, settings, tags, favorites |
-| Tantivy | Full-text search index |
+| Tantivy | Secondary full-text search index (Lucene-like, results merged with FTS5) |
 | portable-pty | PTY terminal sessions |
 | rust-embed | Embed frontend assets into binary |
 | notify | File system watcher |
@@ -84,20 +84,77 @@ Pi Session Manager is built on a three-layer architecture: a React frontend, a R
 
 ```
 src-tauri/src/
-├── main.rs              # Entry: CLI args, window, adapter startup
-├── lib.rs               # Module declarations, command registration
-├── ws_adapter.rs        # WebSocket server + dispatch() router
-├── http_adapter.rs      # HTTP server, embedded frontend (rust-embed)
-├── app_state.rs         # SharedAppState (Arc)
-├── scanner.rs           # Session file scanner (multi-path, incremental)
-├── scanner_scheduler.rs # Background scan scheduling
-├── terminal.rs          # PTY session manager
-├── sqlite_cache.rs      # Dual-layer cache (FS + SQLite)
-├── tantivy_search.rs    # Full-text search index
-├── file_watcher.rs      # FS watcher for incremental updates
-├── write_buffer.rs      # Async write batching
-├── dispatch.rs          # Pure business logic shared by WS/HTTP/CLI
-└── commands/            # Tauri IPC command handlers (12 modules)
+├── main.rs                   # Entry: CLI args, window, adapter startup
+├── lib.rs                    # Module declarations, command registration
+├── dispatch.rs               # Pure business logic shared by WS/HTTP/CLI
+├── config.rs                 # TOML configuration loader
+├── auth.rs                   # Token-based auth for non-local access
+├── export.rs                 # Session export (HTML, Markdown, JSON)
+├── stats.rs                  # Aggregated session statistics
+├── subagent.rs               # Subagent cost tracking
+├── settings_store.rs         # SQLite-backed app settings
+├── compression.rs            # Gzip compression utilities
+├── metrics.rs                # Prometheus-style metrics collection
+├── api_readonly.rs           # Read-only HTTP API for external consumers
+├── commands/                 # Tauri IPC command handlers (17 modules)
+│   ├── auth.rs               # API token management
+│   ├── config_bundle.rs      # Config import/export
+│   ├── config_versions.rs    # Settings version history
+│   ├── favorites.rs          # Favorite sessions
+│   ├── model_config.rs       # Model config CRUD + backup/restore
+│   ├── models.rs             # Legacy model settings
+│   ├── pi_live.rs            # Pi CLI live session registry
+│   ├── search.rs             # Full-text search (session + message FTS)
+│   ├── session.rs            # Session rename, delete, open
+│   ├── session_file.rs       # File-level session operations
+│   ├── session_list.rs       # Paginated session listing
+│   ├── session_open.rs       # Session open in editor
+│   ├── settings.rs           # App settings CRUD
+│   ├── skills.rs             # Skills/models/pi resource management
+│   ├── tags.rs               # Hierarchical tag management
+│   └── terminal.rs           # PTY terminal management
+├── core/                     # Pure business logic (no Tauri deps)
+│   ├── delete.rs             # Session deletion logic
+│   ├── intel.rs              # Structured recall / intent detection
+│   ├── parser.rs             # JSONL session parser
+│   ├── scanner.rs            # Multi-path session scanner + incremental rescan
+│   └── write_buffer.rs       # Async write batching for SQLite
+├── data/
+│   ├── search/               # Search engine layer
+│   │   ├── client.rs         # Unified search client (FTS5 + Tantivy merge)
+│   │   ├── embedding.rs      # Embedding service for semantic search
+│   │   ├── index.rs          # Tantivy index management
+│   │   └── tantivy.rs        # Tantivy full-text search implementation
+│   └── sqlite/               # SQLite data access layer
+│       ├── bootstrap.rs      # DB init, WAL mode, schema creation
+│       ├── deps.rs           # Shared SQLite dependencies
+│       ├── details_cache.rs  # Session details caching
+│       ├── favorites.rs      # Favorites table operations
+│       ├── legacy_fts.rs     # Legacy session-level FTS (deprecated)
+│       ├── maintenance.rs    # Vacuum, cleanup, preload
+│       ├── message_index.rs  # message_entries + FTS5 triggers
+│       ├── migrations.rs     # Versioned schema migrations
+│       ├── schema.rs         # Schema version management (v6)
+│       ├── sessions.rs       # Session upsert / query
+│       ├── subagent_meta.rs  # Subagent metadata caching
+│       ├── tags.rs           # Tags table operations
+│       ├── types.rs          # SQLite type definitions
+│       └── util.rs           # SQLite utilities
+├── domain/                   # Domain models and business rules
+├── server/                   # Protocol adapters
+│   ├── http/                 # HTTP server (Axum)
+│   │   ├── mod.rs            # Router setup, middleware, CORS
+│   │   ├── common.rs         # Shared HTTP handlers
+│   │   ├── readonly_routes.rs# Read-only API routes
+│   │   ├── realtime.rs       # WebSocket / SSE event handling
+│   │   ├── embedding.rs      # Embedding API endpoints
+│   │   ├── sessions.rs       # Session HTTP routes
+│   │   └── static_assets.rs  # Embedded frontend (rust-embed)
+│   └── ws.rs                 # Standalone WebSocket server (legacy)
+└── utils/                    # Utility functions
+    ├── mod.rs
+    ├── payload.rs
+    └── string.rs
 ```
 
 ### Pure Modules

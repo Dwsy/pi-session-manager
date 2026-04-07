@@ -128,6 +128,9 @@ GET http://127.0.0.1:52131/api/events
 | `get_session_paths` | `{}` | 获取已配置的会话目录 |
 | `save_session_paths` | `{ "paths": ["..."] }` | 更新会话目录 |
 | `get_all_session_dirs` | `{}` | 获取所有已解析的扫描目录 |
+| `get_config_bundle` | `{}` | 获取完整配置包 |
+| `save_config_bundle` | `{ ... }` | 保存配置包 |
+| `list_config_versions` | `{}` | 列出配置版本历史 |
 
 ### 认证
 
@@ -142,6 +145,42 @@ GET http://127.0.0.1:52131/api/events
 | 命令 | 载荷 | 说明 |
 |------|------|------|
 | `get_session_stats` | `{}` | 获取聚合的会话统计数据 |
+
+### 模型配置
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `load_model_config` | `{}` | 加载当前模型配置 |
+| `save_model_config` | `{ ... }` | 保存模型配置 |
+| `import_model_config_from_path` | `{ "path": "..." }` | 从文件导入模型配置 |
+| `export_model_config_to_path` | `{ "path": "..." }` | 导出模型配置到文件 |
+| `list_model_config_backups` | `{}` | 列出模型配置备份 |
+| `restore_model_config_backup` | `{ "backup_name": "..." }` | 恢复备份 |
+
+### 技能与资源
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `list_skills` | `{}` | 列出 Pi 技能 |
+| `list_prompts` | `{}` | 列出 Pi 提示词 |
+| `list_themes` | `{}` | 列出 Pi 主题 |
+
+### Pi 实时会话
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `get_pi_live_sessions` | `{}` | 列出活跃的 Pi CLI 会话 |
+| `get_pi_agent_entries` | `{ "session_id": "..." }` | 获取实时会话的缓存历史 |
+| `send_pi_agent_rpc` | `{ "session_id": "...", "prompt": "..." }` | 向 Pi CLI 发送提示 |
+
+### 终端
+
+| 命令 | 载荷 | 说明 |
+|------|------|------|
+| `create_terminal` | `{ "cwd": "..." }` | 创建新 PTY 会话 |
+| `terminal_write` | `{ "id": "...", "data": "..." }` | 写入 PTY |
+| `terminal_resize` | `{ "id": "...", "cols": N, "rows": N }` | 调整终端大小 |
+| `terminal_close` | `{ "id": "..." }` | 关闭 PTY 会话 |
 
 ### 健康检查
 

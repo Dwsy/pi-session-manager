@@ -1,14 +1,14 @@
 ---
 title: 贡献指南
-description: 如何为 Pi Session Manager 做出贡献。
+description: 如何为 Pi Session Manager 做贡献。
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Steps, Step } from 'fumadocs-ui/components/steps';
 
-> "预测未来最好的方式就是去实现它。" — David Heinemeier Hansson
+> "预测未来的最好方式就是去实现它。" — David Heinemeier Hansson
 
-欢迎为 Pi Session Manager 做出贡献！以下是入门指南。
+我们欢迎对 Pi Session Manager 的贡献！以下是入门指南。
 
 ## 前置要求
 
@@ -37,7 +37,7 @@ pnpm install
 </Step>
 
 <Step>
-### 启动开发环境
+### 启动开发模式
 
 ```bash
 pnpm run tauri:dev
@@ -50,20 +50,26 @@ pnpm run tauri:dev
 ## 项目结构
 
 ```
-src/                    # 前端 (React + TypeScript)
-  components/           #   UI 组件 (99+ 文件)
-  hooks/                #   自定义 React Hooks (19 个)
-  plugins/              #   搜索插件系统
-  contexts/             #   React Contexts
-  i18n/                 #   国际化 (en-US, zh-CN)
-src-tauri/              # 后端 (Rust + Tauri 2)
+src/                          # 前端（React + TypeScript）
+  components/                 #   UI 组件（172 个文件，按子目录组织）
+  hooks/                      #   自定义 React Hooks（41 个）
+  plugins/                    #   搜索插件系统
+  contexts/                   #   React Contexts
+  i18n/                       #   国际化（6 种语言）
+src-tauri/                    # 后端（Rust + Tauri 2）
   src/
-    commands/           #   Tauri IPC 命令处理器
-    scanner.rs          #   会话文件扫描器
-    search.rs           #   搜索功能
-    export.rs           #   导出功能
-  tests/                #   集成测试
-src-tauri-cli/          # CLI 二进制文件 (独立 Rust)
+    commands/                 #   Tauri IPC 命令处理器（17 个模块）
+    core/                     #   纯业务逻辑（扫描器、解析器等）
+    data/
+      sqlite/                 #   SQLite 数据访问层
+      search/                 #   搜索引擎（FTS5 + Tantivy）
+    server/
+      http/                   #   HTTP/Axum 服务
+      ws.rs                   #   独立 WebSocket 服务（旧版）
+    dispatch.rs               #   共享命令路由
+  tests/                      #   集成测试
+src-tauri-cli/                # CLI 二进制（独立 Rust 程序）
+website/                      # 文档站点（Next.js + Fumadocs）
 ```
 
 ## 开发工作流
@@ -71,23 +77,26 @@ src-tauri-cli/          # CLI 二进制文件 (独立 Rust)
 ### 代码风格
 
 **TypeScript/React：**
-- 函数式组件 + Hooks
+- 函数组件 + Hooks
 - TypeScript 严格模式（`strict: true`，禁止 `any`）
-- 导入顺序：React → 第三方库 → 内部组件 → Hooks → 工具函数 → 类型
+- 导入顺序：React → 第三方 → 内部组件 → Hooks → 工具 → 类型
+- 使用 `@/*` 路径别名（如 `@/components/App`）
 
 **Rust：**
-- `cargo fmt` 格式化（CI 强制检查）
-- `cargo clippy -D warnings` 静态检查（CI 强制检查）
-- 所有公共函数返回 `Result<T, String>`
-- 公共函数使用 `///` 文档注释
+- `cargo fmt` 格式化（CI 强制执行）
+- `cargo clippy -D warnings` 检查（CI 强制执行）
+- 公共函数返回 `Result<T, String>`
+- 使用 `///` 注释公共函数
+- 命令放在 `commands/`，业务逻辑放在 `core/` 和 `data/`
 
 ### 添加新命令
 
-添加新的后端命令时，需更新以下位置：
+添加后端命令时，需要更新以下位置：
 
-1. **`ws_adapter.rs`** — 在 `dispatch()` 中添加 `match` 分支
-2. **`main.rs`** — 在 `invoke_handler` 中注册 Tauri IPC 命令
-3. WebSocket 和 HTTP 自动从 `dispatch()` 继承
+1. **`dispatch.rs`** — 在命令路由中添加 `match` 分支
+2. **`commands/mod.rs`** — 导出新的命令模块
+3. **`lib.rs`** — 如需要则为外部消费者重新导出
+4. WebSocket 和 HTTP 自动继承 `dispatch()` 的路由
 
 示例：
 
@@ -102,7 +111,7 @@ src-tauri-cli/          # CLI 二进制文件 (独立 Rust)
 ### 添加前端组件
 
 ```typescript
-// 每个文件一个组件，PascalCase 命名
+// 每个文件一个组件，使用 PascalCase 命名
 function MyComponent({ prop1, prop2 }: MyComponentProps) {
   const { t } = useTranslation()
   const [state, setState] = useState<string>('')
@@ -119,8 +128,9 @@ export default MyComponent
 
 ```bash
 cd src-tauri && cargo test
-cd src-tauri && cargo test test_name -- --nocapture  # 指定测试并显示输出
-cd src-tauri && cargo test --test integration_test    # 集成测试
+cd src-tauri && cargo test test_name -- --nocapture  # 特定测试 + 输出
+cd src-tauri && cargo test --test full_text_search_integration_test    # 集成测试
+cd src-tauri && cargo test --test migration_test    # 迁移测试
 ```
 
 ### 代码质量检查
@@ -148,7 +158,7 @@ chore: update dependencies
 
 <Steps>
 <Step>
-### Fork 并创建分支
+### 创建分支
 
 ```bash
 git checkout -b feature/my-feature
@@ -174,14 +184,14 @@ git push origin feature/my-feature
 </Step>
 
 <Step>
-### 发起 Pull Request
+### 提交 Pull Request
 
-向 `main` 分支提交 PR，并清晰描述你的变更内容。
+向 `main` 分支提交 PR，并附上清晰的变更说明。
 </Step>
 </Steps>
 
 <Callout type="info">
-所有 PR 必须通过 CI 检查（rustfmt、clippy、构建）才能合并。CI 流水线还会构建 CLI 二进制文件作为健全性检查。
+所有 PR 必须通过 CI 检查（rustfmt、clippy、构建）后才能合并。CI 流水线还会构建 CLI 二进制文件作为健全性检查。
 </Callout>
 
 ## 报告问题
@@ -189,11 +199,11 @@ git push origin feature/my-feature
 提交 Issue 时，请包含：
 
 1. 操作系统和版本（如 macOS 15.0、Windows 11）
-2. 应用版本（来自设置或 `package.json`）
+2. 应用版本（从设置或 `package.json` 获取）
 3. 复现步骤
-4. 预期行为 vs. 实际行为
+4. 期望行为与实际行为的对比
 5. 相关日志或错误信息
 
 ## 许可证
 
-参与贡献即表示你同意你的贡献将在 [MIT License](https://github.com/Dwsy/pi-session-manager/blob/main/LICENSE) 下发布。
+贡献即表示你同意你的贡献将根据 [MIT License](https://github.com/Dwsy/pi-session-manager/blob/main/LICENSE) 授权。

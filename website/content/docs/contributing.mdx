@@ -50,20 +50,26 @@ This launches both the Vite dev server (with HMR) and the Rust backend.
 ## Project Structure
 
 ```
-src/                    # Frontend (React + TypeScript)
-  components/           #   UI components (99+ files)
-  hooks/                #   Custom React hooks (19)
-  plugins/              #   Search plugin system
-  contexts/             #   React contexts
-  i18n/                 #   Internationalization (en-US, zh-CN)
-src-tauri/              # Backend (Rust + Tauri 2)
+src/                          # Frontend (React + TypeScript)
+  components/                 #   UI components (172 files, organized in subdirs)
+  hooks/                      #   Custom React hooks (41)
+  plugins/                    #   Search plugin system
+  contexts/                   #   React contexts
+  i18n/                       #   Internationalization (6 languages)
+src-tauri/                    # Backend (Rust + Tauri 2)
   src/
-    commands/           #   Tauri IPC command handlers
-    scanner.rs          #   Session file scanner
-    search.rs           #   Search functionality
-    export.rs           #   Export functionality
-  tests/                #   Integration tests
-src-tauri-cli/          # CLI binary (standalone Rust)
+    commands/                 #   Tauri IPC command handlers (17 modules)
+    core/                     #   Pure business logic (scanner, parser, etc.)
+    data/
+      sqlite/                 #   SQLite data access layer
+      search/                 #   Search engine (FTS5 + Tantivy)
+    server/
+      http/                   #   HTTP/Axum server
+      ws.rs                   #   Standalone WebSocket (legacy)
+    dispatch.rs               #   Shared command router
+  tests/                      #   Integration tests
+src-tauri-cli/                # CLI binary (standalone Rust)
+website/                      # Documentation site (Next.js + Fumadocs)
 ```
 
 ## Development Workflow
@@ -74,20 +80,23 @@ src-tauri-cli/          # CLI binary (standalone Rust)
 - Functional components with hooks
 - TypeScript strict mode (`strict: true`, no `any`)
 - Import order: React → third-party → internal components → hooks → utils → types
+- Path aliases via `@/*` (e.g., `@/components/App`)
 
 **Rust:**
 - `cargo fmt` for formatting (enforced in CI)
 - `cargo clippy -D warnings` for linting (enforced in CI)
-- All public functions return `Result<T, String>`
+- Public functions return `Result<T, String>`
 - Document public functions with `///` comments
+- Commands live in `commands/`, business logic in `core/` and `data/`
 
 ### Adding a New Command
 
 When adding a new backend command, update these locations:
 
-1. **`ws_adapter.rs`** — add a `match` arm in `dispatch()`
-2. **`main.rs`** — register in `invoke_handler` for Tauri IPC
-3. WebSocket and HTTP automatically inherit from `dispatch()`
+1. **`dispatch.rs`** — add a `match` arm in the command router
+2. **`commands/mod.rs`** — export the new command module
+3. **`lib.rs`** — re-export if needed for external consumers
+4. WebSocket and HTTP automatically inherit from `dispatch()`
 
 Example:
 
@@ -120,7 +129,8 @@ export default MyComponent
 ```bash
 cd src-tauri && cargo test
 cd src-tauri && cargo test test_name -- --nocapture  # specific test with output
-cd src-tauri && cargo test --test integration_test    # integration tests
+cd src-tauri && cargo test --test full_text_search_integration_test    # integration tests
+cd src-tauri && cargo test --test migration_test    # migration tests
 ```
 
 ### Code Quality Checks
