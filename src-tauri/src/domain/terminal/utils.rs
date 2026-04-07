@@ -37,7 +37,8 @@ pub fn build_resume_command(
     }
 }
 
-fn build_windows_cmd_resume_command(cwd: &str, path: &str, pi_cmd: &str) -> String {
+#[cfg(target_os = "windows")]
+pub fn build_windows_cmd_resume_command(cwd: &str, path: &str, pi_cmd: &str) -> String {
     format!(
         "cd /d {} && {} --session {}",
         cmd_double_quote(cwd),
@@ -46,7 +47,8 @@ fn build_windows_cmd_resume_command(cwd: &str, path: &str, pi_cmd: &str) -> Stri
     )
 }
 
-fn build_windows_powershell_resume_command(cwd: &str, path: &str, pi_cmd: &str) -> String {
+#[cfg(target_os = "windows")]
+pub fn build_windows_powershell_resume_command(cwd: &str, path: &str, pi_cmd: &str) -> String {
     format!(
         "Set-Location -LiteralPath '{}'; & '{}' --session '{}'",
         powershell_single_quote(cwd),

@@ -8,6 +8,11 @@ use std::process::Command;
 #[cfg(target_os = "macos")]
 use crate::domain::terminal::utils::{macos_app_exists, run_osascript};
 
+#[cfg(target_os = "windows")]
+use crate::domain::terminal::utils::{
+    build_windows_cmd_resume_command, build_windows_powershell_resume_command,
+};
+
 #[cfg(target_os = "macos")]
 pub fn try_launch_known_terminal_macos(
     terminal_id: &str,
