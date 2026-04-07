@@ -4,7 +4,7 @@
 
 **Goal:** 重构 Dashboard 为插件化架构，支持多预设模式 + 多自定义模式 + 切换分享功能
 
-**Architecture:** 
+**Architecture:**
 - 采用 **Strategy Pattern** 管理不同布局模式
 - 使用 **Registry Pattern** 管理插件
 - 基于 **react-grid-layout** 实现可拖拽网格
@@ -86,7 +86,7 @@ export interface DashboardPlugin {
   category: 'stats' | 'chart' | 'list' | 'custom';
   icon?: string;
   description?: string;
-  
+
   // 尺寸默认
   defaultSize: {
     w: number;
@@ -94,14 +94,14 @@ export interface DashboardPlugin {
     minW?: number;
     minH?: number;
   };
-  
+
   // 渲染
   component: ComponentType<WidgetProps>;
   configPanel?: ComponentType<ConfigPanelProps>;
-  
+
   // 数据
   dataFetcher?: DataFetcher;
-  
+
   // 生命周期
   onInit?: (ctx: PluginContext) => void | Promise<void>;
   onMount?: (ctx: PluginContext) => void;
@@ -295,7 +295,7 @@ const iconMap: Record<string, React.ComponentType> = {
 
 const StatCardWidget: React.FC<WidgetProps> = ({ config, data }) => {
   const Icon = iconMap[config.icon] || BarChart3;
-  
+
   return (
     <StatCard
       icon={Icon}
@@ -313,9 +313,9 @@ export const StatCardPlugin: DashboardPlugin = {
   category: 'stats',
   icon: 'BarChart3',
   defaultSize: { w: 2, h: 2, minW: 2, minH: 2 },
-  
+
   component: StatCardWidget,
-  
+
   dataFetcher: async (ctx) => {
     return ctx.api.data.getSessionStats();
   },
@@ -332,9 +332,9 @@ export const ActivityHeatmapPlugin: DashboardPlugin = {
   category: 'chart',
   icon: 'Calendar',
   defaultSize: { w: 6, h: 4, minW: 4, minH: 3 },
-  
+
   component: ActivityHeatmap,
-  
+
   dataFetcher: async (ctx) => {
     const stats = await ctx.api.data.getSessionStats();
     return stats.heatmap_data;
@@ -381,24 +381,24 @@ interface LayoutStore {
   modes: LayoutMode[];
   currentModeId: string | null;
   isEditing: boolean;
-  
+
   // 操作
   setCurrentMode: (id: string) => void;
   addMode: (mode: Omit<LayoutMode, 'id' | 'createdAt' | 'updatedAt'>) => string;
   updateMode: (id: string, updates: Partial<LayoutMode>) => void;
   deleteMode: (id: string) => void;
   duplicateMode: (id: string, newName: string) => string;
-  
+
   // 布局编辑
   updateLayout: (id: string, layout: LayoutConfig) => void;
   addWidget: (modeId: string, pluginId: string) => void;
   removeWidget: (modeId: string, widgetId: string) => void;
   updateWidget: (modeId: string, widgetId: string, config: any) => void;
-  
+
   // 导入导出
   exportMode: (id: string) => string;
   importMode: (json: string) => string;
-  
+
   // 初始化
   initializeModes: () => void;
 }
@@ -459,7 +459,7 @@ export const useLayoutStore = create<LayoutStore>()(
       initializeModes: () => {
         const { modes } = get();
         if (modes.length === 0) {
-          set({ 
+          set({
             modes: PRESET_MODES,
             currentModeId: PRESET_MODES[0].id,
           });
@@ -492,8 +492,8 @@ export const useLayoutStore = create<LayoutStore>()(
       deleteMode: (id) => {
         set(state => ({
           modes: state.modes.filter(m => m.id !== id),
-          currentModeId: state.currentModeId === id 
-            ? state.modes[0]?.id || null 
+          currentModeId: state.currentModeId === id
+            ? state.modes[0]?.id || null
             : state.currentModeId,
         }));
       },
@@ -501,7 +501,7 @@ export const useLayoutStore = create<LayoutStore>()(
       duplicateMode: (id, newName) => {
         const mode = get().modes.find(m => m.id === id);
         if (!mode) throw new Error('Mode not found');
-        
+
         return get().addMode({
           ...mode,
           name: newName,
@@ -630,7 +630,7 @@ export function WidgetShell({
           {editable && <GripVertical className="w-4 h-4 text-muted-foreground" />}
           <span className="text-sm font-medium truncate">{title}</span>
         </div>
-        
+
         {editable && (
           <div className="flex items-center gap-1">
             {onConfigClick && (
@@ -652,7 +652,7 @@ export function WidgetShell({
           </div>
         )}
       </div>
-      
+
       {/* Content */}
       <div className="flex-1 overflow-auto p-3">
         {children}
@@ -706,7 +706,7 @@ export function DashboardEngine({ mode, editable = false }: DashboardEngineProps
       const layoutItem = currentLayout.find(l => l.i === item.i);
       return layoutItem ? { ...item, ...layoutItem } : item;
     });
-    
+
     updateLayout(mode.id, {
       ...mode.layout,
       items: newItems,
@@ -739,13 +739,13 @@ export function DashboardEngine({ mode, editable = false }: DashboardEngineProps
   );
 }
 
-function WidgetRenderer({ 
-  item, 
-  editable, 
-  modeId 
-}: { 
-  item: any; 
-  editable: boolean; 
+function WidgetRenderer({
+  item,
+  editable,
+  modeId
+}: {
+  item: any;
+  editable: boolean;
   modeId: string;
 }) {
   const plugin = pluginRegistry.get(item.pluginId);
@@ -756,7 +756,7 @@ function WidgetRenderer({
 
   useEffect(() => {
     if (!plugin?.dataFetcher) return;
-    
+
     setLoading(true);
     plugin.dataFetcher({} as any)
       .then(setData)
@@ -813,7 +813,7 @@ import type { LayoutMode } from '../types';
 export function ModeSwitcher() {
   const [isOpen, setIsOpen] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  
+
   const modes = useLayoutStore(s => s.modes);
   const currentModeId = useLayoutStore(s => s.currentModeId);
   const setCurrentMode = useLayoutStore(s => s.setCurrentMode);
@@ -933,14 +933,14 @@ export function ModeSwitcher() {
   );
 }
 
-function ModeItem({ 
-  mode, 
-  isActive, 
+function ModeItem({
+  mode,
+  isActive,
   onClick,
   onDuplicate,
   onExport,
   onDelete,
-}: { 
+}: {
   mode: LayoutMode;
   isActive: boolean;
   onClick: () => void;
@@ -1009,13 +1009,13 @@ function CreateModeModal({ onClose }: { onClose: () => void }) {
 
   const handleCreate = () => {
     const base = baseMode === 'empty' ? null : modes.find(m => m.id === baseMode);
-    
+
     addMode({
       name,
       description: '',
       layout: base ? { ...base.layout } : { items: [], cols: 12, rowHeight: 60, margin: [16, 16] },
     });
-    
+
     onClose();
   };
 
@@ -1023,7 +1023,7 @@ function CreateModeModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="glass-card rounded-xl p-6 w-96">
         <h3 className="text-lg font-bold mb-4">新建模式</h3>
-        
+
         <div className="space-y-4">
           <div>
             <label className="text-sm text-muted-foreground">名称</label>
@@ -1097,7 +1097,7 @@ interface EditToolbarProps {
 export function EditToolbar({ modeId }: EditToolbarProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [showAddPanel, setShowAddPanel] = useState(false);
-  
+
   const addWidget = useLayoutStore(s => s.addWidget);
   const plugins = pluginRegistry.getAll();
 
@@ -1223,8 +1223,8 @@ export function DashboardContainer({
 
       {/* 网格区域 */}
       <div className="flex-1 overflow-auto p-4">
-        <DashboardEngine 
-          mode={currentMode} 
+        <DashboardEngine
+          mode={currentMode}
           editable={isEditing}
         />
       </div>

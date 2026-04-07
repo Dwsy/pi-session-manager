@@ -135,11 +135,11 @@ interface SearchPlugin {
   description: string                 // Description
   keywords: string[]                  // Search keywords
   priority: number                    // Priority (0-100)
-  
+
   // Core methods (must implement)
   search(query: string, context: SearchContext): Promise<SearchPluginResult[]>
   onSelect(result: SearchPluginResult, context: SearchContext): void
-  
+
   // Optional methods
   renderItem?(result: SearchPluginResult): React.ReactNode
   onMount?(): void
@@ -178,7 +178,7 @@ interface SearchContext {
 // src/plugins/registry.ts
 class PluginRegistry {
   private plugins: Map<string, SearchPlugin> = new Map()
-  
+
   // Register plugin
   register(plugin: SearchPlugin): void {
     if (this.plugins.has(plugin.id)) {
@@ -187,17 +187,17 @@ class PluginRegistry {
     this.plugins.set(plugin.id, plugin)
     plugin.onMount?.()
   }
-  
+
   // Get all plugins (sorted by priority)
   getAll(): SearchPlugin[] {
     return Array.from(this.plugins.values())
       .sort((a, b) => b.priority - a.priority)
   }
-  
+
   // Execute search (parallel)
   async search(query: string, context: SearchContext): Promise<SearchPluginResult[]> {
     const enabledPlugins = this.getEnabled(context)
-    
+
     // Execute all plugin searches in parallel
     const results = await Promise.all(
       enabledPlugins.map(async plugin => {
@@ -209,7 +209,7 @@ class PluginRegistry {
         }))
       })
     )
-    
+
     // Merge and sort
     return results.flat().sort((a, b) => b.score - a.score)
   }
@@ -236,14 +236,14 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
   name = 'Message Search'
   icon = MessageSquare
   priority = 80
-  
+
   async search(query: string, context: SearchContext): Promise<SearchPluginResult[]> {
     // Call Rust FTS5 search
     const sessions = await invoke<SessionInfo[]>('search_sessions_fts', {
       query,
       limit: 50
     })
-    
+
     // Convert to plugin result format
     return sessions.map(session => ({
       id: `session-${session.id}`,
@@ -257,7 +257,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       highlights: [...]
     })).slice(0, 20)
   }
-  
+
   onSelect(result: SearchPluginResult, context: SearchContext): void {
     const session = result.metadata.session
     context.setSelectedSession(session.id)
@@ -279,13 +279,13 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
 // src/components/command/CommandMenu.tsx
 useEffect(() => {
   if (debounceRef.current) clearTimeout(debounceRef.current)
-  
+
   debounceRef.current = setTimeout(async () => {
     // Execute search after 300ms
     const results = await search(query)
     setResults(results)
   }, 300)
-  
+
   return () => clearTimeout(debounceRef.current)
 }, [query, search])
 ```
@@ -301,12 +301,12 @@ const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 export function useSearchCache() {
   const cacheRef = useRef<Map<string, CacheEntry>>(new Map())
-  
+
   return useMemo(() => ({
     get: (query: string): SearchPluginResult[] | null => {
       const entry = cacheRef.current.get(query)
       if (!entry) return null
-      
+
       // Check expiration
       if (Date.now() - entry.timestamp > CACHE_TTL) {
         cacheRef.current.delete(query)
@@ -314,14 +314,14 @@ export function useSearchCache() {
       }
       return entry.results
     },
-    
+
     set: (query: string, results: SearchPluginResult[]): void => {
       // LRU: Delete oldest when cache is full
       if (cacheRef.current.size >= CACHE_SIZE) {
         const firstKey = cacheRef.current.keys().next().value
         cacheRef.current.delete(firstKey)
       }
-      
+
       cacheRef.current.set(query, {
         results,
         timestamp: Date.now()
@@ -344,13 +344,13 @@ useEffect(() => {
   if (abortControllerRef.current) {
     abortControllerRef.current.abort()
   }
-  
+
   // Create new AbortController
   abortControllerRef.current = new AbortController()
-  
+
   // Execute search
   const results = await search(query)
-  
+
   // Check if cancelled
   if (!abortControllerRef.current.signal.aborted) {
     setResults(results)
@@ -366,12 +366,12 @@ useEffect(() => {
 // src/plugins/registry.ts
 async search(query: string, context: SearchContext): Promise<SearchPluginResult[]> {
   const enabledPlugins = this.getEnabled(context)
-  
+
   // Execute all plugin searches in parallel
   const results = await Promise.all(
     enabledPlugins.map(plugin => plugin.search(query, context))
   )
-  
+
   return results.flat().sort((a, b) => b.score - a.score)
 }
 ```
@@ -395,17 +395,17 @@ CREATE VIRTUAL TABLE sessions_fts USING fts5(
 // FTS5 search
 pub fn search_fts5(conn: &Connection, query: &str, limit: usize) -> Result<Vec<String>> {
   let mut stmt = conn.prepare_cached(
-    "SELECT path FROM sessions_fts 
+    "SELECT path FROM sessions_fts
      WHERE sessions_fts MATCH ?
      ORDER BY rank
      LIMIT ?"
   )?;
-  
+
   let paths: Vec<String> = stmt.query_map(
     params![query, limit],
     |row| row.get(0)
   )?.collect::<Result<Vec<_>, _>>()?;
-  
+
   Ok(paths)
 }
 ```
@@ -427,7 +427,7 @@ pub fn search_sessions(
   include_tools: bool,
 ) -> Vec<SearchResult> {
   let regex = Regex::new(&regex_escape(query)).unwrap();
-  
+
   sessions.iter()
     .filter_map(|session| {
       // Search in message content
@@ -438,7 +438,7 @@ pub fn search_sessions(
         })
         .map(|msg| MessageMatch { ... })
         .collect();
-      
+
       if !matches.is_empty() {
         Some(SearchResult {
           session_id: session.id.clone(),
@@ -657,7 +657,7 @@ export function useKeyboardShortcuts(shortcuts: () => Record<string, () => void>
         handler()
       }
     }
-    
+
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [shortcuts])
@@ -776,10 +776,10 @@ try {
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error('Search timeout after 15 seconds')), 15000)
   })
-  
+
   const searchPromise = search(query)
   const searchResults = await Promise.race([searchPromise, timeoutPromise])
-  
+
   setResults(searchResults)
   setIsSearching(false)
 } catch (error) {
@@ -956,24 +956,24 @@ session.messages.iter()
 // BaseSearchPlugin.ts
 protected fuzzyMatch(query: string, text: string): number {
   if (!query || !text) return 0
-  
+
   const lowerQuery = query.toLowerCase()
   const lowerText = text.toLowerCase()
-  
+
   // Exact match
   if (lowerText.includes(lowerQuery)) {
     return 1
   }
-  
+
   // Prefix match
   if (lowerText.startsWith(lowerQuery)) {
     return 0.8
   }
-  
+
   // Fuzzy match (Levenshtein distance)
   const distance = levenshtein(lowerQuery, lowerText)
   const similarity = 1 - distance / Math.max(query.length, text.length)
-  
+
   return Math.max(0, similarity)
 }
 ```
@@ -999,14 +999,14 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 
 function CommandList({ results }: { results: SearchPluginResult[] }) {
   const parentRef = useRef<HTMLDivElement>(null)
-  
+
   const virtualizer = useVirtualizer({
     count: results.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 60,
     overscan: 5
   })
-  
+
   return (
     <div ref={parentRef} className="max-h-[50vh] overflow-auto">
       <div

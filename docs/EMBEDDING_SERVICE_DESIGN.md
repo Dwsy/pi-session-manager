@@ -119,7 +119,7 @@ impl EmbeddingService {
         }
         Ok(self.port)
     }
-    
+
     async fn start(&mut self) -> Result<(), Error> {
         // Start node-llama-cpp embedding service
         let child = Command::new("node")
@@ -127,9 +127,9 @@ impl EmbeddingService {
             .arg("--model").arg(&self.model_path)
             .arg("--port").arg(self.port.to_string())
             .spawn()?;
-        
+
         self.process = Some(child);
-        
+
         // Wait for ready probe
         self.wait_for_ready().await
     }
@@ -143,7 +143,7 @@ Modify `memory-vector.ts`, add HTTP embedding provider:
 ```typescript
 class HttpEmbeddingProvider implements EmbeddingProvider {
   private baseUrl: string;
-  
+
   async embed(text: string): Promise<number[]> {
     const res = await fetch(`${this.baseUrl}/v1/embedding`, {
       method: 'POST',

@@ -61,14 +61,14 @@ import { useSettings } from '@/hooks/useSettings'
 
 function MyComponent() {
   const { settings, updateSetting, isLoading, error } = useSettings()
-  
+
   const handleChange = (value: string) => {
     updateSetting('language', 'locale', value)
   }
-  
+
   if (isLoading) return <div>Loading...</div>
   if (error) return <div>Error: {error.message}</div>
-  
+
   return (
     <div>
       Current language: {settings.language.locale}
@@ -84,7 +84,7 @@ import { useAppearance } from '@/hooks/useAppearance'
 
 function App() {
   const { theme, fontSize, messageSpacing } = useAppearance()
-  
+
   return (
     <div className={theme} style={{ fontSize }}>
       <div className={messageSpacing}>
@@ -102,7 +102,7 @@ import { useAppearance } from '@/hooks/useAppearance'
 
 function App() {
   const { theme, fontSize, messageSpacing } = useAppearance()
-  
+
   return (
     <div
       className={`app-root ${theme}`}
@@ -170,11 +170,11 @@ import { useSettings } from '@/hooks/useSettings'
 function SessionViewer() {
   const { settings, updateSetting } = useSettings()
   const sidebarWidth = settings.appearance.sidebarWidth
-  
+
   const handleResize = (newWidth: number) => {
     updateSetting('appearance', 'sidebarWidth', newWidth)
   }
-  
+
   return (
     <div style={{ width: `${sidebarWidth}px` }}>
       {/* Sidebar content */}
@@ -191,7 +191,7 @@ import { useSettings } from '@/hooks/useSettings'
 function SearchComponent() {
   const { settings } = useSettings()
   const searchConfig = settings.search
-  
+
   const handleSearch = async (query: string) => {
     const results = await invoke('search_sessions', {
       query,
@@ -200,7 +200,7 @@ function SearchComponent() {
     })
     return results
   }
-  
+
   return <input type="search" placeholder="Search..." />
 }
 ```
@@ -214,7 +214,7 @@ import { useEffect } from 'react'
 function SessionList() {
   const { settings } = useSettings()
   const { autoRefresh, refreshInterval, showMessagePreview, previewLines } = settings.session
-  
+
   useEffect(() => {
     if (!autoRefresh) return
     const interval = setInterval(() => {
@@ -222,7 +222,7 @@ function SessionList() {
     }, refreshInterval * 1000)
     return () => clearInterval(interval)
   }, [autoRefresh, refreshInterval])
-  
+
   return (
     <div>
       {sessions.map(session => (
@@ -328,7 +328,7 @@ interface UseSettingsReturn {
   isLoading: boolean
   error: Error | null
   isDirty: boolean
-  
+
   // Actions
   updateSetting: <K extends keyof AppSettings>(
     section: K,
@@ -365,13 +365,13 @@ test('update settings', async () => {
   const wrapper = ({ children }) => (
     <SettingsProvider>{children}</SettingsProvider>
   )
-  
+
   const { result } = renderHook(() => useSettings(), { wrapper })
-  
+
   await act(async () => {
     await result.current.updateSetting('language', 'locale', 'en-US')
   })
-  
+
   expect(result.current.settings.language.locale).toBe('en-US')
 })
 ```

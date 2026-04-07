@@ -4,7 +4,7 @@
 
 **Goal:** Build a multi-Pi-CLI to single-PSM architecture with real-time RPC interaction, automatic mode switching in SessionViewer, and rich UI controls.
 
-**Architecture:** 
+**Architecture:**
 - Extend `pi_agent_registry` to store WebSocket connections per session
 - Add full RPC command set in `commands/pi_live.rs`
 - Update WebSocket adapters to handle RPC routing
@@ -66,7 +66,7 @@ pub struct PiAgentRegistry {
 ```rust
 impl PiAgentRegistry {
     // ... existing methods ...
-    
+
     // New: register connection
     pub fn register_connection(
         &amp;self,
@@ -83,7 +83,7 @@ impl PiAgentRegistry {
             },
         );
     }
-    
+
     // New: send RPC command
     pub async fn send_rpc(
         &amp;self,
@@ -94,15 +94,15 @@ impl PiAgentRegistry {
             let guard = self.connections.lock().unwrap();
             guard.get(session_id).cloned().ok_or_else(|| format!("Session not connected: {}", session_id))?
         };
-        
+
         let sender = conn.sender.ok_or_else(|| "No sender for session".to_string())?;
         let response_tx = conn.response_tx.ok_or_else(|| "No response channel for session".to_string())?;
-        
+
         let mut response_rx = response_tx.subscribe();
         let command_str = serde_json::to_string(&amp;command).map_err(|e| e.to_string())?;
-        
+
         sender.send(command_str).map_err(|e| e.to_string())?;
-        
+
         // Wait for response with timeout
         tokio::time::timeout(
             std::time::Duration::from_secs(30),
@@ -111,7 +111,7 @@ impl PiAgentRegistry {
             .map_err(|_| "RPC timeout".to_string())?
             .map_err(|e| e.to_string())
     }
-    
+
     // New: forward response to waiting callers
     pub fn forward_response(&amp;self, session_id: &amp;str, response: serde_json::Value) {
         if let Some(conn) = self.connections.lock().unwrap().get(session_id) {
@@ -120,7 +120,7 @@ impl PiAgentRegistry {
             }
         }
     }
-    
+
     // New: update session state cache
     pub fn update_session_state(
         &amp;self,
@@ -135,7 +135,7 @@ impl PiAgentRegistry {
             if context_usage.is_some() { s.context_usage = context_usage; }
         }
     }
-    
+
     // New: remove connection
     pub fn remove_connection(&amp;self, session_id: &amp;str) {
         self.connections.lock().unwrap().remove(session_id);
@@ -420,7 +420,7 @@ if text.contains("\"type\"") &amp;&amp; text.contains("\"register\"") {
             let cwd = register["payload"]["cwd"].as_str().map(|s| s.to_string());
             log::info!("[HTTP-WS] Pi agent registered: session={session_id}, pid={pid:?}");
             app_state.pi_agent_registry.register(session_id.to_string(), session_path, pid, cwd);
-            
+
             // NEW: Create RPC channels and register connection
             let (command_tx, mut command_rx) = tokio::sync::mpsc::unbounded_channel::&lt;String&gt;();
             let (response_tx, _) = tokio::sync::broadcast::channel::&lt;serde_json::Value&gt;(16);
@@ -429,7 +429,7 @@ if text.contains("\"type\"") &amp;&amp; text.contains("\"register\"") {
                 command_tx,
                 response_tx,
             );
-            
+
             // Spawn task to forward RPC commands to WebSocket
             let mut tx_clone = tx.clone();
             let session_id_clone = session_id.to_string();
@@ -442,7 +442,7 @@ if text.contains("\"type\"") &amp;&amp; text.contains("\"register\"") {
                 }
                 app_state_clone.pi_agent_registry.remove_connection(&amp;session_id_clone);
             });
-            
+
             let _ = app_state.event_tx.send(crate::app_state::WsEvent {
                 event_type: "event".to_string(),
                 event: "pi-agent:register".to_string(),
@@ -578,11 +578,11 @@ function broadcastSessionState() {
   const contextUsage = latestCtx.getContextUsage();
   conn?.send({
     type: "session_state",
-    payload: { 
+    payload: {
       sessionId,
-      model, 
-      thinkingLevel, 
-      contextUsage 
+      model,
+      thinkingLevel,
+      contextUsage
     },
   });
 }
@@ -616,33 +616,33 @@ export function useSessionViewerData(sessionPath: string) {
   const { liveSessionIds } = usePiLiveSessions()
   const sessionId = extractSessionId(sessionPath)
   const isSessionOnline = liveSessionIds.has(sessionId)
-  
+
   // Add state for online mode
   const [isOnlineMode, setIsOnlineMode] = useState(false)
-  
+
   useEffect(() =&gt; {
     setIsOnlineMode(isSessionOnline)
   }, [isSessionOnline])
-  
+
   // Add listener for pi-agent:entry events
   useEffect(() =&gt; {
     if (!isOnlineMode) return
-    
+
     const unsubs: (() =&gt; void)[] = []
-    
+
     listen&lt;{ sessionId: string; eventType: string; entry: any }&gt;(
       'pi-agent:entry',
       ({ payload }) =&gt; {
         if (payload.sessionId !== sessionId) return
-        
+
         // Merge real-time entries
         // ... implementation similar to tau-mirror's approach
       }
     ).then(f =&gt; unsubs.push(f))
-    
+
     return () =&gt; { unsubs.forEach(u =&gt; u()) }
   }, [isOnlineMode, sessionId])
-  
+
   return {
     // ... existing returns
     isOnlineMode,
@@ -662,22 +662,22 @@ interface SessionViewerOnlineStatusBarProps {
   isOnlineMode: boolean
 }
 
-export function SessionViewerOnlineStatusBar({ 
-  sessionPath, 
-  isOnlineMode 
+export function SessionViewerOnlineStatusBar({
+  sessionPath,
+  isOnlineMode
 }: SessionViewerOnlineStatusBarProps) {
   const { sessions } = usePiLiveSessions()
   const [connectionState, setConnectionState] = useState&lt;'online' | 'reconnecting' | 'offline'&gt;('offline')
   const [model, setModel] = useState&lt;any&gt;(null)
   const [thinkingLevel, setThinkingLevel] = useState&lt;string&gt;('off')
   const [contextUsage, setContextUsage] = useState&lt;any&gt;(null)
-  
+
   // Extract sessionId from sessionPath
   const sessionId = sessionPath.substring(sessionPath.lastIndexOf('/') + 1).replace('.jsonl', '')
-  
+
   // Find matching live session
   const liveSession = sessions.find(s =&gt; s.session_id.includes(sessionId))
-  
+
   useEffect(() =&gt; {
     if (liveSession) {
       setConnectionState('online')
@@ -687,7 +687,7 @@ export function SessionViewerOnlineStatusBar({
       setConnectionState('offline')
     }
   }, [liveSession, isOnlineMode])
-  
+
   const getStatusColor = () =&gt; {
     switch (connectionState) {
       case 'online': return 'text-green-500'
@@ -695,7 +695,7 @@ export function SessionViewerOnlineStatusBar({
       case 'offline': return 'text-gray-400'
     }
   }
-  
+
   const getStatusIcon = () =&gt; {
     switch (connectionState) {
       case 'online': return '🟢'
@@ -703,7 +703,7 @@ export function SessionViewerOnlineStatusBar({
       case 'offline': return '🔴'
     }
   }
-  
+
   const getStatusText = () =&gt; {
     switch (connectionState) {
       case 'online': return '实时连接'
@@ -711,22 +711,22 @@ export function SessionViewerOnlineStatusBar({
       case 'offline': return '离线'
     }
   }
-  
+
   return (
     &lt;div className="flex items-center gap-3 px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"&gt;
       &lt;div className={`flex items-center gap-2 ${getStatusColor()}`}&gt;
         &lt;span className="text-lg"&gt;{getStatusIcon()}&lt;/span&gt;
         &lt;span className="text-sm font-medium"&gt;{getStatusText()}&lt;/span&gt;
       &lt;/div&gt;
-      
+
       {connectionState === 'online' &amp;&amp; (
         &gt;
           &lt;div className="h-4 w-px bg-gray-300 dark:bg-gray-600" /&gt;
-          
+
           {/* Model and thinking controls will go here */}
-          
+
           &lt;div className="h-4 w-px bg-gray-300 dark:bg-gray-600" /&gt;
-          
+
           {/* Token usage will go here */}
         &lt;/&gt;
       )}
@@ -755,15 +755,15 @@ export function SessionViewerModelControls({
   const [availableModels, setAvailableModels] = useState&lt;any[]&gt;([])
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [isChanging, setIsChanging] = useState(false)
-  
+
   const sessionId = sessionPath.substring(sessionPath.lastIndexOf('/') + 1).replace('.jsonl', '')
   const thinkingLevels = ['off', 'minimal', 'low', 'medium', 'high']
-  
+
   useEffect(() =&gt; {
     // Load available models
     // ... implementation
   }, [])
-  
+
   const handleSetModel = async (provider: string, modelId: string) =&gt; {
     if (isChanging) return
     setIsChanging(true)
@@ -778,13 +778,13 @@ export function SessionViewerModelControls({
       setShowModelDropdown(false)
     }
   }
-  
+
   const handleCycleThinking = async () =&gt; {
     if (isChanging) return
     const currentIdx = thinkingLevels.indexOf(currentThinkingLevel)
     const nextIdx = (currentIdx + 1) % thinkingLevels.length
     const nextLevel = thinkingLevels[nextIdx]
-    
+
     setIsChanging(true)
     try {
       await invoke('pi_agent_set_thinking', {
@@ -795,7 +795,7 @@ export function SessionViewerModelControls({
       setIsChanging(false)
     }
   }
-  
+
   return (
     &lt;div className="flex items-center gap-2"&gt;
       {/* Model selector */}
@@ -807,14 +807,14 @@ export function SessionViewerModelControls({
         &gt;
           {currentModel?.name || 'Select model'}
         &lt;/button&gt;
-        
+
         {showModelDropdown &amp;&amp; (
           &lt;div className="absolute top-full left-0 mt-1 w-64 max-h-64 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-50"&gt;
             {/* Model list */}
           &lt;/div&gt;
         )}
       &lt;/div&gt;
-      
+
       {/* Thinking level toggle */}
       &lt;button
         onClick={handleCycleThinking}

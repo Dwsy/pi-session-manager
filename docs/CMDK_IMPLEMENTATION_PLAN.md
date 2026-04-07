@@ -248,7 +248,7 @@ function App() {
   useEffect(() => {
     registerBuiltinPlugins()
   }, [])
-  
+
   return (
     <>
       {/* Existing components */}
