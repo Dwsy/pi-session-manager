@@ -1,3 +1,5 @@
+# Pi Session Manager
+
 <p align="center">
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Pi Session Manager" />
 </p>
@@ -5,42 +7,70 @@
 <h1 align="center">Pi Session Manager</h1>
 
 <p align="center">
-  一个基于 Tauri + Rust + React 的 Pi 会话管理工具，支持桌面端、无头服务端，以及独立静态 Demo 页面。
+  基于 Tauri + Rust + React 的 Pi 会话管理工具，支持桌面端、无头服务端，以及独立静态 Demo 页面。
 </p>
 
 <p align="center">
   <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">Releases</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/cn/">中文文档</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/">Documentation</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/">English</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/demo/">预览</a>
 </p>
 
-## 核心能力
+## 核心功能
 
 - 会话浏览：列表/项目/看板、收藏、标签、重命名、删除、导出。
-- 全文检索：SQLite FTS + Tantivy 路径。
-- 会话内消息搜索：支持命中高亮、当前结果分页跳转，以及键盘友好的关闭/重置体验。`Cmd/Ctrl + F` 行为可配置（搜索或切换侧边栏）。
+- 全文检索：SQLite FTS5 + Tantivy 双引擎，支持精确短语搜索。
+- 会话内消息搜索：命中高亮、结果分页跳转、可配置 `Cmd/Ctrl+F` 行为。
 - 会话恢复：内置 PTY 终端，一键恢复 Pi 会话。
 - 多协议访问：Tauri IPC、WebSocket、HTTP、SSE。
 - 完整 Demo 数据引擎 + 独立静态 Demo 页面构建模式。
 - 内置多语言包：`en-US`、`zh-CN`、`ja-JP`、`de-DE`、`fr-FR`、`es-ES`。
+- Pi Live 集成：实时同步 Pi agent 活动状态，支持模型切换和思考过程控制。
+- 分析仪表盘：活动热力图、Token 趋势、子代理成本统计。
+
+## 技术架构
+
+```
+Frontend: React + TypeScript + Vite
+Backend: Rust + Tauri 2 + Axum + SQLite + Tantivy
+
+Protocols: Tauri IPC | WebSocket (/ws) | HTTP (/api) | SSE
+```
+
+### 四层设计
+
+```
+Commands (thin) <- Tauri IPC / HTTP / WS
+Domain (business) <- model_config, session_list, stats, terminal
+Data <- search (Tantivy) sqlite (cache)
+Server (protocol) <- HTTP adapter, WebSocket adapter
+```
+
+### 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| 前端 | React 18, TypeScript 5, Vite 5, Tailwind CSS, i18next, cmdk, @dnd-kit, @xyflow/react, recharts, @xterm/xterm |
+| 后端 | Rust 2021, Tauri 2, Tokio, Axum, rusqlite, Tantivy, notify, portable-pty |
+| 协议 | Tauri IPC · WebSocket (/ws) · HTTP (/api) · SSE (/api/events) |
+
+### 代码规模
+
+| 模块 | 语言 | 规模 |
+|------|------|------|
+| 前端组件 | TypeScript/React | 155+ 组件 |
+| 前端 Hooks | TypeScript | 40+ Hooks |
+| 后端 | Rust | ~27K 行 |
 
 ## 界面预览
 
 | 首页 | 会话页 |
-| --- | --- |
+|------|--------|
 | ![首页](website/public/screenshots/home.png) | ![会话页](website/public/screenshots/session-page.png) |
+
 | 会话树 | 看板 |
+|--------|------|
 | ![会话树](website/public/screenshots/session-tree.png) | ![看板](website/public/screenshots/kanban.png) |
-
-## 运行模式
-
-| 模式 | 入口 | 网络行为 |
-| --- | --- | --- |
-| 桌面 GUI | `pi-session-manager` | GUI + 后端服务；默认设置里 WS `52130`、HTTP `52131` |
-| 主二进制无头模式 | `pi-session-manager --cli` / `--headless` | 单端口 HTTP + WS(`/ws`)，端口为 `http_port`（默认 `52131`） |
-| 独立 CLI crate | `pi-session-cli` | 单端口 HTTP + WS(`/ws`)（默认 `52131`） |
-| 静态 Demo 页面 | `dist-demo/index.html` | 不依赖后端，强制 Demo 数据 |
 
 ## 快速开始
 
@@ -56,108 +86,85 @@
 git clone https://github.com/Dwsy/pi-session-manager.git
 cd pi-session-manager
 pnpm install
-# 或 npm install
 ```
 
 ### 常用脚本
 
 | 命令 | 说明 |
-| --- | --- |
+|------|------|
 | `npm run dev` | 前端开发服务器 |
-| `npm run dev:demo` | Demo 语境下的前端开发服务器 |
-| `npm run build` | 生产前端构建到 `dist/` |
-| `npm run build:demo` | 生成静态 Demo 到 `dist-demo/`（默认页即 Demo 模式） |
 | `npm run tauri:dev` | 桌面端联调（前后端） |
-| `npm run tauri:build` | 桌面端生产构建 |
+| `npm run build` | 生产构建到 `dist/` |
+| `npm run build:demo` | 静态 Demo 到 `dist-demo/` |
 | `npm run build:cli` | 构建独立 `pi-session-cli` 二进制 |
+| `npm run tauri:build` | 桌面端生产打包 |
 
-## 二进制运行
+## 运行模式
 
-### 桌面 GUI
+| 模式 | 入口 | 网络行为 |
+|------|------|---------|
+| 桌面 GUI | `pi-session-manager` | GUI + 后端服务；统一单端口 HTTP + WS(`/ws`)，默认 `52131` |
+| 主二进制无头模式 | `pi-session-manager --cli` / `--headless` | 单端口 HTTP + WS(`/ws`)，默认 `52131` |
+| 独立 CLI crate | `pi-session-cli` | 单端口 HTTP + WS(`/ws`)（默认 `52131`）|
+| 静态 Demo 页面 | `dist-demo/index.html` | 不依赖后端，强制 Demo 数据 |
 
-```bash
-./pi-session-manager
-```
+### CLI 参数
 
-### 主二进制无头服务
-
-```bash
-./pi-session-manager --cli
-# 或
-./pi-session-manager --headless
-
-# 覆盖端口与地址
-./pi-session-manager --cli -p 18080 -b 0.0.0.0
-```
-
-参数说明：
-
-- `-p, --port <PORT>`：CLI 模式下的 HTTP+WS 共享端口
+- `-p, --port <PORT>`：HTTP+WS 共享端口（默认 52131）
 - `-b, --bind <ADDR>`：监听地址
-- `--auth` / `--no-auth`：开启/关闭鉴权
-- `--token <TOKEN>`：仅当前进程有效的运行时 token
-
-### 独立 CLI 二进制
-
-```bash
-./pi-session-cli
-./pi-session-cli -p 18080 -b 0.0.0.0
-```
-
-鉴权默认行为：
-
-- 默认开启鉴权；
-- 回环地址（localhost/127.0.0.1）免 token；
-- 非回环来源必须携带有效 token。
+- `--auth / --no-auth`：开启/关闭鉴权
+- `--token <TOKEN>`：运行时 token
 
 ## 服务端接口
 
-- `POST /api`：命令入口
-- `GET /ws`：WebSocket
-- `GET /api/events` 与 `/v1/events`：SSE
-- `GET /health`：健康检查
-- `GET /`：嵌入式前端（服务模式）
-
-## Demo 页面模式
-
-### 在线预览
-
-- https://dwsy.github.io/pi-session-manager/demo/
-
-### 开发预览
-
-```bash
-npm run dev
-# 浏览器打开 http://localhost:1420/demo.html
-```
-
-### 静态 Demo 构建
-
-```bash
-npm run build:demo
-# 输出：dist-demo/index.html
-```
-
-`dist-demo/index.html` 启动时会预置：
-
-- `advanced.demoMode = true`
-- `language.locale = en-US`
-
-因此默认进入英文的丰富 Demo 数据视图，不依赖后端。
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api` | POST | 命令入口 |
+| `/ws` | GET | WebSocket |
+| `/api/events` | GET | SSE 事件 |
+| `/health` | GET | 健康检查 |
+| `/` | GET | 嵌入式前端 |
 
 ## 数据与配置路径
 
 | 路径 | 说明 |
-| --- | --- |
+|------|------|
 | `~/.pi/agent/sessions/` | 会话目录 |
-| `~/.pi/agent/sessions/sessions.db` | SQLite 数据库（会话、设置、标签、收藏、鉴权 token） |
-| `~/.pi/agent/session-manager-config.toml` | 扫描配置（`session_paths`、FTS、扫描间隔等） |
+| `~/.pi/agent/sessions/sessions.db` | SQLite 数据库 |
+| `~/.pi/agent/session-manager-config.toml` | 扫描配置 |
 | `~/.pi/agent/skills/` | Pi Skills |
 | `~/.pi/agent/prompts/` | Pi Prompts |
 | `~/.pi/agent/settings.json` | Pi 配置 |
 | `~/.config/pi-session-manager.json` | 独立 `pi-session-cli` 配置 |
 
-## 开发检查
+## 扩展系统
+
+### Pi 插件
+
+```
+extensions/pi-session-bridge/index.ts
+```
+
+### 工具渲染插件
+
+```
+src/plugins/tools-render/
+├── builtins/    # bash, edit, read, write, generic
+└── extensions/  # subagent, ...
+```
+
+### 搜索插件
+
+```
+src/plugins/
+├── message/     # 消息内搜索
+├── project/     # 项目搜索
+└── session/     # 会话搜索
+```
+
+## 开发指南
+
+### 开发检查
 
 ```bash
 cargo fmt --all --check
@@ -166,6 +173,27 @@ cargo clippy -p pi-session-cli -- -D warnings
 cd src-tauri && cargo test
 ```
 
+### 添加新命令
+
+1. **业务逻辑** -> `src-tauri/src/domain/`
+2. **命令层** -> `src-tauri/src/commands/`
+3. **路由注册** -> `src-tauri/src/dispatch.rs`
+4. **Tauri 注册** -> `src-tauri/src/lib.rs`
+
+详细教程请参阅 [agent-docs/03-backend.md](agent-docs/03-backend.md)。
+
+## 文档索引
+
+| 文档 | 说明 |
+|------|------|
+| [AGENTS.md](AGENTS.md) | Agent 开发指南 |
+| [agent-docs/01-architecture.md](agent-docs/01-architecture.md) | 四层架构设计 |
+| [agent-docs/02-frontend.md](agent-docs/02-frontend.md) | 前端组件索引 |
+| [agent-docs/03-backend.md](agent-docs/03-backend.md) | 后端模块 + 命令教程 |
+| [agent-docs/04-development.md](agent-docs/04-development.md) | 构建与发布 |
+| [agent-docs/05-config.md](agent-docs/05-config.md) | 配置与安全 |
+| [DESIGN.md](DESIGN.md) | 设计系统 |
+
 ## 许可证
 
-[MIT](LICENSE)
+MIT

@@ -1,3 +1,5 @@
+# Pi Session Manager
+
 <p align="center">
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Pi Session Manager" />
 </p>
@@ -24,23 +26,52 @@
 - Multi-protocol runtime: Tauri IPC, WebSocket, HTTP, SSE.
 - Rich **demo data engine** and dedicated static demo page build mode.
 - i18n packs: `en-US`, `zh-CN`, `ja-JP`, `de-DE`, `fr-FR`, `es-ES`.
+- Pi Live integration with real-time session sync and model control.
+- Analytics dashboard with activity heatmap, token trends, and subagent cost stats.
+
+## Architecture
+
+```
+Frontend: React + TypeScript + Vite
+Backend: Rust + Tauri 2 + Axum + SQLite + Tantivy
+
+Protocols: Tauri IPC | WebSocket (/ws) | HTTP (/api) | SSE
+```
+
+### Four-Layer Design
+
+```
+Commands (thin) <- Tauri IPC / HTTP / WS
+Domain (business) <- model_config, session_list, stats, terminal
+Data <- search (Tantivy) sqlite (cache)
+Server (protocol) <- HTTP adapter, WebSocket adapter
+```
+
+### Tech Stack
+
+| Layer | Tech |
+|-------|------|
+| Frontend | React 18, TypeScript 5, Vite 5, Tailwind CSS, i18next, cmdk, @dnd-kit, @xyflow/react, recharts, @xterm/xterm |
+| Backend | Rust 2021, Tauri 2, Tokio, Axum, rusqlite, Tantivy, notify, portable-pty |
+| Protocol | Tauri IPC · WebSocket (/ws) · HTTP (/api) · SSE (/api/events) |
+
+### Code Scale
+
+| Module | Language | Scale |
+|--------|----------|-------|
+| Frontend Components | TypeScript/React | 155+ components |
+| Frontend Hooks | TypeScript | 40+ hooks |
+| Backend | Rust | ~27K lines |
 
 ## UI Preview
 
 | Home | Session Page |
-| --- | --- |
+|------|-------------|
 | ![Home](website/public/screenshots/home.png) | ![Session Page](website/public/screenshots/session-page.png) |
+
 | Session Tree | Kanban |
+|-------------|--------|
 | ![Session Tree](website/public/screenshots/session-tree.png) | ![Kanban](website/public/screenshots/kanban.png) |
-
-## Runtime Modes
-
-| Mode | Entry | Network behavior |
-| --- | --- | --- |
-| Desktop GUI | `pi-session-manager` | GUI + backend services; **unified single-port** HTTP + WS(`/ws`) on `http_port` (default `52131`) |
-| Headless in main binary | `pi-session-manager --cli` / `--headless` | Single-port HTTP + WS(`/ws`) on `http_port` (default `52131`) |
-| Standalone CLI crate | `pi-session-cli` | Single-port HTTP + WS(`/ws`) (default `52131`) |
-| Static demo page | `dist-demo/index.html` | No backend required, forced demo data |
 
 ## Quick Start
 
@@ -56,99 +87,49 @@
 git clone https://github.com/Dwsy/pi-session-manager.git
 cd pi-session-manager
 pnpm install
-# or: npm install
 ```
 
-### Common Scripts
+### Common Commands
 
-| Command | Purpose |
-| --- | --- |
+| Command | Description |
+|---------|-------------|
 | `npm run dev` | Frontend dev server |
-| `npm run dev:demo` | Frontend dev server in demo mode context |
-| `npm run build` | Production frontend build to `dist/` |
-| `npm run build:demo` | Static demo build to `dist-demo/` (default page is demo mode) |
 | `npm run tauri:dev` | Full desktop dev (frontend + Rust) |
-| `npm run tauri:build` | Desktop production bundle |
+| `npm run build` | Production frontend build to `dist/` |
+| `npm run build:demo` | Static demo build to `dist-demo/` |
 | `npm run build:cli` | Build standalone `pi-session-cli` binary |
+| `npm run tauri:build` | Desktop production bundle |
 
-## Run Binaries
+## Runtime Modes
 
-### Desktop GUI
+| Mode | Entry | Network behavior |
+|------|-------|------------------|
+| Desktop GUI | `pi-session-manager` | GUI + backend services; unified single-port HTTP + WS(`/ws`) on `http_port` (default `52131`) |
+| Headless in main binary | `pi-session-manager --cli` / `--headless` | Single-port HTTP + WS(`/ws`) on `http_port` (default `52131`) |
+| Standalone CLI crate | `pi-session-cli` | Single-port HTTP + WS(`/ws`) (default `52131`) |
+| Static demo page | `dist-demo/index.html` | No backend required, forced demo data |
 
-```bash
-./pi-session-manager
-```
-
-### Headless service in main binary
-
-```bash
-./pi-session-manager --cli
-# or
-./pi-session-manager --headless
-
-# Override port/bind
-./pi-session-manager --cli -p 18080 -b 0.0.0.0
-```
-
-CLI flags:
+### CLI Flags
 
 - `-p, --port <PORT>`: shared HTTP+WS port in CLI mode
 - `-b, --bind <ADDR>`: bind address
 - `--auth` / `--no-auth`: enable/disable auth
 - `--token <TOKEN>`: runtime-only token for current process
 
-### Standalone CLI binary
+## API Surface
 
-```bash
-./pi-session-cli
-./pi-session-cli -p 18080 -b 0.0.0.0
-```
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api` | POST | Command endpoint |
+| `/ws` | GET | WebSocket |
+| `/api/events` | GET | SSE events |
+| `/health` | GET | Health check |
+| `/` | GET | Embedded frontend |
 
-Default auth behavior:
-
-- Auth is enabled by default.
-- Loopback clients are exempt.
-- Non-loopback clients must provide a valid token.
-
-## API Surface (Server/CLI)
-
-- `POST /api` command endpoint
-- `GET /ws` WebSocket endpoint
-- `GET /api/events` and `/v1/events` SSE events
-- `GET /health` health check
-- `GET /` embedded frontend (server modes)
-
-## Demo Page Mode
-
-### Public preview
-
-- https://dwsy.github.io/pi-session-manager/demo/
-
-### Dev preview
-
-```bash
-npm run dev
-# open http://localhost:1420/demo.html
-```
-
-### Static demo bundle
-
-```bash
-npm run build:demo
-# output: dist-demo/index.html
-```
-
-`dist-demo/index.html` bootstraps app settings with:
-
-- `advanced.demoMode = true`
-- `language.locale = en-US`
-
-So it always opens with rich English demo data and does not require backend services.
-
-## Paths and Storage
+## Paths & Storage
 
 | Path | Description |
-| --- | --- |
+|------|-------------|
 | `~/.pi/agent/sessions/` | Session directory |
 | `~/.pi/agent/sessions/sessions.db` | SQLite DB (sessions, settings, tags, favorites, auth tokens) |
 | `~/.pi/agent/session-manager-config.toml` | Scanner config (`session_paths`, FTS, intervals, etc.) |
@@ -157,42 +138,34 @@ So it always opens with rich English demo data and does not require backend serv
 | `~/.pi/agent/settings.json` | Pi settings |
 | `~/.config/pi-session-manager.json` | Standalone `pi-session-cli` config |
 
-## Custom Terminal Command
+## Extension System
 
-Settings → Terminal → Custom lets you define how "Resume" opens a session in an external terminal. The command supports four placeholders:
+### Pi Plugin (pi-session-bridge)
 
-| Placeholder | Expands to |
-| --- | --- |
-| `{command}` | Full resume command (`cd <cwd> && pi --session <path>`) |
-| `{cwd}` | Session working directory |
-| `{path}` | Session file path |
-| `{pi}` | Pi binary path (from Pi Command Path setting) |
-
-If no placeholders are present the app appends `sh -lc '<resume command>'` automatically.
-
-### Examples
-
-**tmux — new window in an existing session:**
-
-```text
-/opt/homebrew/bin/tmux new-window -t <session> -c {cwd} "/bin/zsh -lic \"{pi} --session {path}\""
+```
+extensions/pi-session-bridge/index.ts
 ```
 
-**tmux — new pane in an existing session:**
+### Tool Render Plugins
 
-```text
-/opt/homebrew/bin/tmux split-window -t <session> -c {cwd} "/bin/zsh -lic \"{pi} --session {path}\""
+```
+src/plugins/tools-render/
+├── builtins/    # bash, edit, read, write, generic
+└── extensions/  # subagent, ...
 ```
 
-Replace `<session>` with the target tmux session name and adjust the tmux path for your system.
+### Search Plugins
 
-### Troubleshooting
+```
+src/plugins/
+├── message/     # In-message search
+├── project/     # Project search
+└── session/     # Session search
+```
 
-- **GUI apps may not inherit the same `PATH` as an interactive shell.** If `pi` or its dependencies (e.g. `node`) are not found, wrap the command in a login shell (`zsh -lic "..."` or `bash -lic "..."`).
-- **Detached tmux windows (`-d` flag) can make it look like nothing happened.** Omit `-d` while debugging, or append `; exec $SHELL` to keep the window open after the command exits.
-- **`{command}` is already a compound shell expression** containing `&&`. For tmux it can be simpler to use `{cwd}` + `{path}` directly with `-c` and avoid extra quoting layers.
+## Development
 
-## Development Checks
+### Development Checks
 
 ```bash
 cargo fmt --all --check
@@ -201,6 +174,27 @@ cargo clippy -p pi-session-cli -- -D warnings
 cd src-tauri && cargo test
 ```
 
+### Adding a New Command
+
+1. **Business logic** -> `src-tauri/src/domain/`
+2. **Command layer** -> `src-tauri/src/commands/`
+3. **Route registration** -> `src-tauri/src/dispatch.rs`
+4. **Tauri registration** -> `src-tauri/src/lib.rs`
+
+See [agent-docs/03-backend.md](agent-docs/03-backend.md) for detailed tutorial.
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [AGENTS.md](AGENTS.md) | Agent development guide |
+| [agent-docs/01-architecture.md](agent-docs/01-architecture.md) | Four-layer architecture |
+| [agent-docs/02-frontend.md](agent-docs/02-frontend.md) | Frontend component index |
+| [agent-docs/03-backend.md](agent-docs/03-backend.md) | Backend modules + command tutorial |
+| [agent-docs/04-development.md](agent-docs/04-development.md) | Build & release |
+| [agent-docs/05-config.md](agent-docs/05-config.md) | Config & security |
+| [DESIGN.md](DESIGN.md) | Design system (colors, typography, motion) |
+
 ## License
 
-[MIT](LICENSE)
+MIT
