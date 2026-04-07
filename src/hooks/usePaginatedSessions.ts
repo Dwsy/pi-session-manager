@@ -144,7 +144,7 @@ export function usePaginatedSessions({
 }: UsePaginatedSessionsOptions): UsePaginatedSessionsReturn {
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(enabled)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
