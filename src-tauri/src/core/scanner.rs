@@ -276,11 +276,47 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
         let total_files = files.len();
         info!("Collected {} JSONL files for scanning", total_files);
 
-        // Parse files in parallel (no conn reference in async block)
-        let parsed_results = parallel_parse_files(files).await;
+        // Load all sessions from DB first (O(1) lookup by path)
+        let db_sessions = sqlite::get_all_sessions(&conn)?;
+        let db_paths: std::collections::HashSet<&str> = db_sessions.iter().map(|s| s.path.as_str()).collect();
+
+        // Identify files that need parsing: new files or files modified after DB's file_modified
+        let files_to_parse: Vec<PathBuf> = files
+            .into_iter()
+            .filter(|path| {
+                let path_str = path.to_string_lossy();
+                if !db_paths.contains(path_str.as_ref()) {
+                    // New file, needs parsing
+                    true
+                } else {
+                    // Existing file, check if modified
+                    if let Ok(Some(cached_modified)) = sqlite::get_cached_file_modified(&conn, &path_str) {
+                        if let Ok(metadata) = std::fs::metadata(&path) {
+                            let file_modified: chrono::DateTime<chrono::Utc> = DateTime::from(metadata.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH));
+                            file_modified > cached_modified
+                        } else {
+                            false
+                        }
+                    } else {
+                        // No cached file_modified, needs parsing
+                        true
+                    }
+                }
+            })
+            .collect();
+
+        info!("Need to parse {} files ({} cached, {} to parse)", total_files, total_files - files_to_parse.len(), files_to_parse.len());
+
+        // Parse only files that need updates
+        let parsed_results = if files_to_parse.is_empty() {
+            Vec::new()
+        } else {
+            parallel_parse_files(files_to_parse).await
+        };
 
         // Process results: separate realtime vs historical, upsert to DB
         let mut realtime_sessions: Vec<SessionInfo> = Vec::new();
+        let mut updated_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         for result in parsed_results {
             if result.file_modified > realtime_cutoff {
@@ -301,17 +337,22 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                     );
                 }
             }
+            updated_paths.insert(result.info.path.clone());
         }
 
-        // Load historical sessions from DB
-        let historical_sessions = sqlite::get_sessions_modified_before(&conn, realtime_cutoff)?;
-
-        // Merge results, avoiding duplicates
-        let mut all_sessions = realtime_sessions;
-        for session in historical_sessions {
-            if !all_sessions.iter().any(|s| s.path == session.path) {
-                all_sessions.push(session);
+        // Start with DB sessions, update only those that were re-parsed
+        let mut all_sessions: Vec<SessionInfo> = Vec::new();
+        for session in db_sessions {
+            if updated_paths.contains(&session.path) {
+                // This session was updated, skip it from DB (already in realtime_sessions or updated via upsert)
+                continue;
             }
+            all_sessions.push(session);
+        }
+
+        // Add updated realtime sessions
+        for session in realtime_sessions {
+            all_sessions.push(session);
         }
 
         all_sessions.sort_by(|a, b| b.modified.cmp(&a.modified));

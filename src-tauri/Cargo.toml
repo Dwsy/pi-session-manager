@@ -12,6 +12,7 @@ required-features = ["gui"]
 [[bin]]
 name = "pi-session-cli"
 path = "src/main-cli.rs"
+required-features = ["cli"]
 
 [build-dependencies]
 tauri-build = { version = "2.5.5", features = [] }
