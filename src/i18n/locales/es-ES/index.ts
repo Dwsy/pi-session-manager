@@ -17,6 +17,9 @@ import terminal from './terminal'
 import { tags } from './tags'
 import { plugins } from './plugins'
 import { time } from './time'
+import { auth } from './auth'
+import { kanban } from './kanban'
+import { piAgent } from './piAgent'
 
 export const esES = {
   common,
@@ -38,9 +41,14 @@ export const esES = {
   tags,
   plugins,
   time,
+  auth,
+  kanban,
+  piAgent,
   connection: {
     disconnected: 'No se puede conectar al servidor — ¿está la aplicación en ejecución?',
     connecting: 'Reconectando…',
     reconnected: 'Reconectado',
   },
 } as const
+
+export type Translations = typeof esES

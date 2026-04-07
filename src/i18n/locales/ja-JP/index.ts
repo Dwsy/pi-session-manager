@@ -17,6 +17,9 @@ import terminal from './terminal'
 import { tags } from './tags'
 import { plugins } from './plugins'
 import { time } from './time'
+import { auth } from './auth'
+import { kanban } from './kanban'
+import { piAgent } from './piAgent'
 
 export const jaJP = {
   common,
@@ -38,6 +41,9 @@ export const jaJP = {
   tags,
   plugins,
   time,
+  auth,
+  kanban,
+  piAgent,
   connection: {
     disconnected: 'サーバーに接続できません — アプリは起動していますか？',
     connecting: '再接続中…',

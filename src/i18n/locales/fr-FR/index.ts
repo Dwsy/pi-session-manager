@@ -17,6 +17,9 @@ import terminal from './terminal'
 import { tags } from './tags'
 import { plugins } from './plugins'
 import { time } from './time'
+import { auth } from './auth'
+import { kanban } from './kanban'
+import { piAgent } from './piAgent'
 
 export const frFR = {
   common,
@@ -38,6 +41,9 @@ export const frFR = {
   tags,
   plugins,
   time,
+  auth,
+  kanban,
+  piAgent,
   connection: {
     disconnected: 'Impossible de se connecter au serveur — l\'application est-elle en cours d\'exécution ?',
     connecting: 'Reconnexion…',

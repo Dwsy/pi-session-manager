@@ -17,6 +17,9 @@ import terminal from './terminal'
 import { tags } from './tags'
 import { plugins } from './plugins'
 import { time } from './time'
+import { auth } from './auth'
+import { kanban } from './kanban'
+import { piAgent } from './piAgent'
 
 export const zhCN = {
   common,
@@ -38,6 +41,9 @@ export const zhCN = {
   tags,
   plugins,
   time,
+  auth,
+  kanban,
+  piAgent,
   connection: {
     disconnected: '无法连接到服务，请检查应用是否运行',
     connecting: '正在重新连接…',
