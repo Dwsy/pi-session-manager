@@ -50,4 +50,6 @@ export const common = {
     noToolsUsed: 'No tools used in this session',
     calls: 'calls',
   },
+  copied: 'Copied to clipboard',
+  copyFailed: 'Copy failed',
 } as const

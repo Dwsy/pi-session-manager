@@ -49,4 +49,6 @@ export const common = {
     noToolsUsed: '此session未使用任何工具',
     calls: '次调用',
   },
+  copied: '已复制到剪贴板',
+  copyFailed: '复制失败',
 } as const

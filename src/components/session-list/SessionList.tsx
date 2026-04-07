@@ -1065,12 +1065,24 @@ export default function SessionList({
                     settings.terminal?.resumeCommand || resumeCommand || "";
                   const piCmd =
                     settings.terminal?.piCommandPath || piPath || "pi";
-                  const fullCommand = cmd
+                  const hasPlaceholders = cmd.includes("{path}") || cmd.includes("{pi}");
+                  let fullCommand = cmd
                     ? cmd
                         .replace(/\{cwd\}/g, contextMenuSession.cwd || "")
                         .replace(/\{path\}/g, contextMenuSession.path)
                         .replace(/\{pi\}/g, piCmd)
                     : `${piCmd} --session ${contextMenuSession.path}`;
+                  // tmux setup command (has new-session but no placeholders) → append pi command
+                  if (cmd.includes("new-session") && !hasPlaceholders) {
+                    const piCmd =
+                      settings.terminal?.piCommandPath || piPath || "pi";
+                    // Extract session id prefix (first 4 chars of UUID) for tmux session name
+                    const sessionSuffix = contextMenuSession.id
+                      ? contextMenuSession.id.slice(0, 4)
+                      : "pi";
+                    const sessionName = `pi-${sessionSuffix}`;
+                    fullCommand = `/opt/homebrew/bin/tmux new-session -A -s ${sessionName} 'cd ${contextMenuSession.cwd || ""} && ${piCmd} --session ${contextMenuSession.path}'`;
+                  }
                   copyText(fullCommand).catch(console.error);
                 }
               : undefined

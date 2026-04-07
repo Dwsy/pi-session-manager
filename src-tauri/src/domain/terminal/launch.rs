@@ -116,12 +116,36 @@ end tell"#,
             Ok(true)
         }
         "tmux" => {
-            let tmux_session = "pi";
+            // Extract session id prefix from path for unique session name
+            // e.g. /path/.../2026-04-07T09-50-16-218Z_5ec96bf4-xxx.jsonl → "5ec9"
+            let session_suffix = std::path::Path::new(&path)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .and_then(|stem| {
+                    // Try to find UUID after underscore: timestamp_UUID
+                    stem.split('_')
+                        .next_back()
+                        .filter(|s| s.len() >= 4)
+                        .map(|uuid| &uuid[..4])
+                        // Fallback: first 4 chars of filename
+                        .or_else(|| stem.get(..4))
+                })
+                .unwrap_or("pi");
+
+            let tmux_session = format!("pi-{session_suffix}");
+
+            // tmux format: new-session -A -s pi-xxxx '<command>'
+            let inner_cmd = build_resume_command(cwd, path, pi_cmd, resume_command);
+
+            log::info!("[Terminal macOS tmux] session: {tmux_session}");
+            log::info!("[Terminal macOS tmux] inner_cmd: {inner_cmd}");
+
             let tmux_cmd = format!(
-                "/opt/homebrew/bin/tmux has-session -t {tmux_session} 2>/dev/null || /opt/homebrew/bin/tmux new-session -d -s {tmux_session} -c '{}'; /opt/homebrew/bin/tmux send-keys -t {tmux_session} \"{}\" Enter; /opt/homebrew/bin/tmux attach -t {tmux_session}",
-                escape_double_quoted(cwd),
-                escape_double_quoted(&resume_cmd)
+                "/opt/homebrew/bin/tmux new-session -A -s {tmux_session} {}",
+                shell_single_quote(&inner_cmd)
             );
+
+            log::info!("[Terminal macOS tmux] full_cmd: {tmux_cmd}");
 
             if macos_app_exists("iTerm") {
                 let script = format!(

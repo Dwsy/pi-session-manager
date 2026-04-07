@@ -253,9 +253,21 @@ export default function KanbanColumn({
                   const settings = getCachedSettings()
                   const cmd = settings.terminal?.resumeCommand || propResumeCommand || ''
                   const piCmd = settings.terminal?.piCommandPath || propPiPath || 'pi'
-                  const fullCommand = cmd
+                  const hasPlaceholders = cmd.includes('{path}') || cmd.includes('{pi}')
+                  let fullCommand = cmd
                     ? cmd.replace(/\{cwd\}/g, contextMenu.session.cwd || '').replace(/\{path\}/g, contextMenu.session.path).replace(/\{pi\}/g, piCmd)
                     : `${piCmd} --session ${contextMenu.session.path}`
+                  // tmux setup command without placeholders → append pi --session in quotes
+                  const isTmuxSetup = cmd.includes('new-session') && !hasPlaceholders
+                  if (isTmuxSetup) {
+                    const sessionSuffix = contextMenu.session.id
+                      ? contextMenu.session.id.slice(0, 4)
+                      : 'pi'
+                    const sessionName = `pi-${sessionSuffix}`
+                    fullCommand = `${fullCommand} 'cd ${contextMenu.session.cwd || ''} && ${piCmd} --session ${contextMenu.session.path}'`
+                    // Replace the hardcoded -s pi in user's command
+                    fullCommand = fullCommand.replace(/-s\s+pi\b/, `-s ${sessionName}`)
+                  }
                   copyText(fullCommand).catch(console.error)
                 }
               : undefined

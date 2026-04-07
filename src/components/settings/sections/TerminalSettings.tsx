@@ -234,23 +234,44 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
               </button>
 
               {showPlaceholders && (
-                <div className="px-3 pb-3 space-y-2">
+                <div className="px-3 pb-3 space-y-3">
                   <p className="text-[11px] text-muted-foreground">
                     {t('settings.terminal.placeholdersHelp', 'Use these placeholders in the resume command')}
                   </p>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { key: '{cwd}', desc: t('settings.terminal.placeholderCwdDesc', 'Session working directory') },
-                      { key: '{path}', desc: t('settings.terminal.placeholderPathDesc', 'Session file path') },
-                      { key: '{pi}', desc: t('settings.terminal.placeholderPiDesc', 'Pi command path') },
+                      { key: '{cwd}', desc: t('settings.terminal.placeholderCwdDesc', 'Session working directory'), example: '/Users/dengwenyu/Dev/AI/project' },
+                      { key: '{path}', desc: t('settings.terminal.placeholderPathDesc', 'Session file path'), example: '/Users/dengwenyu/.pi/agent/sessions/.../2026-04-07_abc123.jsonl' },
+                      { key: '{pi}', desc: t('settings.terminal.placeholderPiDesc', 'Pi command path'), example: 'pi' },
                     ].map((ph) => (
-                      <div key={ph.key} className="flex items-start gap-2 p-2 rounded-md bg-secondary/30">
-                        <code className="text-[11px] font-mono text-info bg-info/10 px-1.5 py-0.5 rounded shrink-0">
-                          {ph.key}
-                        </code>
+                      <div key={ph.key} className="flex flex-col gap-1 p-2 rounded-md bg-secondary/30">
+                        <div className="flex items-center gap-2">
+                          <code className="text-[11px] font-mono text-info bg-info/10 px-1.5 py-0.5 rounded shrink-0">
+                            {ph.key}
+                          </code>
+                        </div>
                         <span className="text-[11px] text-muted-foreground">{ph.desc}</span>
+                        <code className="text-[10px] font-mono text-muted-foreground/70 truncate" title={ph.example}>
+                          {ph.example}
+                        </code>
                       </div>
                     ))}
+                  </div>
+
+                  {/* How it works */}
+                  <div className="space-y-2">
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">
+                      {t('settings.terminal.howItWorks', 'How it works (tmux)')}
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-start gap-2 text-[11px]">
+                        <span className="text-muted-foreground font-medium shrink-0 w-16">tmux:</span>
+                        <span className="text-muted-foreground">Attach existing or create session</span>
+                      </div>
+                      <code className="block text-[11px] font-mono text-info bg-info/10 px-2 py-1 rounded break-all">
+                        {'{tmux setup}'} && {'{pi}'} --session {'{path}'}
+                      </code>
+                    </div>
                   </div>
                 </div>
               )}
@@ -263,14 +284,14 @@ export default function TerminalSettings({ settings, onUpdate }: TerminalSetting
               </span>
               {[
                 {
-                  key: 'tmux',
-                  label: t('settings.terminal.exampleTmux', 'tmux session'),
-                  command: '/opt/homebrew/bin/tmux new-session -A -s pi'
+                  key: 'tmux-session',
+                  label: t('settings.terminal.exampleTmuxSession', 'tmux session'),
+                  command: "/opt/homebrew/bin/tmux new-session -A -s {session}"
                 },
                 {
-                  key: 'tmux-with-cwd',
-                  label: t('settings.terminal.exampleTmuxWithCwd', 'tmux with working dir'),
-                  command: '/opt/homebrew/bin/tmux new-session -A -s pi -c {cwd}'
+                  key: 'default',
+                  label: t('settings.terminal.exampleDefault', 'Default (leave empty)'),
+                  command: 'cd {cwd} && {pi} --session {path}'
                 },
               ].map((example) => (
                 <div key={example.key} className="rounded-lg border border-border bg-background/50 overflow-hidden">

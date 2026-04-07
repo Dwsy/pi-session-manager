@@ -68,9 +68,8 @@ export const settings = {
     // Examples
     examples: 'Examples',
     exampleDefault: 'Default (empty)',
-    exampleTmux: 'tmux session',
-    exampleTmuxWithCmd: 'tmux with custom command',
-    exampleTmuxWithCwd: 'tmux with working dir',
+    exampleTmuxSession: 'tmux session',
+    howItWorks: 'How it works (tmux)',
     // Built-in Terminal
     builtinEnabled: 'Built-in Terminal',
     builtinEnabledHelp: 'Use integrated terminal panel inside the app (Ctrl+`)',

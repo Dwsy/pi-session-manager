@@ -56,9 +56,9 @@ export const settings = {
     placeholderCommand: '{command}',
     placeholderCommandDesc: '完整的恢复命令（cd + pi --session）',
     placeholderCwd: '{cwd}',
-    placeholderCwdDesc: 'session工作directory',
+    placeholderCwdDesc: 'Session 工作目录',
     placeholderPath: '{path}',
-    placeholderPathDesc: 'sessionfile路径',
+    placeholderPathDesc: 'Session 文件路径',
     placeholderPi: '{pi}',
     placeholderPiDesc: 'Pi 命令路径',
     // Resume Command
@@ -68,8 +68,8 @@ export const settings = {
     // Examples
     examples: '示例',
     exampleDefault: '默认（留空）',
-    exampleTmux: 'tmux session',
-    exampleTmuxWithCmd: 'tmux 自定义命令',
+    exampleTmuxSession: 'tmux session',
+    howItWorks: '执行流程（tmux）',
     // Built-in Terminal
     builtinEnabled: '内置终端',
     builtinEnabledHelp: '在应用内使用集成终端面板（Ctrl+`）',
