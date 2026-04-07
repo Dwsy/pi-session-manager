@@ -1,6 +1,6 @@
 mod auth;
 pub mod config_bundle;
-mod config_versions;
+pub mod config_versions;
 mod favorites;
 mod model_config;
 mod models;

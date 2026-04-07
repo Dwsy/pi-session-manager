@@ -40,7 +40,7 @@ fn get_config_db() -> Result<rusqlite::Connection, String> {
     Ok(conn)
 }
 
-pub(super) fn save_config_snapshot(file_path: &str, content: &str) -> Result<(), String> {
+pub fn save_config_snapshot(file_path: &str, content: &str) -> Result<(), String> {
     let conn = get_config_db()?;
     let size = content.len();
 

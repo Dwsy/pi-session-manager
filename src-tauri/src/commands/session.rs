@@ -1,20 +1,14 @@
 use crate::types::{SessionEntry, SessionInfo};
 use crate::{export, scanner, stats};
 
+// Re-export from domain
+pub use crate::domain::session_list::PaginatedSessionsResult;
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct FileStats {
     pub size: u64,
     pub modified_at: u64,
     pub is_file: bool,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct PaginatedSessionsResult {
-    pub sessions: Vec<SessionInfo>,
-    pub total: usize,
-    pub offset: usize,
-    pub limit: usize,
-    pub has_more: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
