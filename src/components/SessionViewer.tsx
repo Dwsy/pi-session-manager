@@ -78,6 +78,7 @@ function SessionViewerContent({
   const { getSessionSetting } = useSettings();
   const cmdFBehavior = getSessionSetting('cmdFBehavior') ?? 'inSessionSearch';
   const scrollMarkersEnabled = getSessionSetting('scrollMarkersEnabled') ?? true;
+  const timelineNavEnabled = getSessionSetting('timelineNavEnabled') ?? true;
 
   const { sessions: liveSessions } = usePiLiveSessions()
   const liveSession = liveSessions.find(s => s.session_id.includes(session.id)) || null
@@ -368,7 +369,7 @@ function SessionViewerContent({
           onPointerUp={handleMarkersPointerUp}
           onPointerLeave={handleMarkersPointerLeave}
           isScrollMarkersFeatureEnabled={scrollMarkersEnabled}
-          isTimelineNavEnabled={true}
+          isTimelineNavEnabled={timelineNavEnabled}
         />
 
         <ChatInput

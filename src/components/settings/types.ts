@@ -68,6 +68,8 @@ export interface AppSettings {
     scrollMarkersEnabled: boolean
     /** Whether the scroll markers onboarding guide has been seen */
     scrollMarkersGuideSeen: boolean
+    /** Timeline navigation dots feature enabled */
+    timelineNavEnabled: boolean
   }
   search: {
     defaultSearchMode: 'content' | 'name'
@@ -140,6 +142,7 @@ export const defaultSettings: AppSettings = {
     cmdFBehavior: 'inSessionSearch',
     scrollMarkersEnabled: true,
     scrollMarkersGuideSeen: false,
+    timelineNavEnabled: true,
   },
   search: {
     defaultSearchMode: 'content',

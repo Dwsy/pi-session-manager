@@ -32,7 +32,7 @@
   "plugins": {
     "updater": {
       "active": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUwQURCNEM1Mzc2MzczQUYKUldTdmMyTTN4YlN0VUJsb3EyUm9LeHg3Wk1qQlJmVHpsbS96ZnRoY1p5cWs3dGUzTGJtNWZoZUEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQxRDRDREU0RkRFQjQxMUMKUldRY1Fldjk1TTNVUVdMM2xCQkVIYXQrQzN6aWlqZ21BUmFJbGFvc0plNXBJUWJrWStVR2o0TUUK",
       "endpoints": [
         "https://github.com/dwsy/pi-session-manager/releases/latest/download/updater.json"
       ],

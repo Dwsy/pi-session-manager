@@ -106,6 +106,8 @@ export const settings = {
     scrollMarkersEnabledHelp: 'メッセージ間を素早く移動するためのサイドナビゲーションドットを表示',
     scrollMarkersGuideSeen: '機能ガイドを表示',
     scrollMarkersGuideSeenHelp: 'セッションを初めて開くときに使い方のヒントを表示',
+    timelineNavEnabled: 'Timeline navigation',
+    timelineNavEnabledHelp: 'Show a dot timeline on the right side for quick message jumping with hover preview',
   },
   search: {
     defaultSearchMode: 'デフォルト検索モード',

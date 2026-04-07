@@ -106,6 +106,8 @@ export const settings = {
     scrollMarkersEnabledHelp: 'Mostrar puntos de navegación laterales para saltar rápidamente entre mensajes',
     scrollMarkersGuideSeen: 'Mostrar guía de función',
     scrollMarkersGuideSeenHelp: 'Mostrar consejos introductorios al abrir una sesión por primera vez',
+    timelineNavEnabled: 'Timeline navigation',
+    timelineNavEnabledHelp: 'Show a dot timeline on the right side for quick message jumping with hover preview',
   },
   search: {
     defaultSearchMode: 'Modo de búsqueda predeterminado',

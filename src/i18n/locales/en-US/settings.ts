@@ -173,6 +173,8 @@ export const settings = {
     scrollMarkersEnabledHelp: 'Show navigation dots on the side for quick jumping between messages',
     scrollMarkersGuideSeen: 'Show feature guide',
     scrollMarkersGuideSeenHelp: 'Show introductory tips when opening a session for the first time',
+    timelineNavEnabled: 'Timeline navigation',
+    timelineNavEnabledHelp: 'Show a dot timeline on the right side for quick message jumping with hover preview',
   },
   search: {
     defaultSearchMode: 'Default Search Mode',

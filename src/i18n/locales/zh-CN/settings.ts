@@ -151,6 +151,8 @@ export const settings = {
     scrollMarkersEnabledHelp: '在侧边显示导航圆点，快速跳转不同message',
     scrollMarkersGuideSeen: '显示功能引导',
     scrollMarkersGuideSeenHelp: '首次打开session时显示滚动标记的使用提示',
+    timelineNavEnabled: '时间线导航',
+    timelineNavEnabledHelp: '在右侧显示圆点时间线，hover 预览消息并快速跳转',
   },
   search: {
     defaultSearchMode: '默认搜索模式',
