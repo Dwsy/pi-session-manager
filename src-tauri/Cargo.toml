@@ -59,6 +59,9 @@ tempfile = "3.14"
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 trash = "5.2"
 
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+
 [lints.rust]
 dead_code = "allow"
 unused_variables = "allow"

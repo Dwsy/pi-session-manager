@@ -1,21 +1,34 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { check, Update } from '@tauri-apps/plugin-updater'
 import {
   AlertCircle,
   CheckCircle2,
   Download,
-  ExternalLink,
+  Loader2,
   RefreshCw,
 } from 'lucide-react'
 import SettingsCard from '@/components/settings/SettingsCard'
 import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
 import type { UpdateSettingsProps } from '@/components/settings/types'
-import { checkForUpdates, getLastUpdateCheckAt } from '@/utils/updateChecker'
+import { getLastUpdateCheckAt } from '@/utils/updateChecker'
 
-type CheckMessage =
-  | { type: 'success'; text: string }
-  | { type: 'error'; text: string }
-  | { type: 'update'; text: string; releaseUrl: string }
+type UpdateState =
+  | { phase: 'idle' }
+  | { phase: 'checking' }
+  | { phase: 'latest'; currentVersion: string }
+  | { phase: 'available'; update: Update; currentVersion: string; latestVersion: string }
+  | { phase: 'downloading'; update: Update; progress: number; downloaded: number; total: number | null }
+  | { phase: 'ready'; update: Update }
+  | { phase: 'error'; message: string }
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
 
 function formatDateTime(value: string | null): string | null {
   if (!value) return null
@@ -26,66 +39,246 @@ function formatDateTime(value: string | null): string | null {
 
 export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsProps) {
   const { t } = useTranslation()
-  const [checking, setChecking] = useState(false)
-  const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(() =>
-    getLastUpdateCheckAt(),
-  )
-  const [message, setMessage] = useState<CheckMessage | null>(null)
+  const [state, setState] = useState<UpdateState>({ phase: 'idle' })
+  const [lastCheckedAt] = useState<string | null>(() => getLastUpdateCheckAt())
 
   const lastCheckedLabel = useMemo(() => {
-    return (
-      formatDateTime(lastCheckedAt) ||
-      t('settings.update.neverChecked', 'Not checked yet')
-    )
+    return formatDateTime(lastCheckedAt) || t('settings.update.neverChecked', 'Not checked yet')
   }, [lastCheckedAt, t])
 
-  const handleManualCheck = async () => {
-    setChecking(true)
-    setMessage(null)
-    const result = await checkForUpdates()
-    setLastCheckedAt(result.checkedAt)
-
-    if (result.status === 'update') {
-      setMessage({
-        type: 'update',
-        text: t(
-          'settings.update.result.hasUpdate',
-          'New version v{{latest}} available (current v{{current}})',
-          {
-            latest: result.update.latestVersion,
-            current: result.update.currentVersion,
-          },
-        ),
-        releaseUrl: result.update.releaseUrl,
+  const handleCheck = async () => {
+    setState({ phase: 'checking' })
+    try {
+      const update = await check()
+      if (update) {
+        setState({
+          phase: 'available',
+          update,
+          currentVersion: update.currentVersion,
+          latestVersion: update.version,
+        })
+      } else {
+        setState({ phase: 'latest', currentVersion: '0.0.0' })
+      }
+    } catch (err) {
+      setState({
+        phase: 'error',
+        message: err instanceof Error ? err.message : 'Unknown error',
       })
-      setChecking(false)
-      return
     }
-
-    if (result.status === 'latest') {
-      setMessage({
-        type: 'success',
-        text: t(
-          'settings.update.result.upToDate',
-          'Already at latest version (v{{version}})',
-          { version: result.currentVersion },
-        ),
-      })
-      setChecking(false)
-      return
-    }
-
-    setMessage({
-      type: 'error',
-      text: t('settings.update.result.failed', 'Check failed: {{reason}}', {
-        reason: result.errorMessage,
-      }),
-    })
-    setChecking(false)
   }
 
-  const openReleasePage = (url: string) => {
-    window.open(url, '_blank', 'noopener,noreferrer')
+  const handleDownload = async () => {
+    const currentState = state
+    if (currentState.phase !== 'available') return
+
+    const { update } = currentState
+    setState({ phase: 'downloading', update, progress: 0, downloaded: 0, total: null })
+
+    try {
+      await update.downloadAndInstall((event) => {
+        if (event.event === 'Started') {
+          setState({
+            phase: 'downloading',
+            update,
+            progress: 0,
+            downloaded: 0,
+            total: event.data.contentLength ?? null,
+          })
+        } else if (event.event === 'Progress') {
+          setState((prev) => {
+            if (prev.phase !== 'downloading') return prev
+            const downloaded = prev.downloaded + event.data.chunkLength
+            const total = prev.total
+            const progress = total ? (downloaded / total) * 100 : 0
+            return { ...prev, downloaded, progress }
+          })
+        } else if (event.event === 'Finished') {
+          setState({ phase: 'ready', update })
+        }
+      })
+    } catch (err) {
+      setState({
+        phase: 'error',
+        message: err instanceof Error ? err.message : 'Download failed',
+      })
+    }
+  }
+
+  const handleInstall = async () => {
+    const currentState = state
+    if (currentState.phase !== 'ready') return
+    try {
+      await currentState.update.install()
+    } catch (err) {
+      setState({
+        phase: 'error',
+        message: err instanceof Error ? err.message : 'Install failed',
+      })
+    }
+  }
+
+  const handleReset = () => {
+    setState({ phase: 'idle' })
+  }
+
+  const renderContent = () => {
+    switch (state.phase) {
+      case 'idle':
+        return (
+          <>
+            <div className="pt-3 border-t border-border/60 space-y-3">
+              <button
+                onClick={handleCheck}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-info hover:bg-info/90 text-white text-sm font-medium motion-color motion-press focus-ring"
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t('settings.update.checkNow', 'Check for updates now')}
+              </button>
+              <p className="text-xs text-muted-foreground">
+                {t('settings.update.lastCheckedAt', 'Last checked at')}: {lastCheckedLabel}
+              </p>
+            </div>
+          </>
+        )
+
+      case 'checking':
+        return (
+          <div className="pt-3 border-t border-border/60 flex items-center gap-3 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {t('settings.update.checking', 'Checking...')}
+          </div>
+        )
+
+      case 'latest':
+        return (
+          <div className="pt-3 border-t border-border/60 space-y-3">
+            <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-xs text-green-300 flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div>
+                <p>{t('settings.update.result.upToDate', 'Already at latest version')}</p>
+                <p className="text-green-400/70 mt-1">v{state.currentVersion}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleCheck}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-color motion-press focus-ring"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              {t('settings.update.checkAgain', 'Check again')}
+            </button>
+          </div>
+        )
+
+      case 'available': {
+        const { currentVersion, latestVersion } = state
+        return (
+          <div className="pt-3 border-t border-border/60 space-y-3">
+            <div className="rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs text-info space-y-2">
+              <div className="flex items-start gap-2">
+                <Download className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">
+                    {t('settings.update.result.hasUpdate', 'New version available')}
+                  </p>
+                  <p className="text-info/80 mt-1">
+                    v{currentVersion} → <span className="font-semibold">v{latestVersion}</span>
+                  </p>
+                  {state.update.body && (
+                    <p className="text-info/70 mt-2 line-clamp-3 whitespace-pre-wrap">
+                      {state.update.body}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleDownload}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-info hover:bg-info/90 text-white text-sm font-medium motion-color motion-press focus-ring"
+            >
+              <Download className="h-4 w-4" />
+              {t('settings.update.downloadAndInstall', 'Download & Install')}
+            </button>
+            <button
+              onClick={handleReset}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-color motion-press focus-ring"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              {t('settings.update.later', 'Later')}
+            </button>
+          </div>
+        )
+      }
+
+      case 'downloading': {
+        const { progress, downloaded, total } = state
+        return (
+          <div className="pt-3 border-t border-border/60 space-y-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">{t('settings.update.downloading', 'Downloading...')}</span>
+                <span className="text-foreground font-mono">
+                  {formatBytes(downloaded)}
+                  {total ? ` / ${formatBytes(total)}` : ''}
+                </span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-info transition-all duration-300 ease-out"
+                  style={{ width: `${Math.min(progress, 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                {progress.toFixed(1)}%
+              </p>
+            </div>
+          </div>
+        )
+      }
+
+      case 'ready':
+        return (
+          <div className="pt-3 border-t border-border/60 space-y-3">
+            <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-xs text-green-300 flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div>
+                <p>{t('settings.update.ready', 'Update ready to install')}</p>
+                <p className="text-green-400/70 mt-1">v{state.update.version}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleInstall}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium motion-color motion-press focus-ring"
+            >
+              <Download className="h-4 w-4" />
+              {t('settings.update.installAndRestart', 'Install & Restart')}
+            </button>
+          </div>
+        )
+
+      case 'error':
+        return (
+          <div className="pt-3 border-t border-border/60 space-y-3">
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">{t('settings.update.error', 'Update failed')}</p>
+                <p className="text-red-400/70 mt-1">{state.message}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleCheck}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-color motion-press focus-ring"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              {t('settings.update.retry', 'Retry')}
+            </button>
+          </div>
+        )
+
+      default:
+        return null
+    }
   }
 
   return (
@@ -108,57 +301,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
             checked={settings.update.autoCheck !== false}
             onChange={(checked) => onUpdate('update', 'autoCheck', checked)}
           />
-
-          <div className="pt-3 border-t border-border/60 space-y-3">
-            <button
-              onClick={handleManualCheck}
-              disabled={checking}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-info hover:bg-info/90 text-white text-sm font-medium disabled:opacity-60 motion-color motion-press focus-ring"
-            >
-              <RefreshCw className={`h-4 w-4 ${checking ? 'animate-spin' : ''}`} />
-              {checking
-                ? t('settings.update.checking', 'Checking...')
-                : t('settings.update.checkNow', 'Check for updates now')}
-            </button>
-
-            <p className="text-xs text-muted-foreground">
-              {t('settings.update.lastCheckedAt', 'Last checked at')}: {lastCheckedLabel}
-            </p>
-
-            {message && (
-              <div
-                className={`rounded-lg border px-3 py-2 text-xs ${
-                  message.type === 'error'
-                    ? 'border-red-500/30 bg-red-500/10 text-red-300'
-                    : message.type === 'update'
-                      ? 'border-info/30 bg-info/10 text-info'
-                      : 'border-green-500/30 bg-green-500/10 text-green-300'
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  {message.type === 'error' ? (
-                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  ) : message.type === 'update' ? (
-                    <Download className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p>{message.text}</p>
-                    {message.type === 'update' && (
-                      <button
-                        onClick={() => openReleasePage(message.releaseUrl)}
-                        className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-info/20 hover:bg-info/30 text-info motion-color motion-press focus-ring"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        {t('settings.update.openRelease', 'Open release page')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          {renderContent()}
         </div>
       </SettingsCard>
     </div>

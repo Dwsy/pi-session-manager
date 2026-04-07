@@ -228,6 +228,7 @@ fn main() {
     let runtime_token = cli_args.runtime_token.clone();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
