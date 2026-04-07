@@ -1,10 +1,12 @@
 //! Cross-platform terminal launching implementations
 use crate::domain::terminal::utils::{
-    build_resume_command, escape_double_quoted, macos_app_exists, run_osascript,
-    shell_single_quote, spawn_command,
+    build_resume_command, escape_double_quoted, shell_single_quote, spawn_command,
 };
 use crate::utils::string::command_exists;
 use std::process::Command;
+
+#[cfg(target_os = "macos")]
+use crate::domain::terminal::utils::{macos_app_exists, run_osascript};
 
 #[cfg(target_os = "macos")]
 pub fn try_launch_known_terminal_macos(

@@ -83,6 +83,7 @@ export interface AppSettings {
   }
   update: {
     autoCheck: boolean
+    channel: 'stable' | 'beta'
   }
   advanced: {
     sessionDirs: string[]
@@ -154,6 +155,7 @@ export const defaultSettings: AppSettings = {
   },
   update: {
     autoCheck: true,
+    channel: 'stable',
   },
   advanced: {
     sessionDirs: ['~/.pi/agent/sessions'],

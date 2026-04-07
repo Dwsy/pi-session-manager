@@ -3,12 +3,16 @@ import { useTranslation } from 'react-i18next'
 import { check, Update } from '@tauri-apps/plugin-updater'
 import {
   AlertCircle,
+  ArrowUpRight,
   CheckCircle2,
   Download,
   Loader2,
   RefreshCw,
+  Zap,
 } from 'lucide-react'
 import SettingsCard from '@/components/settings/SettingsCard'
+import SettingsField from '@/components/settings/SettingsField'
+import SettingsOptionGroup from '@/components/settings/SettingsOptionGroup'
 import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
 import type { UpdateSettingsProps } from '@/components/settings/types'
 import { getLastUpdateCheckAt } from '@/utils/updateChecker'
@@ -35,6 +39,61 @@ function formatDateTime(value: string | null): string | null {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
   return date.toLocaleString()
+}
+
+/**
+ * Current version badge displayed at top of the card
+ */
+function VersionBadge({ version, label }: { version: string; label?: string }) {
+  return (
+    <div className="inline-flex items-center gap-2">
+      <span className="px-2.5 py-1 rounded-md bg-info/10 border border-info/20 text-info font-mono text-sm">
+        v{version}
+      </span>
+      {label && (
+        <span className="px-2 py-0.5 rounded-full bg-success/10 border border-success/20 text-success text-xs font-medium">
+          {label}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Release notes preview — rendered as sanitized markdown-ish text
+ */
+function ReleaseNotesPreview({ body }: { body: string }) {
+  const lines = body.split('\n').filter(Boolean).slice(0, 6)
+  const hasMore = body.split('\n').filter(Boolean).length > 6
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-muted/40 p-3 space-y-1 max-h-32 overflow-y-auto text-xs">
+      {lines.map((line, i) => {
+        if (line.startsWith('###') || line.startsWith('##')) {
+          return (
+            <p key={i} className="font-semibold text-foreground mt-2 first:mt-0">
+              {line.replace(/^#+\s*/, '')}
+            </p>
+          )
+        }
+        if (line.startsWith('- ') || line.startsWith('* ')) {
+          return (
+            <p key={i} className="text-muted-foreground pl-1">
+              • {line.replace(/^[-*]\s*/, '')}
+            </p>
+          )
+        }
+        return (
+          <p key={i} className="text-muted-foreground">
+            {line}
+          </p>
+        )
+      })}
+      {hasMore && (
+        <p className="text-muted-foreground italic pt-1">...</p>
+      )}
+    </div>
+  )
 }
 
 export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsProps) {
@@ -122,44 +181,85 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
     setState({ phase: 'idle' })
   }
 
+  const openReleasePage = () => {
+    window.open('https://github.com/Dwsy/pi-session-manager/releases', '_blank', 'noopener,noreferrer')
+  }
+
+  /* ─── State renderers ─── */
+
   const renderContent = () => {
     switch (state.phase) {
       case 'idle':
         return (
-          <>
-            <div className="pt-3 border-t border-border/60 space-y-3">
-              <button
-                onClick={handleCheck}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-info hover:bg-info/90 text-white text-sm font-medium motion-color motion-press focus-ring"
-              >
-                <RefreshCw className="h-4 w-4" />
-                {t('settings.update.checkNow', 'Check for updates now')}
-              </button>
+          <div className="space-y-4">
+            {/* Quick info */}
+            <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
-                {t('settings.update.lastCheckedAt', 'Last checked at')}: {lastCheckedLabel}
+                {t('settings.update.source', 'Updates from GitHub Releases')}
               </p>
+              <button
+                onClick={openReleasePage}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-info transition-colors"
+              >
+                <ArrowUpRight className="h-3 w-3" />
+                {t('settings.update.viewReleases', 'View Releases')}
+              </button>
             </div>
-          </>
+
+            {/* Check now button */}
+            <button
+              onClick={handleCheck}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-info hover:bg-info/90 text-white text-sm font-medium motion-color motion-press focus-ring"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {t('settings.update.checkNow', 'Check for updates now')}
+            </button>
+
+            {/* Last checked */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                {t('settings.update.lastCheckedAt', 'Last checked')}
+              </span>
+              <span className="text-foreground/70 font-mono">{lastCheckedLabel}</span>
+            </div>
+          </div>
         )
 
       case 'checking':
         return (
-          <div className="pt-3 border-t border-border/60 flex items-center gap-3 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {t('settings.update.checking', 'Checking...')}
+          <div className="flex flex-col items-center justify-center py-8 space-y-3">
+            <Loader2 className="h-8 w-8 animate-spin text-info" />
+            <span className="text-sm text-muted-foreground">
+              {t('settings.update.checking', 'Checking for updates...')}
+            </span>
           </div>
         )
 
-      case 'latest':
+      case 'latest': {
+        const currentVersion = state.currentVersion !== '0.0.0' ? state.currentVersion : '—'
         return (
-          <div className="pt-3 border-t border-border/60 space-y-3">
-            <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-xs text-green-300 flex items-start gap-2">
-              <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <div>
-                <p>{t('settings.update.result.upToDate', 'Already at latest version')}</p>
-                <p className="text-green-400/70 mt-1">v{state.currentVersion}</p>
+          <div className="space-y-4">
+            {/* Up-to-date card */}
+            <div className="rounded-xl border border-success/20 bg-success/5 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-full bg-success/15 p-1.5">
+                  <CheckCircle2 className="h-5 w-5 text-success" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    {t('settings.update.result.upToDate', 'You are up to date!')}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {t('settings.update.result.upToDateDesc', 'Running the latest version')}
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2">
+                <VersionBadge version={currentVersion} label="Latest" />
               </div>
             </div>
+
+            {/* Check again */}
             <button
               onClick={handleCheck}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-color motion-press focus-ring"
@@ -169,68 +269,101 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
             </button>
           </div>
         )
+      }
 
       case 'available': {
         const { currentVersion, latestVersion } = state
         return (
-          <div className="pt-3 border-t border-border/60 space-y-3">
-            <div className="rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs text-info space-y-2">
-              <div className="flex items-start gap-2">
-                <Download className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <div className="space-y-4">
+            {/* Update available card */}
+            <div className="rounded-xl border border-info/30 bg-info/5 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-full bg-info/15 p-1.5">
+                  <ArrowUpRight className="h-5 w-5 text-info" />
+                </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium">
+                  <p className="text-sm font-semibold text-foreground">
                     {t('settings.update.result.hasUpdate', 'New version available')}
                   </p>
-                  <p className="text-info/80 mt-1">
-                    v{currentVersion} → <span className="font-semibold">v{latestVersion}</span>
-                  </p>
-                  {state.update.body && (
-                    <p className="text-info/70 mt-2 line-clamp-3 whitespace-pre-wrap">
-                      {state.update.body}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-2 mt-2">
+                    <VersionBadge version={currentVersion} />
+                    <span className="text-muted-foreground text-sm">→</span>
+                    <VersionBadge version={latestVersion} label="New" />
+                  </div>
                 </div>
               </div>
+
+              {/* Release notes */}
+              {state.update.body && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5 font-medium">
+                    {t('settings.update.releaseNotes', 'Release Notes')}
+                  </p>
+                  <ReleaseNotesPreview body={state.update.body} />
+                </div>
+              )}
             </div>
-            <button
-              onClick={handleDownload}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-info hover:bg-info/90 text-white text-sm font-medium motion-color motion-press focus-ring"
-            >
-              <Download className="h-4 w-4" />
-              {t('settings.update.downloadAndInstall', 'Download & Install')}
-            </button>
-            <button
-              onClick={handleReset}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-color motion-press focus-ring"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              {t('settings.update.later', 'Later')}
-            </button>
+
+            {/* Action buttons */}
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleDownload}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-info hover:bg-info/90 text-white text-sm font-medium motion-color motion-press focus-ring"
+              >
+                <Download className="h-4 w-4" />
+                {t('settings.update.downloadAndInstall', 'Download & Install')}
+              </button>
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handleReset}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  {t('settings.update.later', 'Remind me later')}
+                </button>
+                <button
+                  onClick={openReleasePage}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-info hover:text-info/80 transition-colors"
+                >
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                  {t('settings.update.viewOnGitHub', 'View on GitHub')}
+                </button>
+              </div>
+            </div>
           </div>
         )
       }
 
       case 'downloading': {
         const { progress, downloaded, total } = state
+        const estimatedSize = total ? formatBytes(total) : '—'
+
         return (
-          <div className="pt-3 border-t border-border/60 space-y-3">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">{t('settings.update.downloading', 'Downloading...')}</span>
-                <span className="text-foreground font-mono">
-                  {formatBytes(downloaded)}
-                  {total ? ` / ${formatBytes(total)}` : ''}
+          <div className="space-y-4">
+            {/* Progress card */}
+            <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-info" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    {t('settings.update.downloading', 'Downloading update...')}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {formatBytes(downloaded)} / {estimatedSize}
+                  </p>
+                </div>
+                <span className="text-lg font-mono font-semibold text-info">
+                  {progress.toFixed(0)}%
                 </span>
               </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
+
+              {/* Progress bar */}
+              <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-info transition-all duration-300 ease-out"
+                  className="h-full bg-gradient-to-r from-info to-info/60 rounded-full transition-all duration-300 ease-out"
                   style={{ width: `${Math.min(progress, 100)}%` }}
                 />
               </div>
-              <p className="text-xs text-muted-foreground text-center">
-                {progress.toFixed(1)}%
-              </p>
             </div>
           </div>
         )
@@ -238,41 +371,83 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
 
       case 'ready':
         return (
-          <div className="pt-3 border-t border-border/60 space-y-3">
-            <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-xs text-green-300 flex items-start gap-2">
-              <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <div>
-                <p>{t('settings.update.ready', 'Update ready to install')}</p>
-                <p className="text-green-400/70 mt-1">v{state.update.version}</p>
+          <div className="space-y-4">
+            {/* Ready to install */}
+            <div className="rounded-xl border border-success/20 bg-success/5 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-full bg-success/15 p-1.5">
+                  <Zap className="h-5 w-5 text-success" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">
+                    {t('settings.update.ready', 'Update ready to install')}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {t('settings.update.readyDesc', 'Restart to apply the update')}
+                  </p>
+                  <div className="mt-2">
+                    <VersionBadge version={state.update.version} />
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* Install button */}
             <button
               onClick={handleInstall}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium motion-color motion-press focus-ring"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-success hover:bg-success/90 text-white text-sm font-medium motion-color motion-press focus-ring"
             >
               <Download className="h-4 w-4" />
               {t('settings.update.installAndRestart', 'Install & Restart')}
+            </button>
+
+            {/* Skip option */}
+            <button
+              onClick={handleReset}
+              className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {t('settings.update.cancel', 'Cancel')}
             </button>
           </div>
         )
 
       case 'error':
         return (
-          <div className="pt-3 border-t border-border/60 space-y-3">
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium">{t('settings.update.error', 'Update failed')}</p>
-                <p className="text-red-400/70 mt-1">{state.message}</p>
+          <div className="space-y-4">
+            {/* Error card */}
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 space-y-2">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-full bg-destructive/15 p-1.5">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    {t('settings.update.error', 'Update check failed')}
+                  </p>
+                  <p className="text-xs text-destructive/70 mt-0.5 font-mono break-all">
+                    {state.message}
+                  </p>
+                </div>
               </div>
             </div>
-            <button
-              onClick={handleCheck}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-color motion-press focus-ring"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              {t('settings.update.retry', 'Retry')}
-            </button>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCheck}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                {t('settings.update.retry', 'Retry')}
+              </button>
+              <button
+                onClick={openReleasePage}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-info hover:text-info/80 transition-colors"
+              >
+                <ArrowUpRight className="h-3.5 w-3.5" />
+                {t('settings.update.viewOnGitHub', 'View on GitHub')}
+              </button>
+            </div>
           </div>
         )
 
@@ -283,26 +458,69 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
 
   return (
     <div className="space-y-6">
+      {/* Main update card */}
       <SettingsCard
-        title={t('settings.update.title', 'Update')}
+        title={t('settings.update.title', 'Updates')}
         description={t(
           'settings.update.description',
-          'Check for new versions via GitHub Releases',
+          'Manage app updates from GitHub Releases',
         )}
         icon={<Download className="h-4 w-4" />}
       >
-        <div className="space-y-4">
+        <div className="space-y-5">
           <SettingsToggleRow
             title={t('settings.update.autoCheck', 'Auto check for updates')}
             description={t(
               'settings.update.autoCheckHelp',
-              'Auto-check once per day by default',
+              'Automatically check once per day',
             )}
             checked={settings.update.autoCheck !== false}
             onChange={(checked) => onUpdate('update', 'autoCheck', checked)}
           />
+
           {renderContent()}
         </div>
+      </SettingsCard>
+
+      {/* Update channel card */}
+      <SettingsCard
+        title={t('settings.update.channel.title', 'Update Channel')}
+        description={t(
+          'settings.update.channel.description',
+          'Choose which release track to receive updates from',
+        )}
+        icon={<Zap className="h-4 w-4" />}
+      >
+        <SettingsField label={t('settings.update.channel.label', 'Channel')}>
+          <SettingsOptionGroup
+            options={['stable', 'beta'] as const}
+            value={(settings.update.channel as 'stable' | 'beta') ?? 'stable'}
+            onChange={(channel) => onUpdate('update', 'channel', channel)}
+            renderLabel={(channel) => (
+              <span className="flex items-center gap-1.5">
+                {channel === 'stable' ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {t('settings.update.channel.stable', 'Stable')}
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    {t('settings.update.channel.beta', 'Beta')}
+                  </>
+                )}
+              </span>
+            )}
+            containerClassName="grid grid-cols-2 gap-2"
+            optionClassName="py-2"
+          />
+          <p className="text-xs text-muted-foreground mt-2">
+            {t(
+              'settings.update.channel.help',
+              'Stable: recommended for most users. Beta: early access to new features, may be unstable.',
+            )}
+          </p>
+        </SettingsField>
       </SettingsCard>
     </div>
   )
