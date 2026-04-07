@@ -13,9 +13,11 @@ import { useTranslation } from "react-i18next";
 
 import SessionHeader from "@/components/session-viewer/SessionHeader";
 import SessionScrollMarkers from "@/components/session-viewer/SessionScrollMarkers";
+import SessionTimelineNav from "@/components/session-viewer/SessionTimelineNav";
 import { useSessionView } from "@/contexts/SessionViewContext";
 import type { SessionSearchTarget } from "@/hooks/useSessionViewerInMessageSearch";
 import { useSessionViewerVirtualScroll } from "@/hooks/useSessionViewerVirtualScroll";
+import { useSessionTimelineNav } from "@/hooks/useSessionTimelineNav";
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
 import type { LegacySessionStats, SessionEntry } from "@/types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
@@ -62,6 +64,7 @@ export interface SessionViewerMessagesProps {
   onPointerUp: (event: ReactPointerEvent) => void;
   onPointerLeave: (event: ReactPointerEvent) => void;
   isScrollMarkersFeatureEnabled: boolean;
+  isTimelineNavEnabled?: boolean;
 }
 
 const SessionViewerMessages = forwardRef<
@@ -100,9 +103,18 @@ const SessionViewerMessages = forwardRef<
   onPointerUp,
   onPointerLeave,
   isScrollMarkersFeatureEnabled,
+  isTimelineNavEnabled = false,
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
   const { ensureToolExpandedForSearch } = useSessionView();
+
+  // Timeline nav — find which entry index corresponds to current scroll position
+  const timelineNavItems = useSessionTimelineNav({
+    entries: renderableEntries,
+    enabled: isTimelineNavEnabled,
+    previewFallback: t("session.userMessage", "User message"),
+  });
+
   const {
     messagesContainerRef,
     messagesWrapperRef,
@@ -323,6 +335,12 @@ const SessionViewerMessages = forwardRef<
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerLeave}
+        />
+      )}
+      {isTimelineNavEnabled && timelineNavItems.items.length > 0 && (
+        <SessionTimelineNav
+          items={timelineNavItems.items}
+          onNavigate={(entryId) => setScrollTargetId(entryId)}
         />
       )}
     </div>

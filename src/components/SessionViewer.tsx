@@ -368,6 +368,7 @@ function SessionViewerContent({
           onPointerUp={handleMarkersPointerUp}
           onPointerLeave={handleMarkersPointerLeave}
           isScrollMarkersFeatureEnabled={scrollMarkersEnabled}
+          isTimelineNavEnabled={true}
         />
 
         <ChatInput
