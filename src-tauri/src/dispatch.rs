@@ -1,30 +1,22 @@
+//! Command dispatcher - routes commands to handlers
+//!
+//! This file contains ONLY command routing logic.
+//! All heavy business logic has been moved to:
+//! - `domain/model_config/` - model configuration
+//! - `domain/terminal/` - terminal launching
+//! - `utils/` - shared utilities
+
 use serde_json::Value;
 
-pub fn extract_string(payload: &Value, key: &str) -> Result<String, String> {
-    payload
-        .get(key)
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| format!("Missing or invalid field: {key}"))
-}
-
-pub fn extract_optional_string(payload: &Value, key: &str) -> Option<String> {
-    payload
-        .get(key)
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-}
-
-pub fn extract_usize(payload: &Value, key: &str) -> Result<usize, String> {
-    payload
-        .get(key)
-        .and_then(|v| v.as_u64())
-        .map(|v| v as usize)
-        .ok_or_else(|| format!("Missing or invalid field: {key}"))
-}
+// Re-export for backward compatibility
+pub use crate::utils::payload::{
+    extract_optional_string as extract_optional,
+    extract_string as extract,
+    extract_usize,
+};
+use crate::utils::payload::extract_optional_string;
 
 /// Dispatch a command to the appropriate handler.
-/// This function contains all pure business logic (no Tauri dependency).
 /// GUI-only commands (terminal, save_session_paths with watcher) are handled
 /// by the caller in ws_adapter.rs.
 #[cfg(not(feature = "gui"))]
@@ -41,19 +33,16 @@ pub async fn dispatch(
     payload: &Value,
 ) -> Result<Value, String> {
     match command {
+        // ═══════════════════════════════════════════════════════════════
+        // Session scanning
+        // ═══════════════════════════════════════════════════════════════
         "scan_sessions" => {
             let result = crate::core::scanner::scan_sessions().await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "scan_sessions_paginated" => {
-            let offset = payload
-                .get("offset")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as usize);
-            let limit = payload
-                .get("limit")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as usize);
+            let offset = payload.get("offset").and_then(|v| v.as_u64()).map(|v| v as usize);
+            let limit = payload.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
             let search_query = extract_optional_string(payload, "search_query")
                 .or_else(|| extract_optional_string(payload, "searchQuery"));
             let project_filter = extract_optional_string(payload, "project_filter")
@@ -71,38 +60,33 @@ pub async fn dispatch(
             let sort_by = extract_optional_string(payload, "sort_by")
                 .or_else(|| extract_optional_string(payload, "sortBy"));
             let result = crate::scan_sessions_paginated(
-                offset,
-                limit,
-                search_query,
-                project_filter,
-                filter_tag_ids,
-                sort_by,
-            )
-            .await?;
+                offset, limit, search_query, project_filter, filter_tag_ids, sort_by,
+            ).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "session_digest" => {
             let (version, count) = crate::core::scanner::get_session_digest();
             Ok(serde_json::json!({ "version": version, "count": count }))
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Session file reading
+        // ═══════════════════════════════════════════════════════════════
         "read_session_file" => {
-            let path = extract_string(payload, "path")?;
+            let path = extract(payload, "path")?;
             let result = std::fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read session file: {e}"))?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "read_session_file_chunk" => {
-            let path = extract_string(payload, "path")?;
+            let path = extract(payload, "path")?;
             let offset = payload.get("offset").and_then(|v| v.as_u64());
-            let max_bytes = payload
-                .get("maxBytes")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as usize);
+            let max_bytes = payload.get("maxBytes").and_then(|v| v.as_u64()).map(|v| v as usize);
             let result = crate::read_session_file_chunk(path, offset, max_bytes).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "read_session_file_incremental" => {
-            let path = extract_string(payload, "path")?;
+            let path = extract(payload, "path")?;
             let from_line = extract_usize(payload, "fromLine")?;
             let content = std::fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read session file: {e}"))?;
@@ -116,24 +100,20 @@ pub async fn dispatch(
             Ok(serde_json::json!([total_lines, new_content]))
         }
         "read_session_file_incremental_offset" => {
-            let path = extract_string(payload, "path")?;
-            let from_offset = payload
-                .get("fromOffset")
-                .and_then(|v| v.as_u64())
+            let path = extract(payload, "path")?;
+            let from_offset = payload.get("fromOffset").and_then(|v| v.as_u64())
                 .ok_or_else(|| "Missing or invalid field: fromOffset".to_string())?;
             let (new_offset, new_content) =
                 crate::read_session_file_incremental_offset(path, from_offset).await?;
             Ok(serde_json::json!([new_offset, new_content]))
         }
         "get_file_stats" => {
-            let path = extract_string(payload, "path")?;
+            let path = extract(payload, "path")?;
             let metadata = std::fs::metadata(&path)
                 .map_err(|e| format!("Failed to get file metadata: {e}"))?;
-            let modified = metadata
-                .modified()
+            let modified = metadata.modified()
                 .map_err(|e| format!("Failed to get modified time: {e}"))?;
-            let modified_at = modified
-                .duration_since(std::time::UNIX_EPOCH)
+            let modified_at = modified.duration_since(std::time::UNIX_EPOCH)
                 .map_err(|e| format!("Failed to convert modified time: {e}"))?
                 .as_millis() as u64;
             Ok(serde_json::json!({
@@ -143,184 +123,148 @@ pub async fn dispatch(
             }))
         }
         "get_session_entries" => {
-            let path = extract_string(payload, "path")?;
+            let path = extract(payload, "path")?;
             let result = crate::get_session_entries(path).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "get_session_by_path" => {
-            let path = extract_string(payload, "path")?;
+            let path = extract(payload, "path")?;
             let result = crate::get_session_by_path(path).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Session management
+        // ═══════════════════════════════════════════════════════════════
         "delete_session" => {
-            let path = extract_string(payload, "path")?;
+            let path = extract(payload, "path")?;
             crate::core::delete::delete_session_file_and_cache(&path)?;
             Ok(Value::Null)
         }
         "delete_sessions" => {
             let paths: Vec<String> = serde_json::from_value(
-                payload
-                    .get("paths")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid paths: {e}"))?;
+                payload.get("paths").cloned().unwrap_or(Value::Array(vec![])),
+            ).map_err(|e| format!("Invalid paths: {e}"))?;
             let result = crate::delete_sessions(paths).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "export_session" => {
-            let path = extract_string(payload, "path")?;
-            let format = extract_string(payload, "format")?;
-            let output_path = extract_string(payload, "outputPath")?;
+            let path = extract(payload, "path")?;
+            let format = extract(payload, "format")?;
+            let output_path = extract(payload, "outputPath")?;
             crate::export::export_session(&path, &format, &output_path).await?;
             Ok(Value::Null)
         }
         "rename_session" => {
-            let path = extract_string(payload, "path")?;
-            let new_name = extract_string(payload, "newName")?;
+            let path = extract(payload, "path")?;
+            let new_name = extract(payload, "newName")?;
             crate::rename_session(path, new_name).await?;
             Ok(Value::Null)
         }
         "fork_session" => {
-            let source_path = extract_string(payload, "sourcePath")?;
-            let target_name = payload
-                .get("targetName")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let result =
-                crate::commands::session_file::fork_session_impl(source_path, target_name).await?;
+            let source_path = extract(payload, "sourcePath")?;
+            let target_name = payload.get("targetName").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let result = crate::commands::session_file::fork_session_impl(source_path, target_name).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Statistics
+        // ═══════════════════════════════════════════════════════════════
         "get_session_stats" => {
             let sessions: Vec<crate::types::SessionInfo> = serde_json::from_value(
-                payload
-                    .get("sessions")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid sessions: {e}"))?;
+                payload.get("sessions").cloned().unwrap_or(Value::Array(vec![])),
+            ).map_err(|e| format!("Invalid sessions: {e}"))?;
             let result = crate::stats::calculate_stats(&sessions);
             Ok(serde_json::to_value(result).unwrap())
         }
         "get_session_stats_light" => {
             let sessions: Vec<crate::stats::SessionStatsInput> = serde_json::from_value(
-                payload
-                    .get("sessions")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid sessions: {e}"))?;
+                payload.get("sessions").cloned().unwrap_or(Value::Array(vec![])),
+            ).map_err(|e| format!("Invalid sessions: {e}"))?;
             let result = crate::stats::calculate_stats_from_inputs(&sessions);
             Ok(serde_json::to_value(result).unwrap())
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Search
+        // ═══════════════════════════════════════════════════════════════
         "search_sessions" => {
             let sessions: Vec<crate::types::SessionInfo> = serde_json::from_value(
-                payload
-                    .get("sessions")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid sessions: {e}"))?;
-            let query = extract_string(payload, "query")?;
-            let search_mode =
-                extract_string(payload, "searchMode").unwrap_or_else(|_| "content".to_string());
-            let role_filter =
-                extract_string(payload, "roleFilter").unwrap_or_else(|_| "all".to_string());
-            let include_tools = payload
-                .get("includeTools")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            let result =
-                crate::search_sessions(sessions, query, search_mode, role_filter, include_tools)
-                    .await?;
+                payload.get("sessions").cloned().unwrap_or(Value::Array(vec![])),
+            ).map_err(|e| format!("Invalid sessions: {e}"))?;
+            let query = extract(payload, "query")?;
+            let search_mode = extract(payload, "searchMode").unwrap_or_else(|_| "content".to_string());
+            let role_filter = extract(payload, "roleFilter").unwrap_or_else(|_| "all".to_string());
+            let include_tools = payload.get("includeTools").and_then(|v| v.as_bool()).unwrap_or(false);
+            let result = crate::search_sessions(sessions, query, search_mode, role_filter, include_tools).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "search_sessions_fts" => {
-            let query = extract_string(payload, "query")?;
+            let query = extract(payload, "query")?;
             let limit = payload.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
             let result = crate::search_sessions_fts(query, limit).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
-
         "full_text_search" => {
-            let query = extract_string(payload, "query")?;
-            // Accept both snake_case and camelCase for role_filter
-            let role_filter = extract_string(payload, "role_filter")
-                .or_else(|_| extract_string(payload, "roleFilter"))
+            let query = extract(payload, "query")?;
+            let role_filter = extract(payload, "role_filter")
+                .or_else(|_| extract(payload, "roleFilter"))
                 .map_err(|_| "Missing required field: role_filter or roleFilter")?;
-            let glob_pattern = payload
-                .get("glob_pattern")
-                .or_else(|| payload.get("globPattern"))
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            let project_path = payload
-                .get("project_path")
-                .or_else(|| payload.get("projectPath"))
-                .and_then(|v| v.as_str())
-                .map(String::from);
+            let glob_pattern = payload.get("glob_pattern").or_else(|| payload.get("globPattern"))
+                .and_then(|v| v.as_str()).map(String::from);
+            let project_path = payload.get("project_path").or_else(|| payload.get("projectPath"))
+                .and_then(|v| v.as_str()).map(String::from);
             let page = payload.get("page").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-            let page_size = payload
-                .get("page_size")
-                .or_else(|| payload.get("pageSize"))
-                .and_then(|v| v.as_u64())
-                .unwrap_or(20) as usize;
-            let match_mode = payload
-                .get("match_mode")
-                .or_else(|| payload.get("matchMode"))
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            let sort_order = payload
-                .get("sort_order")
-                .or_else(|| payload.get("sortOrder"))
-                .and_then(|v| v.as_str())
-                .map(String::from);
+            let page_size = payload.get("page_size").or_else(|| payload.get("pageSize"))
+                .and_then(|v| v.as_u64()).unwrap_or(20) as usize;
+            let match_mode = payload.get("match_mode").or_else(|| payload.get("matchMode"))
+                .and_then(|v| v.as_str()).map(String::from);
+            let sort_order = payload.get("sort_order").or_else(|| payload.get("sortOrder"))
+                .and_then(|v| v.as_str()).map(String::from);
             let result = crate::full_text_search(
-                query,
-                role_filter,
-                glob_pattern,
-                project_path,
-                page,
-                page_size,
-                match_mode,
-                sort_order,
-            )
-            .await?;
+                query, role_filter, glob_pattern, project_path, page, page_size, match_mode, sort_order,
+            ).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
 
+        // ═══════════════════════════════════════════════════════════════
         // Favorites
+        // ═══════════════════════════════════════════════════════════════
         "get_all_favorites" => {
             let result = crate::get_all_favorites().await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "add_favorite" => {
-            let id = extract_string(payload, "id")?;
-            let favorite_type = extract_string(payload, "favoriteType")?;
-            let name = extract_string(payload, "name")?;
-            let path = extract_string(payload, "path")?;
+            let id = extract(payload, "id")?;
+            let favorite_type = extract(payload, "favoriteType")?;
+            let name = extract(payload, "name")?;
+            let path = extract(payload, "path")?;
             crate::add_favorite(id, favorite_type, name, path).await?;
             Ok(Value::Null)
         }
         "remove_favorite" => {
-            let id = extract_string(payload, "id")?;
+            let id = extract(payload, "id")?;
             crate::remove_favorite(id).await?;
             Ok(Value::Null)
         }
         "is_favorite" => {
-            let id = extract_string(payload, "id")?;
+            let id = extract(payload, "id")?;
             let result = crate::is_favorite(id).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "toggle_favorite" => {
-            let id = extract_string(payload, "id")?;
-            let favorite_type = extract_string(payload, "favoriteType")?;
-            let name = extract_string(payload, "name")?;
-            let path = extract_string(payload, "path")?;
+            let id = extract(payload, "id")?;
+            let favorite_type = extract(payload, "favoriteType")?;
+            let name = extract(payload, "name")?;
+            let path = extract(payload, "path")?;
             let result = crate::toggle_favorite(id, favorite_type, name, path).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
 
+        // ═══════════════════════════════════════════════════════════════
         // Skills & prompts
+        // ═══════════════════════════════════════════════════════════════
         "scan_skills" => {
             let result = crate::scan_skills_internal().await?;
             Ok(serde_json::to_value(result).unwrap())
@@ -330,13 +274,13 @@ pub async fn dispatch(
             Ok(serde_json::to_value(result).unwrap())
         }
         "get_skill_content" => {
-            let path = extract_string(payload, "path")?;
+            let path = extract(payload, "path")?;
             let content = std::fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read skill file: {e}"))?;
             Ok(serde_json::to_value(content).unwrap())
         }
         "get_prompt_content" => {
-            let path = extract_string(payload, "path")?;
+            let path = extract(payload, "path")?;
             let content = std::fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read prompt file: {e}"))?;
             Ok(serde_json::to_value(content).unwrap())
@@ -346,24 +290,22 @@ pub async fn dispatch(
             Ok(serde_json::to_value(result).unwrap())
         }
         "get_session_system_prompt" => {
-            let path = extract_string(payload, "path")?;
+            let path = extract(payload, "path")?;
             let result = crate::get_session_system_prompt_internal(path).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
 
+        // ═══════════════════════════════════════════════════════════════
         // Settings
+        // ═══════════════════════════════════════════════════════════════
         "load_pi_settings" => {
             let result = crate::load_pi_settings_internal().await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "save_pi_settings" => {
             let settings = serde_json::from_value(
-                payload
-                    .get("settings")
-                    .cloned()
-                    .unwrap_or(Value::Object(Default::default())),
-            )
-            .map_err(|e| format!("Invalid settings: {e}"))?;
+                payload.get("settings").cloned().unwrap_or(Value::Object(Default::default())),
+            ).map_err(|e| format!("Invalid settings: {e}"))?;
             crate::save_pi_settings(settings).await?;
             Ok(Value::Null)
         }
@@ -377,138 +319,128 @@ pub async fn dispatch(
             Ok(serde_json::to_value(result).unwrap())
         }
         "save_pi_setting" => {
-            let key = extract_string(payload, "key")?;
+            let key = extract(payload, "key")?;
             let value = payload.get("value").cloned().unwrap_or(Value::Null);
             crate::save_pi_setting_internal(key, value).await?;
             Ok(Value::Null)
         }
         "toggle_resource" => {
-            let resource_type = extract_string(payload, "resource_type")?;
-            let path = extract_string(payload, "path")?;
-            let enabled = payload
-                .get("enabled")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(true);
-            let scope = extract_string(payload, "scope").unwrap_or_else(|_| "user".to_string());
+            let resource_type = extract(payload, "resource_type")?;
+            let path = extract(payload, "path")?;
+            let enabled = payload.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+            let scope = extract(payload, "scope").unwrap_or_else(|_| "user".to_string());
             crate::toggle_resource_internal(resource_type, path, enabled, scope).await?;
             Ok(Value::Null)
         }
+        "read_resource_file" => {
+            let path = extract(payload, "path")?;
+            let scope = extract(payload, "scope").unwrap_or_else(|_| "user".to_string());
+            let result = crate::read_resource_file_internal(path, scope).await?;
+            Ok(Value::String(result))
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Model config (delegates to domain)
+        // ═══════════════════════════════════════════════════════════════
         "list_model_options_fast" => {
-            let result = crate::list_model_options_fast_internal().await?;
+            let result = crate::domain::model_config::list_model_options_fast_internal().await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "list_model_options_full" => {
-            let result = crate::list_model_options_full_internal().await?;
+            let result = crate::domain::model_config::list_model_options_full_internal().await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "load_model_config" => {
-            let result = crate::load_model_config_internal().await?;
+            let result = crate::domain::model_config::load_model_config_internal().await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "save_model_config" => {
             let content = payload.get("content").cloned().ok_or("Missing content")?;
-            let create_backup = payload
-                .get("create_backup")
-                .or_else(|| payload.get("createBackup"))
+            let create_backup = payload.get("create_backup").or_else(|| payload.get("createBackup"))
                 .and_then(|v| v.as_bool());
-            crate::save_model_config_internal(content, create_backup).await?;
+            crate::domain::model_config::save_model_config_internal(content, create_backup).await?;
             Ok(Value::Null)
         }
         "export_model_config_content" => {
-            let result = crate::export_model_config_content_internal().await?;
+            let result = crate::domain::model_config::export_model_config_content_internal().await?;
             Ok(Value::String(result))
         }
         "export_model_config_to_path" => {
-            let path = extract_string(payload, "path")?;
-            let result = crate::export_model_config_to_path_internal(path).await?;
+            let path = extract(payload, "path")?;
+            let result = crate::domain::model_config::export_model_config_to_path_internal(path).await?;
             Ok(Value::String(result))
         }
         "import_model_config_content" => {
-            let content = payload
-                .get("content")
-                .and_then(|v| v.as_str())
-                .ok_or("Missing content")?
-                .to_string();
+            let content = payload.get("content").and_then(|v| v.as_str())
+                .ok_or("Missing content")?.to_string();
             let mode = extract_optional_string(payload, "mode");
-            let result = crate::import_model_config_content_internal(content, mode).await?;
+            let result = crate::domain::model_config::import_model_config_content_internal(content, mode).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "import_model_config_from_path" => {
-            let path = extract_string(payload, "path")?;
+            let path = extract(payload, "path")?;
             let mode = extract_optional_string(payload, "mode");
-            let result = crate::import_model_config_from_path_internal(path, mode).await?;
+            let result = crate::domain::model_config::import_model_config_from_path_internal(path, mode).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "create_model_config_backup" => {
             let note = extract_optional_string(payload, "note");
-            let result = crate::create_model_config_backup(note).await?;
+            let result = crate::domain::model_config::create_model_config_backup_internal(note)?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "list_model_config_backups" => {
-            let result = crate::list_model_config_backups().await?;
+            let result = crate::domain::model_config::list_model_config_backups_internal()?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "restore_model_config_backup" => {
-            let id = extract_string(payload, "id")?;
-            crate::restore_model_config_backup(id).await?;
+            let id = extract(payload, "id")?;
+            crate::domain::model_config::restore_model_config_backup_internal(id)?;
             Ok(Value::Null)
         }
         "delete_model_config_backup" => {
-            let id = extract_string(payload, "id")?;
-            crate::delete_model_config_backup(id).await?;
+            let id = extract(payload, "id")?;
+            crate::domain::model_config::delete_model_config_backup_internal(id)?;
             Ok(Value::Null)
         }
         "list_model_config_versions" => {
-            let result = crate::list_model_config_versions_internal().await?;
+            let result = crate::domain::model_config::list_model_config_versions_internal().await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "test_model_http" => {
-            let provider = extract_string(payload, "provider")?;
-            let model = extract_string(payload, "model")?;
+            let provider = extract(payload, "provider")?;
+            let model = extract(payload, "model")?;
             let prompt = extract_optional_string(payload, "prompt");
-            let timeout_ms = payload
-                .get("timeout_ms")
-                .or_else(|| payload.get("timeoutMs"))
+            let timeout_ms = payload.get("timeout_ms").or_else(|| payload.get("timeoutMs"))
                 .and_then(|v| v.as_u64());
-            let result =
-                crate::test_model_http_internal(provider, model, prompt, timeout_ms).await?;
+            let result = crate::domain::model_config::test_model_http_internal(provider, model, prompt, timeout_ms).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
-        "read_resource_file" => {
-            let path = extract_string(payload, "path")?;
-            let scope = extract_string(payload, "scope").unwrap_or_else(|_| "user".to_string());
-            let result = crate::read_resource_file_internal(path, scope).await?;
-            Ok(Value::String(result))
-        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Config versions
+        // ═══════════════════════════════════════════════════════════════
         "list_config_versions" => {
-            let file_path = payload
-                .get("file_path")
-                .and_then(|v| v.as_str())
-                .map(String::from);
+            let file_path = payload.get("file_path").and_then(|v| v.as_str()).map(String::from);
             let result = crate::list_config_versions_internal(file_path).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "get_config_version" => {
-            let id = payload
-                .get("id")
-                .and_then(|v| v.as_i64())
-                .ok_or("Missing id")?;
+            let id = payload.get("id").and_then(|v| v.as_i64()).ok_or("Missing id")?;
             let result = crate::get_config_version_internal(id).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "restore_config_version" => {
-            let id = payload
-                .get("id")
-                .and_then(|v| v.as_i64())
-                .ok_or("Missing id")?;
+            let id = payload.get("id").and_then(|v| v.as_i64()).ok_or("Missing id")?;
             crate::restore_config_version_internal(id).await?;
             Ok(Value::Null)
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // App settings
+        // ═══════════════════════════════════════════════════════════════
         "load_app_settings" => crate::load_app_settings_internal().await,
         "save_app_settings" => {
-            let settings = payload
-                .get("settings")
-                .cloned()
+            let settings = payload.get("settings").cloned()
                 .unwrap_or(Value::Object(Default::default()));
             crate::save_app_settings(settings).await?;
             Ok(Value::Null)
@@ -519,12 +451,8 @@ pub async fn dispatch(
         }
         "save_server_settings" => {
             let settings = serde_json::from_value(
-                payload
-                    .get("settings")
-                    .cloned()
-                    .unwrap_or(Value::Object(Default::default())),
-            )
-            .map_err(|e| format!("Invalid settings: {e}"))?;
+                payload.get("settings").cloned().unwrap_or(Value::Object(Default::default())),
+            ).map_err(|e| format!("Invalid settings: {e}"))?;
             crate::save_server_settings(settings).await?;
             Ok(Value::Null)
         }
@@ -534,13 +462,8 @@ pub async fn dispatch(
         }
         "save_session_paths" => {
             let paths: Vec<String> = serde_json::from_value(
-                payload
-                    .get("paths")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid paths: {e}"))?;
-            // Core logic only (no file watcher restart — GUI handles that in ws_adapter)
+                payload.get("paths").cloned().unwrap_or(Value::Array(vec![])),
+            ).map_err(|e| format!("Invalid paths: {e}"))?;
             crate::save_session_paths_core(paths).await?;
             Ok(Value::Null)
         }
@@ -549,47 +472,47 @@ pub async fn dispatch(
             Ok(serde_json::to_value(result).unwrap())
         }
 
+        // ═══════════════════════════════════════════════════════════════
         // Models
+        // ═══════════════════════════════════════════════════════════════
         "list_models" => {
             let search = extract_optional_string(payload, "search");
             let result = crate::list_models(search).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "test_model" => {
-            let provider = extract_string(payload, "provider")?;
-            let model = extract_string(payload, "model")?;
+            let provider = extract(payload, "provider")?;
+            let model = extract(payload, "model")?;
             let prompt = extract_optional_string(payload, "prompt");
             let result = crate::test_model(provider, model, prompt).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "test_models_batch" => {
             let models: Vec<(String, String)> = serde_json::from_value(
-                payload
-                    .get("models")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid models: {e}"))?;
+                payload.get("models").cloned().unwrap_or(Value::Array(vec![])),
+            ).map_err(|e| format!("Invalid models: {e}"))?;
             let prompt = extract_optional_string(payload, "prompt");
             let result = crate::test_models_batch(models, prompt).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
 
+        // ═══════════════════════════════════════════════════════════════
         // Tags
+        // ═══════════════════════════════════════════════════════════════
         "get_all_tags" => {
             let result = crate::get_all_tags().await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "create_tag" => {
-            let name = extract_string(payload, "name")?;
-            let color = extract_string(payload, "color")?;
+            let name = extract(payload, "name")?;
+            let color = extract(payload, "color")?;
             let icon = extract_optional_string(payload, "icon");
             let parent_id = extract_optional_string(payload, "parentId");
             let result = crate::create_tag(name, color, icon, parent_id).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
         "update_tag" => {
-            let id = extract_string(payload, "id")?;
+            let id = extract(payload, "id")?;
             let name = extract_optional_string(payload, "name");
             let color = extract_optional_string(payload, "color");
             let icon = extract_optional_string(payload, "icon");
@@ -603,7 +526,7 @@ pub async fn dispatch(
             Ok(Value::Null)
         }
         "delete_tag" => {
-            let id = extract_string(payload, "id")?;
+            let id = extract(payload, "id")?;
             crate::delete_tag(id).await?;
             Ok(Value::Null)
         }
@@ -612,53 +535,48 @@ pub async fn dispatch(
             Ok(serde_json::to_value(result).unwrap())
         }
         "assign_tag" => {
-            let session_id = extract_string(payload, "sessionId")?;
-            let tag_id = extract_string(payload, "tagId")?;
+            let session_id = extract(payload, "sessionId")?;
+            let tag_id = extract(payload, "tagId")?;
             crate::assign_tag(session_id, tag_id).await?;
             Ok(Value::Null)
         }
         "remove_tag_from_session" => {
-            let session_id = extract_string(payload, "sessionId")?;
-            let tag_id = extract_string(payload, "tagId")?;
+            let session_id = extract(payload, "sessionId")?;
+            let tag_id = extract(payload, "tagId")?;
             crate::remove_tag_from_session(session_id, tag_id).await?;
             Ok(Value::Null)
         }
         "move_session_tag" => {
-            let session_id = extract_string(payload, "sessionId")?;
+            let session_id = extract(payload, "sessionId")?;
             let from_tag_id = extract_optional_string(payload, "fromTagId");
-            let to_tag_id = extract_string(payload, "toTagId")?;
-            let position = payload
-                .get("position")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0);
+            let to_tag_id = extract(payload, "toTagId")?;
+            let position = payload.get("position").and_then(|v| v.as_i64()).unwrap_or(0);
             crate::move_session_tag(session_id, from_tag_id, to_tag_id, position).await?;
             Ok(Value::Null)
         }
         "reorder_tags" => {
             let tag_ids: Vec<String> = serde_json::from_value(
-                payload
-                    .get("tagIds")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid tagIds: {e}"))?;
+                payload.get("tagIds").cloned().unwrap_or(Value::Array(vec![])),
+            ).map_err(|e| format!("Invalid tagIds: {e}"))?;
             crate::reorder_tags(tag_ids).await?;
             Ok(Value::Null)
         }
         "update_tag_auto_rules" => {
-            let id = extract_string(payload, "id")?;
+            let id = extract(payload, "id")?;
             let auto_rules = extract_optional_string(payload, "autoRules");
             crate::update_tag_auto_rules(id, auto_rules).await?;
             Ok(Value::Null)
         }
         "evaluate_auto_rules" => {
-            let session_id = extract_string(payload, "sessionId")?;
-            let text = extract_string(payload, "text")?;
+            let session_id = extract(payload, "sessionId")?;
+            let text = extract(payload, "text")?;
             let result = crate::evaluate_auto_rules(session_id, text).await?;
             Ok(serde_json::to_value(result).unwrap())
         }
 
+        // ═══════════════════════════════════════════════════════════════
         // Auth / API keys
+        // ═══════════════════════════════════════════════════════════════
         "list_api_keys" => {
             let result = crate::list_api_keys().await?;
             Ok(serde_json::to_value(result).unwrap())
@@ -671,10 +589,14 @@ pub async fn dispatch(
             Ok(serde_json::json!(result))
         }
         "revoke_api_key" => {
-            let key_preview = extract_string(payload, "keyPreview")?;
+            let key_preview = extract(payload, "keyPreview")?;
             crate::revoke_api_key(key_preview).await?;
             Ok(Value::Null)
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Pi agent live sessions
+        // ═══════════════════════════════════════════════════════════════
         "get_pi_live_sessions" => {
             #[cfg(feature = "gui")]
             {
@@ -688,8 +610,8 @@ pub async fn dispatch(
             }
         }
         "get_pi_agent_entries" => {
-            let session_id = extract_string(payload, "session_id")
-                .or_else(|_| extract_string(payload, "sessionId"))?;
+            let session_id = extract(payload, "session_id")
+                .or_else(|_| extract(payload, "sessionId"))?;
             #[cfg(feature = "gui")]
             {
                 let state = app_state.as_ref().ok_or("App state not available")?;
@@ -704,15 +626,11 @@ pub async fn dispatch(
                 Err("pi_agent_get_entries unavailable in CLI mode".to_string())
             }
         }
-
         "pi_agent_steering" => {
-            let session_id = extract_string(payload, "session_id")
-                .or_else(|_| extract_string(payload, "sessionId"))?;
-            let message = extract_string(payload, "message")?;
-            let deliver_as = payload
-                .get("deliver_as")
-                .and_then(|v| v.as_str())
-                .unwrap_or("steer");
+            let session_id = extract(payload, "session_id")
+                .or_else(|_| extract(payload, "sessionId"))?;
+            let message = extract(payload, "message")?;
+            let deliver_as = payload.get("deliver_as").and_then(|v| v.as_str()).unwrap_or("steer");
 
             #[cfg(feature = "gui")]
             {
@@ -728,65 +646,48 @@ pub async fn dispatch(
                 };
                 let _ = state.event_tx.send(event);
             }
-            // In CLI mode the dispatch already forwards steer events via the CLI's
-            // own WsEvent broadcast; nothing extra to do here.
             Ok(serde_json::json!({ "status": "sent" }))
         }
 
-        // Pi agent RPC commands
+        // ═══════════════════════════════════════════════════════════════
+        // Pi agent RPC
+        // ═══════════════════════════════════════════════════════════════
         "pi_agent_set_model" => {
-            let session_id = extract_string(payload, "session_id")
-                .or_else(|_| extract_string(payload, "sessionId"))?;
-            let provider = extract_string(payload, "provider")?;
-            let model_id = extract_string(payload, "model_id")?;
+            let session_id = extract(payload, "session_id")
+                .or_else(|_| extract(payload, "sessionId"))?;
+            let provider = extract(payload, "provider")?;
+            let model_id = extract(payload, "model_id")?;
             #[cfg(feature = "gui")]
             {
                 let state = app_state.as_ref().ok_or("App state not available")?;
                 let command = serde_json::json!({
-                    "type": "set_model",
-                    "sessionId": session_id,
-                    "provider": provider,
-                    "modelId": model_id,
+                    "type": "set_model", "sessionId": session_id, "provider": provider, "modelId": model_id,
                 });
-                state
-                    .pi_agent_registry
-                    .send_rpc(&session_id, command)
-                    .await?;
+                state.pi_agent_registry.send_rpc(&session_id, command).await?;
             }
             Ok(serde_json::json!({ "status": "sent" }))
         }
         "pi_agent_set_thinking" => {
-            let session_id = extract_string(payload, "session_id")
-                .or_else(|_| extract_string(payload, "sessionId"))?;
-            let level = extract_string(payload, "level")?;
+            let session_id = extract(payload, "session_id")
+                .or_else(|_| extract(payload, "sessionId"))?;
+            let level = extract(payload, "level")?;
             #[cfg(feature = "gui")]
             {
                 let state = app_state.as_ref().ok_or("App state not available")?;
                 let command = serde_json::json!({
-                    "type": "set_thinking",
-                    "sessionId": session_id,
-                    "level": level,
+                    "type": "set_thinking", "sessionId": session_id, "level": level,
                 });
-                state
-                    .pi_agent_registry
-                    .send_rpc(&session_id, command)
-                    .await?;
+                state.pi_agent_registry.send_rpc(&session_id, command).await?;
             }
             Ok(serde_json::json!({ "status": "sent" }))
         }
         "pi_agent_get_state" => {
-            let session_id = extract_string(payload, "session_id")?;
+            let session_id = extract(payload, "session_id")?;
             #[cfg(feature = "gui")]
             {
                 let state = app_state.as_ref().ok_or("App state not available")?;
-                let command = serde_json::json!({
-                    "type": "get_state",
-                    "sessionId": session_id,
-                });
-                let result = state
-                    .pi_agent_registry
-                    .send_rpc(&session_id, command)
-                    .await?;
+                let command = serde_json::json!({ "type": "get_state", "sessionId": session_id });
+                let result = state.pi_agent_registry.send_rpc(&session_id, command).await?;
                 Ok(result)
             }
             #[cfg(not(feature = "gui"))]
@@ -795,59 +696,49 @@ pub async fn dispatch(
             }
         }
         "pi_agent_abort" => {
-            let session_id = extract_string(payload, "session_id")?;
+            let session_id = extract(payload, "session_id")?;
             #[cfg(feature = "gui")]
             {
                 let state = app_state.as_ref().ok_or("App state not available")?;
-                let command = serde_json::json!({
-                    "type": "abort",
-                    "sessionId": session_id,
-                });
-                state
-                    .pi_agent_registry
-                    .send_rpc(&session_id, command)
-                    .await?;
+                let command = serde_json::json!({ "type": "abort", "sessionId": session_id });
+                state.pi_agent_registry.send_rpc(&session_id, command).await?;
             }
             Ok(serde_json::json!({ "status": "sent" }))
         }
         "pi_agent_send_message" => {
-            let session_id = extract_string(payload, "session_id")?;
-            let message = extract_string(payload, "message")?;
+            let session_id = extract(payload, "session_id")?;
+            let message = extract(payload, "message")?;
             let images = payload.get("images").cloned();
-            let streaming_behavior = payload
-                .get("streaming_behavior")
-                .and_then(|v| v.as_str())
+            let streaming_behavior = payload.get("streaming_behavior").and_then(|v| v.as_str())
                 .map(|s| s.to_string());
             #[cfg(feature = "gui")]
             {
                 let state = app_state.as_ref().ok_or("App state not available")?;
                 let command = serde_json::json!({
-                    "type": "prompt",
-                    "sessionId": session_id,
-                    "message": message,
-                    "images": images,
-                    "streamingBehavior": streaming_behavior.unwrap_or_else(|| "steer".to_string()),
+                    "type": "prompt", "sessionId": session_id, "message": message,
+                    "images": images, "streamingBehavior": streaming_behavior.unwrap_or_else(|| "steer".to_string()),
                 });
-                state
-                    .pi_agent_registry
-                    .send_rpc(&session_id, command)
-                    .await?;
+                state.pi_agent_registry.send_rpc(&session_id, command).await?;
             }
             Ok(serde_json::json!({ "status": "sent" }))
         }
 
+        // ═══════════════════════════════════════════════════════════════
         // Desktop/GUI-only commands
+        // ═══════════════════════════════════════════════════════════════
         "terminal_create"
         | "terminal_write"
         | "terminal_resize"
         | "terminal_close"
         | "get_default_shell"
-        | "get_available_shells" => Err(format!(
-            "Command '{command}' requires GUI mode (terminal not available in CLI)"
-        )),
-        "open_session_in_browser" => Err("open_session_in_browser is desktop-only".to_string()),
-        "open_session_in_terminal" => Err("open_session_in_terminal is desktop-only".to_string()),
-        "toggle_devtools" => Err("toggle_devtools is not supported via WebSocket".to_string()),
+        | "get_available_shells" =>
+            Err(format!("Command '{command}' requires GUI mode (terminal not available in CLI)")),
+        "open_session_in_browser" =>
+            Err("open_session_in_browser is desktop-only".to_string()),
+        "open_session_in_terminal" =>
+            Err("open_session_in_terminal is desktop-only".to_string()),
+        "toggle_devtools" =>
+            Err("toggle_devtools is not supported via WebSocket".to_string()),
 
         _ => Err(format!("Unknown command: {command}")),
     }

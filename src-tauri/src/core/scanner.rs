@@ -10,7 +10,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::RwLock;
 use tokio::time::{interval, Duration as TokioDuration};
 use tracing::{debug, error, info, trace, warn};
 
@@ -21,12 +21,12 @@ fn is_corruption_error(err: &str) -> bool {
         || err.contains("vtable constructor failed")
 }
 
-static SCAN_CACHE: Mutex<Option<Vec<SessionInfo>>> = Mutex::new(None);
+static SCAN_CACHE: RwLock<Option<Vec<SessionInfo>>> = RwLock::new(None);
 static CACHE_VERSION: AtomicU64 = AtomicU64::new(0);
 
 /// Invalidate the scan cache so the next scan re-reads all directories
 pub fn invalidate_cache() {
-    if let Ok(mut guard) = SCAN_CACHE.lock() {
+    if let Ok(mut guard) = SCAN_CACHE.write() {
         *guard = None;
         CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
     }
@@ -36,7 +36,7 @@ pub fn invalidate_cache() {
 pub fn get_session_digest() -> (u64, usize) {
     let version = CACHE_VERSION.load(Ordering::Relaxed);
     let count = SCAN_CACHE
-        .lock()
+        .read()
         .ok()
         .and_then(|g| g.as_ref().map(|v| v.len()))
         .unwrap_or(0);
@@ -46,7 +46,7 @@ pub fn get_session_digest() -> (u64, usize) {
 /// Snapshot cached sessions without forcing a rescan.
 /// Returns None when cache is not initialized yet.
 pub fn get_cached_sessions() -> Option<Vec<SessionInfo>> {
-    SCAN_CACHE.lock().ok().and_then(|g| g.as_ref().cloned())
+    SCAN_CACHE.read().ok().and_then(|g| g.as_ref().cloned())
 }
 
 fn clone_session_for_list(session: &SessionInfo) -> SessionInfo {
@@ -71,7 +71,7 @@ fn clone_session_for_list(session: &SessionInfo) -> SessionInfo {
 /// Snapshot cached sessions optimized for list/pagination APIs.
 /// Drops heavy conversation blobs to reduce clone cost and memory pressure.
 pub fn get_cached_sessions_for_list() -> Option<Vec<SessionInfo>> {
-    SCAN_CACHE.lock().ok().and_then(|guard| {
+    SCAN_CACHE.read().ok().and_then(|guard| {
         guard
             .as_ref()
             .map(|sessions| sessions.iter().map(clone_session_for_list).collect())
@@ -130,7 +130,7 @@ fn expand_tilde(path: &str) -> String {
 
 pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
     // Return cached list if available — file_watcher keeps it fresh
-    if let Ok(guard) = SCAN_CACHE.lock() {
+    if let Ok(guard) = SCAN_CACHE.read() {
         if let Some(ref cached) = *guard {
             return Ok(cached.clone());
         }
@@ -140,12 +140,112 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
     let config = Config::load().unwrap_or_default();
     let result = scan_sessions_with_config(&config).await?;
 
-    if let Ok(mut guard) = SCAN_CACHE.lock() {
+    if let Ok(mut guard) = SCAN_CACHE.write() {
         *guard = Some(result.clone());
         CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
     }
 
     Ok(result)
+}
+
+/// Collect all JSONL file paths from all session directories
+fn collect_jsonl_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for sessions_dir in all_dirs {
+        if !sessions_dir.exists() {
+            continue;
+        }
+        if let Ok(entries) = fs::read_dir(sessions_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    // Skip non-pi-session directories
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        if name == "transcripts" || name == "subagent-artifacts" {
+                            continue;
+                        }
+                    }
+                    if let Ok(sub_entries) = fs::read_dir(&path) {
+                        for file in sub_entries.flatten() {
+                            let file_path = file.path();
+                            if file_path
+                                .extension()
+                                .map(|ext| ext == "jsonl")
+                                .unwrap_or(false)
+                            {
+                                files.push(file_path);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    files
+}
+
+/// Parsed result from a single file
+#[derive(Clone)]
+struct ParsedFileResult {
+    info: SessionInfo,
+    entries: Vec<SessionEntry>,
+    file_modified: DateTime<Utc>,
+    path_str: String,
+}
+
+/// Parallel scan all JSONL files using tokio tasks
+/// Strategy: Parse files in parallel (pure CPU work), return results for caller to handle DB
+async fn parallel_parse_files(files: Vec<PathBuf>) -> Vec<ParsedFileResult> {
+    use tokio::task::JoinSet;
+
+    let mut set = JoinSet::new();
+
+    // Spawn parsing tasks - each task is independent and Send-safe
+    for file_path in files {
+        set.spawn(async move {
+            let path_str = file_path.to_string_lossy().to_string();
+            let metadata = fs::metadata(&file_path);
+            let file_modified: DateTime<Utc> = match metadata {
+                Ok(m) => DateTime::from(
+                    m.modified().unwrap_or(std::time::SystemTime::now()),
+                ),
+                Err(e) => {
+                    warn!("Failed to get metadata for {}: {}", path_str, e);
+                    return None;
+                }
+            };
+
+            // Parse the file
+            match parse_session_info(&file_path) {
+                Ok((info, entries)) => Some(ParsedFileResult {
+                    info,
+                    entries,
+                    file_modified,
+                    path_str,
+                }),
+                Err(e) => {
+                    warn!("Failed to parse {}: {}", path_str, e);
+                    None
+                }
+            }
+        });
+    }
+
+    // Collect all results
+    let mut parsed_results: Vec<ParsedFileResult> = Vec::new();
+    while let Some(result) = set.join_next().await {
+        match result {
+            Ok(Some(data)) => {
+                parsed_results.push(data);
+            }
+            Ok(None) => {} // Skipped due to error
+            Err(e) => {
+                warn!("Task join error: {}", e);
+            }
+        }
+    }
+
+    parsed_results
 }
 
 pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInfo>, String> {
@@ -157,13 +257,13 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
     loop {
         attempt += 1;
         // Initialize database connection (may fail if corrupted)
-        let conn = match crate::data::sqlite::init_db_with_config(config) {
+        let conn = match sqlite::init_db_with_config(config) {
             Ok(conn) => conn,
             Err(e) => {
                 if is_corruption_error(&e) && attempt <= MAX_RETRIES {
                     warn!("[Recovery] Database init failed (corruption suspected): {}. Attempting to recover...", e);
                     // Attempt to delete corrupted DB and retry
-                    if let Ok(db_path) = crate::data::sqlite::get_db_path() {
+                    if let Ok(db_path) = sqlite::get_db_path() {
                         let _ = std::fs::remove_file(&db_path);
                     }
                     continue;
@@ -173,152 +273,64 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             }
         };
 
-        // Perform the scan with error handling
-        let scan_result = (|| -> Result<Vec<SessionInfo>, String> {
-            let mut sessions: Vec<SessionInfo> = vec![];
+        // Collect all files first
+        let files = collect_jsonl_files(&all_dirs);
+        let total_files = files.len();
+        info!("Collected {} JSONL files for scanning", total_files);
 
-            for sessions_dir in &all_dirs {
-                if !sessions_dir.exists() {
-                    continue;
-                }
+        // Parse files in parallel (no conn reference in async block)
+        let parsed_results = parallel_parse_files(files).await;
 
-                let entries = match fs::read_dir(sessions_dir) {
-                    Ok(e) => e,
-                    Err(e) => {
-                        log::warn!("Failed to read sessions directory {sessions_dir:?}: {e}");
-                        continue;
-                    }
-                };
+        // Process results: separate realtime vs historical, upsert to DB
+        let mut realtime_sessions: Vec<SessionInfo> = Vec::new();
 
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir() {
-                        // Skip non-pi-session directories (gateway transcripts, subagent artifacts, etc.)
-                        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                            if name == "transcripts" || name == "subagent-artifacts" {
-                                continue;
-                            }
-                        }
-                        if let Ok(files) = fs::read_dir(&path) {
-                            for file in files.flatten() {
-                                let file_path = file.path();
-                                if file_path
-                                    .extension()
-                                    .map(|ext| ext == "jsonl")
-                                    .unwrap_or(false)
-                                {
-                                    let path_str = file_path.to_string_lossy().to_string();
-
-                                    let metadata = fs::metadata(&file_path);
-                                    let file_modified: DateTime<Utc> = match metadata {
-                                        Ok(m) => DateTime::from(
-                                            m.modified().unwrap_or(std::time::SystemTime::now()),
-                                        ),
-                                        Err(_) => continue,
-                                    };
-
-                                    if file_modified > realtime_cutoff {
-                                        // Recent file: parse from disk, add to results, buffer for DB
-                                        if let Ok((info, _entries)) = parse_session_info(&file_path)
-                                        {
-                                            sessions.push(info);
-                                            crate::core::write_buffer::buffer_session_write(
-                                                sessions.last().unwrap(),
-                                                file_modified,
-                                            );
-                                        }
-                                    } else if let Some(cached_mtime) =
-                                        crate::data::sqlite::get_cached_file_modified(
-                                            &conn, &path_str,
-                                        )?
-                                    {
-                                        // In DB: re-parse only if file changed since last cache
-                                        if file_modified > cached_mtime {
-                                            if let Ok((info, entries)) =
-                                                parse_session_info(&file_path)
-                                            {
-                                                if let Err(e) = crate::data::sqlite::upsert_session(
-                                                    &conn,
-                                                    &info,
-                                                    file_modified,
-                                                    Some(&entries),
-                                                ) {
-                                                    error!(
-                                                        "Failed to upsert cached session {}: {}",
-                                                        path_str, e
-                                                    );
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        // Not in DB (cold start): parse and write directly to DB
-                                        if let Ok((info, entries)) = parse_session_info(&file_path)
-                                        {
-                                            if let Err(e) = crate::data::sqlite::upsert_session(
-                                                &conn,
-                                                &info,
-                                                file_modified,
-                                                Some(&entries),
-                                            ) {
-                                                error!(
-                                                    "Failed to upsert new session {} (cold start): {}",
-                                                    path_str, e
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Load all historical sessions from DB (now populated for cold start too)
-            let historical_sessions =
-                crate::data::sqlite::get_sessions_modified_before(&conn, realtime_cutoff)?;
-
-            for session in historical_sessions {
-                if !sessions.iter().any(|s| s.path == session.path) {
-                    sessions.push(session);
-                }
-            }
-
-            sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
-
-            let realtime_count = sessions
-                .iter()
-                .filter(|s| s.modified > realtime_cutoff)
-                .count();
-            let historical_count = sessions.len() - realtime_count;
-
-            info!(
-                "Scan complete: {} realtime (≤{}d), {} historical (>{}d), {} total",
-                realtime_count,
-                config.realtime_cutoff_days,
-                historical_count,
-                config.realtime_cutoff_days,
-                sessions.len()
-            );
-
-            Ok(sessions)
-        })();
-
-        match scan_result {
-            Ok(sessions) => break Ok(sessions),
-            Err(e) => {
-                if is_corruption_error(&e) && attempt <= MAX_RETRIES {
-                    warn!("[Recovery] Database corruption detected during scan: {}. Dropping connection and retrying...", e);
-                    // Connection will be dropped at end of loop iteration; delete DB and retry
-                    if let Ok(db_path) = crate::data::sqlite::get_db_path() {
-                        let _ = std::fs::remove_file(&db_path);
-                    }
-                    continue;
-                } else {
-                    return Err(e);
+        for result in parsed_results {
+            if result.file_modified > realtime_cutoff {
+                // Realtime file: add to results, buffer for DB
+                realtime_sessions.push(result.info.clone());
+                write_buffer::buffer_session_write(&result.info, result.file_modified);
+            } else {
+                // Historical file: upsert to DB
+                if let Err(e) = sqlite::upsert_session(
+                    &conn,
+                    &result.info,
+                    result.file_modified,
+                    Some(&result.entries),
+                ) {
+                    error!("Failed to upsert historical session {}: {}", result.path_str, e);
                 }
             }
         }
+
+        // Load historical sessions from DB
+        let historical_sessions = sqlite::get_sessions_modified_before(&conn, realtime_cutoff)?;
+
+        // Merge results, avoiding duplicates
+        let mut all_sessions = realtime_sessions;
+        for session in historical_sessions {
+            if !all_sessions.iter().any(|s| s.path == session.path) {
+                all_sessions.push(session);
+            }
+        }
+
+        all_sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+
+        let realtime_count = all_sessions
+            .iter()
+            .filter(|s| s.modified > realtime_cutoff)
+            .count();
+        let historical_count = all_sessions.len() - realtime_count;
+
+        info!(
+            "Parallel scan complete: {} realtime (≤{}d), {} historical (>{}d), {} total",
+            realtime_count,
+            config.realtime_cutoff_days,
+            historical_count,
+            config.realtime_cutoff_days,
+            all_sessions.len()
+        );
+
+        break Ok(all_sessions);
     }
 }
 
@@ -367,70 +379,81 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
     let mut entries = Vec::new();
 
     // Stream read remaining lines to reduce memory usage
-    for line_result in lines {
+    for (line_num, line_result) in lines.enumerate() {
+        let line_num = line_num + 2; // +2 because header is line 1
         let line = match line_result {
             Ok(l) => l,
-            Err(_) => continue,
+            Err(e) => {
+                warn!("Failed to read line {} in {}: {}", line_num, path.display(), e);
+                continue;
+            }
         };
 
         if line.trim().is_empty() {
             continue;
         }
 
-        if let Ok(entry) = serde_json::from_str::<Value>(&line) {
-            if entry["type"] == "session_info" {
-                if let Some(n) = entry["name"].as_str() {
-                    name = Some(n.trim().to_string());
-                }
+        let entry: Value = match serde_json::from_str(&line) {
+            Ok(e) => e,
+            Err(e) => {
+                warn!("Failed to parse JSON at line {} in {}: {}", line_num, path.display(), e);
+                trace!("Problematic line content: {}", &line[..line.len().min(200)]);
+                continue;
             }
+        };
 
-            if entry["type"] == "message" {
-                let role = entry["message"]["role"].as_str().unwrap_or("");
-                if role == "user" || role == "assistant" {
-                    message_count += 1;
+        if entry["type"] == "session_info" {
+            if let Some(n) = entry["name"].as_str() {
+                name = Some(n.trim().to_string());
+            }
+        }
 
-                    let text = extract_primary_message_text(&entry);
-                    if !text.is_empty() {
-                        all_messages.push(text.clone());
-                        if first_message.is_empty() && role == "user" {
-                            first_message = text.chars().take(100).collect();
-                        }
-                        // Update last message
-                        last_message = text.chars().take(150).collect();
-                        last_message_role = role.to_string();
+        if entry["type"] == "message" {
+            let role = entry["message"]["role"].as_str().unwrap_or("");
+            if role == "user" || role == "assistant" {
+                message_count += 1;
 
-                        // Collect user and assistant message text
-                        if role == "user" {
-                            user_messages.push(text.clone());
-                        } else if role == "assistant" {
-                            assistant_messages.push(text.clone());
-                        }
-
-                        // Build SessionEntry for message_entries table
-                        let entry_id = entry["id"].as_str().unwrap_or("").to_string();
-                        let timestamp_str = entry["timestamp"].as_str().unwrap_or("");
-                        let timestamp = parse_timestamp(timestamp_str)?;
-
-                        let normalized_content = extract_message_contents(&entry, true)
-                            .into_iter()
-                            .map(|(content_type, value)| Content {
-                                content_type,
-                                text: Some(value),
-                            })
-                            .collect();
-
-                        let session_entry = SessionEntry {
-                            entry_type: "message".to_string(),
-                            id: entry_id,
-                            parent_id: None,
-                            timestamp,
-                            message: Some(Message {
-                                role: role.to_string(),
-                                content: normalized_content,
-                            }),
-                        };
-                        entries.push(session_entry);
+                let text = extract_primary_message_text(&entry);
+                if !text.is_empty() {
+                    all_messages.push(text.clone());
+                    if first_message.is_empty() && role == "user" {
+                        first_message = text.chars().take(100).collect();
                     }
+                    // Update last message
+                    last_message = text.chars().take(150).collect();
+                    last_message_role = role.to_string();
+
+                    // Collect user and assistant message text
+                    if role == "user" {
+                        user_messages.push(text.clone());
+                    } else if role == "assistant" {
+                        assistant_messages.push(text.clone());
+                    }
+
+                    // Build SessionEntry for message_entries table
+                    let entry_id = entry["id"].as_str().unwrap_or("").to_string();
+                    let timestamp_str = entry["timestamp"].as_str().unwrap_or("");
+                    let timestamp = parse_timestamp(timestamp_str)?;
+
+                    let normalized_content = extract_message_contents(&entry, true)
+                        .into_iter()
+                        .map(|(content_type, value)| Content {
+                            content_type,
+                            text: Some(value),
+                        })
+                        .collect();
+
+                    let session_entry = SessionEntry {
+                        entry_type: "message".to_string(),
+                        id: entry_id,
+                        parent_id: None,
+                        timestamp,
+                        message: Some(Message {
+                            role: role.to_string(),
+                            content: normalized_content,
+                        }),
+                    };
+                    entries.push(session_entry);
                 }
             }
         }
@@ -477,7 +500,7 @@ fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, String> {
 
 /// Incremental update: re-parse changed files, update cache, return diff for frontend merge.
 pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<SessionsDiff, String> {
-    let mut sessions = if let Ok(guard) = SCAN_CACHE.lock() {
+    let mut sessions = if let Ok(guard) = SCAN_CACHE.read() {
         guard.clone().unwrap_or_default()
     } else {
         vec![]
@@ -503,7 +526,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             sessions.retain(|s| s.path != *path_str);
             if sessions.len() != before {
                 diff.removed.push(path_str.clone());
-                log::info!("Session removed (file deleted): {path_str}");
+                info!("Session removed (file deleted): {path_str}");
             }
             continue;
         }
@@ -512,14 +535,17 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             Ok((info, entries)) => {
                 let file_modified = match fs::metadata(&path).and_then(|m| m.modified()) {
                     Ok(mt) => DateTime::from(mt),
-                    Err(_) => continue,
+                    Err(e) => {
+                        warn!("Failed to get metadata for {}: {}", path_str, e);
+                        continue;
+                    }
                 };
 
                 // Ensure session row exists (also populates message_entries via insert_message_entries)
                 if let Err(e) =
                     crate::data::sqlite::upsert_session(&conn, &info, file_modified, Some(&entries))
                 {
-                    log::warn!("Failed to upsert session for {}: {}", info.path, e);
+                    warn!("Failed to upsert session for {}: {}", info.path, e);
                 }
 
                 // Buffer for stats cache updates (periodic flush)
@@ -534,20 +560,20 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                 }
             }
             Err(e) => {
-                log::warn!("Failed to re-parse {path_str}: {e}");
+                warn!("Failed to re-parse {}: {}", path_str, e);
             }
         }
     }
 
     if !diff.updated.is_empty() || !diff.removed.is_empty() {
         sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
-        if let Ok(mut guard) = SCAN_CACHE.lock() {
+        if let Ok(mut guard) = SCAN_CACHE.write() {
             *guard = Some(sessions);
             CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
         }
     }
 
-    log::info!(
+    info!(
         "Incremental rescan: {} updated, {} removed",
         diff.updated.len(),
         diff.removed.len()
@@ -614,41 +640,50 @@ impl ScannerScheduler {
     async fn scan_and_update(&self) -> Result<String, String> {
         let start = std::time::Instant::now();
 
-        let conn = sqlite::init_db_with_config(&self.config)?;
+        let all_dirs = get_all_session_dirs(&self.config);
+        let files = collect_jsonl_files(&all_dirs);
+        let total_files = files.len();
 
+        if total_files == 0 {
+            return Ok("No files to scan".to_string());
+        }
+
+        let conn = sqlite::init_db_with_config(&self.config)?;
+        let realtime_cutoff = Utc::now() - Duration::days(self.config.realtime_cutoff_days);
+
+        // Use parallel parse
+        let parsed_results = parallel_parse_files(files).await;
+
+        // Process and upsert to DB
+        let mut sessions: Vec<SessionInfo> = Vec::with_capacity(parsed_results.len());
         let mut updated = 0;
         let mut added = 0;
         let mut skipped = 0;
 
-        let all_dirs = get_all_session_dirs(&self.config);
+        for result in parsed_results {
+            let path_str = &result.path_str;
+            let file_modified = result.file_modified;
+            let cached_mtime = sqlite::get_cached_file_modified(&conn, path_str)?;
 
-        for sessions_dir in &all_dirs {
-            if !sessions_dir.exists() {
-                continue;
+            match cached_mtime {
+                Some(cached) if file_modified <= cached => {
+                    skipped += 1;
+                }
+                Some(_) => {
+                    sqlite::upsert_session(&conn, &result.info, file_modified, Some(&result.entries))?;
+                    updated += 1;
+                }
+                None => {
+                    sqlite::upsert_session(&conn, &result.info, file_modified, Some(&result.entries))?;
+                    added += 1;
+                }
             }
 
-            if let Ok(entries) = fs::read_dir(sessions_dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir() {
-                        if let Ok(files) = fs::read_dir(&path) {
-                            for file in files.flatten() {
-                                let file_path = file.path();
-                                if file_path
-                                    .extension()
-                                    .map(|ext| ext == "jsonl")
-                                    .unwrap_or(false)
-                                {
-                                    match self.process_file(&conn, &file_path)? {
-                                        FileUpdateResult::Updated => updated += 1,
-                                        FileUpdateResult::Added => added += 1,
-                                        FileUpdateResult::Skipped => skipped += 1,
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+            sessions.push(result.info);
+
+            // Buffer realtime files for stats
+            if file_modified > realtime_cutoff {
+                write_buffer::buffer_session_write(&sessions.last().unwrap(), file_modified);
             }
         }
 
@@ -661,41 +696,6 @@ impl ScannerScheduler {
         Ok(format!(
             "Scanned: +{added} added, ~{updated} updated, {skipped} skipped"
         ))
-    }
-
-    fn process_file(
-        &self,
-        conn: &rusqlite::Connection,
-        file_path: &std::path::Path,
-    ) -> Result<FileUpdateResult, String> {
-        let path_str = file_path.to_string_lossy().to_string();
-
-        let metadata =
-            fs::metadata(file_path).map_err(|e| format!("Failed to get metadata: {e}"))?;
-        let file_modified = DateTime::from(
-            metadata
-                .modified()
-                .map_err(|e| format!("Failed to get modified time: {e}"))?,
-        );
-
-        let cached_mtime = sqlite::get_cached_file_modified(conn, &path_str)?;
-
-        if let Some(cached) = cached_mtime {
-            if file_modified <= cached {
-                return Ok(FileUpdateResult::Skipped);
-            }
-        }
-
-        if let Ok((info, entries)) = parse_session_info(file_path) {
-            sqlite::upsert_session(conn, &info, file_modified, Some(&entries))?;
-            return Ok(if cached_mtime.is_some() {
-                FileUpdateResult::Updated
-            } else {
-                FileUpdateResult::Added
-            });
-        }
-
-        Ok(FileUpdateResult::Skipped)
     }
 
     async fn auto_cleanup(&self) -> Result<String, String> {
