@@ -7,7 +7,7 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
-use tracing::{error, info, warn};
+use tracing::{debug, error, warn};
 
 /// File watcher state that can be managed by Tauri
 pub struct FileWatcherState {
@@ -66,12 +66,12 @@ impl FileWatcher {
             return Err("No existing paths to watch".to_string());
         }
 
-        info!(
+        debug!(
             "Starting file watcher for {} directories:",
             unique_paths.len()
         );
         for path in &unique_paths {
-            info!("  - {:?}", path);
+            debug!("  - {:?}", path);
         }
 
         // Create event channel
@@ -101,7 +101,7 @@ impl FileWatcher {
             }
         }
 
-        info!(
+        debug!(
             "File watcher started successfully (3s debounce + batch merge) for {} dirs",
             unique_paths.len()
         );
@@ -149,7 +149,7 @@ pub fn restart_watcher_with_config(
     let config = crate::config::load_config().unwrap_or_default();
     let all_dirs = crate::core::scanner::get_all_session_dirs(&config);
 
-    info!(
+    debug!(
         "Restarting file watcher with {} directories",
         all_dirs.len()
     );
@@ -193,7 +193,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                     }
 
                     if !pending_paths.is_empty() {
-                        info!(
+                        debug!(
                             "Detected .jsonl file changes: {} files (batching...)",
                             pending_paths.len()
                         );
@@ -216,7 +216,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                 .map(|p| p.to_string_lossy().to_string())
                 .collect();
 
-            info!("Incremental rescan: {} changed files", changed.len());
+            debug!("Incremental rescan: {} changed files", changed.len());
 
             // Update backend cache, get diff
             match rt.block_on(crate::core::scanner::rescan_changed_files(changed)) {
