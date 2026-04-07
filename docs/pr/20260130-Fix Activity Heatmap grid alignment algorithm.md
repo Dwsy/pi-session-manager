@@ -99,7 +99,7 @@ git revert <commit-hash>
 
 ### 1. 修复网格布局算法
 
-**问题：** 
+**问题：**
 - 原算法使用错误的索引计算方式：`dayIndex = week * daysPerWeek + dayOfWeek`，然后 `adjustedIndex = dayIndex - startDayOfWeek`
 - 这导致数据错位，日期与星期几不匹配
 - 开始日期计算错误，不是从星期日开始
@@ -127,7 +127,7 @@ const dateStr = cellDate.toISOString().split('T')[0]
 const point = dataMap.get(dateStr) || null
 ```
 
-**影响范围：** 
+**影响范围：**
 - Activity Heatmap 组件的显示逻辑
 - 不影响后端数据统计
 

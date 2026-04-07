@@ -1,7 +1,7 @@
 # 硬编码中文扫描总结
 
-**扫描日期**: 2026-02-13  
-**扫描工具**: ripgrep (rg)  
+**扫描日期**: 2026-02-13
+**扫描工具**: ripgrep (rg)
 **扫描范围**: src/ 目录（排除 i18n/locales/）
 
 ---
@@ -24,7 +24,7 @@
 
 **问题**: 所有搜索插件的 name 和 description 都是硬编码中文
 
-**影响**: 
+**影响**:
 - 用户界面无法切换语言
 - 英文用户看到中文插件名称
 - 搜索关键词包含中文，影响英文用户体验
@@ -81,7 +81,7 @@
 - 代码维护困难
 - 不确定是否还在使用
 
-**修复**: 
+**修复**:
 1. 检查调用点
 2. 如果未使用，删除函数
 3. 如果使用，重构为 i18n
@@ -155,11 +155,11 @@
 // 修改 BaseSearchPlugin
 abstract class BaseSearchPlugin implements SearchPlugin {
   protected context?: SearchContext
-  
+
   constructor(context?: SearchContext) {
     this.context = context
   }
-  
+
   abstract get name(): string
   abstract get description(): string
 }

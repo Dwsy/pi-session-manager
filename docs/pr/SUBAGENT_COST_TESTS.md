@@ -1,7 +1,7 @@
 # Subagent Cost Feature - Test Report
 
-**Date**: 2026-02-27  
-**Feature**: PR #9 - Roll up subagent costs into dashboard stats  
+**Date**: 2026-02-27
+**Feature**: PR #9 - Roll up subagent costs into dashboard stats
 **Status**: ✅ All Tests Passing
 
 ---
@@ -50,7 +50,7 @@
 
 #### ✅ `test_aggregate_multiple_runs`
 - **Purpose**: Verify aggregation across different agents and models
-- **Validates**: 
+- **Validates**:
   - Total cost calculation: $0.21 (0.01 + 0.05 + 0.15)
   - Total tokens: 23,500
   - Per-agent grouping (scout: 1 run, worker: 2 runs)
@@ -59,7 +59,7 @@
 
 #### ✅ `test_scan_subagent_artifacts`
 - **Purpose**: Verify directory scanning functionality
-- **Validates**: 
+- **Validates**:
   - Scans `subagent-artifacts/` directories
   - Parses multiple `*_meta.json` files
   - Aggregates across different agent types (scout, worker, reviewer)
@@ -68,7 +68,7 @@
 
 #### ✅ `test_subagent_file_modification`
 - **Purpose**: Verify re-scanning picks up file changes
-- **Validates**: 
+- **Validates**:
   - Initial scan reads original values
   - Modified file is re-read on subsequent scan
   - Model change detected (sonnet → opus)
@@ -76,7 +76,7 @@
 
 #### ✅ `test_full_subagent_scanning_integration`
 - **Purpose**: Full integration test with realistic session structure
-- **Validates**: 
+- **Validates**:
   - Session directory structure
   - Multiple subagent runs (scout + worker)
   - Cost aggregation: $0.15
@@ -85,14 +85,14 @@
 
 #### ✅ `test_empty_subagent_directory`
 - **Purpose**: Verify graceful handling of empty directories
-- **Validates**: 
+- **Validates**:
   - No panic on empty `subagent-artifacts/`
   - Returns zero-valued `SubagentSummary`
 - **Result**: Pass
 
 #### ✅ `test_multiple_session_directories`
 - **Purpose**: Verify aggregation across multiple sessions
-- **Validates**: 
+- **Validates**:
   - Scans multiple session directories
   - Correctly aggregates across projects
   - Per-agent distribution (scout: 1, worker: 2, reviewer: 1)
@@ -101,7 +101,7 @@
 
 #### ✅ `test_malformed_meta_json_graceful_handling`
 - **Purpose**: Verify error tolerance for corrupted files
-- **Validates**: 
+- **Validates**:
   - Skips invalid JSON files
   - Continues processing valid files
   - No panic or crash

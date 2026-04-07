@@ -1,7 +1,7 @@
 # 硬编码中文审计报告
 
-**Date**: 2026-02-13  
-**Status**: 🔍 Audit Complete  
+**Date**: 2026-02-13
+**Status**: 🔍 Audit Complete
 **Priority**: P1 (High)
 
 ## 概述
@@ -52,9 +52,9 @@ return { field: 'appearance.sidebarWidth', message: '侧边栏宽度必须在 20
 **修复方案**:
 ```typescript
 // 需要传入 t 函数或使用全局 i18n
-return { 
-  field: 'terminal.piCommandPath', 
-  message: t('settings.validation.piCommandPathRequired', 'Pi 命令路径不能为空') 
+return {
+  field: 'terminal.piCommandPath',
+  message: t('settings.validation.piCommandPathRequired', 'Pi 命令路径不能为空')
 }
 ```
 
@@ -71,8 +71,8 @@ return value ? '启用' : '禁用'
 
 **修复方案**:
 ```typescript
-return value 
-  ? t('common.enabled', '启用') 
+return value
+  ? t('common.enabled', '启用')
   : t('common.disabled', '禁用')
 ```
 
@@ -147,11 +147,11 @@ class SessionSearchPlugin extends BaseSearchPlugin {
   get name() {
     return this.context?.t('plugins.session.name', '会话搜索') || '会话搜索'
   }
-  
+
   get description() {
     return this.context?.t('plugins.session.description', '搜索会话名称和元数据') || '搜索会话名称和元数据'
   }
-  
+
   keywords = ['session', 'file', 'conversation', '会话', '文件', '对话']
 }
 ```
@@ -186,16 +186,16 @@ return `${Math.floor(days / 365)} 年前`
 // 使用 i18n 的相对时间格式化
 formatRelativeTime(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
-  
+
   if (seconds < 60) {
     return this.context.t('time.justNow', '刚刚')
   }
-  
+
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) {
     return this.context.t('time.minutesAgo', '{{count}} 分钟前', { count: minutes })
   }
-  
+
   // ... 更多
 }
 ```
@@ -372,7 +372,7 @@ export const time = {
 
 ### 1. utils/settings.ts 重构
 
-**问题**: 
+**问题**:
 - `getSettingDisplayName()` 函数可能已废弃
 - 验证函数无法访问 i18n
 

@@ -1,7 +1,7 @@
 # i18n: Advanced Settings & Locale-aware Tag Initialization
 
-**Date**: 2026-02-13  
-**Status**: ✅ Completed  
+**Date**: 2026-02-13
+**Status**: ✅ Completed
 **Related Issues**: User feedback on missing i18n and tag localization
 
 ## Summary
@@ -24,7 +24,7 @@ Fixed two i18n-related issues:
 - Session directory configuration
 - All existing advanced settings labels
 
-**Before**: Hard-coded Chinese text in `AdvancedSettings.tsx`  
+**Before**: Hard-coded Chinese text in `AdvancedSettings.tsx`
 **After**: Full i18n support with `t('settings.advanced.*')` keys
 
 ### 2. Locale-aware Tag Initialization (Backend)

@@ -2,8 +2,8 @@
 
 ## ✅ 测试状态：全部通过
 
-**测试时间**: 2026-02-27  
-**测试范围**: 后端 Rust 代码  
+**测试时间**: 2026-02-27
+**测试范围**: 后端 Rust 代码
 **通过率**: 15/15 (100%)
 
 ---
@@ -146,7 +146,7 @@ sqlite3 ~/.pi/agent/sessions/sessions.db "SELECT COUNT(*) FROM subagent_meta_cac
    ```bash
    # 检查是否有 subagent 运行
    ls -la ~/.pi/agent/sessions/*/subagent-artifacts/
-   
+
    # 查看实际的 meta.json 内容
    cat ~/.pi/agent/sessions/*/subagent-artifacts/*_meta.json | head -50
    ```

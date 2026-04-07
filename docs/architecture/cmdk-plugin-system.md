@@ -179,27 +179,27 @@ src/
  */
 export interface SearchPlugin {
   // ========== 元数据 ==========
-  
+
   /** 插件唯一标识 */
   id: string
-  
+
   /** 插件显示名称 */
   name: string
-  
+
   /** 插件图标组件 */
   icon: React.ComponentType<{ className?: string }>
-  
+
   /** 插件描述 */
   description: string
-  
+
   /** 搜索关键词（用于插件匹配） */
   keywords: string[]
-  
+
   /** 优先级（0-100，越高越优先显示） */
   priority: number
-  
+
   // ========== 核心方法 ==========
-  
+
   /**
    * 执行搜索
    * @param query 搜索查询
@@ -210,7 +210,7 @@ export interface SearchPlugin {
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]>
-  
+
   /**
    * 处理结果选中
    * @param result 选中的结果
@@ -220,26 +220,26 @@ export interface SearchPlugin {
     result: SearchPluginResult,
     context: SearchContext
   ): void
-  
+
   // ========== 可选方法 ==========
-  
+
   /**
    * 自定义结果项渲染
    * @param result 搜索结果
    * @returns 自定义 React 节点
    */
   renderItem?(result: SearchPluginResult): React.ReactNode
-  
+
   /**
    * 插件挂载时调用
    */
   onMount?(): void
-  
+
   /**
    * 插件卸载时调用
    */
   onUnmount?(): void
-  
+
   /**
    * 判断插件是否可用
    * @param context 搜索上下文
@@ -254,29 +254,29 @@ export interface SearchPlugin {
  */
 export interface SearchContext {
   // ========== 数据 ==========
-  
+
   /** 所有会话列表 */
   sessions: SessionInfo[]
-  
+
   /** 当前选中的项目 */
   selectedProject: string | null
-  
+
   /** 当前选中的会话 */
   selectedSession: SessionInfo | null
-  
+
   // ========== 方法 ==========
-  
+
   /** 设置选中的会话 */
   setSelectedSession: (session: SessionInfo | null) => void
-  
+
   /** 设置选中的项目 */
   setSelectedProject: (project: string | null) => void
-  
+
   /** 关闭命令面板 */
   closeCommandMenu: () => void
-  
+
   // ========== 工具 ==========
-  
+
   /** 国际化翻译函数 */
   t: (key: string, options?: any) => string
 }
@@ -287,28 +287,28 @@ export interface SearchContext {
 export interface SearchPluginResult {
   /** 结果唯一标识 */
   id: string
-  
+
   /** 所属插件 ID */
   pluginId: string
-  
+
   /** 主标题 */
   title: string
-  
+
   /** 副标题 */
   subtitle?: string
-  
+
   /** 描述 */
   description?: string
-  
+
   /** 图标 */
   icon?: React.ReactNode
-  
+
   /** 元数据（插件自定义） */
   metadata?: Record<string, any>
-  
+
   /** 匹配分数（0-1） */
   score: number
-  
+
   /** 高亮范围 */
   highlights?: HighlightRange[]
 }
@@ -335,7 +335,7 @@ export interface HighlightRange {
  */
 export class PluginRegistry {
   private plugins: Map<string, SearchPlugin> = new Map()
-  
+
   /**
    * 注册插件
    * @param plugin 搜索插件
@@ -345,13 +345,13 @@ export class PluginRegistry {
     if (this.plugins.has(plugin.id)) {
       throw new Error(`Plugin with id "${plugin.id}" already registered`)
     }
-    
+
     this.plugins.set(plugin.id, plugin)
     plugin.onMount?.()
-    
+
     console.log(`[PluginRegistry] Registered plugin: ${plugin.id}`)
   }
-  
+
   /**
    * 注销插件
    * @param pluginId 插件 ID
@@ -364,7 +364,7 @@ export class PluginRegistry {
       console.log(`[PluginRegistry] Unregistered plugin: ${pluginId}`)
     }
   }
-  
+
   /**
    * 获取插件
    * @param pluginId 插件 ID
@@ -373,7 +373,7 @@ export class PluginRegistry {
   get(pluginId: string): SearchPlugin | undefined {
     return this.plugins.get(pluginId)
   }
-  
+
   /**
    * 获取所有插件
    * @returns 插件数组（按优先级排序）
@@ -382,18 +382,18 @@ export class PluginRegistry {
     return Array.from(this.plugins.values())
       .sort((a, b) => b.priority - a.priority)
   }
-  
+
   /**
    * 获取可用插件
    * @param context 搜索上下文
    * @returns 可用插件数组
    */
   getEnabled(context: SearchContext): SearchPlugin[] {
-    return this.getAll().filter(plugin => 
+    return this.getAll().filter(plugin =>
       plugin.isEnabled ? plugin.isEnabled(context) : true
     )
   }
-  
+
   /**
    * 执行搜索
    * @param query 搜索查询
@@ -407,9 +407,9 @@ export class PluginRegistry {
     if (!query.trim()) {
       return []
     }
-    
+
     const enabledPlugins = this.getEnabled(context)
-    
+
     // 并行执行所有插件的搜索
     const results = await Promise.all(
       enabledPlugins.map(async plugin => {
@@ -427,7 +427,7 @@ export class PluginRegistry {
         }
       })
     )
-    
+
     // 合并并排序结果
     return results
       .flat()
@@ -454,9 +454,9 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
   abstract icon: React.ComponentType<{ className?: string }>
   abstract description: string
   abstract keywords: string[]
-  
+
   priority: number = 50 // 默认优先级
-  
+
   /**
    * 抽象搜索方法，子类必须实现
    */
@@ -464,43 +464,43 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]>
-  
+
   /**
    * 默认选中处理（可覆盖）
    */
   onSelect(result: SearchPluginResult, context: SearchContext): void {
     console.log(`[${this.id}] Selected:`, result)
   }
-  
+
   /**
    * 默认启用检查（可覆盖）
    */
   isEnabled(context: SearchContext): boolean {
     return true
   }
-  
+
   /**
    * 工具方法：模糊匹配
    */
   protected fuzzyMatch(query: string, text: string): number {
     const lowerQuery = query.toLowerCase()
     const lowerText = text.toLowerCase()
-    
+
     // 精确匹配
     if (lowerText === lowerQuery) return 1.0
-    
+
     // 包含匹配
     if (lowerText.includes(lowerQuery)) {
       const position = lowerText.indexOf(lowerQuery)
       const positionScore = 1 - (position / lowerText.length)
       return 0.8 * positionScore
     }
-    
+
     // 模糊匹配（字符顺序）
     let queryIndex = 0
     let textIndex = 0
     let matches = 0
-    
+
     while (queryIndex < lowerQuery.length && textIndex < lowerText.length) {
       if (lowerQuery[queryIndex] === lowerText[textIndex]) {
         matches++
@@ -508,14 +508,14 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
       }
       textIndex++
     }
-    
+
     if (matches === lowerQuery.length) {
       return 0.5 * (matches / lowerText.length)
     }
-    
+
     return 0
   }
-  
+
   /**
    * 工具方法：计算高亮范围
    */
@@ -527,7 +527,7 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
     const lowerQuery = query.toLowerCase()
     const lowerText = text.toLowerCase()
     const highlights: HighlightRange[] = []
-    
+
     let index = lowerText.indexOf(lowerQuery)
     while (index !== -1) {
       highlights.push({
@@ -537,7 +537,7 @@ export abstract class BaseSearchPlugin implements SearchPlugin {
       })
       index = lowerText.indexOf(lowerQuery, index + 1)
     }
-    
+
     return highlights
   }
 }
@@ -559,7 +559,7 @@ import CommandMenu from './CommandMenu'
 
 export default function CommandPalette() {
   const { isOpen, close, open } = useCommandMenu()
-  
+
   // 全局快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -568,13 +568,13 @@ export default function CommandPalette() {
         open()
       }
     }
-    
+
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open])
-  
+
   if (!isOpen) return null
-  
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
@@ -614,9 +614,9 @@ export default function CommandMenu() {
     isSearching,
     close
   } = useCommandMenu()
-  
+
   const { registry } = useSearchPlugins()
-  
+
   // 按插件分组结果
   const groupedResults = results.reduce((acc, result) => {
     if (!acc[result.pluginId]) {
@@ -625,7 +625,7 @@ export default function CommandMenu() {
     acc[result.pluginId].push(result)
     return acc
   }, {} as Record<string, SearchPluginResult[]>)
-  
+
   return (
     <Command
       className="w-full"
@@ -647,19 +647,19 @@ export default function CommandMenu() {
           ESC
         </kbd>
       </div>
-      
+
       {/* 结果列表 */}
       <Command.List className="max-h-[50vh] overflow-y-auto p-2">
         {isSearching && <CommandLoading />}
-        
+
         {!isSearching && results.length === 0 && query && (
           <CommandEmpty query={query} />
         )}
-        
+
         {!isSearching && Object.entries(groupedResults).map(([pluginId, pluginResults]) => {
           const plugin = registry.get(pluginId)
           if (!plugin) return null
-          
+
           return (
             <Command.Group
               key={pluginId}
@@ -715,7 +715,7 @@ export default function CommandItem({ result, plugin, onSelect }: CommandItemPro
       </Command.Item>
     )
   }
-  
+
   // 默认渲染
   return (
     <Command.Item
@@ -730,21 +730,21 @@ export default function CommandItem({ result, plugin, onSelect }: CommandItemPro
             {result.icon}
           </div>
         )}
-        
+
         {/* 内容 */}
         <div className="flex-1 min-w-0">
           {/* 标题 */}
           <div className="text-sm font-medium text-foreground truncate">
             {highlightText(result.title, result.highlights, 'title')}
           </div>
-          
+
           {/* 副标题 */}
           {result.subtitle && (
             <div className="text-xs text-muted-foreground truncate mt-0.5">
               {highlightText(result.subtitle, result.highlights, 'subtitle')}
             </div>
           )}
-          
+
           {/* 描述 */}
           {result.description && (
             <div className="text-xs text-muted-foreground line-clamp-2 mt-1">
@@ -752,7 +752,7 @@ export default function CommandItem({ result, plugin, onSelect }: CommandItemPro
             </div>
           )}
         </div>
-        
+
         {/* 分数（开发模式） */}
         {process.env.NODE_ENV === 'development' && (
           <div className="flex-shrink-0 text-xs text-muted-foreground">
@@ -780,7 +780,7 @@ interface CommandEmptyProps {
 
 export default function CommandEmpty({ query }: CommandEmptyProps) {
   const { t } = useTranslation()
-  
+
   return (
     <Command.Empty className="flex flex-col items-center justify-center py-12 text-center">
       <SearchX className="w-12 h-12 text-muted-foreground/50 mb-3" />
@@ -805,7 +805,7 @@ import { useTranslation } from 'react-i18next'
 
 export default function CommandLoading() {
   const { t } = useTranslation()
-  
+
   return (
     <div className="flex items-center justify-center py-12">
       <Loader2 className="w-6 h-6 text-muted-foreground animate-spin mr-2" />
@@ -859,7 +859,7 @@ const useCommandMenuStore = create<CommandMenuStore>((set) => ({
   results: [],
   isSearching: false,
   selectedIndex: 0,
-  
+
   // Actions
   open: () => set({ isOpen: true }),
   close: () => set({ isOpen: false, query: '', results: [], selectedIndex: 0 }),
@@ -882,26 +882,26 @@ export function useCommandMenu() {
   const { search } = useSearchPlugins()
   const debounceRef = useRef<NodeJS.Timeout>()
   const abortControllerRef = useRef<AbortController>()
-  
+
   // 防抖搜索
   const debouncedSearch = useCallback(async (query: string) => {
     // 取消之前的搜索
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
-    
+
     if (!query.trim()) {
       store.setResults([])
       store.setIsSearching(false)
       return
     }
-    
+
     store.setIsSearching(true)
-    
+
     try {
       abortControllerRef.current = new AbortController()
       const results = await search(query)
-      
+
       if (!abortControllerRef.current.signal.aborted) {
         store.setResults(results)
       }
@@ -915,24 +915,24 @@ export function useCommandMenu() {
       }
     }
   }, [search, store])
-  
+
   // 监听查询变化
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
     }
-    
+
     debounceRef.current = setTimeout(() => {
       debouncedSearch(store.query)
     }, 300)
-    
+
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current)
       }
     }
   }, [store.query, debouncedSearch])
-  
+
   // 清理
   useEffect(() => {
     return () => {
@@ -941,7 +941,7 @@ export function useCommandMenu() {
       }
     }
   }, [])
-  
+
   return store
 }
 ```
@@ -958,7 +958,7 @@ import { useSearchCache } from './useSearchCache'
 
 export function useSearchPlugins() {
   const cache = useSearchCache()
-  
+
   // 构建搜索上下文
   const context = useMemo<SearchContext>(() => ({
     sessions: [], // 从 App 传入
@@ -969,7 +969,7 @@ export function useSearchPlugins() {
     closeCommandMenu: () => {},
     t: (key: string) => key
   }), [])
-  
+
   // 执行搜索
   const search = useCallback(async (query: string): Promise<SearchPluginResult[]> => {
     // 检查缓存
@@ -978,17 +978,17 @@ export function useSearchPlugins() {
       console.log('[useSearchPlugins] Cache hit:', query)
       return cached
     }
-    
+
     // 执行搜索
     console.log('[useSearchPlugins] Searching:', query)
     const results = await pluginRegistry.search(query, context)
-    
+
     // 缓存结果
     cache.set(query, results)
-    
+
     return results
   }, [context, cache])
-  
+
   return {
     registry: pluginRegistry,
     search
@@ -1014,38 +1014,38 @@ const CACHE_TTL = 5 * 60 * 1000 // 5 分钟
 
 export function useSearchCache() {
   const cacheRef = useRef<Map<string, CacheEntry>>(new Map())
-  
+
   const get = (query: string): SearchPluginResult[] | null => {
     const entry = cacheRef.current.get(query)
-    
+
     if (!entry) return null
-    
+
     // 检查是否过期
     if (Date.now() - entry.timestamp > CACHE_TTL) {
       cacheRef.current.delete(query)
       return null
     }
-    
+
     return entry.results
   }
-  
+
   const set = (query: string, results: SearchPluginResult[]): void => {
     // LRU: 如果缓存满了，删除最旧的
     if (cacheRef.current.size >= CACHE_SIZE) {
       const firstKey = cacheRef.current.keys().next().value
       cacheRef.current.delete(firstKey)
     }
-    
+
     cacheRef.current.set(query, {
       results,
       timestamp: Date.now()
     })
   }
-  
+
   const clear = (): void => {
     cacheRef.current.clear()
   }
-  
+
   return { get, set, clear }
 }
 ```
@@ -1072,7 +1072,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
   description = 'Search in user messages and assistant responses'
   keywords = ['message', 'content', 'text', 'conversation']
   priority = 80
-  
+
   async search(
     query: string,
     context: SearchContext
@@ -1086,9 +1086,9 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
         roleFilter: 'all',
         includeTools: false
       })
-      
+
       // 转换为插件结果格式
-      return results.flatMap(result => 
+      return results.flatMap(result =>
         result.matches.map(match => ({
           id: `${result.session_id}-${match.entry_id}`,
           pluginId: this.id,
@@ -1111,13 +1111,13 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       return []
     }
   }
-  
+
   onSelect(result: SearchPluginResult, context: SearchContext): void {
     // 导航到对应的会话
     const session = context.sessions.find(
       s => s.id === result.metadata?.sessionId
     )
-    
+
     if (session) {
       context.setSelectedSession(session)
       context.closeCommandMenu()
@@ -1143,25 +1143,25 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
   description = 'Search in projects'
   keywords = ['project', 'folder', 'directory']
   priority = 70
-  
+
   async search(
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]> {
     // 从 sessions 中提取项目列表
     const projectMap = new Map<string, number>()
-    
+
     context.sessions.forEach(session => {
       const project = session.cwd
       projectMap.set(project, (projectMap.get(project) || 0) + 1)
     })
-    
+
     // 搜索匹配的项目
     const results: SearchPluginResult[] = []
-    
+
     for (const [project, count] of projectMap.entries()) {
       const score = this.fuzzyMatch(query, project)
-      
+
       if (score > 0) {
         results.push({
           id: `project-${project}`,
@@ -1179,14 +1179,14 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
         })
       }
     }
-    
+
     return results.sort((a, b) => b.score - a.score)
   }
-  
+
   onSelect(result: SearchPluginResult, context: SearchContext): void {
     // 切换到项目视图
     const project = result.metadata?.project
-    
+
     if (project) {
       context.setSelectedProject(project)
       context.closeCommandMenu()
@@ -1212,28 +1212,28 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
   description = 'Search in session names and metadata'
   keywords = ['session', 'file', 'conversation']
   priority = 60
-  
+
   async search(
     query: string,
     context: SearchContext
   ): Promise<SearchPluginResult[]> {
     const results: SearchPluginResult[] = []
-    
+
     for (const session of context.sessions) {
       // 搜索会话名称
-      const nameScore = session.name 
+      const nameScore = session.name
         ? this.fuzzyMatch(query, session.name)
         : 0
-      
+
       // 搜索第一条消息
       const messageScore = this.fuzzyMatch(query, session.first_message)
-      
+
       // 搜索路径
       const pathScore = this.fuzzyMatch(query, session.path) * 0.5
-      
+
       // 综合分数
       const score = Math.max(nameScore, messageScore, pathScore)
-      
+
       if (score > 0) {
         results.push({
           id: `session-${session.id}`,
@@ -1253,14 +1253,14 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
         })
       }
     }
-    
+
     return results.sort((a, b) => b.score - a.score)
   }
-  
+
   onSelect(result: SearchPluginResult, context: SearchContext): void {
     // 打开会话
     const session = result.metadata?.session
-    
+
     if (session) {
       context.setSelectedSession(session)
       context.closeCommandMenu()
@@ -1291,25 +1291,25 @@ export function highlightText(
   if (!highlights || highlights.length === 0) {
     return text
   }
-  
+
   // 过滤当前字段的高亮
   const fieldHighlights = highlights
     .filter(h => h.field === field)
     .sort((a, b) => a.start - b.start)
-  
+
   if (fieldHighlights.length === 0) {
     return text
   }
-  
+
   const parts: React.ReactNode[] = []
   let lastIndex = 0
-  
+
   fieldHighlights.forEach((highlight, i) => {
     // 添加非高亮部分
     if (highlight.start > lastIndex) {
       parts.push(text.slice(lastIndex, highlight.start))
     }
-    
+
     // 添加高亮部分
     parts.push(
       <mark
@@ -1319,15 +1319,15 @@ export function highlightText(
         {text.slice(highlight.start, highlight.end)}
       </mark>
     )
-    
+
     lastIndex = highlight.end
   })
-  
+
   // 添加剩余部分
   if (lastIndex < text.length) {
     parts.push(text.slice(lastIndex))
   }
-  
+
   return <>{parts}</>
 }
 ```
@@ -1342,15 +1342,15 @@ export function highlightText(
  */
 export function calculateSimilarity(a: string, b: string): number {
   const matrix: number[][] = []
-  
+
   for (let i = 0; i <= b.length; i++) {
     matrix[i] = [i]
   }
-  
+
   for (let j = 0; j <= a.length; j++) {
     matrix[0][j] = j
   }
-  
+
   for (let i = 1; i <= b.length; i++) {
     for (let j = 1; j <= a.length; j++) {
       if (b.charAt(i - 1) === a.charAt(j - 1)) {
@@ -1364,10 +1364,10 @@ export function calculateSimilarity(a: string, b: string): number {
       }
     }
   }
-  
+
   const distance = matrix[b.length][a.length]
   const maxLength = Math.max(a.length, b.length)
-  
+
   return 1 - distance / maxLength
 }
 
@@ -1391,20 +1391,20 @@ export function calculateTfIdf(
 ): number {
   const queryTokens = tokenize(query)
   const docTokens = tokenize(document)
-  
+
   let score = 0
-  
+
   for (const token of queryTokens) {
     // TF: 词频
     const tf = docTokens.filter(t => t === token).length / docTokens.length
-    
+
     // IDF: 逆文档频率
     const df = corpus.filter(doc => tokenize(doc).includes(token)).length
     const idf = Math.log(corpus.length / (df + 1))
-    
+
     score += tf * idf
   }
-  
+
   return score
 }
 ```
@@ -1432,17 +1432,17 @@ const VIRTUAL_THRESHOLD = 50
 
 export default function CommandList({ results, onSelect }: CommandListProps) {
   const parentRef = useRef<HTMLDivElement>(null)
-  
+
   // 只有超过阈值才使用虚拟滚动
   const useVirtual = results.length > VIRTUAL_THRESHOLD
-  
+
   const virtualizer = useVirtualizer({
     count: results.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 60, // 估计每项高度
     enabled: useVirtual
   })
-  
+
   if (!useVirtual) {
     // 直接渲染
     return (
@@ -1457,7 +1457,7 @@ export default function CommandList({ results, onSelect }: CommandListProps) {
       </div>
     )
   }
-  
+
   // 虚拟滚动渲染
   return (
     <div ref={parentRef} className="max-h-[50vh] overflow-y-auto">
@@ -1502,14 +1502,14 @@ export default function CommandList({ results, onSelect }: CommandListProps) {
  */
 export class PerformanceMonitor {
   private marks: Map<string, number> = new Map()
-  
+
   /**
    * 开始计时
    */
   start(label: string): void {
     this.marks.set(label, performance.now())
   }
-  
+
   /**
    * 结束计时并输出
    */
@@ -1519,14 +1519,14 @@ export class PerformanceMonitor {
       console.warn(`[Performance] No start mark for "${label}"`)
       return 0
     }
-    
+
     const duration = performance.now() - start
     console.log(`[Performance] ${label}: ${duration.toFixed(2)}ms`)
-    
+
     this.marks.delete(label)
     return duration
   }
-  
+
   /**
    * 测量函数执行时间
    */
@@ -1758,12 +1758,12 @@ function App() {
   useEffect(() => {
     registerBuiltinPlugins()
   }, [])
-  
+
   return (
     <>
       {/* 现有组件 */}
       <div>...</div>
-      
+
       {/* 命令面板 */}
       <CommandPalette />
     </>

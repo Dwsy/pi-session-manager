@@ -1,7 +1,7 @@
 # i18n 覆盖率补全完成
 
-**日期**: 2026-02-13  
-**状态**: ✅ Phase 1 完成  
+**日期**: 2026-02-13
+**状态**: ✅ Phase 1 完成
 **工作量**: 2 小时
 
 ---
@@ -64,11 +64,11 @@ class SessionSearchPlugin extends BaseSearchPlugin {
   get name(): string {
     return this.context?.t('plugins.session.name') || '会话搜索'
   }
-  
+
   get description(): string {
     return this.context?.t('plugins.session.description') || '搜索会话名称和元数据'
   }
-  
+
   async search(query: string, context: SearchContext) {
     this.setContext(context) // 保存 context
     // ...

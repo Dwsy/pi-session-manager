@@ -1,7 +1,7 @@
 # 硬编码中文扫描结果
 
-**扫描时间**: 2026-02-13  
-**扫描范围**: src/ 目录（排除 locales/）  
+**扫描时间**: 2026-02-13
+**扫描范围**: src/ 目录（排除 locales/）
 **总行数**: 655 行包含中文字符
 
 ---
@@ -118,7 +118,7 @@ class SessionSearchPlugin extends BaseSearchPlugin {
   get name() {
     return this.context?.t('plugins.session.name', '会话搜索') || '会话搜索'
   }
-  
+
   get description() {
     return this.context?.t('plugins.session.description', '搜索会话名称和元数据') || '搜索会话名称和元数据'
   }

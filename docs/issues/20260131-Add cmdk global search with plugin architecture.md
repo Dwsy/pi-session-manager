@@ -181,16 +181,16 @@ export interface SearchPlugin {
   description: string
   keywords: string[]
   priority: number
-  
+
   // 搜索方法
   search(query: string, context: SearchContext): Promise<SearchPluginResult[]>
-  
+
   // 选中处理
   onSelect(result: SearchPluginResult, context: SearchContext): void
-  
+
   // 自定义渲染（可选）
   renderItem?(result: SearchPluginResult): React.ReactNode
-  
+
   // 生命周期（可选）
   onMount?(): void
   onUnmount?(): void
@@ -218,7 +218,7 @@ export interface SearchPluginResult {
 // plugins/registry.ts
 export class PluginRegistry {
   private plugins: Map<string, SearchPlugin>
-  
+
   register(plugin: SearchPlugin): void
   unregister(pluginId: string): void
   get(pluginId: string): SearchPlugin | undefined

@@ -77,9 +77,9 @@ setError(t('settings.error.loadFailed', '加载失败'))
 return { field: 'xxx', message: '不能为空' }
 
 // ✅ After
-return { 
-  field: 'xxx', 
-  message: t('settings.validation.xxxRequired', '不能为空') 
+return {
+  field: 'xxx',
+  message: t('settings.validation.xxxRequired', '不能为空')
 }
 ```
 
