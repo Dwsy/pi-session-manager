@@ -1,8 +1,10 @@
 pub mod commands;
 pub mod core;
 pub mod data;
+pub mod domain;
 pub mod server;
 pub mod types;
+pub mod utils;
 
 // Infrastructure (stay at root)
 pub mod api_readonly;

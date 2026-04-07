@@ -204,7 +204,7 @@ export default function HeatmapDayModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="absolute inset-0 bg-background/68 backdrop-blur-[1.5px]"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 

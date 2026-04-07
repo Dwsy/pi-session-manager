@@ -39,7 +39,7 @@ struct WsResponse {
     compressed: Option<bool>,
 }
 
-use crate::dispatch::{extract_string, extract_usize};
+use crate::utils::payload::{extract_string, extract_usize};
 
 pub struct WsAdapter {
     app_state: SharedAppState,
