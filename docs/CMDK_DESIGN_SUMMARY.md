@@ -94,11 +94,11 @@ interface SearchPlugin {
   description: string
   keywords: string[]
   priority: number
-  
+
   // Core methods
   search(query: string, context: SearchContext): Promise<SearchPluginResult[]>
   onSelect(result: SearchPluginResult, context: SearchContext): void
-  
+
   // Optional methods
   renderItem?(result: SearchPluginResult): React.ReactNode
   isEnabled?(context: SearchContext): boolean

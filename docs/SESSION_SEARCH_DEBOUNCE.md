@@ -1,1 +1,61 @@
-# Session Search Debounce Implementation## SummaryAdded debounce functionality to the session search input to prevent excessive search operations on every keystroke.## Changes### File: `src/components/session-viewer/SessionViewerSearchBar.tsx`**Added:**- `debounceRef: useRef<NodeJS.Timeout>()` - Stores the debounce timer reference- Cleanup effect to clear timer on component unmount- Debounce logic in `onChange` handler with 200ms delay**Implementation Details:**```typescriptonChange={(event) => {  const value = event.target.value;  // Debounce search to avoid excessive operations on every keystroke  if (debounceRef.current) {    clearTimeout(debounceRef.current);  }  debounceRef.current = setTimeout(() => {    onSearchChange(value);  }, 200);}}```## Behavior**Before:**- Every keystroke triggered an immediate search operation- Could cause performance issues with large sessions- Excessive re-renders and computations**After:**- Search is triggered 200ms after the user stops typing- Previous pending searches are cancelled when new input arrives- Clear button and keyboard shortcuts (Enter, Escape) still work immediately- UI remains responsive (input value updates instantly)## Testing- ✅ TypeScript compilation passes- ✅ No type errors- ✅ Follows existing debounce patterns in codebase (SearchPanel.tsx, useFileWatcher.ts)## Related Files- `src/components/SearchPanel.tsx` - Similar debounce implementation (200ms)- `src/hooks/useFileWatcher.ts` - File watcher with debounce (2000ms)- `src/hooks/useSessionViewerInMessageSearch.ts` - Search hook that processes query## Notes> 「速度は力なり、しかし制御なければ無意味」>> *"Speed is power, but meaningless without control"*The 200ms debounce delay strikes a balance between:- **Responsiveness**: Fast enough to feel instant- **Performance**: Slow enough to batch rapid keystrokes- **User Experience**: Search triggers when user pauses, not on every character
+# Session Search Debounce Implementation
+
+## Summary
+
+Added debounce functionality to the session search input to prevent excessive search operations on every keystroke.
+
+## Changes
+
+### File: `src/components/session-viewer/SessionViewerSearchBar.tsx`
+
+**Added:**
+- `debounceRef: useRef<NodeJS.Timeout>()` - Stores the debounce timer reference
+- Cleanup effect to clear timer on component unmount
+- Debounce logic in `onChange` handler with 200ms delay
+
+**Implementation Details:**
+```typescript
+onChange={(event) => {
+  const value = event.target.value;
+  // Debounce search to avoid excessive operations on every keystroke
+  if (debounceRef.current) {
+    clearTimeout(debounceRef.current);
+  }
+  debounceRef.current = setTimeout(() => {
+    onSearchChange(value);
+  }, 200);
+}}
+```
+
+## Behavior
+
+**Before:**
+- Every keystroke triggered an immediate search operation
+- Could cause performance issues with large sessions
+- Excessive re-renders and computations
+
+**After:**
+- Search is triggered 200ms after the user stops typing
+- Previous pending searches are cancelled when new input arrives
+- Clear button and keyboard shortcuts (Enter, Escape) still work immediately
+- UI remains responsive (input value updates instantly)
+
+## Testing
+- ✅ TypeScript compilation passes
+- ✅ No type errors
+- ✅ Follows existing debounce patterns in codebase (SearchPanel.tsx, useFileWatcher.ts)
+
+## Related Files
+- `src/components/SearchPanel.tsx` - Similar debounce implementation (200ms)
+- `src/hooks/useFileWatcher.ts` - File watcher with debounce (2000ms)
+- `src/hooks/useSessionViewerInMessageSearch.ts` - Search hook that processes query
+
+## Notes
+> 「はなり、しかしなければ」
+
+> *"Speed is power, but meaningless without control"*
+
+The 200ms debounce delay strikes a balance between:
+- **Responsiveness**: Fast enough to feel instant
+- **Performance**: Slow enough to batch rapid keystrokes
+- **User Experience**: Search triggers when user pauses, not on every character

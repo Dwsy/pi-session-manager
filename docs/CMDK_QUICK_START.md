@@ -88,7 +88,7 @@ interface SearchPlugin {
   name: string                   // Display name
   icon: React.ComponentType      // Icon
   priority: number               // Priority (0-100)
-  
+
   // Core methods
   search(query, context): Promise<SearchPluginResult[]>
   onSelect(result, context): void
@@ -112,7 +112,7 @@ class MyPlugin extends BaseSearchPlugin {
   name = 'My Plugin'
   icon = MyIcon
   priority = 50
-  
+
   // 2. Implement search
   async search(query: string, context: SearchContext) {
     // Your search logic
@@ -125,7 +125,7 @@ class MyPlugin extends BaseSearchPlugin {
       }
     ]
   }
-  
+
   // 3. Implement selection handler
   onSelect(result: SearchPluginResult, context: SearchContext) {
     // Your handler logic
@@ -323,7 +323,7 @@ function App() {
   useEffect(() => {
     registerBuiltinPlugins()
   }, [])
-  
+
   return (
     <>
       {/* Existing components */}

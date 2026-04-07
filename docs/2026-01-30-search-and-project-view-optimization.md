@@ -1,1 +1,219 @@
-# 搜索和项目视图优化记录**日期**: 2026-01-30**目标**: 解决搜索功能 UI/UX 难用和性能慢的问题---## 问题诊断### 用户反馈- UI/UX 难用- 搜索慢- 扫描 1962 个文件每次都要重新扫描### 性能问题1. **扫描慢**: 每次都扫描所有 1962 个文件，耗时 ~15 秒2. **搜索慢**: 每次搜索都重新读取所有文件3. **UI 复杂**: 搜索模式、角色过滤太多选项---## 解决方案### 1. 增量扫描 (性能优化)#### 新增文件- `src-tauri/src/cache.rs`: 缓存管理#### 实现原理```rust// 缓存结构struct CacheEntry {    path: String,    modified: DateTime<Utc>,    session: SessionInfo,}// 扫描逻辑1. 加载缓存2. 遍历所有文件3. 只重新解析新增或修改的文件4. 保存缓存```#### 性能提升| 操作 | 优化前 | 优化后 ||------|--------|--------|| 首次加载 | ~15秒 | ~15秒 || 刷新加载 | ~15秒 | **<1秒** || 增量扫描 | 扫描 1962 文件 | 只扫描 3 文件 |#### 缓存文件- 位置: `~/.pi/agent/sessions/session_cache.json`- 格式: JSON---### 2. 搜索优化#### 后端修改- 改用 OR 逻辑（任意词匹配即可）- 利用 `all_messages_text` 快速过滤- 每个会话最多返回 5 条匹配#### 前端简化- 移除 Name/Content 模式切换- 移除 User/Assistant/All 角色过滤- 只保留一个简单搜索框- 防抖从 300ms 减少到 200ms#### 搜索响应| 操作 | 优化前 | 优化后 ||------|--------|--------|| 搜索响应 | ~2-5秒 | **<500ms** |---### 3. 项目视图 (新增功能)#### 新增组件- `src/components/ProjectList.tsx`: 项目列表视图#### 两级导航```第一级: 项目列表  - 显示所有项目  - 每个项目显示: 名称、会话数、消息数、最后活动时间  - 点击项目 → 进入第二级第二级: 项目内会话  - 只显示该项目的会话  - 标题显示项目名称  - "← Back" 按钮返回  - Esc 键返回```#### 三种视图模式| 图标 | 模式 | 说明 ||------|------|------|| ☰ | List | 所有会话按时间排序 || 📁 | Directory | 按目录分组，可展开/折叠 || 📂 | Project | 两级项目导航 |#### 默认视图- 应用启动默认显示 Project 视图---## 代码修改清单### 新增文件- `src-tauri/src/cache.rs`: 缓存管理- `src/components/ProjectList.tsx`: 项目列表组件### 修改文件- `src-tauri/src/lib.rs`: 添加 cache 模块- `src-tauri/src/scanner.rs`: 实现增量扫描- `src-tauri/src/search.rs`: 搜索优化- `src-tauri/src/stats.rs`: 简化统计逻辑- `src-tauri/src/commands.rs`: 命令处理- `src/components/SearchPanel.tsx`: 简化搜索面板- `src/components/SessionList.tsx`: 更新列表组件- `src/components/SessionListByDirectory.tsx`: 更新目录列表- `src/App.tsx`: 添加项目视图逻辑---## 性能对比总结| 指标 | 优化前 | 优化后 | 提升 ||------|--------|--------|------|| 首次加载 | 15s | 15s | - || 刷新加载 | 15s | <1s | **15x** || 搜索响应 | 2-5s | <500ms | **4-10x** || 增量扫描 | 1962 文件 | 3 文件 | **654x** |---## 使用说明### 搜索1. 输入关键词自动搜索（200ms 防抖）2. 支持多词搜索（OR 逻辑）3. 点击结果查看会话详情### 项目导航1. 默认显示项目列表2. 点击项目进入查看该项目的会话3. 点击 "← Back" 或按 `Esc` 返回4. 点击顶部图标切换视图模式### 键盘快捷键- `Cmd/Ctrl + R`: 刷新会话列表- `Cmd/Ctrl + F`: 聚焦搜索框- `Cmd/Ctrl + Shift + S`: 打开统计面板- `Esc`: 清除搜索 / 返回上一级---## 已知问题1. 缓存文件可能很大（1962 个会话）2. 删除会话后缓存可能不准确（下次刷新会修正）3. 搜索结果没有高亮显示4. 没有搜索历史---## 未来改进### 性能- [ ] 使用 Tantivy 建立倒排索引- [ ] 并行扫描和搜索- [ ] LRU 缓存搜索结果### UI/UX- [ ] 搜索结果高亮- [ ] 搜索历史- [ ] 高级过滤器（日期、模型等）- [ ] 键盘导航（上下箭头选择）### 功能- [ ] 模糊搜索- [ ] 正则表达式支持- [ ] 拼音搜索- [ ] 语义搜索---## 测试命令```bash# 开发模式npm run tauri:dev# 构建npm run tauri:build```---## 缓存管理### 清除缓存```bashrm ~/.pi/agent/sessions/session_cache.json```### 查看缓存```bashcat ~/.pi/agent/sessions/session_cache.json | jq '.sessions | length'```---## 相关文档- [PROJECT_SUMMARY.md](../PROJECT_SUMMARY.md)- [SYSTEM_DESIGN.md](../SYSTEM_DESIGN.md)- [README.md](../README.md)
+# Search and Project View Optimization Record
+
+**Date**: 2026-01-30
+
+**Goal**: Solve search feature UI/UX usability issues and slow performance problems
+
+---
+
+## Problem Diagnosis
+
+### User Feedback
+- UI/UX hard to use
+- Slow search
+- Scanning 1962 files takes time every time
+
+### Performance Issues
+
+1. **Slow scanning**: Every scan of all 1962 files takes ~15 seconds
+2. **Slow search**: Every search re-reads all files
+3. **Complex UI**: Too many options for search mode and role filtering
+
+---
+
+## Solutions
+
+### 1. Incremental Scanning (Performance Optimization)
+
+#### New Files
+- `src-tauri/src/cache.rs`: Cache management
+
+#### Implementation
+```rust
+// Cache structure
+struct CacheEntry {
+    path: String,
+    modified: DateTime<Utc>,
+    session: SessionInfo,
+}
+
+// Scanning logic
+1. Load cache
+2. Iterate all files
+3. Only re-parse new or modified files
+4. Save cache
+```
+
+#### Performance Improvement
+| Operation | Before | After |
+|-----------|--------|-------|
+| First load | ~15s | ~15s |
+| Refresh load | ~15s | **<1s** |
+| Incremental scan | Scan 1962 files | Only scan 3 files |
+
+#### Cache File
+- Location: `~/.pi/agent/sessions/session_cache.json`
+- Format: JSON
+
+---
+
+### 2. Search Optimization
+
+#### Backend Changes
+- Changed to OR logic (any word match)
+- Use `all_messages_text` for fast filtering
+- Return max 5 matches per session
+
+#### Frontend Simplification
+- Removed Name/Content mode toggle
+- Removed User/Assistant/All role filtering
+- Only one simple search box
+- Debounce reduced from 300ms to 200ms
+
+#### Search Response
+| Operation | Before | After |
+|-----------|--------|-------|
+| Search response | ~2-5s | **<500ms** |
+
+---
+
+### 3. Project View (New Feature)
+
+#### New Components
+- `src/components/ProjectList.tsx`: Project list view
+
+#### Two-Level Navigation
+```
+Level 1: Project List
+  - Display all projects
+  - Each project shows: name, session count, message count, last active time
+  - Click project → Enter Level 2
+
+Level 2: Sessions in Project
+  - Only show sessions in that project
+  - Title shows project name
+  - "← Back" button to return
+  - Esc key to return
+```
+
+#### Three View Modes
+| Icon | Mode | Description |
+|------|------|-------------|
+| ☰ | List | All sessions sorted by time |
+| 📁 | Directory | Grouped by directory, expandable/collapsible |
+| 📂 | Project | Two-level project navigation |
+
+#### Default View
+- App starts with Project view by default
+
+---
+
+## Code Change Summary
+
+### New Files
+- `src-tauri/src/cache.rs`: Cache management
+- `src/components/ProjectList.tsx`: Project list component
+
+### Modified Files
+- `src-tauri/src/lib.rs`: Add cache module
+- `src-tauri/src/scanner.rs`: Implement incremental scanning
+- `src-tauri/src/search.rs`: Search optimization
+- `src-tauri/src/stats.rs`: Simplify stats logic
+- `src-tauri/src/commands.rs`: Command handling
+- `src/components/SearchPanel.tsx`: Simplify search panel
+- `src/components/SessionList.tsx`: Update list component
+- `src/components/SessionListByDirectory.tsx`: Update directory list
+- `src/App.tsx`: Add project view logic
+
+---
+
+## Performance Comparison Summary
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| First load | 15s | 15s | - |
+| Refresh load | 15s | <1s | **15x** |
+| Search response | 2-5s | <500ms | **4-10x** |
+| Incremental scan | 1962 files | 3 files | **654x** |
+
+---
+
+## Usage Instructions
+
+### Search
+1. Enter keywords for auto-search (200ms debounce)
+2. Support multi-word search (OR logic)
+3. Click result to view session details
+
+### Project Navigation
+1. Default shows project list
+2. Click project to view sessions in that project
+3. Click "← Back" or press `Esc` to return
+4. Click top icon to switch view mode
+
+### Keyboard Shortcuts
+- `Cmd/Ctrl + R`: Refresh session list
+- `Cmd/Ctrl + F`: Focus search box
+- `Cmd/Ctrl + Shift + S`: Open stats panel
+- `Esc`: Clear search / Return to previous level
+
+---
+
+## Known Issues
+1. Cache file may be large (1962 sessions)
+2. Cache may be inaccurate after session deletion (next refresh fixes it)
+3. Search results don't highlight matches
+4. No search history
+
+---
+
+## Future Improvements
+
+### Performance
+- [ ] Use Tantivy for inverted index
+- [ ] Parallel scanning and searching
+- [ ] LRU cache for search results
+
+### UI/UX
+- [ ] Search result highlighting
+- [ ] Search history
+- [ ] Advanced filters (date, model, etc.)
+- [ ] Keyboard navigation (up/down arrows to select)
+
+### Features
+- [ ] Fuzzy search
+- [ ] Regular expression support
+- [ ] Pinyin search
+- [ ] Semantic search
+
+---
+
+## Test Commands
+```bash
+# Development mode
+npm run tauri:dev
+
+# Build
+npm run tauri:build
+```
+
+---
+
+## Cache Management
+
+### Clear Cache
+```bash
+rm ~/.pi/agent/sessions/session_cache.json
+```
+
+### View Cache
+```bash
+cat ~/.pi/agent/sessions/session_cache.json | jq '.sessions | length'
+```
+
+---
+
+## Related Documents
+- [PROJECT_SUMMARY.md](../PROJECT_SUMMARY.md)
+- [SYSTEM_DESIGN.md](../SYSTEM_DESIGN.md)
+- [README.md](../README.md)
