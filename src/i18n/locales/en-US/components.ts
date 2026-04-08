@@ -104,9 +104,12 @@ export const components = {
     renamedTo: 'Session renamed to "{{name}}"',
   },
   thinkingLevel: {
+    off: 'Off',
+    minimal: 'Minimal',
     low: 'Low',
     medium: 'Medium',
     high: 'High',
+    xhigh: 'X-High',
     changed: 'Thinking level: {{level}}',
   },
   labelEntry: {

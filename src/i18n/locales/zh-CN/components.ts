@@ -102,9 +102,12 @@ export const components = {
     renamedTo: 'session重命名为"{{name}}"',
   },
   thinkingLevel: {
+    off: '关闭',
+    minimal: '极低',
     low: '低',
     medium: '中',
     high: '高',
+    xhigh: '极高',
     changed: '思考级别：{{level}}',
   },
   labelEntry: {
