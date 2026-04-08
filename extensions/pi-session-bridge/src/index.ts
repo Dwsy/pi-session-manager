@@ -17,8 +17,9 @@
  *   ❌ Disconnected ← Connection lost
  *
  * Live Mode:
- *   Disabled by default, enable via /psm-live on
- *   When enabled, auto-connects to PSM and forwards session events
+ *   Enabled by default
+ *   Auto-connects to PSM and forwards session events
+ *   Can be disabled via /psm-live off
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
@@ -27,6 +28,10 @@ import { BridgeConnection } from "./ws-bridge.ts";
 import type { BridgeState } from "./ws-bridge.ts";
 import { isDbAvailable, initDb, ensureBuiltinTags, refreshTagCache, getTagsForSession } from "./tag-db.ts";
 import { registerTagCommands } from "./tag-commands.ts";
+import { registerSessionContextTool } from "./session-context-tool.ts";
+import { registerSessionRenameTool } from "./session-rename-tool.ts";
+import { registerSessionRecallTool } from "./session-recall-tool.ts";
+import { registerSessionSearchTool } from "./session-search-tool.ts";
 import { registerSessionTagTool } from "./session-tag-tool.ts";
 
 // ── Helpers ────────────────────────────────────────────
@@ -46,7 +51,7 @@ export default function (pi: ExtensionAPI) {
   let isShuttingDown = false;
   let lastNotifyState = "";
   let notifyCooldown = 0;
-  let liveModeEnabled = false;
+  let liveModeEnabled = true;
 
   function shouldNotify(newState: string): boolean {
     const now = Date.now();
@@ -92,7 +97,7 @@ export default function (pi: ExtensionAPI) {
       const action = args.trim().toLowerCase();
       if (action === "on" || action === "enable" || action === "true") {
         liveModeEnabled = true;
-        ctx.ui.notify("🔴 Live mode ON\nAuto-connect enabled for new sessions", "info");
+        ctx.ui.notify("🔴 Live mode ON\nAuto-connect enabled", "info");
         // If we have a session, connect now
         if (sessionId && conn?.state !== "connected") {
           doConnect();
@@ -123,6 +128,10 @@ export default function (pi: ExtensionAPI) {
 
   registerTagCommands(pi, () => sessionId, () => conn);
   registerSessionTagTool(pi, () => conn);
+  registerSessionSearchTool(pi, () => conn);
+  registerSessionContextTool(pi, () => conn);
+  registerSessionRecallTool(pi, () => conn);
+  registerSessionRenameTool(pi, () => conn);
 
   // ── Connection lifecycle ────────────────────────────
 
@@ -201,10 +210,16 @@ export default function (pi: ExtensionAPI) {
         } else if (eventType === "get_state") {
           broadcastSessionState();
           sendResponse(true, buildSessionState());
+        } else if (eventType === "get_commands") {
+          sendResponse(true, { commands: pi.getCommands() });
         } else if (eventType === "prompt") {
           if (latestCtx && !latestCtx.isIdle()) {
             const behavior = payload.streamingBehavior;
-            if (behavior) {
+            const messageText = typeof payload.message === "string" ? payload.message.trim() : "";
+            if (messageText.startsWith("/")) {
+              pi.sendUserMessage(payload.message || "");
+              sendResponse(true);
+            } else if (behavior) {
               pi.sendUserMessage(payload.message || "", { deliverAs: behavior as any });
               sendResponse(true);
             } else {
@@ -248,7 +263,7 @@ export default function (pi: ExtensionAPI) {
       thinkingLevel,
       contextUsage,
       isStreaming: latestCtx ? !latestCtx.isIdle() : false,
-      pendingMessageCount: 0,
+      pendingMessageCount: latestCtx?.hasPendingMessages?.() ? 1 : 0,
       tags,
     };
   }
@@ -267,7 +282,7 @@ export default function (pi: ExtensionAPI) {
     "message_start", "message_update", "message_end",
     "tool_execution_start", "tool_execution_update", "tool_execution_end",
     "agent_start", "agent_end", "turn_start", "turn_end",
-    "model_select", "auto_compaction_start", "auto_compaction_end",
+    "model_select", "auto_compaction_start", "auto_compaction_end", "queue_update",
   ];
 
   for (const et of EVENTS) {

@@ -1,0 +1,12 @@
+{
+  "name": "pi-session-bridge",
+  "version": "0.1.0",
+  "description": "Bridge Pi agent sessions to Pi Session Manager — session sync, tagging, search, and live mode.",
+  "type": "module",
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

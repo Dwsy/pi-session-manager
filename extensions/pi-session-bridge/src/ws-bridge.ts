@@ -16,6 +16,12 @@ interface ConnectionCallbacks {
   onMessage: (msg: any) => void;
 }
 
+interface PendingRequest {
+  resolve: (value: any) => void;
+  reject: (reason: Error) => void;
+  timer: NodeJS.Timeout;
+}
+
 export class BridgeConnection {
   private ws: WebSocket | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
@@ -24,6 +30,8 @@ export class BridgeConnection {
   private _state: BridgeState = "disconnected";
   private hbTimer: NodeJS.Timeout | null = null;
   private lastPongAt = 0;
+  private requestId = 0;
+  private pendingRequests = new Map<string, PendingRequest>();
 
   get state() { return this._state; }
 
@@ -42,7 +50,30 @@ export class BridgeConnection {
     this.ws = new WebSocket(url);
 
     this.ws.on("open", () => { this.reconnectAttempts = 0; this.lastPongAt = Date.now(); this.setState("connected"); });
-    this.ws.on("message", (data: Buffer) => { try { this.cb.onMessage(JSON.parse(data.toString())); } catch { /* skip */ } });
+    this.ws.on("message", (data: Buffer) => {
+      try {
+        const parsed = JSON.parse(data.toString());
+        if (
+          parsed
+          && typeof parsed === "object"
+          && typeof parsed.id === "string"
+          && typeof parsed.command === "string"
+          && typeof parsed.success === "boolean"
+          && this.pendingRequests.has(parsed.id)
+        ) {
+          const pending = this.pendingRequests.get(parsed.id)!;
+          clearTimeout(pending.timer);
+          this.pendingRequests.delete(parsed.id);
+          if (parsed.success) {
+            pending.resolve(parsed.data);
+          } else {
+            pending.reject(new Error(parsed.error || `PSM command failed: ${parsed.command}`));
+          }
+          return;
+        }
+        this.cb.onMessage(parsed);
+      } catch { /* skip */ }
+    });
     this.ws.on("close", () => {
       this.stopHeartbeat();
       if (Date.now() - this.lastPongAt > HB_TIMEOUT) this.setState("disconnected");
@@ -59,6 +90,23 @@ export class BridgeConnection {
   }
 
   send(data: any) { if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(data)); }
+
+  request(command: string, payload: any = {}, timeoutMs = 15000): Promise<any> {
+    if (this.ws?.readyState !== WebSocket.OPEN) {
+      return Promise.reject(new Error("PSM bridge is not connected"));
+    }
+
+    const id = `ext-${++this.requestId}`;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(id);
+        reject(new Error(`PSM request timeout: ${command}`));
+      }, timeoutMs);
+
+      this.pendingRequests.set(id, { resolve, reject, timer });
+      this.ws!.send(JSON.stringify({ id, command, payload }));
+    });
+  }
 
   sendEntry(sessionId: string, sessionPath: string, eventType: string, event: any) {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
@@ -84,6 +132,11 @@ export class BridgeConnection {
 
   private cleanup() {
     this.stopHeartbeat();
+    for (const [id, pending] of this.pendingRequests) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error("PSM bridge disconnected"));
+      this.pendingRequests.delete(id);
+    }
     if (this.ws) { this.ws.removeAllListeners(); try { this.ws.close(); } catch {} this.ws = null; }
   }
 
