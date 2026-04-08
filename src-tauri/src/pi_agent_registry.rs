@@ -27,6 +27,7 @@ pub struct PiLiveSession {
     pub entry_count: u64,
     pub last_seen: String,
     pub model: Option<serde_json::Value>,
+    pub available_models: Option<Vec<serde_json::Value>>,
     pub thinking_level: Option<String>,
     pub context_usage: Option<serde_json::Value>,
     pub entries: Vec<serde_json::Value>,
@@ -74,6 +75,7 @@ impl PiAgentRegistry {
                 entry_count: entries.len() as u64,
                 last_seen: now,
                 model: None,
+                available_models: None,
                 thinking_level: None,
                 context_usage: None,
                 entries,
@@ -100,7 +102,7 @@ impl PiAgentRegistry {
         if event_type == "agent_start" {
             self.update_streaming_state(session_id, true);
         }
-        if event_type == "agent_end" || event_type == "turn_end" {
+        if event_type == "agent_end" {
             self.update_streaming_state(session_id, false);
         }
     }
@@ -238,6 +240,7 @@ impl PiAgentRegistry {
         &self,
         session_id: &str,
         model: Option<serde_json::Value>,
+        available_models: Option<Vec<serde_json::Value>>,
         thinking_level: Option<String>,
         context_usage: Option<serde_json::Value>,
     ) {
@@ -249,6 +252,9 @@ impl PiAgentRegistry {
         {
             if model.is_some() {
                 s.model = model;
+            }
+            if available_models.is_some() {
+                s.available_models = available_models;
             }
             if thinking_level.is_some() {
                 s.thinking_level = thinking_level;
