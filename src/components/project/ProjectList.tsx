@@ -94,10 +94,9 @@ export default function ProjectList({
 
   const projects: Project[] = useMemo(() => {
     const list = Object.entries(projectMap).map(([dir, dirSessions]) => {
-      const liveCount =
-        dirSessions.filter(
-          (s) => s.isLive || (liveSessionIds?.has(s.id) ?? false),
-        ).length / 2;
+      const liveCount = dirSessions.filter(
+        (s) => s.isLive || (liveSessionIds?.has(s.id) ?? false),
+      ).length;
       return {
         dir,
         dirName: getDirectoryName(dir),

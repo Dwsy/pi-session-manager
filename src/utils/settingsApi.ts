@@ -1,6 +1,7 @@
 import { invoke, isTauri } from "@/transport";
 import type { AppSettings } from "@/components/settings/types";
 import { defaultSettings } from "@/components/settings/types";
+import type { SessionConvertTarget } from "@/types";
 import { saveSessionSource } from "@/utils/datasetApi";
 
 const CACHE_KEY = "pi-session-manager-settings";
@@ -94,7 +95,7 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
       rawSession?.showAgentIconInSessionBadge !== false,
     externalResumePromptEnabled:
       rawSession?.externalResumePromptEnabled !== false,
-    defaultExternalResumeTarget:
+    defaultExternalResumeTarget: (
       rawSession?.defaultExternalResumeTarget === "claude-code" ||
       rawSession?.defaultExternalResumeTarget === "codex" ||
       rawSession?.defaultExternalResumeTarget === "opencode" ||
@@ -102,7 +103,8 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
       rawSession?.defaultExternalResumeTarget === "factory" ||
       rawSession?.defaultExternalResumeTarget === "clawdbot"
         ? rawSession.defaultExternalResumeTarget
-        : "pi",
+        : "pi"
+    ) as SessionConvertTarget,
     scanOtherAgentJsonl:
       externalSessionProviders.length > 0
         ? true
