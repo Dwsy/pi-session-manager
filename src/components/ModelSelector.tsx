@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Search, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export interface RPCModel {
   id: string
@@ -105,6 +106,7 @@ export default function ModelSelector({
   loading = false,
   disabled = false,
 }: ModelSelectorProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -144,6 +146,12 @@ export default function ModelSelector({
     )
   }, [allModels, searchQuery])
 
+  const isCurrentModel = useCallback(
+    (model: RPCModel) =>
+      currentModel?.provider === model.provider && currentModel?.id === model.id,
+    [currentModel],
+  )
+
   const recentModels = useMemo(() => {
     if (searchQuery.trim()) return []
     const byKey = new Map(allModels.map((model) => [modelKey(model), model]))
@@ -154,25 +162,33 @@ export default function ModelSelector({
 
   const recentKeySet = useMemo(() => new Set(recentKeys), [recentKeys])
 
+  const visibleRecentModels = useMemo(
+    () => recentModels.filter((model) => !isCurrentModel(model)),
+    [isCurrentModel, recentModels],
+  )
+
   const otherModels = useMemo(() => {
     if (searchQuery.trim()) return filteredModels
     return filteredModels.filter((model) => !recentKeySet.has(modelKey(model)))
   }, [filteredModels, modelKey, recentKeySet, searchQuery])
 
+  const visibleOtherModels = useMemo(
+    () => otherModels.filter((model) => !isCurrentModel(model)),
+    [isCurrentModel, otherModels],
+  )
+
   const displayModels = useMemo(() => {
     if (searchQuery.trim()) return filteredModels
-    return [...recentModels, ...otherModels]
-  }, [filteredModels, otherModels, recentModels, searchQuery])
-
-  const isCurrentModel = useCallback(
-    (model: RPCModel) =>
-      currentModel?.provider === model.provider && currentModel?.id === model.id,
-    [currentModel],
-  )
+    return [
+      ...(currentModel ? [currentModel] : []),
+      ...visibleRecentModels,
+      ...visibleOtherModels,
+    ]
+  }, [currentModel, filteredModels, searchQuery, visibleOtherModels, visibleRecentModels])
 
   const currentLabel = currentModel
     ? `${currentModel.provider}/${currentModel.name || currentModel.id}`
-    : 'Select model'
+    : t('session.modelControls.selectModel', 'Select model')
 
   const updateMenuPosition = useCallback(() => {
     const trigger = triggerRef.current
@@ -316,7 +332,7 @@ export default function ModelSelector({
         </div>
         {current && (
           <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-            当前
+            {t('session.modelControls.current', 'Current')}
           </span>
         )}
       </button>
@@ -340,7 +356,7 @@ export default function ModelSelector({
               setSearchQuery(event.target.value)
               setSelectedIndex(0)
             }}
-            placeholder="搜索模型..."
+            placeholder={t('session.modelControls.searchPlaceholder', 'Search models...')}
             className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
           />
         </div>
@@ -349,7 +365,9 @@ export default function ModelSelector({
       <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
         {displayModels.length === 0 ? (
           <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-            {searchQuery ? '无匹配模型' : '暂无模型'}
+            {searchQuery
+              ? t('session.modelControls.noMatchingModels', 'No matching models')
+              : t('session.modelControls.noModels', 'No models available')}
           </div>
         ) : searchQuery.trim() ? (
           <div className="space-y-0.5">
@@ -357,20 +375,34 @@ export default function ModelSelector({
           </div>
         ) : (
           <div className="space-y-2">
+            {currentModel && (
+              <div className="space-y-0.5">
+                <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  {t('session.modelControls.currentSection', 'Current')}
+                </div>
+                {renderModelItem(currentModel, 0)}
+              </div>
+            )}
             {recentModels.length > 0 && (
               <div className="space-y-0.5">
                 <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                  最近使用
+                  {t('session.modelControls.recentModels', 'Recent')}
                 </div>
-                {recentModels.map((model, index) => renderModelItem(model, index))}
+                {visibleRecentModels.map((model, index) => renderModelItem(model, index + (currentModel ? 1 : 0)))}
               </div>
             )}
-            {otherModels.length > 0 && (
+            {visibleOtherModels.length > 0 && (
               <div className="space-y-0.5">
                 <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                  全部模型
+                  {t('session.modelControls.allModels', 'All models')}
                 </div>
-                {otherModels.map((model, idx) => renderModelItem(model, idx + recentModels.length))}
+                {visibleOtherModels
+                  .map((model, idx) =>
+                    renderModelItem(
+                      model,
+                      idx + (currentModel ? 1 : 0) + visibleRecentModels.length,
+                    ),
+                  )}
               </div>
             )}
           </div>
@@ -396,7 +428,7 @@ export default function ModelSelector({
           <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
         ) : null}
         <span className="truncate font-medium">
-          {loading ? '加载模型...' : currentLabel}
+          {loading ? t('session.modelControls.loadingModels', 'Loading models...') : currentLabel}
         </span>
         <ChevronDown className={`h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
