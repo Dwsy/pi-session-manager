@@ -9,7 +9,11 @@ import SessionList from "@/components/session-list/SessionList";
 import SelectedProjectHeader from "./SelectedProjectHeader";
 import type { TerminalType } from "@/components/settings/types";
 import { getPlatformDefaults } from "@/components/settings/types";
-import { formatDirectory, formatShortTime, getDirectoryName } from "@/utils/sessionDisplay";
+import {
+  formatDirectory,
+  formatShortTime,
+  getDirectoryName,
+} from "@/utils/sessionDisplay";
 
 interface ProjectListProps {
   sessions: SessionInfo[];
@@ -29,6 +33,7 @@ interface ProjectListProps {
   showHeader?: boolean;
   favorites?: FavoriteItem[];
   onToggleFavorite?: (item: Omit<FavoriteItem, "addedAt">) => void;
+  liveSessionIds?: Set<string>;
 }
 
 interface Project {
@@ -37,6 +42,7 @@ interface Project {
   sessionCount: number;
   messageCount: number;
   lastModified: number;
+  liveCount: number;
 }
 
 export default function ProjectList({
@@ -57,6 +63,7 @@ export default function ProjectList({
   showHeader = true,
   favorites = [],
   onToggleFavorite,
+  liveSessionIds,
 }: ProjectListProps) {
   const { t } = useTranslation();
   // Use external selectedProject if provided, otherwise use internal state
@@ -84,18 +91,25 @@ export default function ProjectList({
   }, [sessions, t]);
 
   const projects: Project[] = useMemo(() => {
-    const list = Object.entries(projectMap).map(([dir, dirSessions]) => ({
-      dir,
-      dirName: getDirectoryName(dir),
-      sessionCount: dirSessions.length,
-      messageCount: dirSessions.reduce((sum, s) => sum + s.message_count, 0),
-      lastModified: Math.max(
-        ...dirSessions.map((s) => new Date(s.modified).getTime()),
-      ),
-    }));
+    const list = Object.entries(projectMap).map(([dir, dirSessions]) => {
+      const liveCount =
+        dirSessions.filter(
+          (s) => s.isLive || (liveSessionIds?.has(s.id) ?? false),
+        ).length / 2;
+      return {
+        dir,
+        dirName: getDirectoryName(dir),
+        sessionCount: dirSessions.length,
+        messageCount: dirSessions.reduce((sum, s) => sum + s.message_count, 0),
+        lastModified: Math.max(
+          ...dirSessions.map((s) => new Date(s.modified).getTime()),
+        ),
+        liveCount,
+      };
+    });
     list.sort((a, b) => b.lastModified - a.lastModified);
     return list;
-  }, [projectMap]);
+  }, [projectMap, liveSessionIds]);
 
   const handleBackToProjects = () => {
     setSelectedProject(null);
@@ -111,6 +125,12 @@ export default function ProjectList({
   const projectInfo = selectedProject
     ? projects.find((p) => p.dir === selectedProject)
     : null;
+
+  const projectLiveCount = selectedProject
+    ? projectSessions.filter(
+        (s) => s.isLive || (liveSessionIds?.has(s.id) ?? false),
+      ).length
+    : 0;
 
   const projectsVirtualizer = useVirtualizer({
     count: selectedProject ? 0 : projects.length,
@@ -195,6 +215,15 @@ export default function ProjectList({
                       <span className="px-1.5 py-0.5 rounded bg-muted/40">
                         {project.messageCount} {t("session.list.messages")}
                       </span>
+                      {project.liveCount > 0 && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 text-green-500">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                          </span>
+                          {project.liveCount}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {onToggleFavorite && (
@@ -237,6 +266,7 @@ export default function ProjectList({
         <SelectedProjectHeader
           projectName={projectInfo?.dirName || ""}
           sessionCount={projectSessions.length}
+          liveCount={projectLiveCount}
           onBack={handleBackToProjects}
           backLabel={t("project.list.back")}
           nameClassName="text-xs"

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { ComponentProps, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -74,6 +75,7 @@ export interface AppDesktopSidebarContentProps {
   onDeleteSession: NonNullable<SessionListProps["onDeleteSession"]>;
   onRemoveFavorite: FavoritesPanelProps["onRemoveFavorite"];
   onToggleFavorite: NonNullable<ProjectListProps["onToggleFavorite"]>;
+  liveSessionIds?: Set<string>;
 }
 
 function AppDesktopSidebarContent({
@@ -106,8 +108,16 @@ function AppDesktopSidebarContent({
   onDeleteSession,
   onRemoveFavorite,
   onToggleFavorite,
+  liveSessionIds,
 }: AppDesktopSidebarContentProps) {
   const { t } = useTranslation();
+
+  const selectedProjectLiveCount = useMemo(() => {
+    if (!selectedProject) return 0;
+    return filteredSessions.filter(
+      (s) => s.cwd === selectedProject && (s.isLive || (liveSessionIds?.has(s.id) ?? false)),
+    ).length;
+  }, [selectedProject, filteredSessions, liveSessionIds]);
 
   return (
     <>
@@ -137,6 +147,7 @@ function AppDesktopSidebarContent({
           <SelectedProjectHeader
             projectName={selectedProjectSummary.projectName}
             sessionCount={selectedProjectSummary.sessionCount}
+            liveCount={selectedProjectLiveCount}
             onBack={() => onSelectProject(null)}
             backLabel={t("project.list.back")}
           />
@@ -170,6 +181,7 @@ function AppDesktopSidebarContent({
           scrollParentRef={listScrollRef}
           favorites={favorites}
           onToggleFavorite={onToggleFavorite}
+          liveSessionIds={liveSessionIds}
         />
       ) : (
         <SessionList
