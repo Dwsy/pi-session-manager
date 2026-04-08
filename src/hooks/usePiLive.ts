@@ -139,12 +139,26 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
     if (!isEnabled) return
     try {
       const result = await invoke<PiLiveSession[]>('get_pi_live_sessions')
-      setSessions(result)
+      setSessions((prev) =>
+        result.map((session) => {
+          const existing = prev.find((item) => matchesSessionId(item.sessionId, session.sessionId))
+          return existing
+            ? {
+                ...existing,
+                ...session,
+                availableModels: session.availableModels ?? existing.availableModels,
+                steeringQueue: session.steeringQueue ?? existing.steeringQueue,
+                followUpQueue: session.followUpQueue ?? existing.followUpQueue,
+                pendingMessageCount: session.pendingMessageCount ?? existing.pendingMessageCount,
+              }
+            : session
+        }),
+      )
       refreshCountRef.current++
     } catch {
       // Backend may not be ready
     }
-  }, [isEnabled])
+  }, [isEnabled, matchesSessionId])
 
   // Command senders
   const prompt = useCallback(async (sessionId: string, message: string, streamingBehavior?: string) => {
