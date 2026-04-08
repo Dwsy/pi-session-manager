@@ -16,6 +16,7 @@ export interface PiLiveSession {
   entryCount: number
   lastSeen: string
   model?: PiLiveModelInfo
+  availableModels?: PiLiveAvailableModel[]
   thinkingLevel?: string
   contextUsage?: PiLiveContextUsage
   pendingMessageCount?: number
@@ -27,6 +28,12 @@ export interface PiLiveSession {
 // ── Model ────────────────────────────────────────────────
 
 export interface PiLiveModelInfo {
+  provider: string
+  id: string
+  name?: string
+}
+
+export interface PiLiveAvailableModel {
   provider: string
   id: string
   name?: string
@@ -167,6 +174,7 @@ export interface PiLiveChatEventPayload {
 export interface PiLiveStateUpdatedPayload {
   sessionId: string
   model?: PiLiveModelInfo
+  availableModels?: PiLiveAvailableModel[]
   thinkingLevel?: string
   contextUsage?: PiLiveContextUsage
   isStreaming?: boolean

@@ -204,6 +204,7 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
       listen<PiLiveStateUpdatedPayload>('pi-live:state_updated', ({ payload }) => {
         patchSession(payload.sessionId, {
           model: payload.model,
+          availableModels: payload.availableModels,
           thinkingLevel: payload.thinkingLevel,
           contextUsage: payload.contextUsage,
           isStreaming: payload.isStreaming,
@@ -245,7 +246,7 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
             lastSeen: new Date().toISOString(),
           }
           if (eventName === 'agent_start') nextPatch.isStreaming = true
-          if (eventName === 'agent_end' || eventName === 'turn_end') nextPatch.isStreaming = false
+          if (eventName === 'agent_end') nextPatch.isStreaming = false
 
           setSessions((prev) =>
             prev.map((session) =>
