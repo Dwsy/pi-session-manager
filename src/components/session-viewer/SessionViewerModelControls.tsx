@@ -96,6 +96,48 @@ export default function SessionViewerModelControls({
     setModelsLoading(false);
   }, [liveSession]);
 
+  useEffect(() => {
+    if (!liveSession || (liveSession.availableModels && liveSession.availableModels.length > 1)) {
+      return;
+    }
+
+    let cancelled = false;
+    setModelsLoading(true);
+    invoke<{
+      models?: Array<{ provider: string; id: string; name?: string }>;
+    }>("pi_agent_get_available_models", {
+      sessionId: liveSession.sessionId,
+    })
+      .then((state) => {
+        if (cancelled) return;
+        const availableModels = state.models || [];
+        const dedup = new Map<string, RPCModel>();
+        for (const item of availableModels) {
+          const key = `${item.provider}:${item.id}`;
+          if (!dedup.has(key)) {
+            dedup.set(key, {
+              id: item.id,
+              name: item.name || item.id,
+              provider: item.provider,
+            });
+          }
+        }
+        if (dedup.size > 0) {
+          setModels([...dedup.values()]);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) {
+          setModelsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [liveSession?.availableModels, liveSession?.sessionId]);
+
   const currentModel = useMemo<RPCModel | null>(() => {
     if (!liveSession?.model || typeof liveSession.model === "string") {
       return null;
