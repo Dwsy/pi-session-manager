@@ -990,6 +990,23 @@ pub async fn dispatch(
                 Ok(serde_json::json!({ "commands": [] }))
             }
         }
+        "pi_agent_get_available_models" => {
+            let session_id = extract(payload, "sessionId")?;
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or("App state not available")?;
+                let command = serde_json::json!({ "type": "get_available_models", "sessionId": session_id });
+                let result = state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
+                Ok(unpack_pi_rpc_response(result)?)
+            }
+            #[cfg(not(feature = "gui"))]
+            {
+                Ok(serde_json::json!({ "models": [] }))
+            }
+        }
         "pi_agent_abort" => {
             let session_id = extract(payload, "sessionId")?;
             #[cfg(feature = "gui")]

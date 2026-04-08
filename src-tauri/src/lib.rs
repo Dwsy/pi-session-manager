@@ -166,6 +166,7 @@ pub fn run() {
             pi_agent_set_thinking_level,
             pi_agent_get_state,
             pi_agent_get_commands,
+            pi_agent_get_available_models,
             pi_agent_abort,
             list_config_versions,
             get_config_version,

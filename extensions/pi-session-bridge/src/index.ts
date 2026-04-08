@@ -52,6 +52,7 @@ export default function (pi: ExtensionAPI) {
   let lastNotifyState = "";
   let notifyCooldown = 0;
   let liveModeEnabled = true;
+  let liveStreaming = false;
 
   function shouldNotify(newState: string): boolean {
     const now = Date.now();
@@ -212,6 +213,8 @@ export default function (pi: ExtensionAPI) {
           sendResponse(true, buildSessionState());
         } else if (eventType === "get_commands") {
           sendResponse(true, { commands: pi.getCommands() });
+        } else if (eventType === "get_available_models") {
+          sendResponse(true, { models: latestCtx?.modelRegistry.getAvailable() || [] });
         } else if (eventType === "prompt") {
           if (latestCtx && !latestCtx.isIdle()) {
             const behavior = payload.streamingBehavior;
@@ -268,7 +271,7 @@ export default function (pi: ExtensionAPI) {
       availableModels,
       thinkingLevel,
       contextUsage,
-      isStreaming: latestCtx ? !latestCtx.isIdle() : false,
+      isStreaming: liveStreaming || Boolean(latestCtx?.hasPendingMessages?.()),
       pendingMessageCount: latestCtx?.hasPendingMessages?.() ? 1 : 0,
       tags,
     };
@@ -294,6 +297,8 @@ export default function (pi: ExtensionAPI) {
   for (const et of EVENTS) {
     pi.on(et as any, async (event: any, ctx: ExtensionContext) => {
       latestCtx = ctx;
+      if (et === "agent_start") liveStreaming = true;
+      if (et === "agent_end") liveStreaming = false;
       forward(et, event);
       if (et === "model_select" || et === "turn_end" || et === "turn_start") broadcastSessionState();
     });
@@ -305,6 +310,7 @@ export default function (pi: ExtensionAPI) {
     latestCtx = ctx;
     ({ sessionId, sessionPath } = extractSessionId(ctx));
     lastNotifyState = "";
+    liveStreaming = false;
 
     if (!isDbAvailable()) initDb();
     ensureBuiltinTags();

@@ -66,6 +66,7 @@ export type PiLiveCommandType =
   | 'abort'
   | 'get_state'
   | 'get_commands'
+  | 'get_available_models'
 
 // ── Command Payloads ─────────────────────────────────────
 
@@ -119,6 +120,11 @@ export interface PiLiveGetCommandsCommand {
   sessionId: string
 }
 
+export interface PiLiveGetAvailableModelsCommand {
+  type: 'get_available_models'
+  sessionId: string
+}
+
 export type PiLiveCommand =
   | PiLivePromptCommand
   | PiLiveSteerCommand
@@ -128,6 +134,7 @@ export type PiLiveCommand =
   | PiLiveAbortCommand
   | PiLiveGetStateCommand
   | PiLiveGetCommandsCommand
+  | PiLiveGetAvailableModelsCommand
 
 // ── Event Types ──────────────────────────────────────────
 
@@ -239,7 +246,7 @@ export function isPiLiveSession(obj: unknown): obj is PiLiveSession {
 }
 
 export function isPiLiveCommandType(type: string): type is PiLiveCommandType {
-  return ['prompt', 'steer', 'follow_up', 'set_model', 'set_thinking_level', 'abort', 'get_state', 'get_commands'].includes(type)
+  return ['prompt', 'steer', 'follow_up', 'set_model', 'set_thinking_level', 'abort', 'get_state', 'get_commands', 'get_available_models'].includes(type)
 }
 
 // Extract UUID from session_id for matching

@@ -582,6 +582,7 @@ fn main() {
             pi_session_manager::pi_agent_set_thinking_level,
             pi_session_manager::pi_agent_get_state,
             pi_session_manager::pi_agent_get_commands,
+            pi_session_manager::pi_agent_get_available_models,
             pi_session_manager::pi_agent_abort,
             pi_session_manager::list_config_versions,
             pi_session_manager::get_config_version,

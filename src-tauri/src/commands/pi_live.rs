@@ -179,6 +179,23 @@ pub async fn pi_agent_get_commands(
 }
 
 #[tauri::command]
+pub async fn pi_agent_get_available_models(
+    state: State<'_, crate::app_state::SharedAppState>,
+    session_id: String,
+) -> Result<serde_json::Value, String> {
+    let command = json!({
+        "type": "get_available_models",
+        "sessionId": session_id,
+    });
+    unpack_rpc_response(
+        state
+            .pi_agent_registry
+            .send_rpc(&session_id, command)
+            .await?,
+    )
+}
+
+#[tauri::command]
 pub async fn pi_agent_abort(
     state: State<'_, crate::app_state::SharedAppState>,
     session_id: String,
