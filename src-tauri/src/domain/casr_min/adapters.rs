@@ -2,6 +2,7 @@ use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 use crate::types::{Content, Message, SessionEntry, SessionInfo};
 
@@ -55,7 +56,7 @@ pub fn canonical_to_session_info(
 
     SessionInfo {
         path: path.to_string_lossy().to_string(),
-        id: canonical.session_id.clone(),
+        id: canonical_session_cache_id(canonical, path),
         cwd: canonical
             .workspace
             .as_ref()
@@ -140,6 +141,24 @@ pub fn canonical_to_session_entries(canonical: &CanonicalSession) -> Vec<Session
     }
 
     entries
+}
+
+fn canonical_session_cache_id(canonical: &CanonicalSession, path: &Path) -> String {
+    if canonical.provider_slug == "pi-agent" || canonical.provider_slug == "pi" {
+        return canonical.session_id.clone();
+    }
+
+    let mut hasher = Sha256::new();
+    hasher.update(path.to_string_lossy().as_bytes());
+    let digest = format!("{:x}", hasher.finalize());
+    let short = &digest[..12];
+
+    format!(
+        "{}:{}:{}",
+        canonical.provider_slug.replace('_', "-"),
+        canonical.session_id,
+        short
+    )
 }
 
 fn canonical_message_id(canonical: &CanonicalSession, message: &CanonicalMessage) -> String {

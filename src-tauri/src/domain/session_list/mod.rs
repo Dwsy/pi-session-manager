@@ -23,6 +23,7 @@ pub async fn scan_sessions_paginated_impl(
     search_query: Option<String>,
     project_filter: Option<String>,
     filter_tag_ids: Option<Vec<String>>,
+    source_filter_slugs: Option<Vec<String>>,
     sort_by: Option<String>,
 ) -> Result<PaginatedSessionsResult, String> {
     use crate::{config, scanner};
@@ -54,6 +55,10 @@ pub async fn scan_sessions_paginated_impl(
     // Apply tag filter
     if let Some(tag_ids) = filter_tag_ids.as_ref().filter(|ids| !ids.is_empty()) {
         filter_by_tags(&mut sessions, tag_ids)?;
+    }
+
+    if let Some(source_slugs) = source_filter_slugs.as_ref().filter(|ids| !ids.is_empty()) {
+        filter_by_source_slugs(&mut sessions, source_slugs);
     }
 
     // Apply sorting

@@ -10,6 +10,7 @@ pub(super) async fn scan_sessions_paginated_impl(
     search_query: Option<String>,
     project_filter: Option<String>,
     filter_tag_ids: Option<Vec<String>>,
+    source_filter_slugs: Option<Vec<String>>,
     sort_by: Option<String>,
 ) -> Result<session_list::PaginatedSessionsResult, String> {
     session_list::scan_sessions_paginated_impl(
@@ -18,6 +19,7 @@ pub(super) async fn scan_sessions_paginated_impl(
         search_query,
         project_filter,
         filter_tag_ids,
+        source_filter_slugs,
         sort_by,
     )
     .await

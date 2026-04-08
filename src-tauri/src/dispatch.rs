@@ -77,6 +77,16 @@ pub async fn dispatch(
                         .filter_map(|item| item.as_str().map(|text| text.to_string()))
                         .collect::<Vec<String>>()
                 });
+            let source_filter_slugs = payload
+                .get("source_filter_slugs")
+                .or_else(|| payload.get("sourceFilterSlugs"))
+                .and_then(|value| value.as_array())
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| item.as_str().map(|text| text.to_string()))
+                        .collect::<Vec<String>>()
+                });
             let sort_by = extract_optional_string(payload, "sort_by")
                 .or_else(|| extract_optional_string(payload, "sortBy"));
             let result = crate::scan_sessions_paginated(
@@ -85,6 +95,7 @@ pub async fn dispatch(
                 search_query,
                 project_filter,
                 filter_tag_ids,
+                source_filter_slugs,
                 sort_by,
             )
             .await?;
@@ -959,6 +970,23 @@ pub async fn dispatch(
             #[cfg(not(feature = "gui"))]
             {
                 Ok(serde_json::json!({}))
+            }
+        }
+        "pi_agent_get_commands" => {
+            let session_id = extract(payload, "sessionId")?;
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or("App state not available")?;
+                let command = serde_json::json!({ "type": "get_commands", "sessionId": session_id });
+                let result = state
+                    .pi_agent_registry
+                    .send_rpc(&session_id, command)
+                    .await?;
+                Ok(unpack_pi_rpc_response(result)?)
+            }
+            #[cfg(not(feature = "gui"))]
+            {
+                Ok(serde_json::json!({ "commands": [] }))
             }
         }
         "pi_agent_abort" => {

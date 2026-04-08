@@ -57,6 +57,7 @@ fn is_pi_live_forward_event(event_type: &str) -> bool {
             | "model_select"
             | "auto_compaction_start"
             | "auto_compaction_end"
+            | "queue_update"
     )
 }
 

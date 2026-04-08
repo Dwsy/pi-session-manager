@@ -82,3 +82,27 @@ pub fn filter_by_tags(sessions: &mut Vec<SessionInfo>, tag_ids: &[String]) -> Re
     sessions.retain(|session| matched_session_ids.contains(session.id.as_str()));
     Ok(())
 }
+
+pub fn session_matches_source_filter(session: &SessionInfo, source_slug: &str) -> bool {
+    let normalized = source_slug.trim().replace('_', "-").to_ascii_lowercase();
+    if normalized.is_empty() {
+        return true;
+    }
+
+    crate::domain::session_bridge::SessionBridgeSource::ALL
+        .into_iter()
+        .find(|source| source.slug().replace('_', "-") == normalized)
+        .is_some_and(|source| source.matches_path(std::path::Path::new(&session.path)))
+}
+
+pub fn filter_by_source_slugs(sessions: &mut Vec<SessionInfo>, source_slugs: &[String]) {
+    if source_slugs.is_empty() {
+        return;
+    }
+
+    sessions.retain(|session| {
+        source_slugs
+            .iter()
+            .any(|source_slug| session_matches_source_filter(session, source_slug))
+    });
+}
