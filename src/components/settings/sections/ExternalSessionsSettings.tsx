@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import SettingsCard from "@/components/settings/SettingsCard";
+import SettingsField from "@/components/settings/SettingsField";
+import SettingsRadioCardGroup from "@/components/settings/SettingsRadioCardGroup";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
 import { AgentIcon } from "@/components/session-viewer/AgentIcon";
 import type { SessionSettingsProps } from "@/components/settings/types";
@@ -27,6 +29,11 @@ export default function ExternalSessionsSettings({
   const enabledProviders = useMemo(
     () => new Set(settings.session.externalSessionProviders ?? []),
     [settings.session.externalSessionProviders],
+  );
+  const convertTargets = useMemo(
+    () =>
+      supportedProviders.filter((provider) => provider.capabilities.canConvertTarget),
+    [supportedProviders],
   );
 
   useEffect(() => {
@@ -74,6 +81,48 @@ export default function ExternalSessionsSettings({
             }
             className="items-start py-0"
           />
+
+          <SettingsToggleRow
+            title={t(
+              "settings.externalSessions.externalResumePromptEnabled",
+              "Prompt before external resume",
+            )}
+            description={t(
+              "settings.externalSessions.externalResumePromptEnabledHelp",
+              "When opening a non-Pi session, show a dialog to choose the target CLI before resuming.",
+            )}
+            checked={settings.session.externalResumePromptEnabled !== false}
+            onChange={(checked) =>
+              onUpdate("session", "externalResumePromptEnabled", checked)
+            }
+            className="items-start py-0"
+          />
+
+          <SettingsField
+            label={t(
+              "settings.externalSessions.defaultExternalResumeTarget",
+              "Default external resume target",
+            )}
+            description={t(
+              "settings.externalSessions.defaultExternalResumeTargetHelp",
+              "When prompt is disabled, non-Pi sessions will be resumed into this target CLI.",
+            )}
+            className="space-y-3"
+          >
+            <SettingsRadioCardGroup
+              name="default-external-resume-target"
+              options={convertTargets.map((provider) => provider.slug)}
+              value={settings.session.defaultExternalResumeTarget}
+              onChange={(value) =>
+                onUpdate("session", "defaultExternalResumeTarget", value)
+              }
+              getLabel={(value) =>
+                convertTargets.find((provider) => provider.slug === value)?.display_name || value
+              }
+              getDescription={() => ""}
+              containerClassName="grid grid-cols-2 gap-2 sm:grid-cols-3"
+            />
+          </SettingsField>
 
           {otherAgentProviders.length > 0 ? (
             <div className="rounded-lg border border-border/60 bg-background/40 divide-y divide-border/50">

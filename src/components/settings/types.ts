@@ -81,6 +81,8 @@ export interface AppSettings {
     scanOtherAgentJsonl: boolean;
     externalSessionProviders: string[];
     showAgentIconInSessionBadge: boolean;
+    externalResumePromptEnabled: boolean;
+    defaultExternalResumeTarget: SessionConvertTarget;
     showMessagePreview: boolean;
     previewLines: number;
     colorizeToolCalls: boolean;
@@ -166,6 +168,8 @@ export const defaultSettings: AppSettings = {
     scanOtherAgentJsonl: false,
     externalSessionProviders: [],
     showAgentIconInSessionBadge: true,
+    externalResumePromptEnabled: true,
+    defaultExternalResumeTarget: "pi",
     showMessagePreview: true,
     previewLines: 2,
     colorizeToolCalls: true,

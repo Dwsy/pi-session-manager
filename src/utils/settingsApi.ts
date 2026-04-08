@@ -92,6 +92,17 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
     externalSessionProviders,
     showAgentIconInSessionBadge:
       rawSession?.showAgentIconInSessionBadge !== false,
+    externalResumePromptEnabled:
+      rawSession?.externalResumePromptEnabled !== false,
+    defaultExternalResumeTarget:
+      rawSession?.defaultExternalResumeTarget === "claude-code" ||
+      rawSession?.defaultExternalResumeTarget === "codex" ||
+      rawSession?.defaultExternalResumeTarget === "opencode" ||
+      rawSession?.defaultExternalResumeTarget === "gemini" ||
+      rawSession?.defaultExternalResumeTarget === "factory" ||
+      rawSession?.defaultExternalResumeTarget === "clawdbot"
+        ? rawSession.defaultExternalResumeTarget
+        : "pi",
     scanOtherAgentJsonl:
       externalSessionProviders.length > 0
         ? true

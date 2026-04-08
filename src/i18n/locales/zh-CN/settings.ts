@@ -226,6 +226,12 @@ export const settings = {
     showAgentIconInSessionBadge: "在 SessionBadge 显示 agent 图标",
     showAgentIconInSessionBadgeHelp:
       "在 session 卡片的来源徽章旁显示 provider 图标。",
+    externalResumePromptEnabled: "外部会话 Resume 前先询问",
+    externalResumePromptEnabledHelp:
+      "打开非 Pi 会话时，先弹窗选择目标 CLI，再执行 resume。",
+    defaultExternalResumeTarget: "默认外部 Resume 目标",
+    defaultExternalResumeTargetHelp:
+      "关闭询问弹窗后，非 Pi 会话会直接 Resume 到这个目标 CLI。",
   },
   search: {
     defaultSearchMode: "默认搜索模式",

@@ -265,6 +265,12 @@ export const settings = {
     showAgentIconInSessionBadge: "Show agent icon in SessionBadge",
     showAgentIconInSessionBadgeHelp:
       "Display the provider icon next to the source badge in session cards.",
+    externalResumePromptEnabled: "Prompt before external resume",
+    externalResumePromptEnabledHelp:
+      "When opening a non-Pi session, show a dialog to choose the target CLI before resuming.",
+    defaultExternalResumeTarget: "Default external resume target",
+    defaultExternalResumeTargetHelp:
+      "When prompt is disabled, non-Pi sessions will be resumed into this target CLI.",
   },
   search: {
     defaultSearchMode: "Default Search Mode",
