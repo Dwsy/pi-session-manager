@@ -11,6 +11,9 @@ interface SearchFilterBarProps {
   sessionTags: SessionTag[]
   filterTagIds: string[]
   onFilterChange: (tagIds: string[]) => void
+  sourceOptions?: Array<{ slug: string; label: string }>
+  selectedSourceSlugs?: string[]
+  onSourceFilterChange?: (slugs: string[]) => void
   onCreateTag?: (name: string, color: string, parentId?: string) => void
   getDescendantIds: (tagId: string) => string[]
   placeholder?: string
@@ -25,6 +28,9 @@ export default function SearchFilterBar({
   sessionTags,
   filterTagIds,
   onFilterChange,
+  sourceOptions,
+  selectedSourceSlugs,
+  onSourceFilterChange,
   onCreateTag,
   getDescendantIds,
   placeholder,
@@ -110,6 +116,9 @@ export default function SearchFilterBar({
           sessionTags={sessionTags}
           filterTagIds={filterTagIds}
           onFilterChange={onFilterChange}
+          sourceOptions={sourceOptions}
+          selectedSourceSlugs={selectedSourceSlugs}
+          onSourceFilterChange={onSourceFilterChange}
           onCreateTag={onCreateTag}
           getDescendantIds={getDescendantIds}
         />

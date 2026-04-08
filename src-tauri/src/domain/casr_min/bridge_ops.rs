@@ -145,9 +145,7 @@ pub fn convert_canonical_session(
         outcome.target_path
     };
 
-    if let Err(error) = write_support::verify_written_session(canonical, target, &written_path) {
-        return Err(error);
-    }
+    write_support::verify_written_session(canonical, target, &written_path)?;
 
     Ok(ConversionOutcome {
         target_session_id: plan.target_session_id,

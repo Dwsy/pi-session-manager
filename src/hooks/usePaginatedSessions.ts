@@ -23,6 +23,7 @@ interface UsePaginatedSessionsOptions {
   searchQuery?: string;
   projectFilter?: string | null;
   filterTagIds?: string[];
+  sourceFilterSlugs?: string[];
   sortBy?: SessionSortBy;
   sortOrder?: SessionSortOrder;
 }
@@ -138,6 +139,7 @@ export function usePaginatedSessions({
   searchQuery = "",
   projectFilter = null,
   filterTagIds = [],
+  sourceFilterSlugs = [],
   sortBy = DEFAULT_SESSION_SORT_BY,
   sortOrder = DEFAULT_SESSION_SORT_ORDER,
 }: UsePaginatedSessionsOptions): UsePaginatedSessionsReturn {
@@ -171,6 +173,10 @@ export function usePaginatedSessions({
     () => Array.from(new Set(filterTagIds)).sort(),
     [filterTagIds],
   );
+  const normalizedSourceSlugs = useMemo(
+    () => Array.from(new Set(sourceFilterSlugs)).sort(),
+    [sourceFilterSlugs],
+  );
   const normalizedSortBy = useMemo(() => sortBy, [sortBy]);
   const normalizedSortOrder = useMemo(() => sortOrder, [sortOrder]);
   const normalizedSortKey = useMemo(
@@ -193,6 +199,7 @@ export function usePaginatedSessions({
         normalizedProjectFilter || "__all__",
         normalizedSortKey,
         normalizedTagIds.join(",") || "__no_tags__",
+        normalizedSourceSlugs.join(",") || "__no_sources__",
       ].join("|");
 
       if (inFlightRequestKeysRef.current.has(requestKey)) {
@@ -219,6 +226,8 @@ export function usePaginatedSessions({
             searchQuery: normalizedSearchQuery || null,
             projectFilter: normalizedProjectFilter,
             filterTagIds: normalizedTagIds.length > 0 ? normalizedTagIds : null,
+            sourceFilterSlugs:
+              normalizedSourceSlugs.length > 0 ? normalizedSourceSlugs : null,
             sortBy: normalizedSortBy,
             sortOrder: normalizedSortOrder,
           }),
@@ -306,6 +315,7 @@ export function usePaginatedSessions({
       normalizedSortKey,
       normalizedSortOrder,
       normalizedTagIds,
+      normalizedSourceSlugs,
       pageSize,
       enabled,
       shouldUseBackend,

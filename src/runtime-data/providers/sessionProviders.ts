@@ -202,6 +202,10 @@ export const backendSessionProvider: SessionProvider = {
         options.filterTagIds && options.filterTagIds.length > 0
           ? options.filterTagIds
           : null,
+      sourceFilterSlugs:
+        options.sourceFilterSlugs && options.sourceFilterSlugs.length > 0
+          ? options.sourceFilterSlugs
+          : null,
       sortBy: normalizedSortKey,
       sort_by: normalizedSortKey,
     });
@@ -294,6 +298,7 @@ export const browserSessionProvider: SessionProvider = {
       searchQuery: options.searchQuery || "",
       projectFilter: options.projectFilter || null,
       filterTagIds: options.filterTagIds || [],
+      sourceFilterSlugs: options.sourceFilterSlugs || [],
       sessionTags: tagsState.sessionTags,
       getDescendantIds: (tagId) => getDescendantIds(tagsState.tags, tagId),
     });

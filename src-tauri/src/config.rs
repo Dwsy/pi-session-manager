@@ -176,7 +176,9 @@ impl Config {
         if values.is_empty() && self.scan_other_agent_jsonl {
             values = crate::domain::casr_min::providers::ProviderKind::ALL
                 .into_iter()
-                .filter(|provider| *provider != crate::domain::casr_min::providers::ProviderKind::Pi)
+                .filter(|provider| {
+                    *provider != crate::domain::casr_min::providers::ProviderKind::Pi
+                })
                 .map(|provider| provider.slug().replace('_', "-"))
                 .collect();
         }

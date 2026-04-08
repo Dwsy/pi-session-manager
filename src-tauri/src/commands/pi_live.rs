@@ -51,9 +51,9 @@ pub async fn pi_agent_prompt(
 
     unpack_rpc_response(
         state
-        .pi_agent_registry
-        .send_rpc(&session_id, command)
-        .await?,
+            .pi_agent_registry
+            .send_rpc(&session_id, command)
+            .await?,
     )?;
     Ok(())
 }
@@ -73,9 +73,9 @@ pub async fn pi_agent_steer(
     });
     unpack_rpc_response(
         state
-        .pi_agent_registry
-        .send_rpc(&session_id, command)
-        .await?,
+            .pi_agent_registry
+            .send_rpc(&session_id, command)
+            .await?,
     )?;
     Ok(())
 }
@@ -95,9 +95,9 @@ pub async fn pi_agent_follow_up(
     });
     unpack_rpc_response(
         state
-        .pi_agent_registry
-        .send_rpc(&session_id, command)
-        .await?,
+            .pi_agent_registry
+            .send_rpc(&session_id, command)
+            .await?,
     )?;
     Ok(())
 }
@@ -117,9 +117,9 @@ pub async fn pi_agent_set_model(
     });
     unpack_rpc_response(
         state
-        .pi_agent_registry
-        .send_rpc(&session_id, command)
-        .await?,
+            .pi_agent_registry
+            .send_rpc(&session_id, command)
+            .await?,
     )?;
     Ok(())
 }
@@ -137,9 +137,9 @@ pub async fn pi_agent_set_thinking_level(
     });
     unpack_rpc_response(
         state
-        .pi_agent_registry
-        .send_rpc(&session_id, command)
-        .await?,
+            .pi_agent_registry
+            .send_rpc(&session_id, command)
+            .await?,
     )?;
     Ok(())
 }
@@ -153,7 +153,12 @@ pub async fn pi_agent_get_state(
         "type": "get_state",
         "sessionId": session_id,
     });
-    unpack_rpc_response(state.pi_agent_registry.send_rpc(&session_id, command).await?)
+    unpack_rpc_response(
+        state
+            .pi_agent_registry
+            .send_rpc(&session_id, command)
+            .await?,
+    )
 }
 
 #[tauri::command]
@@ -167,9 +172,9 @@ pub async fn pi_agent_abort(
     });
     unpack_rpc_response(
         state
-        .pi_agent_registry
-        .send_rpc(&session_id, command)
-        .await?,
+            .pi_agent_registry
+            .send_rpc(&session_id, command)
+            .await?,
     )?;
     Ok(())
 }

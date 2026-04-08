@@ -27,6 +27,7 @@ export interface UseSidebarSessionsOptions {
   showFavorites: boolean;
   sidebarSearchQuery: string;
   filterTagIds: string[];
+  sourceFilterSlugs?: string[];
   sessionTags: SessionTag[];
   getDescendantIds: (tagId: string) => string[];
   onSelectSession: (session: SessionInfo) => void;
@@ -83,6 +84,7 @@ export function useSidebarSessions({
   showFavorites,
   sidebarSearchQuery,
   filterTagIds,
+  sourceFilterSlugs = [],
   sessionTags,
   getDescendantIds,
   onSelectSession,
@@ -122,6 +124,7 @@ export function useSidebarSessions({
       sessions,
       searchQuery: sidebarSearchQuery,
       filterTagIds,
+      sourceFilterSlugs,
       sessionTags,
       getDescendantIds,
     });
@@ -129,6 +132,7 @@ export function useSidebarSessions({
     sessions,
     sessionTags,
     filterTagIds,
+    sourceFilterSlugs,
     getDescendantIds,
     sidebarSearchQuery,
   ]);
@@ -172,6 +176,7 @@ export function useSidebarSessions({
     searchQuery: sidebarSearchQuery,
     projectFilter: listProjectFilter,
     filterTagIds: effectiveFilterTagIds,
+    sourceFilterSlugs,
     sortBy,
     sortOrder,
   });

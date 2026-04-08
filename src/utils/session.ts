@@ -443,36 +443,60 @@ function isCodexBootstrapText(text: string): boolean {
   ].some(prefix => normalized.startsWith(prefix))
 }
 export function getSessionSourceTag(sessionPath: string): string | null {
+  const slug = getSessionSourceSlug(sessionPath)
+  if (!slug) return null
+
+  switch (slug) {
+    case 'pi':
+      return 'Pi'
+    case 'claude-code':
+      return 'Claude Code'
+    case 'codex':
+      return 'Codex'
+    case 'opencode':
+      return 'OpenCode'
+    case 'gemini':
+      return 'Gemini CLI'
+    case 'factory':
+      return 'Factory'
+    case 'clawdbot':
+      return 'ClawdBot'
+    default:
+      return slug
+  }
+}
+
+export function getSessionSourceSlug(sessionPath: string): string | null {
   if (!sessionPath) return null
 
   const normalized = sessionPath.replace(/\\/g, '/')
 
   if (normalized.includes('/.pi/agent/sessions')) {
-    return 'Pi'
+    return 'pi'
   }
 
   if (normalized.includes('/.claude/projects')) {
-    return 'Claude Code'
+    return 'claude-code'
   }
 
   if (normalized.includes('/.codex/sessions')) {
-    return 'Codex'
+    return 'codex'
   }
 
   if (normalized.includes('/.opencode/') || normalized.includes('/opencode.db')) {
-    return 'OpenCode'
+    return 'opencode'
   }
 
   if (normalized.includes('/.gemini/tmp/')) {
-    return 'Gemini CLI'
+    return 'gemini'
   }
 
   if (normalized.includes('/.factory/sessions/')) {
-    return 'Factory'
+    return 'factory'
   }
 
   if (normalized.includes('/.clawdbot/sessions/')) {
-    return 'ClawdBot'
+    return 'clawdbot'
   }
 
   const parts = normalized.split('/').filter(Boolean)

@@ -32,6 +32,9 @@ interface LabelFilterProps {
   sessionTags: SessionTag[]
   filterTagIds: string[]
   onFilterChange: (tagIds: string[]) => void
+  sourceOptions?: Array<{ slug: string; label: string }>
+  selectedSourceSlugs?: string[]
+  onSourceFilterChange?: (slugs: string[]) => void
   onCreateTag?: (name: string, color: string, parentId?: string) => void
   getDescendantIds: (tagId: string) => string[]
 }
@@ -45,7 +48,7 @@ type MenuPosition = {
 }
 
 export default function LabelFilter({
-  tags, sessionTags, filterTagIds, onFilterChange, onCreateTag, getDescendantIds,
+  tags, sessionTags, filterTagIds, onFilterChange, sourceOptions = [], selectedSourceSlugs = [], onSourceFilterChange, onCreateTag, getDescendantIds,
 }: LabelFilterProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -64,7 +67,7 @@ export default function LabelFilter({
     transformOrigin: 'top right',
   })
 
-  const activeCount = filterTagIds.length
+  const activeCount = filterTagIds.length + selectedSourceSlugs.length
   const activeRootTags = useMemo(() => {
     return tags.filter(t => !t.parentId && filterTagIds.includes(t.id))
   }, [tags, filterTagIds])
@@ -304,6 +307,39 @@ export default function LabelFilter({
 
           {/* Grouped list */}
           <div className="min-h-0 flex-1 overflow-y-auto">
+            {onSourceFilterChange && sourceOptions.length > 0 && (
+              <div className="py-1 border-b border-border/50">
+                <div className="px-3 pt-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                  {t('tags.filter.sources', 'Sources')}
+                </div>
+                <div className="px-2 pb-2 space-y-1">
+                  {sourceOptions.map((source) => {
+                    const selected = selectedSourceSlugs.includes(source.slug)
+                    return (
+                      <button
+                        key={source.slug}
+                        onClick={() => {
+                          if (selected) {
+                            onSourceFilterChange(
+                              selectedSourceSlugs.filter((slug) => slug !== source.slug),
+                            )
+                          } else {
+                            onSourceFilterChange(
+                              [...new Set([...selectedSourceSlugs, source.slug])],
+                            )
+                          }
+                        }}
+                        className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                      >
+                        <span className="flex-1 text-left">{source.label}</span>
+                        {selected && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Statuses */}
             <div className="py-1">
               <div className="px-3 pt-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">

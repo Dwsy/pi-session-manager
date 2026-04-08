@@ -217,7 +217,9 @@ pub async fn save_session_scan_other_agents(
     Ok(())
 }
 
-pub async fn save_external_session_providers_core(provider_slugs: Vec<String>) -> Result<(), String> {
+pub async fn save_external_session_providers_core(
+    provider_slugs: Vec<String>,
+) -> Result<(), String> {
     let mut config = crate::config::Config::load().unwrap_or_default();
     let mut normalized = provider_slugs
         .into_iter()

@@ -56,6 +56,7 @@ export interface SessionProvider {
     searchQuery?: string | null;
     projectFilter?: string | null;
     filterTagIds?: string[] | null;
+    sourceFilterSlugs?: string[] | null;
     sortBy: SessionSortBy;
     sortOrder: SessionSortOrder;
   }): Promise<RuntimePaginatedSessionsResponse>;

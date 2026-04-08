@@ -1,4 +1,5 @@
 import type { SessionInfo, SessionTag } from "@/types";
+import { getSessionSourceSlug } from "./session";
 import { getSessionIdMatchKind, normalizeSessionIdQuery } from "./session";
 import { parseQuotedQuery } from "./search";
 
@@ -11,6 +12,7 @@ interface FilterSessionsOptions {
   searchQuery?: string;
   projectFilter?: string | null;
   filterTagIds?: string[];
+  sourceFilterSlugs?: string[];
   sessionTags?: SessionTag[];
   getDescendantIds?: (tagId: string) => string[];
 }
@@ -120,11 +122,27 @@ export function filterSessionsByTagIds(
   return sessions.filter((session) => taggedIds.has(session.id));
 }
 
+export function filterSessionsBySourceSlugs(
+  sessions: SessionInfo[],
+  sourceFilterSlugs: string[],
+): SessionInfo[] {
+  if (sourceFilterSlugs.length === 0) {
+    return sessions;
+  }
+
+  const allowed = new Set(sourceFilterSlugs);
+  return sessions.filter((session) => {
+    const slug = getSessionSourceSlug(session.path);
+    return slug ? allowed.has(slug) : false;
+  });
+}
+
 export function filterSessions({
   sessions,
   searchQuery,
   projectFilter,
   filterTagIds = [],
+  sourceFilterSlugs = [],
   sessionTags = [],
   getDescendantIds = () => [],
 }: FilterSessionsOptions): SessionInfo[] {
@@ -141,6 +159,10 @@ export function filterSessions({
       filterTagIds,
       getDescendantIds,
     );
+  }
+
+  if (sourceFilterSlugs.length > 0) {
+    result = filterSessionsBySourceSlugs(result, sourceFilterSlugs);
   }
 
   if (searchQuery?.trim()) {
