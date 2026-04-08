@@ -22,13 +22,13 @@ jobs:
           # macOS ARM64
           - platform: macos-latest
             target: aarch64-apple-darwin
-            tauri_args: "--target aarch64-apple-darwin --bundles dmg"
+            tauri_args: "--target aarch64-apple-darwin --bundles app,dmg"
             cli_artifact: pi-session-cli-macos-arm64
             cli_binary: pi-session-cli
           # macOS x64
           - platform: macos-latest
             target: x86_64-apple-darwin
-            tauri_args: "--target x86_64-apple-darwin --bundles dmg"
+            tauri_args: "--target x86_64-apple-darwin --bundles app,dmg"
             cli_artifact: pi-session-cli-macos-x64
             cli_binary: pi-session-cli
           # Linux x64
@@ -156,8 +156,51 @@ jobs:
           path: cli-artifacts
           merge-multiple: true
 
+      - name: Download updater metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release-metadata
+          gh release download "$GITHUB_REF_NAME" \
+            --repo "${{ github.repository }}" \
+            --pattern latest.json \
+            --dir release-metadata
+          cp release-metadata/latest.json release-metadata/updater.json
+
+      - name: Validate updater platforms
+        run: |
+          python3 <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path('release-metadata/latest.json').read_text())
+          platforms = set(data.get('platforms', {}).keys())
+          print('Updater platforms:', ', '.join(sorted(platforms)))
+
+          required_any = {
+              'darwin-aarch64': {'darwin-aarch64-app', 'darwin-aarch64'},
+              'darwin-x86_64': {'darwin-x86_64-app', 'darwin-x86_64'},
+              'linux-x86_64': {'linux-x86_64', 'linux-x86_64-appimage'},
+              'windows-x86_64': {'windows-x86_64', 'windows-x86_64-msi', 'windows-x86_64-nsis'},
+          }
+
+          missing = {
+              name: sorted(candidates)
+              for name, candidates in required_any.items()
+              if platforms.isdisjoint(candidates)
+          }
+
+          if missing:
+              print('Missing required updater platforms:')
+              for name, candidates in missing.items():
+                  print(f'  - {name}: expected one of {candidates}')
+              raise SystemExit(1)
+          PY
+
       - name: List release assets
-        run: ls -lhR cli-artifacts/
+        run: |
+          ls -lhR cli-artifacts/
+          ls -lhR release-metadata/
 
       - name: Generate release notes
         id: notes
@@ -245,6 +288,8 @@ jobs:
           body: ${{ steps.notes.outputs.body }}
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          files: cli-artifacts/*
+          files: |
+            cli-artifacts/*
+            release-metadata/updater.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
