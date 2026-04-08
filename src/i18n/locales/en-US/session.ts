@@ -33,6 +33,7 @@ export const session = {
     slashCommands: 'Slash commands',
     loadingCommands: 'Loading commands…',
     noMatchingCommands: 'No matching commands',
+    unsupportedCommand: 'Unsupported',
     recentMessage: 'Recent message {{current}}/{{total}}',
     recentHint: '↑↓ browse · type to exit history',
     placeholderPrompt: 'Type a prompt…',
@@ -88,6 +89,10 @@ export const session = {
     title: 'Session',
     loadError: 'Failed to load session',
     noMessages: 'No messages in this session',
+  },
+  resumeDialog: {
+    title: 'Resume in another CLI',
+    copyTitle: 'Choose a CLI for copy resume',
   },
   rename: {
     title: 'Rename Session',

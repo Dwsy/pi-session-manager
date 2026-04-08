@@ -17,10 +17,34 @@ function notifyPsmTagChange(sessionId: string, conn: BridgeConnection | null) {
   conn.send({ type: "session_tag_changed", payload: { sessionId, tags } });
 }
 
-export function registerTagCommands(pi: ExtensionAPI, sessionId: () => string, conn: () => BridgeConnection | null) {
-  pi.registerCommand("state", {
+type RegisterLocalCommand = (
+  name: string,
+  options: {
+    description: string;
+    handler: (args: string, ctx: ExtensionContext) => Promise<void>;
+    getArgumentCompletions?: (prefix: string) => Array<{ value: string; label: string }>;
+  },
+) => void;
+
+export function registerTagCommands(
+  pi: ExtensionAPI,
+  sessionId: () => string,
+  conn: () => BridgeConnection | null,
+  registerLocalCommand?: RegisterLocalCommand,
+) {
+  const register = registerLocalCommand
+    ? registerLocalCommand
+    : (name: string, options: {
+        description: string;
+        handler: (args: string, ctx: ExtensionContext) => Promise<void>;
+        getArgumentCompletions?: (prefix: string) => Array<{ value: string; label: string }>;
+      }) => {
+        pi.registerCommand(name, options);
+      };
+
+  register("state", {
     description: "Show current session tag status",
-    handler: async (_args, ctx) => {
+    handler: async (_args: string, ctx: ExtensionContext) => {
       const sid = getSessionId(ctx);
       if (!sid) { ctx.ui.notify("❌ Cannot get session ID", "error"); return; }
       const [tagsResult] = await Promise.all([getTagsForSession(sid), refreshTagCache()]);
@@ -35,13 +59,13 @@ export function registerTagCommands(pi: ExtensionAPI, sessionId: () => string, c
     },
   });
 
-  pi.registerCommand("state-set", {
+  register("state-set", {
     description: "Set session status tag",
     getArgumentCompletions: (prefix: string) =>
       ["todo", "wip", "done", "important", "archive"]
         .filter(t => t.includes(prefix.toLowerCase()))
         .map(t => ({ value: t, label: t })),
-    handler: async (args: string, ctx) => {
+    handler: async (args: string, ctx: ExtensionContext) => {
       const tagName = args.trim();
       if (!tagName) { ctx.ui.notify("❌ Specify a tag: /state-set wip", "error"); return; }
       const sid = getSessionId(ctx);
@@ -61,9 +85,9 @@ export function registerTagCommands(pi: ExtensionAPI, sessionId: () => string, c
     },
   });
 
-  pi.registerCommand("state-list", {
+  register("state-list", {
     description: "List all available status tags",
-    handler: async (_args, ctx) => {
+    handler: async (_args: string, ctx: ExtensionContext) => {
       await refreshTagCache();
       const builtin = getCachedTags().filter((t: Tag) => t.isBuiltin);
       const custom = getCachedTags().filter((t: Tag) => !t.isBuiltin);
@@ -75,9 +99,9 @@ export function registerTagCommands(pi: ExtensionAPI, sessionId: () => string, c
     },
   });
 
-  pi.registerCommand("state-clear", {
+  register("state-clear", {
     description: "Clear all tags from current session",
-    handler: async (_args, ctx) => {
+    handler: async (_args: string, ctx: ExtensionContext) => {
       const sid = getSessionId(ctx);
       if (!sid) { ctx.ui.notify("❌ Cannot get session ID", "error"); return; }
       const current = getTagsForSession(sid);
@@ -89,14 +113,14 @@ export function registerTagCommands(pi: ExtensionAPI, sessionId: () => string, c
     },
   });
 
-  pi.registerCommand("flow", {
+  register("flow", {
     description: "Quick transitions: start(wip) / done / hold(todo) / important / archive",
     getArgumentCompletions: () => [
       { value: "start", label: "Start (→ WIP)" },
       { value: "done", label: "Done (→ Complete)" },
       { value: "hold", label: "Hold (→ Todo)" },
     ],
-    handler: async (args: string, ctx) => {
+    handler: async (args: string, ctx: ExtensionContext) => {
       const action = args.trim().toLowerCase();
       const sid = getSessionId(ctx);
       if (!sid) { ctx.ui.notify("❌ Cannot get session ID", "error"); return; }

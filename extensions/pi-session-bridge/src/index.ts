@@ -24,6 +24,7 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import * as path from "node:path";
+import { readFileSync } from "node:fs";
 import { BridgeConnection } from "./ws-bridge.ts";
 import type { BridgeState } from "./ws-bridge.ts";
 import { isDbAvailable, initDb, ensureBuiltinTags, refreshTagCache, getTagsForSession } from "./tag-db.ts";
@@ -41,9 +42,102 @@ function extractSessionId(ctx: ExtensionContext): { sessionId: string; sessionPa
   return { sessionId: path.basename(sf, ".jsonl"), sessionPath: sf };
 }
 
+function parseCommandArgs(argsString: string): string[] {
+  const args: string[] = [];
+  let current = "";
+  let inQuote: '"' | "'" | null = null;
+
+  for (let i = 0; i < argsString.length; i++) {
+    const char = argsString[i]!;
+    if (inQuote) {
+      if (char === inQuote) {
+        inQuote = null;
+      } else {
+        current += char;
+      }
+    } else if (char === '"' || char === "'") {
+      inQuote = char as '"' | "'";
+    } else if (char === " " || char === "\t") {
+      if (current) {
+        args.push(current);
+        current = "";
+      }
+    } else {
+      current += char;
+    }
+  }
+
+  if (current) args.push(current);
+  return args;
+}
+
+function stripFrontmatter(content: string): string {
+  const normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (!normalized.startsWith("---")) {
+    return normalized.trim();
+  }
+  const endIndex = normalized.indexOf("\n---", 3);
+  if (endIndex === -1) {
+    return normalized.trim();
+  }
+  return normalized.slice(endIndex + 4).trim();
+}
+
+function substituteArgs(content: string, args: string[]): string {
+  let result = content;
+  result = result.replace(/\$(\d+)/g, (_, num) => {
+    const index = parseInt(num, 10) - 1;
+    return args[index] ?? "";
+  });
+  result = result.replace(/\$\{@:(\d+)(?::(\d+))?\}/g, (_, startStr, lengthStr) => {
+    let start = parseInt(startStr, 10) - 1;
+    if (start < 0) start = 0;
+    if (lengthStr) {
+      const length = parseInt(lengthStr, 10);
+      return args.slice(start, start + length).join(" ");
+    }
+    return args.slice(start).join(" ");
+  });
+  const allArgs = args.join(" ");
+  result = result.replace(/\$ARGUMENTS/g, allArgs);
+  result = result.replace(/\$@/g, allArgs);
+  return result;
+}
+
+function expandSlashCommandFromCommandList(pi: ExtensionAPI, text: string): { action: "transform"; text: string } | { action: "handled" } | null {
+  if (!text.startsWith("/")) return null;
+  const commands = pi.getCommands();
+  const spaceIndex = text.indexOf(" ");
+  const commandName = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
+  const args = spaceIndex === -1 ? "" : text.slice(spaceIndex + 1).trim();
+  const command = commands.find((item) => item.name === commandName);
+  if (!command) return null;
+
+  if (command.source === "prompt") {
+    const rawContent = readFileSync(command.sourceInfo.path, "utf-8");
+    const body = stripFrontmatter(rawContent);
+    const expanded = substituteArgs(body, parseCommandArgs(args));
+    return { action: "transform", text: expanded };
+  }
+
+  if (command.source === "skill") {
+    const rawContent = readFileSync(command.sourceInfo.path, "utf-8");
+    const body = stripFrontmatter(rawContent);
+    const skillBlock = `<skill name="${command.name.replace(/^skill:/, "")}" location="${command.sourceInfo.path}">\nReferences are relative to ${command.sourceInfo.baseDir || path.dirname(command.sourceInfo.path)}.\n\n${body}\n</skill>`;
+    return { action: "transform", text: args ? `${skillBlock}\n\n${args}` : skillBlock };
+  }
+
+  if (command.source === "extension") {
+    return { action: "handled" };
+  }
+
+  return null;
+}
+
 // ── Extension ──────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
+  const localCommandHandlers = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void> | void>();
   let latestCtx: ExtensionContext | null = null;
   let sessionId = "";
   let sessionPath = "";
@@ -63,9 +157,21 @@ export default function (pi: ExtensionAPI) {
     return true;
   }
 
+  function registerBridgeCommand(
+    name: string,
+    options: {
+      description: string;
+      handler: (args: string, ctx: ExtensionContext) => Promise<void>;
+      getArgumentCompletions?: (prefix: string) => Array<{ value: string; label: string }>;
+    },
+  ) {
+    localCommandHandlers.set(name, options.handler);
+    pi.registerCommand(name, options);
+  }
+
   // ── Core commands ──────────────────────────────────
 
-  pi.registerCommand("psm", {
+  registerBridgeCommand("psm", {
     description: "PSM bridge status",
     handler: async (_args, ctx) => {
       const s = conn?.state ?? "disconnected";
@@ -75,7 +181,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("psm-connect", {
+  registerBridgeCommand("psm-connect", {
     description: "Connect to psm (requires live mode on)",
     handler: async (_args, ctx) => {
       if (!liveModeEnabled) {
@@ -87,12 +193,12 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("psm-disconnect", {
+  registerBridgeCommand("psm-disconnect", {
     description: "Disconnect from psm",
     handler: async (_args, ctx) => { doDisconnect(); ctx.ui.notify("Disconnected", "info"); },
   });
 
-  pi.registerCommand("psm-live", {
+  registerBridgeCommand("psm-live", {
     description: "Toggle live mode (on/off)",
     handler: async (args: string, ctx) => {
       const action = args.trim().toLowerCase();
@@ -114,7 +220,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("steer", {
+  registerBridgeCommand("steer", {
     description: "Steer running agent",
     handler: async (args: string, ctx) => {
       if (latestCtx && !latestCtx.isIdle()) {
@@ -127,12 +233,53 @@ export default function (pi: ExtensionAPI) {
 
   // ── Tag module ──────────────────────────────────────
 
-  registerTagCommands(pi, () => sessionId, () => conn);
+  registerTagCommands(pi, () => sessionId, () => conn, registerBridgeCommand);
   registerSessionTagTool(pi, () => conn);
   registerSessionSearchTool(pi, () => conn);
   registerSessionContextTool(pi, () => conn);
   registerSessionRecallTool(pi, () => conn);
   registerSessionRenameTool(pi, () => conn);
+
+  pi.on("input", async (event: any, ctx: ExtensionContext) => {
+    latestCtx = ctx;
+    if (event.source !== "extension") return;
+    const text = typeof event.text === "string" ? event.text.trim() : "";
+    if (!text.startsWith("/")) return;
+
+    const withoutSlash = text.slice(1);
+    const firstSpace = withoutSlash.indexOf(" ");
+    const commandName = (firstSpace === -1 ? withoutSlash : withoutSlash.slice(0, firstSpace)).trim();
+    const args = firstSpace === -1 ? "" : withoutSlash.slice(firstSpace + 1).trim();
+
+    const handler = localCommandHandlers.get(commandName);
+    if (!handler) return;
+
+    await handler(args, ctx);
+    return { action: "handled" };
+  });
+
+  pi.on("input", async (event: any, ctx: ExtensionContext) => {
+    latestCtx = ctx;
+    if (event.source !== "extension") return;
+    const text = typeof event.text === "string" ? event.text.trim() : "";
+    if (!text.startsWith("/")) return;
+
+    const spaceIndex = text.indexOf(" ");
+    const commandName = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
+    if (localCommandHandlers.has(commandName)) return;
+
+    try {
+      const expanded = expandSlashCommandFromCommandList(pi, text);
+      if (expanded?.action === "handled") {
+        ctx.ui.notify(`Unsupported remote extension command: /${commandName}`, "warning");
+        return { action: "handled" };
+      }
+      if (expanded) return expanded;
+    } catch (error: any) {
+      ctx.ui.notify(`Failed to expand command: ${error?.message || String(error)}`, "error");
+      return { action: "handled" };
+    }
+  });
 
   // ── Connection lifecycle ────────────────────────────
 
@@ -212,7 +359,14 @@ export default function (pi: ExtensionAPI) {
           broadcastSessionState();
           sendResponse(true, buildSessionState());
         } else if (eventType === "get_commands") {
-          sendResponse(true, { commands: pi.getCommands() });
+          sendResponse(true, {
+            commands: pi.getCommands().map((command) => ({
+              ...command,
+              supported:
+                command.source !== "extension" ||
+                localCommandHandlers.has(command.name),
+            })),
+          });
         } else if (eventType === "get_available_models") {
           sendResponse(true, { models: latestCtx?.modelRegistry.getAvailable() || [] });
         } else if (eventType === "prompt") {

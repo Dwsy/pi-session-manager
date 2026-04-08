@@ -201,6 +201,7 @@ export interface PiLiveSlashCommand {
   name: string
   description?: string
   source: 'extension' | 'prompt' | 'skill'
+  supported?: boolean
   sourceInfo: {
     path: string
     source: string

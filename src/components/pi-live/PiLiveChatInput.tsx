@@ -46,6 +46,20 @@ function historyStorageKey(sessionId: string): string {
   return `pi-session-manager:live-input-history:${sessionId}`;
 }
 
+function findNextSupportedCommandIndex(
+  commands: PiLiveSlashCommand[],
+  startIndex: number,
+  direction: 1 | -1,
+): number {
+  if (commands.length === 0) return 0
+
+  for (let index = startIndex + direction; index >= 0 && index < commands.length; index += direction) {
+    if (commands[index]?.supported !== false) return index
+  }
+
+  return startIndex
+}
+
 export default function PiLiveChatInput({
   sessionId,
   isLive: isLiveProp,
@@ -192,6 +206,9 @@ export default function PiLiveChatInput({
   }, [slashQuery]);
 
   const applySlashCommand = useCallback((command: PiLiveSlashCommand) => {
+    if (command.supported === false) {
+      return
+    }
     setInput(`/${command.name} `);
     setCommandIndex(0);
     requestAnimationFrame(() => {
@@ -322,9 +339,9 @@ export default function PiLiveChatInput({
       event.preventDefault();
       setCommandIndex((prev) => {
         if (event.key === "ArrowDown") {
-          return Math.min(prev + 1, slashMatches.length - 1);
+          return findNextSupportedCommandIndex(slashMatches, prev, 1);
         }
-        return Math.max(prev - 1, 0);
+        return findNextSupportedCommandIndex(slashMatches, prev, -1);
       });
       return;
     }
@@ -332,7 +349,7 @@ export default function PiLiveChatInput({
     if (slashMatches.length > 0 && event.key === "Tab") {
       event.preventDefault();
       const command = slashMatches[commandIndex] || slashMatches[0];
-      if (command) {
+      if (command && command.supported !== false) {
         applySlashCommand(command);
       }
       return;
@@ -371,7 +388,10 @@ export default function PiLiveChatInput({
     if (event.key === "Enter" && !event.shiftKey) {
       if (hasBareSlashCommandInput && slashMatches.length > 0) {
         event.preventDefault();
-        applySlashCommand(slashMatches[commandIndex] || slashMatches[0]);
+        const command = slashMatches[commandIndex] || slashMatches[0]
+        if (command?.supported !== false) {
+          applySlashCommand(command);
+        }
         return;
       }
       event.preventDefault();
@@ -524,11 +544,18 @@ export default function PiLiveChatInput({
                   <button
                     key={command.name}
                     type="button"
-                    onClick={() => applySlashCommand(command)}
+                    onClick={() => {
+                      if (command.supported !== false) {
+                        applySlashCommand(command)
+                      }
+                    }}
+                    disabled={command.supported === false}
                     className={`flex w-full items-start justify-between gap-3 rounded-md px-2 py-1.5 text-left text-[11px] transition-colors ${
                       index === commandIndex
                         ? "bg-primary/10 text-foreground"
-                        : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                        : command.supported === false
+                          ? "cursor-not-allowed text-muted-foreground/50"
+                          : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
                     }`}
                   >
                     <div className="min-w-0">
@@ -542,9 +569,16 @@ export default function PiLiveChatInput({
                         </div>
                       )}
                     </div>
-                    <span className="rounded bg-muted/50 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
-                      {command.source}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="rounded bg-muted/50 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+                        {command.source}
+                      </span>
+                      {command.supported === false && (
+                        <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] text-destructive/80">
+                          {t("session.liveInput.unsupportedCommand", "Unsupported")}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 ))
               )}

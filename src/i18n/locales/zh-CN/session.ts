@@ -33,6 +33,7 @@ export const session = {
     slashCommands: '斜杠命令',
     loadingCommands: '正在加载命令…',
     noMatchingCommands: '没有匹配命令',
+    unsupportedCommand: '暂不支持',
     recentMessage: '最近消息 {{current}}/{{total}}',
     recentHint: '↑↓ 浏览 · 输入内容退出历史',
     placeholderPrompt: '输入 prompt…',
@@ -88,6 +89,10 @@ export const session = {
     title: 'session',
     loadError: '加载session失败',
     noMessages: '此session中没有message',
+  },
+  resumeDialog: {
+    title: '恢复到其他 CLI',
+    copyTitle: '选择用于复制恢复命令的 CLI',
   },
   rename: {
     title: '重命名session',
