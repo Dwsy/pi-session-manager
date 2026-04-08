@@ -5,7 +5,10 @@
 //! - terminal/: External terminal launching logic
 //! - stats/: Statistics aggregation
 
+pub mod casr_min;
+pub mod datasets;
 pub mod model_config;
+pub mod session_bridge;
 pub mod session_list;
 pub mod stats;
 pub mod terminal;
