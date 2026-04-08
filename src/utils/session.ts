@@ -1,4 +1,4 @@
-import type { SessionEntry, LegacySessionStats } from '@/types'
+import type { SessionEntry, LegacySessionStats, Content } from '@/types'
 import { parseQuotedQuery } from './search'
 
 export const SHORT_SESSION_ID_LENGTH = 12
@@ -16,6 +16,45 @@ export function parseSessionEntriesWithLineCount(jsonlContent: string): {
   entries: SessionEntry[]
   lineCount: number
 } {
+  const trimmed = jsonlContent.trim()
+  if (trimmed.startsWith('[')) {
+    try {
+      const rawItems = JSON.parse(trimmed)
+      if (Array.isArray(rawItems)) {
+        const entries: SessionEntry[] = []
+        const seenIds = new Map<string, number>()
+
+        for (const raw of rawItems) {
+          const normalized = normalizeSessionEntry(raw)
+          if (!normalized) continue
+
+          if (
+            normalized.type === 'message' &&
+            !normalized.parentId &&
+            entries.length > 0
+          ) {
+            const previous = entries[entries.length - 1]
+            if (previous?.id && previous.id !== normalized.id) {
+              normalized.parentId = previous.id
+            }
+          }
+
+          const baseId = ensureEntryId(normalized)
+          const existing = seenIds.get(baseId) || 0
+          if (existing > 0) {
+            normalized.id = `${baseId}__dup_${existing}`
+          }
+          seenIds.set(baseId, existing + 1)
+          entries.push(normalized)
+        }
+
+        return { entries, lineCount: rawItems.length }
+      }
+    } catch {
+      // Fall through to line-based parsing.
+    }
+  }
+
   const entries: SessionEntry[] = []
   const lines = jsonlContent.split('\n')
   const seenIds = new Map<string, number>()
@@ -27,18 +66,30 @@ export function parseSessionEntriesWithLineCount(jsonlContent: string): {
     lineCount++
 
     try {
-      const entry = JSON.parse(line)
-
-      if (entry.id) {
-        const originalId = entry.id as string
-        const count = seenIds.get(originalId) || 0
-        if (count > 0) {
-          entry.id = `${originalId}__dup_${count}`
-        }
-        seenIds.set(originalId, count + 1)
+      const raw = JSON.parse(line)
+      const normalized = normalizeSessionEntry(raw)
+      if (!normalized) {
+        continue
       }
 
-      entries.push(entry)
+      if (
+        normalized.type === 'message' &&
+        !normalized.parentId &&
+        entries.length > 0
+      ) {
+        const previous = entries[entries.length - 1]
+        if (previous?.id && previous.id !== normalized.id) {
+          normalized.parentId = previous.id
+        }
+      }
+
+      const baseId = ensureEntryId(normalized)
+      const existing = seenIds.get(baseId) || 0
+      if (existing > 0) {
+        normalized.id = `${baseId}__dup_${existing}`
+      }
+      seenIds.set(baseId, existing + 1)
+      entries.push(normalized)
     } catch (_error) {
       // Skip malformed lines silently to avoid noisy console churn on large sessions.
     }
@@ -113,22 +164,327 @@ export function findToolResult(
     e.message?.content.some((c: any) => c.id === toolCallId)
   ) || null
 }
-export function getSessionSourceTag(sessionPath: string): string | null {
-  if (!sessionPath) return null;
-  // Normalize path separators
-  const normalizedPath = sessionPath.replace(/\\/g, '/');
-  const parts = normalizedPath.split('/').filter(Boolean);
 
-  // Find the last "sessions" directory
-  const sessionsIndex = parts.lastIndexOf('sessions');
-  if (sessionsIndex > 0) {
-    const sourceDir = parts[sessionsIndex - 1];
-    // Default source is "agent"
-    if (sourceDir !== 'agent') {
-      return sourceDir;
+function ensureEntryId(entry: SessionEntry): string {
+  if (entry.id && entry.id.trim()) {
+    return entry.id
+  }
+  entry.id = generateFallbackId('session-entry')
+  return entry.id
+}
+
+function generateFallbackId(prefix: string): string {
+  const base =
+    typeof globalThis !== 'undefined' &&
+    globalThis.crypto &&
+    typeof globalThis.crypto.randomUUID === 'function'
+      ? globalThis.crypto.randomUUID()
+      : Math.random().toString(36).slice(2)
+  return `${prefix}-${base}`
+}
+
+function normalizeSessionEntry(raw: any): SessionEntry | null {
+  if (!raw || typeof raw !== 'object') return null
+  const type = typeof raw.type === 'string' ? raw.type : undefined
+
+  if (type === 'user' || type === 'assistant' || type === 'tool_result') {
+    return convertClaudeLineToSessionEntry(raw)
+  }
+
+  if (type === 'response_item') {
+    return convertCodexResponseItem(raw.payload)
+  }
+
+  if (type === 'message') {
+    return raw as SessionEntry
+  }
+
+  if (
+    type === 'toolCall' ||
+    type === 'custom_message' ||
+    type === 'compaction' ||
+    type === 'branch_summary'
+  ) {
+    return raw as SessionEntry
+  }
+
+  return null
+}
+
+function convertClaudeLineToSessionEntry(line: any): SessionEntry | null {
+  const message = line?.message
+  if (!message) return null
+
+  const roleCandidate =
+    typeof message.role === 'string'
+      ? message.role
+      : line.type === 'assistant'
+        ? 'assistant'
+        : 'user'
+
+  const role =
+    roleCandidate === 'assistant'
+      ? 'assistant'
+      : roleCandidate === 'toolResult'
+        ? 'toolResult'
+        : 'user'
+
+  const content = normalizeClaudeContent(message.content)
+  const timestamp =
+    typeof line.timestamp === 'string' ? line.timestamp : new Date().toISOString()
+
+  return {
+    type: 'message',
+    id: (line.uuid as string) || generateFallbackId('claude-entry'),
+    parentId: line.parentUuid || undefined,
+    timestamp,
+    message: {
+      role,
+      content,
+      model: typeof message.model === 'string' ? message.model : undefined,
+      provider: role === 'assistant' ? 'anthropic' : undefined,
+      usage: normalizeTokenUsage(message.usage),
+      stopReason:
+        typeof message.stop_reason === 'string' ? message.stop_reason : undefined,
+    },
+  }
+}
+
+function normalizeTokenUsage(value: unknown) {
+  if (!value || typeof value !== 'object') return undefined
+  const usage = value as Record<string, any>
+  const input =
+    Number(usage.input ?? usage.input_tokens ?? usage.inputTokens ?? 0) || 0
+  const output =
+    Number(usage.output ?? usage.output_tokens ?? usage.outputTokens ?? 0) || 0
+  const cacheRead =
+    Number(
+      usage.cacheRead ?? usage.cache_read_tokens ?? usage.cacheReadTokens ?? 0
+    ) || 0
+  const cacheWrite =
+    Number(
+      usage.cacheWrite ??
+        usage.cache_creation_input_tokens ??
+        usage.cacheWriteTokens ??
+        0
+    ) || 0
+
+  return { input, output, cacheRead, cacheWrite }
+}
+
+function normalizeClaudeContent(value: unknown): Content[] {
+  if (!value) return []
+  if (typeof value === 'string') {
+    return [{ type: 'text', text: value }]
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap(item => convertClaudeContentItem(item))
+  }
+
+  return convertClaudeContentItem(value)
+}
+
+function convertClaudeContentItem(item: any): Content[] {
+  if (!item || typeof item !== 'object') return []
+  const type = typeof item.type === 'string' ? item.type : 'text'
+
+  switch (type) {
+    case 'text':
+      return typeof item.text === 'string'
+        ? [{ type: 'text', text: item.text }]
+        : []
+    case 'thinking':
+      return typeof item.thinking === 'string'
+        ? [{ type: 'thinking', thinking: item.thinking }]
+        : []
+    case 'tool_use':
+      return [
+        {
+          type: 'toolCall',
+          id: item.id,
+          name: item.name,
+          arguments: item.input,
+          text: item.name || 'tool call',
+        },
+      ]
+    case 'tool_result':
+      return [
+        {
+          type: 'text',
+          text:
+            typeof item.content === 'string'
+              ? item.content
+              : JSON.stringify(item.content),
+        },
+      ]
+    default:
+      return [{ type: 'text', text: JSON.stringify(item) }]
+  }
+}
+
+function convertCodexResponseItem(payload: any): SessionEntry | null {
+  if (!payload || typeof payload !== 'object') return null
+  const payloadType = payload.type as string | undefined
+  if (!payloadType) return null
+
+  if (payloadType === 'message') {
+    const rawRole = typeof payload.role === 'string' ? payload.role : 'user'
+    if (rawRole === 'developer' || rawRole === 'system') {
+      return null
+    }
+    const role = rawRole === 'assistant' ? 'assistant' : 'user'
+    const content = normalizeCodexContent(payload.content ?? [])
+    const visibleText = content
+      .filter(item => item.type === 'text' && typeof item.text === 'string')
+      .map(item => item.text!.trim())
+      .filter(Boolean)
+      .join('\n')
+    if (role === 'user' && isCodexBootstrapText(visibleText)) {
+      return null
+    }
+    const timestamp =
+      typeof payload.timestamp === 'string'
+        ? payload.timestamp
+        : new Date().toISOString()
+    return {
+      type: 'message',
+      id: payload.id || generateFallbackId('codex-entry'),
+      timestamp,
+      message: {
+        role,
+        content,
+        model: role === 'assistant' ? 'gpt-5.4' : undefined,
+        provider: role === 'assistant' ? 'openai-codex' : undefined,
+      },
     }
   }
-  return null;
+
+  if (payloadType === 'function_call_output') {
+    const timestamp =
+      typeof payload.timestamp === 'string'
+        ? payload.timestamp
+        : new Date().toISOString()
+    return {
+      type: 'message',
+      id: payload.call_id || generateFallbackId('codex-tool'),
+      timestamp,
+      message: {
+        role: 'toolResult',
+        content: [
+          {
+            type: 'text',
+            text:
+              typeof payload.output === 'string'
+                ? payload.output
+                : JSON.stringify(payload.output),
+          },
+        ],
+      },
+    }
+  }
+
+  return null
+}
+
+function normalizeCodexContent(items: unknown[]): Content[] {
+  const content: Content[] = []
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue
+    const candidate = item as Record<string, any>
+    const type = candidate.type as string | undefined
+    switch (type) {
+      case 'input_text':
+      case 'output_text':
+        if (typeof candidate.text === 'string') {
+          content.push({ type: 'text', text: candidate.text })
+        }
+        break
+      case 'reasoning':
+        if (typeof candidate.text === 'string') {
+          content.push({ type: 'thinking', thinking: candidate.text })
+        }
+        break
+      case 'function_call':
+        content.push({
+          type: 'toolCall',
+          id: candidate.call_id,
+          name: candidate.name,
+          arguments: candidate.arguments,
+          text: candidate.name || 'function call',
+        })
+        break
+      case 'input_image':
+        if (typeof candidate.data === 'string') {
+          content.push({ type: 'image', data: candidate.data, mimeType: candidate.mimeType })
+        }
+        break
+      default:
+        if (typeof candidate.text === 'string') {
+          content.push({ type: 'text', text: candidate.text })
+        }
+        break
+    }
+  }
+  return content
+}
+
+function isCodexBootstrapText(text: string): boolean {
+  const normalized = text.trimStart()
+  return [
+    '<permissions instructions>',
+    '<app-context>',
+    '<collaboration_mode>',
+    '<skills_instructions>',
+    '<plugins_instructions>',
+    '# AGENTS.md instructions for ',
+    '<environment_context>',
+    '<turn_aborted>',
+  ].some(prefix => normalized.startsWith(prefix))
+}
+export function getSessionSourceTag(sessionPath: string): string | null {
+  if (!sessionPath) return null
+
+  const normalized = sessionPath.replace(/\\/g, '/')
+
+  if (normalized.includes('/.pi/agent/sessions')) {
+    return 'Pi'
+  }
+
+  if (normalized.includes('/.claude/projects')) {
+    return 'Claude Code'
+  }
+
+  if (normalized.includes('/.codex/sessions')) {
+    return 'Codex'
+  }
+
+  if (normalized.includes('/.opencode/') || normalized.includes('/opencode.db')) {
+    return 'OpenCode'
+  }
+
+  if (normalized.includes('/.gemini/tmp/')) {
+    return 'Gemini CLI'
+  }
+
+  if (normalized.includes('/.factory/sessions/')) {
+    return 'Factory'
+  }
+
+  if (normalized.includes('/.clawdbot/sessions/')) {
+    return 'ClawdBot'
+  }
+
+  const parts = normalized.split('/').filter(Boolean)
+  const sessionsIndex = parts.lastIndexOf('sessions')
+  if (sessionsIndex > 0) {
+    const sourceDir = parts[sessionsIndex - 1]
+    if (sourceDir !== 'agent') {
+      return sourceDir
+    }
+  }
+
+  return null
 }
 
 export function formatShortSessionId(

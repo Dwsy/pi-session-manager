@@ -16,6 +16,7 @@ interface AssistantMessageProps {
   toolResultByCallId?: Map<string, SessionEntry>
   searchQuery?: string
   isStreaming?: boolean
+  previewMode?: boolean
 }
 
 function AssistantMessage({
@@ -25,6 +26,7 @@ function AssistantMessage({
   toolResultByCallId = new Map(),
   searchQuery = '',
   isStreaming = false,
+  previewMode = false,
 }: AssistantMessageProps) {
   const { showThinking } = useSessionView()
   const [copied, setCopied] = useState(false)
@@ -72,7 +74,7 @@ function AssistantMessage({
           )}
         </div>
       ))}
-      {textBlocks.length > 0 && (
+      {textBlocks.length > 0 && !previewMode && (
         <div className="flex justify-end mt-2">
           <button
             onClick={handleCopy}

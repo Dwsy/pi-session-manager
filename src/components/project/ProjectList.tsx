@@ -18,6 +18,7 @@ interface ProjectListProps {
   onSelectSession: (session: SessionInfo) => void;
   onSelectProject?: (project: string | null) => void;
   onDeleteSession?: (session: SessionInfo) => void;
+  onConvertSession?: (session: SessionInfo) => void;
   loading: boolean;
   terminal?: TerminalType;
   piPath?: string;
@@ -45,6 +46,7 @@ export default function ProjectList({
   onSelectSession,
   onSelectProject,
   onDeleteSession,
+  onConvertSession,
   loading,
   terminal = getPlatformDefaults().defaultTerminal,
   piPath,
@@ -246,6 +248,7 @@ export default function ProjectList({
         selectedSession={selectedSession}
         onSelectSession={onSelectSession}
         onDeleteSession={onDeleteSession}
+        onConvertSession={onConvertSession}
         loading={loading}
         getBadgeType={getBadgeType}
         terminal={terminal}

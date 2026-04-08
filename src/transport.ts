@@ -255,7 +255,6 @@ export class WebSocketTransport implements Transport {
         for (const w of this.connectWaiters) w.resolve()
         this.connectWaiters = []
         this.emitStatus('connected')
-        console.log('[WS] connected')
       }
 
       ws.onmessage = async (event) => {
@@ -559,7 +558,6 @@ export class HttpTransport implements Transport {
     this.wsConnected = true
     this.retryCount = 0
     this.emitStatus('connected')
-    console.log('[HTTP-WS] event channel connected')
   }
 
   private scheduleReconnect(): void {
@@ -652,7 +650,6 @@ function detectMobileWeb(): boolean {
 
 export function createTransport(enableCompression = false): Transport {
   if (typeof window !== 'undefined' && (window as { __TAURI__?: unknown }).__TAURI__) {
-    console.log('Using Tauri IPC transport')
     return new TauriTransport()
   }
 
@@ -661,11 +658,9 @@ export function createTransport(enableCompression = false): Transport {
   const forceWs = cfg.transport === 'ws'
 
   if (forceHttp || (!forceWs && detectMobileWeb())) {
-    console.log('Using HTTP transport', cfg.httpBaseUrl)
     return new HttpTransport(cfg.httpBaseUrl, cfg.wsUrl, cfg.token ?? null)
   }
 
-  console.log('Using WebSocket transport', cfg.wsUrl, enableCompression ? 'with compression' : '')
   return new WebSocketTransport(cfg.wsUrl, cfg.token, enableCompression)
 }
 

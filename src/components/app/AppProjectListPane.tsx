@@ -19,6 +19,7 @@ export type AppProjectListPaneSessionListCommonProps = Pick<
   | "onSelectSession"
   | "onDeleteSession"
   | "onDeleteSessions"
+  | "onConvertSession"
   | "loading"
   | "getBadgeType"
   | "terminal"
@@ -54,6 +55,7 @@ export interface AppProjectListPaneProps {
   onSelectSession: SessionListProps["onSelectSession"];
   onSelectProject: NonNullable<ProjectListProps["onSelectProject"]>;
   onDeleteSession: NonNullable<SessionListProps["onDeleteSession"]>;
+  onConvertSession?: SessionListProps["onConvertSession"];
   loading: boolean;
   terminal?: ProjectListProps["terminal"];
   piPath?: ProjectListProps["piPath"];
@@ -83,6 +85,7 @@ function AppProjectListPane({
   onSelectSession,
   onSelectProject,
   onDeleteSession,
+  onConvertSession,
   loading,
   terminal,
   piPath,
@@ -123,6 +126,7 @@ function AppProjectListPane({
             onSelectSession={onSelectSession}
             onSelectProject={onSelectProject}
             onDeleteSession={onDeleteSession}
+            onConvertSession={onConvertSession}
             loading={loading}
             terminal={terminal}
             piPath={piPath}

@@ -99,6 +99,29 @@
   white-space: nowrap;
 }
 
+// Generic tool collapsed args preview (truncated JSON)
+.tool-generic-args-preview {
+  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
+  color: rgb(var(--color-muted-foreground));
+  background: rgba(var(--accent-rgb), 0.06);
+  border: 1px solid rgba(var(--accent-rgb), 0.1);
+  border-radius: 4px;
+  padding: 2px 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  cursor: inherit;
+  opacity: 0.85;
+}
+
+.tool-header:hover .tool-generic-args-preview {
+  opacity: 1;
+  border-color: rgba(var(--accent-rgb), 0.2);
+}
+
 .tool-meta {
   color: rgb(var(--color-muted-foreground));
   font-size: calc(var(--font-size-base, 16px) * 0.625);

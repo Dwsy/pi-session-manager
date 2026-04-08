@@ -161,6 +161,37 @@ export interface SessionChunk {
   has_more: boolean
 }
 
+export type SessionConvertTarget =
+  | 'pi'
+  | 'claude-code'
+  | 'codex'
+  | 'opencode'
+  | 'gemini'
+  | 'factory'
+  | 'clawdbot'
+
+export interface SessionProviderCapabilities {
+  canScan: boolean
+  canConvertTarget: boolean
+}
+
+export interface SessionProviderInfo {
+  slug: SessionConvertTarget
+  display_name: string
+  capabilities: SessionProviderCapabilities
+}
+
+export interface SessionConvertResult {
+  source_provider: string
+  target_provider: string
+  source_session_id: string
+  target_session_id: string
+  written_paths: string[]
+  resume_command: string
+  dry_run: boolean
+  warnings: string[]
+}
+
 export interface Message {
   role: string
   content: Content[]

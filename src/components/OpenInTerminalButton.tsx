@@ -76,12 +76,8 @@ export default function OpenInTerminalButton({
   const getResumeCommand = () => {
     try {
       const settings = getCachedSettings()
-      console.log('[DEBUG] getCachedSettings terminal:', settings.terminal)
-      console.log('[DEBUG] resumeCommand:', settings.terminal?.resumeCommand)
-      console.log('[DEBUG] propResumeCommand:', propResumeCommand)
       return settings.terminal?.resumeCommand || propResumeCommand || ''
-    } catch (e) {
-      console.error('[DEBUG] getResumeCommand error:', e)
+    } catch {
       return propResumeCommand || ''
     }
   }
@@ -121,9 +117,6 @@ export default function OpenInTerminalButton({
       const customCommand = getCustomCommand()
       const piPath = getPiPath()
       const resumeCommand = getResumeCommand()
-
-      console.log('[OpenInTerminal] Terminal:', terminal)
-      console.log('[OpenInTerminal] Resume command:', resumeCommand)
 
       await invoke('open_session_in_terminal', {
         path: session.path,

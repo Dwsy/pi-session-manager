@@ -32,6 +32,7 @@ interface KanbanBoardProps {
   getTagsForSession: (sessionId: string) => Tag[]
   onToggleTag: (sessionId: string, tagId: string, assigned: boolean) => void
   onDeleteSession?: (session: SessionInfo) => void
+  onConvertSession?: (session: SessionInfo) => void
   favorites?: FavoriteItem[]
   onToggleFavorite?: (item: Omit<FavoriteItem, 'addedAt'>) => void
   terminal?: TerminalType
@@ -63,6 +64,7 @@ export default function KanbanBoard({
   getTagsForSession,
   onToggleTag,
   onDeleteSession,
+  onConvertSession,
   favorites,
   onToggleFavorite,
   terminal,
@@ -379,6 +381,11 @@ export default function KanbanBoard({
         onClose={handleClosePreview}
         onCloseStart={handleClosePreviewStart}
         onExpand={handleExpandToFull}
+        onConvert={
+          previewSession && onConvertSession
+            ? () => onConvertSession(previewSession)
+            : undefined
+        }
         terminal={terminal}
         piPath={piPath}
         customCommand={customCommand}

@@ -6,6 +6,7 @@ export interface AppSessionViewerPaneProps extends Pick<
   ComponentProps<typeof SessionViewer>,
   | "session"
   | "onExport"
+  | "onConvert"
   | "onRename"
   | "onFork"
   | "onBack"
@@ -21,6 +22,7 @@ export interface AppSessionViewerPaneProps extends Pick<
 function AppSessionViewerPane({
   session,
   onExport,
+  onConvert,
   onRename,
   onFork,
   onBack,
@@ -35,6 +37,7 @@ function AppSessionViewerPane({
     <SessionViewer
       session={session}
       onExport={onExport}
+      onConvert={onConvert}
       onRename={onRename}
       onFork={onFork}
       onBack={onBack}

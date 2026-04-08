@@ -15,6 +15,7 @@ export const common = {
   back: '返回',
   refresh: '刷新',
   close: '关闭',
+  done: '完成',
   settings: '设置',
   messages: '条message',
   session: 'session',
@@ -51,4 +52,5 @@ export const common = {
   },
   copied: '已复制到剪贴板',
   copyFailed: '复制失败',
+  warning: '提示',
 } as const

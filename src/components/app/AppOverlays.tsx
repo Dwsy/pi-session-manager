@@ -2,11 +2,17 @@ import { Suspense } from "react";
 import type { ComponentType, LazyExoticComponent } from "react";
 
 import ExportDialog from "@/components/dialogs/ExportDialog";
+import ConvertSessionDialog from "@/components/dialogs/ConvertSessionDialog";
+import ConvertSessionResultDialog from "@/components/dialogs/ConvertSessionResultDialog";
 import RenameDialog from "@/components/dialogs/RenameDialog";
 import ForkDialog from "@/components/dialogs/ForkDialog";
 import Onboarding from "@/components/Onboarding";
 import type { SearchContext } from "@/plugins/types";
-import type { SessionInfo } from "@/types";
+import type {
+  SessionConvertResult,
+  SessionConvertTarget,
+  SessionInfo,
+} from "@/types";
 
 type ExportFormat = "html" | "md" | "json";
 
@@ -21,6 +27,8 @@ export interface CommandPaletteOverlayProps {
 
 export interface AppOverlaysProps {
   showExportDialog: boolean;
+  showConvertDialog: boolean;
+  convertResult: SessionConvertResult | null;
   showRenameDialog: boolean;
   showForkDialog: boolean;
   showSettings: boolean;
@@ -28,19 +36,30 @@ export interface AppOverlaysProps {
   selectedSession: SessionInfo | null;
   commandContext: SearchContext;
   onExportSession: (format: ExportFormat) => Promise<void> | void;
+  onConvertSession: (
+    target: SessionConvertTarget,
+    options: { dryRun: boolean; force: boolean }
+  ) => Promise<void> | void;
   onRenameSession: (newName: string) => Promise<void> | void;
   onForkSession: (targetName?: string) => Promise<void> | void;
   onCloseExportDialog: () => void;
+  onCloseConvertDialog: () => void;
+  onCloseConvertResultDialog: () => void;
   onCloseRenameDialog: () => void;
   onCloseForkDialog: () => void;
   onCloseSettings: () => void;
   onCompleteOnboarding: () => void;
+  onOpenConvertedPath: (path: string) => Promise<void> | void;
+  onRunConvertedResume: (command: string) => Promise<void> | void;
+  onConvertAgain: () => void;
   SettingsPanel: LazyExoticComponent<ComponentType<SettingsPanelOverlayProps>>;
   CommandPalette: LazyExoticComponent<ComponentType<CommandPaletteOverlayProps>>;
 }
 
 function AppOverlays({
   showExportDialog,
+  showConvertDialog,
+  convertResult,
   showRenameDialog,
   showForkDialog,
   showSettings,
@@ -48,13 +67,19 @@ function AppOverlays({
   selectedSession,
   commandContext,
   onExportSession,
+  onConvertSession,
   onRenameSession,
   onForkSession,
   onCloseExportDialog,
+  onCloseConvertDialog,
+  onCloseConvertResultDialog,
   onCloseRenameDialog,
   onCloseForkDialog,
   onCloseSettings,
   onCompleteOnboarding,
+  onOpenConvertedPath,
+  onRunConvertedResume,
+  onConvertAgain,
   SettingsPanel,
   CommandPalette,
 }: AppOverlaysProps) {
@@ -65,6 +90,22 @@ function AppOverlays({
           session={selectedSession}
           onExport={onExportSession}
           onClose={onCloseExportDialog}
+        />
+      )}
+      {showConvertDialog && selectedSession && (
+        <ConvertSessionDialog
+          session={selectedSession}
+          onConvert={onConvertSession}
+          onClose={onCloseConvertDialog}
+        />
+      )}
+      {convertResult && (
+        <ConvertSessionResultDialog
+          result={convertResult}
+          onClose={onCloseConvertResultDialog}
+          onOpenTargetPath={onOpenConvertedPath}
+          onRunResumeCommand={onRunConvertedResume}
+          onConvertAgain={onConvertAgain}
         />
       )}
       {showRenameDialog && selectedSession && (

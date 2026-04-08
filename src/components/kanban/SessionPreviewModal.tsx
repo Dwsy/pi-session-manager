@@ -15,6 +15,7 @@ export interface SessionPreviewModalProps {
   onCloseStart?: () => void
   onExpand: () => void
   onExport?: () => void
+  onConvert?: () => void
   onRename?: () => void
   terminal?: TerminalType
   piPath?: string
@@ -46,6 +47,7 @@ export default function SessionPreviewModal({
   onCloseStart,
   onExpand,
   onExport = () => {},
+  onConvert,
   onRename = () => {},
   terminal,
   piPath,
@@ -288,6 +290,7 @@ export default function SessionPreviewModal({
           <SessionViewer
             session={session}
             onExport={onExport}
+            onConvert={onConvert}
             onRename={onRename}
             onBack={handleCloseWithAnimation}
             terminal={terminal}

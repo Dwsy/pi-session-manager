@@ -1,22 +1,32 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Search, X, Loader2, User, Bot, FileText, Globe, ArrowUpDown } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { invoke } from '@/transport';
-import { shortenPath } from '@/utils/format';
-import { getPathParentName } from '@/utils/path';
-import { parseQuotedQuery } from '@/utils/search';
-import { getCachedSettings } from '@/utils/settingsApi';
-import type { FullTextSearchHit, FullTextSearchResponse, SessionInfo } from '@/types';
-import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '@/demo';
-import { formatShortSessionId } from '@/utils/session';
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import {
+  Search,
+  X,
+  Loader2,
+  User,
+  Bot,
+  FileText,
+  Globe,
+  ArrowUpDown,
+} from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { shortenPath } from "@/utils/format";
+import { getPathParentName } from "@/utils/path";
+import { parseQuotedQuery } from "@/utils/search";
+import type { FullTextSearchHit, SessionInfo } from "@/types";
+import {
+  fullTextSearchRuntime,
+  getRuntimeSessionByPath,
+} from "@/runtime-data/sessionSource";
+import { formatShortSessionId } from "@/utils/session";
 
 const HIGHLIGHT_CACHE_MAX_ENTRIES = 500;
 const HTML_ESCAPE_MAP: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-  "'": '&#039;',
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#039;",
 };
 
 function getProjectDirName(path: string): string {
@@ -37,7 +47,9 @@ function getHighlightTerms(query: string): string[] {
     ? [...parsedQuery.phrases, ...parsedQuery.remainderTokens]
     : query.trim().split(/\s+/).filter(Boolean);
 
-  return [...new Set(terms.filter(Boolean))].sort((a, b) => b.length - a.length);
+  return [...new Set(terms.filter(Boolean))].sort(
+    (a, b) => b.length - a.length,
+  );
 }
 
 interface FullTextSearchProps {
@@ -46,17 +58,25 @@ interface FullTextSearchProps {
   onSelectResult: (session: SessionInfo, entryId: string) => void;
 }
 
-export default function FullTextSearch({ isOpen, onClose, onSelectResult }: FullTextSearchProps) {
+export default function FullTextSearch({
+  isOpen,
+  onClose,
+  onSelectResult,
+}: FullTextSearchProps) {
   const { t } = useTranslation();
-  const [query, setQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'assistant'>('all');
-  const [globPattern, setGlobPattern] = useState('');
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | "user" | "assistant">(
+    "all",
+  );
+  const [globPattern, setGlobPattern] = useState("");
   const [allHits, setAllHits] = useState<FullTextSearchHit[]>([]);
   const [totalHitsCount, setTotalHitsCount] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hitsPage, setHitsPage] = useState(0);
-  const [sortMode, setSortMode] = useState<'score' | 'newest' | 'oldest'>('score');
+  const [sortMode, setSortMode] = useState<"score" | "newest" | "oldest">(
+    "score",
+  );
 
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,11 +88,17 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
   const sortedHits = useMemo(() => {
     const sorted = [...allHits];
     switch (sortMode) {
-      case 'newest':
-        sorted.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      case "newest":
+        sorted.sort(
+          (a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+        );
         break;
-      case 'oldest':
-        sorted.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      case "oldest":
+        sorted.sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+        );
         break;
       default:
         sorted.sort((a, b) => b.score - a.score);
@@ -82,11 +108,16 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
 
   const sessionCounts = useMemo(() => {
     const map = new Map<string, number>();
-    allHits.forEach(hit => map.set(hit.session_id, (map.get(hit.session_id) ?? 0) + 1));
+    allHits.forEach((hit) =>
+      map.set(hit.session_id, (map.get(hit.session_id) ?? 0) + 1),
+    );
     return map;
   }, [allHits]);
 
-  const paginatedHits = useMemo(() => sortedHits.slice(0, (hitsPage + 1) * pageSize), [sortedHits, hitsPage]);
+  const paginatedHits = useMemo(
+    () => sortedHits.slice(0, (hitsPage + 1) * pageSize),
+    [sortedHits, hitsPage],
+  );
 
   const remainingToFetch = totalHitsCount - allHits.length;
 
@@ -99,57 +130,64 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
       const hour = 60 * minute;
       const day = 24 * hour;
 
-      if (diffMs < minute) return t('common.time.justNow');
-      if (diffMs < hour) return t('common.time.minutesAgo', { count: Math.floor(diffMs / minute) });
-      if (diffMs < day) return t('common.time.hoursAgo', { count: Math.floor(diffMs / hour) });
-      if (diffMs < 7 * day) return t('common.time.daysAgo', { count: Math.floor(diffMs / day) });
-      return t('common.time.monthsAgo', { count: Math.floor(diffMs / (30 * day)) });
+      if (diffMs < minute) return t("common.time.justNow");
+      if (diffMs < hour)
+        return t("common.time.minutesAgo", {
+          count: Math.floor(diffMs / minute),
+        });
+      if (diffMs < day)
+        return t("common.time.hoursAgo", { count: Math.floor(diffMs / hour) });
+      if (diffMs < 7 * day)
+        return t("common.time.daysAgo", { count: Math.floor(diffMs / day) });
+      return t("common.time.monthsAgo", {
+        count: Math.floor(diffMs / (30 * day)),
+      });
     } catch {
       return timestamp;
     }
   };
 
-  const performSearch = useCallback(async (searchQuery: string, role: string, glob: string, pageNum: number, append = false) => {
-    if (!searchQuery.trim()) {
-      setAllHits([]);
-      setTotalHitsCount(0);
-      setHitsPage(0);
-      return;
-    }
-    setIsSearching(true);
-    setError(null);
-    try {
-      const response = isDemoModeEnabled()
-        ? fullTextSearchDemo({
+  const performSearch = useCallback(
+    async (
+      searchQuery: string,
+      role: string,
+      glob: string,
+      pageNum: number,
+      append = false,
+    ) => {
+      if (!searchQuery.trim()) {
+        setAllHits([]);
+        setTotalHitsCount(0);
+        setHitsPage(0);
+        return;
+      }
+      setIsSearching(true);
+      setError(null);
+      try {
+        const response = await fullTextSearchRuntime({
           query: searchQuery,
-          roleFilter: role as 'all' | 'user' | 'assistant',
+          roleFilter: role as "all" | "user" | "assistant",
           globPattern: glob || null,
           projectPath: null,
-          includeThinking: getCachedSettings().search.includeThinkingInSearch,
           page: pageNum,
           pageSize: pageSize,
-          matchMode: 'any',
-        })
-        : await invoke<FullTextSearchResponse>('full_text_search', {
-          query: searchQuery,
-          roleFilter: role,
-          globPattern: glob || null,
-          projectPath: null,
-          includeThinking: getCachedSettings().search.includeThinkingInSearch,
-          page: pageNum,
-          pageSize: pageSize,
-          matchMode: 'any', // default mode; could be made configurable
+          matchMode: "any",
+          sortOrder: sortMode === "score" ? "score" : sortMode,
         });
-      setAllHits(prev => append ? [...prev, ...response.hits] : response.hits);
-      setTotalHitsCount(response.total_hits);
-      setHitsPage(pageNum);
-    } catch (err: any) {
-      console.error('Full text search failed:', err);
-      setError(err as string || 'Search failed');
-    } finally {
-      setIsSearching(false);
-    }
-  }, [pageSize]);
+        setAllHits((prev) =>
+          append ? [...prev, ...response.hits] : response.hits,
+        );
+        setTotalHitsCount(response.total_hits);
+        setHitsPage(pageNum);
+      } catch (err: any) {
+        console.error("Full text search failed:", err);
+        setError((err as string) || "Search failed");
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [pageSize],
+  );
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -173,22 +211,25 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
 
   useEffect(() => setHitsPage(0), [sortMode]);
 
-  const highlightContent = useCallback((content: string): string => {
-    if (highlightTerms.length === 0) {
-      return escapeHtml(content);
-    }
+  const highlightContent = useCallback(
+    (content: string): string => {
+      if (highlightTerms.length === 0) {
+        return escapeHtml(content);
+      }
 
-    let result = escapeHtml(content);
-    highlightTerms.forEach((term) => {
-      const escapedTerm = escapeHtml(term);
-      const regex = new RegExp(
-        `(${escapedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
-        'gi',
-      );
-      result = result.replace(regex, '<b>$1</b>');
-    });
-    return result;
-  }, [highlightTerms]);
+      let result = escapeHtml(content);
+      highlightTerms.forEach((term) => {
+        const escapedTerm = escapeHtml(term);
+        const regex = new RegExp(
+          `(${escapedTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+          "gi",
+        );
+        result = result.replace(regex, "<b>$1</b>");
+      });
+      return result;
+    },
+    [highlightTerms],
+  );
 
   // Infinite scroll: load more when sentinel enters viewport
   useEffect(() => {
@@ -196,7 +237,7 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
     if (!sentinel) return;
 
     // Get the scroll container by ID (the element with #search-results-wrapper)
-    const scrollContainer = document.getElementById('search-results-wrapper');
+    const scrollContainer = document.getElementById("search-results-wrapper");
     const root = scrollContainer || sentinel.parentElement;
 
     const observer = new IntersectionObserver(
@@ -208,9 +249,9 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
       },
       {
         root,
-        rootMargin: '200px',
+        rootMargin: "200px",
         threshold: 0,
-      }
+      },
     );
     observer.observe(sentinel);
     return () => {
@@ -231,14 +272,14 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         e.preventDefault();
         onClose();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
   const handleLoadMore = () => {
@@ -248,31 +289,31 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
 
   const handleSelect = async (hit: FullTextSearchHit) => {
     try {
-      const session = isDemoModeEnabled()
-        ? getDemoSessionByPath(hit.session_path)
-        : await invoke<SessionInfo>('get_session_by_path', { path: hit.session_path });
+      const session = await getRuntimeSessionByPath(hit.session_path);
       if (session) {
         onSelectResult(session, hit.entry_id);
         onClose();
       }
     } catch (error) {
-      console.error('Failed to get session:', error);
+      console.error("Failed to get session:", error);
     }
   };
 
-
-
   const getSortLabel = () => {
     const keys = {
-      score: 'search.fullText.sortScore',
-      newest: 'search.fullText.sortNewest',
-      oldest: 'search.fullText.sortOldest',
+      score: "search.fullText.sortScore",
+      newest: "search.fullText.sortNewest",
+      oldest: "search.fullText.sortOldest",
     };
     return t(keys[sortMode]);
   };
 
   const cycleSort = () => {
-    const modes: ('score' | 'newest' | 'oldest')[] = ['score', 'newest', 'oldest'];
+    const modes: ("score" | "newest" | "oldest")[] = [
+      "score",
+      "newest",
+      "oldest",
+    ];
     const currentIndex = modes.indexOf(sortMode);
     setSortMode(modes[(currentIndex + 1) % 3]);
   };
@@ -286,15 +327,15 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
     >
       <div
         className="w-full max-w-3xl bg-[#1a1b26] border border-[#2a2b36] rounded-xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden animate-in zoom-in-95"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="p-4 border-b border-[#2a2b36] bg-[#1f2029] relative">
           {/* Close button - top right corner */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-1.5 rounded-md hover:bg-[#2a2b36] motion-surface motion-color motion-press focus-ring flex-shrink-0 z-10"
-            aria-label={t('common.close')}
-            title={t('common.close')}
+            aria-label={t("common.close")}
+            title={t("common.close")}
           >
             <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
           </button>
@@ -305,48 +346,48 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
               ref={inputRef}
               type="text"
               value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder={t('search.fullText.placeholder')}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("search.fullText.placeholder")}
               className="flex-1 bg-transparent border-none p-0 outline-none text-base font-medium text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex bg-[#252636]/50 p-1 rounded-lg border border-[#2a2b36]/50">
               <button
-                onClick={() => setRoleFilter('all')}
+                onClick={() => setRoleFilter("all")}
                 className={`px-3 py-1.5 text-xs rounded-md motion-surface motion-color motion-press focus-ring flex items-center gap-1 ${
-                  roleFilter === 'all'
-                    ? 'bg-blue-500/90 text-white shadow-md shadow-blue-500/25'
-                    : 'text-muted-foreground hover:bg-[#2a2b36] hover:text-foreground'
+                  roleFilter === "all"
+                    ? "bg-blue-500/90 text-white shadow-md shadow-blue-500/25"
+                    : "text-muted-foreground hover:bg-[#2a2b36] hover:text-foreground"
                 }`}
               >
                 <div className="flex -space-x-1">
                   <User className="w-3 h-3 flex-shrink-0" />
                   <Bot className="w-3 h-3 flex-shrink-0" />
                 </div>
-                {t('search.fullText.role.all')}
+                {t("search.fullText.role.all")}
               </button>
               <button
-                onClick={() => setRoleFilter('user')}
+                onClick={() => setRoleFilter("user")}
                 className={`px-3 py-1.5 text-xs rounded-md motion-surface motion-color motion-press focus-ring flex items-center gap-1 ${
-                  roleFilter === 'user'
-                    ? 'bg-blue-500/90 text-white shadow-md shadow-blue-500/25'
-                    : 'text-muted-foreground hover:bg-[#2a2b36] hover:text-foreground'
+                  roleFilter === "user"
+                    ? "bg-blue-500/90 text-white shadow-md shadow-blue-500/25"
+                    : "text-muted-foreground hover:bg-[#2a2b36] hover:text-foreground"
                 }`}
               >
                 <User className="w-3 h-3 flex-shrink-0" />
-                {t('search.fullText.role.user')}
+                {t("search.fullText.role.user")}
               </button>
               <button
-                onClick={() => setRoleFilter('assistant')}
+                onClick={() => setRoleFilter("assistant")}
                 className={`px-3 py-1.5 text-xs rounded-md motion-surface motion-color motion-press focus-ring flex items-center gap-1 ${
-                  roleFilter === 'assistant'
-                    ? 'bg-blue-500/90 text-white shadow-md shadow-blue-500/25'
-                    : 'text-muted-foreground hover:bg-[#2a2b36] hover:text-foreground'
+                  roleFilter === "assistant"
+                    ? "bg-blue-500/90 text-white shadow-md shadow-blue-500/25"
+                    : "text-muted-foreground hover:bg-[#2a2b36] hover:text-foreground"
                 }`}
               >
                 <Bot className="w-3 h-3 flex-shrink-0" />
-                {t('search.fullText.role.assistant')}
+                {t("search.fullText.role.assistant")}
               </button>
             </div>
             <div className="flex-1 min-w-[200px] relative">
@@ -354,19 +395,19 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
               <input
                 type="text"
                 value={globPattern}
-                onChange={e => setGlobPattern(e.target.value)}
-                placeholder={t('search.fullText.globPlaceholder')}
+                onChange={(e) => setGlobPattern(e.target.value)}
+                placeholder={t("search.fullText.globPlaceholder")}
                 className="w-full pl-10 pr-4 py-2 bg-[#252636] border border-[#2a2b36]/50 rounded-lg text-sm focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/20 motion-surface motion-color placeholder:text-muted-foreground/70"
               />
             </div>
             <button
               onClick={cycleSort}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border font-medium motion-surface motion-color motion-press focus-ring ${
-                sortMode === 'score'
-                  ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-blue-400/30 text-blue-300 shadow-sm shadow-blue-500/10'
-                  : 'bg-[#252636]/50 border-[#2a2b36]/50 text-muted-foreground hover:border-blue-400/30 hover:text-blue-300 hover:bg-blue-500/5'
+                sortMode === "score"
+                  ? "bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-blue-400/30 text-blue-300 shadow-sm shadow-blue-500/10"
+                  : "bg-[#252636]/50 border-[#2a2b36]/50 text-muted-foreground hover:border-blue-400/30 hover:text-blue-300 hover:bg-blue-500/5"
               }`}
-              title={t('search.fullText.sortTitle')}
+              title={t("search.fullText.sortTitle")}
             >
               <ArrowUpDown className="w-3.5 h-3.5" />
               <span className="font-normal">{getSortLabel()}</span>
@@ -378,37 +419,44 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
             {isSearching ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400 mr-1.5 inline" />
-                {t('search.searching')}
+                {t("search.searching")}
               </>
             ) : totalHitsCount > 0 ? (
-              t('search.fullText.resultsFound', { count: totalHitsCount })
+              t("search.fullText.resultsFound", { count: totalHitsCount })
             ) : null}
           </div>
           <div className="text-muted-foreground/60 flex items-center gap-1.5">
             <kbd className="px-1.5 py-0.5 bg-muted/30 border rounded-sm text-xs font-mono tracking-wider uppercase">
               Esc
             </kbd>
-            <span>{t('common.close')}</span>
+            <span>{t("common.close")}</span>
           </div>
         </div>
-        <div id="search-results-wrapper" className="flex-1 min-h-0 overflow-hidden bg-[#16161e]/50">
+        <div
+          id="search-results-wrapper"
+          className="flex-1 min-h-0 overflow-hidden bg-[#16161e]/50"
+        >
           <div className="flex flex-col p-4 space-y-2 custom-scrollbar">
             {error ? (
               <div className="flex flex-col items-center justify-center p-8 text-center text-red-400 bg-red-500/5 border border-red-500/20 rounded-xl">
                 <X className="w-12 h-12 mb-4 opacity-50" />
                 <p className="text-sm font-medium">{error}</p>
               </div>
-            ) : (isSearching && allHits.length === 0) ? (
+            ) : isSearching && allHits.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground/50">
                 <Loader2 className="w-16 h-16 mb-4 animate-spin" />
-                <p className="text-lg font-medium">{t('search.searching')}</p>
+                <p className="text-lg font-medium">{t("search.searching")}</p>
               </div>
             ) : paginatedHits.length === 0 ? (
               !isSearching && query ? (
                 <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground/50">
                   <Search className="w-16 h-16 mb-4 opacity-30" />
-                  <p className="text-lg font-medium mb-1">{t('search.noResults')}</p>
-                  <p className="text-sm">Try adjusting your search terms or filters</p>
+                  <p className="text-lg font-medium mb-1">
+                    {t("search.noResults")}
+                  </p>
+                  <p className="text-sm">
+                    Try adjusting your search terms or filters
+                  </p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground/30">
@@ -416,25 +464,33 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
                     <Search className="w-20 h-20 opacity-20 absolute inset-0" />
                     <Globe className="w-12 h-12 opacity-40 absolute inset-0 m-auto text-blue-400" />
                   </div>
-                  <p className="text-lg font-medium mb-1">{t('search.fullText.startTyping')}</p>
+                  <p className="text-lg font-medium mb-1">
+                    {t("search.fullText.startTyping")}
+                  </p>
                 </div>
               )
             ) : (
               <>
-                {paginatedHits.map(hit => {
+                {paginatedHits.map((hit) => {
                   const projectName = getProjectDirName(hit.session_path);
                   const title = hit.session_name?.trim() || projectName;
                   const truncatedPath = shortenPath(hit.session_path, 60);
                   const count = sessionCounts.get(hit.session_id) || 1;
-                  const isSessionIdMatch = hit.match_reason === 'session_id_exact' || hit.match_reason === 'session_id_prefix';
+                  const isSessionIdMatch =
+                    hit.match_reason === "session_id_exact" ||
+                    hit.match_reason === "session_id_prefix";
 
                   // Memoized highlight rendering
                   const cacheKey = `${hit.entry_id || `session:${hit.session_id}`}|${query}`;
                   let highlightedHtml = highlightCache.current.get(cacheKey);
                   if (highlightedHtml === undefined) {
                     highlightedHtml = highlightContent(hit.content);
-                    if (highlightCache.current.size >= HIGHLIGHT_CACHE_MAX_ENTRIES) {
-                      const oldestKey = highlightCache.current.keys().next().value;
+                    if (
+                      highlightCache.current.size >= HIGHLIGHT_CACHE_MAX_ENTRIES
+                    ) {
+                      const oldestKey = highlightCache.current
+                        .keys()
+                        .next().value;
                       if (oldestKey !== undefined) {
                         highlightCache.current.delete(oldestKey);
                       }
@@ -479,19 +535,26 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
                               </span>
                               {isSessionIdMatch && (
                                 <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
-                                  {t('search.fullText.sessionIdMatch', 'session id')}
+                                  {t(
+                                    "search.fullText.sessionIdMatch",
+                                    "session id",
+                                  )}
                                 </span>
                               )}
                             </div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground/70 mt-1">
-                              <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${
-                                hit.role === 'user'
-                                  ? 'bg-gradient-to-r from-blue-500/20 to-blue-600/20 text-blue-300 border border-blue-500/30'
-                                  : 'bg-gradient-to-r from-purple-500/20 to-purple-600/20 text-purple-300 border border-purple-500/30'
-                              }`}>
+                              <span
+                                className={`px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${
+                                  hit.role === "user"
+                                    ? "bg-gradient-to-r from-blue-500/20 to-blue-600/20 text-blue-300 border border-blue-500/30"
+                                    : "bg-gradient-to-r from-purple-500/20 to-purple-600/20 text-purple-300 border border-purple-500/30"
+                                }`}
+                              >
                                 {hit.role.toUpperCase()}
                               </span>
-                              <span className="font-mono whitespace-nowrap">{formatRelativeTime(hit.timestamp)}</span>
+                              <span className="font-mono whitespace-nowrap">
+                                {formatRelativeTime(hit.timestamp)}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -507,7 +570,9 @@ export default function FullTextSearch({ isOpen, onClose, onSelectResult }: Full
                   );
                 })}
                 {/* Infinite scroll sentinel */}
-                {remainingToFetch > 0 && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
+                {remainingToFetch > 0 && (
+                  <div ref={sentinelRef} className="h-1" aria-hidden="true" />
+                )}
               </>
             )}
           </div>

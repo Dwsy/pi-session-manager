@@ -21,6 +21,7 @@ type AppKanbanPaneBaseProps = Pick<
   | "getTagsForSession"
   | "onToggleTag"
   | "onDeleteSession"
+  | "onConvertSession"
   | "favorites"
   | "onToggleFavorite"
   | "terminal"
@@ -51,6 +52,7 @@ function AppKanbanPane({
   getTagsForSession,
   onToggleTag,
   onDeleteSession,
+  onConvertSession,
   favorites,
   onToggleFavorite,
   terminal,
@@ -74,6 +76,7 @@ function AppKanbanPane({
         getTagsForSession={getTagsForSession}
         onToggleTag={onToggleTag}
         onDeleteSession={onDeleteSession}
+        onConvertSession={onConvertSession}
         favorites={favorites}
         onToggleFavorite={onToggleFavorite}
         terminal={terminal}

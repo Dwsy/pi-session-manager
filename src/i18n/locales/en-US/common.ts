@@ -16,6 +16,7 @@ export const common = {
   back: 'Back',
   refresh: 'Refresh',
   close: 'Close',
+  done: 'Done',
   settings: 'Settings',
   messages: 'messages',
   session: 'Session',
@@ -52,4 +53,5 @@ export const common = {
   },
   copied: 'Copied to clipboard',
   copyFailed: 'Copy failed',
+  warning: 'Warning',
 } as const

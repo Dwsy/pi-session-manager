@@ -1,58 +1,49 @@
-import { useState, useCallback } from 'react'
-import { invoke } from '@/transport'
-import { getCachedSettings } from '@/utils/settingsApi'
-import type { SessionInfo, SearchResult } from '@/types'
-import { isDemoModeEnabled, searchDemoSessions } from '@/demo'
+import { useState, useCallback } from "react";
+import type { SessionInfo, SearchResult } from "@/types";
+import { searchRuntimeSessions } from "@/runtime-data/sessionSource";
 
 export interface UseSearchReturn {
-  searchResults: SearchResult[]
-  isSearching: boolean
-  handleSearch: (query: string, sessions: SessionInfo[]) => Promise<void>
-  clearSearch: () => void
+  searchResults: SearchResult[];
+  isSearching: boolean;
+  handleSearch: (query: string, sessions: SessionInfo[]) => Promise<void>;
+  clearSearch: () => void;
 }
 
 export function useSearch(
-  onSelectSession: (session: SessionInfo | null) => void
+  onSelectSession: (session: SessionInfo | null) => void,
 ): UseSearchReturn {
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
-  const [isSearching, setIsSearching] = useState(false)
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const handleSearch = useCallback(async (query: string, sessions: SessionInfo[]) => {
-    if (!query.trim()) {
-      setSearchResults([])
-      return
-    }
+  const handleSearch = useCallback(
+    async (query: string, sessions: SessionInfo[]) => {
+      if (!query.trim()) {
+        setSearchResults([]);
+        return;
+      }
 
-    try {
-      setIsSearching(true)
-      const searchPrefs = getCachedSettings().search
+      try {
+        setIsSearching(true);
+        const results = await searchRuntimeSessions(query, sessions);
 
-      const results = isDemoModeEnabled()
-        ? searchDemoSessions({ query, sessions })
-        : await invoke<SearchResult[]>('search_sessions', {
-          sessions,
-          query,
-          search_mode: searchPrefs.defaultSearchMode || 'content',
-          role_filter: 'all',
-          include_tools: searchPrefs.includeToolCalls ?? false,
-        })
-
-      setSearchResults(results)
-    } catch (error) {
-      console.error('[useSearch] Search failed:', error)
-    } finally {
-      setIsSearching(false)
-    }
-  }, [onSelectSession])
+        setSearchResults(results);
+      } catch (error) {
+        console.error("[useSearch] Search failed:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [onSelectSession],
+  );
 
   const clearSearch = useCallback(() => {
-    setSearchResults([])
-  }, [])
+    setSearchResults([]);
+  }, []);
 
   return {
     searchResults,
     isSearching,
     handleSearch,
     clearSearch,
-  }
+  };
 }

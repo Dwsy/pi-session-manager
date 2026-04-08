@@ -1,11 +1,4 @@
-import {
-  useState,
-  useMemo,
-  useRef,
-  useCallback,
-  lazy,
-  useEffect,
-} from "react";
+import { useState, useMemo, useRef, useCallback, lazy, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -25,17 +18,21 @@ import { useUpdateChecker } from "./hooks/app/useUpdateChecker";
 import { useDesktopSidebarActions } from "./hooks/app/useDesktopSidebarActions";
 import { useFavorites } from "./hooks/app/useFavorites";
 import { useSidebarSessions } from "./hooks/app/useSidebarSessions";
-import { registerBuiltinToolPlugins, registerExtensionToolPlugins } from "./plugins/tools-render";
+import {
+  registerBuiltinToolPlugins,
+  registerExtensionToolPlugins,
+} from "./plugins/tools-render";
 import ConnectionBanner from "./components/ConnectionBanner";
 import UpdateNoticeToast from "./components/UpdateNoticeToast";
-import PiLivePanel from "./components/pi-live/PiLivePanel";
 import { useTags } from "./hooks/useTags";
-import type { SessionInfo } from "./types";
+import type { SessionConvertTarget, SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
 import { invoke, isTauri } from "./transport";
-import { isDemoModeEnabled } from "./demo";
 import { getCachedSettings } from "./utils/settingsApi";
-import AppMobileLayout, { type MobileTab } from "./components/app/AppMobileLayout";
+import { shouldSkipOnboardingForRuntime } from "./runtime-data/mode";
+import AppMobileLayout, {
+  type MobileTab,
+} from "./components/app/AppMobileLayout";
 import AppDesktopSidebar from "./components/app/AppDesktopSidebar";
 import AppDesktopContent from "./components/app/AppDesktopContent";
 import AppDesktopSearchBar from "./components/app/AppDesktopSearchBar";
@@ -130,8 +127,9 @@ function App() {
     cancelDeleteSession,
   } = useSessions();
 
-  const { terminal, piPath, customCommand, resumeCommand, loadSettings } = useAppSettings();
-  const { handleExportSession } = useSessionActions();
+  const { terminal, piPath, customCommand, resumeCommand, loadSettings } =
+    useAppSettings();
+  const { handleExportSession, handleConvertSession } = useSessionActions();
   const { getBadgeType, clearBadge } = useSessionBadges(
     sessions,
     selectedSession?.id ?? null,
@@ -157,7 +155,7 @@ function App() {
   } = useTags();
   useAppearance();
   useToolStyles();
-  const { liveSessionIds, isEnabled: piLiveEnabled, showInSidebar: showPiLiveInSidebar } = usePiLive();
+  const { liveSessionIds } = usePiLive();
 
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "project" | "kanban">(
@@ -173,6 +171,10 @@ function App() {
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showConvertDialog, setShowConvertDialog] = useState(false);
+  const [convertResult, setConvertResult] = useState<
+    import("./types").SessionConvertResult | null
+  >(null);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showForkDialog, setShowForkDialog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -183,7 +185,7 @@ function App() {
   );
   const [selectionModeTrigger, setSelectionModeTrigger] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(() => {
-    if (isDemoModeEnabled()) {
+    if (shouldSkipOnboardingForRuntime()) {
       try {
         localStorage.setItem("onboarding-completed", "true");
       } catch {}
@@ -196,9 +198,6 @@ function App() {
     }
   });
   const [showTerminal, setShowTerminal] = useState(false);
-
-  // Actually display Pi Live requires: feature enabled + sidebar visible + user toggled
-  const showPiLivePanel = piLiveEnabled && showPiLiveInSidebar;
 
   const [pendingScrollEntryId, setPendingScrollEntryId] = useState<
     string | null
@@ -235,6 +234,8 @@ function App() {
   useAppUiEffects({
     isMobile,
     showExportDialog,
+    showConvertDialog,
+    showConvertResultDialog: !!convertResult,
     showRenameDialog,
     showForkDialog,
     hasPendingDeleteSession: false,
@@ -253,7 +254,6 @@ function App() {
     },
     [setSelectedSession, clearBadge],
   );
-
 
   const buildResumeCommand = useCallback(
     (session: SessionInfo) => {
@@ -295,6 +295,8 @@ function App() {
   const isBlockingShortcutOverlayOpen =
     showSettings ||
     showExportDialog ||
+    showConvertDialog ||
+    !!convertResult ||
     showRenameDialog ||
     showForkDialog ||
     showOnboarding ||
@@ -335,6 +337,10 @@ function App() {
           setShowSettings(false);
         } else if (showExportDialog) {
           setShowExportDialog(false);
+        } else if (showConvertDialog) {
+          setShowConvertDialog(false);
+        } else if (convertResult) {
+          setConvertResult(null);
         } else if (showRenameDialog) {
           setShowRenameDialog(false);
         } else if (showForkDialog) {
@@ -355,6 +361,8 @@ function App() {
     [
       showSettings,
       showExportDialog,
+      showConvertDialog,
+      convertResult,
       showRenameDialog,
       showForkDialog,
       showTerminal,
@@ -370,12 +378,9 @@ function App() {
     ],
   );
 
-  const shouldHandleGlobalShortcutEvent = useCallback(
-    () => {
-      return true;
-    },
-    [],
-  );
+  const shouldHandleGlobalShortcutEvent = useCallback(() => {
+    return true;
+  }, []);
 
   useKeyboardShortcuts(shortcuts, {
     shouldHandleEvent: shouldHandleGlobalShortcutEvent,
@@ -430,6 +435,10 @@ function App() {
     onSelectSession: handleSelectSession,
     onDeleteSession: handleDeleteSession,
     onDeleteSessions: handleDeleteSessionsWithRef,
+    onConvertSession: async (session) => {
+      setSelectedSession(session);
+      setShowConvertDialog(true);
+    },
     getBadgeType,
     terminal,
     piPath,
@@ -467,6 +476,48 @@ function App() {
     await handleExportSession(selectedSession, format);
     setShowExportDialog(false);
   };
+
+  const onConvertSession = async (
+    target: SessionConvertTarget,
+    options: { dryRun: boolean; force: boolean },
+  ) => {
+    if (!selectedSession) return;
+    const result = await handleConvertSession(selectedSession, target, options);
+    if (result) {
+      setConvertResult(result);
+    }
+    setShowConvertDialog(false);
+  };
+
+  const handleStartConvertSession = useCallback((session: SessionInfo) => {
+    setSelectedSession(session);
+    setShowConvertDialog(true);
+  }, [setSelectedSession]);
+
+  const handleOpenConvertedPath = useCallback(
+    async (path: string) => {
+      try {
+        await invoke("open_path_in_system", { path });
+      } catch (error) {
+        console.error("Failed to open converted path:", error);
+        alert(`${t("session.convert.openFailed")}: ${error}`);
+      }
+    },
+    [t],
+  );
+
+  const handleRunConvertedResume = useCallback(async (command: string) => {
+    if (!command) {
+      return;
+    }
+    setTerminalPendingCommand(command);
+    setShowTerminal(true);
+  }, []);
+
+  const handleConvertAgain = useCallback(() => {
+    setConvertResult(null);
+    setShowConvertDialog(true);
+  }, []);
 
   // ─── Shared content renderers ───
 
@@ -516,7 +567,9 @@ function App() {
       mobileFilterBar={
         isMobile
           ? renderMobileFilterBar(
-              selectedProject ? undefined : t("common.searchProjectsPlaceholder"),
+              selectedProject
+                ? undefined
+                : t("common.searchProjectsPlaceholder"),
               !!selectedProject,
             )
           : null
@@ -561,6 +614,7 @@ function App() {
       getTagsForSession={getTagsForSession}
       onToggleTag={handleToggleSessionTag}
       onDeleteSession={handleDeleteSession}
+      onConvertSession={handleStartConvertSession}
       favorites={favorites}
       onToggleFavorite={toggleFavorite}
       terminal={terminal}
@@ -606,6 +660,7 @@ function App() {
     <AppSessionViewerPane
       session={selectedSession!}
       onExport={() => setShowExportDialog(true)}
+      onConvert={() => setShowConvertDialog(true)}
       onRename={() => setShowRenameDialog(true)}
       onFork={() => setShowForkDialog(true)}
       onBack={() => setSelectedSession(null)}
@@ -640,6 +695,8 @@ function App() {
   const renderOverlays = () => (
     <AppOverlays
       showExportDialog={showExportDialog}
+      showConvertDialog={showConvertDialog}
+      convertResult={convertResult}
       showRenameDialog={showRenameDialog}
       showForkDialog={showForkDialog}
       showSettings={showSettings}
@@ -647,9 +704,12 @@ function App() {
       selectedSession={selectedSession}
       commandContext={commandContext}
       onExportSession={onExportSession}
+      onConvertSession={onConvertSession}
       onRenameSession={onRenameSession}
       onForkSession={onForkSession}
       onCloseExportDialog={() => setShowExportDialog(false)}
+      onCloseConvertDialog={() => setShowConvertDialog(false)}
+      onCloseConvertResultDialog={() => setConvertResult(null)}
       onCloseRenameDialog={() => setShowRenameDialog(false)}
       onCloseForkDialog={() => setShowForkDialog(false)}
       onCloseSettings={() => {
@@ -660,6 +720,9 @@ function App() {
         localStorage.setItem("onboarding-completed", "true");
         setShowOnboarding(false);
       }}
+      onOpenConvertedPath={handleOpenConvertedPath}
+      onRunConvertedResume={handleRunConvertedResume}
+      onConvertAgain={handleConvertAgain}
       SettingsPanel={SettingsPanel}
       CommandPalette={CommandPalette}
     />
@@ -738,9 +801,7 @@ function App() {
     />
   );
 
-  const desktopSidebarContent = showPiLivePanel
-    ? (<PiLivePanel />)
-    : (
+  const desktopSidebarContent = (
     <AppDesktopSidebarContent
       showFavorites={showFavorites}
       viewMode={viewMode}

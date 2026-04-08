@@ -6,6 +6,8 @@ import type { SessionInfo } from "@/types";
 export interface UseAppUiEffectsOptions {
   isMobile: boolean;
   showExportDialog: boolean;
+  showConvertDialog: boolean;
+  showConvertResultDialog: boolean;
   showRenameDialog: boolean;
   showForkDialog: boolean;
   hasPendingDeleteSession: boolean;
@@ -20,6 +22,8 @@ export interface UseAppUiEffectsOptions {
 export function useAppUiEffects({
   isMobile,
   showExportDialog,
+  showConvertDialog,
+  showConvertResultDialog,
   showRenameDialog,
   showForkDialog,
   hasPendingDeleteSession,
@@ -37,6 +41,8 @@ export function useAppUiEffects({
 
     const isAnyModalOpen =
       showExportDialog ||
+      showConvertDialog ||
+      showConvertResultDialog ||
       showRenameDialog ||
       showForkDialog ||
       hasPendingDeleteSession ||
@@ -56,6 +62,8 @@ export function useAppUiEffects({
   }, [
     isMobile,
     showExportDialog,
+    showConvertDialog,
+    showConvertResultDialog,
     showRenameDialog,
     showForkDialog,
     hasPendingDeleteSession,

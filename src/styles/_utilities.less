@@ -5,7 +5,8 @@
 @layer utilities {
   // Motion Utilities
   .motion-color {
-    transition-property: color, background-color, border-color, fill, stroke, opacity;
+    transition-property:
+      color, background-color, border-color, fill, stroke, opacity;
     transition-duration: var(--motion-duration-fast);
     transition-timing-function: var(--motion-ease-standard);
   }
@@ -64,19 +65,29 @@
 
   // UI Animations
   .ui-enter-fade {
-    animation: ui-fade-in var(--motion-duration-overlay) var(--motion-ease-enter) both;
+    animation: ui-fade-in var(--motion-duration-overlay)
+      var(--motion-ease-enter) both;
   }
 
   .ui-enter-zoom {
-    animation: ui-zoom-in var(--motion-duration-overlay) var(--motion-ease-enter) both;
+    animation: ui-zoom-in var(--motion-duration-overlay)
+      var(--motion-ease-enter) both;
   }
 
   .ui-exit-fade {
-    animation: ui-fade-out var(--motion-duration-fast) var(--motion-ease-exit) both;
+    animation: ui-fade-out var(--motion-duration-fast) var(--motion-ease-exit)
+      both;
   }
 
   .ui-exit-zoom {
-    animation: ui-zoom-out var(--motion-duration-fast) var(--motion-ease-exit) both;
+    animation: ui-zoom-out var(--motion-duration-fast) var(--motion-ease-exit)
+      both;
+  }
+
+  // Settings modal: keep interactions stable, no press-scale effect
+  .settings-modal-no-press .motion-press:active {
+    transform: none;
+    opacity: 1;
   }
 
   // Glassmorphism
@@ -129,7 +140,11 @@
 
   // Text Gradient
   .text-gradient {
-    background: linear-gradient(135deg, rgb(var(--color-foreground)) 0%, rgb(var(--color-muted-foreground)) 100%);
+    background: linear-gradient(
+      135deg,
+      rgb(var(--color-foreground)) 0%,
+      rgb(var(--color-muted-foreground)) 100%
+    );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -217,7 +232,16 @@
   padding: 12px;
   overflow: auto;
   max-height: inherit;
-  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    "DejaVu Sans Mono",
+    monospace
+  );
   font-size: 11px;
   color: var(--text-secondary);
   line-height: var(--line-height);

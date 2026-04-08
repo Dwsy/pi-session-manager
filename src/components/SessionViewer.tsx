@@ -34,6 +34,7 @@ import type { TerminalType } from "./settings/types";
 interface SessionViewerProps {
   session: SessionInfo;
   onExport: () => void;
+  onConvert?: () => void;
   onRename: () => void;
   onFork?: () => void;
   onBack?: () => void;
@@ -43,6 +44,7 @@ interface SessionViewerProps {
   customCommand?: string;
   resumeCommand?: string;
   initialEntryId?: string;
+  previewMode?: boolean;
 }
 
 const SIDEBAR_MIN_WIDTH = 200;
@@ -53,6 +55,7 @@ const SIDEBAR_WIDTH_KEY = "pi-session-manager-sidebar-width";
 function SessionViewerContent({
   session,
   onExport,
+  onConvert,
   onRename,
   onFork,
   onBack,
@@ -62,6 +65,7 @@ function SessionViewerContent({
   customCommand,
   resumeCommand,
   initialEntryId,
+  previewMode = false,
 }: SessionViewerProps) {
   const { t } = useTranslation();
   const {
@@ -77,12 +81,20 @@ function SessionViewerContent({
   const isMobile = useIsMobile();
   const { getSessionSetting } = useSettings();
   const cmdFBehavior = getSessionSetting('cmdFBehavior') ?? 'inSessionSearch';
-  const scrollMarkersEnabled = getSessionSetting('scrollMarkersEnabled') ?? true;
-  const timelineNavEnabled = getSessionSetting('timelineNavEnabled') ?? true;
+  const scrollMarkersEnabledSetting =
+    getSessionSetting('scrollMarkersEnabled') ?? false;
+  const timelineNavEnabledSetting =
+    getSessionSetting('timelineNavEnabled') ?? false;
+  const timelineNavEnabled = previewMode ? false : timelineNavEnabledSetting;
+  const scrollMarkersEnabled = previewMode
+    ? false
+    : scrollMarkersEnabledSetting && !timelineNavEnabled;
 
   const { sessions: liveSessions } = usePiLiveSessions()
-  const liveSession = liveSessions.find(s => s.session_id.includes(session.id)) || null
-  const isLive = Boolean(liveSession)
+  const liveSession = previewMode
+    ? null
+    : liveSessions.find(s => s.sessionId.includes(session.id)) || null
+  const isLive = previewMode ? false : Boolean(liveSession)
 
   const [showSidebar, setShowSidebar] = useState(false);
   const [searchFocusKey, setSearchFocusKey] = useState(0);
@@ -129,6 +141,9 @@ function SessionViewerContent({
   });
 
   const handleToggleSidebar = useCallback(() => {
+    if (previewMode) {
+      return;
+    }
     setShowMobileMenu(false);
     setShowSidebar((prev) => {
       const next = !prev;
@@ -137,7 +152,7 @@ function SessionViewerContent({
       }
       return next;
     });
-  }, [isMobile]);
+  }, [isMobile, previewMode]);
 
   const {
     renderableEntries,
@@ -145,7 +160,7 @@ function SessionViewerContent({
     stats,
     headerEntry,
     messageEntries,
-  } = useSessionViewerDerivedData(entries, activeEntryId, isLive);
+  } = useSessionViewerDerivedData(entries, activeEntryId, isLive, previewMode);
 
   const {
     isSearchOpen,
@@ -179,7 +194,7 @@ function SessionViewerContent({
   }, [closeSearch, restoreSearchExpandedTools]);
 
   useSessionViewerHotkeys({
-    enabled: !showSystemPromptDialog && !showMobileMenu,
+    enabled: !previewMode && !showSystemPromptDialog && !showMobileMenu,
     isSearchOpen,
     cmdFBehavior,
     onToggleThinking: toggleThinking,
@@ -234,42 +249,45 @@ function SessionViewerContent({
 
   return (
     <div
-      className={`h-full flex relative ${showToolExpandIndicator ? "" : "tool-expand-indicators-hidden"}`}
+      className={`h-full flex relative ${showToolExpandIndicator ? "" : "tool-expand-indicators-hidden"} ${previewMode ? "session-viewer-preview" : ""}`}
     >
-      <SessionViewerSidebar
-        showSidebar={showSidebar}
-        isMobile={isMobile}
-        sidebarWidth={sidebarWidth}
-        isResizing={isResizing}
-        entries={entries}
-        activeEntryId={activeEntryId}
-        onCloseSidebar={() => setShowSidebar(false)}
-        onNodeClick={handleTreeNodeClick}
-        onResizeMouseDown={handleMouseDown}
-        treeRef={treeRef}
-        sidebarRef={sidebarRef}
-        resizeHandleRef={resizeHandleRef}
-        outlineTitle={t("session.toolbar.outline", "Outline")}
-        hideSidebarTitle={t("session.hideSidebar")}
-      />
+      {!previewMode && (
+        <SessionViewerSidebar
+          showSidebar={showSidebar}
+          isMobile={isMobile}
+          sidebarWidth={sidebarWidth}
+          isResizing={isResizing}
+          entries={entries}
+          activeEntryId={activeEntryId}
+          onCloseSidebar={() => setShowSidebar(false)}
+          onNodeClick={handleTreeNodeClick}
+          onResizeMouseDown={handleMouseDown}
+          treeRef={treeRef}
+          sidebarRef={sidebarRef}
+          resizeHandleRef={resizeHandleRef}
+          outlineTitle={t("session.toolbar.outline", "Outline")}
+          hideSidebarTitle={t("session.hideSidebar")}
+        />
+      )}
 
       <div
         className="flex-1 flex flex-col min-w-0 min-h-0"
         style={{
-          paddingLeft: showSidebar && !isMobile ? `${sidebarWidth}px` : 0,
+          paddingLeft: !previewMode && showSidebar && !isMobile ? `${sidebarWidth}px` : 0,
         }}
       >
         <SessionViewerToolbar
           isMobile={isMobile}
           title={session.name || t("session.title")}
           messageCount={messageEntries.length}
-          showSidebar={showSidebar}
+          showSidebar={previewMode ? false : showSidebar}
           showThinking={showThinking}
           toolsExpanded={toolsExpanded}
-          showScrollMarkers={showScrollMarkers}
+          showScrollMarkers={previewMode ? false : showScrollMarkers}
           isMobileMenuOpen={showMobileMenu}
-          isScrollMarkersFeatureEnabled={scrollMarkersEnabled}
+          isScrollMarkersFeatureEnabled={previewMode ? false : scrollMarkersEnabled}
           isSearchOpen={isSearchOpen}
+          previewMode={previewMode}
           onBack={onBack}
           onToggleSidebar={handleToggleSidebar}
           onToggleThinking={toggleThinking}
@@ -283,6 +301,7 @@ function SessionViewerContent({
           onRename={onRename}
           onFork={onFork}
           onExport={onExport}
+          onConvert={onConvert}
           onResume={onWebResume}
           liveSession={liveSession}
           desktopResumeButton={
@@ -358,7 +377,7 @@ function SessionViewerContent({
           isAtBottomRef={sessionDataIsAtBottomRef}
           onReachBottom={handleReachBottom}
           toolResultByCallId={toolResultByCallId}
-          showScrollMarkers={showScrollMarkers}
+          showScrollMarkers={previewMode ? false : showScrollMarkers}
           isMobile={isMobile}
           scrollMarkers={scrollMarkers}
           activeMarkerId={activeMarkerId}
@@ -368,22 +387,27 @@ function SessionViewerContent({
           onPointerMove={handleMarkersPointerMove}
           onPointerUp={handleMarkersPointerUp}
           onPointerLeave={handleMarkersPointerLeave}
-          isScrollMarkersFeatureEnabled={scrollMarkersEnabled}
-          isTimelineNavEnabled={timelineNavEnabled}
+          isScrollMarkersFeatureEnabled={previewMode ? false : scrollMarkersEnabled}
+          isTimelineNavEnabled={previewMode ? false : timelineNavEnabled}
+          previewMode={previewMode}
         />
 
-        <ChatInput
-          sessionId={session.id}
-          isLive={isLive}
-          onSent={() => setHasNewMessages(false)}
-        />
+        {!previewMode && (
+          <ChatInput
+            sessionId={session.id}
+            isLive={isLive}
+            onSent={() => setHasNewMessages(false)}
+          />
+        )}
       </div>
-      <SystemPromptDialog
-        isOpen={showSystemPromptDialog}
-        onClose={() => setShowSystemPromptDialog(false)}
-        entries={entries}
-        sessionPath={session.path}
-      />
+      {!previewMode && (
+        <SystemPromptDialog
+          isOpen={showSystemPromptDialog}
+          onClose={() => setShowSystemPromptDialog(false)}
+          entries={entries}
+          sessionPath={session.path}
+        />
+      )}
     </div>
   );
 }
