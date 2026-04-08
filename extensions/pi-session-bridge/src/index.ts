@@ -251,6 +251,11 @@ export default function (pi: ExtensionAPI) {
 
   function buildSessionState() {
     const model = latestCtx?.model;
+    const availableModels = (latestCtx?.modelRegistry.getAvailable() || []).map((item: any) => ({
+      provider: item.provider,
+      id: item.id,
+      name: item.name || item.id,
+    }));
     const thinkingLevel = pi.getThinkingLevel();
     const contextUsage = latestCtx?.getContextUsage();
     const tagsResult = getTagsForSession(sessionId);
@@ -260,6 +265,7 @@ export default function (pi: ExtensionAPI) {
       sessionId,
       sessionPath,
       model,
+      availableModels,
       thinkingLevel,
       contextUsage,
       isStreaming: latestCtx ? !latestCtx.isIdle() : false,
