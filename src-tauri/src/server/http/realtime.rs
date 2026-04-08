@@ -20,6 +20,25 @@ use tokio::sync::broadcast;
 
 use super::common::{cors_headers, is_authorized};
 
+fn is_pi_live_forward_event(event_type: &str) -> bool {
+    matches!(
+        event_type,
+        "message_start"
+            | "message_update"
+            | "message_end"
+            | "tool_execution_start"
+            | "tool_execution_update"
+            | "tool_execution_end"
+            | "agent_start"
+            | "agent_end"
+            | "turn_start"
+            | "turn_end"
+            | "model_select"
+            | "auto_compaction_start"
+            | "auto_compaction_end"
+    )
+}
+
 pub(crate) async fn handle_preflight() -> impl IntoResponse {
     (StatusCode::NO_CONTENT, cors_headers())
 }
@@ -149,38 +168,32 @@ async fn handle_ws_connection(
 
                                     let _ = app_state.event_tx.send(crate::app_state::WsEvent {
                                         event_type: "event".to_string(),
-                                        event: "pi-agent:register".to_string(),
+                                        event: "pi-live:session_registered".to_string(),
                                         payload: register["payload"].clone(),
                                     });
-                                    let _ = app_state.app_handle.emit("pi-agent:register", &register["payload"]);
+                                    let _ = app_state.app_handle.emit("pi-live:session_registered", &register["payload"]);
                                 }
                             }
                             continue;
                         }
 
-                        // ── Pi agent protocol: live entry ───────────────────
-                        if text.contains("\"type\"") && text.contains("\"pi-agent:entry\"") {
-                            if let Ok(entry) = serde_json::from_str::<Value>(&text) {
-                                let session_id = entry["sessionId"].as_str().unwrap_or("");
+                        if let Ok(live_event) = serde_json::from_str::<Value>(&text) {
+                            let event_type = live_event["type"].as_str().unwrap_or("");
+                            if is_pi_live_forward_event(event_type) {
+                                let session_id = live_event["sessionId"].as_str().unwrap_or("");
                                 if !session_id.is_empty() {
-                                    let event_type = entry["payload"]["eventType"].as_str().unwrap_or("");
                                     app_state.pi_agent_registry.record_entry(session_id, event_type);
-                                    log::info!("[HTTP-WS] Pi agent entry: session={session_id}, event={event_type}");
-                                    let payload = json!({
-                                        "sessionId": session_id,
-                                        "eventType": entry["payload"]["eventType"],
-                                        "entry": &entry["payload"]["entry"],
-                                    });
+                                    log::info!("[HTTP-WS] Pi live event: session={session_id}, event={event_type}");
                                     let _ = app_state.event_tx.send(crate::app_state::WsEvent {
                                         event_type: "event".to_string(),
-                                        event: "pi-agent:entry".to_string(),
-                                        payload: payload.clone(),
+                                        event: event_type.to_string(),
+                                        payload: live_event.clone(),
                                     });
-                                    let _ = app_state.app_handle.emit("pi-agent:entry", &payload);
+                                    let _ = app_state.app_handle.emit(event_type, &live_event);
                                     let _ = tx.send(AxumWsMsg::Text(r#"{"type":"ack"}"#.into())).await;
                                 }
+                                continue;
                             }
-                            continue;
                         }
 
                         // ── Pi agent protocol: RPC response ─────────────────
@@ -215,10 +228,10 @@ async fn handle_ws_connection(
                                     // Also broadcast session_state to frontend
                                     let _ = app_state.event_tx.send(crate::app_state::WsEvent {
                                         event_type: "event".to_string(),
-                                        event: "pi-agent:session_state".to_string(),
+                                        event: "pi-live:state_updated".to_string(),
                                         payload: state_msg["payload"].clone(),
                                     });
-                                    let _ = app_state.app_handle.emit("pi-agent:session_state", &state_msg["payload"]);
+                                    let _ = app_state.app_handle.emit("pi-live:state_updated", &state_msg["payload"]);
                                 }
                             }
                             continue;
@@ -318,12 +331,12 @@ async fn handle_ws_connection(
 
         let ws_event = crate::app_state::WsEvent {
             event_type: "event".to_string(),
-            event: "pi-agent:disconnect".to_string(),
+            event: "pi-live:session_disconnected".to_string(),
             payload: serde_json::json!({ "sessionId": sid }),
         };
         let _ = app_state.event_tx.send(ws_event.clone());
         let _ = app_state
             .app_handle
-            .emit("pi-agent:disconnect", &ws_event.payload);
+            .emit("pi-live:session_disconnected", &ws_event.payload);
     }
 }

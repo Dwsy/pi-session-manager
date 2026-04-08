@@ -176,3 +176,36 @@ pub async fn open_session_in_browser_impl(path: String) -> Result<(), String> {
     result.map_err(|e| format!("Failed to open browser: {e}"))?;
     Ok(())
 }
+
+/// Open a file or directory in the system file manager.
+pub async fn open_path_in_system_impl(path: String) -> Result<(), String> {
+    let target = Path::new(&path);
+    let open_target = if target.is_file() {
+        target
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| target.to_path_buf())
+    } else {
+        target.to_path_buf()
+    };
+
+    if !open_target.exists() {
+        return Err(format!("Path does not exist: {}", open_target.display()));
+    }
+
+    let open_target_str = open_target.to_string_lossy().to_string();
+    let result = if cfg!(target_os = "macos") {
+        Command::new("open").arg(&open_target_str).spawn()
+    } else if cfg!(target_os = "linux") {
+        Command::new("xdg-open").arg(&open_target_str).spawn()
+    } else if cfg!(target_os = "windows") {
+        Command::new("cmd")
+            .args(["/C", "start", "", &open_target_str])
+            .spawn()
+    } else {
+        return Err("Unsupported operating system".to_string());
+    };
+
+    result.map_err(|e| format!("Failed to open path in system file manager: {e}"))?;
+    Ok(())
+}

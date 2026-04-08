@@ -41,6 +41,25 @@ struct WsResponse {
 
 use crate::utils::payload::{extract_string, extract_usize};
 
+fn is_pi_live_forward_event(event_type: &str) -> bool {
+    matches!(
+        event_type,
+        "message_start"
+            | "message_update"
+            | "message_end"
+            | "tool_execution_start"
+            | "tool_execution_update"
+            | "tool_execution_end"
+            | "agent_start"
+            | "agent_end"
+            | "turn_start"
+            | "turn_end"
+            | "model_select"
+            | "auto_compaction_start"
+            | "auto_compaction_end"
+    )
+}
+
 pub struct WsAdapter {
     app_state: SharedAppState,
     bind_addr: String,
@@ -146,9 +165,11 @@ impl WsAdapter {
                             // Debug: log raw message start for pi-agent detection
                             let has_type = text.contains("\"type\"");
                             let has_register = text.contains("\"register\"");
-                            let has_entry = text.contains("\"pi-agent:entry\"");
-                            if has_type || has_register || has_entry {
-                                log::info!("[WS] Pi agent msg detected: type={} reg={} entry={} len={}", has_type, has_register, has_entry, text.len());
+                            let has_live_event = text.contains("\"message_update\"")
+                                || text.contains("\"turn_end\"")
+                                || text.contains("\"tool_execution_\"");
+                            if has_type || has_register || has_live_event {
+                                log::info!("[WS] Pi agent msg detected: type={} reg={} live={} len={}", has_type, has_register, has_live_event, text.len());
                             }
 
                             // Pi agent protocol: register with sessionId
@@ -178,44 +199,36 @@ impl WsAdapter {
                                         // Broadcast to WS clients
                                         let ws_event = WsEvent {
                                             event_type: "event".to_string(),
-                                            event: "pi-agent:register".to_string(),
+                                            event: "pi-live:session_registered".to_string(),
                                             payload: register["payload"].clone(),
                                         };
                                         let _ = self.app_state.event_tx.send(ws_event);
 
                                         // ALSO emit to Tauri frontend so usePiLiveSessions can react
-                                        let _ = self.app_state.app_handle.emit("pi-agent:register", &register["payload"]);
+                                        let _ = self.app_state.app_handle.emit("pi-live:session_registered", &register["payload"]);
                                     }
                                 }
                                 continue;
                             }
 
-                            // Pi agent protocol: live entry stream
-                            if text.contains("\"type\"") && text.contains("\"pi-agent:entry\"") {
-                                log::info!("[WS] Pi entry message detected, len={}", text.len());
-                                if let Ok(entry) = serde_json::from_str::<serde_json::Value>(&text) {
-                                    let session_id = entry["sessionId"].as_str().unwrap_or("");
+                            if let Ok(live_event) = serde_json::from_str::<serde_json::Value>(&text) {
+                                let event_type = live_event["type"].as_str().unwrap_or("");
+                                if is_pi_live_forward_event(event_type) {
+                                    let session_id = live_event["sessionId"].as_str().unwrap_or("");
                                     if !session_id.is_empty() {
-                                        let event_type = entry["payload"]["eventType"].as_str().unwrap_or("");
-
                                         self.app_state.pi_agent_registry.record_entry(session_id, event_type);
 
-                                        log::info!("[WS] Pi agent entry: session={session_id}, event={event_type}");
-                                        let payload = serde_json::json!({
-                                            "sessionId": session_id,
-                                            "eventType": entry["payload"]["eventType"],
-                                            "entry": &entry["payload"]["entry"],
-                                        });
+                                        log::info!("[WS] Pi live event: session={session_id}, event={event_type}");
                                         let _ = self.app_state.event_tx.send(WsEvent {
                                             event_type: "event".to_string(),
-                                            event: "pi-agent:entry".to_string(),
-                                            payload: payload.clone(),
+                                            event: event_type.to_string(),
+                                            payload: live_event.clone(),
                                         });
-                                        let _ = self.app_state.app_handle.emit("pi-agent:entry", &payload);
+                                        let _ = self.app_state.app_handle.emit(event_type, &live_event);
                                         let _ = ws_sender.send(Message::Text(r#"{"type":"ack"}"#.to_string())).await;
                                     }
+                                    continue;
                                 }
-                                continue;
                             }
 
                              // ── Pi agent protocol: RPC response ─────────────────
@@ -250,11 +263,11 @@ impl WsAdapter {
                                         // Also broadcast session_state to frontend
                                         let ws_event = WsEvent {
                                             event_type: "event".to_string(),
-                                            event: "pi-agent:session_state".to_string(),
+                                            event: "pi-live:state_updated".to_string(),
                                             payload: state_msg["payload"].clone(),
                                         };
                                         let _ = self.app_state.event_tx.send(ws_event.clone());
-                                        let _ = self.app_state.app_handle.emit("pi-agent:session_state", &ws_event.payload);
+                                        let _ = self.app_state.app_handle.emit("pi-live:state_updated", &ws_event.payload);
                                     }
                                 }
                                 continue;
@@ -360,14 +373,14 @@ impl WsAdapter {
 
             let ws_event = WsEvent {
                 event_type: "event".to_string(),
-                event: "pi-agent:disconnect".to_string(),
+                event: "pi-live:session_disconnected".to_string(),
                 payload: serde_json::json!({ "sessionId": sid }),
             };
             let _ = self.app_state.event_tx.send(ws_event.clone());
             let _ = self
                 .app_state
                 .app_handle
-                .emit("pi-agent:disconnect", &ws_event.payload);
+                .emit("pi-live:session_disconnected", &ws_event.payload);
         }
 
         Ok(())
@@ -558,7 +571,7 @@ pub async fn ws_dispatch(
         }
         "get_pi_live_sessions" => {
             let sessions = app_state.pi_agent_registry.list();
-            return Ok(serde_json::to_value(sessions).unwrap());
+            return Ok(serde_json::to_value(sessions).expect("serialize pi_live_sessions"));
         }
         _ => {}
     }

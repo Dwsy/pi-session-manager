@@ -87,7 +87,7 @@ async fn handle_command(
                         .header("content-type", "application/json")
                         .header("content-encoding", "gzip")
                         .body(Body::from(compressed))
-                        .unwrap()
+                        .expect("build gzip response")
                         .into_response();
                 }
                 Err(error) => {

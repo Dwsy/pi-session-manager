@@ -54,7 +54,8 @@ pub async fn save_server_settings(settings: ServerSettings) -> Result<(), String
 }
 
 pub async fn load_app_settings_internal() -> Result<Value, String> {
-    if let Some(v) = crate::settings_store::get::<Value>(APP_SETTINGS_KEY)? {
+    if let Some(mut v) = crate::settings_store::get::<Value>(APP_SETTINGS_KEY)? {
+        inject_session_source_settings(&mut v);
         return Ok(v);
     }
 
@@ -63,7 +64,8 @@ pub async fn load_app_settings_internal() -> Result<Value, String> {
     let legacy_path = config_dir.join("pi-session-manager").join("settings.json");
     if legacy_path.exists() {
         if let Ok(content) = fs::read_to_string(&legacy_path) {
-            if let Ok(v) = serde_json::from_str::<Value>(&content) {
+            if let Ok(mut v) = serde_json::from_str::<Value>(&content) {
+                inject_session_source_settings(&mut v);
                 crate::settings_store::set(APP_SETTINGS_KEY, &v)?;
                 let _ = fs::remove_file(&legacy_path);
                 return Ok(v);
@@ -71,7 +73,9 @@ pub async fn load_app_settings_internal() -> Result<Value, String> {
         }
     }
 
-    Ok(serde_json::json!({}))
+    let mut value = serde_json::json!({});
+    inject_session_source_settings(&mut value);
+    Ok(value)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -82,6 +86,66 @@ pub async fn load_app_settings() -> Result<Value, String> {
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn save_app_settings(settings: Value) -> Result<(), String> {
     crate::settings_store::set(APP_SETTINGS_KEY, &settings)
+}
+
+fn inject_session_source_settings(settings: &mut Value) {
+    let config = crate::config::Config::load().unwrap_or_default();
+    let mode = match config.session_source_mode {
+        crate::config::SessionSourceMode::Dataset => "dataset",
+        crate::config::SessionSourceMode::Local => "local",
+    };
+
+    let Some(root) = settings.as_object_mut() else {
+        *settings = serde_json::json!({
+            "session": {
+                "sourceMode": mode,
+                "activeDatasetId": config.active_dataset_id,
+            }
+        });
+        return;
+    };
+
+    let session_value = root
+        .entry("session".to_string())
+        .or_insert_with(|| serde_json::json!({}));
+    if !session_value.is_object() {
+        *session_value = serde_json::json!({});
+    }
+    if let Some(session) = session_value.as_object_mut() {
+        session.insert("sourceMode".to_string(), Value::String(mode.to_string()));
+        session.insert(
+            "activeDatasetId".to_string(),
+            config
+                .active_dataset_id
+                .clone()
+                .map(Value::String)
+                .unwrap_or(Value::Null),
+        );
+        session.insert(
+            "activeDatasetIds".to_string(),
+            Value::Array(
+                config
+                    .effective_active_dataset_ids()
+                    .into_iter()
+                    .map(Value::String)
+                    .collect(),
+            ),
+        );
+        session.insert(
+            "scanOtherAgentJsonl".to_string(),
+            Value::Bool(config.scan_other_agent_jsonl),
+        );
+        session.insert(
+            "externalSessionProviders".to_string(),
+            Value::Array(
+                config
+                    .effective_external_session_provider_slugs()
+                    .into_iter()
+                    .map(Value::String)
+                    .collect(),
+            ),
+        );
+    }
 }
 
 /// Get configured session paths (extra paths beyond the default)
@@ -116,6 +180,75 @@ pub async fn save_session_paths(
         crate::file_watcher::restart_watcher_with_config(&watcher_state, app_handle.clone())
     {
         warn!("Failed to restart file watcher: {}", e);
+    }
+
+    Ok(())
+}
+
+pub async fn save_session_scan_other_agents_core(enabled: bool) -> Result<(), String> {
+    let mut config = crate::config::Config::load().unwrap_or_default();
+    config.scan_other_agent_jsonl = enabled;
+    if !enabled {
+        config.external_session_provider_slugs.clear();
+    }
+    crate::config::save_config(&config)?;
+    crate::core::scanner::invalidate_cache();
+    Ok(())
+}
+
+#[cfg(feature = "gui")]
+#[tauri::command]
+pub async fn save_session_scan_other_agents(
+    enabled: bool,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    save_session_scan_other_agents_core(enabled).await?;
+
+    let watcher_state: tauri::State<'_, crate::file_watcher::FileWatcherState> = app_handle.state();
+    if let Err(e) =
+        crate::file_watcher::restart_watcher_with_config(&watcher_state, app_handle.clone())
+    {
+        warn!(
+            "Failed to restart file watcher after save_session_scan_other_agents: {}",
+            e
+        );
+    }
+
+    Ok(())
+}
+
+pub async fn save_external_session_providers_core(provider_slugs: Vec<String>) -> Result<(), String> {
+    let mut config = crate::config::Config::load().unwrap_or_default();
+    let mut normalized = provider_slugs
+        .into_iter()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty() && value != "pi")
+        .collect::<Vec<_>>();
+    normalized.sort();
+    normalized.dedup();
+    config.external_session_provider_slugs = normalized.clone();
+    config.scan_other_agent_jsonl = !normalized.is_empty();
+    crate::config::save_config(&config)?;
+    crate::core::scanner::invalidate_cache();
+    Ok(())
+}
+
+#[cfg(feature = "gui")]
+#[tauri::command]
+pub async fn save_external_session_providers(
+    provider_slugs: Vec<String>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    save_external_session_providers_core(provider_slugs).await?;
+
+    let watcher_state: tauri::State<'_, crate::file_watcher::FileWatcherState> = app_handle.state();
+    if let Err(e) =
+        crate::file_watcher::restart_watcher_with_config(&watcher_state, app_handle.clone())
+    {
+        warn!(
+            "Failed to restart file watcher after save_external_session_providers: {}",
+            e
+        );
     }
 
     Ok(())
@@ -331,9 +464,9 @@ pub async fn save_pi_setting_internal(key: String, value: Value) -> Result<(), S
             if !target.get(*part).is_some_and(|v| v.is_object()) {
                 target[*part] = serde_json::json!({});
             }
-            target = target.get_mut(*part).unwrap();
+            target = target.get_mut(*part).expect("ensure_object path exists");
         }
-        target[*parts.last().unwrap()] = value;
+        target[*parts.last().expect("ensure_non_empty_path")] = value;
     }
 
     write_settings_json(&path, &json, true)

@@ -57,7 +57,9 @@ fn finish_message_entries_backfill(db_key: &str, mark_done: bool) -> Result<(), 
 
 #[cfg(test)]
 fn clear_message_entries_backfill_state_for_tests(db_key: &str) {
-    let mut guard = MESSAGE_ENTRIES_BACKFILL_STATE.lock().unwrap();
+    let mut guard = MESSAGE_ENTRIES_BACKFILL_STATE
+        .lock()
+        .expect("mutex poisoned");
     if let Some(states) = guard.as_mut() {
         states.remove(db_key);
         if states.is_empty() {
@@ -644,6 +646,10 @@ pub fn upsert_message_entries(
         let Some(ref msg) = entry.message else {
             continue;
         };
+
+        if msg.role != "user" && msg.role != "assistant" {
+            continue;
+        }
 
         let mut visible_parts = Vec::new();
         let mut thinking_parts = Vec::new();

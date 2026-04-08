@@ -18,3 +18,7 @@ pub async fn open_session_in_terminal_impl(
 pub async fn open_session_in_browser_impl(path: String) -> Result<(), String> {
     terminal::open_session_in_browser_impl(path).await
 }
+
+pub async fn open_path_in_system_impl(path: String) -> Result<(), String> {
+    terminal::open_path_in_system_impl(path).await
+}

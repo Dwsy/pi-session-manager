@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
+use std::sync::{OnceLock, RwLock};
 
 use crate::{config, sqlite_cache};
 
@@ -20,11 +21,159 @@ fn utf8_safe_cut(buf: &[u8], mut end: usize) -> usize {
     end
 }
 
+fn looks_like_json_array_file(path: &str) -> bool {
+    let Ok(content) = fs::read_to_string(path) else {
+        return false;
+    };
+    content.trim_start().starts_with('[')
+}
+
+#[derive(Clone)]
+struct TransformedSessionCacheEntry {
+    modified_at_ms: u128,
+    content: String,
+}
+
+fn transformed_session_cache(
+) -> &'static RwLock<std::collections::HashMap<String, TransformedSessionCacheEntry>> {
+    static CACHE: OnceLock<
+        RwLock<std::collections::HashMap<String, TransformedSessionCacheEntry>>,
+    > = OnceLock::new();
+    CACHE.get_or_init(|| RwLock::new(std::collections::HashMap::new()))
+}
+
+fn file_modified_ms(path: &str) -> Result<u128, String> {
+    let backing_path = crate::domain::casr_min::bridge_ops::backing_file_path(Path::new(path));
+    let modified = fs::metadata(backing_path)
+        .map_err(|e| format!("Failed to get session file metadata: {e}"))?
+        .modified()
+        .map_err(|e| format!("Failed to get modified time: {e}"))?;
+    modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .map_err(|e| format!("Failed to convert modified time: {e}"))
+}
+
+fn transformed_session_content(path: &str) -> Result<Option<String>, String> {
+    let session_path = Path::new(path);
+    let Ok((source, canonical)) =
+        crate::domain::casr_min::bridge_ops::read_canonical_session_from_path(session_path)
+    else {
+        return Ok(None);
+    };
+
+    if source == crate::domain::casr_min::providers::ProviderKind::Pi {
+        return Ok(None);
+    }
+
+    let modified_at_ms = file_modified_ms(path)?;
+    if let Ok(guard) = transformed_session_cache().read() {
+        if let Some(entry) = guard.get(path) {
+            if entry.modified_at_ms == modified_at_ms {
+                return Ok(Some(entry.content.clone()));
+            }
+        }
+    }
+
+    let content = crate::domain::casr_min::bridge_ops::preview_session_for_viewer(&canonical)?;
+
+    if let Ok(mut guard) = transformed_session_cache().write() {
+        guard.insert(
+            path.to_string(),
+            TransformedSessionCacheEntry {
+                modified_at_ms,
+                content: content.clone(),
+            },
+        );
+    }
+
+    Ok(Some(content))
+}
+
+fn chunk_string_content(
+    content: &str,
+    offset: Option<u64>,
+    max_bytes: Option<usize>,
+) -> Result<SessionChunk, String> {
+    const DEFAULT_CHUNK_BYTES: usize = 256 * 1024;
+    const MAX_CHUNK_BYTES: usize = 1024 * 1024;
+
+    let bytes = content.as_bytes();
+    let file_size = bytes.len() as u64;
+    let start_offset = offset.unwrap_or(0).min(file_size) as usize;
+
+    if start_offset >= bytes.len() {
+        return Ok(SessionChunk {
+            content: String::new(),
+            next_offset: file_size,
+            file_size,
+            has_more: false,
+        });
+    }
+
+    let chunk_bytes = max_bytes
+        .unwrap_or(DEFAULT_CHUNK_BYTES)
+        .clamp(1, MAX_CHUNK_BYTES);
+    let end = (start_offset + chunk_bytes).min(bytes.len());
+    let mut cut = utf8_safe_cut(bytes, end);
+    let mut has_more = cut < bytes.len();
+
+    if has_more {
+        if let Some(last_newline_idx) = bytes[start_offset..cut].iter().rposition(|b| *b == b'\n') {
+            cut = start_offset + last_newline_idx + 1;
+        }
+
+        if cut <= start_offset {
+            let fallback_end = (start_offset + 8192).min(bytes.len());
+            cut = utf8_safe_cut(bytes, fallback_end);
+        }
+    }
+
+    let content = String::from_utf8(bytes[start_offset..cut].to_vec())
+        .map_err(|e| format!("Failed to decode session content as UTF-8: {e}"))?;
+    let next_offset = cut as u64;
+    if next_offset >= file_size {
+        has_more = false;
+    }
+
+    Ok(SessionChunk {
+        content,
+        next_offset,
+        file_size,
+        has_more,
+    })
+}
+
 pub(super) async fn read_session_file_chunk_impl(
     path: String,
     offset: Option<u64>,
     max_bytes: Option<usize>,
 ) -> Result<SessionChunk, String> {
+    if let Some(transformed) = transformed_session_content(&path)? {
+        return chunk_string_content(&transformed, offset, max_bytes);
+    }
+
+    if looks_like_json_array_file(&path) {
+        let content =
+            fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
+        let file_size = content.len() as u64;
+        let start_offset = offset.unwrap_or(0);
+        if start_offset > 0 {
+            return Ok(SessionChunk {
+                content: String::new(),
+                next_offset: file_size,
+                file_size,
+                has_more: false,
+            });
+        }
+        return Ok(SessionChunk {
+            content,
+            next_offset: file_size,
+            file_size,
+            has_more: false,
+        });
+    }
+
     const DEFAULT_CHUNK_BYTES: usize = 256 * 1024;
     const MAX_CHUNK_BYTES: usize = 1024 * 1024;
 
@@ -112,6 +261,9 @@ pub(super) async fn read_session_file_chunk_impl(
 }
 
 pub(super) async fn read_session_file_impl(path: String) -> Result<String, String> {
+    if let Some(transformed) = transformed_session_content(&path)? {
+        return Ok(transformed);
+    }
     fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))
 }
 
@@ -119,6 +271,15 @@ pub(super) async fn read_session_file_incremental_impl(
     path: String,
     from_line: usize,
 ) -> Result<(usize, String), String> {
+    if let Some(transformed) = transformed_session_content(&path)? {
+        let lines: Vec<&str> = transformed.lines().collect();
+        let total_lines = lines.len();
+        if from_line >= total_lines {
+            return Ok((total_lines, String::new()));
+        }
+        return Ok((total_lines, lines[from_line..].join("\n")));
+    }
+
     let content =
         fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
@@ -139,6 +300,17 @@ pub(super) async fn read_session_file_incremental_offset_impl(
     path: String,
     from_offset: u64,
 ) -> Result<(u64, String), String> {
+    if let Some(transformed) = transformed_session_content(&path)? {
+        let bytes = transformed.as_bytes();
+        let file_size = bytes.len() as u64;
+        if from_offset >= file_size {
+            return Ok((file_size, String::new()));
+        }
+        let content = String::from_utf8(bytes[from_offset as usize..].to_vec())
+            .map_err(|e| format!("Failed to decode session content as UTF-8: {e}"))?;
+        return Ok((file_size, content));
+    }
+
     let mut file =
         fs::File::open(&path).map_err(|e| format!("Failed to open session file: {e}"))?;
     let file_size = file
@@ -165,7 +337,10 @@ pub(super) async fn read_session_file_incremental_offset_impl(
 }
 
 pub(super) async fn get_file_stats_impl(path: String) -> Result<FileStats, String> {
-    let metadata = fs::metadata(&path).map_err(|e| format!("Failed to get file metadata: {e}"))?;
+    let metadata = fs::metadata(crate::domain::casr_min::bridge_ops::backing_file_path(
+        Path::new(&path),
+    ))
+    .map_err(|e| format!("Failed to get file metadata: {e}"))?;
 
     let modified = metadata
         .modified()
@@ -208,22 +383,19 @@ fn parse_session_entry(line: &str) -> Option<SessionEntry> {
 }
 
 pub(super) async fn get_session_entries_impl(path: String) -> Result<Vec<SessionEntry>, String> {
-    let content =
-        fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
-
-    let mut entries = Vec::new();
-
-    for line in content.lines() {
-        if line.trim().is_empty() {
-            continue;
+    if let Some(transformed) = transformed_session_content(&path)? {
+        let mut entries = Vec::new();
+        for line in transformed.lines() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            if let Some(entry) = parse_session_entry(line) {
+                entries.push(entry);
+            }
         }
-
-        if let Some(entry) = parse_session_entry(line) {
-            entries.push(entry);
-        }
+        return Ok(entries);
     }
-
-    Ok(entries)
+    crate::domain::casr_min::bridge_ops::parse_session_entries_from_path(Path::new(&path))
 }
 
 pub(super) async fn get_session_by_path_impl(
@@ -362,7 +534,7 @@ pub async fn fork_session_impl(
         "{:x}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system clock before Unix epoch")
             .as_nanos()
     );
     let now = chrono::Utc::now();
@@ -403,7 +575,7 @@ pub async fn fork_session_impl(
             "{:x}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .expect("system clock before Unix epoch")
                 .as_nanos()
         );
         let session_info = serde_json::json!({

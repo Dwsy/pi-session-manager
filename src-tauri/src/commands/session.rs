@@ -2,7 +2,23 @@ use crate::types::{SessionEntry, SessionInfo};
 use crate::{export, scanner, stats};
 
 // Re-export from domain
+pub use crate::domain::session_bridge::SessionBridgeConvertResult;
 pub use crate::domain::session_list::PaginatedSessionsResult;
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionProviderCapabilities {
+    pub can_scan: bool,
+    pub can_convert_target: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionProviderInfo {
+    pub slug: String,
+    pub display_name: String,
+    pub capabilities: SessionProviderCapabilities,
+}
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct FileStats {
@@ -164,6 +180,55 @@ pub async fn open_session_in_terminal(
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn open_session_in_browser(path: String) -> Result<(), String> {
     super::session_open::open_session_in_browser_impl(path).await
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn open_path_in_system(path: String) -> Result<(), String> {
+    super::session_open::open_path_in_system_impl(path).await
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn detect_session_format(path: String) -> Result<String, String> {
+    let (provider, _) = crate::domain::casr_min::bridge_ops::read_canonical_session_from_path(
+        std::path::Path::new(&path),
+    )?;
+    Ok(provider.display_name().to_string())
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn list_supported_session_providers() -> Result<Vec<SessionProviderInfo>, String> {
+    Ok(crate::domain::session_bridge::SessionBridgeSource::ALL
+        .into_iter()
+        .map(|source| {
+            let kind: crate::domain::casr_min::providers::ProviderKind = source.into();
+            SessionProviderInfo {
+                slug: source.slug().replace('_', "-"),
+                display_name: source.display_name().to_string(),
+                capabilities: SessionProviderCapabilities {
+                    can_scan: kind.can_scan(),
+                    can_convert_target: kind.can_convert_target(),
+                },
+            }
+        })
+        .collect())
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn convert_session_format(
+    path: String,
+    target_format: String,
+    dry_run: Option<bool>,
+    force: Option<bool>,
+) -> Result<SessionBridgeConvertResult, String> {
+    let target = crate::domain::session_bridge::SessionBridgeSource::parse_alias(&target_format)?;
+    crate::domain::session_bridge::convert_session_format(
+        std::path::Path::new(&path),
+        target,
+        crate::domain::session_bridge::SessionBridgeConvertOptions {
+            dry_run: dry_run.unwrap_or(false),
+            force: force.unwrap_or(false),
+        },
+    )
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]

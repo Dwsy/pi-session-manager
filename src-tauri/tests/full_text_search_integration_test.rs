@@ -901,6 +901,53 @@ async fn test_full_text_search_project_path_filter() {
 }
 
 #[tokio::test]
+async fn test_full_text_search_ignores_tool_result_entries_during_upsert() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+
+    let temp_dir = tempdir().unwrap();
+    let sessions_dir = temp_dir.path().join("sessions");
+    fs::create_dir_all(&sessions_dir).unwrap();
+    env::set_var("HOME", temp_dir.path());
+
+    let config = Config::default();
+    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+
+    let path = sessions_dir.join("tool-result.jsonl");
+    fs::write(
+        &path,
+        concat!(
+            "{\"type\":\"session\",\"version\":3,\"id\":\"tool-session\",\"timestamp\":\"2026-04-08T01:49:02.501Z\",\"cwd\":\"/workspace/tool\"}\n",
+            "{\"type\":\"message\",\"id\":\"user-1\",\"timestamp\":\"2026-04-08T01:49:03.000Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"read file\"}]}}\n",
+            "{\"type\":\"message\",\"id\":\"assistant-1\",\"parentId\":\"user-1\",\"timestamp\":\"2026-04-08T01:49:04.000Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"toolCall\",\"id\":\"call_1\",\"name\":\"read\",\"arguments\":{\"path\":\"README.md\"}}]}}\n",
+            "{\"type\":\"message\",\"id\":\"tool-1\",\"parentId\":\"assistant-1\",\"timestamp\":\"2026-04-08T01:49:05.000Z\",\"message\":{\"role\":\"toolResult\",\"content\":[{\"type\":\"text\",\"text\":\"# README\"}]}}\n",
+            "{\"type\":\"message\",\"id\":\"assistant-2\",\"parentId\":\"tool-1\",\"timestamp\":\"2026-04-08T01:49:06.000Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"done\"}]}}\n"
+        ),
+    )
+    .unwrap();
+
+    let (session, entries) = scanner::parse_session_info(&path).unwrap();
+    sqlite_cache::upsert_session(&conn, &session, Utc::now(), Some(&entries)).unwrap();
+
+    let indexed_rows: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM message_entries WHERE session_path = ?",
+            params![path.to_string_lossy().to_string()],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(indexed_rows, 3);
+
+    let tool_rows: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM message_entries WHERE session_path = ? AND role NOT IN ('user', 'assistant')",
+            params![path.to_string_lossy().to_string()],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(tool_rows, 0);
+}
+
+#[tokio::test]
 async fn test_full_text_search_thinking_toggle() {
     let _lock = TEST_DB_LOCK.lock().unwrap();
     let temp_dir = tempdir().unwrap();

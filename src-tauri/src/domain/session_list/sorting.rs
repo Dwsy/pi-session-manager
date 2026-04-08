@@ -14,9 +14,11 @@ fn resolve_session_name(session: &SessionInfo) -> String {
 }
 
 fn get_session_size_bytes(path: &str) -> u64 {
-    fs::metadata(path)
-        .map(|metadata| metadata.len())
-        .unwrap_or(0)
+    fs::metadata(crate::domain::casr_min::bridge_ops::backing_file_path(
+        std::path::Path::new(path),
+    ))
+    .map(|metadata| metadata.len())
+    .unwrap_or(0)
 }
 
 pub fn sort_sessions(sessions: &mut [SessionInfo], raw_sort_by: Option<&str>) {

@@ -3,8 +3,10 @@ use super::legacy_fts::drop_sessions_fts_triggers;
 use super::message_index::{drop_message_entries_triggers, ensure_message_fts_schema};
 use super::migrations::apply_migrations;
 use super::schema::{ensure_schema_version_table, get_current_version, LATEST_SCHEMA_VERSION};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
-pub fn get_db_path() -> Result<PathBuf, String> {
+pub fn get_primary_db_path() -> Result<PathBuf, String> {
     // Allow explicit test override
     if let Ok(test_db) = std::env::var("PPM_TEST_DB") {
         let path = PathBuf::from(test_db);
@@ -24,13 +26,72 @@ pub fn get_db_path() -> Result<PathBuf, String> {
     Ok(sessions_dir.join("sessions.db"))
 }
 
+pub fn get_db_path_for_config(config: &Config) -> Result<PathBuf, String> {
+    if let Ok(test_db) = std::env::var("PPM_TEST_DB") {
+        let path = PathBuf::from(test_db);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|e| format!("Failed to create test db dir: {e}"))?;
+        }
+        return Ok(path);
+    }
+
+    if config.session_source_mode == crate::config::SessionSourceMode::Dataset {
+        let active_dataset_ids = config.effective_active_dataset_ids();
+        if active_dataset_ids.len() == 1 {
+            if let Some(dataset) = config
+                .datasets
+                .iter()
+                .find(|item| item.id == active_dataset_ids[0])
+            {
+                let home = match std::env::var("HOME") {
+                    Ok(h) => PathBuf::from(h),
+                    Err(_) => dirs::home_dir().ok_or("Cannot find home directory")?,
+                };
+                let dataset_dir = home
+                    .join(".pi")
+                    .join("agent")
+                    .join("sessions")
+                    .join("datasets")
+                    .join(&dataset.slug);
+                fs::create_dir_all(&dataset_dir)
+                    .map_err(|e| format!("Failed to create dataset dir: {e}"))?;
+                return Ok(dataset_dir.join("sessions.db"));
+            }
+        } else if active_dataset_ids.len() > 1 {
+            let home = match std::env::var("HOME") {
+                Ok(h) => PathBuf::from(h),
+                Err(_) => dirs::home_dir().ok_or("Cannot find home directory")?,
+            };
+            let mut hasher = DefaultHasher::new();
+            active_dataset_ids.hash(&mut hasher);
+            let selection_hash = format!("{:016x}", hasher.finish());
+            let selection_dir = home
+                .join(".pi")
+                .join("agent")
+                .join("sessions")
+                .join("datasets")
+                .join("__selection__");
+            fs::create_dir_all(&selection_dir)
+                .map_err(|e| format!("Failed to create selection dir: {e}"))?;
+            return Ok(selection_dir.join(format!("{selection_hash}.db")));
+        }
+    }
+
+    get_primary_db_path()
+}
+
+pub fn get_db_path() -> Result<PathBuf, String> {
+    let config = Config::load_config().unwrap_or_default();
+    get_db_path_for_config(&config)
+}
+
 pub fn init_db() -> Result<Connection, String> {
     let config = Config::load_config().unwrap_or_default();
     init_db_with_config(&config)
 }
 
 pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
-    let db_path = get_db_path()?;
+    let db_path = get_db_path_for_config(config)?;
     init_db_with_path(&db_path, config)
 }
 
@@ -75,6 +136,10 @@ pub fn init_db_with_path(db_path: &Path, config: &Config) -> Result<Connection, 
 }
 
 fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, String> {
+    if let Some(parent) = db_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create database parent dir: {e}"))?;
+    }
     let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
 
     let init_result = (|| -> Result<(), String> {
@@ -314,5 +379,42 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             }
             Err(error)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn uses_primary_db_for_local_mode() {
+        let config = Config::default();
+        let db_path = get_db_path_for_config(&config).expect("db path");
+        assert!(db_path.ends_with("sessions.db"));
+    }
+
+    #[test]
+    fn uses_dataset_db_for_dataset_mode() {
+        let config = Config {
+            session_source_mode: crate::config::SessionSourceMode::Dataset,
+            active_dataset_id: Some("badlogicgames/pi-mono".to_string()),
+            datasets: vec![crate::config::DatasetRegistryEntry {
+                id: "badlogicgames/pi-mono".to_string(),
+                slug: "badlogicgames__pi-mono".to_string(),
+                display_name: "pi-mono".to_string(),
+                source_url: "https://huggingface.co/datasets/badlogicgames/pi-mono".to_string(),
+                repo_id: "badlogicgames/pi-mono".to_string(),
+                revision: "main".to_string(),
+                imported_at: None,
+                total_files: 0,
+                total_bytes: 0,
+            }],
+            ..Config::default()
+        };
+
+        let db_path = get_db_path_for_config(&config).expect("dataset db path");
+        let path_str = db_path.to_string_lossy();
+        assert!(path_str.contains("/datasets/badlogicgames__pi-mono/"));
+        assert!(path_str.ends_with("/sessions.db"));
     }
 }
