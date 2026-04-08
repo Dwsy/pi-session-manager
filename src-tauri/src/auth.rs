@@ -72,7 +72,7 @@ pub fn init() -> Result<String, String> {
     };
 
     reload_tokens(&conn)?;
-    *ENABLED.lock().unwrap() = true;
+    *ENABLED.lock().expect("mutex poisoned") = true;
 
     Ok(token)
 }
@@ -86,7 +86,7 @@ fn reload_tokens(conn: &Connection) -> Result<(), String> {
         .map_err(|e| format!("{e}"))?
         .filter_map(|r| r.ok())
         .collect();
-    *TOKENS.lock().unwrap() = tokens;
+    *TOKENS.lock().expect("mutex poisoned") = tokens;
     Ok(())
 }
 
@@ -172,13 +172,13 @@ pub fn update_last_used(token: &str) {
 }
 
 pub fn validate(token: &str) -> bool {
-    let runtime_tokens = RUNTIME_TOKENS.lock().unwrap();
+    let runtime_tokens = RUNTIME_TOKENS.lock().expect("mutex poisoned");
     if !runtime_tokens.is_empty() {
         return runtime_tokens.contains(token);
     }
     drop(runtime_tokens);
 
-    let persistent_valid = TOKENS.lock().unwrap().contains(token);
+    let persistent_valid = TOKENS.lock().expect("mutex poisoned").contains(token);
     if persistent_valid {
         update_last_used(token);
         return true;
@@ -198,12 +198,12 @@ pub fn set_runtime_tokens(tokens: Vec<String>) -> Result<(), String> {
         normalized.insert(trimmed.to_string());
     }
 
-    *RUNTIME_TOKENS.lock().unwrap() = normalized;
+    *RUNTIME_TOKENS.lock().expect("mutex poisoned") = normalized;
     Ok(())
 }
 
 pub fn is_auth_required(ip: &IpAddr) -> bool {
-    *ENABLED.lock().unwrap() && !ip.is_loopback()
+    *ENABLED.lock().expect("mutex poisoned") && !ip.is_loopback()
 }
 
 pub fn is_local(ip: &IpAddr) -> bool {
@@ -224,7 +224,7 @@ fn generate_token() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .expect("system clock before Unix epoch")
         .as_nanos();
     let bytes = nanos.to_le_bytes();
     buf[..16].copy_from_slice(&bytes);

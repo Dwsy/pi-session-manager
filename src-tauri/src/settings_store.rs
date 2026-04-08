@@ -2,7 +2,7 @@ use rusqlite::{params, Connection};
 use serde::{de::DeserializeOwned, Serialize};
 
 fn open_db() -> Result<Connection, String> {
-    let db_path = crate::data::sqlite::get_db_path()?;
+    let db_path = crate::data::sqlite::get_primary_db_path()?;
     let conn =
         Connection::open(&db_path).map_err(|e| format!("Failed to open settings DB: {e}"))?;
     conn.execute(

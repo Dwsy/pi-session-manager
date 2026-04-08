@@ -9,6 +9,10 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
 use tracing::{debug, error, warn};
 
+fn should_disable_watcher(config: &crate::config::Config) -> bool {
+    config.session_source_mode == crate::config::SessionSourceMode::Dataset
+}
+
 /// File watcher state that can be managed by Tauri
 pub struct FileWatcherState {
     watcher: Arc<Mutex<Option<FileWatcher>>>,
@@ -32,6 +36,12 @@ impl FileWatcherState {
         let watcher = FileWatcher::new(paths, app_handle)?;
         *guard = Some(watcher);
 
+        Ok(())
+    }
+
+    pub fn stop(&self) -> Result<(), String> {
+        let mut guard = self.watcher.lock().map_err(|e| e.to_string())?;
+        *guard = None;
         Ok(())
     }
 }
@@ -93,11 +103,18 @@ impl FileWatcher {
 
         // Watch all paths
         for path in &unique_paths {
-            if let Err(e) = debouncer_guard
-                .watcher()
-                .watch(path, RecursiveMode::Recursive)
-            {
-                error!("Failed to watch directory {:?}: {}", path, e);
+            let watch_path = if path.is_file() {
+                path.parent().unwrap_or(path)
+            } else {
+                path.as_path()
+            };
+            let recursive_mode = if path.is_file() {
+                RecursiveMode::NonRecursive
+            } else {
+                RecursiveMode::Recursive
+            };
+            if let Err(e) = debouncer_guard.watcher().watch(watch_path, recursive_mode) {
+                error!("Failed to watch path {:?}: {}", watch_path, e);
             }
         }
 
@@ -134,6 +151,10 @@ pub fn start_watcher_for_all_dirs(app_handle: AppHandle) -> Result<FileWatcherSt
     let state = FileWatcherState::new();
 
     let config = crate::config::load_config().unwrap_or_default();
+    if should_disable_watcher(&config) {
+        debug!("File watcher disabled in dataset mode");
+        return Ok(state);
+    }
     let all_dirs = crate::core::scanner::get_all_session_dirs(&config);
 
     state.restart(all_dirs, app_handle)?;
@@ -147,6 +168,11 @@ pub fn restart_watcher_with_config(
     app_handle: AppHandle,
 ) -> Result<(), String> {
     let config = crate::config::load_config().unwrap_or_default();
+    if should_disable_watcher(&config) {
+        debug!("Skipping file watcher restart in dataset mode");
+        watcher_state.stop().ok();
+        return Ok(());
+    }
     let all_dirs = crate::core::scanner::get_all_session_dirs(&config);
 
     debug!(
@@ -178,12 +204,21 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                 Ok(events) => {
                     for event in &events {
                         for path in &event.paths {
-                            if path.extension().map(|ext| ext == "jsonl").unwrap_or(false) {
+                            let is_jsonl =
+                                path.extension().map(|ext| ext == "jsonl").unwrap_or(false);
+                            let is_gemini_json =
+                                crate::domain::casr_min::providers::gemini::is_session_file(path);
+                            let is_opencode_db = path.file_name().and_then(|value| value.to_str())
+                                == Some(crate::domain::casr_min::providers::opencode::DB_FILENAME);
+
+                            if is_jsonl || is_opencode_db || is_gemini_json {
                                 // Skip non-pi-session files: subagent artifacts and
                                 // gateway transcripts use different JSONL formats.
                                 let dominated_by_excluded = path.components().any(|c| {
                                     let s = c.as_os_str();
-                                    s == "subagent-artifacts" || s == "transcripts"
+                                    s == "subagent-artifacts"
+                                        || s == "transcripts"
+                                        || s == "datasets"
                                 });
                                 if !dominated_by_excluded {
                                     pending_paths.insert(path.clone());
@@ -194,7 +229,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
 
                     if !pending_paths.is_empty() {
                         debug!(
-                            "Detected .jsonl file changes: {} files (batching...)",
+                            "Detected session file changes: {} files (batching...)",
                             pending_paths.len()
                         );
                     }

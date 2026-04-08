@@ -15,6 +15,43 @@ pub struct SessionModelUsage {
 
 /// Parse session file to extract detailed statistics
 pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
+    if let Ok((_, session)) =
+        crate::domain::casr_min::bridge_ops::read_canonical_session_from_str(jsonl_content, None)
+    {
+        let mut details = SessionDetails::default();
+        let mut model_set: HashSet<String> = HashSet::new();
+        let mut first_message_time: Option<chrono::DateTime<chrono::Utc>> = None;
+        let mut last_message_time: Option<chrono::DateTime<chrono::Utc>> = None;
+
+        for message in session.messages {
+            match message.role {
+                crate::domain::casr_min::model::MessageRole::User => details.user_messages += 1,
+                crate::domain::casr_min::model::MessageRole::Assistant => {
+                    details.assistant_messages += 1;
+                    if let Some(author) = message.author.clone().filter(|value| !value.is_empty()) {
+                        model_set.insert(author.clone());
+                        details.model_usage.entry(author).or_default().messages += 1;
+                    }
+                }
+                crate::domain::casr_min::model::MessageRole::Tool => details.tool_results += 1,
+                crate::domain::casr_min::model::MessageRole::System
+                | crate::domain::casr_min::model::MessageRole::Other(_) => {}
+            }
+
+            if let Some(timestamp_ms) = message.timestamp {
+                if let Some(dt) = chrono::DateTime::from_timestamp_millis(timestamp_ms) {
+                    first_message_time = Some(first_message_time.unwrap_or(dt).min(dt));
+                    last_message_time = Some(last_message_time.unwrap_or(dt).max(dt));
+                }
+            }
+        }
+
+        details.models = model_set.into_iter().collect();
+        details.first_message_time = first_message_time;
+        details.last_message_time = last_message_time;
+        return details;
+    }
+
     let mut details = SessionDetails::default();
     let mut model_set: HashSet<String> = HashSet::new();
     let mut first_message_time: Option<chrono::DateTime<chrono::Utc>> = None;

@@ -67,7 +67,7 @@ impl TerminalSession {
             .try_clone_reader()
             .map_err(|e| format!("Failed to get reader: {e}"))?;
 
-        *self.writer.lock().unwrap() = Some(writer);
+        *self.writer.lock().expect("mutex poisoned") = Some(writer);
         self.pty_pair = Some(pair);
 
         let session_id = id;
@@ -105,7 +105,7 @@ impl TerminalSession {
     }
 
     pub fn write(&self, data: String) -> Result<(), String> {
-        if let Some(ref mut writer) = *self.writer.lock().unwrap() {
+        if let Some(ref mut writer) = *self.writer.lock().expect("mutex poisoned") {
             writer
                 .write_all(data.as_bytes())
                 .map_err(|e| format!("Write error: {e}"))?;
@@ -137,7 +137,7 @@ impl Drop for TerminalSession {
     fn drop(&mut self) {
         log::debug!("TerminalSession dropping, cleaning up...");
         // 1. Drop writer to close the master PTY write end → reader thread gets EOF
-        *self.writer.lock().unwrap() = None;
+        *self.writer.lock().expect("mutex poisoned") = None;
         // 2. Kill child process
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();
@@ -182,12 +182,15 @@ impl TerminalManager {
     ) -> Result<String, String> {
         let mut session = TerminalSession::new();
         session.create(id.clone(), app, event_tx, cwd, shell, rows, cols)?;
-        self.sessions.lock().unwrap().insert(id, session);
+        self.sessions
+            .lock()
+            .expect("mutex poisoned")
+            .insert(id, session);
         Ok("Session created".to_string())
     }
 
     pub fn write_to_session(&self, id: &str, data: String) -> Result<(), String> {
-        if let Some(session) = self.sessions.lock().unwrap().get(id) {
+        if let Some(session) = self.sessions.lock().expect("mutex poisoned").get(id) {
             session.write(data)
         } else {
             Err(format!("Session '{id}' not found"))
@@ -195,7 +198,7 @@ impl TerminalManager {
     }
 
     pub fn resize_session(&self, id: &str, rows: u16, cols: u16) -> Result<(), String> {
-        if let Some(session) = self.sessions.lock().unwrap().get(id) {
+        if let Some(session) = self.sessions.lock().expect("mutex poisoned").get(id) {
             session.resize(rows, cols)
         } else {
             Err(format!("Session '{id}' not found"))
@@ -203,7 +206,13 @@ impl TerminalManager {
     }
 
     pub fn close_session(&self, id: &str) -> Result<(), String> {
-        if self.sessions.lock().unwrap().remove(id).is_some() {
+        if self
+            .sessions
+            .lock()
+            .expect("mutex poisoned")
+            .remove(id)
+            .is_some()
+        {
             Ok(())
         } else {
             Err(format!("Session '{id}' not found"))

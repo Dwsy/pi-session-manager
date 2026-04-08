@@ -2,12 +2,11 @@ use crate::config::Config;
 use crate::core::write_buffer;
 use crate::data::search::index::{extract_message_contents, extract_primary_message_text};
 use crate::data::sqlite;
-use crate::types::{Content, Message, SessionEntry, SessionInfo, SessionsDiff};
+use crate::types::{SessionEntry, SessionInfo, SessionsDiff};
 /// Check if an error message indicates database corruption
 use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 use std::fs;
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
@@ -85,11 +84,56 @@ pub fn get_sessions_dir() -> Result<PathBuf, String> {
 
 /// Returns all session directories: the default one plus any user-configured paths.
 pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
+    if config.session_source_mode == crate::config::SessionSourceMode::Dataset {
+        let mut dataset_dirs = Vec::new();
+        if let Some(home) = dirs::home_dir() {
+            for active_dataset_id in config.effective_active_dataset_ids() {
+                if let Some(dataset) = config
+                    .datasets
+                    .iter()
+                    .find(|item| item.id == active_dataset_id)
+                {
+                    dataset_dirs.push(
+                        home.join(".pi")
+                            .join("agent")
+                            .join("sessions")
+                            .join("datasets")
+                            .join(&dataset.slug)
+                            .join("sessions"),
+                    );
+                }
+            }
+        }
+        dataset_dirs.sort();
+        dataset_dirs.dedup();
+        return dataset_dirs;
+    }
+
     let mut dirs = vec![];
 
-    // Default path always included
-    if let Ok(default_dir) = get_sessions_dir() {
-        dirs.push(default_dir);
+    for source in crate::domain::session_bridge::SessionBridgeSource::ALL {
+        if source == crate::domain::session_bridge::SessionBridgeSource::Pi {
+            for root in source.session_roots() {
+                if root.exists() && !dirs.iter().any(|existing| existing == &root) {
+                    dirs.push(root);
+                }
+            }
+            continue;
+        }
+
+        let enabled = config
+            .effective_external_session_provider_slugs()
+            .iter()
+            .any(|slug| slug == &source.slug().replace('_', "-"));
+        if !enabled {
+            continue;
+        }
+
+        for root in source.session_roots() {
+            if root.exists() && !dirs.iter().any(|existing| existing == &root) {
+                dirs.push(root);
+            }
+        }
     }
 
     // User-configured extra paths
@@ -149,53 +193,105 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
 }
 
 /// Collect all JSONL file paths from all session directories
-fn collect_jsonl_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
+pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
+    fn should_skip_dir(path: &Path, root: &Path, default_root: Option<&Path>) -> bool {
+        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+            return false;
+        };
+
+        if matches!(
+            name,
+            "transcripts" | "subagent-artifacts" | "subagents" | ".timelines" | "checkpoints"
+        ) {
+            return true;
+        }
+
+        default_root.is_some_and(|default_root| root == default_root && name == "datasets")
+    }
+
+    fn extend_candidate(path: &Path, files: &mut Vec<PathBuf>) {
+        let is_jsonl = path.extension().map(|ext| ext == "jsonl").unwrap_or(false);
+        let is_gemini_json = crate::domain::casr_min::providers::gemini::is_session_file(path);
+        let is_opencode_db = path.file_name().and_then(|value| value.to_str())
+            == Some(crate::domain::casr_min::providers::opencode::DB_FILENAME);
+
+        if !is_jsonl && !is_opencode_db && !is_gemini_json {
+            return;
+        }
+
+        if is_opencode_db {
+            match crate::domain::casr_min::providers::opencode::list_session_paths_in_db(path) {
+                Ok(paths) if !paths.is_empty() => files.extend(paths),
+                Ok(_) | Err(_) => files.push(path.to_path_buf()),
+            }
+            return;
+        }
+
+        files.push(path.to_path_buf());
+    }
+
+    fn walk_dir(dir: &Path, root: &Path, default_root: Option<&Path>, files: &mut Vec<PathBuf>) {
+        if dir.is_file() {
+            extend_candidate(dir, files);
+            return;
+        }
+
+        let entries = match fs::read_dir(dir) {
+            Ok(entries) => entries,
+            Err(_) => return,
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if should_skip_dir(&path, root, default_root) {
+                    continue;
+                }
+                walk_dir(&path, root, default_root, files);
+                continue;
+            }
+
+            extend_candidate(&path, files);
+        }
+    }
+
     let mut files = Vec::new();
+    let default_root = get_sessions_dir().ok();
     for sessions_dir in all_dirs {
         if !sessions_dir.exists() {
             continue;
         }
-        if let Ok(entries) = fs::read_dir(sessions_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    // Skip non-pi-session directories
-                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                        if name == "transcripts" || name == "subagent-artifacts" {
-                            continue;
-                        }
-                    }
-                    if let Ok(sub_entries) = fs::read_dir(&path) {
-                        for file in sub_entries.flatten() {
-                            let file_path = file.path();
-                            if file_path
-                                .extension()
-                                .map(|ext| ext == "jsonl")
-                                .unwrap_or(false)
-                            {
-                                files.push(file_path);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        walk_dir(
+            sessions_dir,
+            sessions_dir,
+            default_root.as_deref(),
+            &mut files,
+        );
     }
+    files.sort();
+    files.dedup();
     files
+}
+
+pub(crate) fn collect_jsonl_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
+    collect_session_files(all_dirs)
+        .into_iter()
+        .filter(|path| path.extension().map(|ext| ext == "jsonl").unwrap_or(false))
+        .collect()
 }
 
 /// Parsed result from a single file
 #[derive(Clone)]
-struct ParsedFileResult {
-    info: SessionInfo,
-    entries: Vec<SessionEntry>,
-    file_modified: DateTime<Utc>,
-    path_str: String,
+pub(crate) struct ParsedFileResult {
+    pub(crate) info: SessionInfo,
+    pub(crate) entries: Vec<SessionEntry>,
+    pub(crate) file_modified: DateTime<Utc>,
+    pub(crate) path_str: String,
 }
 
 /// Parallel scan all JSONL files using tokio tasks
 /// Strategy: Parse files in parallel (pure CPU work), return results for caller to handle DB
-async fn parallel_parse_files(files: Vec<PathBuf>) -> Vec<ParsedFileResult> {
+pub(crate) async fn parallel_parse_files(files: Vec<PathBuf>) -> Vec<ParsedFileResult> {
     use tokio::task::JoinSet;
 
     let mut set = JoinSet::new();
@@ -204,7 +300,9 @@ async fn parallel_parse_files(files: Vec<PathBuf>) -> Vec<ParsedFileResult> {
     for file_path in files {
         set.spawn(async move {
             let path_str = file_path.to_string_lossy().to_string();
-            let metadata = fs::metadata(&file_path);
+            let metadata = fs::metadata(crate::domain::casr_min::bridge_ops::backing_file_path(
+                &file_path,
+            ));
             let file_modified: DateTime<Utc> = match metadata {
                 Ok(m) => DateTime::from(m.modified().unwrap_or(std::time::SystemTime::now())),
                 Err(e) => {
@@ -272,7 +370,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
         };
 
         // Collect all files first
-        let files = collect_jsonl_files(&all_dirs);
+        let files = collect_session_files(&all_dirs);
         let total_files = files.len();
         info!("Collected {} JSONL files for scanning", total_files);
 
@@ -294,7 +392,9 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                     if let Ok(Some(cached_modified)) =
                         sqlite::get_cached_file_modified(&conn, &path_str)
                     {
-                        if let Ok(metadata) = std::fs::metadata(path) {
+                        if let Ok(metadata) = std::fs::metadata(
+                            crate::domain::casr_min::bridge_ops::backing_file_path(path),
+                        ) {
                             let file_modified: chrono::DateTime<chrono::Utc> = DateTime::from(
                                 metadata
                                     .modified()
@@ -392,160 +492,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
 /// Optimization: Use BufReader for streaming to reduce memory usage on large files
 /// Returns: (SessionInfo, Vec<SessionEntry>) - session info and message entry list
 pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
-    let file = fs::File::open(path).map_err(|e| format!("Failed to open file: {e}"))?;
-    let reader = BufReader::new(file);
-    let mut lines = reader.lines();
-
-    // Read and parse header
-    let header_line = lines
-        .next()
-        .ok_or("Empty session file")?
-        .map_err(|e| format!("Failed to read header: {e}"))?;
-
-    let header: Value =
-        serde_json::from_str(&header_line).map_err(|e| format!("Failed to parse header: {e}"))?;
-
-    if header["type"] != "session" {
-        return Err("Invalid session header".to_string());
-    }
-
-    let id = header["id"].as_str().unwrap_or("unknown").to_string();
-    let cwd = header["cwd"].as_str().unwrap_or("").to_string();
-    let timestamp_str = header["timestamp"].as_str().unwrap_or("");
-    let created = parse_timestamp(timestamp_str)?;
-    let parent_session_path = header["parentSession"].as_str().map(|s| s.to_string());
-
-    let metadata = fs::metadata(path).map_err(|e| format!("Failed to get metadata: {e}"))?;
-    let modified = DateTime::from(
-        metadata
-            .modified()
-            .map_err(|e| format!("Failed to get modified time: {e}"))?,
-    );
-
-    let mut message_count = 0;
-    let mut first_message = String::new();
-    let mut all_messages = Vec::new();
-    let mut user_messages = Vec::new();
-    let mut assistant_messages = Vec::new();
-    let mut name: Option<String> = None;
-    let mut last_message = String::new();
-    let mut last_message_role = String::new();
-    let mut entries = Vec::new();
-
-    // Stream read remaining lines to reduce memory usage
-    for (line_num, line_result) in lines.enumerate() {
-        let line_num = line_num + 2; // +2 because header is line 1
-        let line = match line_result {
-            Ok(l) => l,
-            Err(e) => {
-                warn!(
-                    "Failed to read line {} in {}: {}",
-                    line_num,
-                    path.display(),
-                    e
-                );
-                continue;
-            }
-        };
-
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        let entry: Value = match serde_json::from_str(&line) {
-            Ok(e) => e,
-            Err(e) => {
-                warn!(
-                    "Failed to parse JSON at line {} in {}: {}",
-                    line_num,
-                    path.display(),
-                    e
-                );
-                trace!("Problematic line content: {}", &line[..line.len().min(200)]);
-                continue;
-            }
-        };
-
-        if entry["type"] == "session_info" {
-            if let Some(n) = entry["name"].as_str() {
-                name = Some(n.trim().to_string());
-            }
-        }
-
-        if entry["type"] == "message" {
-            let role = entry["message"]["role"].as_str().unwrap_or("");
-            if role == "user" || role == "assistant" {
-                message_count += 1;
-
-                let text = extract_primary_message_text(&entry);
-                if !text.is_empty() {
-                    all_messages.push(text.clone());
-                    if first_message.is_empty() && role == "user" {
-                        first_message = text.chars().take(100).collect();
-                    }
-                    // Update last message
-                    last_message = text.chars().take(150).collect();
-                    last_message_role = role.to_string();
-
-                    // Collect user and assistant message text
-                    if role == "user" {
-                        user_messages.push(text.clone());
-                    } else if role == "assistant" {
-                        assistant_messages.push(text.clone());
-                    }
-
-                    // Build SessionEntry for message_entries table
-                    let entry_id = entry["id"].as_str().unwrap_or("").to_string();
-                    let timestamp_str = entry["timestamp"].as_str().unwrap_or("");
-                    let timestamp = parse_timestamp(timestamp_str)?;
-
-                    let normalized_content = extract_message_contents(&entry, true)
-                        .into_iter()
-                        .map(|(content_type, value)| Content {
-                            content_type,
-                            text: Some(value),
-                        })
-                        .collect();
-
-                    let session_entry = SessionEntry {
-                        entry_type: "message".to_string(),
-                        id: entry_id,
-                        parent_id: None,
-                        timestamp,
-                        message: Some(Message {
-                            role: role.to_string(),
-                            content: normalized_content,
-                        }),
-                    };
-                    entries.push(session_entry);
-                }
-            }
-        }
-    }
-
-    let all_messages_text = all_messages.join("\n");
-    let user_messages_text = user_messages.join("\n");
-    let assistant_messages_text = assistant_messages.join("\n");
-
-    Ok((
-        SessionInfo {
-            path: path.to_string_lossy().to_string(),
-            id,
-            cwd,
-            name,
-            created,
-            modified,
-            message_count,
-            first_message,
-            all_messages_text,
-            user_messages_text,
-            assistant_messages_text,
-            last_message,
-            last_message_role,
-            parent_session_path,
-        },
-        entries,
-    ))
+    crate::domain::casr_min::bridge_ops::parse_session_info_from_path(path)
 }
 
 pub fn extract_message_text(entry: &Value) -> String {
@@ -584,47 +531,101 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
 
     for path_str in &changed_paths {
         let path = PathBuf::from(path_str);
+        let is_opencode_db = path.file_name().and_then(|value| value.to_str())
+            == Some(crate::domain::casr_min::providers::opencode::DB_FILENAME);
 
         if !path.exists() {
-            let before = sessions.len();
-            sessions.retain(|s| s.path != *path_str);
-            if sessions.len() != before {
-                diff.removed.push(path_str.clone());
+            let removed_paths = sessions
+                .iter()
+                .filter(|session| {
+                    session.path == *path_str
+                        || crate::domain::casr_min::bridge_ops::backing_file_path(Path::new(
+                            &session.path,
+                        )) == path
+                })
+                .map(|session| session.path.clone())
+                .collect::<Vec<_>>();
+
+            if !removed_paths.is_empty() {
+                sessions.retain(|session| {
+                    !removed_paths.iter().any(|removed| removed == &session.path)
+                });
+                for removed in removed_paths {
+                    let _ = crate::data::sqlite::delete_session(&conn, &removed);
+                    diff.removed.push(removed);
+                }
                 info!("Session removed (file deleted): {path_str}");
             }
             continue;
         }
 
-        match parse_session_info(&path) {
-            Ok((info, entries)) => {
-                let file_modified = match fs::metadata(&path).and_then(|m| m.modified()) {
-                    Ok(mt) => DateTime::from(mt),
-                    Err(e) => {
-                        warn!("Failed to get metadata for {}: {}", path_str, e);
-                        continue;
+        let expanded_paths = if is_opencode_db {
+            crate::domain::casr_min::providers::opencode::list_session_paths_in_db(&path)
+                .unwrap_or_else(|_| vec![path.clone()])
+        } else {
+            vec![path.clone()]
+        };
+        let mut seen_paths = std::collections::HashSet::new();
+
+        for expanded_path in expanded_paths {
+            match parse_session_info(&expanded_path) {
+                Ok((info, entries)) => {
+                    seen_paths.insert(info.path.clone());
+                    let file_modified = match fs::metadata(
+                        crate::domain::casr_min::bridge_ops::backing_file_path(&expanded_path),
+                    )
+                    .and_then(|m| m.modified())
+                    {
+                        Ok(mt) => DateTime::from(mt),
+                        Err(e) => {
+                            warn!(
+                                "Failed to get metadata for {}: {}",
+                                expanded_path.display(),
+                                e
+                            );
+                            continue;
+                        }
+                    };
+
+                    if let Err(e) = crate::data::sqlite::upsert_session(
+                        &conn,
+                        &info,
+                        file_modified,
+                        Some(&entries),
+                    ) {
+                        warn!("Failed to upsert session for {}: {}", info.path, e);
                     }
-                };
 
-                // Ensure session row exists (also populates message_entries via insert_message_entries)
-                if let Err(e) =
-                    crate::data::sqlite::upsert_session(&conn, &info, file_modified, Some(&entries))
-                {
-                    warn!("Failed to upsert session for {}: {}", info.path, e);
+                    crate::core::write_buffer::buffer_session_write(&info, file_modified);
+                    diff.updated.push(info.clone());
+
+                    if let Some(existing) = sessions.iter_mut().find(|s| s.path == info.path) {
+                        *existing = info;
+                    } else {
+                        sessions.push(info);
+                    }
                 }
-
-                // Buffer for stats cache updates (periodic flush)
-                crate::core::write_buffer::buffer_session_write(&info, file_modified);
-
-                diff.updated.push(info.clone());
-
-                if let Some(existing) = sessions.iter_mut().find(|s| s.path == info.path) {
-                    *existing = info;
-                } else {
-                    sessions.push(info);
+                Err(e) => {
+                    warn!("Failed to re-parse {}: {}", expanded_path.display(), e);
                 }
             }
-            Err(e) => {
-                warn!("Failed to re-parse {}: {}", path_str, e);
+        }
+
+        if is_opencode_db {
+            let removed_paths = sessions
+                .iter()
+                .filter(|session| {
+                    crate::domain::casr_min::bridge_ops::backing_file_path(Path::new(&session.path))
+                        == path
+                        && !seen_paths.contains(&session.path)
+                })
+                .map(|session| session.path.clone())
+                .collect::<Vec<_>>();
+
+            for removed in removed_paths {
+                sessions.retain(|session| session.path != removed);
+                let _ = crate::data::sqlite::delete_session(&conn, &removed);
+                diff.removed.push(removed);
             }
         }
     }
@@ -644,28 +645,6 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
     );
 
     Ok(diff)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::expand_tilde;
-
-    #[test]
-    fn expand_tilde_supports_windows_separator() {
-        let Some(home) = dirs::home_dir() else {
-            return;
-        };
-
-        let expanded = super::expand_tilde(r"~\.pi\agent\sessions");
-        assert_eq!(
-            expanded,
-            home.join(".pi")
-                .join("agent")
-                .join("sessions")
-                .to_string_lossy()
-                .to_string()
-        );
-    }
 }
 
 pub struct ScannerScheduler {
@@ -705,7 +684,7 @@ impl ScannerScheduler {
         let start = std::time::Instant::now();
 
         let all_dirs = get_all_session_dirs(&self.config);
-        let files = collect_jsonl_files(&all_dirs);
+        let files = collect_session_files(&all_dirs);
         let total_files = files.len();
 
         if total_files == 0 {
@@ -757,7 +736,10 @@ impl ScannerScheduler {
 
             // Buffer realtime files for stats
             if file_modified > realtime_cutoff {
-                write_buffer::buffer_session_write(sessions.last().unwrap(), file_modified);
+                write_buffer::buffer_session_write(
+                    sessions.last().expect("session just pushed"),
+                    file_modified,
+                );
             }
         }
 
@@ -804,4 +786,74 @@ pub fn start_background_scanner(sessions_dir: PathBuf, interval_secs: u64) {
         let scheduler = ScannerScheduler::new(sessions_dir, interval_secs, config);
         scheduler.start().await;
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{collect_session_files, expand_tilde};
+    use crate::domain::casr_min::model::{CanonicalMessage, CanonicalSession, MessageRole};
+    use serde_json::Value;
+
+    #[test]
+    fn expand_tilde_supports_windows_separator() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+
+        let expanded = expand_tilde(r"~\.pi\agent\sessions");
+        assert_eq!(
+            expanded,
+            home.join(".pi")
+                .join("agent")
+                .join("sessions")
+                .to_string_lossy()
+                .to_string()
+        );
+    }
+
+    #[test]
+    fn collect_session_files_expands_opencode_db_into_virtual_sessions() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let workspace = temp.path().join("workspace");
+        std::fs::create_dir_all(&workspace).expect("workspace");
+
+        for (idx, title) in ["First session", "Second session"].iter().enumerate() {
+            let canonical = CanonicalSession {
+                session_id: format!("seed-{idx}"),
+                provider_slug: "codex".to_string(),
+                workspace: Some(workspace.clone()),
+                title: Some((*title).to_string()),
+                started_at: Some(1_701_388_800_000 + (idx as i64 * 1000)),
+                ended_at: Some(1_701_388_800_500 + (idx as i64 * 1000)),
+                messages: vec![CanonicalMessage {
+                    idx: 0,
+                    role: MessageRole::User,
+                    content: format!("message-{idx}"),
+                    timestamp: Some(1_701_388_800_000 + (idx as i64 * 1000)),
+                    author: None,
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: Value::Null,
+                }],
+                metadata: Value::Null,
+                source_path: workspace.join(format!("seed-{idx}.jsonl")),
+                model_name: None,
+            };
+
+            crate::domain::casr_min::providers::opencode::write_session(
+                &canonical,
+                &format!("opc-session-{idx}"),
+            )
+            .expect("write opencode session");
+        }
+
+        let files = collect_session_files(&[workspace.clone()]);
+        assert_eq!(files.len(), 2);
+        assert!(
+            files
+                .iter()
+                .all(|path| path.to_string_lossy().contains("opencode.db/")),
+            "expected virtual opencode session paths"
+        );
+    }
 }
