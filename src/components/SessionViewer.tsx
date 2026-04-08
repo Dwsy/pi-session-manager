@@ -399,7 +399,12 @@ function SessionViewerContent({
           <ChatInput
             sessionId={session.id}
             isLive={isLive}
-            onSent={() => setHasNewMessages(false)}
+            onSent={() => {
+              sessionDataIsAtBottomRef.current = true
+              pendingScrollToBottomRef.current = true
+              setHasNewMessages(false)
+              messagesRef.current?.scrollToBottom()
+            }}
           />
         )}
       </div>
