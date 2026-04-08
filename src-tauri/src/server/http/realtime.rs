@@ -218,11 +218,15 @@ async fn handle_ws_connection(
                             if let Ok(state_msg) = serde_json::from_str::<Value>(&text) {
                                 if let Some(session_id) = state_msg["payload"]["sessionId"].as_str() {
                                     let model = state_msg["payload"]["model"].clone();
+                                    let available_models = state_msg["payload"]["availableModels"]
+                                        .as_array()
+                                        .cloned();
                                     let thinking_level = state_msg["payload"]["thinkingLevel"].as_str().map(|s| s.to_string());
                                     let context_usage = state_msg["payload"]["contextUsage"].clone();
                                     app_state.pi_agent_registry.update_session_state(
                                         session_id,
                                         if model.is_null() { None } else { Some(model) },
+                                        available_models,
                                         thinking_level,
                                         if context_usage.is_null() { None } else { Some(context_usage) },
                                     );
