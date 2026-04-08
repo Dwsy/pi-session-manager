@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { useSessionView } from '@/contexts/SessionViewContext'
 import MarkdownContent from '@/components/ui/MarkdownContent'
 import { escapeHtml } from '@/utils/markdown'
@@ -41,18 +41,34 @@ function truncateValue(value: unknown): string {
   return String(value)
 }
 
-function buildCollapsedArgs(args: unknown): string {
+function buildCollapsedArgs(args: unknown): ReactNode {
   if (!isPlainObject(args)) {
     const str = formatToolValue(args)
     return str.length > 80 ? str.slice(0, 80) + '…' : str
   }
 
-  const entries = Object.entries(args).map(([key, value]) => {
+  const keyStyle: React.CSSProperties = {
+    color: 'var(--accent)',
+    fontWeight: 600,
+  }
+
+  const entries = Object.entries(args).map(([key, value], i, arr) => {
     const truncated = truncateValue(value)
     const safeKey = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : JSON.stringify(key)
-    return `${safeKey}: ${typeof value === 'string' ? JSON.stringify(truncated) : truncated}`
+    const formatted = `${typeof value === 'string' ? JSON.stringify(truncated) : truncated}`
+    return (
+      <span key={key}>
+        <span style={keyStyle}>{safeKey}</span>
+        : {formatted}
+        {i < arr.length - 1 && ', '}
+      </span>
+    )
   })
-  return `{ ${entries.join(', ')} }`
+  return (
+    <span>
+      {'{ '}{entries}{'}'}
+    </span>
+  )
 }
 
 function hasMeaningfulValue(value: unknown): boolean {

@@ -1,55 +1,59 @@
-import { useMemo } from 'react'
-import type { Content } from '@/types'
-import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '@/plugins/tools-render/types'
-import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
-import MarkdownContent from '@/components/ui/MarkdownContent'
-import { escapeHtml } from '@/utils/markdown'
-import { highlightSearchInHTML } from '@/utils/search'
+import { useMemo } from "react";
+import type { Content } from "@/types";
+import type {
+  ToolRenderPlugin,
+  ToolRenderProps,
+  ResolvedToolData,
+} from "@/plugins/tools-render/types";
+import { defaultResolveData } from "@/plugins/tools-render/utils/resolveData";
+import MarkdownContent from "@/components/ui/MarkdownContent";
+import { escapeHtml } from "@/utils/markdown";
+import { highlightSearchInHTML } from "@/utils/search";
 
 /** Maximum height for tool output/arguments in pixels */
-const OUTPUT_MAX_HEIGHT = 300
+const OUTPUT_MAX_HEIGHT = 300;
 
 /** Threshold for rendering structured arguments vs raw JSON */
-const SMALL_ARGUMENT_FIELD_THRESHOLD = 5
+const SMALL_ARGUMENT_FIELD_THRESHOLD = 5;
 
 /** Maximum string length before truncation in collapsed preview */
-const VALUE_TRUNCATE_LENGTH = 10
+const VALUE_TRUNCATE_LENGTH = 30;
 
 /**
  * Check if value is a plain object (not array, not null)
  */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
  * Check if value has meaningful content (not empty/null)
  */
 function hasMeaningfulValue(value: unknown): boolean {
-  if (value == null) return false
-  if (typeof value === 'string') return value.length > 0
-  if (Array.isArray(value)) return value.length > 0
-  if (isPlainObject(value)) return Object.keys(value).length > 0
-  return true
+  if (value == null) return false;
+  if (typeof value === "string") return value.length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (isPlainObject(value)) return Object.keys(value).length > 0;
+  return true;
 }
 
 /**
  * Check if string looks like markdown by examining first characters
  */
 function looksLikeMarkdownByFirstChars(value: string): boolean {
-  const prefix = value.trimStart().slice(0, 10)
-  return /^(#{1,6}\s|>\s|[-*+]\s|```|~~~|\d+\.\s)/.test(prefix)
+  const prefix = value.trimStart().slice(0, 10);
+  return /^(#{1,6}\s|>\s|[-*+]\s|```|~~~|\d+\.\s)/.test(prefix);
 }
 
 /**
  * Format any value as string (JSON stringify for objects)
  */
 function formatToolValue(value: unknown): string {
-  if (typeof value === 'string') return value
+  if (typeof value === "string") return value;
   try {
-    return JSON.stringify(value, null, 2)
+    return JSON.stringify(value, null, 2);
   } catch {
-    return String(value)
+    return String(value);
   }
 }
 
@@ -58,18 +62,18 @@ function formatToolValue(value: unknown): string {
  * Used for collapsed preview of JSON arguments
  */
 function truncateValue(value: unknown): string {
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return value.length > VALUE_TRUNCATE_LENGTH
-      ? value.slice(0, VALUE_TRUNCATE_LENGTH) + '…'
-      : value
+      ? value.slice(0, VALUE_TRUNCATE_LENGTH) + "…"
+      : value;
   }
   if (Array.isArray(value)) {
-    return `[${value.length} items]`
+    return `[${value.length} items]`;
   }
   if (isPlainObject(value)) {
-    return `{${Object.keys(value).length} keys}`
+    return `{${Object.keys(value).length} keys}`;
   }
-  return String(value)
+  return String(value);
 }
 
 /**
@@ -77,37 +81,39 @@ function truncateValue(value: unknown): string {
  */
 function buildCollapsedArgs(args: unknown): string {
   if (!isPlainObject(args)) {
-    const str = formatToolValue(args)
-    return str.length > 80 ? str.slice(0, 80) + '…' : str
+    const str = formatToolValue(args);
+    return str.length > 80 ? str.slice(0, 80) + "…" : str;
   }
 
   const entries = Object.entries(args).map(([key, value]) => {
-    const truncated = truncateValue(value)
+    const truncated = truncateValue(value);
     // Use quoted key only if it contains special chars
-    const safeKey = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : JSON.stringify(key)
-    return `${safeKey}: ${typeof value === 'string' ? JSON.stringify(truncated) : truncated}`
-  })
-  return `{ ${entries.join(', ')} }`
+    const safeKey = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)
+      ? key
+      : JSON.stringify(key);
+    return `${safeKey}: ${typeof value === "string" ? JSON.stringify(truncated) : truncated}`;
+  });
+  return `{ ${entries.join(", ")} }`;
 }
 
 /**
  * Normalize tool arguments (parse JSON string if needed)
  */
 function normalizeToolArguments(args: unknown): unknown {
-  if (typeof args !== 'string') return args
-  const trimmed = args.trim()
-  if (!trimmed) return args
+  if (typeof args !== "string") return args;
+  const trimmed = args.trim();
+  if (!trimmed) return args;
 
   const looksLikeJson =
-    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"));
 
-  if (!looksLikeJson) return args
+  if (!looksLikeJson) return args;
 
   try {
-    return JSON.parse(trimmed)
+    return JSON.parse(trimmed);
   } catch {
-    return args
+    return args;
   }
 }
 
@@ -121,49 +127,74 @@ function GenericToolCall({
   searchQuery,
   context,
 }: ToolRenderProps) {
-  const { name, args: rawArgs, output, isError, entryId } = resolvedData
-  const { isExpanded, toggleExpanded, disableSuccessStyle } = context
+  const { name, args: rawArgs, output, isError, entryId } = resolvedData;
+  const { isExpanded, toggleExpanded, disableSuccessStyle } = context;
 
-  const args = normalizeToolArguments(rawArgs)
-  const argsText = formatToolValue(args)
-  const hasArgs = hasMeaningfulValue(args)
-  const hasOutput = Boolean(output && output.length > 0)
+  const args = normalizeToolArguments(rawArgs);
+  const argsText = formatToolValue(args);
+  const hasArgs = hasMeaningfulValue(args);
+  const hasOutput = Boolean(output && output.length > 0);
   const canRenderStructuredArgs =
     isPlainObject(args) &&
     Object.keys(args).length > 0 &&
-    Object.keys(args).length <= SMALL_ARGUMENT_FIELD_THRESHOLD
+    Object.keys(args).length <= SMALL_ARGUMENT_FIELD_THRESHOLD;
 
   const highlightedOutput = useMemo(() => {
-    if (!output) return ''
-    const escapedOutput = escapeHtml(output)
-    return searchQuery ? highlightSearchInHTML(escapedOutput, searchQuery) : escapedOutput
-  }, [output, searchQuery])
+    if (!output) return "";
+    const escapedOutput = escapeHtml(output);
+    return searchQuery
+      ? highlightSearchInHTML(escapedOutput, searchQuery)
+      : escapedOutput;
+  }, [output, searchQuery]);
 
   const getHighlightedArgumentHtml = (value: unknown): string => {
-    const escapedValue = escapeHtml(formatToolValue(value))
-    return searchQuery ? highlightSearchInHTML(escapedValue, searchQuery) : escapedValue
-  }
+    const escapedValue = escapeHtml(formatToolValue(value));
+    return searchQuery
+      ? highlightSearchInHTML(escapedValue, searchQuery)
+      : escapedValue;
+  };
 
   return (
-    <div className={`tool-execution ${isError ? 'error' : disableSuccessStyle ? '' : 'success'}`.trim()} id={`entry-${entryId}`}>
+    <div
+      className={`tool-execution ${isError ? "error" : disableSuccessStyle ? "" : "success"}`.trim()}
+      id={`entry-${entryId}`}
+    >
       <div
-        className={`tool-header ${(hasArgs || hasOutput) ? 'cursor-pointer select-none' : ''}`}
-        onClick={(hasArgs || hasOutput) ? toggleExpanded : undefined}
+        className={`tool-header ${hasArgs || hasOutput ? "cursor-pointer select-none" : ""}`}
+        onClick={hasArgs || hasOutput ? toggleExpanded : undefined}
       >
         {(hasArgs || hasOutput) && (
           <span className="tool-expand-indicator">
-            {isExpanded ? '▾' : '▸'}
+            {isExpanded ? "▾" : "▸"}
           </span>
         )}
         <span className="tool-name">
-          <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <svg
+            className="tool-icon"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            />
           </svg>
           {name}
         </span>
         {hasArgs && (
-          <span className="tool-generic-args-preview" title={escapeHtml(argsText)}>
+          <span
+            className="tool-generic-args-preview"
+            title={escapeHtml(argsText)}
+          >
             {buildCollapsedArgs(args)}
           </span>
         )}
@@ -176,34 +207,56 @@ function GenericToolCall({
           </div>
           <div
             className="tool-arguments"
-            style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto', margin: 0 }}
+            style={{
+              maxHeight: OUTPUT_MAX_HEIGHT,
+              overflowY: "auto",
+              margin: 0,
+            }}
           >
             {canRenderStructuredArgs ? (
-              <div style={{ display: 'grid', gap: 10 }}>
+              <div style={{ display: "grid", gap: 10 }}>
                 {Object.entries(args).map(([key, value]) => {
-                  const shouldRenderMarkdown = typeof value === 'string' && looksLikeMarkdownByFirstChars(value)
+                  const shouldRenderMarkdown =
+                    typeof value === "string" &&
+                    looksLikeMarkdownByFirstChars(value);
 
                   return (
                     <div key={key}>
-                      <div className="tool-arguments-title" style={{ marginBottom: 6, textTransform: 'none' }}>
+                      <div
+                        className="tool-arguments-title"
+                        style={{ marginBottom: 6, textTransform: "none" }}
+                      >
                         {key}
                       </div>
                       {shouldRenderMarkdown ? (
-                        <div style={{ fontFamily: 'var(--font-family, inherit)' }}>
-                          <MarkdownContent content={value} searchQuery={searchQuery} />
+                        <div
+                          style={{ fontFamily: "var(--font-family, inherit)" }}
+                        >
+                          <MarkdownContent
+                            content={value}
+                            searchQuery={searchQuery}
+                          />
                         </div>
                       ) : (
                         <pre>
-                          <code dangerouslySetInnerHTML={{ __html: getHighlightedArgumentHtml(value) }} />
+                          <code
+                            dangerouslySetInnerHTML={{
+                              __html: getHighlightedArgumentHtml(value),
+                            }}
+                          />
                         </pre>
                       )}
                     </div>
-                  )
+                  );
                 })}
               </div>
             ) : (
               <pre>
-                <code dangerouslySetInnerHTML={{ __html: getHighlightedArgumentHtml(argsText) }} />
+                <code
+                  dangerouslySetInnerHTML={{
+                    __html: getHighlightedArgumentHtml(argsText),
+                  }}
+                />
               </pre>
             )}
           </div>
@@ -217,45 +270,51 @@ function GenericToolCall({
           </div>
           <div
             className="tool-output"
-            style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}
+            style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: "auto" }}
           >
-            <pre className="whitespace-pre-wrap m-0" dangerouslySetInnerHTML={{ __html: highlightedOutput }} />
+            <pre
+              className="whitespace-pre-wrap m-0"
+              dangerouslySetInnerHTML={{ __html: highlightedOutput }}
+            />
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }
 
 /**
  * Generate search segments for generic tool
  * Includes formatted arguments and output
  */
-function getGenericSearchSegments(_toolCall: Content, resolvedData: ResolvedToolData): string[] {
-  const segments: string[] = []
+function getGenericSearchSegments(
+  _toolCall: Content,
+  resolvedData: ResolvedToolData,
+): string[] {
+  const segments: string[] = [];
 
-  const normalizedArgs = normalizeToolArguments(resolvedData.args)
+  const normalizedArgs = normalizeToolArguments(resolvedData.args);
   if (normalizedArgs) {
-    segments.push(escapeHtml(formatToolValue(normalizedArgs)))
+    segments.push(escapeHtml(formatToolValue(normalizedArgs)));
   }
 
   if (resolvedData.output) {
-    segments.push(escapeHtml(resolvedData.output))
+    segments.push(escapeHtml(resolvedData.output));
   }
 
-  return segments
+  return segments;
 }
 
 /** Generic tool fallback plugin definition */
 export const genericToolPlugin: ToolRenderPlugin = {
-  id: 'builtin-generic',
-  name: 'Generic Tool',
+  id: "builtin-generic",
+  name: "Generic Tool",
   match: () => true, // Matches all tools (lowest priority fallback)
   priority: -Infinity, // Lowest priority
   component: GenericToolCall,
   resolveData: defaultResolveData,
   getSearchSegments: getGenericSearchSegments,
   getPreview: (_toolCall, data) => {
-    return `${data.name}: ${JSON.stringify(data.args).slice(0, 50)}`
+    return `${data.name}: ${JSON.stringify(data.args).slice(0, 50)}`;
   },
-}
+};

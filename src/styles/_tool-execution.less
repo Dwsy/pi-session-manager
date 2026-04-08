@@ -25,7 +25,10 @@
 
 .tool-execution.success {
   background: var(--toolSuccessBgOverride, rgba(var(--success-rgb), 0.08));
-  border-color: var(--toolSuccessBorderOverride, rgba(var(--success-rgb), 0.22));
+  border-color: var(
+    --toolSuccessBorderOverride,
+    rgba(var(--success-rgb), 0.22)
+  );
 }
 
 .tool-execution.error {
@@ -92,7 +95,16 @@
 
 .tool-path {
   color: var(--toolTitle, var(--text));
-  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    "DejaVu Sans Mono",
+    monospace
+  );
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -101,11 +113,20 @@
 
 // Generic tool collapsed args preview (truncated JSON)
 .tool-generic-args-preview {
-  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    "DejaVu Sans Mono",
+    monospace
+  );
   font-size: calc(var(--font-size-base, 16px) * 0.625);
   color: rgb(var(--color-muted-foreground));
-  background: rgba(var(--accent-rgb), 0.06);
-  border: 1px solid rgba(var(--accent-rgb), 0.1);
+  // background: rgba(var(--accent-rgb), 0.06);
+  // border: 1px solid rgba(var(--accent-rgb), 0.1);
   border-radius: 4px;
   padding: 2px 8px;
   min-width: 0;
@@ -155,7 +176,16 @@
 // Tool Command
 .tool-command {
   padding: 12px 16px;
-  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    "DejaVu Sans Mono",
+    monospace
+  );
   font-size: calc(var(--font-size-base, 16px) * 0.75);
   color: var(--toolOutput, var(--text-secondary));
   flex: 1;
@@ -220,8 +250,9 @@
   max-height: 0;
   opacity: 0;
   overflow: hidden;
-  transition: max-height 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.15s ease;
+  transition:
+    max-height 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.15s ease;
 }
 
 .tool-expand-content.expanded {
@@ -290,7 +321,16 @@
 // Tool Output
 .tool-output {
   padding: 8px 0;
-  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    "DejaVu Sans Mono",
+    monospace
+  );
   font-size: calc(var(--font-size-base, 16px) * 0.6875);
   color: var(--toolOutput, var(--text-secondary));
   white-space: pre-wrap;
@@ -310,7 +350,16 @@
 
 .tool-arguments pre {
   margin: 0;
-  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    "DejaVu Sans Mono",
+    monospace
+  );
   font-size: calc(var(--font-size-base, 16px) * 0.6875);
   color: var(--text-secondary);
 }
@@ -328,7 +377,16 @@
 }
 
 .tool-arguments-content {
-  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    "DejaVu Sans Mono",
+    monospace
+  );
   font-size: calc(var(--font-size-base, 16px) * 0.6875);
   color: var(--text-secondary);
 }
@@ -354,13 +412,28 @@
   overflow-x: auto;
   white-space: pre;
   padding: 12px;
-  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    "DejaVu Sans Mono",
+    monospace
+  );
   background: transparent;
 }
 
-.diff-added { color: var(--toolDiffAdded); }
-.diff-removed { color: var(--toolDiffRemoved); }
-.diff-context { color: var(--toolDiffContext); }
+.diff-added {
+  color: var(--toolDiffAdded);
+}
+.diff-removed {
+  color: var(--toolDiffRemoved);
+}
+.diff-context {
+  color: var(--toolDiffContext);
+}
 
 .tool-diff.expandable {
   cursor: pointer;
@@ -387,8 +460,17 @@
 }
 
 // Pierre Diffs overrides
-.tool-diff [class*='pierre-'] {
-  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+.tool-diff [class*="pierre-"] {
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    "DejaVu Sans Mono",
+    monospace
+  );
   font-size: calc(var(--font-size-base, 16px) * 0.6875);
 }
 
@@ -456,7 +538,16 @@
   word-break: break-word;
   background: var(--bg-inset);
   border-radius: 6px;
-  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    "DejaVu Sans Mono",
+    monospace
+  );
   font-size: calc(var(--font-size-base, 16px) * 0.75);
   line-height: 1.5;
 }
