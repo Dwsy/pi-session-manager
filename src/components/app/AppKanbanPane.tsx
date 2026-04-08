@@ -31,8 +31,10 @@ type AppKanbanPaneBaseProps = Pick<
   | "onCreateTag"
   | "projectFilter"
   | "filterTagIds"
+  | "sourceFilterSlugs"
   | "onFilterChange"
   | "getDescendantIds"
+  | "liveSessionIds"
 >;
 
 export interface AppKanbanPaneProps extends AppKanbanPaneBaseProps {
@@ -61,8 +63,10 @@ function AppKanbanPane({
   onCreateTag,
   projectFilter,
   filterTagIds,
+  sourceFilterSlugs,
   onFilterChange,
   getDescendantIds,
+  liveSessionIds,
 }: AppKanbanPaneProps) {
   return (
     <Suspense fallback={fallback}>
@@ -85,8 +89,10 @@ function AppKanbanPane({
         onCreateTag={onCreateTag}
         projectFilter={projectFilter}
         filterTagIds={filterTagIds}
+        sourceFilterSlugs={sourceFilterSlugs}
         onFilterChange={onFilterChange}
         getDescendantIds={getDescendantIds}
+        liveSessionIds={liveSessionIds}
       />
     </Suspense>
   );

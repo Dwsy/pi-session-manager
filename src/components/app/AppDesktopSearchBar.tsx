@@ -15,6 +15,9 @@ export interface AppDesktopSearchBarProps {
   sessionTags: SessionTag[];
   filterTagIds: string[];
   onFilterChange: (tagIds: string[]) => void;
+  sourceOptions?: Array<{ slug: string; label: string }>;
+  selectedSourceSlugs?: string[];
+  onSourceFilterChange?: (slugs: string[]) => void;
   onCreateTag: (name: string, color: string, parentId?: string) => void;
   getDescendantIds: (tagId: string) => string[];
   viewMode: AppDesktopSearchBarViewMode;
@@ -33,6 +36,9 @@ function AppDesktopSearchBar({
   sessionTags,
   filterTagIds,
   onFilterChange,
+  sourceOptions,
+  selectedSourceSlugs,
+  onSourceFilterChange,
   onCreateTag,
   getDescendantIds,
   viewMode,
@@ -55,6 +61,9 @@ function AppDesktopSearchBar({
         sessionTags={sessionTags}
         filterTagIds={filterTagIds}
         onFilterChange={onFilterChange}
+        sourceOptions={sourceOptions}
+        selectedSourceSlugs={selectedSourceSlugs}
+        onSourceFilterChange={onSourceFilterChange}
         onCreateTag={onCreateTag}
         getDescendantIds={getDescendantIds}
         placeholder={
