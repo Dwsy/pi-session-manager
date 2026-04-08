@@ -19,7 +19,7 @@ function BashExecution({
   context,
 }: ToolRenderProps) {
   const { args, output, result, entryId } = resolvedData
-  const { isExpanded, toggleExpanded, copyToClipboard } = context
+  const { isExpanded, toggleExpanded, copyToClipboard, disableSuccessStyle } = context
 
   const [commandCopied, setCommandCopied] = useState(false)
 
@@ -46,6 +46,7 @@ function BashExecution({
 
   const statusClass = cancelled || (exitCode !== undefined && exitCode !== null && exitCode !== 0)
     ? 'error'
+    : disableSuccessStyle ? ''
     : 'success'
 
   return (

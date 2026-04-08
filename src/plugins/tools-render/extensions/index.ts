@@ -22,7 +22,6 @@ export function registerExtensionToolPlugins(): void {
     }
   })
 
-  console.log('[Tool Plugins] Extension plugins registered')
 }
 
 // Export extension plugins for individual use

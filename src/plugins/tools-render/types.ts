@@ -68,6 +68,8 @@ export interface ToolRenderContext {
   t: (key: string, options?: any) => string
   /** Copy text to clipboard */
   copyToClipboard: (text: string) => Promise<void>
+  /** Whether to suppress the 'success' class on tool cards */
+  disableSuccessStyle: boolean
 }
 
 /**

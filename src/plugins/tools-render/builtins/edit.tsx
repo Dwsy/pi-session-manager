@@ -47,7 +47,7 @@ function EditExecution({
 }: ToolRenderProps) {
   const { t } = useTranslation()
   const { args, diff, output, isError, entryId } = resolvedData
-  const { isExpanded, toggleExpanded, theme, isMobile } = context
+  const { isExpanded, toggleExpanded, theme, isMobile, disableSuccessStyle } = context
 
   const filePath = args.file_path || args.path || ''
   const isDark = theme === 'dark'
@@ -188,7 +188,7 @@ function EditExecution({
 
   const shouldShowOutput = Boolean(isError && output)
   const hasContent = Boolean(diff || shouldShowOutput)
-  const statusClass = isError ? 'error' : 'success'
+  const statusClass = isError ? 'error' : disableSuccessStyle ? '' : 'success'
 
   return (
     <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>

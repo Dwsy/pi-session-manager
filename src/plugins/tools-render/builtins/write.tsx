@@ -19,7 +19,7 @@ function WriteExecution({
   context,
 }: ToolRenderProps) {
   const { args, output, entryId } = resolvedData
-  const { isExpanded, toggleExpanded, isMobile } = context
+  const { isExpanded, toggleExpanded, isMobile, disableSuccessStyle } = context
 
   const filePath = args.file_path || args.path || ''
   const content = args.content || ''
@@ -40,7 +40,7 @@ function WriteExecution({
   const lines = content.split('\n')
 
   return (
-    <div className="tool-execution success" id={`entry-${entryId}`}>
+    <div className={`tool-execution ${disableSuccessStyle ? '' : 'success'}`.trim()} id={`entry-${entryId}`}>
       <div
         className="tool-header cursor-pointer select-none"
         onClick={toggleExpanded}

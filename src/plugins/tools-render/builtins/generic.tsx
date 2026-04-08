@@ -12,6 +12,9 @@ const OUTPUT_MAX_HEIGHT = 300
 /** Threshold for rendering structured arguments vs raw JSON */
 const SMALL_ARGUMENT_FIELD_THRESHOLD = 5
 
+/** Maximum string length before truncation in collapsed preview */
+const VALUE_TRUNCATE_LENGTH = 10
+
 /**
  * Check if value is a plain object (not array, not null)
  */
@@ -51,6 +54,43 @@ function formatToolValue(value: unknown): string {
 }
 
 /**
+ * Truncate string values longer than VALUE_TRUNCATE_LENGTH
+ * Used for collapsed preview of JSON arguments
+ */
+function truncateValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value.length > VALUE_TRUNCATE_LENGTH
+      ? value.slice(0, VALUE_TRUNCATE_LENGTH) + '…'
+      : value
+  }
+  if (Array.isArray(value)) {
+    return `[${value.length} items]`
+  }
+  if (isPlainObject(value)) {
+    return `{${Object.keys(value).length} keys}`
+  }
+  return String(value)
+}
+
+/**
+ * Build a compact {key: truncatedValue} preview string for collapsed state
+ */
+function buildCollapsedArgs(args: unknown): string {
+  if (!isPlainObject(args)) {
+    const str = formatToolValue(args)
+    return str.length > 80 ? str.slice(0, 80) + '…' : str
+  }
+
+  const entries = Object.entries(args).map(([key, value]) => {
+    const truncated = truncateValue(value)
+    // Use quoted key only if it contains special chars
+    const safeKey = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : JSON.stringify(key)
+    return `${safeKey}: ${typeof value === 'string' ? JSON.stringify(truncated) : truncated}`
+  })
+  return `{ ${entries.join(', ')} }`
+}
+
+/**
  * Normalize tool arguments (parse JSON string if needed)
  */
 function normalizeToolArguments(args: unknown): unknown {
@@ -82,7 +122,7 @@ function GenericToolCall({
   context,
 }: ToolRenderProps) {
   const { name, args: rawArgs, output, isError, entryId } = resolvedData
-  const { isExpanded, toggleExpanded } = context
+  const { isExpanded, toggleExpanded, disableSuccessStyle } = context
 
   const args = normalizeToolArguments(rawArgs)
   const argsText = formatToolValue(args)
@@ -105,7 +145,7 @@ function GenericToolCall({
   }
 
   return (
-    <div className={`tool-execution ${isError ? 'error' : 'success'}`} id={`entry-${entryId}`}>
+    <div className={`tool-execution ${isError ? 'error' : disableSuccessStyle ? '' : 'success'}`.trim()} id={`entry-${entryId}`}>
       <div
         className={`tool-header ${(hasArgs || hasOutput) ? 'cursor-pointer select-none' : ''}`}
         onClick={(hasArgs || hasOutput) ? toggleExpanded : undefined}
@@ -122,6 +162,11 @@ function GenericToolCall({
           </svg>
           {name}
         </span>
+        {hasArgs && (
+          <span className="tool-generic-args-preview" title={escapeHtml(argsText)}>
+            {buildCollapsedArgs(args)}
+          </span>
+        )}
       </div>
 
       {hasArgs && isExpanded && (

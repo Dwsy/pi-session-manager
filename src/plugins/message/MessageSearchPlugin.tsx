@@ -1,35 +1,32 @@
-import type { ReactNode } from 'react'
-import { MessageSquare, Bot, User } from 'lucide-react'
-import { invoke } from '@/transport'
-import { BaseSearchPlugin } from '@/plugins/base/BaseSearchPlugin'
-import type { SearchContext, SearchPluginResult } from '@/plugins/types'
-import type {
-  SessionInfo,
-  FullTextSearchHit,
-  FullTextSearchResponse,
-} from '@/types'
-import { getPathBasename, getPathParentName } from '@/utils/path'
-import { parseQuotedQuery } from '@/utils/search'
-import { formatShortSessionId } from '@/utils/session'
-import { getCachedSettings } from '@/utils/settingsApi'
-import { fullTextSearchDemo, getDemoSessionByPath, isDemoModeEnabled } from '@/demo'
+import type { ReactNode } from "react";
+import { MessageSquare, Bot, User } from "lucide-react";
+import { BaseSearchPlugin } from "@/plugins/base/BaseSearchPlugin";
+import type { SearchContext, SearchPluginResult } from "@/plugins/types";
+import type { SessionInfo, FullTextSearchHit } from "@/types";
+import { getPathBasename, getPathParentName } from "@/utils/path";
+import { parseQuotedQuery } from "@/utils/search";
+import { formatShortSessionId } from "@/utils/session";
+import {
+  fullTextSearchRuntime,
+  getRuntimeSessionByPath,
+} from "@/runtime-data/sessionSource";
 
 interface MessageResultMetadata {
-  sessionId: string
-  sessionPath: string
-  session?: SessionInfo
-  sessionName?: string
-  entryId: string
-  snippetLines: string[]
-  queryTerms: string[]
-  truncatedHead: boolean
-  truncatedTail: boolean
-  role: string
-  timestamp: string
+  sessionId: string;
+  sessionPath: string;
+  session?: SessionInfo;
+  sessionName?: string;
+  entryId: string;
+  snippetLines: string[];
+  queryTerms: string[];
+  truncatedHead: boolean;
+  truncatedTail: boolean;
+  role: string;
+  timestamp: string;
   // FTS mode fields
-  score?: number
-  sortMode?: 'score' | 'newest' | 'oldest'
-  matchReason?: FullTextSearchHit['match_reason']
+  score?: number;
+  sortMode?: "score" | "newest" | "oldest";
+  matchReason?: FullTextSearchHit["match_reason"];
 }
 
 /**
@@ -37,397 +34,429 @@ interface MessageResultMetadata {
  */
 export interface MessageSearchPluginOptions {
   /** Enable FTS enhanced mode */
-  ftsMode?: boolean
+  ftsMode?: boolean;
   /** Role filter: user/assistant/all */
-  roleFilter?: 'user' | 'assistant' | 'all'
+  roleFilter?: "user" | "assistant" | "all";
   /** Glob pattern for path filtering */
-  globPattern?: string
+  globPattern?: string;
   /** Sort mode: score/newest/oldest */
-  sortMode?: 'score' | 'newest' | 'oldest'
+  sortMode?: "score" | "newest" | "oldest";
   /** Page number (0-indexed) */
-  page?: number
+  page?: number;
   /** Page size */
-  pageSize?: number
+  pageSize?: number;
 }
 
-const MAX_RESULTS = 24
-const MAX_HITS_TO_FETCH = 40
-const MAX_SESSION_PREFETCH = 12
-const MAX_SNIPPET_LINES = 3
-const MAX_SNIPPET_LINE_LENGTH = 180
-const HIGHLIGHT_CACHE_MAX_ENTRIES = 500
+const MAX_RESULTS = 24;
+const MAX_HITS_TO_FETCH = 40;
+const MAX_SESSION_PREFETCH = 12;
+const MAX_SNIPPET_LINES = 3;
+const MAX_SNIPPET_LINE_LENGTH = 180;
+const HIGHLIGHT_CACHE_MAX_ENTRIES = 500;
 
 /**
  * Message search plugin
  * Uses full-text message search and returns message-level hits with context snippets
  */
 export class MessageSearchPlugin extends BaseSearchPlugin {
-  id = 'message-search'
-  icon = MessageSquare
-  keywords = ['message', 'content', 'text', 'conversation', 'message', 'Content', 'conversation']
-  priority = 80
-  private readonly sessionCache = new Map<string, SessionInfo>()
+  id = "message-search";
+  icon = MessageSquare;
+  keywords = [
+    "message",
+    "content",
+    "text",
+    "conversation",
+    "message",
+    "Content",
+    "conversation",
+  ];
+  priority = 80;
+  private readonly sessionCache = new Map<string, SessionInfo>();
 
   // FTS mode state
-  private ftsOptions: MessageSearchPluginOptions = {}
+  private ftsOptions: MessageSearchPluginOptions = {};
 
   // Memoization cache for highlighted HTML
-  private highlightCache = new Map<string, string>()
+  private highlightCache = new Map<string, string>();
 
   get name(): string {
-    return this.context?.t('plugins.message.name', 'Message Search') || 'Message search'
+    return (
+      this.context?.t("plugins.message.name", "Message Search") ||
+      "Message search"
+    );
   }
 
   get description(): string {
-    return this.context?.t('plugins.message.description', 'Search user messages and assistant replies') || 'Search user messages and assistant replies'
+    return (
+      this.context?.t(
+        "plugins.message.description",
+        "Search user messages and assistant replies",
+      ) || "Search user messages and assistant replies"
+    );
   }
 
   private truncateText(text: string, maxLength: number): string {
-    if (!text) return ''
-    if (text.length <= maxLength) return text
-    return `${text.slice(0, maxLength)}…`
+    if (!text) return "";
+    if (text.length <= maxLength) return text;
+    return `${text.slice(0, maxLength)}…`;
   }
 
   private escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   private getHighlightTerms(query: string): string[] {
     if (!query.trim()) {
-      return []
+      return [];
     }
 
-    const parsed = parseQuotedQuery(query)
+    const parsed = parseQuotedQuery(query);
     const terms = parsed.hasPhrases
       ? [...parsed.phrases, ...parsed.remainderTokens]
-      : parsed.remainderTokens
+      : parsed.remainderTokens;
 
     return Array.from(new Set(terms.filter(Boolean)))
-      .map(term => term.trim())
+      .map((term) => term.trim())
       .filter(Boolean)
-      .sort((a, b) => b.length - a.length)
+      .sort((a, b) => b.length - a.length);
   }
 
   private findFirstMatchIndex(text: string, terms: string[]): number {
-    const lowerText = text.toLowerCase()
-    let firstIndex = -1
+    const lowerText = text.toLowerCase();
+    let firstIndex = -1;
 
     for (const term of terms) {
-      const index = lowerText.indexOf(term.toLowerCase())
+      const index = lowerText.indexOf(term.toLowerCase());
       if (index !== -1 && (firstIndex === -1 || index < firstIndex)) {
-        firstIndex = index
+        firstIndex = index;
       }
     }
 
-    return firstIndex
+    return firstIndex;
   }
 
   private trimSnippetLine(line: string, terms: string[]): string {
-    const normalizedLine = line.trim()
+    const normalizedLine = line.trim();
     if (!normalizedLine) {
-      return ' '
+      return " ";
     }
 
     if (normalizedLine.length <= MAX_SNIPPET_LINE_LENGTH) {
-      return normalizedLine
+      return normalizedLine;
     }
 
-    const firstMatch = this.findFirstMatchIndex(normalizedLine, terms)
+    const firstMatch = this.findFirstMatchIndex(normalizedLine, terms);
     if (firstMatch < 0) {
-      return `${normalizedLine.slice(0, MAX_SNIPPET_LINE_LENGTH)}…`
+      return `${normalizedLine.slice(0, MAX_SNIPPET_LINE_LENGTH)}…`;
     }
 
-    const halfWindow = Math.floor(MAX_SNIPPET_LINE_LENGTH / 2)
-    let start = Math.max(0, firstMatch - halfWindow)
-    let end = Math.min(normalizedLine.length, start + MAX_SNIPPET_LINE_LENGTH)
+    const halfWindow = Math.floor(MAX_SNIPPET_LINE_LENGTH / 2);
+    let start = Math.max(0, firstMatch - halfWindow);
+    let end = Math.min(normalizedLine.length, start + MAX_SNIPPET_LINE_LENGTH);
 
     if (end - start < MAX_SNIPPET_LINE_LENGTH) {
-      start = Math.max(0, end - MAX_SNIPPET_LINE_LENGTH)
+      start = Math.max(0, end - MAX_SNIPPET_LINE_LENGTH);
     }
 
-    const prefix = start > 0 ? '…' : ''
-    const suffix = end < normalizedLine.length ? '…' : ''
+    const prefix = start > 0 ? "…" : "";
+    const suffix = end < normalizedLine.length ? "…" : "";
 
-    return `${prefix}${normalizedLine.slice(start, end)}${suffix}`
+    return `${prefix}${normalizedLine.slice(start, end)}${suffix}`;
   }
 
-  private buildSnippet(content: string, terms: string[]): {
-    lines: string[]
-    truncatedHead: boolean
-    truncatedTail: boolean
+  private buildSnippet(
+    content: string,
+    terms: string[],
+  ): {
+    lines: string[];
+    truncatedHead: boolean;
+    truncatedTail: boolean;
   } {
-    const normalized = (content || '').replace(/\r\n/g, '\n')
-    const lines = normalized.split('\n')
+    const normalized = (content || "").replace(/\r\n/g, "\n");
+    const lines = normalized.split("\n");
 
     if (lines.length === 0) {
       return {
-        lines: [''],
+        lines: [""],
         truncatedHead: false,
         truncatedTail: false,
-      }
+      };
     }
 
-    let targetLineIndex = lines.findIndex(line => this.findFirstMatchIndex(line, terms) >= 0)
+    let targetLineIndex = lines.findIndex(
+      (line) => this.findFirstMatchIndex(line, terms) >= 0,
+    );
     if (targetLineIndex < 0) {
-      targetLineIndex = 0
+      targetLineIndex = 0;
     }
 
-    let start = Math.max(0, targetLineIndex - 1)
-    let end = Math.min(lines.length, targetLineIndex + 2)
+    let start = Math.max(0, targetLineIndex - 1);
+    let end = Math.min(lines.length, targetLineIndex + 2);
 
     if (end - start < MAX_SNIPPET_LINES) {
-      const shortBy = MAX_SNIPPET_LINES - (end - start)
-      start = Math.max(0, start - shortBy)
-      end = Math.min(lines.length, end + shortBy)
+      const shortBy = MAX_SNIPPET_LINES - (end - start);
+      start = Math.max(0, start - shortBy);
+      end = Math.min(lines.length, end + shortBy);
     }
 
     const snippetLines = lines
       .slice(start, end)
-      .map(line => this.trimSnippetLine(line, terms))
+      .map((line) => this.trimSnippetLine(line, terms));
 
     return {
       lines: snippetLines,
       truncatedHead: start > 0,
       truncatedTail: end < lines.length,
-    }
+    };
   }
 
   private highlightText(text: string, terms: string[]): ReactNode {
     if (!text || !terms.length) {
-      return text || ' '
+      return text || " ";
     }
 
-    const uniqueTerms = Array.from(new Set(terms.map(term => term.toLowerCase())))
+    const uniqueTerms = Array.from(
+      new Set(terms.map((term) => term.toLowerCase())),
+    )
       .filter(Boolean)
-      .sort((a, b) => b.length - a.length)
+      .sort((a, b) => b.length - a.length);
 
     if (!uniqueTerms.length) {
-      return text
+      return text;
     }
 
     // Use cached highlighted HTML
-    const cacheKey = `${text}|${uniqueTerms.join('|')}`
-    let highlightedHtml = this.highlightCache.get(cacheKey)
+    const cacheKey = `${text}|${uniqueTerms.join("|")}`;
+    let highlightedHtml = this.highlightCache.get(cacheKey);
 
     if (highlightedHtml === undefined) {
-      const pattern = new RegExp(`(${uniqueTerms.map(term => this.escapeRegExp(term)).join('|')})`, 'gi')
-      const parts = text.split(pattern)
+      const pattern = new RegExp(
+        `(${uniqueTerms.map((term) => this.escapeRegExp(term)).join("|")})`,
+        "gi",
+      );
+      const parts = text.split(pattern);
 
-      highlightedHtml = parts.map((part) => {
-        const isMatch = uniqueTerms.includes(part.toLowerCase())
-        if (!isMatch) {
-          return part
-        }
-        return `<mark class="rounded bg-warning/35 text-foreground px-0.5 font-semibold">${part}</mark>`
-      }).join('')
+      highlightedHtml = parts
+        .map((part) => {
+          const isMatch = uniqueTerms.includes(part.toLowerCase());
+          if (!isMatch) {
+            return part;
+          }
+          return `<mark class="rounded bg-warning/35 text-foreground px-0.5 font-semibold">${part}</mark>`;
+        })
+        .join("");
 
       // Cache with LRU eviction
       if (this.highlightCache.size >= HIGHLIGHT_CACHE_MAX_ENTRIES) {
-        const oldestKey = this.highlightCache.keys().next().value
+        const oldestKey = this.highlightCache.keys().next().value;
         if (oldestKey !== undefined) {
-          this.highlightCache.delete(oldestKey)
+          this.highlightCache.delete(oldestKey);
         }
       }
-      this.highlightCache.set(cacheKey, highlightedHtml)
+      this.highlightCache.set(cacheKey, highlightedHtml);
     }
 
     // Convert HTML string to React nodes
-    return <span dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
+    return <span dangerouslySetInnerHTML={{ __html: highlightedHtml }} />;
   }
 
   private getRoleLabel(role: string): string {
     if (!this.context) {
-      return role
+      return role;
     }
 
-    if (role === 'assistant') {
-      return this.context.t('search.fullText.role.assistant', 'AI')
+    if (role === "assistant") {
+      return this.context.t("search.fullText.role.assistant", "AI");
     }
 
-    if (role === 'user') {
-      return this.context.t('search.fullText.role.user', 'User')
+    if (role === "user") {
+      return this.context.t("search.fullText.role.user", "User");
     }
 
-    return role
+    return role;
   }
 
   private getRoleBadgeClass(role: string): string {
-    if (role === 'assistant') {
-      return 'bg-info/12 text-info border-info/30'
+    if (role === "assistant") {
+      return "bg-info/12 text-info border-info/30";
     }
 
-    if (role === 'user') {
-      return 'bg-surface-dark/90 text-foreground/90 border-border'
+    if (role === "user") {
+      return "bg-surface-dark/90 text-foreground/90 border-border";
     }
 
-    return 'bg-surface-dark/80 text-foreground/85 border-border/80'
+    return "bg-surface-dark/80 text-foreground/85 border-border/80";
   }
 
   private getRoleIcon(role: string): ReactNode {
-    if (role === 'assistant') {
-      return <Bot className="w-3 h-3 opacity-90" />
+    if (role === "assistant") {
+      return <Bot className="w-3 h-3 opacity-90" />;
     }
 
-    if (role === 'user') {
-      return <User className="w-3 h-3 opacity-85" />
+    if (role === "user") {
+      return <User className="w-3 h-3 opacity-85" />;
     }
 
-    return <MessageSquare className="w-3 h-3 opacity-80" />
+    return <MessageSquare className="w-3 h-3 opacity-80" />;
   }
 
   private warmSessionCache(sessions: SessionInfo[]): void {
     for (const session of sessions) {
-      this.sessionCache.set(session.path, session)
+      this.sessionCache.set(session.path, session);
     }
   }
 
-  private async resolveSessionByPath(path: string): Promise<SessionInfo | null> {
-    const cached = this.sessionCache.get(path)
+  private async resolveSessionByPath(
+    path: string,
+  ): Promise<SessionInfo | null> {
+    const cached = this.sessionCache.get(path);
     if (cached) {
-      return cached
+      return cached;
     }
 
     try {
-      const session = isDemoModeEnabled()
-        ? getDemoSessionByPath(path)
-        : await invoke<SessionInfo>('get_session_by_path', { path })
+      const session = await getRuntimeSessionByPath(path);
       if (session) {
-        this.sessionCache.set(path, session)
-        return session
+        this.sessionCache.set(path, session);
+        return session;
       }
     } catch {
       // Ignore per-item resolution failure
     }
 
-    return null
+    return null;
   }
 
   private async prefetchSessionsByPath(paths: string[]): Promise<void> {
     if (!paths.length) {
-      return
+      return;
     }
 
-    const uniquePaths = Array.from(new Set(paths)).filter(path => !this.sessionCache.has(path))
+    const uniquePaths = Array.from(new Set(paths)).filter(
+      (path) => !this.sessionCache.has(path),
+    );
     if (!uniquePaths.length) {
-      return
+      return;
     }
 
     await Promise.all(
       uniquePaths.map(async (path) => {
-        const session = await this.resolveSessionByPath(path)
+        const session = await this.resolveSessionByPath(path);
         if (session) {
-          this.sessionCache.set(path, session)
+          this.sessionCache.set(path, session);
         }
-      })
-    )
+      }),
+    );
   }
 
   private fallbackSessionTitle(hit: FullTextSearchHit): string {
     if (hit.session_name?.trim()) {
-      return hit.session_name.trim()
+      return hit.session_name.trim();
     }
 
-    const firstLine = hit.content?.split('\n')[0]?.trim() || ''
-    return firstLine ? this.truncateText(firstLine, 60) : this.truncateText(hit.session_path, 60)
+    const firstLine = hit.content?.split("\n")[0]?.trim() || "";
+    return firstLine
+      ? this.truncateText(firstLine, 60)
+      : this.truncateText(hit.session_path, 60);
   }
 
   private fallbackProjectName(hit: FullTextSearchHit): string {
-    const maybeParent = getPathParentName(hit.session_path)
+    const maybeParent = getPathParentName(hit.session_path);
 
-    if (maybeParent && maybeParent !== 'sessions' && maybeParent !== hit.session_path) {
-      return maybeParent
+    if (
+      maybeParent &&
+      maybeParent !== "sessions" &&
+      maybeParent !== hit.session_path
+    ) {
+      return maybeParent;
     }
 
-    return this.context?.t('command.allProjects', 'All Projects') || 'Project'
+    return this.context?.t("command.allProjects", "All Projects") || "Project";
   }
 
   /**
    * Configure FTS mode options
    */
   setFTSOptions(options: MessageSearchPluginOptions): void {
-    this.ftsOptions = options
+    this.ftsOptions = options;
   }
 
   /**
    * Get current FTS options
    */
   getFTSOptions(): MessageSearchPluginOptions {
-    return this.ftsOptions
+    return this.ftsOptions;
   }
 
   /**
    * Clear highlight cache
    */
   clearHighlightCache(): void {
-    this.highlightCache.clear()
+    this.highlightCache.clear();
   }
 
   async search(
     query: string,
     context: SearchContext,
-    options?: MessageSearchPluginOptions
+    options?: MessageSearchPluginOptions,
   ): Promise<SearchPluginResult[]> {
-    this.setContext(context)
-    this.warmSessionCache(context.sessions)
+    this.setContext(context);
+    this.warmSessionCache(context.sessions);
 
     // Merge options: explicit params > instance options > defaults
     const ftsOptions: MessageSearchPluginOptions = {
       ftsMode: options?.ftsMode ?? this.ftsOptions.ftsMode ?? false,
-      roleFilter: options?.roleFilter ?? this.ftsOptions.roleFilter ?? 'all',
-      globPattern: options?.globPattern ?? this.ftsOptions.globPattern ?? undefined,
-      sortMode: options?.sortMode ?? this.ftsOptions.sortMode ?? 'score',
+      roleFilter: options?.roleFilter ?? this.ftsOptions.roleFilter ?? "all",
+      globPattern:
+        options?.globPattern ?? this.ftsOptions.globPattern ?? undefined,
+      sortMode: options?.sortMode ?? this.ftsOptions.sortMode ?? "score",
       page: options?.page ?? this.ftsOptions.page ?? 0,
-      pageSize: options?.pageSize ?? this.ftsOptions.pageSize ?? MAX_HITS_TO_FETCH,
-    }
+      pageSize:
+        options?.pageSize ?? this.ftsOptions.pageSize ?? MAX_HITS_TO_FETCH,
+    };
 
     // Clear highlight cache when query changes
     if (this.lastQuery !== query) {
-      this.clearHighlightCache()
-      this.lastQuery = query
+      this.clearHighlightCache();
+      this.lastQuery = query;
     }
 
     try {
-      const response: FullTextSearchResponse = isDemoModeEnabled()
-        ? fullTextSearchDemo({
-          query,
-          roleFilter: ftsOptions.roleFilter || 'all',
-          globPattern: ftsOptions.globPattern || undefined,
-          projectPath: context.searchCurrentProjectOnly ? context.selectedProject : null,
-          includeThinking: getCachedSettings().search.includeThinkingInSearch,
-          page: ftsOptions.page || 0,
-          pageSize: ftsOptions.pageSize || MAX_HITS_TO_FETCH,
-          matchMode: 'any',
-          sortOrder: ftsOptions.sortMode || 'newest',
-        })
-        : await invoke<FullTextSearchResponse>('full_text_search', {
-          query,
-          roleFilter: ftsOptions.roleFilter || 'all',
-          globPattern: ftsOptions.globPattern || undefined,
-          projectPath: context.searchCurrentProjectOnly ? context.selectedProject : null,
-          includeThinking: getCachedSettings().search.includeThinkingInSearch,
-          page: ftsOptions.page || 0,
-          pageSize: ftsOptions.pageSize || MAX_HITS_TO_FETCH,
-          matchMode: 'any',
-          sortOrder: ftsOptions.sortMode || 'newest',
-        })
+      const response = await fullTextSearchRuntime({
+        query,
+        roleFilter: ftsOptions.roleFilter || "all",
+        globPattern: ftsOptions.globPattern || undefined,
+        projectPath: context.searchCurrentProjectOnly
+          ? context.selectedProject
+          : null,
+        page: ftsOptions.page || 0,
+        pageSize: ftsOptions.pageSize || MAX_HITS_TO_FETCH,
+        matchMode: "any",
+        sortOrder: ftsOptions.sortMode || "newest",
+      });
 
-      const hits = response.hits.slice(0, ftsOptions.pageSize || MAX_HITS_TO_FETCH)
+      const hits = response.hits.slice(
+        0,
+        ftsOptions.pageSize || MAX_HITS_TO_FETCH,
+      );
       if (!hits.length) {
-        return []
+        return [];
       }
 
       const missingPaths = hits
-        .map(hit => hit.session_path)
-        .filter(path => !this.sessionCache.has(path))
-      await this.prefetchSessionsByPath(missingPaths.slice(0, MAX_SESSION_PREFETCH))
+        .map((hit) => hit.session_path)
+        .filter((path) => !this.sessionCache.has(path));
+      await this.prefetchSessionsByPath(
+        missingPaths.slice(0, MAX_SESSION_PREFETCH),
+      );
 
-      const queryTerms = this.getHighlightTerms(query)
-      const results: SearchPluginResult[] = []
+      const queryTerms = this.getHighlightTerms(query);
+      const results: SearchPluginResult[] = [];
 
       for (const hit of hits) {
-        const session = this.sessionCache.get(hit.session_path)
+        const session = this.sessionCache.get(hit.session_path);
 
-        const snippet = this.buildSnippet(hit.content, queryTerms)
+        const snippet = this.buildSnippet(hit.content, queryTerms);
         const metadata: MessageResultMetadata = {
           sessionId: hit.session_id,
           sessionPath: hit.session_path,
@@ -443,15 +472,15 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
           score: hit.score,
           sortMode: ftsOptions.sortMode,
           matchReason: hit.match_reason,
-        }
+        };
 
-        results.push(this.createSearchResult(hit, metadata, ftsOptions))
+        results.push(this.createSearchResult(hit, metadata, ftsOptions));
       }
 
-      return results.slice(0, MAX_RESULTS)
+      return results.slice(0, MAX_RESULTS);
     } catch (error) {
-      console.error('[MessageSearchPlugin] full_text_search failed:', error)
-      return []
+      console.error("[MessageSearchPlugin] full_text_search failed:", error);
+      return [];
     }
   }
 
@@ -460,25 +489,25 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     metadata: MessageResultMetadata,
     ftsOptions?: MessageSearchPluginOptions,
   ): SearchPluginResult {
-    const session = metadata.session
+    const session = metadata.session;
     const projectName = session
       ? this.getProjectName(session.cwd)
-      : this.fallbackProjectName(hit)
-    const title = session?.name || this.fallbackSessionTitle(hit)
+      : this.fallbackProjectName(hit);
+    const title = session?.name || this.fallbackSessionTitle(hit);
 
     // Score used for sorting — registry sorts by this descending
-    const timestamp = new Date(hit.timestamp).getTime()
-    let score: number
-    if (ftsOptions?.sortMode === 'newest') {
+    const timestamp = new Date(hit.timestamp).getTime();
+    let score: number;
+    if (ftsOptions?.sortMode === "newest") {
       // Newer = higher score (appear first)
-      const ageInDays = (Date.now() - timestamp) / 86400000
-      score = 10 + hit.score - ageInDays
-    } else if (ftsOptions?.sortMode === 'oldest') {
+      const ageInDays = (Date.now() - timestamp) / 86400000;
+      score = 10 + hit.score - ageInDays;
+    } else if (ftsOptions?.sortMode === "oldest") {
       // Older = higher score (appear first)
-      const ageInDays = (Date.now() - timestamp) / 86400000
-      score = 10 + hit.score + ageInDays
+      const ageInDays = (Date.now() - timestamp) / 86400000;
+      score = 10 + hit.score + ageInDays;
     } else {
-      score = hit.score
+      score = hit.score;
     }
 
     return {
@@ -491,48 +520,57 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       metadata,
       score,
       highlights: [],
-    }
+    };
   }
 
   onSelect(result: SearchPluginResult, context: SearchContext): void {
-    void this.handleSelect(result, context)
+    void this.handleSelect(result, context);
   }
 
-  private async handleSelect(result: SearchPluginResult, context: SearchContext): Promise<void> {
-    const metadata = result.metadata as MessageResultMetadata | undefined
+  private async handleSelect(
+    result: SearchPluginResult,
+    context: SearchContext,
+  ): Promise<void> {
+    const metadata = result.metadata as MessageResultMetadata | undefined;
     if (!metadata) {
-      console.warn('[MessageSearchPlugin] Result metadata is missing')
-      return
+      console.warn("[MessageSearchPlugin] Result metadata is missing");
+      return;
     }
 
-    let session: SessionInfo | null | undefined = metadata.session || this.sessionCache.get(metadata.sessionPath)
+    let session: SessionInfo | null | undefined =
+      metadata.session || this.sessionCache.get(metadata.sessionPath);
     if (!session) {
-      session = await this.resolveSessionByPath(metadata.sessionPath)
+      session = await this.resolveSessionByPath(metadata.sessionPath);
     }
     if (!session) {
-      console.warn('[MessageSearchPlugin] Failed to resolve session by path:', metadata.sessionPath)
-      return
+      console.warn(
+        "[MessageSearchPlugin] Failed to resolve session by path:",
+        metadata.sessionPath,
+      );
+      return;
     }
 
-    this.sessionCache.set(session.path, session)
-    context.setSelectedSession(session)
-    context.setSelectedProject(session.cwd)
+    this.sessionCache.set(session.path, session);
+    context.setSelectedSession(session);
+    context.setSelectedProject(session.cwd);
 
     if (metadata.entryId && context.setPendingScrollEntryId) {
-      context.setPendingScrollEntryId(metadata.entryId)
+      context.setPendingScrollEntryId(metadata.entryId);
     }
 
-    context.closeCommandMenu()
+    context.closeCommandMenu();
   }
 
   renderItem(result: SearchPluginResult): ReactNode {
-    const metadata = result.metadata as MessageResultMetadata | undefined
+    const metadata = result.metadata as MessageResultMetadata | undefined;
     if (!metadata) {
-      return null
+      return null;
     }
 
-    const roleLabel = this.getRoleLabel(metadata.role)
-    const isSessionIdMatch = metadata.matchReason === 'session_id_exact' || metadata.matchReason === 'session_id_prefix'
+    const roleLabel = this.getRoleLabel(metadata.role);
+    const isSessionIdMatch =
+      metadata.matchReason === "session_id_exact" ||
+      metadata.matchReason === "session_id_prefix";
 
     return (
       <div className="w-full min-w-0">
@@ -550,10 +588,15 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
           <div className="flex items-center gap-2.5 flex-shrink-0">
             {isSessionIdMatch && (
               <span className="inline-flex items-center h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
-                {this.context?.t('search.fullText.sessionIdMatch', 'session id') || 'session id'}
+                {this.context?.t(
+                  "search.fullText.sessionIdMatch",
+                  "session id",
+                ) || "session id"}
               </span>
             )}
-            <span className={`inline-flex items-center gap-1.5 h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border ${this.getRoleBadgeClass(metadata.role)}`}>
+            <span
+              className={`inline-flex items-center gap-1.5 h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border ${this.getRoleBadgeClass(metadata.role)}`}
+            >
               {this.getRoleIcon(metadata.role)}
               <span>{roleLabel}</span>
             </span>
@@ -565,7 +608,9 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
 
         <div className="mt-2 rounded-lg border border-border/70 bg-surface/70 px-3 py-2">
           {metadata.truncatedHead && (
-            <p className="text-[11px] leading-5 text-muted-foreground/80">...</p>
+            <p className="text-[11px] leading-5 text-muted-foreground/80">
+              ...
+            </p>
           )}
           {metadata.snippetLines.map((line, lineIndex) => (
             <p
@@ -576,40 +621,42 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
             </p>
           ))}
           {metadata.truncatedTail && (
-            <p className="text-[11px] leading-5 text-muted-foreground/80">...</p>
+            <p className="text-[11px] leading-5 text-muted-foreground/80">
+              ...
+            </p>
           )}
         </div>
       </div>
-    )
+    );
   }
 
   private getProjectName(cwd: string): string {
-    return getPathBasename(cwd)
+    return getPathBasename(cwd);
   }
 
   private formatDate(date: Date | string): string {
-    if (!this.context) return String(date)
+    if (!this.context) return String(date);
 
-    const dateObj = typeof date === 'string' ? new Date(date) : date
-    const now = new Date()
-    const diff = now.getTime() - dateObj.getTime()
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const dateObj = typeof date === "string" ? new Date(date) : date;
+    const now = new Date();
+    const diff = now.getTime() - dateObj.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-    if (days === 0) return this.context.t('time.today')
-    if (days === 1) return this.context.t('time.yesterday')
-    if (days < 7) return this.context.t('time.daysAgo', { count: days })
+    if (days === 0) return this.context.t("time.today");
+    if (days === 1) return this.context.t("time.yesterday");
+    if (days < 7) return this.context.t("time.daysAgo", { count: days });
     if (days < 30) {
-      const weeks = Math.floor(days / 7)
-      return this.context.t('time.weeksAgo', { count: weeks })
+      const weeks = Math.floor(days / 7);
+      return this.context.t("time.weeksAgo", { count: weeks });
     }
     if (days < 365) {
-      const months = Math.floor(days / 30)
-      return this.context.t('time.monthsAgo', { count: months })
+      const months = Math.floor(days / 30);
+      return this.context.t("time.monthsAgo", { count: months });
     }
-    const years = Math.floor(days / 365)
-    return this.context.t('time.yearsAgo', { count: years })
+    const years = Math.floor(days / 365);
+    return this.context.t("time.yearsAgo", { count: years });
   }
 
   // Track last query for cache invalidation
-  private lastQuery: string = ''
+  private lastQuery: string = "";
 }

@@ -21,7 +21,7 @@ function ReadExecution({
 }: ToolRenderProps) {
   const { t } = useTranslation()
   const { args, output, images, entryId } = resolvedData
-  const { isExpanded, toggleExpanded, isMobile } = context
+  const { isExpanded, toggleExpanded, isMobile, disableSuccessStyle } = context
 
   const filePath = args.file_path || args.path || ''
   const offset = args.offset
@@ -50,7 +50,7 @@ function ReadExecution({
   const hasContent = output || (images && images.length > 0)
 
   return (
-    <div className="tool-execution success" id={`entry-${entryId}`}>
+    <div className={`tool-execution ${disableSuccessStyle ? '' : 'success'}`.trim()} id={`entry-${entryId}`}>
       <div
         className={`tool-header ${hasContent ? 'cursor-pointer select-none' : ''}`}
         onClick={hasContent ? toggleExpanded : undefined}

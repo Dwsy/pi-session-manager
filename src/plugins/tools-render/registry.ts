@@ -26,7 +26,6 @@ export class ToolRenderRegistry {
     this.sortedCache = null // Clear cache for re-sort
 
     plugin.onMount?.()
-    console.log(`[ToolRenderRegistry] Registered plugin: ${plugin.id}`)
   }
 
   /**

@@ -7,6 +7,7 @@ import { useSessionView } from '@/contexts/SessionViewContext'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useAppearance } from '@/hooks/useAppearance'
 import { useClipboard } from '@/hooks/useClipboard'
+import { useSettings } from '@/hooks/useSettings'
 
 interface ToolCallListProps {
   toolCalls: Content[]
@@ -23,6 +24,8 @@ function ToolCallList({
   const { appearance } = useAppearance()
   const theme = appearance.theme
   const isMobile = useIsMobile()
+  const { settings } = useSettings()
+  const disableSuccessStyle = settings.appearance.disableToolSuccessStyle
   const {
     isToolExpanded,
     toggleToolExpanded,
@@ -62,6 +65,7 @@ function ToolCallList({
           isMobile,
           t,
           copyToClipboard: copyText,
+          disableSuccessStyle,
         }
 
         const Component = plugin.component

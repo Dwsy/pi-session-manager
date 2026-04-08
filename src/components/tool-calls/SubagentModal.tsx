@@ -92,8 +92,8 @@ async function loadSubagentEntries(result: SubagentResult): Promise<SessionEntry
         const entries = parseSessionEntries(content)
         if (entries.length > 0) return cacheAndReturn(entries)
       }
-    } catch (e) {
-      console.log('[SubagentModal] sessionFile read failed:', e)
+    } catch {
+      // sessionFile read failed, fall back to artifactPaths
     }
   }
 
@@ -106,9 +106,8 @@ async function loadSubagentEntries(result: SubagentResult): Promise<SessionEntry
         const entries = parseSessionEntries(content)
         if (entries.length > 0) return cacheAndReturn(entries)
       }
-    } catch (e) {
-      // File was likely cleaned up - this is normal, fall back to inline messages
-      console.log('[SubagentModal] JSONL file cleaned up, using inline messages')
+    } catch {
+      // JSONL file was likely cleaned up - fall back to inline messages
     }
   }
 
