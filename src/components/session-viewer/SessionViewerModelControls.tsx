@@ -6,11 +6,6 @@ import { useTranslation } from "react-i18next";
 import ModelSelector, { type RPCModel } from "@/components/ModelSelector";
 import type { LiveSessionInfo } from "@/hooks/usePiLiveSessions";
 
-type ModelOption = {
-  provider: string;
-  model: string;
-};
-
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
 
 interface SessionViewerModelControlsProps {
@@ -85,44 +80,21 @@ export default function SessionViewerModelControls({
   useEffect(() => {
     if (!liveSession) return;
 
-    let cancelled = false;
-    setModelsLoading(true);
-
-    invoke<ModelOption[]>("list_model_options_fast")
-      .then((fast) => {
-        if (cancelled) return;
-        setModels(
-          fast.map((item: ModelOption) => ({
-            id: item.model,
-            name: item.model,
-            provider: item.provider,
-          })),
-        );
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) {
-          setModelsLoading(false);
-        }
-      });
-
-    invoke<ModelOption[]>("list_model_options_full")
-      .then((full) => {
-        if (cancelled) return;
-        setModels(
-          full.map((item: ModelOption) => ({
-            id: item.model,
-            name: item.model,
-            provider: item.provider,
-          })),
-        );
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [liveSession?.sessionId]);
+    const availableModels = liveSession.availableModels || [];
+    const dedup = new Map<string, RPCModel>();
+    for (const item of availableModels) {
+      const key = `${item.provider}:${item.id}`;
+      if (!dedup.has(key)) {
+        dedup.set(key, {
+          id: item.id,
+          name: item.name || item.id,
+          provider: item.provider,
+        });
+      }
+    }
+    setModels([...dedup.values()]);
+    setModelsLoading(false);
+  }, [liveSession]);
 
   const currentModel = useMemo<RPCModel | null>(() => {
     if (!liveSession?.model || typeof liveSession.model === "string") {
