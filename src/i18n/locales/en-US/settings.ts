@@ -261,6 +261,10 @@ export const settings = {
     title: "Other external sessions",
     description:
       "Control whether sessions from other supported coding agents should be scanned and shown in the app.",
+    providerEnabledHelp: "Show and scan sessions from this external provider.",
+    showAgentIconInSessionBadge: "Show agent icon in SessionBadge",
+    showAgentIconInSessionBadgeHelp:
+      "Display the provider icon next to the source badge in session cards.",
   },
   search: {
     defaultSearchMode: "Default Search Mode",

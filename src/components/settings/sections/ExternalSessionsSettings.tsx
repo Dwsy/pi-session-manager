@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
+import { AgentIcon } from "@/components/session-viewer/AgentIcon";
 import type { SessionSettingsProps } from "@/components/settings/types";
 import type { SessionProviderInfo } from "@/types";
 import { listSupportedSessionProviders } from "@/utils/sessionProvidersApi";
@@ -58,6 +59,22 @@ export default function ExternalSessionsSettings({
         )}
       >
         <div className="space-y-4">
+          <SettingsToggleRow
+            title={t(
+              "settings.externalSessions.showAgentIconInSessionBadge",
+              "Show agent icon in SessionBadge",
+            )}
+            description={t(
+              "settings.externalSessions.showAgentIconInSessionBadgeHelp",
+              "Display the provider icon next to the source badge in session cards.",
+            )}
+            checked={settings.session.showAgentIconInSessionBadge !== false}
+            onChange={(checked) =>
+              onUpdate("session", "showAgentIconInSessionBadge", checked)
+            }
+            className="items-start py-0"
+          />
+
           {otherAgentProviders.length > 0 ? (
             <div className="rounded-lg border border-border/60 bg-background/40 divide-y divide-border/50">
               {otherAgentProviders.map((provider) => {
@@ -65,7 +82,12 @@ export default function ExternalSessionsSettings({
                 return (
                   <div key={provider.slug} className="px-3 py-2">
                     <SettingsToggleRow
-                      title={provider.display_name}
+                      title={
+                        <span className="inline-flex items-center gap-2">
+                          <AgentIcon source={provider.slug} size={14} />
+                          <span>{provider.display_name}</span>
+                        </span>
+                      }
                       description={t(
                         "settings.externalSessions.providerEnabledHelp",
                         "Show and scan sessions from this external provider.",

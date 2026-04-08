@@ -80,6 +80,7 @@ export interface AppSettings {
     activeDatasetIds: string[];
     scanOtherAgentJsonl: boolean;
     externalSessionProviders: string[];
+    showAgentIconInSessionBadge: boolean;
     showMessagePreview: boolean;
     previewLines: number;
     colorizeToolCalls: boolean;
@@ -164,6 +165,7 @@ export const defaultSettings: AppSettings = {
     activeDatasetIds: [],
     scanOtherAgentJsonl: false,
     externalSessionProviders: [],
+    showAgentIconInSessionBadge: true,
     showMessagePreview: true,
     previewLines: 2,
     colorizeToolCalls: true,

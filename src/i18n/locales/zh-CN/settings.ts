@@ -222,6 +222,10 @@ export const settings = {
   externalSessions: {
     title: "其他外部 Session",
     description: "控制是否扫描并显示其他已支持编码 Agent 的本地会话。",
+    providerEnabledHelp: "显示并扫描该外部 provider 的会话。",
+    showAgentIconInSessionBadge: "在 SessionBadge 显示 agent 图标",
+    showAgentIconInSessionBadgeHelp:
+      "在 session 卡片的来源徽章旁显示 provider 图标。",
   },
   search: {
     defaultSearchMode: "默认搜索模式",
