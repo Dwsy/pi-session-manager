@@ -1,197 +1,133 @@
-import { memo, useCallback, useMemo, useState, type CSSProperties } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { memo, useCallback, useMemo } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 export interface TimelineNavItem {
-  entryId: string
-  role: string
-  preview: string
-  markerType: 'user' | 'assistant' | 'compaction'
+  entryId: string;
+  index: number;
+  preview: string;
   /** 0-1, position in the scroll area */
-  top: number
+  top: number;
 }
 
 interface SessionTimelineNavProps {
-  items: TimelineNavItem[]
-  onNavigate: (entryId: string) => void
+  items: TimelineNavItem[];
+  activeEntryId: string | null;
+  onNavigate: (entryId: string) => void;
 }
 
-const MAX_TIMELINE_DOTS = 60
+const MAX_TIMELINE_DOTS = 60;
 
 function sampleItems(items: TimelineNavItem[], max: number): TimelineNavItem[] {
-  if (items.length <= max) return items
-  if (max <= 1) return [items[items.length - 1]]
-  const sampled: TimelineNavItem[] = []
-  const step = (items.length - 1) / (max - 1)
+  if (items.length <= max) return items;
+  if (max <= 1) return [items[items.length - 1]];
+  const sampled: TimelineNavItem[] = [];
+  const step = (items.length - 1) / (max - 1);
   for (let i = 0; i < max; i++) {
-    const idx = Math.round(i * step)
-    const item = items[idx]
-    if (!item) continue
-    if (sampled[sampled.length - 1]?.entryId === item.entryId) continue
-    sampled.push(item)
+    const idx = Math.round(i * step);
+    const item = items[idx];
+    if (!item) continue;
+    if (sampled[sampled.length - 1]?.entryId === item.entryId) continue;
+    sampled.push(item);
   }
-  const last = items[items.length - 1]
+  const last = items[items.length - 1];
   if (sampled[sampled.length - 1]?.entryId !== last.entryId) {
-    sampled.push(last)
+    sampled.push(last);
   }
-  return sampled
+  return sampled;
 }
 
-function SessionTimelineNav({ items, onNavigate }: SessionTimelineNavProps) {
-  const [hoveredEntryId, setHoveredEntryId] = useState<string | null>(null)
-  const [isHovered, setIsHovered] = useState(false)
-
-  const sampled = useMemo(() => sampleItems(items, MAX_TIMELINE_DOTS), [items])
-
-  // Track active (currently visible) entry — for now use hovered, can be enhanced with scroll tracking
-  const activeEntryId = hoveredEntryId
+function SessionTimelineNav({
+  items,
+  activeEntryId,
+  onNavigate,
+}: SessionTimelineNavProps) {
+  const sampled = useMemo(() => sampleItems(items, MAX_TIMELINE_DOTS), [items]);
+  const activeSourceIndex = useMemo(() => {
+    const currentItem = items.find((item) => item.entryId === activeEntryId);
+    return currentItem?.index ?? items[0]?.index ?? 0;
+  }, [activeEntryId, items]);
+  const currentSampledEntryId = useMemo(() => {
+    return (
+      [...sampled].reverse().find((item) => item.index <= activeSourceIndex)
+        ?.entryId ?? sampled[0]?.entryId ?? null
+    );
+  }, [activeSourceIndex, sampled]);
+  const currentSampledIndex = useMemo(() => {
+    const index = sampled.findIndex((item) => item.entryId === currentSampledEntryId);
+    return index >= 0 ? index : 0;
+  }, [currentSampledEntryId, sampled]);
 
   const handleDotClick = useCallback(
     (entryId: string) => {
-      onNavigate(entryId)
+      onNavigate(entryId);
     },
     [onNavigate],
-  )
+  );
 
-  if (sampled.length === 0) return null
+  if (sampled.length === 0) return null;
 
   return (
     <div
-      className="absolute right-3 top-1/2 -translate-y-1/2 z-20"
-      style={{ height: 'min(320px, 60vh)' }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => {
-        setIsHovered(false)
-        setHoveredEntryId(null)
-      }}
+      className="absolute right-3 top-1/2 z-20 -translate-y-1/2"
       role="navigation"
-      aria-label="Message timeline navigation"
+      aria-label="User message timeline navigation"
     >
-      <div className="relative w-full h-full flex flex-col items-center">
-        {/* Previous message button */}
+      <div className="group flex flex-col items-center gap-1">
         <button
-          onClick={() => {
-            const firstVisible = sampled.find((item) => item.top >= 0.05)
-            const idx = sampled.indexOf(firstVisible ?? sampled[0])
-            if (idx > 0) onNavigate(sampled[idx - 1].entryId)
-            else if (sampled.length > 0) onNavigate(sampled[0].entryId)
-          }}
-          className={`
-            absolute -top-7 left-1/2 -translate-x-1/2
-            inline-flex items-center justify-center rounded-full
-            w-7 h-7 p-1
-            text-muted-foreground/70 hover:text-foreground hover:bg-secondary
-            transition-all duration-200
-            ${isHovered ? 'opacity-100' : 'opacity-0'}
-          `}
-          aria-label="Previous message"
-          title="Previous message"
+          type="button"
+          onClick={() => onNavigate(sampled[Math.max(currentSampledIndex - 1, 0)].entryId)}
+          disabled={currentSampledIndex <= 0}
+          className="inline-flex h-8 w-8 -translate-y-0 items-center justify-center overflow-hidden rounded-full border border-transparent px-1.5 py-1.5 text-muted-foreground transition-all duration-200 hover:bg-secondary/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:translate-y-0 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:group-hover:opacity-60 opacity-0 translate-y-1"
+          aria-label="Navigate to previous user message"
+          title="Previous user message"
         >
-          <ChevronUp className="h-3.5 w-3.5" strokeWidth={2.2} />
+          <ChevronUp className="h-4 w-4" strokeWidth={2} />
         </button>
 
-        {/* Timeline dots — absolutely positioned by top % */}
-        {sampled.map((item) => {
-          const isActive = activeEntryId === item.entryId
-          const isHoveredDot = hoveredEntryId === item.entryId
+        <div className="group/timeline flex max-h-[60vh] flex-col items-end gap-0 overflow-hidden">
+          {sampled.map((item, index) => {
+            const isCurrent = item.entryId === currentSampledEntryId;
+            const isPast = index < currentSampledIndex;
+            const dotWidthClass = isCurrent ? "w-4" : isPast ? "w-3" : "w-1.5";
+            const dotColorClass = isCurrent ? "bg-primary" : "bg-muted-foreground/60";
 
-          let dotStyle: CSSProperties = {
-            position: 'absolute',
-            top: `${item.top * 100}%`,
-            right: 0,
-            transform: 'translateY(-50%)',
-            width: isActive || isHoveredDot ? '14px' : '10px',
-            height: isActive || isHoveredDot ? '4px' : '3px',
-            borderRadius: '999px',
-            transition: 'all 0.15s ease',
-            background: isActive
-              ? 'var(--accent)'
-              : isHoveredDot
-                ? 'rgba(var(--accent-rgb), 0.8)'
-                : item.markerType === 'compaction'
-                  ? 'rgba(168, 139, 250, 0.5)'
-                  : item.role === 'user'
-                    ? 'rgba(var(--accent-rgb), 0.4)'
-                    : 'rgba(var(--accent-rgb), 0.2)',
-            boxShadow: isActive
-              ? '0 0 0 1px rgba(var(--accent-rgb), 0.15), 0 4px 10px rgba(var(--accent-rgb), 0.15)'
-              : 'none',
-          }
+            return (
+              <button
+                type="button"
+                key={item.entryId}
+                onClick={() => handleDotClick(item.entryId)}
+                className="group/timeline-tick relative flex h-3 w-10 items-center justify-end rounded-full border border-transparent px-2.5 text-xs font-medium text-muted-foreground transition-colors duration-100 hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                aria-current={isCurrent ? "true" : undefined}
+                aria-label={`Jump to user message: ${item.preview}`}
+                title={item.preview}
+              >
+                <span
+                  className={`rounded-full ${dotWidthClass} ${dotColorClass} h-px opacity-50 transition-all duration-150 group-hover/timeline-tick:w-4 group-hover/timeline-tick:bg-primary group-hover/timeline-tick:opacity-100`}
+                />
+              </button>
+            );
+          })}
+        </div>
 
-          return (
-            <button
-              key={item.entryId}
-              onClick={() => handleDotClick(item.entryId)}
-              onMouseEnter={() => setHoveredEntryId(item.entryId)}
-              onMouseLeave={() => setHoveredEntryId(null)}
-              className="absolute group"
-              style={{
-                top: `${item.top * 100}%`,
-                right: 0,
-                transform: 'translateY(-50%)',
-                width: '40px',
-                height: '16px',
-              }}
-              aria-label={`${item.role} message: ${item.preview}`}
-              title={item.preview}
-            >
-              <span style={dotStyle} />
-
-              {/* Tooltip */}
-              {isHoveredDot && (
-                <div
-                  className="absolute right-6 top-1/2 -translate-y-1/2
-                    bg-card/95 backdrop-blur-xl border border-border/60
-                    rounded-xl px-3 py-2.5 min-w-[200px] max-w-[280px]
-                    shadow-lg text-left z-50
-                    opacity-0 translate-x-1
-                    group-hover:opacity-100 group-hover:translate-x-0
-                    transition-all duration-150 ease-out
-                    pointer-events-none"
-                >
-                  <div className="flex items-start gap-2.5">
-                    <span
-                      className="w-[3px] min-w-[3px] self-stretch rounded-full"
-                      style={{ background: 'var(--accent)', boxShadow: '0 0 8px rgba(var(--accent-rgb), 0.2)' }}
-                    />
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-medium text-muted-foreground mb-0.5 uppercase tracking-wide">
-                        {item.role}
-                      </div>
-                      <div className="text-[12px] text-foreground leading-relaxed line-clamp-3">
-                        {item.preview}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </button>
-          )
-        })}
-
-        {/* Next message button */}
         <button
-          onClick={() => {
-            const lastVisible = [...sampled].reverse().find((item) => item.top <= 0.95)
-            const idx = sampled.indexOf(lastVisible ?? sampled[sampled.length - 1])
-            if (idx < sampled.length - 1) onNavigate(sampled[idx + 1].entryId)
-            else if (sampled.length > 0) onNavigate(sampled[sampled.length - 1].entryId)
-          }}
-          className={`
-            absolute -bottom-7 left-1/2 -translate-x-1/2
-            inline-flex items-center justify-center rounded-full
-            w-7 h-7 p-1
-            text-muted-foreground/70 hover:text-foreground hover:bg-secondary
-            transition-all duration-200
-            ${isHovered ? 'opacity-100' : 'opacity-0'}
-          `}
-          aria-label="Next message"
-          title="Next message"
+          type="button"
+          onClick={() =>
+            onNavigate(
+              sampled[
+                Math.min(currentSampledIndex + 1, sampled.length - 1)
+              ].entryId,
+            )
+          }
+          disabled={currentSampledIndex >= sampled.length - 1}
+          className="inline-flex h-8 w-8 -translate-y-0 items-center justify-center overflow-hidden rounded-full border border-transparent px-1.5 py-1.5 text-muted-foreground transition-all duration-200 hover:bg-secondary/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:translate-y-0 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:group-hover:opacity-60 opacity-0 -translate-y-1"
+          aria-label="Navigate to next user message"
+          title="Next user message"
         >
-          <ChevronDown className="h-3.5 w-3.5" strokeWidth={2.2} />
+          <ChevronDown className="h-4 w-4" strokeWidth={2} />
         </button>
       </div>
     </div>
-  )
+  );
 }
 
-export default memo(SessionTimelineNav)
+export default memo(SessionTimelineNav);

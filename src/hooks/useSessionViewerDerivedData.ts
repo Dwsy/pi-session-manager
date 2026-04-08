@@ -55,6 +55,7 @@ export function useSessionViewerDerivedData(
   entries: SessionEntry[],
   activeEntryId: string | null,
   isLive?: boolean,
+  previewMode = false,
 ): SessionViewerDerivedData {
   return useMemo(() => {
     const entryById = new Map<string, SessionEntry>()
@@ -88,7 +89,7 @@ export function useSessionViewerDerivedData(
         continue
       }
 
-      if (isRenderableNonMessageEntry(entry)) {
+      if (!previewMode && isRenderableNonMessageEntry(entry)) {
         renderableEntries.push(entry)
       }
     }
@@ -100,5 +101,5 @@ export function useSessionViewerDerivedData(
       headerEntry,
       messageEntries,
     }
-  }, [entries, activeEntryId])
+  }, [entries, activeEntryId, isLive, previewMode])
 }

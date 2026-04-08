@@ -8,9 +8,10 @@ interface SessionHeaderProps {
   sessionId?: string
   timestamp?: string
   stats: LegacySessionStats
+  previewMode?: boolean
 }
 
-function SessionHeader({ sessionId, timestamp, stats }: SessionHeaderProps) {
+function SessionHeader({ sessionId, timestamp, stats, previewMode = false }: SessionHeaderProps) {
   const { t } = useTranslation()
   const totalCost = stats.cost.input + stats.cost.output + stats.cost.cacheRead + stats.cost.cacheWrite
 
@@ -27,6 +28,32 @@ function SessionHeader({ sessionId, timestamp, stats }: SessionHeaderProps) {
   if (stats.customMessages) msgParts.push(`${stats.customMessages} ${t('session.header.custom')}`)
   if (stats.compactions) msgParts.push(`${stats.compactions} ${t('session.header.compactions')}`)
   if (stats.branchSummaries) msgParts.push(`${stats.branchSummaries} ${t('session.header.branchSummaries')}`)
+
+  const compactModelSummary = stats.models.length <= 1
+    ? (stats.models[0] || t('session.header.unknown'))
+    : `${stats.models[0]} +${stats.models.length - 1}`
+
+  if (previewMode) {
+    return (
+      <div className="session-header">
+        <h1>{t('session.header.session')}: {escapeHtml(sessionId || t('session.header.unknown'))}</h1>
+        <div className="session-meta">
+          <div className="info-item">
+            <span className="info-label">{t('session.header.date')}:</span>
+            <span className="info-value">{timestamp ? formatDate(timestamp) : t('session.header.unknown')}</span>
+          </div>
+          <div className="info-item">
+            <span className="info-label">{t('session.header.models')}:</span>
+            <span className="info-value">{compactModelSummary}</span>
+          </div>
+          <div className="info-item">
+            <span className="info-label">{t('session.header.messagesLabel')}:</span>
+            <span className="info-value">{msgParts.join(', ') || '0'}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="session-header">

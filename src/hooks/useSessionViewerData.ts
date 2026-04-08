@@ -1,97 +1,108 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
-import { invoke, listen } from '@/transport'
-import type { SessionChunk, SessionEntry, SessionsDiff } from '@/types'
-import { trimMarkdownCacheOnSessionSwitch } from '@/utils/markdown'
-import { getCachedSettings } from '@/utils/settingsApi'
-import { parseSessionEntriesWithLineCount } from '@/utils/session'
-import { isDemoModeEnabled, readDemoSessionChunk } from '@/demo'
+import { invoke, listen } from "@/transport";
+import type { SessionEntry, SessionsDiff } from "@/types";
+import { trimMarkdownCacheOnSessionSwitch } from "@/utils/markdown";
+import { getCachedSettings } from "@/utils/settingsApi";
+import { parseSessionEntriesWithLineCount } from "@/utils/session";
+import {
+  BROWSER_DATASET_REFRESHED_EVENT,
+  isBrowserDatasetModeEnabled,
+} from "@/browser-dataset";
+import {
+  readRuntimeSessionChunk,
+  shouldListenRuntimeSessionEvents,
+} from "@/runtime-data/sessionSource";
 
 function extractSessionId(sessionPath: string): string {
-  const base = sessionPath.replace(/\.jsonl$/, '')
-  return base.substring(base.lastIndexOf('/') + 1)
+  const base = sessionPath.replace(/\.jsonl$/, "");
+  return base.substring(base.lastIndexOf("/") + 1);
 }
 
 function appendDeltaToMessageContent(
   existingContent: any[] | undefined,
   assistantMessageEvent: any,
 ): any[] {
-  const content = Array.isArray(existingContent) ? [...existingContent] : []
-  const contentIndex = typeof assistantMessageEvent?.contentIndex === 'number'
-    ? assistantMessageEvent.contentIndex
-    : 0
-  const deltaType = assistantMessageEvent?.type
+  const content = Array.isArray(existingContent) ? [...existingContent] : [];
+  const contentIndex =
+    typeof assistantMessageEvent?.contentIndex === "number"
+      ? assistantMessageEvent.contentIndex
+      : 0;
+  const deltaType = assistantMessageEvent?.type;
 
-  const ensureBlock = (type: 'text' | 'thinking') => {
-    while (content.length <= contentIndex) content.push({ type: 'text', text: '' })
+  const ensureBlock = (type: "text" | "thinking") => {
+    while (content.length <= contentIndex)
+      content.push({ type: "text", text: "" });
     if (!content[contentIndex] || content[contentIndex].type !== type) {
-      content[contentIndex] = type === 'thinking'
-        ? { type: 'thinking', thinking: '' }
-        : { type: 'text', text: '' }
+      content[contentIndex] =
+        type === "thinking"
+          ? { type: "thinking", thinking: "" }
+          : { type: "text", text: "" };
     }
-    return content[contentIndex]
+    return content[contentIndex];
+  };
+
+  if (deltaType === "text_start") {
+    const block = ensureBlock("text");
+    block.text = assistantMessageEvent?.partial?.text || block.text || "";
+  } else if (deltaType === "text_delta") {
+    const block = ensureBlock("text");
+    block.text = `${block.text || ""}${assistantMessageEvent?.delta || ""}`;
+  } else if (deltaType === "text_end") {
+    const block = ensureBlock("text");
+    block.text = assistantMessageEvent?.content || block.text || "";
+  } else if (deltaType === "thinking_start") {
+    const block = ensureBlock("thinking");
+    block.thinking =
+      assistantMessageEvent?.partial?.thinking || block.thinking || "";
+  } else if (deltaType === "thinking_delta") {
+    const block = ensureBlock("thinking");
+    block.thinking = `${block.thinking || ""}${assistantMessageEvent?.delta || ""}`;
+  } else if (deltaType === "thinking_end") {
+    const block = ensureBlock("thinking");
+    block.thinking = assistantMessageEvent?.content || block.thinking || "";
   }
 
-  if (deltaType === 'text_start') {
-    const block = ensureBlock('text')
-    block.text = assistantMessageEvent?.partial?.text || block.text || ''
-  } else if (deltaType === 'text_delta') {
-    const block = ensureBlock('text')
-    block.text = `${block.text || ''}${assistantMessageEvent?.delta || ''}`
-  } else if (deltaType === 'text_end') {
-    const block = ensureBlock('text')
-    block.text = assistantMessageEvent?.content || block.text || ''
-  } else if (deltaType === 'thinking_start') {
-    const block = ensureBlock('thinking')
-    block.thinking = assistantMessageEvent?.partial?.thinking || block.thinking || ''
-  } else if (deltaType === 'thinking_delta') {
-    const block = ensureBlock('thinking')
-    block.thinking = `${block.thinking || ''}${assistantMessageEvent?.delta || ''}`
-  } else if (deltaType === 'thinking_end') {
-    const block = ensureBlock('thinking')
-    block.thinking = assistantMessageEvent?.content || block.thinking || ''
-  }
-
-  return content
+  return content;
 }
 
 interface SessionCacheItem {
-  entries: SessionEntry[]
-  lineCount: number
-  nextOffset: number
-  fileSize: number
-  hasMore: boolean
+  entries: SessionEntry[];
+  lineCount: number;
+  nextOffset: number;
+  fileSize: number;
+  hasMore: boolean;
 }
 
-const SESSION_CONTENT_CACHE = new Map<string, SessionCacheItem>()
-const MAX_CACHE_SIZE = 5
+const SESSION_CONTENT_CACHE = new Map<string, SessionCacheItem>();
+const MAX_CACHE_SIZE = 5;
 
 function cacheSessionContent(path: string, cacheItem: SessionCacheItem): void {
   if (SESSION_CONTENT_CACHE.size >= MAX_CACHE_SIZE) {
-    const firstKey = SESSION_CONTENT_CACHE.keys().next().value
+    const firstKey = SESSION_CONTENT_CACHE.keys().next().value;
     if (firstKey) {
-      SESSION_CONTENT_CACHE.delete(firstKey)
+      SESSION_CONTENT_CACHE.delete(firstKey);
     }
   }
-  SESSION_CONTENT_CACHE.set(path, cacheItem)
+  SESSION_CONTENT_CACHE.set(path, cacheItem);
 }
 
 function getDefaultActiveEntryId(entries: SessionEntry[]): string | null {
-  const lastMessage = entries.filter((entry) => entry.type === 'message').pop()
+  const lastMessage = entries.filter((entry) => entry.type === "message").pop();
   if (lastMessage) {
-    return lastMessage.id
+    return lastMessage.id;
   }
-  return entries.length > 0 ? entries[0].id : null
+  return entries.length > 0 ? entries[0].id : null;
 }
 
 function normalizeEntryId(rawId: string): string {
-  const duplicateMarker = '__dup_'
-  const markerIndex = rawId.indexOf(duplicateMarker)
+  const duplicateMarker = "__dup_";
+  const markerIndex = rawId.indexOf(duplicateMarker);
   if (markerIndex === -1) {
-    return rawId
+    return rawId;
   }
-  return rawId.slice(0, markerIndex)
+  return rawId.slice(0, markerIndex);
 }
 
 function mergeEntriesWithUniqueIds(
@@ -99,57 +110,57 @@ function mergeEntriesWithUniqueIds(
   incomingEntries: SessionEntry[],
 ): SessionEntry[] {
   if (incomingEntries.length === 0) {
-    return prevEntries
+    return prevEntries;
   }
 
-  const idCounts = new Map<string, number>()
+  const idCounts = new Map<string, number>();
 
   for (const entry of prevEntries) {
-    const baseId = normalizeEntryId(entry.id)
-    idCounts.set(baseId, (idCounts.get(baseId) ?? 0) + 1)
+    const baseId = normalizeEntryId(entry.id);
+    idCounts.set(baseId, (idCounts.get(baseId) ?? 0) + 1);
   }
 
   const adjustedIncoming = incomingEntries.map((entry) => {
-    const baseId = normalizeEntryId(entry.id)
-    const count = idCounts.get(baseId) ?? 0
-    idCounts.set(baseId, count + 1)
+    const baseId = normalizeEntryId(entry.id);
+    const count = idCounts.get(baseId) ?? 0;
+    idCounts.set(baseId, count + 1);
 
     if (count === 0) {
-      return entry
+      return entry;
     }
 
     return {
       ...entry,
       id: `${baseId}__dup_${count}`,
-    }
-  })
+    };
+  });
 
-  return [...prevEntries, ...adjustedIncoming]
+  return [...prevEntries, ...adjustedIncoming];
 }
 
 export interface UseSessionViewerDataOptions {
-  sessionPath: string
-  initialEntryId?: string
-  loadErrorMessage: string
-  isAtBottomRef: MutableRefObject<boolean>
-  isLive?: boolean
+  sessionPath: string;
+  initialEntryId?: string;
+  loadErrorMessage: string;
+  isAtBottomRef: MutableRefObject<boolean>;
+  isLive?: boolean;
 }
 
 export interface UseSessionViewerDataResult {
-  entries: SessionEntry[]
-  loading: boolean
-  showLoading: boolean
-  error: string | null
-  activeEntryId: string | null
-  setActiveEntryId: Dispatch<SetStateAction<string | null>>
-  scrollTargetId: string | null
-  setScrollTargetId: Dispatch<SetStateAction<string | null>>
-  hasNewMessages: boolean
-  setHasNewMessages: Dispatch<SetStateAction<boolean>>
-  streamingId: string | null
-  pendingScrollToBottomRef: MutableRefObject<boolean>
-  hasMoreHistory: boolean
-  loadMoreHistory: () => Promise<void>
+  entries: SessionEntry[];
+  loading: boolean;
+  showLoading: boolean;
+  error: string | null;
+  activeEntryId: string | null;
+  setActiveEntryId: Dispatch<SetStateAction<string | null>>;
+  scrollTargetId: string | null;
+  setScrollTargetId: Dispatch<SetStateAction<string | null>>;
+  hasNewMessages: boolean;
+  setHasNewMessages: Dispatch<SetStateAction<boolean>>;
+  streamingId: string | null;
+  pendingScrollToBottomRef: MutableRefObject<boolean>;
+  hasMoreHistory: boolean;
+  loadMoreHistory: () => Promise<void>;
 }
 
 export function useSessionViewerData({
@@ -159,110 +170,109 @@ export function useSessionViewerData({
   isAtBottomRef,
   isLive,
 }: UseSessionViewerDataOptions): UseSessionViewerDataResult {
-  const [entries, setEntries] = useState<SessionEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showLoading, setShowLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [lineCount, setLineCount] = useState(0)
-  const [activeEntryId, setActiveEntryId] = useState<string | null>(null)
-  const [scrollTargetId, setScrollTargetId] = useState<string | null>(null)
-  const [hasNewMessages, setHasNewMessages] = useState(false)
-  const [hasMoreHistory, setHasMoreHistory] = useState(false)
-  const [streamingId, setStreamingId] = useState<string | null>(null)
+  const [entries, setEntries] = useState<SessionEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showLoading, setShowLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lineCount, setLineCount] = useState(0);
+  const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const [scrollTargetId, setScrollTargetId] = useState<string | null>(null);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [streamingId, setStreamingId] = useState<string | null>(null);
+  const [datasetRefreshVersion, setDatasetRefreshVersion] = useState(0);
 
-  const pendingScrollToBottomRef = useRef(false)
-  const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lineCountRef = useRef(0)
-  const loadErrorMessageRef = useRef(loadErrorMessage)
-  const nextOffsetRef = useRef(0)
-  const fileSizeRef = useRef(0)
-  const loadingMoreRef = useRef(false)
-  const hasMoreHistoryRef = useRef(false)
-  const isLiveRef = useRef(isLive ?? false)
-  const lastResponseIdRef = useRef<string | null>(null)
+  const pendingScrollToBottomRef = useRef(false);
+  const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lineCountRef = useRef(0);
+  const loadErrorMessageRef = useRef(loadErrorMessage);
+  const nextOffsetRef = useRef(0);
+  const fileSizeRef = useRef(0);
+  const loadingMoreRef = useRef(false);
+  const hasMoreHistoryRef = useRef(false);
+  const isLiveRef = useRef(isLive ?? false);
+  const lastResponseIdRef = useRef<string | null>(null);
 
-  lineCountRef.current = lineCount
+  lineCountRef.current = lineCount;
 
   // Sync isLive prop to ref so the effect always has the latest status
   useEffect(() => {
-    isLiveRef.current = isLive ?? isLiveRef.current
-  }, [isLive])
+    isLiveRef.current = isLive ?? isLiveRef.current;
+  }, [isLive]);
 
   useEffect(() => {
     if (!sessionPath) {
-      return
+      return;
     }
-    trimMarkdownCacheOnSessionSwitch()
-  }, [sessionPath])
+    trimMarkdownCacheOnSessionSwitch();
+  }, [sessionPath]);
 
   useEffect(() => {
-    loadErrorMessageRef.current = loadErrorMessage
-  }, [loadErrorMessage])
+    loadErrorMessageRef.current = loadErrorMessage;
+  }, [loadErrorMessage]);
 
   const updateHasMoreHistory = useCallback((next: boolean) => {
-    hasMoreHistoryRef.current = next
-    setHasMoreHistory(next)
-  }, [])
+    hasMoreHistoryRef.current = next;
+    setHasMoreHistory(next);
+  }, []);
 
   const loadMoreHistory = useCallback(
     async (options?: {
-      asRealtime?: boolean
-      maxBytes?: number
-      force?: boolean
+      asRealtime?: boolean;
+      maxBytes?: number;
+      force?: boolean;
     }) => {
-      const asRealtime = Boolean(options?.asRealtime)
-      const force = Boolean(options?.force)
-      const maxBytes = options?.maxBytes ?? 384 * 1024
+      const asRealtime = Boolean(options?.asRealtime);
+      const force = Boolean(options?.force);
+      const maxBytes = options?.maxBytes ?? 384 * 1024;
 
       if (!sessionPath || loadingMoreRef.current) {
-        return
+        return;
       }
 
       if (!force && !asRealtime && !hasMoreHistoryRef.current) {
-        return
+        return;
       }
 
       try {
-        loadingMoreRef.current = true
+        loadingMoreRef.current = true;
 
-        const chunk = isDemoModeEnabled()
-          ? readDemoSessionChunk(sessionPath, nextOffsetRef.current, maxBytes)
-          : await invoke<SessionChunk>('read_session_file_chunk', {
-            path: sessionPath,
-            offset: nextOffsetRef.current,
-            maxBytes,
-          })
+        const chunk = await readRuntimeSessionChunk(
+          sessionPath,
+          nextOffsetRef.current,
+          maxBytes,
+        );
 
-        nextOffsetRef.current = chunk.next_offset
-        fileSizeRef.current = chunk.file_size
-        updateHasMoreHistory(chunk.has_more)
+        nextOffsetRef.current = chunk.next_offset;
+        fileSizeRef.current = chunk.file_size;
+        updateHasMoreHistory(chunk.has_more);
 
         if (!chunk.content.trim()) {
-          return
+          return;
         }
 
         const { entries: newEntries, lineCount: addedLines } =
-          parseSessionEntriesWithLineCount(chunk.content)
+          parseSessionEntriesWithLineCount(chunk.content);
 
         if (newEntries.length === 0) {
-          return
+          return;
         }
 
-        const nextLineCount = lineCountRef.current + addedLines
-        lineCountRef.current = nextLineCount
-        setLineCount(nextLineCount)
+        const nextLineCount = lineCountRef.current + addedLines;
+        lineCountRef.current = nextLineCount;
+        setLineCount(nextLineCount);
 
         setEntries((prev) => {
-          const merged = mergeEntriesWithUniqueIds(prev, newEntries)
+          const merged = mergeEntriesWithUniqueIds(prev, newEntries);
           cacheSessionContent(sessionPath, {
             entries: merged,
             lineCount: nextLineCount,
             nextOffset: chunk.next_offset,
             fileSize: chunk.file_size,
             hasMore: chunk.has_more,
-          })
-          return merged
-        })
+          });
+          return merged;
+        });
 
         if (asRealtime) {
           // In Live mode, we prefer WebSocket events for real-time updates to avoid duplicates and ID drifting.
@@ -271,92 +281,99 @@ export function useSessionViewerData({
             return;
           }
 
-          const nextActiveEntryId = getDefaultActiveEntryId(newEntries)
+          const nextActiveEntryId = getDefaultActiveEntryId(newEntries);
           if (nextActiveEntryId) {
-            setActiveEntryId(nextActiveEntryId)
+            setActiveEntryId(nextActiveEntryId);
           }
 
           if (isAtBottomRef.current) {
-            pendingScrollToBottomRef.current = true
+            pendingScrollToBottomRef.current = true;
           } else {
-            setHasNewMessages(true)
+            setHasNewMessages(true);
           }
         }
       } catch (loadMoreError) {
-        console.error('[useSessionViewerData] Failed to load session chunk:', loadMoreError)
+        console.error(
+          "[useSessionViewerData] Failed to load session chunk:",
+          loadMoreError,
+        );
       } finally {
-        loadingMoreRef.current = false
+        loadingMoreRef.current = false;
       }
     },
     [isAtBottomRef, sessionPath],
-  )
+  );
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     if (loadingTimerRef.current) {
-      clearTimeout(loadingTimerRef.current)
-      loadingTimerRef.current = null
+      clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
     }
 
-    setLineCount(0)
-    setEntries([])
-    setActiveEntryId(null)
-    setScrollTargetId(null)
-    setHasNewMessages(false)
-    updateHasMoreHistory(false)
-    pendingScrollToBottomRef.current = false
-    nextOffsetRef.current = 0
-    fileSizeRef.current = 0
-    loadingMoreRef.current = false
+    setLineCount(0);
+    setEntries([]);
+    setActiveEntryId(null);
+    setScrollTargetId(null);
+    setHasNewMessages(false);
+    updateHasMoreHistory(false);
+    pendingScrollToBottomRef.current = false;
+    nextOffsetRef.current = 0;
+    fileSizeRef.current = 0;
+    loadingMoreRef.current = false;
 
     if (!sessionPath) {
-      setLoading(false)
-      setShowLoading(false)
-      setError(null)
+      setLoading(false);
+      setShowLoading(false);
+      setError(null);
       return () => {
-        cancelled = true
-      }
+        cancelled = true;
+      };
     }
 
     const doLoad = async () => {
       try {
-        setLoading(true)
-        setShowLoading(false)
-        setError(null)
+        setLoading(true);
+        setShowLoading(false);
+        setError(null);
 
-        const openPosition = getCachedSettings().session?.openPosition ?? 'top'
+        const openPosition = getCachedSettings().session?.openPosition ?? "top";
 
-        const cached = SESSION_CONTENT_CACHE.get(sessionPath)
+        const cached = SESSION_CONTENT_CACHE.get(sessionPath);
         if (cached) {
-          if (openPosition === 'top' && cached.hasMore) {
+          if (openPosition === "top" && cached.hasMore) {
             // Top mode expects full history available immediately for stable tree anchors.
             // Force a fresh full hydration to avoid partial-cache entry mismatch.
-            SESSION_CONTENT_CACHE.delete(sessionPath)
+            SESSION_CONTENT_CACHE.delete(sessionPath);
           } else {
-            setEntries(cached.entries)
-            setLineCount(cached.lineCount)
-            updateHasMoreHistory(cached.hasMore)
-            nextOffsetRef.current = cached.nextOffset
-            fileSizeRef.current = cached.fileSize
-            lineCountRef.current = cached.lineCount
-            setActiveEntryId(getDefaultActiveEntryId(cached.entries))
+            setEntries(cached.entries);
+            setLineCount(cached.lineCount);
+            updateHasMoreHistory(cached.hasMore);
+            nextOffsetRef.current = cached.nextOffset;
+            fileSizeRef.current = cached.fileSize;
+            lineCountRef.current = cached.lineCount;
+            setActiveEntryId(getDefaultActiveEntryId(cached.entries));
 
             pendingScrollToBottomRef.current =
-              !initialEntryId && openPosition === 'bottom'
-            return
+              !initialEntryId && openPosition === "bottom";
+            return;
           }
         }
 
         loadingTimerRef.current = setTimeout(() => {
           if (!cancelled) {
-            setShowLoading(true)
+            setShowLoading(true);
           }
-        }, 300)
+        }, 300);
 
         if (isLiveRef.current) {
           try {
-            const liveEntries = await invoke<any[]>('get_pi_agent_entries', { sessionId: sessionPath.split('/').pop()?.replace('.jsonl', '') || sessionPath });
+            const liveEntries = await invoke<any[]>("get_pi_agent_entries", {
+              sessionId:
+                sessionPath.split("/").pop()?.replace(".jsonl", "") ||
+                sessionPath,
+            });
             if (liveEntries && liveEntries.length > 0) {
               setEntries(liveEntries);
               setLineCount(liveEntries.length);
@@ -365,45 +382,40 @@ export function useSessionViewerData({
               return;
             }
           } catch (e) {
-            console.warn('[useSessionViewerData] Failed to fetch live entries, falling back to disk:', e);
+            console.warn(
+              "[useSessionViewerData] Failed to fetch live entries, falling back to disk:",
+              e,
+            );
           }
         }
 
-        let chunk = isDemoModeEnabled()
-          ? readDemoSessionChunk(sessionPath, 0, 384 * 1024)
-          : await invoke<SessionChunk>('read_session_file_chunk', {
-            path: sessionPath,
-            offset: 0,
-            maxBytes: 384 * 1024,
-          })
+        let chunk = await readRuntimeSessionChunk(sessionPath, 0, 384 * 1024);
 
         let { entries: allEntries, lineCount: totalLineCount } =
-          parseSessionEntriesWithLineCount(chunk.content)
-        let nextOffset = chunk.next_offset
-        const fileSize = chunk.file_size
-        let hasMore = chunk.has_more
+          parseSessionEntriesWithLineCount(chunk.content);
+        let nextOffset = chunk.next_offset;
+        const fileSize = chunk.file_size;
+        let hasMore = chunk.has_more;
 
-        if (openPosition === 'top') {
+        if (openPosition === "top") {
           while (hasMore) {
-            const nextChunk = isDemoModeEnabled()
-              ? readDemoSessionChunk(sessionPath, nextOffset, 384 * 1024)
-              : await invoke<SessionChunk>('read_session_file_chunk', {
-                path: sessionPath,
-                offset: nextOffset,
-                maxBytes: 384 * 1024,
-              })
+            const nextChunk = await readRuntimeSessionChunk(
+              sessionPath,
+              nextOffset,
+              384 * 1024,
+            );
 
             const { entries: chunkEntries, lineCount: chunkLineCount } =
-              parseSessionEntriesWithLineCount(nextChunk.content)
+              parseSessionEntriesWithLineCount(nextChunk.content);
 
-            allEntries = mergeEntriesWithUniqueIds(allEntries, chunkEntries)
-            totalLineCount += chunkLineCount
-            nextOffset = nextChunk.next_offset
-            hasMore = nextChunk.has_more
-            chunk = nextChunk
+            allEntries = mergeEntriesWithUniqueIds(allEntries, chunkEntries);
+            totalLineCount += chunkLineCount;
+            nextOffset = nextChunk.next_offset;
+            hasMore = nextChunk.has_more;
+            chunk = nextChunk;
 
             if (cancelled) {
-              return
+              return;
             }
           }
         }
@@ -414,361 +426,487 @@ export function useSessionViewerData({
           nextOffset,
           fileSize,
           hasMore,
-        })
+        });
 
         if (cancelled) {
-          return
+          return;
         }
 
-        nextOffsetRef.current = nextOffset
-        fileSizeRef.current = fileSize
-        lineCountRef.current = totalLineCount
+        nextOffsetRef.current = nextOffset;
+        fileSizeRef.current = fileSize;
+        lineCountRef.current = totalLineCount;
 
-        setEntries(allEntries)
-        setLineCount(totalLineCount)
-        updateHasMoreHistory(hasMore)
-        setActiveEntryId(getDefaultActiveEntryId(allEntries))
+        setEntries(allEntries);
+        setLineCount(totalLineCount);
+        updateHasMoreHistory(hasMore);
+        setActiveEntryId(getDefaultActiveEntryId(allEntries));
 
         pendingScrollToBottomRef.current =
-          !initialEntryId && openPosition === 'bottom'
+          !initialEntryId && openPosition === "bottom";
       } catch (loadError) {
         if (!cancelled) {
-          console.error('[useSessionViewerData] Failed to load session:', loadError)
+          console.error(
+            "[useSessionViewerData] Failed to load session:",
+            loadError,
+          );
           setError(
             loadError instanceof Error
               ? loadError.message
               : loadErrorMessageRef.current,
-          )
+          );
         }
       } finally {
         if (!cancelled) {
           if (loadingTimerRef.current) {
-            clearTimeout(loadingTimerRef.current)
-            loadingTimerRef.current = null
+            clearTimeout(loadingTimerRef.current);
+            loadingTimerRef.current = null;
           }
-          setLoading(false)
-          setShowLoading(false)
+          setLoading(false);
+          setShowLoading(false);
         }
       }
-    }
+    };
 
-    void doLoad()
+    void doLoad();
 
     return () => {
-      cancelled = true
+      cancelled = true;
       if (loadingTimerRef.current) {
-        clearTimeout(loadingTimerRef.current)
-        loadingTimerRef.current = null
+        clearTimeout(loadingTimerRef.current);
+        loadingTimerRef.current = null;
       }
-    }
-  }, [initialEntryId, sessionPath, updateHasMoreHistory])
+    };
+  }, [
+    datasetRefreshVersion,
+    initialEntryId,
+    sessionPath,
+    updateHasMoreHistory,
+  ]);
 
   useEffect(() => {
     if (initialEntryId) {
-      setScrollTargetId(initialEntryId)
+      setScrollTargetId(initialEntryId);
     }
-  }, [initialEntryId])
+  }, [initialEntryId]);
 
   useEffect(() => {
-    if (!sessionPath || loading) return
-    if (isDemoModeEnabled()) return
+    if (!isBrowserDatasetModeEnabled() || typeof window === "undefined") {
+      return;
+    }
 
-    let unlistenSessionsChanged: (() => void) | null = null
-    let unlistenLiveEntry: (() => void) | null = null
-    let unlistenLiveRegister: (() => void) | null = null
+    const handleRefresh = () => {
+      SESSION_CONTENT_CACHE.delete(sessionPath);
+      setDatasetRefreshVersion((value) => value + 1);
+    };
+
+    window.addEventListener(BROWSER_DATASET_REFRESHED_EVENT, handleRefresh);
+    return () => {
+      window.removeEventListener(
+        BROWSER_DATASET_REFRESHED_EVENT,
+        handleRefresh,
+      );
+    };
+  }, [sessionPath]);
+
+  useEffect(() => {
+    if (!sessionPath || loading) return;
+    if (!shouldListenRuntimeSessionEvents()) return;
+
+    let unlistenSessionsChanged: (() => void) | null = null;
+    let unlistenLiveEntry: (() => void) | null = null;
+    let unlistenLiveRegister: (() => void) | null = null;
 
     const setup = async () => {
-      const sessionId = extractSessionId(sessionPath)
+      const sessionId = extractSessionId(sessionPath);
 
       // Track live session registration — when live, skip file-watcher disk reads
-      const listenReg = await listen<any>('pi-agent:register', (event) => {
+      const listenReg = await listen<any>("pi-live:session_registered", (event) => {
         const payload = event.payload;
-        if (payload.sessionId.includes(sessionPath) || sessionPath.includes(payload.sessionId)) {
+        if (
+          payload.sessionId.includes(sessionPath) ||
+          sessionPath.includes(payload.sessionId)
+        ) {
           isLiveRef.current = true;
           // When bridge connects/reconnects, it sends the full entries list. Sync it!
           if (Array.isArray(payload.entries) && payload.entries.length > 0) {
-             setEntries(payload.entries);
+            setEntries(payload.entries);
           }
         }
       });
-      const listenDisc = await listen<{ sessionId: string }>('pi-agent:disconnect', ({ payload }) => {
-        if (payload.sessionId === sessionId) isLiveRef.current = false
-      })
+      const listenDisc = await listen<{ sessionId: string }>(
+        "pi-live:session_disconnected",
+        ({ payload }) => {
+          if (payload.sessionId === sessionId) isLiveRef.current = false;
+        },
+      );
       unlistenLiveRegister = () => {
         listenReg();
         listenDisc();
-      }
+      };
 
       // Only listen to file-watcher when NOT live (avoid conflict with real-time WS streaming)
-      unlistenSessionsChanged = await listen<SessionsDiff>('sessions-changed', (event) => {
-        if (isLiveRef.current) return
-        const diff = event.payload
-        if (!diff?.updated?.length) return
+      unlistenSessionsChanged = await listen<SessionsDiff>(
+        "sessions-changed",
+        (event) => {
+          if (isLiveRef.current) return;
+          const diff = event.payload;
+          if (!diff?.updated?.length) return;
 
-        const hit = diff.updated.some((session) => session.path === sessionPath)
-        if (hit) {
-          void loadMoreHistory({ asRealtime: true })
-        }
-      })
-
-      // Pi Agent live streaming — receives entries via WebSocket
-      unlistenLiveEntry = await listen<{ sessionId: string; eventType: string; entry: any }>(
-        'pi-agent:entry',
-        ({ payload }) => {
-          // Robust sessionId matching: could be full ID or just the UUID
-          const matches = payload.sessionId === sessionId ||
-                         (payload.sessionId && sessionId.includes(payload.sessionId)) ||
-                         (sessionId && payload.sessionId.includes(sessionId));
-          if (!matches) return;
-
-          console.log(`[useSessionViewerData] Live event: ${payload.eventType}`, payload.entry);
-
-          const raw = payload.entry as Record<string, any>
-          if (raw._sessionPath && raw._sessionPath !== sessionPath) return
-
-            const eventType = payload.eventType
-
-            if (eventType.startsWith('message_')) {
-              const rawMessage = raw.message || raw
-              const isUser = rawMessage?.role === 'user'
-              const messageIdFromRaw = rawMessage?.id || rawMessage?.responseId || rawMessage?.response_id
-
-              // Case A: message_start -> Register a new ID or use raw one
-              if (eventType === 'message_start') {
-                if (messageIdFromRaw) {
-                  lastResponseIdRef.current = messageIdFromRaw
-                } else if (!isUser) {
-                  // Generate a stable ID for this turn if backend didn't provide one
-                  lastResponseIdRef.current = `assistant-msg-${Date.now()}`
-                }
-              }
-
-              // Case B: message_update -> Use the tracked active ID
-              let messageId = messageIdFromRaw || (isUser ? null : lastResponseIdRef.current)
-
-              setEntries((prev) => {
-                // Deduplication for user messages (content fingerprinting)
-                if (isUser && !messageId) {
-                  const rawText = Array.isArray(rawMessage.content)
-                    ? rawMessage.content.find((c: any) => c.text)?.text
-                    : (typeof rawMessage.content === 'string' ? rawMessage.content : '')
-
-                  const duplicate = prev.slice(-5).find(e =>
-                    e.type === 'message' &&
-                    e.message?.role === 'user' &&
-                    (Array.isArray(e.message.content) ? e.message.content.some((c: any) => c.text === rawText) : e.message.content === rawText)
-                  )
-                  if (duplicate) {
-                    messageId = duplicate.id
-                  } else {
-                    messageId = `user-msg-${rawText.substring(0, 10)}-${Date.now()}`
-                  }
-                }
-
-                if (!messageId) return prev
-
-                const existingIndex = prev.findIndex((e) => e.id === messageId)
-                let nextContent = Array.isArray(rawMessage?.content) ? [...rawMessage.content] : []
-
-                // Delta merging if applicable
-                if (raw.assistantMessageEvent && existingIndex !== -1) {
-                  const existingContent = prev[existingIndex].message?.content || []
-                  if (nextContent.length === 0 || (nextContent.length === 1 && nextContent[0].text === "")) {
-                    nextContent = appendDeltaToMessageContent(existingContent as any[], raw.assistantMessageEvent)
-                  }
-                }
-
-                let parentId = raw.parentId
-                if (!parentId && existingIndex === -1 && prev.length > 0) {
-                  parentId = prev[prev.length - 1].id
-                }
-
-                const liveEntry: SessionEntry = {
-                  type: 'message',
-                  id: messageId,
-                  parentId: parentId || (existingIndex !== -1 ? prev[existingIndex].parentId : undefined),
-                  timestamp: raw.timestamp || (existingIndex !== -1 ? prev[existingIndex].timestamp : new Date().toISOString()),
-                  message: {
-                    ...rawMessage,
-                    role: rawMessage?.role || (existingIndex !== -1 ? prev[existingIndex].message?.role : 'assistant'),
-                    content: nextContent.length > 0 ? nextContent : (existingIndex !== -1 ? prev[existingIndex].message?.content : []),
-                  },
-                }
-
-                let next = [...prev]
-                if (existingIndex === -1) {
-                  next.push(liveEntry)
-                } else {
-                  // Merge carefully
-                  next[existingIndex] = {
-                    ...next[existingIndex],
-                    ...liveEntry,
-                    message: {
-                      role: liveEntry.message?.role ?? next[existingIndex].message?.role ?? "unknown",
-                      ...next[existingIndex].message,
-                      ...liveEntry.message,
-                      // Keep existing content if new content is empty (prevent wipeouts)
-                      content: liveEntry.message?.content?.length ? liveEntry.message.content : next[existingIndex].message?.content ?? [],
-                    }
-                  }
-                }
-
-                // Sort stably
-                next.sort((a, b) => {
-                  const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0
-                  const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0
-                  if (ta !== tb) return ta - tb
-                  return 0 // Keep stable for same-ms events
-                })
-
-                return next
-              })
-
-              if (messageId) {
-                setActiveEntryId(messageId)
-                if (eventType === 'message_start' || eventType === 'message_update') {
-                  setStreamingId(messageId)
-                }
-              }
-              if (eventType === 'message_end') {
-                setStreamingId(null)
-              }
-
-              if (isAtBottomRef.current) {
-                pendingScrollToBottomRef.current = true
-              } else {
-                setHasNewMessages(true)
-              }
-              return
-            }
-
-          if (eventType === 'turn_end' && raw.message) {
-            const m = raw.message
-            const mid = m.id || m.responseId || m.response_id
-            if (mid) {
-              setEntries(prev => {
-                const existingIdx = prev.findIndex(e => e.id === mid)
-                if (existingIdx === -1) {
-                  return [...prev, {
-                    type: 'message',
-                    id: mid,
-                    timestamp: m.timestamp || new Date().toISOString(),
-                    message: { ...m }
-                  }]
-                }
-                const next = [...prev]
-                // Merge carefully: don't overwrite with empty content if we already have it
-                next[existingIdx] = {
-                  ...next[existingIdx],
-                  message: {
-                    ...next[existingIdx].message,
-                    ...m,
-                    content: (m.content?.length > 0) ? m.content : next[existingIdx].message?.content
-                  }
-                }
-                return next
-              })
-            }
-          }
-
-          if (eventType.startsWith('tool_execution_')) {
-            const toolCallId = raw.toolCallId
-            if (!toolCallId) return
-
-            if (eventType === 'tool_execution_update') {
-              setEntries((prev) => {
-                // Find message that has this toolCall
-                const msgIdx = prev.findIndex(e =>
-                  e.type === 'message' &&
-                  e.message?.role === 'assistant' &&
-                  e.message.content?.some((c: any) => c.type === 'toolCall' && c.toolCallId === toolCallId)
-                )
-
-                if (msgIdx === -1) return prev
-
-                const next = [...prev]
-                const msg = { ...next[msgIdx] }
-                const content = [...(msg.message?.content || [])]
-                const toolIdx = content.findIndex((c: any) => c.type === 'toolCall' && c.toolCallId === toolCallId)
-
-                if (toolIdx !== -1) {
-                  content[toolIdx] = {
-                    ...content[toolIdx],
-                    // Merge update: name, status, arguments etc.
-                    ...raw,
-                    // !!! CRITICAL: Ensure we don't overwrite "toolCall" type with "tool_execution_update"
-                    // Otherwise it gets filtered out from toolCalls list in AssistantMessage
-                    type: 'toolCall',
-                    // Ensure args are stringified into arguments if they arrive as object
-                    arguments: raw.args ? JSON.stringify(raw.args) : (raw.arguments || content[toolIdx].arguments)
-                  }
-                  msg.message = { ...msg.message!, content }
-                  next[msgIdx] = msg
-                }
-
-                // Additionally, if there is partialResult, create/update a toolResult entry
-                // so the ToolCallList can render the intermediate output.
-                if (raw.partialResult || raw.result) {
-                  const resultData = raw.partialResult || raw.result
-                  const toolResultEntry: SessionEntry = {
-                    type: 'message',
-                    id: `tool-result-${toolCallId}`,
-                    timestamp: raw.timestamp || new Date().toISOString(),
-                    message: {
-                      role: 'toolResult',
-                      toolCallId,
-                      isError: !!raw.isError,
-                      content: resultData.content || [],
-                    },
-                  }
-                  const resIdx = next.findIndex(e => e.id === toolResultEntry.id)
-                  if (resIdx === -1) {
-                    next.push(toolResultEntry)
-                  } else {
-                    next[resIdx] = toolResultEntry
-                  }
-                }
-
-                return next
-              })
-            }
-
-            if (eventType === 'tool_execution_end') {
-              const resultText = raw.result?.content?.find?.((c: any) => c.type === 'text')?.text || ''
-              const toolResultEntry: SessionEntry = {
-                type: 'message',
-                id: `tool-result-${toolCallId}`,
-                timestamp: raw.timestamp || new Date().toISOString(),
-                message: {
-                  role: 'toolResult',
-                  toolCallId,
-                  isError: !!raw.isError,
-                  content: raw.result?.content || [{ type: 'text', text: resultText }],
-                },
-              }
-
-              setEntries((prev) => {
-                const existingIndex = prev.findIndex((e) => e.id === toolResultEntry.id)
-                if (existingIndex === -1) return [...prev, toolResultEntry]
-                const next = [...prev]
-                next[existingIndex] = toolResultEntry
-                return next
-              })
-            }
+          const hit = diff.updated.some(
+            (session) => session.path === sessionPath,
+          );
+          if (hit) {
+            void loadMoreHistory({ asRealtime: true });
           }
         },
-      )
-    }
+      );
 
-    void setup()
+      const handleLiveEvent = (
+        eventType: string,
+        payload: {
+          sessionId: string;
+          sessionPath?: string;
+          [key: string]: any;
+        },
+      ) => {
+        // Robust sessionId matching: could be full ID or just the UUID
+        const matches =
+          payload.sessionId === sessionId ||
+          (payload.sessionId && sessionId.includes(payload.sessionId)) ||
+          (sessionId && payload.sessionId.includes(sessionId));
+        if (!matches) return;
+
+        const raw = payload as Record<string, any>;
+        if (payload.sessionPath && payload.sessionPath !== sessionPath) return;
+
+        if (eventType.startsWith("message_")) {
+          const rawMessage = raw.message || raw;
+          const isUser = rawMessage?.role === "user";
+          const messageIdFromRaw =
+            rawMessage?.id || rawMessage?.responseId || rawMessage?.response_id;
+
+          // Case A: message_start -> Register a new ID or use raw one
+          if (eventType === "message_start") {
+            if (messageIdFromRaw) {
+              lastResponseIdRef.current = messageIdFromRaw;
+            } else if (!isUser) {
+              // Generate a stable ID for this turn if backend didn't provide one
+              lastResponseIdRef.current = `assistant-msg-${Date.now()}`;
+            }
+          }
+
+          // Case B: message_update -> Use the tracked active ID
+          let messageId =
+            messageIdFromRaw || (isUser ? null : lastResponseIdRef.current);
+
+          setEntries((prev) => {
+            // Deduplication for user messages (content fingerprinting)
+            if (isUser && !messageId) {
+              const rawText = Array.isArray(rawMessage.content)
+                ? rawMessage.content.find((c: any) => c.text)?.text
+                : typeof rawMessage.content === "string"
+                  ? rawMessage.content
+                  : "";
+
+              const duplicate = prev
+                .slice(-5)
+                .find(
+                  (e) =>
+                    e.type === "message" &&
+                    e.message?.role === "user" &&
+                    (Array.isArray(e.message.content)
+                      ? e.message.content.some((c: any) => c.text === rawText)
+                      : e.message.content === rawText),
+                );
+              if (duplicate) {
+                messageId = duplicate.id;
+              } else {
+                messageId = `user-msg-${rawText.substring(0, 10)}-${Date.now()}`;
+              }
+            }
+
+            if (!messageId) return prev;
+
+            const existingIndex = prev.findIndex((e) => e.id === messageId);
+            let nextContent = Array.isArray(rawMessage?.content)
+              ? [...rawMessage.content]
+              : [];
+
+            // Delta merging if applicable
+            if (raw.assistantMessageEvent && existingIndex !== -1) {
+              const existingContent =
+                prev[existingIndex].message?.content || [];
+              if (
+                nextContent.length === 0 ||
+                (nextContent.length === 1 && nextContent[0].text === "")
+              ) {
+                nextContent = appendDeltaToMessageContent(
+                  existingContent as any[],
+                  raw.assistantMessageEvent,
+                );
+              }
+            }
+
+            let parentId = raw.parentId;
+            if (!parentId && existingIndex === -1 && prev.length > 0) {
+              parentId = prev[prev.length - 1].id;
+            }
+
+            const liveEntry: SessionEntry = {
+              type: "message",
+              id: messageId,
+              parentId:
+                parentId ||
+                (existingIndex !== -1
+                  ? prev[existingIndex].parentId
+                  : undefined),
+              timestamp:
+                raw.timestamp ||
+                (existingIndex !== -1
+                  ? prev[existingIndex].timestamp
+                  : new Date().toISOString()),
+              message: {
+                ...rawMessage,
+                role:
+                  rawMessage?.role ||
+                  (existingIndex !== -1
+                    ? prev[existingIndex].message?.role
+                    : "assistant"),
+                content:
+                  nextContent.length > 0
+                    ? nextContent
+                    : existingIndex !== -1
+                      ? prev[existingIndex].message?.content
+                      : [],
+              },
+            };
+
+            let next = [...prev];
+            if (existingIndex === -1) {
+              next.push(liveEntry);
+            } else {
+              // Merge carefully
+              next[existingIndex] = {
+                ...next[existingIndex],
+                ...liveEntry,
+                message: {
+                  role:
+                    liveEntry.message?.role ??
+                    next[existingIndex].message?.role ??
+                    "unknown",
+                  ...next[existingIndex].message,
+                  ...liveEntry.message,
+                  // Keep existing content if new content is empty (prevent wipeouts)
+                  content: liveEntry.message?.content?.length
+                    ? liveEntry.message.content
+                    : (next[existingIndex].message?.content ?? []),
+                },
+              };
+            }
+
+            // Sort stably
+            next.sort((a, b) => {
+              const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+              const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+              if (ta !== tb) return ta - tb;
+              return 0; // Keep stable for same-ms events
+            });
+
+            return next;
+          });
+
+          if (messageId) {
+            setActiveEntryId(messageId);
+            if (
+              eventType === "message_start" ||
+              eventType === "message_update"
+            ) {
+              setStreamingId(messageId);
+            }
+          }
+          if (eventType === "message_end") {
+            setStreamingId(null);
+          }
+
+          if (isAtBottomRef.current) {
+            pendingScrollToBottomRef.current = true;
+          } else {
+            setHasNewMessages(true);
+          }
+          return;
+        }
+
+        if (eventType === "turn_end" && raw.message) {
+          const m = raw.message;
+          const mid = m.id || m.responseId || m.response_id;
+          if (mid) {
+            setEntries((prev) => {
+              const existingIdx = prev.findIndex((e) => e.id === mid);
+              if (existingIdx === -1) {
+                return [
+                  ...prev,
+                  {
+                    type: "message",
+                    id: mid,
+                    timestamp: m.timestamp || new Date().toISOString(),
+                    message: { ...m },
+                  },
+                ];
+              }
+              const next = [...prev];
+              // Merge carefully: don't overwrite with empty content if we already have it
+              next[existingIdx] = {
+                ...next[existingIdx],
+                message: {
+                  ...next[existingIdx].message,
+                  ...m,
+                  content:
+                    m.content?.length > 0
+                      ? m.content
+                      : next[existingIdx].message?.content,
+                },
+              };
+              return next;
+            });
+          }
+        }
+
+        if (eventType.startsWith("tool_execution_")) {
+          const toolCallId = raw.toolCallId;
+          if (!toolCallId) return;
+
+          if (eventType === "tool_execution_update") {
+            setEntries((prev) => {
+              // Find message that has this toolCall
+              const msgIdx = prev.findIndex(
+                (e) =>
+                  e.type === "message" &&
+                  e.message?.role === "assistant" &&
+                  e.message.content?.some(
+                    (c: any) =>
+                      c.type === "toolCall" && (c.id === toolCallId || c.toolCallId === toolCallId),
+                  ),
+              );
+
+              if (msgIdx === -1) return prev;
+
+              const next = [...prev];
+              const msg = { ...next[msgIdx] };
+              const content = [...(msg.message?.content || [])];
+              const toolIdx = content.findIndex(
+                (c: any) =>
+                  c.type === "toolCall" && (c.id === toolCallId || c.toolCallId === toolCallId),
+              );
+
+              if (toolIdx !== -1) {
+                content[toolIdx] = {
+                  ...content[toolIdx],
+                  // Merge update: name, status, arguments etc.
+                  ...raw,
+                  // !!! CRITICAL: Ensure we don't overwrite "toolCall" type with "tool_execution_update"
+                  // Otherwise it gets filtered out from toolCalls list in AssistantMessage
+                  type: "toolCall",
+                  id: toolCallId,
+                  // Ensure args are stringified into arguments if they arrive as object
+                  arguments: raw.args
+                    ? JSON.stringify(raw.args)
+                    : raw.arguments || content[toolIdx].arguments,
+                };
+                msg.message = { ...msg.message!, content };
+                next[msgIdx] = msg;
+              }
+
+              // Additionally, if there is partialResult, create/update a toolResult entry
+              // so the ToolCallList can render the intermediate output.
+              if (raw.partialResult || raw.result) {
+                const resultData = raw.partialResult || raw.result;
+                const toolResultEntry: SessionEntry = {
+                  type: "message",
+                  id: `tool-result-${toolCallId}`,
+                  timestamp: raw.timestamp || new Date().toISOString(),
+                  message: {
+                    role: "toolResult",
+                    toolCallId,
+                    isError: !!raw.isError,
+                    content: resultData.content || [],
+                  },
+                };
+                const resIdx = next.findIndex(
+                  (e) => e.id === toolResultEntry.id,
+                );
+                if (resIdx === -1) {
+                  next.push(toolResultEntry);
+                } else {
+                  next[resIdx] = toolResultEntry;
+                }
+              }
+
+              return next;
+            });
+          }
+
+          if (eventType === "tool_execution_end") {
+            const resultText =
+              raw.result?.content?.find?.((c: any) => c.type === "text")
+                ?.text || "";
+            const toolResultEntry: SessionEntry = {
+              type: "message",
+              id: `tool-result-${toolCallId}`,
+              timestamp: raw.timestamp || new Date().toISOString(),
+              message: {
+                role: "toolResult",
+                toolCallId,
+                isError: !!raw.isError,
+                content: raw.result?.content || [
+                  { type: "text", text: resultText },
+                ],
+              },
+            };
+
+            setEntries((prev) => {
+              const existingIndex = prev.findIndex(
+                (e) => e.id === toolResultEntry.id,
+              );
+              if (existingIndex === -1) return [...prev, toolResultEntry];
+              const next = [...prev];
+              next[existingIndex] = toolResultEntry;
+              return next;
+            });
+          }
+        }
+      };
+
+      const liveEventNames = [
+        "message_start",
+        "message_update",
+        "message_end",
+        "tool_execution_start",
+        "tool_execution_update",
+        "tool_execution_end",
+        "turn_start",
+        "turn_end",
+      ] as const;
+      const liveEventUnsubs = await Promise.all(
+        liveEventNames.map((eventName) =>
+          listen<any>(eventName, ({ payload }) => {
+            handleLiveEvent(eventName, payload);
+          }),
+        ),
+      );
+      unlistenLiveEntry = () => {
+        liveEventUnsubs.forEach((dispose) => dispose());
+      };
+    };
+
+    void setup();
 
     return () => {
-      isLiveRef.current = false
-      unlistenSessionsChanged?.()
-      unlistenLiveEntry?.()
-      unlistenLiveRegister?.()
-    }
-  }, [loadMoreHistory, loading, sessionPath, isAtBottomRef])
+      isLiveRef.current = false;
+      unlistenSessionsChanged?.();
+      unlistenLiveEntry?.();
+      unlistenLiveRegister?.();
+    };
+  }, [loadMoreHistory, loading, sessionPath, isAtBottomRef]);
 
   return {
     entries,
@@ -785,7 +923,7 @@ export function useSessionViewerData({
     pendingScrollToBottomRef,
     hasMoreHistory,
     loadMoreHistory: async () => {
-      await loadMoreHistory()
+      await loadMoreHistory();
     },
-  }
+  };
 }

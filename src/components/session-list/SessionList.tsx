@@ -11,6 +11,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
 import type { SessionInfo, FavoriteItem, Tag } from "@/types";
 import {
+  ArrowRightLeft,
   CheckSquare2,
   Search,
   Square,
@@ -50,6 +51,7 @@ interface SessionListProps {
   onSelectSession: (session: SessionInfo) => void;
   onDeleteSession?: (session: SessionInfo) => void;
   onDeleteSessions?: (sessions: SessionInfo[]) => void;
+  onConvertSession?: (session: SessionInfo) => void;
   loading: boolean;
   hasMore?: boolean;
   loadingMore?: boolean;
@@ -83,6 +85,7 @@ export default function SessionList({
   onSelectSession,
   onDeleteSession,
   onDeleteSessions,
+  onConvertSession,
   loading,
   hasMore = false,
   loadingMore = false,
@@ -955,6 +958,18 @@ export default function SessionList({
                                 }
                               />
                             )}
+                            {!isSelectionMode && onConvertSession && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onConvertSession(session);
+                                }}
+                                className="p-1 text-muted-foreground/60 hover:text-primary rounded motion-color motion-press focus-ring"
+                                title={t("session.convert.title")}
+                              >
+                                <ArrowRightLeft className="h-3 w-3" />
+                              </button>
+                            )}
                             {!isSelectionMode && onDeleteSession && (
                               <button
                                 ref={
@@ -1039,6 +1054,13 @@ export default function SessionList({
                   invoke("open_session_in_browser", {
                     path: contextMenuSession.path,
                   }).catch(console.error);
+                }
+              : undefined
+          }
+          onConvert={
+            onConvertSession
+              ? () => {
+                  onConvertSession(contextMenuSession);
                 }
               : undefined
           }

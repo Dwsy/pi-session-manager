@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Terminal, Globe, Star, Trash2, Check, Copy } from 'lucide-react'
+import { Terminal, Globe, Star, Trash2, Check, Copy, ArrowRightLeft } from 'lucide-react'
 import type { Tag } from '@/types'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
 
@@ -13,6 +13,7 @@ interface SessionContextMenuProps {
   onToggleTag: (tagId: string, assigned: boolean) => void
   onOpenTerminal?: () => void
   onOpenBrowser?: () => void
+  onConvert?: () => void
   onToggleFavorite?: () => void
   onCopyResume?: () => void
   onDelete?: () => void
@@ -23,7 +24,7 @@ interface SessionContextMenuProps {
 export default function SessionContextMenu({
   x, y, tags, sessionTagIds,
   onToggleTag, onOpenTerminal, onOpenBrowser,
-  onToggleFavorite, onCopyResume, onDelete, isFavorite, onClose,
+  onConvert, onToggleFavorite, onCopyResume, onDelete, isFavorite, onClose,
 }: SessionContextMenuProps) {
   const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
@@ -93,6 +94,12 @@ export default function SessionContextMenu({
         <button onClick={() => { onOpenBrowser(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
           <Globe className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs text-foreground">{t('tags.contextMenu.openBrowser')}</span>
+        </button>
+      )}
+      {onConvert && (
+        <button onClick={() => { onConvert(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
+          <ArrowRightLeft className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs text-foreground">{t('session.convert.title')}</span>
         </button>
       )}
       {onToggleFavorite && (

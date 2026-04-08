@@ -12,6 +12,7 @@ export interface SessionViewerToolbarProps {
   isMobileMenuOpen: boolean;
   isScrollMarkersFeatureEnabled: boolean;
   isSearchOpen: boolean;
+  previewMode?: boolean;
   onBack?: () => void;
   onToggleSidebar: () => void;
   onToggleThinking: () => void;
@@ -25,6 +26,7 @@ export interface SessionViewerToolbarProps {
   onRename: () => void;
   onFork?: () => void;
   onExport: () => void;
+  onConvert?: () => void;
   onResume?: () => void;
   desktopResumeButton?: ReactNode;
   liveSession?: LiveSessionInfo | null;

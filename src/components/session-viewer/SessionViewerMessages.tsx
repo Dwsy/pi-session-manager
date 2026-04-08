@@ -2,6 +2,7 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   type Dispatch,
   type MutableRefObject,
   type PointerEvent as ReactPointerEvent,
@@ -65,6 +66,7 @@ export interface SessionViewerMessagesProps {
   onPointerLeave: (event: ReactPointerEvent) => void;
   isScrollMarkersFeatureEnabled: boolean;
   isTimelineNavEnabled?: boolean;
+  previewMode?: boolean;
 }
 
 const SessionViewerMessages = forwardRef<
@@ -104,6 +106,7 @@ const SessionViewerMessages = forwardRef<
   onPointerLeave,
   isScrollMarkersFeatureEnabled,
   isTimelineNavEnabled = false,
+  previewMode = false,
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
   const { ensureToolExpandedForSearch } = useSessionView();
@@ -226,6 +229,20 @@ const SessionViewerMessages = forwardRef<
   );
 
   const virtualRows = rowVirtualizer.getVirtualItems();
+  const activeTimelineEntryId = useMemo(() => {
+    if (!isTimelineNavEnabled || timelineNavItems.items.length === 0) {
+      return null;
+    }
+
+    const firstVisibleIndex = virtualRows[0]?.index ?? 0;
+    const currentItem =
+      [...timelineNavItems.items]
+        .reverse()
+        .find((item) => item.index <= firstVisibleIndex) ??
+      timelineNavItems.items[0];
+
+    return currentItem?.entryId ?? null;
+  }, [isTimelineNavEnabled, timelineNavItems.items, virtualRows]);
 
   if (loading) {
     return (
@@ -283,6 +300,7 @@ const SessionViewerMessages = forwardRef<
           sessionId={sessionId}
           timestamp={headerTimestamp}
           stats={stats}
+          previewMode={previewMode}
         />
         <div className="messages" ref={messagesWrapperRef}>
           {renderableEntries.length > 0 ? (
@@ -313,6 +331,7 @@ const SessionViewerMessages = forwardRef<
                       toolResultByCallId={toolResultByCallId}
                       searchQuery={searchQuery}
                       isStreaming={entry.id === streamingId}
+                      previewMode={previewMode}
                     />
                   </div>
                 );
@@ -340,6 +359,7 @@ const SessionViewerMessages = forwardRef<
       {isTimelineNavEnabled && timelineNavItems.items.length > 0 && (
         <SessionTimelineNav
           items={timelineNavItems.items}
+          activeEntryId={activeTimelineEntryId}
           onNavigate={(entryId) => setScrollTargetId(entryId)}
         />
       )}

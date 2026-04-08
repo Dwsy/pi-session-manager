@@ -32,7 +32,7 @@ export default function SessionViewerModelControls({
 
   if (!liveSession) return null;
 
-  const thinkingLevel = liveSession.thinking_level || "low";
+  const thinkingLevel = liveSession.thinkingLevel || "low";
   // Attempt to parse model ID - handles various formats passed from backend
   const modelId =
     typeof liveSession.model === "string"
@@ -42,8 +42,8 @@ export default function SessionViewerModelControls({
   const handleSetThinkingLevel = async (level: string) => {
     try {
       setIsChangingThinking(true);
-      await invoke("pi_agent_set_thinking", {
-        sessionId: liveSession.session_id,
+      await invoke("pi_agent_set_thinking_level", {
+        sessionId: liveSession.sessionId,
         level,
       });
       setIsOpen(false);

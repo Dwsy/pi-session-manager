@@ -9,15 +9,20 @@ import SessionInfoEntry from "@/components/session-viewer/SessionInfoEntry";
 import ThinkingLevelChange from "@/components/messages/ThinkingLevelChange";
 import UserMessage from "@/components/messages/UserMessage";
 
-import type { SessionEntry } from "@/types";
+import type { Content, SessionEntry } from "@/types";
 
 const EMPTY_TOOL_RESULTS = new Map<string, SessionEntry>();
+
+function stripPreviewAssistantContent(content: Content[]): Content[] {
+  return content.filter((item) => item.type === "text");
+}
 
 export interface SessionEntryRendererProps {
   entry: SessionEntry;
   toolResultByCallId?: Map<string, SessionEntry>;
   searchQuery?: string;
   isStreaming?: boolean;
+  previewMode?: boolean;
 }
 
 export function renderSessionEntry(
@@ -25,6 +30,7 @@ export function renderSessionEntry(
   toolResultByCallId: Map<string, SessionEntry> = EMPTY_TOOL_RESULTS,
   searchQuery = "",
   isStreaming = false,
+  previewMode = false,
 ): JSX.Element | null {
   switch (entry.type) {
     case "message": {
@@ -47,12 +53,13 @@ export function renderSessionEntry(
         return (
           <AssistantMessage
             key={entry.id}
-            content={entry.message.content}
+            content={previewMode ? stripPreviewAssistantContent(entry.message.content) : entry.message.content}
             timestamp={entry.timestamp}
             entryId={entry.id}
             toolResultByCallId={toolResultByCallId}
             searchQuery={searchQuery}
             isStreaming={isStreaming}
+            previewMode={previewMode}
           />
         );
       }
@@ -136,13 +143,15 @@ export const SessionEntryRenderer = memo(
     toolResultByCallId = EMPTY_TOOL_RESULTS,
     searchQuery = "",
     isStreaming = false,
+    previewMode = false,
   }: SessionEntryRendererProps): JSX.Element | null {
-    return renderSessionEntry(entry, toolResultByCallId, searchQuery, isStreaming);
+    return renderSessionEntry(entry, toolResultByCallId, searchQuery, isStreaming, previewMode);
   },
   (prev, next) =>
     prev.entry === next.entry &&
     prev.toolResultByCallId === next.toolResultByCallId &&
-    prev.searchQuery === next.searchQuery,
+    prev.searchQuery === next.searchQuery &&
+    prev.previewMode === next.previewMode,
 );
 
 export default SessionEntryRenderer;

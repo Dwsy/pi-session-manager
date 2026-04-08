@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   ArrowDown,
+  ArrowRightLeft,
   ArrowUp,
   Bot,
   Brain,
@@ -37,6 +38,7 @@ export default function SessionViewerToolbar({
   isMobileMenuOpen,
   isScrollMarkersFeatureEnabled,
   isSearchOpen,
+  previewMode = false,
   onBack,
   onToggleSidebar,
   onToggleThinking,
@@ -50,6 +52,7 @@ export default function SessionViewerToolbar({
   onRename,
   onFork,
   onExport,
+  onConvert,
   onResume,
   desktopResumeButton,
   liveSession,
@@ -126,7 +129,7 @@ export default function SessionViewerToolbar({
                 <ChevronLeft className="h-4 w-4" />
               </button>
             )}
-            {!isMobile && (
+            {!isMobile && !previewMode && (
               <button
                 onClick={onToggleSidebar}
                 className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors flex-shrink-0"
@@ -157,7 +160,7 @@ export default function SessionViewerToolbar({
 
           {!isMobile && (
             <div className="flex items-center gap-1 flex-shrink-0">
-              {liveSession && (
+              {!previewMode && liveSession && (
                 <>
                   <SessionViewerModelControls liveSession={liveSession} />
                   <div className="h-4 w-px bg-border/60 mx-0.5" />
@@ -174,40 +177,44 @@ export default function SessionViewerToolbar({
                   <Search className="h-3.5 w-3.5" />
                 </button>
               </KbdTooltip>
-              <KbdTooltip shortcut="Cmd+T">
-                <button
-                  onClick={onToggleThinking}
-                  className={`p-1.5 text-xs ${toggleButtonBase} ${showThinking ? toggleButtonActive : toggleButtonInactive}`}
-                  title={`${thinkingToggleLabel} (⌘T)`}
-                  aria-label={thinkingToggleLabel}
-                  aria-pressed={showThinking}
-                >
-                  {showThinking ? (
-                    <BrainCircuit className="h-3.5 w-3.5" />
-                  ) : (
-                    <Brain className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              </KbdTooltip>
-              <KbdTooltip shortcut="Cmd+O">
-                <button
-                  onClick={onToggleToolsExpanded}
-                  className={`p-1.5 text-xs ${toggleButtonBase} ${toolsExpanded ? toggleButtonActive : toggleButtonInactive}`}
-                  title={`${toolsToggleLabel} (⌘O)`}
-                  aria-label={toolsToggleLabel}
-                  aria-pressed={toolsExpanded}
-                >
-                  <ListTree className="h-3.5 w-3.5" />
-                </button>
-              </KbdTooltip>
-              <button
-                onClick={onOpenSystemPromptDialog}
-                className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
-                title={t("session.systemPromptAndTools", "System prompt & tools")}
-                aria-label={t("session.systemPromptAndTools", "System prompt & tools")}
-              >
-                <Bot className="h-3.5 w-3.5" />
-              </button>
+              {!previewMode && (
+                <>
+                  <KbdTooltip shortcut="Cmd+T">
+                    <button
+                      onClick={onToggleThinking}
+                      className={`p-1.5 text-xs ${toggleButtonBase} ${showThinking ? toggleButtonActive : toggleButtonInactive}`}
+                      title={`${thinkingToggleLabel} (⌘T)`}
+                      aria-label={thinkingToggleLabel}
+                      aria-pressed={showThinking}
+                    >
+                      {showThinking ? (
+                        <BrainCircuit className="h-3.5 w-3.5" />
+                      ) : (
+                        <Brain className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </KbdTooltip>
+                  <KbdTooltip shortcut="Cmd+O">
+                    <button
+                      onClick={onToggleToolsExpanded}
+                      className={`p-1.5 text-xs ${toggleButtonBase} ${toolsExpanded ? toggleButtonActive : toggleButtonInactive}`}
+                      title={`${toolsToggleLabel} (⌘O)`}
+                      aria-label={toolsToggleLabel}
+                      aria-pressed={toolsExpanded}
+                    >
+                      <ListTree className="h-3.5 w-3.5" />
+                    </button>
+                  </KbdTooltip>
+                  <button
+                    onClick={onOpenSystemPromptDialog}
+                    className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
+                    title={t("session.systemPromptAndTools", "System prompt & tools")}
+                    aria-label={t("session.systemPromptAndTools", "System prompt & tools")}
+                  >
+                    <Bot className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
               <button
                 onClick={onScrollToTop}
                 className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
@@ -224,43 +231,47 @@ export default function SessionViewerToolbar({
               >
                 <ArrowDown className="h-3.5 w-3.5" />
               </button>
-              <button
-                onClick={onRename}
-                className="px-2.5 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
-              >
-                {t("common.rename")}
-              </button>
-              {onFork && (
-                <button
-                  onClick={onFork}
-                  className="px-2.5 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors flex items-center gap-1"
-                  title={t("session.fork.title")}
-                >
-                  <Copy className="h-3 w-3" />
-                  {t("session.fork.confirm")}
-                </button>
-              )}
-              <KbdTooltip shortcut="Cmd+E">
-                <button
-                  onClick={onExport}
-                  className="px-2.5 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
-                >
-                  {t("common.export")}
-                </button>
-              </KbdTooltip>
-              {desktopResumeButton ??
-                (onResume && (
-                  <KbdTooltip shortcut="Cmd+R">
+              {!previewMode && (
+                <>
+                  <button
+                    onClick={onRename}
+                    className="px-2.5 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
+                  >
+                    {t("common.rename")}
+                  </button>
+                  {onFork && (
                     <button
-                      onClick={onResume}
-                      className="px-3 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors flex items-center gap-1.5"
-                      title={t("session.resume", "Resume")}
+                      onClick={onFork}
+                      className="px-2.5 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors flex items-center gap-1"
+                      title={t("session.fork.title")}
                     >
-                      <Play className="h-3.5 w-3.5" />
-                      <span>{t("session.resume", "Resume")}</span>
+                      <Copy className="h-3 w-3" />
+                      {t("session.fork.confirm")}
+                    </button>
+                  )}
+                  <KbdTooltip shortcut="Cmd+E">
+                    <button
+                      onClick={onExport}
+                      className="px-2.5 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
+                    >
+                      {t("common.export")}
                     </button>
                   </KbdTooltip>
-                ))}
+                  {desktopResumeButton ??
+                    (onResume && (
+                      <KbdTooltip shortcut="Cmd+R">
+                        <button
+                          onClick={onResume}
+                          className="px-3 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors flex items-center gap-1.5"
+                          title={t("session.resume", "Resume")}
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                          <span>{t("session.resume", "Resume")}</span>
+                        </button>
+                      </KbdTooltip>
+                    ))}
+                </>
+              )}
             </div>
           )}
         </div>
@@ -447,6 +458,18 @@ export default function SessionViewerToolbar({
               <Download className="h-4 w-4 text-muted-foreground" />
               {t("common.export")}
             </button>
+            {onConvert && (
+              <button
+                onClick={() => {
+                  onConvert();
+                  closeMobileMenu();
+                }}
+                className={mobileSheetItemClass}
+              >
+                <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                {t("session.convert.title")}
+              </button>
+            )}
             {onResume && (
               <button
                 onClick={() => {
