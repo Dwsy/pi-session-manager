@@ -77,3 +77,4 @@ build-output/
 
 # Pi messenger/crew runtime files
 .pi/messenger/
+notepad/
