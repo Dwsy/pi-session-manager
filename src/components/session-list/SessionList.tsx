@@ -849,10 +849,11 @@ export default function SessionList({
                             )}
 
                             {sourceTag && (
-                              <span className="px-1.5 py-0.5 rounded border border-blue-500/20 bg-blue-500/10 text-[9px] sm:text-[10px] text-blue-500/90 font-medium flex-shrink-0 flex items-center">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500/60 mr-1"></div>
-                                {sourceTag}
-                              </span>
+                              <SessionBadge
+                                label={sourceTag}
+                                tone="source"
+                                className="text-[9px] sm:text-[10px]"
+                              />
                             )}
 
                             {sessionTags.length > 0 && (

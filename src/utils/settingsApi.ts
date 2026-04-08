@@ -194,6 +194,14 @@ export async function saveAppSettings(settings: AppSettings): Promise<void> {
   } catch (e) {
     console.warn("Failed to sync other-agent session scan setting:", e);
   }
+
+  try {
+    await invoke("save_external_session_providers", {
+      providerSlugs: settings.session.externalSessionProviders || [],
+    });
+  } catch (e) {
+    console.warn("Failed to sync external session providers:", e);
+  }
 }
 
 export function getCachedSettings(): AppSettings {

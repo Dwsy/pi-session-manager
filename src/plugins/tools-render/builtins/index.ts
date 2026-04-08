@@ -33,7 +33,6 @@ export function registerBuiltinToolPlugins(): void {
     toolRenderRegistry.setFallback(genericToolPlugin)
   }
 
-  console.log('[Tool Plugins] Builtin plugins registered')
 }
 
 // Export core plugins for individual use
