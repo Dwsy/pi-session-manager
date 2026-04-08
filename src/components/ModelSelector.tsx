@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   useEffect,
+  useLayoutEffect,
   useCallback,
   type CSSProperties,
 } from 'react'
@@ -125,7 +126,7 @@ export default function ModelSelector({
   const wrapperRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const [menuStyle, setMenuStyle] = useState<CSSProperties>({})
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({ visibility: 'hidden' })
 
   const modelKey = useCallback((model: RPCModel) => `${model.provider}:${model.id}`, [])
 
@@ -214,10 +215,11 @@ export default function ModelSelector({
       width,
       maxHeight,
       zIndex: 1300,
+      visibility: 'visible',
     })
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return
 
     const handleClickOutside = (event: MouseEvent) => {
