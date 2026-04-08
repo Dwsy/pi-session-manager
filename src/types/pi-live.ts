@@ -18,6 +18,9 @@ export interface PiLiveSession {
   model?: PiLiveModelInfo
   thinkingLevel?: string
   contextUsage?: PiLiveContextUsage
+  pendingMessageCount?: number
+  steeringQueue?: string[]
+  followUpQueue?: string[]
   tags?: PiLiveTag[]
 }
 
@@ -55,6 +58,7 @@ export type PiLiveCommandType =
   | 'set_thinking_level'
   | 'abort'
   | 'get_state'
+  | 'get_commands'
 
 // ── Command Payloads ─────────────────────────────────────
 
@@ -103,6 +107,11 @@ export interface PiLiveGetStateCommand {
   sessionId: string
 }
 
+export interface PiLiveGetCommandsCommand {
+  type: 'get_commands'
+  sessionId: string
+}
+
 export type PiLiveCommand =
   | PiLivePromptCommand
   | PiLiveSteerCommand
@@ -111,6 +120,7 @@ export type PiLiveCommand =
   | PiLiveSetThinkingCommand
   | PiLiveAbortCommand
   | PiLiveGetStateCommand
+  | PiLiveGetCommandsCommand
 
 // ── Event Types ──────────────────────────────────────────
 
@@ -131,6 +141,7 @@ export type PiLiveEventType =
   | 'model_select'
   | 'auto_compaction_start'
   | 'auto_compaction_end'
+  | 'queue_update'
 
 // ── Event Payloads ───────────────────────────────────────
 
@@ -159,8 +170,29 @@ export interface PiLiveStateUpdatedPayload {
   thinkingLevel?: string
   contextUsage?: PiLiveContextUsage
   isStreaming?: boolean
+  pendingMessageCount?: number
   sessionPath?: string
   tags?: PiLiveTag[]
+}
+
+export interface PiLiveQueueUpdatePayload {
+  sessionId: string
+  sessionPath?: string
+  steering: string[]
+  followUp: string[]
+}
+
+export interface PiLiveSlashCommand {
+  name: string
+  description?: string
+  source: 'extension' | 'prompt' | 'skill'
+  sourceInfo: {
+    path: string
+    source: string
+    scope: 'user' | 'project' | 'temporary'
+    origin: 'package' | 'top-level'
+    baseDir?: string
+  }
 }
 
 // ── Connection State ─────────────────────────────────────
@@ -199,7 +231,7 @@ export function isPiLiveSession(obj: unknown): obj is PiLiveSession {
 }
 
 export function isPiLiveCommandType(type: string): type is PiLiveCommandType {
-  return ['prompt', 'steer', 'follow_up', 'set_model', 'set_thinking_level', 'abort', 'get_state'].includes(type)
+  return ['prompt', 'steer', 'follow_up', 'set_model', 'set_thinking_level', 'abort', 'get_state', 'get_commands'].includes(type)
 }
 
 // Extract UUID from session_id for matching

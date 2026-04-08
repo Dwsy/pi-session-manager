@@ -17,6 +17,8 @@ import type {
   PiLiveSessionRegisteredPayload,
   PiLiveSessionDisconnectedPayload,
   PiLiveStateUpdatedPayload,
+  PiLiveQueueUpdatePayload,
+  PiLiveSlashCommand,
   PiLiveChatEventPayload,
   PiLiveConnectionState,
   PiLiveSettings,
@@ -58,6 +60,8 @@ export interface UsePiLiveReturn {
   setModel: (sessionId: string, provider: string, modelId: string) => Promise<void>
   /** Set thinking level */
   setThinkingLevel: (sessionId: string, level: string) => Promise<void>
+  /** Available slash commands for current live session */
+  getCommands: (sessionId: string) => Promise<PiLiveSlashCommand[]>
   /** Abort generation */
   abort: (sessionId: string) => Promise<void>
 }
@@ -163,6 +167,11 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
     await invoke('pi_agent_set_thinking_level', { sessionId, level })
   }, [])
 
+  const getCommands = useCallback(async (sessionId: string) => {
+    const result = await invoke<{ commands?: PiLiveSlashCommand[] }>('pi_agent_get_commands', { sessionId })
+    return result?.commands || []
+  }, [])
+
   const abort = useCallback(async (sessionId: string) => {
     await invoke('pi_agent_abort', { sessionId })
   }, [])
@@ -198,8 +207,18 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
           thinkingLevel: payload.thinkingLevel,
           contextUsage: payload.contextUsage,
           isStreaming: payload.isStreaming,
+          pendingMessageCount: payload.pendingMessageCount,
           sessionPath: payload.sessionPath,
           tags: payload.tags,
+          lastSeen: new Date().toISOString(),
+        })
+      }).then(f => unsubs.push(f))
+
+      listen<PiLiveQueueUpdatePayload>('queue_update', ({ payload }) => {
+        patchSession(payload.sessionId, {
+          steeringQueue: payload.steering,
+          followUpQueue: payload.followUp,
+          pendingMessageCount: payload.steering.length + payload.followUp.length,
           lastSeen: new Date().toISOString(),
         })
       }).then(f => unsubs.push(f))
@@ -274,6 +293,7 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
     followUp,
     setModel,
     setThinkingLevel,
+    getCommands,
     abort,
   }
 }

@@ -163,7 +163,7 @@ export default function SessionViewerToolbar({
               {!previewMode && liveSession && (
                 <>
                   <SessionViewerModelControls liveSession={liveSession} />
-                  <div className="h-4 w-px bg-border/60 mx-0.5" />
+                  <div className="h-4 w-px bg-border/60 mx-1" />
                 </>
               )}
               <KbdTooltip shortcut="Cmd+F">
