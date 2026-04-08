@@ -75,6 +75,12 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
         rawSession.activeDatasetId
       ? [rawSession.activeDatasetId]
       : [];
+  const externalSessionProviders = Array.isArray(rawSession?.externalSessionProviders)
+    ? rawSession.externalSessionProviders.filter(
+        (value): value is string =>
+          typeof value === "string" && value.trim().length > 0,
+      )
+    : [];
   const session = {
     ...defaultSettings.session,
     ...raw.session,
@@ -83,6 +89,13 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
       | "dataset",
     activeDatasetId: activeDatasetIds[0] || "",
     activeDatasetIds,
+    externalSessionProviders,
+    showAgentIconInSessionBadge:
+      rawSession?.showAgentIconInSessionBadge !== false,
+    scanOtherAgentJsonl:
+      externalSessionProviders.length > 0
+        ? true
+        : (rawSession?.scanOtherAgentJsonl === true),
   };
 
   return {
