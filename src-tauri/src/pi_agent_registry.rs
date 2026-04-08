@@ -17,6 +17,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PiLiveSession {
     pub session_id: String,
     pub session_path: Option<String>,
@@ -62,7 +63,7 @@ impl PiAgentRegistry {
         entries: Vec<serde_json::Value>,
     ) {
         let now = chrono::Utc::now().to_rfc3339();
-        self.sessions.lock().unwrap().insert(
+        self.sessions.lock().expect("mutex poisoned").insert(
             session_id.clone(),
             PiLiveSession {
                 session_id,
@@ -82,8 +83,14 @@ impl PiAgentRegistry {
 
     /// Remove a session
     pub fn remove(&self, session_id: &str) {
-        self.sessions.lock().unwrap().remove(session_id);
-        self.connections.lock().unwrap().remove(session_id);
+        self.sessions
+            .lock()
+            .expect("mutex poisoned")
+            .remove(session_id);
+        self.connections
+            .lock()
+            .expect("mutex poisoned")
+            .remove(session_id);
     }
 
     /// Record a new entry for a session
@@ -100,12 +107,17 @@ impl PiAgentRegistry {
 
     /// List all sessions
     pub fn list(&self) -> Vec<PiLiveSession> {
-        self.sessions.lock().unwrap().values().cloned().collect()
+        self.sessions
+            .lock()
+            .expect("mutex poisoned")
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// Get a session by id (exact or partial match)
     pub fn get_live_session(&self, session_id: &str) -> Option<PiLiveSession> {
-        let guard = self.sessions.lock().unwrap();
+        let guard = self.sessions.lock().expect("mutex poisoned");
         guard.get(session_id).cloned().or_else(|| {
             guard
                 .values()
@@ -123,7 +135,7 @@ impl PiAgentRegistry {
         sender: mpsc::UnboundedSender<String>,
         response_tx: broadcast::Sender<serde_json::Value>,
     ) {
-        self.connections.lock().unwrap().insert(
+        self.connections.lock().expect("mutex poisoned").insert(
             session_id.clone(),
             PiAgentConnection {
                 session_id,
@@ -140,7 +152,7 @@ impl PiAgentRegistry {
         command: serde_json::Value,
     ) -> Result<serde_json::Value, String> {
         let (full_id, conn) = {
-            let guard = self.connections.lock().unwrap();
+            let guard = self.connections.lock().expect("mutex poisoned");
             let conn = guard
                 .get(session_id)
                 .cloned()
@@ -209,7 +221,12 @@ impl PiAgentRegistry {
 
     /// Forward a response to waiting RPC callers
     pub fn forward_response(&self, session_id: &str, response: serde_json::Value) {
-        if let Some(conn) = self.connections.lock().unwrap().get(session_id) {
+        if let Some(conn) = self
+            .connections
+            .lock()
+            .expect("mutex poisoned")
+            .get(session_id)
+        {
             if let Some(tx) = &conn.response_tx {
                 let _ = tx.send(response);
             }
@@ -224,7 +241,12 @@ impl PiAgentRegistry {
         thinking_level: Option<String>,
         context_usage: Option<serde_json::Value>,
     ) {
-        if let Some(s) = self.sessions.lock().unwrap().get_mut(session_id) {
+        if let Some(s) = self
+            .sessions
+            .lock()
+            .expect("mutex poisoned")
+            .get_mut(session_id)
+        {
             if model.is_some() {
                 s.model = model;
             }
@@ -239,7 +261,12 @@ impl PiAgentRegistry {
 
     /// Update session entries
     pub fn update_session_entries(&self, session_id: &str, entries: Vec<serde_json::Value>) {
-        if let Some(s) = self.sessions.lock().unwrap().get_mut(session_id) {
+        if let Some(s) = self
+            .sessions
+            .lock()
+            .expect("mutex poisoned")
+            .get_mut(session_id)
+        {
             s.entries = entries;
             s.entry_count = s.entries.len() as u64;
         }
@@ -247,28 +274,46 @@ impl PiAgentRegistry {
 
     /// Update streaming state
     pub fn update_streaming_state(&self, session_id: &str, is_streaming: bool) {
-        if let Some(s) = self.sessions.lock().unwrap().get_mut(session_id) {
+        if let Some(s) = self
+            .sessions
+            .lock()
+            .expect("mutex poisoned")
+            .get_mut(session_id)
+        {
             s.is_streaming = is_streaming;
         }
     }
 
     /// Increment entry count
     pub fn increment_entry_count(&self, session_id: &str) {
-        if let Some(s) = self.sessions.lock().unwrap().get_mut(session_id) {
+        if let Some(s) = self
+            .sessions
+            .lock()
+            .expect("mutex poisoned")
+            .get_mut(session_id)
+        {
             s.entry_count += 1;
         }
     }
 
     /// Update last_seen timestamp
     pub fn touch(&self, session_id: &str) {
-        if let Some(s) = self.sessions.lock().unwrap().get_mut(session_id) {
+        if let Some(s) = self
+            .sessions
+            .lock()
+            .expect("mutex poisoned")
+            .get_mut(session_id)
+        {
             s.last_seen = chrono::Utc::now().to_rfc3339();
         }
     }
 
     /// Remove RPC connection only (session data preserved)
     pub fn remove_connection(&self, session_id: &str) {
-        self.connections.lock().unwrap().remove(session_id);
+        self.connections
+            .lock()
+            .expect("mutex poisoned")
+            .remove(session_id);
     }
 }
 

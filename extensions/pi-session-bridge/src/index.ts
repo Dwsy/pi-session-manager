@@ -161,7 +161,7 @@ export default function (pi: ExtensionAPI) {
         const eventType = msg?.event_type === "event" ? msg.event : msg.type;
         const payload = msg?.event_type === "event" ? msg.payload : msg;
         const localUuid = sessionId.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0];
-        const payloadSessionId = payload?.sessionId || payload?.session_id || "";
+        const payloadSessionId = payload?.sessionId || "";
         const sessionMatches = payloadSessionId === sessionId || (localUuid && payloadSessionId === localUuid);
 
         const sendResponse = (success = true, data?: any) => {
@@ -172,10 +172,20 @@ export default function (pi: ExtensionAPI) {
         if (msg.type === "pong" || msg.pong === true) { conn?.pongReceived(); return; }
         if (!sessionMatches && id) return;
 
-        if (eventType === "steer" && latestCtx && !latestCtx.isIdle()) {
-          const deliverAs = payload?.deliverAs === "followUp" ? "followUp" : "steer";
-          pi.sendUserMessage(payload?.message || "", { deliverAs });
-          sendResponse(true);
+        if (eventType === "steer") {
+          if (latestCtx && !latestCtx.isIdle()) {
+            pi.sendUserMessage(payload?.message || "", { deliverAs: "steer" });
+            sendResponse(true);
+          } else {
+            sendResponse(false, "steer requires an active streaming session");
+          }
+        } else if (eventType === "follow_up") {
+          if (latestCtx && !latestCtx.isIdle()) {
+            pi.sendUserMessage(payload?.message || "", { deliverAs: "followUp" });
+            sendResponse(true);
+          } else {
+            sendResponse(false, "follow_up requires an active streaming session");
+          }
         } else if (eventType === "abort" && latestCtx) {
           latestCtx.abort();
           sendResponse(true);
@@ -190,15 +200,20 @@ export default function (pi: ExtensionAPI) {
           sendResponse(true);
         } else if (eventType === "get_state") {
           broadcastSessionState();
-          sendResponse(true);
+          sendResponse(true, buildSessionState());
         } else if (eventType === "prompt") {
           if (latestCtx && !latestCtx.isIdle()) {
-            const behavior = payload.streamingBehavior || (payload.deliverAs === "followUp" ? "followUp" : "steer");
-            pi.sendUserMessage(payload.message || "", { deliverAs: behavior as any });
+            const behavior = payload.streamingBehavior;
+            if (behavior) {
+              pi.sendUserMessage(payload.message || "", { deliverAs: behavior as any });
+              sendResponse(true);
+            } else {
+              sendResponse(false, "prompt requires streamingBehavior while streaming");
+            }
           } else {
             pi.sendUserMessage(payload.message || "");
+            sendResponse(true);
           }
-          sendResponse(true);
         }
       },
     });
@@ -214,21 +229,35 @@ export default function (pi: ExtensionAPI) {
   // ── Forward events ──────────────────────────────────
 
   function forward(eventName: string, event: any) {
-    conn?.sendEntry(sessionId, sessionPath, { eventType: eventName, entry: event });
+    conn?.sendEntry(sessionId, sessionPath, eventName, event);
   }
 
   // ── Session state broadcast ─────────────────────────
 
-  function broadcastSessionState() {
-    if (!latestCtx || !conn?.state || conn.state !== "connected") return;
-    const model = latestCtx.model;
+  function buildSessionState() {
+    const model = latestCtx?.model;
     const thinkingLevel = pi.getThinkingLevel();
-    const contextUsage = latestCtx.getContextUsage();
+    const contextUsage = latestCtx?.getContextUsage();
     const tagsResult = getTagsForSession(sessionId);
     const tags = tagsResult.success ? (tagsResult.data || []) : [];
+
+    return {
+      sessionId,
+      sessionPath,
+      model,
+      thinkingLevel,
+      contextUsage,
+      isStreaming: latestCtx ? !latestCtx.isIdle() : false,
+      pendingMessageCount: 0,
+      tags,
+    };
+  }
+
+  function broadcastSessionState() {
+    if (!latestCtx || !conn?.state || conn.state !== "connected") return;
     conn?.send({
       type: "session_state",
-      payload: { sessionId, model, thinkingLevel, contextUsage, tags },
+      payload: buildSessionState(),
     });
   }
 

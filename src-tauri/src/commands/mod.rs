@@ -1,6 +1,7 @@
 mod auth;
 pub mod config_bundle;
 pub mod config_versions;
+mod datasets;
 mod favorites;
 mod model_config;
 mod models;
@@ -24,6 +25,7 @@ pub mod terminal;
 pub use auth::*;
 pub use config_bundle::*;
 pub use config_versions::*;
+pub use datasets::*;
 pub use favorites::*;
 pub use model_config::*;
 pub use models::*;

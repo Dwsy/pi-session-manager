@@ -60,9 +60,12 @@ export class BridgeConnection {
 
   send(data: any) { if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(data)); }
 
-  sendEntry(sessionId: string, sessionPath: string, payload: { eventType: string; entry: any }) {
+  sendEntry(sessionId: string, sessionPath: string, eventType: string, event: any) {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
-    this.send({ type: "pi-agent:entry", sessionId, sessionPath, payload });
+    const payload = event && typeof event === "object" && !Array.isArray(event)
+      ? { ...event }
+      : { event };
+    this.send({ type: eventType, sessionId, sessionPath, ...payload });
   }
 
   startHeartbeat() {

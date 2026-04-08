@@ -1,13 +1,26 @@
 use serde_json::json;
 use tauri::State;
 
+fn unpack_rpc_response(response: serde_json::Value) -> Result<serde_json::Value, String> {
+    if response["success"].as_bool() == Some(false) {
+        return Err(response["error"]
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| "Pi RPC command failed".to_string()));
+    }
+
+    Ok(response
+        .get("data")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null))
+}
+
 #[tauri::command]
 pub fn get_pi_live_sessions(
     state: State<'_, crate::app_state::SharedAppState>,
 ) -> Result<Vec<crate::pi_agent_registry::PiLiveSession>, String> {
     Ok(state.pi_agent_registry.list())
 }
-
 #[tauri::command]
 pub fn get_pi_agent_entries(
     state: State<'_, crate::app_state::SharedAppState>,
@@ -21,34 +34,71 @@ pub fn get_pi_agent_entries(
 }
 
 #[tauri::command]
-pub async fn pi_agent_steering(
+pub async fn pi_agent_prompt(
     state: State<'_, crate::app_state::SharedAppState>,
     session_id: String,
     message: String,
-    deliver_as: Option<String>,
+    images: Option<Vec<serde_json::Value>>,
+    streaming_behavior: Option<String>,
 ) -> Result<(), String> {
-    let is_streaming = state
-        .pi_agent_registry
-        .get_live_session(&session_id)
-        .map(|s| s.is_streaming)
-        .unwrap_or(false);
-
-    let command_type = if is_streaming {
-        deliver_as.unwrap_or_else(|| "steer".to_string())
-    } else {
-        "prompt".to_string()
-    };
-
     let command = json!({
-        "type": command_type,
+        "type": "prompt",
         "sessionId": session_id,
         "message": message,
+        "images": images,
+        "streamingBehavior": streaming_behavior,
     });
 
-    state
+    unpack_rpc_response(
+        state
         .pi_agent_registry
         .send_rpc(&session_id, command)
-        .await?;
+        .await?,
+    )?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn pi_agent_steer(
+    state: State<'_, crate::app_state::SharedAppState>,
+    session_id: String,
+    message: String,
+    images: Option<Vec<serde_json::Value>>,
+) -> Result<(), String> {
+    let command = json!({
+        "type": "steer",
+        "sessionId": session_id,
+        "message": message,
+        "images": images,
+    });
+    unpack_rpc_response(
+        state
+        .pi_agent_registry
+        .send_rpc(&session_id, command)
+        .await?,
+    )?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn pi_agent_follow_up(
+    state: State<'_, crate::app_state::SharedAppState>,
+    session_id: String,
+    message: String,
+    images: Option<Vec<serde_json::Value>>,
+) -> Result<(), String> {
+    let command = json!({
+        "type": "follow_up",
+        "sessionId": session_id,
+        "message": message,
+        "images": images,
+    });
+    unpack_rpc_response(
+        state
+        .pi_agent_registry
+        .send_rpc(&session_id, command)
+        .await?,
+    )?;
     Ok(())
 }
 
@@ -65,15 +115,17 @@ pub async fn pi_agent_set_model(
         "provider": provider,
         "modelId": model_id,
     });
-    state
+    unpack_rpc_response(
+        state
         .pi_agent_registry
         .send_rpc(&session_id, command)
-        .await?;
+        .await?,
+    )?;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn pi_agent_set_thinking(
+pub async fn pi_agent_set_thinking_level(
     state: State<'_, crate::app_state::SharedAppState>,
     session_id: String,
     level: String,
@@ -83,10 +135,12 @@ pub async fn pi_agent_set_thinking(
         "sessionId": session_id,
         "level": level,
     });
-    state
+    unpack_rpc_response(
+        state
         .pi_agent_registry
         .send_rpc(&session_id, command)
-        .await?;
+        .await?,
+    )?;
     Ok(())
 }
 
@@ -99,7 +153,7 @@ pub async fn pi_agent_get_state(
         "type": "get_state",
         "sessionId": session_id,
     });
-    state.pi_agent_registry.send_rpc(&session_id, command).await
+    unpack_rpc_response(state.pi_agent_registry.send_rpc(&session_id, command).await?)
 }
 
 #[tauri::command]
@@ -111,31 +165,11 @@ pub async fn pi_agent_abort(
         "type": "abort",
         "sessionId": session_id,
     });
-    state
+    unpack_rpc_response(
+        state
         .pi_agent_registry
         .send_rpc(&session_id, command)
-        .await?;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn pi_agent_send_message(
-    state: State<'_, crate::app_state::SharedAppState>,
-    session_id: String,
-    message: String,
-    images: Option<Vec<serde_json::Value>>,
-    streaming_behavior: Option<String>,
-) -> Result<(), String> {
-    let command = json!({
-        "type": "prompt",
-        "sessionId": session_id,
-        "message": message,
-        "images": images,
-        "streamingBehavior": streaming_behavior.unwrap_or_else(|| "steer".to_string()),
-    });
-    state
-        .pi_agent_registry
-        .send_rpc(&session_id, command)
-        .await?;
+        .await?,
+    )?;
     Ok(())
 }

@@ -46,20 +46,23 @@ interface PiLiveSettings {
 
 | Event | Description |
 |-------|-------------|
-| `pi-agent:register` | New session registered |
-| `pi-agent:disconnect` | Session disconnected |
-| `pi-agent:entry` | New entry received |
-| `pi-agent:session_state` | State updated |
+| `pi-live:session_registered` | New live session registered |
+| `pi-live:session_disconnected` | Live session disconnected |
+| `pi-live:state_updated` | Session state updated |
+| `message_update` | Streaming message delta |
+| `turn_end` | Turn completes with final assistant message |
+| `tool_execution_update` | Tool call progress update |
 
 ## Commands
 
 | Command | Description |
 |--------|-------------|
 | `get_pi_live_sessions` | Get session list |
-| `pi_agent_steering` | Send steering message |
-| `pi_agent_send_message` | Send regular message |
+| `pi_agent_prompt` | Send prompt |
+| `pi_agent_steer` | Send steering message |
+| `pi_agent_follow_up` | Queue follow-up message |
 | `pi_agent_set_model` | Set model |
-| `pi_agent_set_thinking` | Set thinking level |
+| `pi_agent_set_thinking_level` | Set thinking level |
 | `pi_agent_abort` | Abort generation |
 
 ## File Structure

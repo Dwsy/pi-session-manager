@@ -41,7 +41,7 @@ export default function PiLivePanel() {
       </div>
 
       {sessions.map((session) => (
-        <PiLiveSessionCard key={session.session_id} session={session} />
+        <PiLiveSessionCard key={session.sessionId} session={session} />
       ))}
     </div>
   )

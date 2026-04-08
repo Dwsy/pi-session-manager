@@ -8,16 +8,16 @@
 // ── Session ──────────────────────────────────────────────
 
 export interface PiLiveSession {
-  session_id: string
-  session_path?: string
+  sessionId: string
+  sessionPath?: string
   pid?: number
   cwd?: string
-  is_streaming: boolean
-  entry_count: number
-  last_seen: string
+  isStreaming: boolean
+  entryCount: number
+  lastSeen: string
   model?: PiLiveModelInfo
-  thinking_level?: string
-  context_usage?: PiLiveContextUsage
+  thinkingLevel?: string
+  contextUsage?: PiLiveContextUsage
   tags?: PiLiveTag[]
 }
 
@@ -48,10 +48,11 @@ export interface PiLiveTag {
 // ── Command Types ────────────────────────────────────────
 
 export type PiLiveCommandType =
-  | 'steer'
   | 'prompt'
+  | 'steer'
+  | 'follow_up'
   | 'set_model'
-  | 'set_thinking'
+  | 'set_thinking_level'
   | 'abort'
   | 'get_state'
 
@@ -61,7 +62,14 @@ export interface PiLiveSteerCommand {
   type: 'steer'
   sessionId: string
   message: string
-  deliverAs?: string
+  images?: unknown[]
+}
+
+export interface PiLiveFollowUpCommand {
+  type: 'follow_up'
+  sessionId: string
+  message: string
+  images?: unknown[]
 }
 
 export interface PiLivePromptCommand {
@@ -80,7 +88,7 @@ export interface PiLiveSetModelCommand {
 }
 
 export interface PiLiveSetThinkingCommand {
-  type: 'set_thinking'
+  type: 'set_thinking_level'
   sessionId: string
   level: string
 }
@@ -96,8 +104,9 @@ export interface PiLiveGetStateCommand {
 }
 
 export type PiLiveCommand =
-  | PiLiveSteerCommand
   | PiLivePromptCommand
+  | PiLiveSteerCommand
+  | PiLiveFollowUpCommand
   | PiLiveSetModelCommand
   | PiLiveSetThinkingCommand
   | PiLiveAbortCommand
@@ -108,34 +117,40 @@ export type PiLiveCommand =
 export type PiLiveEventType =
   | 'pi-live:session_registered'
   | 'pi-live:session_disconnected'
-  | 'pi-live:entry_received'
   | 'pi-live:state_updated'
-
-// Legacy event types (for backward compatibility during transition)
-export type PiLiveLegacyEventType =
-  | 'pi-agent:register'
-  | 'pi-agent:disconnect'
-  | 'pi-agent:entry'
-  | 'pi-agent:session_state'
+  | 'message_start'
+  | 'message_update'
+  | 'message_end'
+  | 'tool_execution_start'
+  | 'tool_execution_update'
+  | 'tool_execution_end'
+  | 'agent_start'
+  | 'agent_end'
+  | 'turn_start'
+  | 'turn_end'
+  | 'model_select'
+  | 'auto_compaction_start'
+  | 'auto_compaction_end'
 
 // ── Event Payloads ───────────────────────────────────────
 
 export interface PiLiveSessionRegisteredPayload {
-  session_id: string
-  session_path?: string
+  sessionId: string
+  sessionPath?: string
   pid?: number
   cwd?: string
   entries?: unknown[]
 }
 
 export interface PiLiveSessionDisconnectedPayload {
-  session_id: string
+  sessionId: string
 }
 
-export interface PiLiveEntryReceivedPayload {
+export interface PiLiveChatEventPayload {
   sessionId: string
-  eventType: string
-  entry: unknown
+  sessionPath?: string
+  type: string
+  [key: string]: unknown
 }
 
 export interface PiLiveStateUpdatedPayload {
@@ -143,6 +158,8 @@ export interface PiLiveStateUpdatedPayload {
   model?: PiLiveModelInfo
   thinkingLevel?: string
   contextUsage?: PiLiveContextUsage
+  isStreaming?: boolean
+  sessionPath?: string
   tags?: PiLiveTag[]
 }
 
@@ -176,13 +193,13 @@ export function isPiLiveSession(obj: unknown): obj is PiLiveSession {
   return (
     typeof obj === 'object' &&
     obj !== null &&
-    'session_id' in obj &&
-    typeof (obj as Record<string, unknown>).session_id === 'string'
+    'sessionId' in obj &&
+    typeof (obj as Record<string, unknown>).sessionId === 'string'
   )
 }
 
 export function isPiLiveCommandType(type: string): type is PiLiveCommandType {
-  return ['steer', 'prompt', 'set_model', 'set_thinking', 'abort', 'get_state'].includes(type)
+  return ['prompt', 'steer', 'follow_up', 'set_model', 'set_thinking_level', 'abort', 'get_state'].includes(type)
 }
 
 // Extract UUID from session_id for matching

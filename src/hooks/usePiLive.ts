@@ -14,9 +14,14 @@ import { invoke, listen } from '@/transport'
 import { getCachedSettings } from '@/utils/settingsApi'
 import type {
   PiLiveSession,
+  PiLiveSessionRegisteredPayload,
+  PiLiveSessionDisconnectedPayload,
+  PiLiveStateUpdatedPayload,
+  PiLiveChatEventPayload,
   PiLiveConnectionState,
   PiLiveSettings,
 } from '@/types/pi-live'
+import { extractSessionUuid } from '@/types/pi-live'
 
 // Legacy type for backward compatibility
 export type LiveSessionInfo = PiLiveSession
@@ -43,10 +48,12 @@ export interface UsePiLiveReturn {
   settings: PiLiveSettings
   /** Refresh session list */
   refresh: () => Promise<void>
+  /** Send prompt message */
+  prompt: (sessionId: string, message: string, streamingBehavior?: string) => Promise<void>
   /** Send steering message */
   steer: (sessionId: string, message: string) => Promise<void>
-  /** Send prompt message */
-  sendMessage: (sessionId: string, message: string, streamingBehavior?: string) => Promise<void>
+  /** Send follow-up message */
+  followUp: (sessionId: string, message: string) => Promise<void>
   /** Set model */
   setModel: (sessionId: string, provider: string, modelId: string) => Promise<void>
   /** Set thinking level */
@@ -70,11 +77,54 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
   const isEnabled = settings.enabled
   const showInSidebar = settings.showInSidebar
 
+  const matchesSessionId = useCallback((candidate: string, target: string) => {
+    if (!candidate || !target) return false
+    if (candidate === target) return true
+    const candidateUuid = extractSessionUuid(candidate)
+    const targetUuid = extractSessionUuid(target)
+    return Boolean(
+      (candidateUuid && candidateUuid === target)
+      || (targetUuid && targetUuid === candidate)
+      || (candidateUuid && targetUuid && candidateUuid === targetUuid)
+      || candidate.includes(target)
+      || target.includes(candidate),
+    )
+  }, [])
+
+  const upsertSession = useCallback((session: PiLiveSession) => {
+    setSessions((prev) => {
+      const index = prev.findIndex((item) => matchesSessionId(item.sessionId, session.sessionId))
+      if (index === -1) {
+        return [session, ...prev]
+      }
+      const next = [...prev]
+      next[index] = {
+        ...next[index],
+        ...session,
+      }
+      return next
+    })
+  }, [matchesSessionId])
+
+  const patchSession = useCallback((sessionId: string, patch: Partial<PiLiveSession>) => {
+    setSessions((prev) =>
+      prev.map((item) =>
+        matchesSessionId(item.sessionId, sessionId)
+          ? { ...item, ...patch }
+          : item,
+      ),
+    )
+  }, [matchesSessionId])
+
+  const removeSession = useCallback((sessionId: string) => {
+    setSessions((prev) => prev.filter((item) => !matchesSessionId(item.sessionId, sessionId)))
+  }, [matchesSessionId])
+
   // Create UUID set for fast matching
   const liveSessionIds = useMemo(() => {
     const ids = new Set<string>()
     for (const s of sessions) {
-      const uuidMatch = s.session_id.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+      const uuidMatch = s.sessionId.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
       if (uuidMatch) ids.add(uuidMatch[0])
     }
     return ids
@@ -93,12 +143,16 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
   }, [isEnabled])
 
   // Command senders
-  const steer = useCallback(async (sessionId: string, message: string) => {
-    await invoke('pi_agent_steering', { sessionId, message, deliverAs: 'steer' })
+  const prompt = useCallback(async (sessionId: string, message: string, streamingBehavior?: string) => {
+    await invoke('pi_agent_prompt', { sessionId, message, streamingBehavior })
   }, [])
 
-  const sendMessage = useCallback(async (sessionId: string, message: string, streamingBehavior = 'steer') => {
-    await invoke('pi_agent_send_message', { sessionId, message, streamingBehavior })
+  const steer = useCallback(async (sessionId: string, message: string) => {
+    await invoke('pi_agent_steer', { sessionId, message })
+  }, [])
+
+  const followUp = useCallback(async (sessionId: string, message: string) => {
+    await invoke('pi_agent_follow_up', { sessionId, message })
   }, [])
 
   const setModel = useCallback(async (sessionId: string, provider: string, modelId: string) => {
@@ -106,7 +160,7 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
   }, [])
 
   const setThinkingLevel = useCallback(async (sessionId: string, level: string) => {
-    await invoke('pi_agent_set_thinking', { sessionId, level })
+    await invoke('pi_agent_set_thinking_level', { sessionId, level })
   }, [])
 
   const abort = useCallback(async (sessionId: string) => {
@@ -120,27 +174,73 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
     const unsubs: (() => void)[] = []
 
     const setupListeners = async () => {
-      // Register event
-      listen('pi-agent:register', () => {
+      listen<PiLiveSessionRegisteredPayload>('pi-live:session_registered', ({ payload }) => {
         setConnectionState('connected')
-        void refresh()
+        upsertSession({
+          sessionId: payload.sessionId,
+          sessionPath: payload.sessionPath,
+          pid: payload.pid,
+          cwd: payload.cwd,
+          isStreaming: false,
+          entryCount: payload.entries?.length ?? 0,
+          lastSeen: new Date().toISOString(),
+        })
       }).then(f => unsubs.push(f))
 
-      // Disconnect event
-      listen('pi-agent:disconnect', () => {
+      listen<PiLiveSessionDisconnectedPayload>('pi-live:session_disconnected', ({ payload }) => {
+        removeSession(payload.sessionId)
         setConnectionState('disconnected')
-        void refresh()
       }).then(f => unsubs.push(f))
 
-      // Entry event
-      listen('pi-agent:entry', () => {
-        void refresh()
+      listen<PiLiveStateUpdatedPayload>('pi-live:state_updated', ({ payload }) => {
+        patchSession(payload.sessionId, {
+          model: payload.model,
+          thinkingLevel: payload.thinkingLevel,
+          contextUsage: payload.contextUsage,
+          isStreaming: payload.isStreaming,
+          sessionPath: payload.sessionPath,
+          tags: payload.tags,
+          lastSeen: new Date().toISOString(),
+        })
       }).then(f => unsubs.push(f))
 
-      // State update event
-      listen('pi-agent:session_state', () => {
-        void refresh()
-      }).then(f => unsubs.push(f))
+      const liveEventNames = [
+        'message_start',
+        'message_update',
+        'message_end',
+        'tool_execution_start',
+        'tool_execution_update',
+        'tool_execution_end',
+        'agent_start',
+        'agent_end',
+        'turn_start',
+        'turn_end',
+        'model_select',
+        'auto_compaction_start',
+        'auto_compaction_end',
+      ] as const
+
+      for (const eventName of liveEventNames) {
+        listen<PiLiveChatEventPayload>(eventName, ({ payload }) => {
+          const nextPatch: Partial<PiLiveSession> = {
+            lastSeen: new Date().toISOString(),
+          }
+          if (eventName === 'agent_start') nextPatch.isStreaming = true
+          if (eventName === 'agent_end' || eventName === 'turn_end') nextPatch.isStreaming = false
+
+          setSessions((prev) =>
+            prev.map((session) =>
+              matchesSessionId(session.sessionId, payload.sessionId)
+                ? {
+                    ...session,
+                    ...nextPatch,
+                    entryCount: session.entryCount + 1,
+                  }
+                : session,
+            ),
+          )
+        }).then(f => unsubs.push(f))
+      }
     }
 
     // Initial refresh
@@ -169,8 +269,9 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
     showInSidebar,
     settings,
     refresh,
+    prompt,
     steer,
-    sendMessage,
+    followUp,
     setModel,
     setThinkingLevel,
     abort,
