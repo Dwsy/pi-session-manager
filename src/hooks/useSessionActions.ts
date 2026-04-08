@@ -2,10 +2,15 @@ import { useCallback } from 'react'
 import { invoke } from '@/transport'
 import { save } from '@tauri-apps/plugin-dialog'
 import { useTranslation } from 'react-i18next'
-import type { SessionInfo } from '@/types'
+import type { SessionConvertResult, SessionConvertTarget, SessionInfo } from '@/types'
 
 export interface UseSessionActionsReturn {
   handleExportSession: (session: SessionInfo, format: 'html' | 'md' | 'json') => Promise<void>
+  handleConvertSession: (
+    session: SessionInfo,
+    target: SessionConvertTarget,
+    options?: { dryRun?: boolean; force?: boolean }
+  ) => Promise<SessionConvertResult | null>
 }
 
 export function useSessionActions(): UseSessionActionsReturn {
@@ -46,7 +51,33 @@ export function useSessionActions(): UseSessionActionsReturn {
     }
   }, [t])
 
+  const handleConvertSession = useCallback(async (
+    session: SessionInfo,
+    target: SessionConvertTarget,
+    options: { dryRun?: boolean; force?: boolean } = {}
+  ): Promise<SessionConvertResult | null> => {
+    if (!session) {
+      console.error('[useSessionActions] No session provided for conversion')
+      return null
+    }
+
+    try {
+      const result = await invoke<SessionConvertResult>('convert_session_format', {
+        path: session.path,
+        targetFormat: target,
+        dryRun: options.dryRun ?? false,
+        force: options.force ?? false,
+      })
+      return result
+    } catch (error) {
+      console.error('[useSessionActions] Conversion failed:', error)
+      alert(`${t('session.convert.failed')}: ${error}`)
+      return null
+    }
+  }, [t])
+
   return {
     handleExportSession,
+    handleConvertSession,
   }
 }

@@ -1,341 +1,420 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { invoke, listen } from '@/transport'
-import { useTranslation } from 'react-i18next'
-import type { SessionInfo, SessionsDiff } from '@/types'
-import { useDemoMode } from './useDemoMode'
-import { deleteDemoSessions, renameDemoSession } from '@/demo'
+import { useState, useEffect, useCallback, useRef } from "react";
+import { listen } from "@/transport";
+import { useTranslation } from "react-i18next";
+import type { SessionInfo, SessionsDiff } from "@/types";
+import {
+  BROWSER_DATASET_REFRESHED_EVENT,
+  isBrowserDatasetModeEnabled,
+} from "@/browser-dataset";
+import {
+  canResolveRuntimeSession,
+  deleteRuntimeSessionItems,
+  forkRuntimeSessionItem,
+  getRuntimeSessionOperationCapability,
+  getSessionRuntimeMode,
+  loadRuntimeSessions,
+  renameRuntimeSessionItem,
+} from "@/runtime-data/sessionSource";
 
 export interface PendingDeleteSession {
-  sessions: SessionInfo[]
-  requestedAt: number
-  anchorRef?: React.RefObject<HTMLElement>
+  sessions: SessionInfo[];
+  requestedAt: number;
+  anchorRef?: React.RefObject<HTMLElement>;
 }
 
 interface DeleteSessionsResult {
-  deleted_count: number
-  failed: Array<{ path: string; error: string }>
+  deleted_count: number;
+  failed: Array<{ path: string; error: string }>;
 }
 
 export interface UseSessionsReturn {
-  sessions: SessionInfo[]
-  loading: boolean
-  selectedSession: SessionInfo | null
-  setSelectedSession: (session: SessionInfo | null) => void
-  loadSessions: () => Promise<void>
-  patchSessions: (diff: SessionsDiff) => void
-  handleDeleteSession: (session: SessionInfo) => Promise<void>
-  handleDeleteSessions: (sessions: SessionInfo[], anchorRef?: React.RefObject<HTMLElement>) => Promise<void>
-  pendingDeleteSession: PendingDeleteSession | null
-  confirmDeleteSession: () => Promise<void>
-  cancelDeleteSession: () => void
-  handleRenameSession: (session: SessionInfo, newName: string) => Promise<void>
-  forkSession: (sourcePath: string, targetName?: string) => Promise<SessionInfo | null>
+  sessions: SessionInfo[];
+  loading: boolean;
+  selectedSession: SessionInfo | null;
+  setSelectedSession: (session: SessionInfo | null) => void;
+  loadSessions: () => Promise<void>;
+  patchSessions: (diff: SessionsDiff) => void;
+  handleDeleteSession: (session: SessionInfo) => Promise<void>;
+  handleDeleteSessions: (
+    sessions: SessionInfo[],
+    anchorRef?: React.RefObject<HTMLElement>,
+  ) => Promise<void>;
+  pendingDeleteSession: PendingDeleteSession | null;
+  confirmDeleteSession: () => Promise<void>;
+  cancelDeleteSession: () => void;
+  handleRenameSession: (session: SessionInfo, newName: string) => Promise<void>;
+  forkSession: (
+    sourcePath: string,
+    targetName?: string,
+  ) => Promise<SessionInfo | null>;
 }
 
 export function useSessions(): UseSessionsReturn {
-  const { t } = useTranslation()
-  const { isDemoMode, getDemoSessions } = useDemoMode()
-  const [sessions, setSessions] = useState<SessionInfo[]>([])
-  const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [pendingDeleteSession, setPendingDeleteSession] = useState<PendingDeleteSession | null>(null)
-  const selectedSessionRef = useRef<SessionInfo | null>(null)
+  const { t } = useTranslation();
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(
+    null,
+  );
+  const [loading, setLoading] = useState(true);
+  const [pendingDeleteSession, setPendingDeleteSession] =
+    useState<PendingDeleteSession | null>(null);
+  const selectedSessionRef = useRef<SessionInfo | null>(null);
 
   useEffect(() => {
-    selectedSessionRef.current = selectedSession
-  }, [selectedSession])
+    selectedSessionRef.current = selectedSession;
+  }, [selectedSession]);
 
   const loadSessions = useCallback(async () => {
     try {
-      let loadedSessions: SessionInfo[] = []
-      if (isDemoMode) {
-        loadedSessions = getDemoSessions()
-      } else {
-        const [scanned, live] = await Promise.all([
-          invoke<SessionInfo[]>('scan_sessions'),
-          invoke<any[]>('get_pi_live_sessions')
-        ])
+      const loadedSessions: SessionInfo[] = await loadRuntimeSessions();
+      setSessions(loadedSessions);
 
-        // Merge scanned with live
-        const liveMap = new Map(live.map(l => [l.session_id, l]))
-        const visitedLiveIds = new Set<string>()
-
-        loadedSessions = scanned.map(s => {
-          const liveInfo = liveMap.get(s.id)
-          if (liveInfo) {
-            visitedLiveIds.add(s.id)
-            return { ...s, isLive: true, pid: liveInfo.pid }
-          }
-          return s
-        })
-
-        // Add live sessions that aren't scanned yet (new sessions)
-        for (const l of live) {
-          if (!visitedLiveIds.has(l.session_id)) {
-            loadedSessions.push({
-              id: l.session_id,
-              path: l.session_path || l.session_id,
-              name: l.session_id,
-              modified: l.last_seen,
-              message_count: l.entry_count,
-              last_message: "",
-              last_message_role: "assistant",
-              isLive: true,
-              pid: l.pid,
-              cwd: l.cwd || "",
-              first_message: "",
-              created: "",
-            })
-          }
-        }
-
-        loadedSessions.sort((a, b) => b.modified.localeCompare(a.modified))
-      }
-      setSessions(loadedSessions)
-
-      const currentSelection = selectedSessionRef.current
+      const currentSelection = selectedSessionRef.current;
       if (currentSelection) {
-        const matchedByPath = loadedSessions.find(s => s.path === currentSelection.path)
-        const matchedById = loadedSessions.find(s => s.id === currentSelection.id)
-        const matched = matchedByPath || matchedById
+        const matchedByPath = loadedSessions.find(
+          (s) => s.path === currentSelection.path,
+        );
+        const matchedById = loadedSessions.find(
+          (s) => s.id === currentSelection.id,
+        );
+        const matched = matchedByPath || matchedById;
 
         if (matched) {
-          const pathChanged = matched.path !== currentSelection.path
-          const nameChanged = matched.name !== currentSelection.name
-          const hasChanges = pathChanged || nameChanged ||
+          const pathChanged = matched.path !== currentSelection.path;
+          const nameChanged = matched.name !== currentSelection.name;
+          const hasChanges =
+            pathChanged ||
+            nameChanged ||
             matched.message_count !== currentSelection.message_count ||
-            matched.modified !== currentSelection.modified
+            matched.modified !== currentSelection.modified;
 
           if (!hasChanges) {
             // No changes detected, keeping current selection stable
           } else if (pathChanged || nameChanged) {
-            setSelectedSession(matched)
+            setSelectedSession(matched);
           } else {
             // Session metadata changed, updating silently
-            setSelectedSession(prev => {
-              if (!prev) return matched
-              return { ...prev, ...matched }
-            })
+            setSelectedSession((prev) => {
+              if (!prev) return matched;
+              return { ...prev, ...matched };
+            });
           }
         } else {
           try {
-            if (isDemoMode) {
+            const runtimeMode = getSessionRuntimeMode();
+            if (runtimeMode === "demo") {
               // Demo mode doesn't need to check file existence
-              setSelectedSession(currentSelection)
+              setSelectedSession(currentSelection);
             } else {
-              await invoke('read_session_file', { path: currentSelection.path })
+              const readable = await canResolveRuntimeSession(
+                currentSelection.path,
+              );
+              if (readable && runtimeMode !== "backend") {
+                setSelectedSession(currentSelection);
+              }
               // Selected session file still readable but not in scan results, keeping selection
             }
           } catch (error) {
-            console.warn('[useSessions] Selected session file not readable, clearing selection:', error)
-            setSelectedSession(null)
+            console.warn(
+              "[useSessions] Selected session file not readable, clearing selection:",
+              error,
+            );
+            setSelectedSession(null);
           }
         }
       }
     } catch (error) {
-      console.error('[useSessions] Failed to load sessions:', error)
+      console.error("[useSessions] Failed to load sessions:", error);
       // Don't alert on mobile — connection errors are common on first load
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [t, isDemoMode, getDemoSessions])
+  }, [t]);
 
   const patchSessions = useCallback((diff: SessionsDiff) => {
-    setSessions(prev => {
-      const removedSet = new Set(diff.removed)
-      let changed = diff.removed.length > 0 && prev.some(s => removedSet.has(s.path))
+    setSessions((prev) => {
+      const removedSet = new Set(diff.removed);
+      let changed =
+        diff.removed.length > 0 && prev.some((s) => removedSet.has(s.path));
 
-      let next = changed ? prev.filter(s => !removedSet.has(s.path)) : [...prev]
+      let next = changed
+        ? prev.filter((s) => !removedSet.has(s.path))
+        : [...prev];
 
       for (const u of diff.updated) {
-        const idx = next.findIndex(s => s.path === u.path)
+        const idx = next.findIndex((s) => s.path === u.path);
         if (idx >= 0) {
           // Only replace if something actually changed
-          const existing = next[idx]
-          if (existing.modified !== u.modified
-            || existing.message_count !== u.message_count
-            || existing.name !== u.name
-            || existing.last_message !== u.last_message) {
-            next[idx] = u
-            changed = true
+          const existing = next[idx];
+          if (
+            existing.modified !== u.modified ||
+            existing.message_count !== u.message_count ||
+            existing.name !== u.name ||
+            existing.last_message !== u.last_message
+          ) {
+            next[idx] = u;
+            changed = true;
           }
         } else {
-          next.push(u)
-          changed = true
+          next.push(u);
+          changed = true;
         }
       }
 
-      if (!changed) return prev
+      if (!changed) return prev;
 
-      next.sort((a, b) => b.modified.localeCompare(a.modified))
-      return next
-    })
+      next.sort((a, b) => b.modified.localeCompare(a.modified));
+      return next;
+    });
 
     // Update selected session if it was in the diff
-    const currentSelection = selectedSessionRef.current
+    const currentSelection = selectedSessionRef.current;
     if (currentSelection) {
-      const removedSet = new Set(diff.removed)
+      const removedSet = new Set(diff.removed);
       if (removedSet.has(currentSelection.path)) {
-        setSelectedSession(null)
+        setSelectedSession(null);
       } else {
-        const updated = diff.updated.find(s => s.path === currentSelection.path)
+        const updated = diff.updated.find(
+          (s) => s.path === currentSelection.path,
+        );
         if (updated) {
-          setSelectedSession(prev => prev ? { ...prev, ...updated } : null)
+          setSelectedSession((prev) => (prev ? { ...prev, ...updated } : null));
         }
       }
     }
-  }, [])
+  }, []);
 
-  const handleDeleteSessions = useCallback(async (targets: SessionInfo[], anchorRef?: React.RefObject<HTMLElement>) => {
-    const nextTargets: SessionInfo[] = []
-    const seen = new Set<string>()
+  const handleDeleteSessions = useCallback(
+    async (
+      targets: SessionInfo[],
+      anchorRef?: React.RefObject<HTMLElement>,
+    ) => {
+      const nextTargets: SessionInfo[] = [];
+      const seen = new Set<string>();
 
-    for (const session of targets) {
-      if (!session || seen.has(session.id)) {
-        continue
+      for (const session of targets) {
+        if (!session || seen.has(session.id)) {
+          continue;
+        }
+        seen.add(session.id);
+        nextTargets.push(session);
       }
-      seen.add(session.id)
-      nextTargets.push(session)
-    }
 
-    if (nextTargets.length === 0) {
-      return
-    }
+      if (nextTargets.length === 0) {
+        return;
+      }
 
-    setPendingDeleteSession({
-      sessions: nextTargets,
-      requestedAt: Date.now(),
-      anchorRef,
-    })
-  }, [])
+      setPendingDeleteSession({
+        sessions: nextTargets,
+        requestedAt: Date.now(),
+        anchorRef,
+      });
+    },
+    [],
+  );
 
-  const handleDeleteSession = useCallback(async (session: SessionInfo, anchorRef?: React.RefObject<HTMLElement>) => {
-    await handleDeleteSessions([session], anchorRef)
-  }, [handleDeleteSessions])
+  const handleDeleteSession = useCallback(
+    async (session: SessionInfo, anchorRef?: React.RefObject<HTMLElement>) => {
+      await handleDeleteSessions([session], anchorRef);
+    },
+    [handleDeleteSessions],
+  );
 
   const confirmDeleteSession = useCallback(async () => {
     if (!pendingDeleteSession) {
-      return
+      return;
     }
 
-    const targetSessions = pendingDeleteSession.sessions
-    const targetSessionIds = new Set(targetSessions.map(session => session.id))
-    let deletedSessionIds = targetSessionIds
+    const targetSessions = pendingDeleteSession.sessions;
+    const targetSessionIds = new Set(
+      targetSessions.map((session) => session.id),
+    );
+    let deletedSessionIds = targetSessionIds;
 
     try {
-      if (isDemoMode) {
-        deleteDemoSessions(targetSessions.map(session => session.path))
-        setSessions(prev => prev.filter(s => !targetSessionIds.has(s.id)))
-      } else {
-        const result = await invoke<DeleteSessionsResult>('delete_sessions', {
-          paths: targetSessions.map(session => session.path),
-        })
+      const capability = getRuntimeSessionOperationCapability("delete");
+      if (!capability.supported) {
+        console.warn("Delete is not supported in this runtime mode");
+        alert(
+          t("app.errors.deleteSession", {
+            defaultValue: capability.fallbackMessage,
+          }),
+        );
+        setPendingDeleteSession(null);
+        return;
+      }
 
-        const failedPaths = new Set(result.failed.map(item => item.path))
-        deletedSessionIds = new Set(
-          targetSessions
-            .filter(session => !failedPaths.has(session.path))
-            .map(session => session.id)
-        )
+      const result = (await deleteRuntimeSessionItems(
+        targetSessions.map((session) => session.path),
+      )) as DeleteSessionsResult;
 
-        if (deletedSessionIds.size > 0) {
-          setSessions(prev => prev.filter(session => !deletedSessionIds.has(session.id)))
-        }
+      const failedPaths = new Set(result.failed.map((item) => item.path));
+      deletedSessionIds = new Set(
+        targetSessions
+          .filter((session) => !failedPaths.has(session.path))
+          .map((session) => session.id),
+      );
 
-        if (result.failed.length > 0) {
-          console.error('Failed to delete some sessions:', result.failed)
-          alert(t('app.errors.deleteSessionPartial', {
+      if (deletedSessionIds.size > 0) {
+        setSessions((prev) =>
+          prev.filter((session) => !deletedSessionIds.has(session.id)),
+        );
+      }
+
+      if (result.failed.length > 0) {
+        console.error("Failed to delete some sessions:", result.failed);
+        alert(
+          t("app.errors.deleteSessionPartial", {
             count: result.failed.length,
-            defaultValue: '{{count}} sessions failed to delete. Check the console for details.',
-          }))
-        }
+            defaultValue:
+              "{{count}} sessions failed to delete. Check the console for details.",
+          }),
+        );
       }
 
-      if (selectedSessionRef.current?.id && deletedSessionIds.has(selectedSessionRef.current.id)) {
-        setSelectedSession(null)
+      if (
+        selectedSessionRef.current?.id &&
+        deletedSessionIds.has(selectedSessionRef.current.id)
+      ) {
+        setSelectedSession(null);
       }
 
-      setPendingDeleteSession(null)
+      setPendingDeleteSession(null);
     } catch (error) {
-      console.error('Failed to delete session:', error)
-      alert(t('app.errors.deleteSession'))
+      console.error("Failed to delete session:", error);
+      alert(t("app.errors.deleteSession"));
     }
-  }, [isDemoMode, pendingDeleteSession, t])
+  }, [pendingDeleteSession, t]);
 
   const cancelDeleteSession = useCallback(() => {
-    setPendingDeleteSession(null)
-  }, [])
+    setPendingDeleteSession(null);
+  }, []);
 
-  const handleRenameSession = useCallback(async (session: SessionInfo, newName: string) => {
-    try {
-      if (isDemoMode) {
-        const updated = renameDemoSession(session.path, newName)
-        setSessions(prev => prev.map(s =>
-          s.id === session.id
-            ? { ...s, name: newName, modified: updated?.modified || s.modified }
-            : s
-        ))
-      } else {
-        await invoke('rename_session', {
-          path: session.path,
-          new_name: newName
-        })
-        setSessions(prev => prev.map(s =>
-          s.id === session.id ? { ...s, name: newName } : s
-        ))
+  const handleRenameSession = useCallback(
+    async (session: SessionInfo, newName: string) => {
+      try {
+        const capability = getRuntimeSessionOperationCapability("rename");
+        if (!capability.supported) {
+          console.warn("Rename is not supported in this runtime mode");
+          alert(
+            t("app.errors.renameSession", {
+              defaultValue: capability.fallbackMessage,
+            }),
+          );
+          return;
+        }
+
+        const updated = await renameRuntimeSessionItem(session.path, newName);
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === session.id
+              ? {
+                  ...s,
+                  name: newName,
+                  modified: updated?.modified || s.modified,
+                  path: updated?.path || s.path,
+                }
+              : s,
+          ),
+        );
+
+        if (selectedSession?.id === session.id) {
+          setSelectedSession((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  name: newName,
+                  modified: updated?.modified || prev.modified,
+                  path: updated?.path || prev.path,
+                }
+              : null,
+          );
+        }
+      } catch (error) {
+        console.error("Failed to rename session:", error);
+        alert(t("app.errors.renameSession"));
       }
+    },
+    [selectedSession, t],
+  );
 
-      if (selectedSession?.id === session.id) {
-        setSelectedSession(prev => prev ? { ...prev, name: newName } : null)
+  const forkSession = useCallback(
+    async (
+      sourcePath: string,
+      targetName?: string,
+    ): Promise<SessionInfo | null> => {
+      try {
+        const capability = getRuntimeSessionOperationCapability("fork");
+        if (!capability.supported) {
+          console.warn("Fork is not supported in this runtime mode");
+          alert(
+            t("app.errors.forkSession", {
+              defaultValue: capability.fallbackMessage,
+            }),
+          );
+          return null;
+        }
+
+        const newSession = await forkRuntimeSessionItem(sourcePath, targetName);
+        if (!newSession) {
+          return null;
+        }
+
+        // Add the new session to the list
+        setSessions((prev) => {
+          const updated = [newSession, ...prev];
+          updated.sort((a, b) => b.modified.localeCompare(a.modified));
+          return updated;
+        });
+
+        return newSession;
+      } catch (error) {
+        console.error("Failed to fork session:", error);
+        alert(
+          t("app.errors.forkSession", {
+            defaultValue: "Failed to fork session",
+          }),
+        );
+        return null;
       }
-    } catch (error) {
-      console.error('Failed to rename session:', error)
-      alert(t('app.errors.renameSession'))
-    }
-  }, [selectedSession, t, isDemoMode])
-
-  const forkSession = useCallback(async (sourcePath: string, targetName?: string): Promise<SessionInfo | null> => {
-    try {
-      if (isDemoMode) {
-        // Demo mode doesn't support fork
-        console.warn('Fork is not supported in demo mode')
-        return null
-      }
-
-      const newSession = await invoke<SessionInfo>('fork_session', {
-        source_path: sourcePath,
-        target_name: targetName || null
-      })
-
-      // Add the new session to the list
-      setSessions(prev => {
-        const updated = [newSession, ...prev]
-        updated.sort((a, b) => b.modified.localeCompare(a.modified))
-        return updated
-      })
-
-      return newSession
-    } catch (error) {
-      console.error('Failed to fork session:', error)
-      alert(t('app.errors.forkSession', { defaultValue: 'Failed to fork session' }))
-      return null
-    }
-  }, [isDemoMode, t])
+    },
+    [t],
+  );
 
   useEffect(() => {
-    if (isDemoMode) return
+    if (getSessionRuntimeMode() !== "backend") return;
 
-    let unlisten: (() => void) | null = null
+    let unlisten: (() => void) | null = null;
     const setupSubscriptions = async () => {
-      const u1 = await listen('pi-agent:register', () => loadSessions())
-      const u2 = await listen('pi-agent:disconnect', () => loadSessions())
-      const u3 = await listen('sessions-changed', () => loadSessions())
-      unlisten = () => { if (u1) u1(); if (u2) u2(); if (u3) u3() }
-    }
+      const u1 = await listen("pi-live:session_registered", () => loadSessions());
+      const u2 = await listen("pi-live:session_disconnected", () => loadSessions());
+      unlisten = () => {
+        if (u1) u1();
+        if (u2) u2();
+      };
+    };
 
-    setupSubscriptions()
-    return () => { if (unlisten) unlisten() }
-  }, [isDemoMode, loadSessions])
+    setupSubscriptions();
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [loadSessions]);
+
+  useEffect(() => {
+    if (!isBrowserDatasetModeEnabled() || typeof window === "undefined") return;
+
+    const handleRefresh = () => {
+      void loadSessions();
+    };
+
+    window.addEventListener(BROWSER_DATASET_REFRESHED_EVENT, handleRefresh);
+    return () => {
+      window.removeEventListener(
+        BROWSER_DATASET_REFRESHED_EVENT,
+        handleRefresh,
+      );
+    };
+  }, [loadSessions]);
 
   return {
     sessions,
@@ -351,5 +430,5 @@ export function useSessions(): UseSessionsReturn {
     cancelDeleteSession,
     handleRenameSession,
     forkSession,
-  }
+  };
 }

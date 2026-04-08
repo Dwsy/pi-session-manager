@@ -1,181 +1,228 @@
-import { useState, useCallback, useEffect } from 'react'
-import { invoke } from '@/transport'
-import type { Tag, SessionTag } from '@/types'
+import { useState, useCallback, useEffect } from "react";
+import type { Tag, SessionTag } from "@/types";
 import {
-  assignDemoTag,
-  createDemoTag,
-  deleteDemoTag,
-  evaluateDemoAutoRules,
-  getDemoSessionTags,
-  getDemoTags,
-  isDemoModeEnabled,
-  moveDemoSessionTag,
-  removeDemoTagFromSession,
-  reorderDemoTags,
-  updateDemoTag,
-  updateDemoTagAutoRules,
-} from '@/demo'
+  assignRuntimeTag,
+  createRuntimeTag,
+  deleteRuntimeTag,
+  evaluateRuntimeAutoRules,
+  loadRuntimeTags,
+  moveRuntimeSessionTag,
+  removeRuntimeTagFromSession,
+  reorderRuntimeTags,
+  updateRuntimeTag,
+  updateRuntimeTagAutoRules,
+} from "@/runtime-data/tagsSource";
 
 export function useTags() {
-  const [tags, setTags] = useState<Tag[]>([])
-  const [sessionTags, setSessionTags] = useState<SessionTag[]>([])
-  const [loading, setLoading] = useState(true)
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [sessionTags, setSessionTags] = useState<SessionTag[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const loadTags = useCallback(async () => {
     try {
-      const [allTags, allST] = isDemoModeEnabled()
-        ? [getDemoTags(), getDemoSessionTags()]
-        : await Promise.all([
-          invoke<Tag[]>('get_all_tags'),
-          invoke<SessionTag[]>('get_all_session_tags'),
-        ])
-      setTags(allTags)
-      setSessionTags(allST)
+      const state = await loadRuntimeTags();
+      setTags(state.tags);
+      setSessionTags(state.sessionTags);
     } catch (err) {
-      console.error('Failed to load tags:', err)
+      console.error("Failed to load tags:", err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
-  useEffect(() => { loadTags() }, [loadTags])
+  useEffect(() => {
+    void loadTags();
+  }, [loadTags]);
 
-  const createTag = useCallback(async (name: string, color: string, icon?: string, parentId?: string) => {
-    const tag = isDemoModeEnabled()
-      ? createDemoTag(name, color, icon, parentId)
-      : await invoke<Tag>('create_tag', { name, color, icon, parentId })
-    setTags(prev => [...prev, tag])
-    return tag
-  }, [])
+  const createTag = useCallback(
+    async (name: string, color: string, icon?: string, parentId?: string) => {
+      const tag = await createRuntimeTag(name, color, icon, parentId);
+      setTags((prev) => [...prev, tag]);
+      return tag;
+    },
+    [],
+  );
 
-  const updateTag = useCallback(async (id: string, updates: Partial<Pick<Tag, 'name' | 'color' | 'icon'>>) => {
-    if (isDemoModeEnabled()) {
-      updateDemoTag(id, updates)
-    } else {
-      await invoke('update_tag', { id, ...updates })
-    }
-    setTags(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
-  }, [])
+  const updateTag = useCallback(
+    async (
+      id: string,
+      updates: Partial<Pick<Tag, "name" | "color" | "icon">>,
+    ) => {
+      await updateRuntimeTag(id, updates);
+      setTags((prev) =>
+        prev.map((tag) => (tag.id === id ? { ...tag, ...updates } : tag)),
+      );
+    },
+    [],
+  );
 
   const deleteTag = useCallback(async (id: string) => {
-    if (isDemoModeEnabled()) {
-      deleteDemoTag(id)
-    } else {
-      await invoke('delete_tag', { id })
-    }
-    setTags(prev => prev.filter(t => t.id !== id))
-    setSessionTags(prev => prev.filter(st => st.tagId !== id))
-  }, [])
+    await deleteRuntimeTag(id);
+    setTags((prev) => prev.filter((tag) => tag.id !== id));
+    setSessionTags((prev) => prev.filter((tag) => tag.tagId !== id));
+  }, []);
 
   const assignTag = useCallback(async (sessionId: string, tagId: string) => {
-    if (isDemoModeEnabled()) {
-      assignDemoTag(sessionId, tagId)
-    } else {
-      await invoke('assign_tag', { sessionId, tagId })
-    }
-    setSessionTags(prev => [
-      ...prev.filter(st => !(st.sessionId === sessionId && st.tagId === tagId)),
-      { sessionId, tagId, position: 0, assignedAt: new Date().toISOString() },
-    ])
-  }, [])
+    await assignRuntimeTag(sessionId, tagId);
+    setSessionTags((prev) => [
+      ...prev.filter(
+        (tag) => !(tag.sessionId === sessionId && tag.tagId === tagId),
+      ),
+      {
+        sessionId,
+        tagId,
+        position: 0,
+        assignedAt: new Date().toISOString(),
+      },
+    ]);
+  }, []);
 
-  const removeTagFromSession = useCallback(async (sessionId: string, tagId: string) => {
-    if (isDemoModeEnabled()) {
-      removeDemoTagFromSession(sessionId, tagId)
-    } else {
-      await invoke('remove_tag_from_session', { sessionId, tagId })
-    }
-    setSessionTags(prev => prev.filter(st => !(st.sessionId === sessionId && st.tagId === tagId)))
-  }, [])
+  const removeTagFromSession = useCallback(
+    async (sessionId: string, tagId: string) => {
+      await removeRuntimeTagFromSession(sessionId, tagId);
+      setSessionTags((prev) =>
+        prev.filter(
+          (tag) => !(tag.sessionId === sessionId && tag.tagId === tagId),
+        ),
+      );
+    },
+    [],
+  );
 
-  const moveSession = useCallback(async (
-    sessionId: string,
-    fromTagId: string | null,
-    toTagId: string,
-    position: number,
-  ) => {
-    setSessionTags(prev => {
-      const next = fromTagId
-        ? prev.filter(st => !(st.sessionId === sessionId && st.tagId === fromTagId))
-        : [...prev]
-      return [
-        ...next.filter(st => !(st.sessionId === sessionId && st.tagId === toTagId)),
-        { sessionId, tagId: toTagId, position, assignedAt: new Date().toISOString() },
-      ]
-    })
-    try {
-      if (isDemoModeEnabled()) {
-        moveDemoSessionTag(sessionId, fromTagId, toTagId, position)
-      } else {
-        await invoke('move_session_tag', { sessionId, fromTagId, toTagId, position })
+  const moveSession = useCallback(
+    async (
+      sessionId: string,
+      fromTagId: string | null,
+      toTagId: string,
+      position: number,
+    ) => {
+      setSessionTags((prev) => {
+        const next = fromTagId
+          ? prev.filter(
+              (tag) =>
+                !(tag.sessionId === sessionId && tag.tagId === fromTagId),
+            )
+          : [...prev];
+        return [
+          ...next.filter(
+            (tag) => !(tag.sessionId === sessionId && tag.tagId === toTagId),
+          ),
+          {
+            sessionId,
+            tagId: toTagId,
+            position,
+            assignedAt: new Date().toISOString(),
+          },
+        ];
+      });
+
+      try {
+        await moveRuntimeSessionTag(sessionId, fromTagId, toTagId, position);
+      } catch {
+        await loadTags();
       }
-    } catch {
-      await loadTags()
-    }
-  }, [loadTags])
+    },
+    [loadTags],
+  );
 
   const reorderTags = useCallback(async (tagIds: string[]) => {
-    setTags(prev => {
-      const map = new Map(prev.map(t => [t.id, t]))
-      return tagIds.filter(id => map.has(id)).map((id, i) => ({ ...map.get(id)!, sortOrder: i }))
-    })
-    if (isDemoModeEnabled()) {
-      reorderDemoTags(tagIds)
-    } else {
-      await invoke('reorder_tags', { tagIds })
-    }
-  }, [])
+    setTags((prev) => {
+      const map = new Map(prev.map((tag) => [tag.id, tag]));
+      return tagIds
+        .filter((id) => map.has(id))
+        .map((id, index) => ({ ...map.get(id)!, sortOrder: index }));
+    });
+    await reorderRuntimeTags(tagIds);
+  }, []);
 
-  const getTagsForSession = useCallback((sessionId: string): Tag[] => {
-    const ids = new Set(sessionTags.filter(st => st.sessionId === sessionId).map(st => st.tagId))
-    return tags.filter(t => ids.has(t.id))
-  }, [tags, sessionTags])
+  const getTagsForSession = useCallback(
+    (sessionId: string): Tag[] => {
+      const ids = new Set(
+        sessionTags
+          .filter((tag) => tag.sessionId === sessionId)
+          .map((tag) => tag.tagId),
+      );
+      return tags.filter((tag) => ids.has(tag.id));
+    },
+    [tags, sessionTags],
+  );
 
-  const getSessionsForTag = useCallback((tagId: string): SessionTag[] => {
-    return sessionTags.filter(st => st.tagId === tagId).sort((a, b) => a.position - b.position)
-  }, [sessionTags])
+  const getSessionsForTag = useCallback(
+    (tagId: string): SessionTag[] =>
+      sessionTags
+        .filter((tag) => tag.tagId === tagId)
+        .sort((left, right) => left.position - right.position),
+    [sessionTags],
+  );
 
-  const updateTagAutoRules = useCallback(async (id: string, rules: string | null) => {
-    if (isDemoModeEnabled()) {
-      updateDemoTagAutoRules(id, rules)
-    } else {
-      await invoke('update_tag_auto_rules', { id, autoRules: rules })
-    }
-    setTags(prev => prev.map(t => t.id === id ? { ...t, autoRules: rules ?? undefined } : t))
-  }, [])
+  const updateTagAutoRules = useCallback(
+    async (id: string, rules: string | null) => {
+      await updateRuntimeTagAutoRules(id, rules);
+      setTags((prev) =>
+        prev.map((tag) =>
+          tag.id === id ? { ...tag, autoRules: rules ?? undefined } : tag,
+        ),
+      );
+    },
+    [],
+  );
 
-  const evaluateAutoRules = useCallback(async (sessionId: string, text: string) => {
-    const matched = isDemoModeEnabled()
-      ? evaluateDemoAutoRules(sessionId, text)
-      : await invoke<string[]>('evaluate_auto_rules', { sessionId, text })
-    if (matched.length > 0) await loadTags()
-    return matched
-  }, [loadTags])
+  const evaluateAutoRules = useCallback(
+    async (sessionId: string, text: string) => {
+      const matched = await evaluateRuntimeAutoRules(sessionId, text);
+      if (matched.length > 0) await loadTags();
+      return matched;
+    },
+    [loadTags],
+  );
 
-  const getDescendantIds = useCallback((tagId: string): string[] => {
-    const result: string[] = []
-    const children = tags.filter(t => t.parentId === tagId)
-    for (const child of children) {
-      result.push(child.id)
-      result.push(...getDescendantIds(child.id))
-    }
-    return result
-  }, [tags])
+  const getDescendantIds = useCallback(
+    (tagId: string): string[] => {
+      const result: string[] = [];
+      const children = tags.filter((tag) => tag.parentId === tagId);
+      for (const child of children) {
+        result.push(child.id);
+        result.push(...getDescendantIds(child.id));
+      }
+      return result;
+    },
+    [tags],
+  );
 
-  const getRootTags = useCallback((): Tag[] => {
-    return tags.filter(t => !t.parentId).sort((a, b) => a.sortOrder - b.sortOrder)
-  }, [tags])
+  const getRootTags = useCallback(
+    (): Tag[] =>
+      tags
+        .filter((tag) => !tag.parentId)
+        .sort((left, right) => left.sortOrder - right.sortOrder),
+    [tags],
+  );
 
-  const getChildTags = useCallback((parentId: string): Tag[] => {
-    return tags.filter(t => t.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder)
-  }, [tags])
+  const getChildTags = useCallback(
+    (parentId: string): Tag[] =>
+      tags
+        .filter((tag) => tag.parentId === parentId)
+        .sort((left, right) => left.sortOrder - right.sortOrder),
+    [tags],
+  );
 
   return {
-    tags, sessionTags, loading,
-    loadTags, createTag, updateTag, deleteTag,
-    assignTag, removeTagFromSession, moveSession, reorderTags,
-    getTagsForSession, getSessionsForTag,
-    updateTagAutoRules, evaluateAutoRules,
-    getDescendantIds, getRootTags, getChildTags,
-  }
+    tags,
+    sessionTags,
+    loading,
+    loadTags,
+    createTag,
+    updateTag,
+    deleteTag,
+    assignTag,
+    removeTagFromSession,
+    moveSession,
+    reorderTags,
+    getTagsForSession,
+    getSessionsForTag,
+    updateTagAutoRules,
+    evaluateAutoRules,
+    getDescendantIds,
+    getRootTags,
+    getChildTags,
+  };
 }
