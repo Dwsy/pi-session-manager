@@ -34,6 +34,7 @@ interface KanbanBoardProps {
   onDeleteSession?: (session: SessionInfo) => void
   onConvertSession?: (session: SessionInfo) => void
   onResumeSession?: (session: SessionInfo) => void | Promise<void>
+  onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>
   favorites?: FavoriteItem[]
   onToggleFavorite?: (item: Omit<FavoriteItem, 'addedAt'>) => void
   terminal?: TerminalType
@@ -69,6 +70,7 @@ export default function KanbanBoard({
   onDeleteSession,
   onConvertSession,
   onResumeSession,
+  onCopyResumeSession,
   favorites,
   onToggleFavorite,
   terminal,
@@ -338,6 +340,7 @@ export default function KanbanBoard({
                     onToggleTag={onToggleTag}
                     onDeleteSession={onDeleteSession}
                     onResumeSession={onResumeSession}
+                    onCopyResumeSession={onCopyResumeSession}
                     isMobile
                     liveSessionIds={liveSessionIds}
                 />
@@ -363,6 +366,7 @@ export default function KanbanBoard({
                     onToggleTag={onToggleTag}
                     onDeleteSession={onDeleteSession}
                     onResumeSession={onResumeSession}
+                    onCopyResumeSession={onCopyResumeSession}
                     liveSessionIds={liveSessionIds}
                   />
                 </div>

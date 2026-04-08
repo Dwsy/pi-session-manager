@@ -31,6 +31,12 @@ import type { SearchContext } from "./plugins/types";
 import { invoke, isTauri } from "./transport";
 import { getCachedSettings } from "./utils/settingsApi";
 import { getSessionSourceSlug } from "./utils/session";
+import {
+  buildPiResumeCommand,
+  buildCopyResumeCommandForTarget,
+  getConfiguredExternalResumeTarget,
+  getFallbackExternalResumeTarget,
+} from "./utils/sessionResume";
 import { shouldSkipOnboardingForRuntime } from "./runtime-data/mode";
 import AppMobileLayout, {
   type MobileTab,
@@ -189,6 +195,9 @@ function App() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
+  const [resumeDialogMode, setResumeDialogMode] = useState<"resume" | "copy">(
+    "resume",
+  );
   const [convertResult, setConvertResult] = useState<
     import("./types").SessionConvertResult | null
   >(null);
@@ -288,11 +297,12 @@ function App() {
   );
 
   const buildResumeCommand = useCallback(
-    (session: SessionInfo) => {
-      const pi = piPath || "pi";
-      return `cd "${session.cwd}" && ${pi} --session "${session.path}"`;
-    },
-    [piPath],
+    (session: SessionInfo) =>
+      buildPiResumeCommand(session, {
+        piPath,
+        resumeCommand,
+      }),
+    [piPath, resumeCommand],
   );
 
   const openResumeCommandInTerminal = useCallback(
@@ -354,20 +364,49 @@ function App() {
         return;
       }
 
-      const settings = getCachedSettings();
-      const defaultTarget =
-        settings.session?.defaultExternalResumeTarget || "pi";
-      const promptEnabled =
-        settings.session?.externalResumePromptEnabled !== false;
+      const defaultTarget = getFallbackExternalResumeTarget();
+      const promptEnabled = getConfiguredExternalResumeTarget() === null;
 
       setSelectedSession(session);
       if (promptEnabled) {
+        setResumeDialogMode("resume");
         setShowResumeDialog(true);
         return;
       }
       await handleResumeSessionWithTarget(session, defaultTarget);
     },
     [handleResumeSessionWithTarget],
+  );
+
+  const handleCopyResumeCommandWithTarget = useCallback(
+    async (session: SessionInfo, target: SessionConvertTarget) => {
+      const command = await buildCopyResumeCommandForTarget(session, target, {
+        piPath,
+        resumeCommand,
+      });
+      await navigator.clipboard.writeText(command);
+    },
+    [piPath, resumeCommand],
+  );
+
+  const requestCopyResumeCommand = useCallback(
+    async (session: SessionInfo) => {
+      const sourceSlug = getSessionSourceSlug(session.path);
+      if (!sourceSlug || sourceSlug === "pi") {
+        await handleCopyResumeCommandWithTarget(session, "pi");
+        return;
+      }
+
+      const configuredTarget = getConfiguredExternalResumeTarget();
+      setSelectedSession(session);
+      if (!configuredTarget) {
+        setResumeDialogMode("copy");
+        setShowResumeDialog(true);
+        return;
+      }
+      await handleCopyResumeCommandWithTarget(session, configuredTarget);
+    },
+    [handleCopyResumeCommandWithTarget],
   );
 
   const handleResumeSession = useCallback(async () => {
@@ -537,6 +576,7 @@ function App() {
       setShowConvertDialog(true);
     },
     onResumeSession: requestResumeSession,
+    onCopyResumeSession: requestCopyResumeCommand,
     getBadgeType,
     terminal,
     piPath,
@@ -589,7 +629,11 @@ function App() {
 
   const onResumeToTarget = async (target: SessionConvertTarget) => {
     if (!selectedSession) return;
-    await handleResumeSessionWithTarget(selectedSession, target);
+    if (resumeDialogMode === "copy") {
+      await handleCopyResumeCommandWithTarget(selectedSession, target);
+    } else {
+      await handleResumeSessionWithTarget(selectedSession, target);
+    }
     setShowResumeDialog(false);
   };
 
@@ -723,6 +767,7 @@ function App() {
       onDeleteSession={handleDeleteSession}
       onConvertSession={handleStartConvertSession}
       onResumeSession={requestResumeSession}
+      onCopyResumeSession={requestCopyResumeCommand}
       favorites={favorites}
       onToggleFavorite={toggleFavorite}
       terminal={terminal}
@@ -807,6 +852,7 @@ function App() {
       showExportDialog={showExportDialog}
       showConvertDialog={showConvertDialog}
       showResumeDialog={showResumeDialog}
+      resumeDialogMode={resumeDialogMode}
       convertResult={convertResult}
       showRenameDialog={showRenameDialog}
       showForkDialog={showForkDialog}
@@ -836,9 +882,7 @@ function App() {
       onOpenConvertedPath={handleOpenConvertedPath}
       onRunConvertedResume={handleRunConvertedResume}
       onConvertAgain={handleConvertAgain}
-      resumeDefaultTarget={
-        getCachedSettings().session?.defaultExternalResumeTarget || "pi"
-      }
+      resumeDefaultTarget={getFallbackExternalResumeTarget()}
       SettingsPanel={SettingsPanel}
       CommandPalette={CommandPalette}
     />

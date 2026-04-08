@@ -28,6 +28,7 @@ export type AppDesktopSidebarSessionListCommonProps = Pick<
   | "onDeleteSessions"
   | "onConvertSession"
   | "onResumeSession"
+  | "onCopyResumeSession"
   | "loading"
   | "getBadgeType"
   | "terminal"
@@ -140,6 +141,7 @@ function AppDesktopSidebarContent({
           onSelectProject={onSelectFavoriteProject}
           getBadgeType={getBadgeType}
           loading={loadingFavorites}
+          liveSessionIds={liveSessionIds}
         />
       ) : viewMode === "kanban" ? null : viewMode === "project" &&
         selectedProject &&

@@ -16,6 +16,7 @@ interface FavoritesPanelProps {
   onSelectProject?: (projectPath: string) => void
   getBadgeType?: (sessionId: string) => 'new' | 'updated' | null
   loading?: boolean
+  liveSessionIds?: Set<string>
 }
 
 export default function FavoritesPanel({
@@ -27,6 +28,7 @@ export default function FavoritesPanel({
   onSelectProject,
   getBadgeType,
   loading = false,
+  liveSessionIds,
 }: FavoritesPanelProps) {
   const { t } = useTranslation()
   const { getSessionSetting } = useSettings()
@@ -100,6 +102,7 @@ export default function FavoritesPanel({
             const isSelected = selectedSession?.id === session.id
             const sourceTag = getSessionSourceTag(session.path)
             const sourceSlug = getSessionSourceSlug(session.path)
+            const isLive = session.isLive || (liveSessionIds?.has(session.id) ?? false)
 
             return (
               <div
@@ -112,6 +115,12 @@ export default function FavoritesPanel({
                 <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
+                      {isLive && (
+                        <span
+                          className="h-2 w-2 rounded-full bg-green-500 animate-pulse flex-shrink-0"
+                          title="Live"
+                        />
+                      )}
                       <span className="text-sm truncate">{session.name || t('common.untitled')}</span>
                       {sourceTag && (
                         <SessionBadge

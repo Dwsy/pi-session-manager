@@ -10,6 +10,8 @@ import OpenInTerminalButton from '@/components/OpenInTerminalButton'
 import { SessionBadge } from '@/components/session-viewer/SessionBadge'
 import type { TerminalType } from '@/components/settings/types'
 import { getPlatformDefaults } from '@/components/settings/types'
+import { getSessionSourceSlug, getSessionSourceTag } from '@/utils/session'
+import { useSettings } from '@/hooks/useSettings'
 
 interface SessionListByDirectoryProps {
   sessions: SessionInfo[]
@@ -24,6 +26,7 @@ interface SessionListByDirectoryProps {
   resumeCommand?: string
   getBadgeType?: (sessionId: string) => 'new' | 'updated' | null
   scrollParentRef?: RefObject<HTMLDivElement>
+  liveSessionIds?: Set<string>
 }
 
 export default function SessionListByDirectory({
@@ -39,8 +42,12 @@ export default function SessionListByDirectory({
   resumeCommand,
   getBadgeType,
   scrollParentRef,
+  liveSessionIds,
 }: SessionListByDirectoryProps) {
   const { t } = useTranslation()
+  const { getSessionSetting } = useSettings()
+  const showAgentIconInBadge =
+    getSessionSetting('showAgentIconInSessionBadge') !== false
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
 
   const groupedSessions = sessions.reduce((acc, session) => {
@@ -174,6 +181,9 @@ export default function SessionListByDirectory({
           }
 
           const session = row.session
+          const sourceTag = getSessionSourceTag(session.path)
+          const sourceSlug = getSessionSourceSlug(session.path)
+          const isLive = session.isLive || (liveSessionIds?.has(session.id) ?? false)
           const hoverTitle = [
             session.name || session.first_message || t('session.list.untitled'),
             `${t('session.tooltip.path')}: ${session.path}`,
@@ -206,14 +216,28 @@ export default function SessionListByDirectory({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
+                      {isLive && (
+                        <span
+                          className="h-2 w-2 rounded-full bg-green-500 animate-pulse flex-shrink-0"
+                          title="Live"
+                        />
+                      )}
+                      {sourceTag && (
+                        <SessionBadge
+                          label={sourceTag}
+                          tone="source"
+                          sourceSlug={sourceSlug || undefined}
+                          showIcon={showAgentIconInBadge}
+                          className="text-[9px] sm:text-[10px]"
+                        />
+                      )}
                       <h3 className="font-medium text-xs truncate leading-tight flex-1">
                         {session.name || session.first_message || t('session.list.untitled')}
                       </h3>
-                    {/* Badge */}
-                    {getBadgeType && getBadgeType(session.id) && (
-                      <SessionBadge type={getBadgeType(session.id)!} />
-                    )}
-                  </div>
+                      {getBadgeType && getBadgeType(session.id) && (
+                        <SessionBadge type={getBadgeType(session.id)!} />
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground/80 tabular-nums">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />

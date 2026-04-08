@@ -9,10 +9,11 @@ import KanbanContextMenu from './KanbanContextMenu'
 import DeleteSessionPopover from '@/components/dialogs/DeleteSessionPopover'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
 import { invoke, isTauri } from '@/transport'
-import { getCachedSettings } from '@/utils/settingsApi'
-import { getPlatformDefaults } from '@/components/settings/types'
 import { useClipboard } from '@/hooks/useClipboard'
-import { getSessionSourceSlug } from '@/utils/session'
+import {
+  buildCopyResumeCommand,
+  openSessionInTerminalDirect,
+} from '@/utils/sessionResume'
 
 interface KanbanColumnProps {
   id: string
@@ -27,6 +28,7 @@ interface KanbanColumnProps {
   onToggleTag: (sessionId: string, tagId: string, assigned: boolean) => void
   onDeleteSession?: (session: SessionInfo) => void
   onResumeSession?: (session: SessionInfo) => void | Promise<void>
+  onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>
   terminal?: string
   piPath?: string
   customCommand?: string
@@ -52,6 +54,7 @@ export default function KanbanColumn({
   onToggleTag,
   onDeleteSession,
   onResumeSession,
+  onCopyResumeSession,
   terminal: propTerminal,
   piPath: propPiPath,
   customCommand: propCustomCommand,
@@ -237,17 +240,11 @@ export default function KanbanColumn({
             }
             if (!isTauri()) return
             try {
-              const settings = getCachedSettings()
-              const terminal = settings.terminal?.defaultTerminal || propTerminal || getPlatformDefaults().defaultTerminal
-              const customCommand = settings.terminal?.customTerminalCommand || propCustomCommand || ''
-              const piPath = settings.terminal?.piCommandPath || propPiPath || 'pi'
-              const resumeCommand = settings.terminal?.resumeCommand || ''
-              await invoke('open_session_in_terminal', {
-                path: contextMenu.session.path,
-                cwd: contextMenu.session.cwd,
-                terminal: terminal === 'custom' ? customCommand : terminal,
-                piPath: piPath || null,
-                resumeCommand: resumeCommand || null,
+              await openSessionInTerminalDirect(contextMenu.session, {
+                terminal: propTerminal,
+                customCommand: propCustomCommand,
+                piPath: propPiPath,
+                resumeCommand: propResumeCommand,
               })
             } catch (err) {
               console.error('Failed to open in terminal:', err)
@@ -273,65 +270,16 @@ export default function KanbanColumn({
             onToggleTag(contextMenu.session.id, tagId, assigned)
           }}
           onCopyResume={
-            onResumeSession
+            onCopyResumeSession
               ? async () => {
-                  const sourceSlug = getSessionSourceSlug(contextMenu.session.path)
-                  const settings = getCachedSettings()
-                  const defaultTarget =
-                    settings.session?.defaultExternalResumeTarget || 'pi'
-
-                  if (!sourceSlug || sourceSlug === 'pi') {
-                    const cmd = settings.terminal?.resumeCommand || propResumeCommand || ''
-                    const piCmd = settings.terminal?.piCommandPath || propPiPath || 'pi'
-                    const hasPlaceholders = cmd.includes('{path}') || cmd.includes('{pi}')
-                    let fullCommand = cmd
-                      ? cmd.replace(/\{cwd\}/g, contextMenu.session.cwd || '').replace(/\{path\}/g, contextMenu.session.path).replace(/\{pi\}/g, piCmd)
-                      : `${piCmd} --session ${contextMenu.session.path}`
-                    const isTmuxSetup = cmd.includes('new-session') && !hasPlaceholders
-                    if (isTmuxSetup) {
-                      const sessionSuffix = contextMenu.session.id
-                        ? contextMenu.session.id.slice(0, 4)
-                        : 'pi'
-                      const sessionName = `pi-${sessionSuffix}`
-                      fullCommand = `${fullCommand} 'cd ${contextMenu.session.cwd || ''} && ${piCmd} --session ${contextMenu.session.path}'`
-                      fullCommand = fullCommand.replace(/-s\\s+pi\\b/, `-s ${sessionName}`)
-                    }
-                    copyText(fullCommand).catch(console.error)
-                    return
-                  }
-
-                  const result = await invoke<import('@/types').SessionConvertResult>(
-                    'convert_session_format',
-                    {
-                      path: contextMenu.session.path,
-                      targetFormat: defaultTarget,
-                      dryRun: true,
-                      force: false,
-                    },
-                  )
-                  copyText(result.resume_command).catch(console.error)
+                  await onCopyResumeSession(contextMenu.session)
                 }
               : isTauri()
               ? () => {
-                  const settings = getCachedSettings()
-                  const cmd = settings.terminal?.resumeCommand || propResumeCommand || ''
-                  const piCmd = settings.terminal?.piCommandPath || propPiPath || 'pi'
-                  const hasPlaceholders = cmd.includes('{path}') || cmd.includes('{pi}')
-                  let fullCommand = cmd
-                    ? cmd.replace(/\{cwd\}/g, contextMenu.session.cwd || '').replace(/\{path\}/g, contextMenu.session.path).replace(/\{pi\}/g, piCmd)
-                    : `${piCmd} --session ${contextMenu.session.path}`
-                  // tmux setup command without placeholders → append pi --session in quotes
-                  const isTmuxSetup = cmd.includes('new-session') && !hasPlaceholders
-                  if (isTmuxSetup) {
-                    const sessionSuffix = contextMenu.session.id
-                      ? contextMenu.session.id.slice(0, 4)
-                      : 'pi'
-                    const sessionName = `pi-${sessionSuffix}`
-                    fullCommand = `${fullCommand} 'cd ${contextMenu.session.cwd || ''} && ${piCmd} --session ${contextMenu.session.path}'`
-                    // Replace the hardcoded -s pi in user's command
-                    fullCommand = fullCommand.replace(/-s\s+pi\b/, `-s ${sessionName}`)
-                  }
-                  copyText(fullCommand).catch(console.error)
+                  void buildCopyResumeCommand(contextMenu.session, {
+                    piPath: propPiPath,
+                    resumeCommand: propResumeCommand,
+                  }).then((command) => copyText(command).catch(console.error))
                 }
               : undefined
           }

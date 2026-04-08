@@ -222,16 +222,19 @@ export const settings = {
   externalSessions: {
     title: "其他外部 Session",
     description: "控制是否扫描并显示其他已支持编码 Agent 的本地会话。",
+    enabledProviders: "启用的外部 Provider",
+    enabledProvidersHelp: "打开后会扫描并展示这些 provider 的本地会话。",
     providerEnabledHelp: "显示并扫描该外部 provider 的会话。",
     showAgentIconInSessionBadge: "在 SessionBadge 显示 agent 图标",
     showAgentIconInSessionBadgeHelp:
       "在 session 卡片的来源徽章旁显示 provider 图标。",
-    externalResumePromptEnabled: "外部会话 Resume 前先询问",
-    externalResumePromptEnabledHelp:
-      "打开非 Pi 会话时，先弹窗选择目标 CLI，再执行 resume。",
     defaultExternalResumeTarget: "默认外部 Resume 目标",
     defaultExternalResumeTargetHelp:
       "关闭询问弹窗后，非 Pi 会话会直接 Resume 到这个目标 CLI。",
+    resumeTargetSelectionHelp:
+      "单项勾选。取消当前选择后，打开非 Pi 会话时会先弹出目标选择窗口。",
+    resumePromptFallback:
+      "当前未选择默认目标。打开非 Pi 会话时会先弹窗询问要 Resume 到哪个 CLI。",
   },
   search: {
     defaultSearchMode: "默认搜索模式",

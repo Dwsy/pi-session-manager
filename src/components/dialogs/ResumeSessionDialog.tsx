@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Play, X } from "lucide-react";
+import { CheckCircle2, Circle, Play, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { AgentIcon } from "@/components/session-viewer/AgentIcon";
 import type {
   SessionConvertTarget,
   SessionInfo,
@@ -14,6 +15,7 @@ import { listSupportedSessionProviders } from "@/utils/sessionProvidersApi";
 interface ResumeSessionDialogProps {
   session: SessionInfo;
   defaultTarget: SessionConvertTarget;
+  mode?: "resume" | "copy";
   onResume: (target: SessionConvertTarget) => Promise<void> | void;
   onClose: () => void;
 }
@@ -21,6 +23,7 @@ interface ResumeSessionDialogProps {
 export default function ResumeSessionDialog({
   session,
   defaultTarget,
+  mode = "resume",
   onResume,
   onClose,
 }: ResumeSessionDialogProps) {
@@ -38,7 +41,13 @@ export default function ResumeSessionDialog({
     let cancelled = false;
     listSupportedSessionProviders().then((items) => {
       if (cancelled) return;
-      const targets = items.filter((item) => item.capabilities.canConvertTarget);
+      const targets = items
+        .filter((item) => item.capabilities.canConvertTarget)
+        .sort((a, b) => {
+          if (a.slug === "pi") return -1;
+          if (b.slug === "pi") return 1;
+          return a.display_name.localeCompare(b.display_name);
+        });
       setProviders(targets);
       if (!targets.some((item) => item.slug === defaultTarget) && targets[0]) {
         setTarget(targets[0].slug);
@@ -73,7 +82,12 @@ export default function ResumeSessionDialog({
           <div className="flex items-center gap-2">
             <Play className="h-5 w-5 text-primary" />
             <h3 className="text-lg font-semibold">
-              {t("session.resumeDialog.title", "Resume in another CLI")}
+              {mode === "copy"
+                ? t(
+                    "session.resumeDialog.copyTitle",
+                    "Choose a CLI for copy resume",
+                  )
+                : t("session.resumeDialog.title", "Resume in another CLI")}
             </h3>
           </div>
           <button
@@ -100,16 +114,34 @@ export default function ResumeSessionDialog({
               key={option.slug}
               type="button"
               onClick={() => setTarget(option.slug)}
-              className={`w-full rounded-lg border px-4 py-3 text-left transition-all ${
+              className={`flex w-full items-start justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-all ${
                 target === option.slug
                   ? "border-primary/40 bg-primary/10"
                   : "border-border/60 bg-secondary/20 hover:bg-secondary/50"
               }`}
             >
-              <div className="font-medium">{option.display_name}</div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {t(`session.convert.targetDescriptions.${option.slug}`)}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 font-medium">
+                  <AgentIcon source={option.slug} size={16} />
+                  <span className="truncate">{option.display_name}</span>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {t(`session.convert.targetDescriptions.${option.slug}`)}
+                </div>
               </div>
+              <span
+                className={`mt-0.5 shrink-0 ${
+                  target === option.slug
+                    ? "text-primary"
+                    : "text-muted-foreground/70"
+                }`}
+              >
+                {target === option.slug ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <Circle className="h-4 w-4" />
+                )}
+              </span>
             </button>
           ))}
         </div>
@@ -131,7 +163,9 @@ export default function ResumeSessionDialog({
             <Play className="h-4 w-4" />
             {submitting
               ? t("common.loading")
-              : t("session.resume", "Resume")}
+              : mode === "copy"
+                ? t("common.copy", "Copy")
+                : t("session.resume", "Resume")}
           </button>
         </div>
       </div>

@@ -30,6 +30,7 @@ export interface AppOverlaysProps {
   showExportDialog: boolean;
   showConvertDialog: boolean;
   showResumeDialog: boolean;
+  resumeDialogMode?: "resume" | "copy";
   convertResult: SessionConvertResult | null;
   showRenameDialog: boolean;
   showForkDialog: boolean;
@@ -65,6 +66,7 @@ function AppOverlays({
   showExportDialog,
   showConvertDialog,
   showResumeDialog,
+  resumeDialogMode = "resume",
   convertResult,
   showRenameDialog,
   showForkDialog,
@@ -112,6 +114,7 @@ function AppOverlays({
         <ResumeSessionDialog
           session={selectedSession}
           defaultTarget={resumeDefaultTarget}
+          mode={resumeDialogMode}
           onResume={onResumeToTarget}
           onClose={onCloseResumeDialog}
         />

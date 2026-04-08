@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { invoke, isTauri } from '@/transport'
+import { isTauri } from '@/transport'
 import { Terminal, Loader2 } from 'lucide-react'
 import type { SessionInfo } from '@/types'
 import type { TerminalType } from './settings/types'
-import { getPlatformDefaults } from './settings/types'
-import { getCachedSettings } from '@/utils/settingsApi'
+import { openSessionInTerminalDirect } from '@/utils/sessionResume'
 
 interface OpenInTerminalButtonProps {
   session: SessionInfo
@@ -46,43 +45,6 @@ export default function OpenInTerminalButton({
 }: OpenInTerminalButtonProps) {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
-
-  // Get latest settings from cache (fallback to props)
-  const getTerminal = () => {
-    try {
-      const settings = getCachedSettings()
-      return settings.terminal?.defaultTerminal || propTerminal || getPlatformDefaults().defaultTerminal
-    } catch {
-      return propTerminal || getPlatformDefaults().defaultTerminal
-    }
-  }
-
-  const getPiPath = () => {
-    try {
-      const settings = getCachedSettings()
-      return settings.terminal?.piCommandPath || propPiPath || 'pi'
-    } catch {
-      return propPiPath || 'pi'
-    }
-  }
-
-  const getCustomCommand = () => {
-    try {
-      const settings = getCachedSettings()
-      return settings.terminal?.customTerminalCommand || propCustomCommand || ''
-    } catch {
-      return propCustomCommand || ''
-    }
-  }
-
-  const getResumeCommand = () => {
-    try {
-      const settings = getCachedSettings()
-      return settings.terminal?.resumeCommand || propResumeCommand || ''
-    } catch {
-      return propResumeCommand || ''
-    }
-  }
 
   const sizeClasses = {
     sm: 'p-1.5',
@@ -131,17 +93,11 @@ export default function OpenInTerminalButton({
 
     setLoading(true)
     try {
-      const terminal = getTerminal()
-      const customCommand = getCustomCommand()
-      const piPath = getPiPath()
-      const resumeCommand = getResumeCommand()
-
-      await invoke('open_session_in_terminal', {
-        path: session.path,
-        cwd: session.cwd,
-        terminal: terminal === 'custom' ? customCommand : terminal,
-        piPath: piPath || null,
-        resumeCommand: resumeCommand || null,
+      await openSessionInTerminalDirect(session, {
+        terminal: propTerminal,
+        customCommand: propCustomCommand,
+        piPath: propPiPath,
+        resumeCommand: propResumeCommand,
       })
       onSuccess?.()
     } catch (err) {
