@@ -30,6 +30,7 @@ import type { SessionConvertTarget, SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
 import { invoke, isTauri } from "./transport";
 import { getCachedSettings } from "./utils/settingsApi";
+import { getSessionSourceSlug } from "./utils/session";
 import { shouldSkipOnboardingForRuntime } from "./runtime-data/mode";
 import AppMobileLayout, {
   type MobileTab,
@@ -187,6 +188,7 @@ function App() {
   >([]);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
+  const [showResumeDialog, setShowResumeDialog] = useState(false);
   const [convertResult, setConvertResult] = useState<
     import("./types").SessionConvertResult | null
   >(null);
@@ -293,25 +295,85 @@ function App() {
     [piPath],
   );
 
+  const openResumeCommandInTerminal = useCallback(
+    async (path: string, cwd: string, commandOverride?: string | null) => {
+      if (!isTauri()) {
+        setTerminalPendingCommand(commandOverride || "");
+        setShowTerminal(true);
+        return;
+      }
+      try {
+        await invoke("open_session_in_terminal", {
+          path,
+          cwd,
+          terminal: terminal === "custom" ? customCommand : terminal,
+          piPath: piPath || null,
+          resumeCommand: commandOverride || resumeCommand || null,
+        });
+      } catch (err) {
+        console.error("Failed to resume session:", err);
+        throw err;
+      }
+    },
+    [terminal, customCommand, piPath, resumeCommand],
+  );
+
+  const handleResumeSessionWithTarget = useCallback(
+    async (session: SessionInfo, target: SessionConvertTarget) => {
+      const sourceSlug = getSessionSourceSlug(session.path);
+      if (!sourceSlug || sourceSlug === "pi") {
+        const command = isTauri() ? null : buildResumeCommand(session);
+        await openResumeCommandInTerminal(session.path, session.cwd, command);
+        return;
+      }
+
+      const result = await invoke<import("./types").SessionConvertResult>(
+        "convert_session_format",
+        {
+          path: session.path,
+          targetFormat: target,
+          dryRun: false,
+          force: false,
+        },
+      );
+      const writtenPath = result.written_paths[0] || session.path;
+      await openResumeCommandInTerminal(
+        writtenPath,
+        session.cwd,
+        result.resume_command || null,
+      );
+    },
+    [buildResumeCommand, openResumeCommandInTerminal],
+  );
+
+  const requestResumeSession = useCallback(
+    async (session: SessionInfo) => {
+      const sourceSlug = getSessionSourceSlug(session.path);
+      if (!sourceSlug || sourceSlug === "pi") {
+        await handleResumeSessionWithTarget(session, "pi");
+        return;
+      }
+
+      const settings = getCachedSettings();
+      const defaultTarget =
+        settings.session?.defaultExternalResumeTarget || "pi";
+      const promptEnabled =
+        settings.session?.externalResumePromptEnabled !== false;
+
+      setSelectedSession(session);
+      if (promptEnabled) {
+        setShowResumeDialog(true);
+        return;
+      }
+      await handleResumeSessionWithTarget(session, defaultTarget);
+    },
+    [handleResumeSessionWithTarget],
+  );
+
   const handleResumeSession = useCallback(async () => {
     if (!selectedSession) return;
-    if (!isTauri()) {
-      setTerminalPendingCommand(buildResumeCommand(selectedSession));
-      setShowTerminal(true);
-      return;
-    }
-    try {
-      await invoke("open_session_in_terminal", {
-        path: selectedSession.path,
-        cwd: selectedSession.cwd,
-        terminal: terminal === "custom" ? customCommand : terminal,
-        piPath: piPath || null,
-        resumeCommand: resumeCommand || null,
-      });
-    } catch (err) {
-      console.error("Failed to resume session:", err);
-    }
-  }, [selectedSession, terminal, customCommand, piPath, buildResumeCommand]);
+    await requestResumeSession(selectedSession);
+  }, [selectedSession, requestResumeSession]);
 
   const handleExportAndOpen = useCallback(async () => {
     if (!selectedSession || !isTauri()) return;
@@ -326,6 +388,7 @@ function App() {
     showSettings ||
     showExportDialog ||
     showConvertDialog ||
+    showResumeDialog ||
     !!convertResult ||
     showRenameDialog ||
     showForkDialog ||
@@ -369,6 +432,8 @@ function App() {
           setShowExportDialog(false);
         } else if (showConvertDialog) {
           setShowConvertDialog(false);
+        } else if (showResumeDialog) {
+          setShowResumeDialog(false);
         } else if (convertResult) {
           setConvertResult(null);
         } else if (showRenameDialog) {
@@ -392,6 +457,7 @@ function App() {
       showSettings,
       showExportDialog,
       showConvertDialog,
+      showResumeDialog,
       convertResult,
       showRenameDialog,
       showForkDialog,
@@ -470,6 +536,7 @@ function App() {
       setSelectedSession(session);
       setShowConvertDialog(true);
     },
+    onResumeSession: requestResumeSession,
     getBadgeType,
     terminal,
     piPath,
@@ -518,6 +585,12 @@ function App() {
       setConvertResult(result);
     }
     setShowConvertDialog(false);
+  };
+
+  const onResumeToTarget = async (target: SessionConvertTarget) => {
+    if (!selectedSession) return;
+    await handleResumeSessionWithTarget(selectedSession, target);
+    setShowResumeDialog(false);
   };
 
   const handleStartConvertSession = useCallback((session: SessionInfo) => {
@@ -649,6 +722,7 @@ function App() {
       onToggleTag={handleToggleSessionTag}
       onDeleteSession={handleDeleteSession}
       onConvertSession={handleStartConvertSession}
+      onResumeSession={requestResumeSession}
       favorites={favorites}
       onToggleFavorite={toggleFavorite}
       terminal={terminal}
@@ -732,6 +806,7 @@ function App() {
     <AppOverlays
       showExportDialog={showExportDialog}
       showConvertDialog={showConvertDialog}
+      showResumeDialog={showResumeDialog}
       convertResult={convertResult}
       showRenameDialog={showRenameDialog}
       showForkDialog={showForkDialog}
@@ -741,10 +816,12 @@ function App() {
       commandContext={commandContext}
       onExportSession={onExportSession}
       onConvertSession={onConvertSession}
+      onResumeToTarget={onResumeToTarget}
       onRenameSession={onRenameSession}
       onForkSession={onForkSession}
       onCloseExportDialog={() => setShowExportDialog(false)}
       onCloseConvertDialog={() => setShowConvertDialog(false)}
+      onCloseResumeDialog={() => setShowResumeDialog(false)}
       onCloseConvertResultDialog={() => setConvertResult(null)}
       onCloseRenameDialog={() => setShowRenameDialog(false)}
       onCloseForkDialog={() => setShowForkDialog(false)}
@@ -759,6 +836,9 @@ function App() {
       onOpenConvertedPath={handleOpenConvertedPath}
       onRunConvertedResume={handleRunConvertedResume}
       onConvertAgain={handleConvertAgain}
+      resumeDefaultTarget={
+        getCachedSettings().session?.defaultExternalResumeTarget || "pi"
+      }
       SettingsPanel={SettingsPanel}
       CommandPalette={CommandPalette}
     />

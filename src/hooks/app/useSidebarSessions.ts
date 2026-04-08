@@ -34,6 +34,7 @@ export interface UseSidebarSessionsOptions {
   onDeleteSession: (session: SessionInfo) => void | Promise<void>;
   onDeleteSessions: (sessions: SessionInfo[]) => void | Promise<void>;
   onConvertSession: (session: SessionInfo) => void | Promise<void>;
+  onResumeSession: (session: SessionInfo) => void | Promise<void>;
   getBadgeType: (sessionId: string) => "new" | "updated" | null;
   terminal: TerminalType;
   piPath: string;
@@ -91,6 +92,7 @@ export function useSidebarSessions({
   onDeleteSession,
   onDeleteSessions,
   onConvertSession,
+  onResumeSession,
   getBadgeType,
   terminal,
   piPath,
@@ -241,6 +243,7 @@ export function useSidebarSessions({
       onDeleteSession,
       onDeleteSessions,
       onConvertSession,
+      onResumeSession,
       loading,
       getBadgeType,
       terminal,
@@ -263,6 +266,7 @@ export function useSidebarSessions({
       onDeleteSession,
       onDeleteSessions,
       onConvertSession,
+      onResumeSession,
       loading,
       getBadgeType,
       terminal,

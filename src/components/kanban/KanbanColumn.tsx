@@ -12,6 +12,7 @@ import { invoke, isTauri } from '@/transport'
 import { getCachedSettings } from '@/utils/settingsApi'
 import { getPlatformDefaults } from '@/components/settings/types'
 import { useClipboard } from '@/hooks/useClipboard'
+import { getSessionSourceSlug } from '@/utils/session'
 
 interface KanbanColumnProps {
   id: string
@@ -25,6 +26,7 @@ interface KanbanColumnProps {
   onToggleFavorite: (item: Omit<FavoriteItem, 'addedAt'>) => void
   onToggleTag: (sessionId: string, tagId: string, assigned: boolean) => void
   onDeleteSession?: (session: SessionInfo) => void
+  onResumeSession?: (session: SessionInfo) => void | Promise<void>
   terminal?: string
   piPath?: string
   customCommand?: string
@@ -49,6 +51,7 @@ export default function KanbanColumn({
   onToggleFavorite,
   onToggleTag,
   onDeleteSession,
+  onResumeSession,
   terminal: propTerminal,
   piPath: propPiPath,
   customCommand: propCustomCommand,
@@ -228,6 +231,10 @@ export default function KanbanColumn({
           position={contextMenu.position}
           onClose={() => setContextMenu(null)}
           onOpenInTerminal={async () => {
+            if (onResumeSession) {
+              await onResumeSession(contextMenu.session)
+              return
+            }
             if (!isTauri()) return
             try {
               const settings = getCachedSettings()
@@ -266,7 +273,45 @@ export default function KanbanColumn({
             onToggleTag(contextMenu.session.id, tagId, assigned)
           }}
           onCopyResume={
-            isTauri()
+            onResumeSession
+              ? async () => {
+                  const sourceSlug = getSessionSourceSlug(contextMenu.session.path)
+                  const settings = getCachedSettings()
+                  const defaultTarget =
+                    settings.session?.defaultExternalResumeTarget || 'pi'
+
+                  if (!sourceSlug || sourceSlug === 'pi') {
+                    const cmd = settings.terminal?.resumeCommand || propResumeCommand || ''
+                    const piCmd = settings.terminal?.piCommandPath || propPiPath || 'pi'
+                    const hasPlaceholders = cmd.includes('{path}') || cmd.includes('{pi}')
+                    let fullCommand = cmd
+                      ? cmd.replace(/\{cwd\}/g, contextMenu.session.cwd || '').replace(/\{path\}/g, contextMenu.session.path).replace(/\{pi\}/g, piCmd)
+                      : `${piCmd} --session ${contextMenu.session.path}`
+                    const isTmuxSetup = cmd.includes('new-session') && !hasPlaceholders
+                    if (isTmuxSetup) {
+                      const sessionSuffix = contextMenu.session.id
+                        ? contextMenu.session.id.slice(0, 4)
+                        : 'pi'
+                      const sessionName = `pi-${sessionSuffix}`
+                      fullCommand = `${fullCommand} 'cd ${contextMenu.session.cwd || ''} && ${piCmd} --session ${contextMenu.session.path}'`
+                      fullCommand = fullCommand.replace(/-s\\s+pi\\b/, `-s ${sessionName}`)
+                    }
+                    copyText(fullCommand).catch(console.error)
+                    return
+                  }
+
+                  const result = await invoke<import('@/types').SessionConvertResult>(
+                    'convert_session_format',
+                    {
+                      path: contextMenu.session.path,
+                      targetFormat: defaultTarget,
+                      dryRun: true,
+                      force: false,
+                    },
+                  )
+                  copyText(result.resume_command).catch(console.error)
+                }
+              : isTauri()
               ? () => {
                   const settings = getCachedSettings()
                   const cmd = settings.terminal?.resumeCommand || propResumeCommand || ''

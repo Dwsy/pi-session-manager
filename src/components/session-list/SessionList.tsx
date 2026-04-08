@@ -1048,7 +1048,11 @@ export default function SessionList({
             onToggleTag(contextMenu.sessionId, tagId, assigned)
           }
           onOpenTerminal={
-            isTauri()
+            onResumeSession
+              ? () => {
+                  void onResumeSession(contextMenuSession);
+                }
+              : isTauri()
               ? () => {
                   invoke("open_session_in_terminal", {
                     path: contextMenuSession.path,
@@ -1092,7 +1096,48 @@ export default function SessionList({
               : undefined
           }
           onCopyResume={
-            isTauri()
+            onResumeSession
+              ? async () => {
+                  const sourceSlug = getSessionSourceSlug(contextMenuSession.path);
+                  const settings = getCachedSettings();
+                  const defaultTarget =
+                    settings.session?.defaultExternalResumeTarget || "pi";
+                  if (!sourceSlug || sourceSlug === "pi") {
+                    const cmd =
+                      settings.terminal?.resumeCommand || resumeCommand || "";
+                    const piCmd =
+                      settings.terminal?.piCommandPath || piPath || "pi";
+                    const hasPlaceholders =
+                      cmd.includes("{path}") || cmd.includes("{pi}");
+                    let fullCommand = cmd
+                      ? cmd
+                          .replace(/\{cwd\}/g, contextMenuSession.cwd || "")
+                          .replace(/\{path\}/g, contextMenuSession.path)
+                          .replace(/\{pi\}/g, piCmd)
+                      : `${piCmd} --session ${contextMenuSession.path}`;
+                    if (cmd.includes("new-session") && !hasPlaceholders) {
+                      const sessionSuffix = contextMenuSession.id
+                        ? contextMenuSession.id.slice(0, 4)
+                        : "pi";
+                      const sessionName = `pi-${sessionSuffix}`;
+                      fullCommand = `/opt/homebrew/bin/tmux new-session -A -s ${sessionName} 'cd ${contextMenuSession.cwd || ""} && ${piCmd} --session ${contextMenuSession.path}'`;
+                    }
+                    copyText(fullCommand).catch(console.error);
+                    return;
+                  }
+
+                  const result = await invoke<import("@/types").SessionConvertResult>(
+                    "convert_session_format",
+                    {
+                      path: contextMenuSession.path,
+                      targetFormat: defaultTarget,
+                      dryRun: true,
+                      force: false,
+                    },
+                  );
+                  copyText(result.resume_command).catch(console.error);
+                }
+              : isTauri()
               ? () => {
                   const settings = getCachedSettings();
                   const cmd =

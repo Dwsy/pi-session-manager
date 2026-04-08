@@ -44,6 +44,7 @@ export function getPlatformDefaults(): {
 }
 
 import { defaultPiLiveSettings, type PiLiveSettings } from "@/types/pi-live";
+import type { SessionConvertTarget } from "@/types";
 
 export interface AppSettings {
   piLive: PiLiveSettings;

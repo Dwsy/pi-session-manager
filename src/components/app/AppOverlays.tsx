@@ -56,6 +56,7 @@ export interface AppOverlaysProps {
   onOpenConvertedPath: (path: string) => Promise<void> | void;
   onRunConvertedResume: (command: string) => Promise<void> | void;
   onConvertAgain: () => void;
+  resumeDefaultTarget: SessionConvertTarget;
   SettingsPanel: LazyExoticComponent<ComponentType<SettingsPanelOverlayProps>>;
   CommandPalette: LazyExoticComponent<ComponentType<CommandPaletteOverlayProps>>;
 }
@@ -87,6 +88,7 @@ function AppOverlays({
   onOpenConvertedPath,
   onRunConvertedResume,
   onConvertAgain,
+  resumeDefaultTarget,
   SettingsPanel,
   CommandPalette,
 }: AppOverlaysProps) {
@@ -109,7 +111,7 @@ function AppOverlays({
       {showResumeDialog && selectedSession && (
         <ResumeSessionDialog
           session={selectedSession}
-          defaultTarget="pi"
+          defaultTarget={resumeDefaultTarget}
           onResume={onResumeToTarget}
           onClose={onCloseResumeDialog}
         />
