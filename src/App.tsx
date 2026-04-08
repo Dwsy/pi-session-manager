@@ -6,6 +6,7 @@ import { useSwipe } from "./hooks/useSwipe";
 import { triggerHaptic } from "./utils/haptics";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useSessionBadges } from "./hooks/useSessionBadges";
+import { listSupportedSessionProviders } from "./utils/sessionProvidersApi";
 import { useSessions } from "./hooks/useSessions";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useSessionActions } from "./hooks/useSessionActions";
@@ -169,7 +170,21 @@ function App() {
     },
   );
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
+  const [sourceFilterSlugs, setSourceFilterSlugs] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("psm-source-filter-slugs");
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  });
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
+  const [sourceOptions, setSourceOptions] = useState<
+    Array<{ slug: string; label: string }>
+  >([]);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const [convertResult, setConvertResult] = useState<
@@ -215,6 +230,21 @@ function App() {
   const handleBuiltinTerminalDisabled = useCallback(() => {
     setShowTerminal(false);
   }, []);
+  useEffect(() => {
+    void listSupportedSessionProviders().then((items) => {
+      setSourceOptions(
+        items.map((item) => ({ slug: item.slug, label: item.display_name })),
+      );
+    });
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "psm-source-filter-slugs",
+        JSON.stringify(sourceFilterSlugs),
+      );
+    } catch {}
+  }, [sourceFilterSlugs]);
   const { isInitialized, terminalConfig, reloadTerminalConfig } =
     useAppBootstrap({
       loadSessions,
@@ -430,6 +460,7 @@ function App() {
     showFavorites,
     sidebarSearchQuery,
     filterTagIds,
+    sourceFilterSlugs,
     sessionTags,
     getDescendantIds,
     onSelectSession: handleSelectSession,
@@ -529,6 +560,9 @@ function App() {
       sessionTags={sessionTags}
       filterTagIds={filterTagIds}
       onFilterChange={setFilterTagIds}
+      sourceOptions={sourceOptions}
+      selectedSourceSlugs={sourceFilterSlugs}
+      onSourceFilterChange={setSourceFilterSlugs}
       onCreateTag={(name, color, parentId) => {
         void createTag(name, color, undefined, parentId);
       }}
@@ -624,8 +658,10 @@ function App() {
       onCreateTag={createTag}
       projectFilter={selectedProject}
       filterTagIds={filterTagIds}
+      sourceFilterSlugs={sourceFilterSlugs}
       onFilterChange={setFilterTagIds}
       getDescendantIds={getDescendantIds}
+      liveSessionIds={liveSessionIds}
     />
   );
 
@@ -787,6 +823,9 @@ function App() {
       sessionTags={sessionTags}
       filterTagIds={filterTagIds}
       onFilterChange={setFilterTagIds}
+      sourceOptions={sourceOptions}
+      selectedSourceSlugs={sourceFilterSlugs}
+      onSourceFilterChange={setSourceFilterSlugs}
       onCreateTag={(name, color, parentId) => {
         void createTag(name, color, undefined, parentId);
       }}
@@ -832,6 +871,7 @@ function App() {
       onDeleteSession={handleDeleteSession}
       onRemoveFavorite={removeFavorite}
       onToggleFavorite={toggleFavorite}
+      liveSessionIds={liveSessionIds}
     />
   );
 

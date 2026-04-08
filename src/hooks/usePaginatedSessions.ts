@@ -242,42 +242,35 @@ export function usePaginatedSessions({
 
         let finalSessions = response.sessions;
         if (offset === 0 && live.length > 0) {
-          const liveMap = new Map(live.map((l) => [l.sessionId, l]));
-          const visitedLiveIds = new Set<string>();
+          // Build a flexible lookup map: index by sessionId, UUID portion, and path basename
+          const liveByFlexibleKey = new Map<string, any>();
+          for (const l of live) {
+            // Index by full sessionId
+            liveByFlexibleKey.set(l.sessionId, l);
+            // Index by UUID extracted from sessionId
+            const uuidMatch = l.sessionId.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+            if (uuidMatch) {
+              liveByFlexibleKey.set(uuidMatch[0], l);
+            }
+            // Index by path basename (without directory and extension)
+            if (l.sessionPath) {
+              const basename = l.sessionPath.split('/').pop()?.replace(/\.jsonl$/, '');
+              if (basename) {
+                liveByFlexibleKey.set(basename, l);
+              }
+            }
+          }
 
-          const mergedScanned = response.sessions.map((s) => {
-            const liveInfo = liveMap.get(s.id);
+          finalSessions = response.sessions.map((s) => {
+            // Try matching by id, UUID, or path basename
+            const liveInfo =
+              liveByFlexibleKey.get(s.id) ||
+              liveByFlexibleKey.get(s.path.split('/').pop()?.replace(/\.jsonl$/, '') || '');
             if (liveInfo) {
-              visitedLiveIds.add(s.id);
               return { ...s, isLive: true, pid: liveInfo.pid };
             }
             return s;
           });
-
-          const newLive = live
-            .filter((l) => !visitedLiveIds.has(l.sessionId))
-            .map(
-              (l) =>
-                ({
-                  id: l.sessionId,
-                  path: l.sessionPath || l.sessionId,
-                  name: l.sessionId,
-                  modified: l.lastSeen,
-                  message_count: l.entryCount,
-                  last_message: "",
-                  last_message_role: "assistant",
-                  isLive: true,
-                  pid: l.pid,
-                  cwd: l.cwd || "",
-                  first_message: "",
-                }) as SessionInfo,
-            );
-
-          finalSessions = [...newLive, ...mergedScanned];
-          // Re-sort if we added new items to ensure temporal order
-          if (newLive.length > 0) {
-            finalSessions.sort((a, b) => b.modified.localeCompare(a.modified));
-          }
         }
 
         setSessions((prev) =>

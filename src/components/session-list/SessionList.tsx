@@ -31,6 +31,7 @@ import DeleteSessionPopover from "@/components/dialogs/DeleteSessionPopover";
 import {
   formatShortSessionId,
   MIN_SESSION_ID_PREFIX_LENGTH,
+  getSessionSourceSlug,
   getSessionSourceTag,
 } from "@/utils/session";
 import { formatDirectory, formatShortTime } from "@/utils/sessionDisplay";
@@ -41,6 +42,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { isTextEntryTarget } from "@/hooks/useKeyboardShortcuts";
 import { useClipboard } from "@/hooks/useClipboard";
 import { getCachedSettings } from "@/utils/settingsApi";
+import { useSettings } from "@/hooks/useSettings";
 
 const ESTIMATED_ROW_HEIGHT = 122;
 const STICKY_SCROLL_TOP_THRESHOLD = 48;
@@ -109,8 +111,11 @@ export default function SessionList({
   liveSessionIds,
 }: SessionListProps) {
   const { t } = useTranslation();
+  const { getSessionSetting } = useSettings();
   const isMobile = useIsMobile();
   const { copyText } = useClipboard();
+  const showAgentIconInBadge =
+    getSessionSetting("showAgentIconInSessionBadge") !== false;
   const listContainerRef = useRef<HTMLDivElement>(null);
   const [columnCount, setColumnCount] = useState(1);
   const [tagPickerSessionId, setTagPickerSessionId] = useState<string | null>(
@@ -695,6 +700,7 @@ export default function SessionList({
                       session.last_message ||
                       (session.first_message && !session.name);
                     const sourceTag = getSessionSourceTag(session.path);
+                    const sourceSlug = getSessionSourceSlug(session.path);
                     const sessionTags = getTagsForSession
                       ? getTagsForSession(session.id)
                       : [];
@@ -780,7 +786,8 @@ export default function SessionList({
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                  {(liveSessionIds?.has(session.id) || session.isLive) && (
+                                  {(liveSessionIds?.has(session.id) ||
+                                    session.isLive) && (
                                     <div
                                       className="flex items-center justify-center bg-green-500/15 p-0.5 rounded flex-shrink-0"
                                       title={t("session.online", "Online")}
@@ -837,10 +844,6 @@ export default function SessionList({
 
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                            <span className="px-1.5 py-0.5 rounded bg-muted/40 text-[9px] sm:text-[10px] tabular-nums font-medium text-muted-foreground flex-shrink-0">
-                              {session.message_count}
-                            </span>
-
                             {liveSessionIds?.has(session.id) && (
                               <span
                                 className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0"
@@ -852,9 +855,14 @@ export default function SessionList({
                               <SessionBadge
                                 label={sourceTag}
                                 tone="source"
+                                sourceSlug={sourceSlug || undefined}
+                                showIcon={showAgentIconInBadge}
                                 className="text-[9px] sm:text-[10px]"
                               />
                             )}
+                            <span className="px-1.5 py-0.5  text-[9px] sm:text-[10px] tabular-nums font-medium text-muted-foreground flex-shrink-0">
+                              {session.message_count}
+                            </span>
 
                             {sessionTags.length > 0 && (
                               <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -1088,7 +1096,8 @@ export default function SessionList({
                     settings.terminal?.resumeCommand || resumeCommand || "";
                   const piCmd =
                     settings.terminal?.piCommandPath || piPath || "pi";
-                  const hasPlaceholders = cmd.includes("{path}") || cmd.includes("{pi}");
+                  const hasPlaceholders =
+                    cmd.includes("{path}") || cmd.includes("{pi}");
                   let fullCommand = cmd
                     ? cmd
                         .replace(/\{cwd\}/g, contextMenuSession.cwd || "")

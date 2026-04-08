@@ -4,6 +4,8 @@ import type { SessionInfo, FavoriteItem } from '@/types'
 import { SessionBadge } from './session-viewer/SessionBadge'
 import { FavoritesSkeleton } from './ui/Skeleton'
 import { getPathBasename } from '@/utils/path'
+import { getSessionSourceSlug, getSessionSourceTag } from '@/utils/session'
+import { useSettings } from '@/hooks/useSettings'
 
 interface FavoritesPanelProps {
   sessions: SessionInfo[]
@@ -27,6 +29,9 @@ export default function FavoritesPanel({
   loading = false,
 }: FavoritesPanelProps) {
   const { t } = useTranslation()
+  const { getSessionSetting } = useSettings()
+  const showAgentIconInBadge =
+    getSessionSetting('showAgentIconInSessionBadge') !== false
 
   const favoriteSessions = favorites.filter(f => f.type === 'session')
   const favoriteProjects = favorites.filter(f => f.type === 'project')
@@ -93,6 +98,8 @@ export default function FavoritesPanel({
 
             const badgeType = getBadgeType?.(session.id)
             const isSelected = selectedSession?.id === session.id
+            const sourceTag = getSessionSourceTag(session.path)
+            const sourceSlug = getSessionSourceSlug(session.path)
 
             return (
               <div
@@ -106,6 +113,14 @@ export default function FavoritesPanel({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm truncate">{session.name || t('common.untitled')}</span>
+                      {sourceTag && (
+                        <SessionBadge
+                          label={sourceTag}
+                          tone="source"
+                          sourceSlug={sourceSlug || undefined}
+                          showIcon={showAgentIconInBadge}
+                        />
+                      )}
                       {badgeType && <SessionBadge type={badgeType} />}
                     </div>
                     <div className="text-xs text-muted-foreground truncate mt-0.5">
