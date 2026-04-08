@@ -42,8 +42,10 @@ interface KanbanBoardProps {
   onCreateTag?: (name: string, color: string) => void
   projectFilter?: string | null // null = all projects
   filterTagIds?: string[]
+  sourceFilterSlugs?: string[]
   onFilterChange?: (tagIds: string[]) => void
   getDescendantIds?: (tagId: string) => string[]
+  liveSessionIds?: Set<string>
 }
 
 interface ColumnData {
@@ -73,8 +75,10 @@ export default function KanbanBoard({
   resumeCommand,
   projectFilter,
   filterTagIds = [],
+  sourceFilterSlugs = [],
   onFilterChange,
   getDescendantIds = () => [],
+  liveSessionIds,
 }: KanbanBoardProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -91,8 +95,9 @@ export default function KanbanBoard({
       sessions,
       projectFilter,
       searchQuery,
+      sourceFilterSlugs,
     })
-  }, [sessions, projectFilter, searchQuery])
+  }, [sessions, projectFilter, searchQuery, sourceFilterSlugs])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -331,6 +336,7 @@ export default function KanbanBoard({
                   onToggleTag={onToggleTag}
                   onDeleteSession={onDeleteSession}
                   isMobile
+                  liveSessionIds={liveSessionIds}
                 />
               )}
             </div>
@@ -353,6 +359,7 @@ export default function KanbanBoard({
                     onToggleFavorite={onToggleFavorite || (() => {})}
                     onToggleTag={onToggleTag}
                     onDeleteSession={onDeleteSession}
+                    liveSessionIds={liveSessionIds}
                   />
                 </div>
               ))}

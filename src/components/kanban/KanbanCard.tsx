@@ -4,6 +4,9 @@ import { CSS } from '@dnd-kit/utilities'
 import { Clock, MessageSquare } from 'lucide-react'
 import type { SessionInfo, Tag } from '@/types'
 import TagBadge from '@/components/tags/TagBadge'
+import { SessionBadge } from '@/components/session-viewer/SessionBadge'
+import { useSettings } from '@/hooks/useSettings'
+import { getSessionSourceSlug, getSessionSourceTag } from '@/utils/session'
 import { getLastPathSegments } from '@/utils/path'
 
 interface KanbanCardProps {
@@ -25,6 +28,7 @@ function KanbanCardInner({
   onSelect,
   onContextMenu,
 }: KanbanCardProps) {
+  const { getSessionSetting } = useSettings()
   const cardRef = useRef<HTMLDivElement>(null)
   const {
     attributes,
@@ -53,6 +57,10 @@ function KanbanCardInner({
 
   // Directory path (last 2 segments)
   const dir = session.cwd ? getLastPathSegments(session.cwd, 2) : ''
+  const sourceTag = getSessionSourceTag(session.path)
+  const sourceSlug = getSessionSourceSlug(session.path)
+  const showAgentIconInBadge =
+    getSessionSetting('showAgentIconInSessionBadge') !== false
 
   const cardClasses = [
     'group relative rounded-md border p-2.5 cursor-pointer motion-surface motion-color',
@@ -104,6 +112,14 @@ function KanbanCardInner({
 
       {/* Meta info */}
       <div className="flex items-center gap-2 text-[9px] text-muted-foreground/60">
+        {sourceTag && (
+          <SessionBadge
+            label={sourceTag}
+            tone="source"
+            sourceSlug={sourceSlug || undefined}
+            showIcon={showAgentIconInBadge}
+          />
+        )}
         <span className="inline-flex items-center gap-0.5">
           <MessageSquare size={9} />
           {session.message_count}

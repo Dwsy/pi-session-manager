@@ -30,6 +30,7 @@ interface KanbanColumnProps {
   customCommand?: string
   resumeCommand?: string
   isMobile?: boolean
+  liveSessionIds?: Set<string>
 }
 
 // Threshold for enabling virtualization
@@ -53,6 +54,7 @@ export default function KanbanColumn({
   customCommand: propCustomCommand,
   resumeCommand: propResumeCommand,
   isMobile,
+  liveSessionIds,
 }: KanbanColumnProps) {
   const { t } = useTranslation()
   const { copyText } = useClipboard()
@@ -81,6 +83,13 @@ export default function KanbanColumn({
 
   const isHex = tag?.color?.startsWith('#')
   const useVirtual = sessions.length > VIRTUALIZATION_THRESHOLD
+
+  const liveCount = useMemo(
+    () => sessions.filter(
+      (s) => s.isLive || (liveSessionIds?.has(s.id) ?? false),
+    ).length,
+    [sessions, liveSessionIds],
+  )
 
   // Virtualizer for large lists
   const virtualizer = useVirtualizer({
@@ -173,6 +182,15 @@ export default function KanbanColumn({
         <span className="text-[10px] text-muted-foreground tabular-nums px-1.5 py-0.5 rounded bg-muted/50">
           {sessions.length}
         </span>
+        {liveCount > 0 && (
+          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-green-500/10 text-green-500">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+            </span>
+            <span className="text-[10px] font-medium tabular-nums">{liveCount}</span>
+          </span>
+        )}
       </div>
       )}
 
