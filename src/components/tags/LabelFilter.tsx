@@ -66,7 +66,7 @@ type MenuPosition = {
   left: number;
   maxHeight: number;
   transform: string;
-  transformOrigin: "top right" | "bottom right";
+  transformOrigin: "top left" | "bottom left";
 };
 
 export default function LabelFilter({
@@ -89,12 +89,14 @@ export default function LabelFilter({
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const createInputRef = useRef<HTMLInputElement>(null);
+  const clickPointRef = useRef<{ x: number; y: number } | null>(null);
+  const [menuReady, setMenuReady] = useState(false);
   const [menuPosition, setMenuPosition] = useState<MenuPosition>({
     top: 0,
     left: 0,
     maxHeight: 360,
     transform: "translateY(0)",
-    transformOrigin: "top right",
+    transformOrigin: "top left",
   });
 
   const activeCount = filterTagIds.length + selectedSourceSlugs.length;
@@ -111,6 +113,7 @@ export default function LabelFilter({
         setFilter("");
         setCreating(false);
         setNewName("");
+        setMenuReady(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -129,6 +132,7 @@ export default function LabelFilter({
         setFilter("");
         setCreating(false);
         setNewName("");
+        setMenuReady(false);
       }
     };
     document.addEventListener("keydown", handler);
@@ -142,47 +146,52 @@ export default function LabelFilter({
   }, [open]);
 
   const updateMenuPosition = useCallback(() => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-
     const viewportPadding = 8;
-    const gap = 6;
+    const gap = 10;
     const menuWidth =
       menuRef.current?.offsetWidth ??
       Math.min(280, Math.max(180, window.innerWidth - viewportPadding * 2));
     const menuHeight = menuRef.current?.offsetHeight ?? 360;
-    const triggerRect = trigger.getBoundingClientRect();
+    const anchor = clickPointRef.current;
+    const fallbackRect = triggerRef.current?.getBoundingClientRect();
+
+    const originX =
+      anchor?.x ?? (fallbackRect ? fallbackRect.right : window.innerWidth / 2);
+    const originY =
+      anchor?.y ?? (fallbackRect ? fallbackRect.bottom : window.innerHeight / 2);
+
     const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2);
     const boundedMenuWidth = Math.min(menuWidth, availableWidth || menuWidth);
-    const spaceBelow =
-      window.innerHeight - triggerRect.bottom - gap - viewportPadding;
-    const spaceAbove = triggerRect.top - gap - viewportPadding;
+    const spaceBelow = window.innerHeight - originY - gap - viewportPadding;
+    const spaceAbove = originY - gap - viewportPadding;
     const openUpward = spaceBelow < menuHeight && spaceAbove > spaceBelow;
     const maxHeight = Math.max(
       120,
       Math.floor(openUpward ? spaceAbove : spaceBelow),
     );
 
-    let left = triggerRect.right - boundedMenuWidth;
+    let left = originX + gap;
     left = Math.max(
       viewportPadding,
       Math.min(left, window.innerWidth - boundedMenuWidth - viewportPadding),
     );
 
-    const top = openUpward ? triggerRect.top - gap : triggerRect.bottom + gap;
+    const top = openUpward ? originY - gap : originY + gap;
 
     setMenuPosition({
       top,
       left,
       maxHeight,
       transform: openUpward ? "translateY(-100%)" : "translateY(0)",
-      transformOrigin: openUpward ? "bottom right" : "top right",
+      transformOrigin: openUpward ? "bottom left" : "top left",
     });
+    setMenuReady(true);
   }, []);
 
   useEffect(() => {
     if (!open) return;
 
+    setMenuReady(false);
     updateMenuPosition();
     const rafId = requestAnimationFrame(updateMenuPosition);
     window.addEventListener("resize", updateMenuPosition);
@@ -311,7 +320,15 @@ export default function LabelFilter({
     <div className="relative">
       <button
         ref={triggerRef}
-        onClick={() => setOpen(!open)}
+        onClick={(event) => {
+          if (open) {
+            setOpen(false);
+            setMenuReady(false);
+            return;
+          }
+          clickPointRef.current = { x: event.clientX, y: event.clientY };
+          setOpen(true);
+        }}
         className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-[6px] text-[12px] select-none motion-color motion-press focus-ring ${
           activeCount > 0
             ? "bg-foreground/[0.08] text-foreground"
@@ -349,8 +366,10 @@ export default function LabelFilter({
               maxHeight: menuPosition.maxHeight,
               transform: menuPosition.transform,
               transformOrigin: menuPosition.transformOrigin,
+              opacity: menuReady ? 1 : 0,
+              pointerEvents: menuReady ? "auto" : "none",
             }}
-            className="z-[70] flex w-[280px] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-[8px] border border-border/50 bg-popover text-popover-foreground shadow-lg"
+            className="z-[70] flex w-[280px] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-[8px] border border-border/50 bg-popover text-popover-foreground shadow-lg transition-opacity duration-75"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
