@@ -10,6 +10,7 @@
     "core:window:allow-start-dragging",
     "shell:default",
     "dialog:default",
-    "core:webview:allow-set-webview-zoom"
+    "core:webview:allow-set-webview-zoom",
+    "updater:default"
   ]
 }

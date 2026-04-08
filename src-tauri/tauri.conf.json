@@ -34,7 +34,7 @@
       "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQxRDRDREU0RkRFQjQxMUMKUldRY1Fldjk1TTNVUVdMM2xCQkVIYXQrQzN6aWlqZ21BUmFJbGFvc0plNXBJUWJrWStVR2o0TUUK",
       "endpoints": [
-        "https://github.com/dwsy/pi-session-manager/releases/latest/download/updater.json"
+        "https://github.com/dwsy/pi-session-manager/releases/latest/download/latest.json"
       ],
       "dialog": true
     }
