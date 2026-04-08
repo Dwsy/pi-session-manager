@@ -977,7 +977,8 @@ pub async fn dispatch(
             #[cfg(feature = "gui")]
             {
                 let state = app_state.as_ref().ok_or("App state not available")?;
-                let command = serde_json::json!({ "type": "get_commands", "sessionId": session_id });
+                let command =
+                    serde_json::json!({ "type": "get_commands", "sessionId": session_id });
                 let result = state
                     .pi_agent_registry
                     .send_rpc(&session_id, command)

@@ -35,7 +35,7 @@ function SelectedProjectHeader({
         <span className="text-[11px] text-muted-foreground flex-shrink-0">
           ({sessionCount})
         </span>
-        {/* {!!liveCount && liveCount > 0 && (
+        {liveCount && liveCount > 0 && (
           <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-green-500/10 text-green-500">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
@@ -43,7 +43,7 @@ function SelectedProjectHeader({
             </span>
             <span className="text-[10px] font-medium">{liveCount}</span>
           </span>
-        )} */}
+        )}
       </div>
     </div>
   );
