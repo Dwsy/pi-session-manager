@@ -11,6 +11,7 @@ export interface AppSessionViewerPaneProps extends Pick<
   | "onFork"
   | "onBack"
   | "onWebResume"
+  | "onResumeSession"
   | "terminal"
   | "piPath"
   | "customCommand"
@@ -27,6 +28,7 @@ function AppSessionViewerPane({
   onFork,
   onBack,
   onWebResume,
+  onResumeSession,
   terminal,
   piPath,
   customCommand,
@@ -42,6 +44,7 @@ function AppSessionViewerPane({
       onFork={onFork}
       onBack={onBack}
       onWebResume={onWebResume}
+      onResumeSession={onResumeSession}
       terminal={terminal}
       piPath={piPath}
       customCommand={customCommand}

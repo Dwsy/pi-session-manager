@@ -54,6 +54,7 @@ interface SessionListProps {
   onDeleteSession?: (session: SessionInfo) => void;
   onDeleteSessions?: (sessions: SessionInfo[]) => void;
   onConvertSession?: (session: SessionInfo) => void;
+  onResumeSession?: (session: SessionInfo) => void | Promise<void>;
   loading: boolean;
   hasMore?: boolean;
   loadingMore?: boolean;
@@ -88,6 +89,7 @@ export default function SessionList({
   onDeleteSession,
   onDeleteSessions,
   onConvertSession,
+  onResumeSession,
   loading,
   hasMore = false,
   loadingMore = false,
@@ -944,6 +946,7 @@ export default function SessionList({
                                 piPath={piPath}
                                 customCommand={customCommand}
                                 resumeCommand={resumeCommand}
+                                onResumeSession={onResumeSession}
                                 size="sm"
                                 variant="ghost"
                                 onError={(error) =>

@@ -39,6 +39,7 @@ interface SessionViewerProps {
   onFork?: () => void;
   onBack?: () => void;
   onWebResume?: () => void;
+  onResumeSession?: (session: SessionInfo) => Promise<void> | void;
   terminal?: TerminalType;
   piPath?: string;
   customCommand?: string;
@@ -60,6 +61,7 @@ function SessionViewerContent({
   onFork,
   onBack,
   onWebResume,
+  onResumeSession,
   terminal = getPlatformDefaults().defaultTerminal,
   piPath,
   customCommand,
@@ -312,6 +314,7 @@ function SessionViewerContent({
                 piPath={piPath}
                 customCommand={customCommand}
                 resumeCommand={resumeCommand}
+                onResumeSession={onResumeSession}
                 size="sm"
                 variant="ghost"
                 label={t("session.resume", "Resume")}

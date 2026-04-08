@@ -20,6 +20,7 @@ export type AppProjectListPaneSessionListCommonProps = Pick<
   | "onDeleteSession"
   | "onDeleteSessions"
   | "onConvertSession"
+  | "onResumeSession"
   | "loading"
   | "getBadgeType"
   | "terminal"

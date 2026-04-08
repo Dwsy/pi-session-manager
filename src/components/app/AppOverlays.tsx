@@ -4,6 +4,7 @@ import type { ComponentType, LazyExoticComponent } from "react";
 import ExportDialog from "@/components/dialogs/ExportDialog";
 import ConvertSessionDialog from "@/components/dialogs/ConvertSessionDialog";
 import ConvertSessionResultDialog from "@/components/dialogs/ConvertSessionResultDialog";
+import ResumeSessionDialog from "@/components/dialogs/ResumeSessionDialog";
 import RenameDialog from "@/components/dialogs/RenameDialog";
 import ForkDialog from "@/components/dialogs/ForkDialog";
 import Onboarding from "@/components/Onboarding";
@@ -28,6 +29,7 @@ export interface CommandPaletteOverlayProps {
 export interface AppOverlaysProps {
   showExportDialog: boolean;
   showConvertDialog: boolean;
+  showResumeDialog: boolean;
   convertResult: SessionConvertResult | null;
   showRenameDialog: boolean;
   showForkDialog: boolean;
@@ -40,10 +42,12 @@ export interface AppOverlaysProps {
     target: SessionConvertTarget,
     options: { dryRun: boolean; force: boolean }
   ) => Promise<void> | void;
+  onResumeToTarget: (target: SessionConvertTarget) => Promise<void> | void;
   onRenameSession: (newName: string) => Promise<void> | void;
   onForkSession: (targetName?: string) => Promise<void> | void;
   onCloseExportDialog: () => void;
   onCloseConvertDialog: () => void;
+  onCloseResumeDialog: () => void;
   onCloseConvertResultDialog: () => void;
   onCloseRenameDialog: () => void;
   onCloseForkDialog: () => void;
@@ -59,6 +63,7 @@ export interface AppOverlaysProps {
 function AppOverlays({
   showExportDialog,
   showConvertDialog,
+  showResumeDialog,
   convertResult,
   showRenameDialog,
   showForkDialog,
@@ -68,10 +73,12 @@ function AppOverlays({
   commandContext,
   onExportSession,
   onConvertSession,
+  onResumeToTarget,
   onRenameSession,
   onForkSession,
   onCloseExportDialog,
   onCloseConvertDialog,
+  onCloseResumeDialog,
   onCloseConvertResultDialog,
   onCloseRenameDialog,
   onCloseForkDialog,
@@ -97,6 +104,14 @@ function AppOverlays({
           session={selectedSession}
           onConvert={onConvertSession}
           onClose={onCloseConvertDialog}
+        />
+      )}
+      {showResumeDialog && selectedSession && (
+        <ResumeSessionDialog
+          session={selectedSession}
+          defaultTarget="pi"
+          onResume={onResumeToTarget}
+          onClose={onCloseResumeDialog}
         />
       )}
       {convertResult && (

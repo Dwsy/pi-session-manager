@@ -16,6 +16,7 @@ interface SessionListByDirectoryProps {
   selectedSession: SessionInfo | null
   onSelectSession: (session: SessionInfo) => void
   onDeleteSession?: (session: SessionInfo) => void
+  onResumeSession?: (session: SessionInfo) => void | Promise<void>
   loading: boolean
   terminal?: TerminalType
   piPath?: string
@@ -30,6 +31,7 @@ export default function SessionListByDirectory({
   selectedSession,
   onSelectSession,
   onDeleteSession,
+  onResumeSession,
   loading,
   terminal = getPlatformDefaults().defaultTerminal,
   piPath,
@@ -236,6 +238,7 @@ export default function SessionListByDirectory({
                       piPath={piPath}
                       customCommand={customCommand}
                       resumeCommand={resumeCommand}
+                      onResumeSession={onResumeSession}
                       size="sm"
                       variant="ghost"
                       onError={(error) => console.error('Failed to open in terminal:', error)}

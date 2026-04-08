@@ -27,6 +27,7 @@ export type AppDesktopSidebarSessionListCommonProps = Pick<
   | "onDeleteSession"
   | "onDeleteSessions"
   | "onConvertSession"
+  | "onResumeSession"
   | "loading"
   | "getBadgeType"
   | "terminal"

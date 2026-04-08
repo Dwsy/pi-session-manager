@@ -94,7 +94,13 @@ pub async fn open_session_in_terminal_impl(
     pi_path: Option<String>,
     resume_command: Option<String>,
 ) -> Result<(), String> {
-    if !Path::new(&path).is_file() {
+    let has_explicit_resume_command = resume_command
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_some();
+
+    if !has_explicit_resume_command && !Path::new(&path).is_file() {
         return Err(format!("Session file does not exist: {path}"));
     }
 

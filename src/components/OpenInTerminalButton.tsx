@@ -22,6 +22,7 @@ interface OpenInTerminalButtonProps {
   onSuccess?: () => void
   onError?: (error: string) => void
   onWebResume?: () => void
+  onResumeSession?: (session: SessionInfo) => Promise<void> | void
   children?: React.ReactNode
 }
 
@@ -40,6 +41,7 @@ export default function OpenInTerminalButton({
   onSuccess,
   onError,
   onWebResume,
+  onResumeSession,
   children,
 }: OpenInTerminalButtonProps) {
   const { t } = useTranslation()
@@ -103,6 +105,22 @@ export default function OpenInTerminalButton({
 
   const handleOpenInTerminal = async (e?: React.MouseEvent) => {
     e?.stopPropagation()
+
+    if (onResumeSession) {
+      if (loading) return
+      setLoading(true)
+      try {
+        await onResumeSession(session)
+        onSuccess?.()
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error('Failed to resume session:', errorMessage)
+        onError?.(errorMessage)
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
 
     if (!isTauri()) {
       onWebResume?.()
