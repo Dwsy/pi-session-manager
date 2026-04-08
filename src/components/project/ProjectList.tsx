@@ -23,6 +23,7 @@ interface ProjectListProps {
   onSelectProject?: (project: string | null) => void;
   onDeleteSession?: (session: SessionInfo) => void;
   onConvertSession?: (session: SessionInfo) => void;
+  onResumeSession?: (session: SessionInfo) => void | Promise<void>;
   loading: boolean;
   terminal?: TerminalType;
   piPath?: string;
@@ -53,6 +54,7 @@ export default function ProjectList({
   onSelectProject,
   onDeleteSession,
   onConvertSession,
+  onResumeSession,
   loading,
   terminal = getPlatformDefaults().defaultTerminal,
   piPath,
@@ -191,7 +193,13 @@ export default function ProjectList({
                   >
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <FolderOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                        <div className={`p-0.5 rounded flex-shrink-0 `}>
+                          {isFavorite ? (
+                            <Star className="h-4 w-4 flex-shrink-0 text-yellow-500 fill-current" />
+                          ) : (
+                            <FolderOpen className="h-4 w-4 flex-shrink-0 text-blue-400" />
+                          )}
+                        </div>
                         <div className="text-[13px] sm:text-sm font-medium truncate leading-tight">
                           {project.dirName}
                         </div>
@@ -246,9 +254,9 @@ export default function ProjectList({
                         isFavorite ? t("favorites.remove") : t("favorites.add")
                       }
                     >
-                      <Star
+                      {/* <Star
                         className={`h-3 w-3 ${isFavorite ? "fill-current" : ""}`}
-                      />
+                      /> */}
                     </button>
                   )}
                 </div>
@@ -270,6 +278,13 @@ export default function ProjectList({
           onBack={handleBackToProjects}
           backLabel={t("project.list.back")}
           nameClassName="text-xs"
+          isFavorite={
+            projectInfo
+              ? favorites.some(
+                  (f) => f.type === "project" && f.id === projectInfo.dir,
+                )
+              : false
+          }
         />
       )}
 
@@ -279,6 +294,7 @@ export default function ProjectList({
         onSelectSession={onSelectSession}
         onDeleteSession={onDeleteSession}
         onConvertSession={onConvertSession}
+        onResumeSession={onResumeSession}
         loading={loading}
         getBadgeType={getBadgeType}
         terminal={terminal}

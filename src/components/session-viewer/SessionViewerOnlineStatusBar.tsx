@@ -14,8 +14,8 @@ export default function SessionViewerOnlineStatusBar({
   if (!liveSession) return null;
 
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-md border border-green-500/20 bg-green-500/10 px-2 py-1 text-[11px] font-medium text-green-500">
-      <Zap className="h-3.5 w-3.5 fill-current" />
+    <div className="inline-flex items-center gap-1.5 rounded-md border border-green-500/20 bg-green-500/10 px-1 py-1 text-[11px] font-medium text-green-500">
+      <Zap className="h-2.5 w-2.5 fill-current" />
       <span>
         {liveSession.isStreaming
           ? t("session.streaming", "Streaming")

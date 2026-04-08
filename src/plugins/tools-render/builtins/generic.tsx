@@ -17,7 +17,7 @@ const OUTPUT_MAX_HEIGHT = 300;
 const SMALL_ARGUMENT_FIELD_THRESHOLD = 5;
 
 /** Maximum string length before truncation in collapsed preview */
-const VALUE_TRUNCATE_LENGTH = 30;
+const VALUE_TRUNCATE_LENGTH = 50;
 
 /**
  * Check if value is a plain object (not array, not null)
