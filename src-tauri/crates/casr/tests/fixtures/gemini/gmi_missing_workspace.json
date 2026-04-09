@@ -1,0 +1,17 @@
+{
+  "sessionId": "gmi-nows-001",
+  "startTime": "2026-01-11T07:00:00.000Z",
+  "lastUpdated": "2026-01-11T07:02:00.000Z",
+  "messages": [
+    {
+      "type": "user",
+      "content": "Explain how TCP handshakes work",
+      "timestamp": "2026-01-11T07:00:00.000Z"
+    },
+    {
+      "type": "model",
+      "content": "TCP uses a three-way handshake: SYN, SYN-ACK, ACK. The client sends SYN, server responds with SYN-ACK, and client confirms with ACK.",
+      "timestamp": "2026-01-11T07:01:00.000Z"
+    }
+  ]
+}

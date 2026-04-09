@@ -1,0 +1,16 @@
+{
+  "fixture_id": "opc_simple",
+  "provider_slug": "opencode",
+  "session_id": "opc-session-001",
+  "workspace": "__DYNAMIC__",
+  "title": "Set up CI/CD pipeline with GitHub Actions",
+  "message_count": 4,
+  "roles": ["User", "Assistant", "User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "claude-3.5-sonnet",
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": ["workspace"],
+  "notes": "OpenCode .opencode/opencode.db SQLite with sessions+messages tables. Workspace from db_path parent of .opencode/ dir — depends on fixture location so treated as lossy."
+}

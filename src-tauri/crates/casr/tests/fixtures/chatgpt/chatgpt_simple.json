@@ -1,0 +1,62 @@
+{
+  "id": "chatgpt-conv-001",
+  "title": "Understanding Rust lifetimes",
+  "create_time": 1700000001.0,
+  "update_time": 1700000020.0,
+  "mapping": {
+    "root": {
+      "id": "root",
+      "parent": null,
+      "children": ["node1"],
+      "message": null
+    },
+    "node1": {
+      "id": "node1",
+      "parent": "root",
+      "children": ["node2"],
+      "message": {
+        "id": "node1",
+        "author": {"role": "user"},
+        "content": {"content_type": "text", "parts": ["Can you explain Rust lifetimes to me?"]},
+        "create_time": 1700000001.0,
+        "metadata": {}
+      }
+    },
+    "node2": {
+      "id": "node2",
+      "parent": "node1",
+      "children": ["node3"],
+      "message": {
+        "id": "node2",
+        "author": {"role": "assistant"},
+        "content": {"content_type": "text", "parts": ["Lifetimes in Rust are a way of ensuring that references are valid for as long as they're used. The borrow checker uses lifetime annotations to verify that references don't outlive the data they point to.\n\nHere's a simple example:\n\n```rust\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\n```\n\nThe `'a` annotation tells the compiler that the returned reference lives at least as long as both input references."]},
+        "create_time": 1700000005.0,
+        "metadata": {"model_slug": "gpt-4"}
+      }
+    },
+    "node3": {
+      "id": "node3",
+      "parent": "node2",
+      "children": ["node4"],
+      "message": {
+        "id": "node3",
+        "author": {"role": "user"},
+        "content": {"content_type": "text", "parts": ["What about lifetime elision rules?"]},
+        "create_time": 1700000010.0,
+        "metadata": {}
+      }
+    },
+    "node4": {
+      "id": "node4",
+      "parent": "node3",
+      "children": [],
+      "message": {
+        "id": "node4",
+        "author": {"role": "assistant"},
+        "content": {"content_type": "text", "parts": ["Rust has three lifetime elision rules that let you omit annotations in common cases:\n\n1. Each parameter gets its own lifetime\n2. If there's exactly one input lifetime, it's assigned to all output lifetimes\n3. If one parameter is `&self` or `&mut self`, its lifetime is assigned to all output lifetimes\n\nThese rules cover most function signatures, so you rarely need explicit annotations."]},
+        "create_time": 1700000015.0,
+        "metadata": {"model_slug": "gpt-4"}
+      }
+    }
+  }
+}

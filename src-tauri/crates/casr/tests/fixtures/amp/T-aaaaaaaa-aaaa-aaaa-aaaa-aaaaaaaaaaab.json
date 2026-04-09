@@ -1,0 +1,34 @@
+{
+  "v": 0,
+  "id": "T-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaab",
+  "created": 1700000000000,
+  "title": "Database migration helper",
+  "env": {
+    "initial": {
+      "cwd": "/home/user/webapp",
+      "trees": [{"uri": "file:///home/user/webapp", "displayName": "webapp"}]
+    }
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": [{"type": "text", "text": "Create a database migration helper that supports up/down migrations"}],
+      "meta": {"sentAt": 1700000001000}
+    },
+    {
+      "role": "assistant",
+      "content": [{"type": "text", "text": "I'll create a migration helper with up/down support. Let me start with the core structure:\n\n```rust\npub struct Migration {\n    pub version: u64,\n    pub name: String,\n    pub up: String,\n    pub down: String,\n}\n\npub struct Migrator {\n    pool: PgPool,\n    migrations: Vec<Migration>,\n}\n\nimpl Migrator {\n    pub async fn up(&self) -> Result<(), MigrationError> {\n        for m in &self.migrations {\n            sqlx::query(&m.up).execute(&self.pool).await?;\n        }\n        Ok(())\n    }\n\n    pub async fn down(&self, steps: usize) -> Result<(), MigrationError> {\n        for m in self.migrations.iter().rev().take(steps) {\n            sqlx::query(&m.down).execute(&self.pool).await?;\n        }\n        Ok(())\n    }\n}\n```"}],
+      "meta": {"sentAt": 1700000010000}
+    },
+    {
+      "role": "user",
+      "content": [{"type": "text", "text": "Add version tracking in a migrations table"}],
+      "meta": {"sentAt": 1700000020000}
+    },
+    {
+      "role": "assistant",
+      "content": [{"type": "text", "text": "I'll add a `_migrations` table to track applied versions:\n\n```rust\nimpl Migrator {\n    async fn ensure_table(&self) -> Result<(), MigrationError> {\n        sqlx::query(\n            \"CREATE TABLE IF NOT EXISTS _migrations (\n                version BIGINT PRIMARY KEY,\n                name TEXT NOT NULL,\n                applied_at TIMESTAMPTZ DEFAULT NOW()\n            )\"\n        ).execute(&self.pool).await?;\n        Ok(())\n    }\n\n    pub async fn current_version(&self) -> Result<u64, MigrationError> {\n        self.ensure_table().await?;\n        let row = sqlx::query_scalar::<_, i64>(\n            \"SELECT COALESCE(MAX(version), 0) FROM _migrations\"\n        ).fetch_one(&self.pool).await?;\n        Ok(row as u64)\n    }\n}\n```"}],
+      "meta": {"sentAt": 1700000030000}
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "v": 0,
+  "id": "T-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "created": 1700002234567,
+  "title": "Amp fixture session",
+  "env": {
+    "initial": {
+      "cwd": "/data/projects/fixture-amp",
+      "trees": [
+        {
+          "uri": "file:///data/projects/fixture-amp",
+          "displayName": "fixture-amp"
+        }
+      ]
+    }
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Review amp parser behavior."
+        }
+      ],
+      "meta": {
+        "sentAt": 1700002234567
+      }
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "I reviewed it and found two issues."
+        }
+      ],
+      "meta": {
+        "sentAt": 1700002235567
+      }
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Please patch them."
+        }
+      ],
+      "meta": {
+        "sentAt": 1700002236567
+      }
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Patched and added tests."
+        }
+      ],
+      "meta": {
+        "sentAt": 1700002237567
+      }
+    }
+  ]
+}

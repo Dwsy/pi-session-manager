@@ -1,0 +1,2 @@
+{"parentUuid":null,"isSidechain":false,"userType":"external","sessionId":"cc-nows-001","version":"1.0.27","type":"user","message":{"role":"user","content":"What is the capital of France?"},"uuid":"nw-001","timestamp":"2026-01-10T08:00:00.000Z"}
+{"parentUuid":"nw-001","isSidechain":false,"userType":"external","sessionId":"cc-nows-001","version":"1.0.27","type":"assistant","message":{"role":"assistant","content":"Paris is the capital of France.","model":"claude-sonnet-4-5-20250929"},"uuid":"nw-002","timestamp":"2026-01-10T08:00:05.000Z"}

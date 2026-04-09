@@ -1,0 +1,238 @@
+{
+  "version": "1.0.0",
+  "description": "Test fixture corpus for casr provider readers, writers, and round-trip tests.",
+  "fixtures": {
+    "cc_simple": {
+      "provider": "claude-code",
+      "format": "jsonl",
+      "path": "claude_code/cc_simple.jsonl",
+      "expected": "expected/cc_simple.json",
+      "category": "synthetic",
+      "intent": "Basic 4-message conversation with all fields populated."
+    },
+    "cc_complex": {
+      "provider": "claude-code",
+      "format": "jsonl",
+      "path": "claude_code/cc_complex.jsonl",
+      "expected": "expected/cc_complex.json",
+      "category": "synthetic",
+      "intent": "Tool use/result content blocks, content arrays, file-history-snapshot skip."
+    },
+    "cc_missing_workspace": {
+      "provider": "claude-code",
+      "format": "jsonl",
+      "path": "claude_code/cc_missing_workspace.jsonl",
+      "expected": "expected/cc_missing_workspace.json",
+      "category": "synthetic",
+      "intent": "Session with no cwd field. Tests workspace=None path."
+    },
+    "cc_unicode": {
+      "provider": "claude-code",
+      "format": "jsonl",
+      "path": "claude_code/cc_unicode.jsonl",
+      "expected": "expected/cc_unicode.json",
+      "category": "synthetic",
+      "intent": "Japanese, Chinese, and emoji characters. Tests UTF-8 fidelity."
+    },
+    "cc_malformed": {
+      "provider": "claude-code",
+      "format": "jsonl",
+      "path": "claude_code/cc_malformed.jsonl",
+      "expected": "expected/cc_malformed.json",
+      "category": "synthetic",
+      "intent": "Malformed JSON lines interspersed with valid messages. Tests error tolerance."
+    },
+    "codex_modern": {
+      "provider": "codex",
+      "format": "jsonl",
+      "path": "codex/codex_modern.jsonl",
+      "expected": "expected/codex_modern.json",
+      "category": "synthetic",
+      "intent": "Modern JSONL envelope with session_meta, event_msg, response_item."
+    },
+    "codex_legacy": {
+      "provider": "codex",
+      "format": "json",
+      "path": "codex/codex_legacy.json",
+      "expected": "expected/codex_legacy.json",
+      "category": "synthetic",
+      "intent": "Legacy single-JSON format with session and items keys."
+    },
+    "codex_token_count": {
+      "provider": "codex",
+      "format": "jsonl",
+      "path": "codex/codex_token_count.jsonl",
+      "expected": "expected/codex_token_count.json",
+      "category": "synthetic",
+      "intent": "Includes token_count events that should be skipped as non-conversational."
+    },
+    "codex_reasoning": {
+      "provider": "codex",
+      "format": "jsonl",
+      "path": "codex/codex_reasoning.jsonl",
+      "expected": "expected/codex_reasoning.json",
+      "category": "synthetic",
+      "intent": "Agent reasoning events extracted as Assistant messages with author=reasoning."
+    },
+    "codex_malformed": {
+      "provider": "codex",
+      "format": "jsonl",
+      "path": "codex/codex_malformed.jsonl",
+      "expected": "expected/codex_malformed.json",
+      "category": "synthetic",
+      "intent": "Malformed lines interspersed with valid Codex entries. Tests error tolerance."
+    },
+    "gmi_simple": {
+      "provider": "gemini",
+      "format": "json",
+      "path": "gemini/gmi_simple.json",
+      "expected": "expected/gmi_simple.json",
+      "category": "synthetic",
+      "intent": "Basic Gemini session with user/model message types."
+    },
+    "gmi_grounding": {
+      "provider": "gemini",
+      "format": "json",
+      "path": "gemini/gmi_grounding.json",
+      "expected": "expected/gmi_grounding.json",
+      "category": "synthetic",
+      "intent": "Grounding metadata and citations in model responses. Tests extra field preservation."
+    },
+    "gmi_missing_workspace": {
+      "provider": "gemini",
+      "format": "json",
+      "path": "gemini/gmi_missing_workspace.json",
+      "expected": "expected/gmi_missing_workspace.json",
+      "category": "synthetic",
+      "intent": "No workspace inferrable from content. Tests workspace=None."
+    },
+    "gmi_gemini_role": {
+      "provider": "gemini",
+      "format": "json",
+      "path": "gemini/gmi_gemini_role.json",
+      "expected": "expected/gmi_gemini_role.json",
+      "category": "synthetic",
+      "intent": "Uses 'gemini' role type instead of 'model'. Tests normalize_role mapping."
+    },
+    "cline_simple": {
+      "provider": "cline",
+      "format": "json",
+      "path": "cline/tasks/1700001234567/api_conversation_history.json",
+      "expected": "expected/cline_simple.json",
+      "category": "synthetic",
+      "intent": "Basic Cline task fixture with API conversation history and taskHistory metadata."
+    },
+    "amp_simple": {
+      "provider": "amp",
+      "format": "json",
+      "path": "amp/T-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.json",
+      "expected": "expected/amp_simple.json",
+      "category": "synthetic",
+      "intent": "Basic Amp centralized thread fixture with workspace and timestamp metadata."
+    },
+    "aider_simple": {
+      "provider": "aider",
+      "format": "md",
+      "path": "aider/aider_simple.md",
+      "expected": "expected/aider_simple.json",
+      "category": "synthetic",
+      "intent": "Basic Aider markdown history fixture with model/workspace metadata lines."
+    },
+    "chatgpt_simple": {
+      "provider": "chatgpt",
+      "format": "json",
+      "path": "chatgpt/chatgpt_simple.json",
+      "expected": "expected/chatgpt_simple.json",
+      "category": "synthetic",
+      "intent": "ChatGPT mapping-format conversation with parent chain. Float timestamps, model_slug metadata."
+    },
+    "clawdbot_simple": {
+      "provider": "clawdbot",
+      "format": "jsonl",
+      "path": "clawdbot/clawdbot_simple.jsonl",
+      "expected": "expected/clawdbot_simple.json",
+      "category": "synthetic",
+      "intent": "Basic ClawdBot JSONL with RFC3339 timestamps. No workspace or model in format."
+    },
+    "vibe_simple": {
+      "provider": "vibe",
+      "format": "jsonl",
+      "path": "vibe/messages.jsonl",
+      "expected": "expected/vibe_simple.json",
+      "category": "synthetic",
+      "intent": "Basic Vibe JSONL conversation with role/content/timestamp fields."
+    },
+    "factory_simple": {
+      "provider": "factory",
+      "format": "jsonl",
+      "path": "factory/factory_simple.jsonl",
+      "expected": "expected/factory_simple.json",
+      "category": "synthetic",
+      "intent": "Factory JSONL with session_start header and typed message entries. Model from message.model."
+    },
+    "openclaw_simple": {
+      "provider": "openclaw",
+      "format": "jsonl",
+      "path": "openclaw/openclaw_simple.jsonl",
+      "expected": "expected/openclaw_simple.json",
+      "category": "synthetic",
+      "intent": "OpenClaw JSONL with session header, sequential message IDs, and toolCall content blocks."
+    },
+    "piagent_simple": {
+      "provider": "pi-agent",
+      "format": "jsonl",
+      "path": "pi_agent/2025-12-01T10-00-00_pi-uuid-001.jsonl",
+      "expected": "expected/piagent_simple.json",
+      "category": "synthetic",
+      "intent": "Pi-Agent JSONL with session header, toolResult role, and toolCall blocks. Underscore filename."
+    },
+    "cur_simple": {
+      "provider": "cursor",
+      "format": "sqlite",
+      "path": "cursor/state.vscdb",
+      "expected": "expected/cur_simple.json",
+      "category": "synthetic",
+      "intent": "Cursor state.vscdb SQLite with modern v0.40+ format. 4-message conversation with workspace in bubble."
+    },
+    "opc_simple": {
+      "provider": "opencode",
+      "format": "sqlite",
+      "path": "opencode/.opencode/opencode.db",
+      "expected": "expected/opc_simple.json",
+      "category": "synthetic",
+      "intent": "OpenCode SQLite with sessions+messages tables. 4-message session with model metadata."
+    },
+    "edge_empty_content_cc": {
+      "provider": "claude-code",
+      "format": "jsonl",
+      "path": "edge/edge_empty_content_cc.jsonl",
+      "expected": "expected/edge_empty_content_cc.json",
+      "category": "edge",
+      "intent": "Empty and whitespace-only content messages that should be skipped."
+    },
+    "edge_null_timestamps_cc": {
+      "provider": "claude-code",
+      "format": "jsonl",
+      "path": "edge/edge_null_timestamps_cc.jsonl",
+      "expected": "expected/edge_null_timestamps_cc.json",
+      "category": "edge",
+      "intent": "All messages lack timestamps. Tests None timestamp handling."
+    },
+    "edge_long_message_cc": {
+      "provider": "claude-code",
+      "format": "jsonl",
+      "path": "edge/edge_long_message_cc.jsonl",
+      "expected": "expected/edge_long_message_cc.json",
+      "category": "edge",
+      "intent": "Very long message body (900+ chars). Tests no-truncation preservation."
+    },
+    "edge_single_sided_cc": {
+      "provider": "claude-code",
+      "format": "jsonl",
+      "path": "edge/edge_single_sided_cc.jsonl",
+      "expected": "expected/edge_single_sided_cc.json",
+      "category": "edge",
+      "intent": "User-only messages, no assistant. Validation should flag as error."
+    }
+  }
+}

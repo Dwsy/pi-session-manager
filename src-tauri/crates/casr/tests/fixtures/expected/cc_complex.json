@@ -1,0 +1,16 @@
+{
+  "fixture_id": "cc_complex",
+  "provider_slug": "claude-code",
+  "session_id": "cc-complex-001",
+  "workspace": "/data/projects/webapp",
+  "title": "Refactor the API handler to use async/await",
+  "message_count": 6,
+  "roles": ["User", "Assistant", "User", "Assistant", "User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "claude-sonnet-4-5-20250929",
+  "has_tool_calls": true,
+  "has_tool_results": true,
+  "known_lossy_fields": ["gitBranch", "parentUuid", "isSidechain"],
+  "notes": "Complex session with tool_use and tool_result content blocks. User messages c-003 and c-005 contain only tool_result blocks. These are preserved so the session can resume with valid context. The file-history-snapshot entry is skipped. Final 6 messages: user(c-001), assistant+tool_use(c-002), user+tool_result(c-003), assistant+tool_use(c-004), user+tool_result(c-005), assistant(c-006)."
+}

@@ -1,0 +1,16 @@
+{
+  "fixture_id": "codex_token_count",
+  "provider_slug": "codex",
+  "session_id": "codex-tokens-001",
+  "workspace": "/data/projects/llmapp",
+  "title": "Summarize the README",
+  "message_count": 4,
+  "roles": ["User", "Assistant", "User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": null,
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": ["token_count events are not extracted as messages"],
+  "notes": "Includes token_count event_msg entries interspersed with conversational messages. Token count events are non-conversational and should be skipped by the reader. The token data is preserved only in the extra field of the preceding response_item."
+}

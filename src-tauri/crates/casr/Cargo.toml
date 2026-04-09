@@ -1,0 +1,44 @@
+[package]
+name = "casr"
+version = "0.1.1"
+edition = "2024"
+description = "Cross Agent Session Resumer — resume AI coding sessions across providers"
+license-file = "LICENSE"
+repository = "https://github.com/Dicklesworthstone/cross_agent_session_resumer"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+clap = { version = "4", features = ["derive", "env"] }
+clap_complete = "4"
+colored = "3"
+dirs = "6"
+glob = "0.3"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+serde_json = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+walkdir = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+urlencoding = "2"
+which = "7"
+rich_rust = "0.2.1"
+rayon = "1"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
+
+[build-dependencies]
+vergen-gix = { version = "9", features = ["build", "cargo", "rustc"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,0 +1,83 @@
+# Rust
+/target/
+
+# Common accidental compiler output
+a.out
+
+# Editor/OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python cache
+__pycache__/
+
+# Profiling data
+perf.data
+perf.data.*
+
+# Coverage reports
+lcov*.info
+
+# Local scratch DBs
+storage.sqlite3
+storage.sqlite3-*
+
+# Local test artifacts
+artifacts/
+
+# bv (beads viewer) local config and caches
+.bv/
+
+# beads (br) local database (JSONL export is tracked)
+.beads/*.db
+.beads/*.db-shm
+.beads/*.db-wal
+.beads/*.lock
+.beads/last-touched
+
+# Ephemeral files (core dumps, profiling, agent config backups, etc.)
+core.*
+core
+perf.data
+perf.data.old
+*.bak
+clippy.txt
+clippy.json
+clippy_results.json
+clippy_unwrap.json
+clippy_unwrap_clean.txt
+check_output.txt
+error.log
+.next_backup*/
+cline.mcp.json
+opencode.json
+windsurf.mcp.json
+*.mcp.json.*.bak
+storage.sqlite3
+storage.sqlite3-shm
+storage.sqlite3-wal
+storage.sqlite3.bak
+storage.sqlite3.corrupt-*
+storage.sqlite3-shm.corrupt-*
+storage.sqlite3-wal.corrupt-*
+
+# ACFS ephemeral patterns (auto-generated agent artifacts)
+codex.mcp.json
+cursor.mcp.json
+gemini.mcp.json
+.opencode.json.*.bak
+.windsurf.mcp.json.*.bak
+.agent-mail-project-id
+.agent-mail.yaml
+*.sqlite3.bak
+*.sqlite3.corrupt*
+.beads/*.corrupt*
+.beads/*.pre_repair_*
+.beads/*.repair_candidate_*
+.beads/*.bak-corrupt
+
+# One-off test shell scripts at repo root
+/test_*.sh

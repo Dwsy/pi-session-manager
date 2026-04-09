@@ -1,0 +1,16 @@
+{
+  "fixture_id": "edge_long_message_cc",
+  "provider_slug": "claude-code",
+  "session_id": "edge-long-001",
+  "workspace": "/data/projects/edge",
+  "title_starts_with": "Here is a very long prompt",
+  "message_count": 2,
+  "roles": ["User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "claude-sonnet-4-5-20250929",
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "User message contains a very long string (900+ chars of repeated 'A'). Tests that long messages are preserved without truncation in the canonical model."
+}

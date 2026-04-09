@@ -1,0 +1,8 @@
+{"type":"session_meta","timestamp":1737400000.0,"payload":{"id":"codex-malformed-001","cwd":"/data/projects/resilient"}}
+not json
+{"type":"event_msg","timestamp":1737400001.0,"payload":{"type":"user_message","message":"First valid user message"}}
+{broken json here
+{"type":"response_item","timestamp":1737400010.0,"payload":{"role":"assistant","content":[{"type":"input_text","text":"Valid assistant response after garbage"}]}}
+
+{"type":"event_msg","timestamp":1737400020.0,"payload":{"type":"user_message","message":"Second valid user message"}}
+{"type":"response_item","timestamp":1737400030.0,"payload":{"role":"assistant","content":[{"type":"input_text","text":"Second valid response"}]}}

@@ -1,0 +1,16 @@
+{
+  "fixture_id": "codex_malformed",
+  "provider_slug": "codex",
+  "session_id": "codex-malformed-001",
+  "workspace": "/data/projects/resilient",
+  "title": "First valid user message",
+  "message_count": 4,
+  "roles": ["User", "Assistant", "User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": null,
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "Contains 2 malformed lines and 1 blank line interspersed with valid entries. Reader should skip garbage and parse 4 conversational messages."
+}

@@ -1,0 +1,27 @@
+{
+  "sessionId": "gmi-role-001",
+  "startTime": "2026-01-17T09:00:00.000Z",
+  "lastUpdated": "2026-01-17T09:03:00.000Z",
+  "messages": [
+    {
+      "type": "user",
+      "content": "Help me debug this segfault",
+      "timestamp": "2026-01-17T09:00:00.000Z"
+    },
+    {
+      "type": "gemini",
+      "content": "A segfault usually indicates a null pointer dereference or buffer overflow. Let me check the backtrace.",
+      "timestamp": "2026-01-17T09:01:00.000Z"
+    },
+    {
+      "type": "user",
+      "content": "It happens in the parser module",
+      "timestamp": "2026-01-17T09:02:00.000Z"
+    },
+    {
+      "type": "gemini",
+      "content": "Found it. The parser was reading past the end of the input buffer. Added a bounds check.",
+      "timestamp": "2026-01-17T09:03:00.000Z"
+    }
+  ]
+}

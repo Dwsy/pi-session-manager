@@ -1,0 +1,7 @@
+{"type":"session_meta","timestamp":1737200000.0,"payload":{"id":"codex-tokens-001","cwd":"/data/projects/llmapp"}}
+{"type":"event_msg","timestamp":1737200001.0,"payload":{"type":"user_message","message":"Summarize the README"}}
+{"type":"response_item","timestamp":1737200010.0,"payload":{"role":"assistant","content":[{"type":"input_text","text":"The README describes an LLM-powered application for code review."}]}}
+{"type":"event_msg","timestamp":1737200010.5,"payload":{"type":"token_count","info":{"input_tokens":150,"output_tokens":42,"total_tokens":192,"cached_input_tokens":80}}}
+{"type":"event_msg","timestamp":1737200020.0,"payload":{"type":"user_message","message":"What are the main features?"}}
+{"type":"response_item","timestamp":1737200030.0,"payload":{"role":"assistant","content":[{"type":"input_text","text":"Main features: automated PR review, security scanning, and style enforcement."}]}}
+{"type":"event_msg","timestamp":1737200030.5,"payload":{"type":"token_count","info":{"input_tokens":200,"output_tokens":35,"total_tokens":235}}}

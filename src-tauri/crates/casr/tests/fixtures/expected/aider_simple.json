@@ -1,0 +1,16 @@
+{
+  "fixture_id": "aider_simple",
+  "provider_slug": "aider",
+  "session_id": "2024-08-05T19-33-02",
+  "workspace": "/data/projects/fixture-aider",
+  "title": "Review parser edge cases",
+  "message_count": 4,
+  "roles": ["User", "Assistant", "User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "claude-3-5-sonnet",
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "Synthetic Aider markdown history fixture with model and workspace metadata lines."
+}

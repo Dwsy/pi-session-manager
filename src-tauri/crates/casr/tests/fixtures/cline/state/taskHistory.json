@@ -1,0 +1,12 @@
+[
+  {
+    "id": "1700001234567",
+    "ts": 1700001234567,
+    "task": "Fix Cline fixture flow",
+    "tokensIn": 100,
+    "tokensOut": 200,
+    "totalCost": 0,
+    "cwdOnTaskInitialization": "/data/projects/fixture-cline",
+    "modelId": "claude-sonnet-4-5-20250929"
+  }
+]

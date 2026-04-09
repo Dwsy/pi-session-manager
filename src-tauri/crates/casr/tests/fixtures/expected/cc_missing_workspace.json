@@ -1,0 +1,16 @@
+{
+  "fixture_id": "cc_missing_workspace",
+  "provider_slug": "claude-code",
+  "session_id": "cc-nows-001",
+  "workspace": null,
+  "title": "What is the capital of France?",
+  "message_count": 2,
+  "roles": ["User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "claude-sonnet-4-5-20250929",
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "Session with no cwd field. workspace should be None. Assistant content is plain string (not array)."
+}

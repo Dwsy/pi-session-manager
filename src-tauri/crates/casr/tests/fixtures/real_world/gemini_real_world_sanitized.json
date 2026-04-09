@@ -1,0 +1,887 @@
+{
+  "sessionId": "sessionId-0001",
+  "projectHash": "projectHash-0002",
+  "startTime": "[redacted:startTime:3]",
+  "lastUpdated": "[redacted:lastUpdated:4]",
+  "messages": [
+    {
+      "id": "id-0005",
+      "timestamp": "2026-01-20T05:37:22.009Z",
+      "type": "user",
+      "content": "[redacted:content:6]"
+    },
+    {
+      "id": "id-0007",
+      "timestamp": "2026-01-20T05:37:29.955Z",
+      "type": "gemini",
+      "content": "[redacted:content:8]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:9]",
+          "description": "[redacted:description:10]",
+          "timestamp": "2026-01-20T05:37:25.550Z"
+        },
+        {
+          "subject": "[redacted:subject:11]",
+          "description": "[redacted:description:12]",
+          "timestamp": "2026-01-20T05:37:29.747Z"
+        },
+        {
+          "subject": "[redacted:subject:13]",
+          "description": "[redacted:description:14]",
+          "timestamp": "2026-01-20T05:37:29.752Z"
+        }
+      ],
+      "tokens": {
+        "input": 22638,
+        "output": 62,
+        "cached": 0,
+        "thoughts": 446,
+        "tool": 0,
+        "total": 23146
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0015",
+          "name": "read_file",
+          "args": {
+            "file_path": "[redacted:file_path:16]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0015",
+                "name": "read_file",
+                "response": {
+                  "output": "[redacted:output:17]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:37:29.992Z",
+          "resultDisplay": "[redacted:resultDisplay:18]",
+          "displayName": "ReadFile",
+          "description": "[redacted:description:19]",
+          "renderOutputAsMarkdown": true
+        },
+        {
+          "id": "id-0020",
+          "name": "read_file",
+          "args": {
+            "file_path": "[redacted:file_path:21]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0020",
+                "name": "read_file",
+                "response": {
+                  "error": "[redacted:error:22]"
+                }
+              }
+            }
+          ],
+          "status": "error",
+          "timestamp": "2026-01-20T05:37:29.992Z",
+          "resultDisplay": "[redacted:resultDisplay:23]",
+          "displayName": "ReadFile",
+          "description": "[redacted:description:24]",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    },
+    {
+      "id": "id-0025",
+      "timestamp": "2026-01-20T05:37:43.527Z",
+      "type": "gemini",
+      "content": "[redacted:content:26]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:27]",
+          "description": "[redacted:description:28]",
+          "timestamp": "2026-01-20T05:37:33.846Z"
+        },
+        {
+          "subject": "[redacted:subject:29]",
+          "description": "[redacted:description:30]",
+          "timestamp": "2026-01-20T05:37:37.124Z"
+        },
+        {
+          "subject": "[redacted:subject:31]",
+          "description": "[redacted:description:32]",
+          "timestamp": "2026-01-20T05:37:40.130Z"
+        },
+        {
+          "subject": "[redacted:subject:33]",
+          "description": "[redacted:description:34]",
+          "timestamp": "2026-01-20T05:37:43.349Z"
+        },
+        {
+          "subject": "[redacted:subject:35]",
+          "description": "[redacted:description:36]",
+          "timestamp": "2026-01-20T05:37:43.355Z"
+        }
+      ],
+      "tokens": {
+        "input": 26607,
+        "output": 104,
+        "cached": 19895,
+        "thoughts": 992,
+        "tool": 0,
+        "total": 27703
+      },
+      "model": "gemini-3-pro-preview"
+    },
+    {
+      "id": "id-0037",
+      "timestamp": "2026-01-20T05:37:43.547Z",
+      "type": "user",
+      "content": "[redacted:content:38]"
+    },
+    {
+      "id": "id-0039",
+      "timestamp": "2026-01-20T05:38:11.484Z",
+      "type": "user",
+      "content": "[redacted:content:40]"
+    },
+    {
+      "id": "id-0041",
+      "timestamp": "2026-01-20T05:38:21.123Z",
+      "type": "gemini",
+      "content": "[redacted:content:42]",
+      "toolCalls": [
+        {
+          "id": "id-0043",
+          "name": "delegate_to_agent",
+          "args": {
+            "objective": "[redacted:objective:44]",
+            "agent_name": "[redacted:agent_name:45]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0043",
+                "name": "delegate_to_agent",
+                "response": {
+                  "output": "[redacted:output:46]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:38:21.123Z",
+          "resultDisplay": "[redacted:resultDisplay:47]",
+          "displayName": "Delegate to Agent",
+          "description": "[redacted:description:48]",
+          "renderOutputAsMarkdown": true
+        }
+      ],
+      "thoughts": [],
+      "model": "gemini-3-pro-preview",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cached": 0,
+        "thoughts": 0,
+        "tool": 0,
+        "total": 0
+      }
+    },
+    {
+      "id": "id-0049",
+      "timestamp": "2026-01-20T05:38:27.300Z",
+      "type": "gemini",
+      "content": "[redacted:content:50]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:51]",
+          "description": "[redacted:description:52]",
+          "timestamp": "2026-01-20T05:38:24.736Z"
+        },
+        {
+          "subject": "[redacted:subject:53]",
+          "description": "[redacted:description:54]",
+          "timestamp": "2026-01-20T05:38:27.144Z"
+        }
+      ],
+      "tokens": {
+        "input": 27435,
+        "output": 62,
+        "cached": 19419,
+        "thoughts": 314,
+        "tool": 0,
+        "total": 27811
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0055",
+          "name": "register_agent",
+          "args": {
+            "task_description": "[redacted:task_description:56]",
+            "program": "[redacted:program:57]",
+            "project_key": "[redacted:project_key:58]",
+            "model": "gemini-2.0-flash-thinking-exp"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0055",
+                "name": "register_agent",
+                "response": {
+                  "output": "[redacted:output:59]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:38:29.971Z",
+          "resultDisplay": "[redacted:resultDisplay:60]",
+          "displayName": "register_agent (mcp-agent-mail MCP Server)",
+          "description": "[redacted:description:61]",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    },
+    {
+      "id": "id-0062",
+      "timestamp": "2026-01-20T05:38:43.815Z",
+      "type": "gemini",
+      "content": "[redacted:content:63]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:64]",
+          "description": "[redacted:description:65]",
+          "timestamp": "2026-01-20T05:38:35.302Z"
+        },
+        {
+          "subject": "[redacted:subject:66]",
+          "description": "[redacted:description:67]",
+          "timestamp": "2026-01-20T05:38:38.627Z"
+        },
+        {
+          "subject": "[redacted:subject:68]",
+          "description": "[redacted:description:69]",
+          "timestamp": "2026-01-20T05:38:41.631Z"
+        },
+        {
+          "subject": "[redacted:subject:70]",
+          "description": "[redacted:description:71]",
+          "timestamp": "2026-01-20T05:38:43.646Z"
+        }
+      ],
+      "tokens": {
+        "input": 27632,
+        "output": 49,
+        "cached": 25669,
+        "thoughts": 858,
+        "tool": 0,
+        "total": 28539
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0072",
+          "name": "list_directory",
+          "args": {
+            "dir_path": "[redacted:dir_path:73]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0072",
+                "name": "list_directory",
+                "response": {
+                  "output": "[redacted:output:74]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:38:43.823Z",
+          "resultDisplay": "[redacted:resultDisplay:75]",
+          "displayName": "ReadFolder",
+          "description": "[redacted:description:76]",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    },
+    {
+      "id": "id-0077",
+      "timestamp": "2026-01-20T05:38:49.709Z",
+      "type": "gemini",
+      "content": "[redacted:content:78]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:79]",
+          "description": "[redacted:description:80]",
+          "timestamp": "2026-01-20T05:38:47.657Z"
+        },
+        {
+          "subject": "[redacted:subject:81]",
+          "description": "[redacted:description:82]",
+          "timestamp": "2026-01-20T05:38:49.533Z"
+        }
+      ],
+      "tokens": {
+        "input": 27747,
+        "output": 80,
+        "cached": 25063,
+        "thoughts": 248,
+        "tool": 0,
+        "total": 28075
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0083",
+          "name": "run_shell_command",
+          "args": {
+            "command": "[redacted:command:84]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0083",
+                "name": "run_shell_command",
+                "response": {
+                  "output": "[redacted:output:85]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:38:49.839Z",
+          "resultDisplay": "[redacted:resultDisplay:86]",
+          "displayName": "Shell",
+          "description": "[redacted:description:87]",
+          "renderOutputAsMarkdown": false
+        }
+      ]
+    },
+    {
+      "id": "id-0088",
+      "timestamp": "2026-01-20T05:38:54.534Z",
+      "type": "gemini",
+      "content": "[redacted:content:89]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:90]",
+          "description": "[redacted:description:91]",
+          "timestamp": "2026-01-20T05:38:53.562Z"
+        },
+        {
+          "subject": "[redacted:subject:92]",
+          "description": "[redacted:description:93]",
+          "timestamp": "2026-01-20T05:38:54.403Z"
+        }
+      ],
+      "tokens": {
+        "input": 27927,
+        "output": 52,
+        "cached": 24911,
+        "thoughts": 128,
+        "tool": 0,
+        "total": 28107
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0094",
+          "name": "run_shell_command",
+          "args": {
+            "command": "[redacted:command:95]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0094",
+                "name": "run_shell_command",
+                "response": {
+                  "output": "[redacted:output:96]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:38:54.658Z",
+          "resultDisplay": "[redacted:resultDisplay:97]",
+          "displayName": "Shell",
+          "description": "[redacted:description:98]",
+          "renderOutputAsMarkdown": false
+        }
+      ]
+    },
+    {
+      "id": "id-0099",
+      "timestamp": "2026-01-20T05:39:03.354Z",
+      "type": "gemini",
+      "content": "[redacted:content:100]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:101]",
+          "description": "[redacted:description:102]",
+          "timestamp": "2026-01-20T05:38:58.573Z"
+        },
+        {
+          "subject": "[redacted:subject:103]",
+          "description": "[redacted:description:104]",
+          "timestamp": "2026-01-20T05:39:01.902Z"
+        },
+        {
+          "subject": "[redacted:subject:105]",
+          "description": "[redacted:description:106]",
+          "timestamp": "2026-01-20T05:39:03.212Z"
+        }
+      ],
+      "tokens": {
+        "input": 28106,
+        "output": 62,
+        "cached": 24843,
+        "thoughts": 463,
+        "tool": 0,
+        "total": 28631
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0107",
+          "name": "run_shell_command",
+          "args": {
+            "command": "[redacted:command:108]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0107",
+                "name": "run_shell_command",
+                "response": {
+                  "output": "[redacted:output:109]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:39:03.491Z",
+          "resultDisplay": "[redacted:resultDisplay:110]",
+          "displayName": "Shell",
+          "description": "[redacted:description:111]",
+          "renderOutputAsMarkdown": false
+        }
+      ]
+    },
+    {
+      "id": "id-0112",
+      "timestamp": "2026-01-20T05:39:08.631Z",
+      "type": "gemini",
+      "content": "[redacted:content:113]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:114]",
+          "description": "[redacted:description:115]",
+          "timestamp": "2026-01-20T05:39:07.366Z"
+        },
+        {
+          "subject": "[redacted:subject:116]",
+          "description": "[redacted:description:117]",
+          "timestamp": "2026-01-20T05:39:08.479Z"
+        }
+      ],
+      "tokens": {
+        "input": 28279,
+        "output": 67,
+        "cached": 27624,
+        "thoughts": 180,
+        "tool": 0,
+        "total": 28526
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0118",
+          "name": "run_shell_command",
+          "args": {
+            "command": "[redacted:command:119]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0118",
+                "name": "run_shell_command",
+                "response": {
+                  "output": "[redacted:output:120]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:39:08.751Z",
+          "resultDisplay": "[redacted:resultDisplay:121]",
+          "displayName": "Shell",
+          "description": "[redacted:description:122]",
+          "renderOutputAsMarkdown": false
+        }
+      ]
+    },
+    {
+      "id": "id-0123",
+      "timestamp": "2026-01-20T05:39:12.868Z",
+      "type": "gemini",
+      "content": "[redacted:content:124]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:125]",
+          "description": "[redacted:description:126]",
+          "timestamp": "2026-01-20T05:39:12.684Z"
+        }
+      ],
+      "tokens": {
+        "input": 28480,
+        "output": 68,
+        "cached": 27521,
+        "thoughts": 62,
+        "tool": 0,
+        "total": 28610
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0127",
+          "name": "run_shell_command",
+          "args": {
+            "command": "[redacted:command:128]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0127",
+                "name": "run_shell_command",
+                "response": {
+                  "output": "[redacted:output:129]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:39:12.986Z",
+          "resultDisplay": "[redacted:resultDisplay:130]",
+          "displayName": "Shell",
+          "description": "[redacted:description:131]",
+          "renderOutputAsMarkdown": false
+        }
+      ]
+    },
+    {
+      "id": "id-0132",
+      "timestamp": "2026-01-20T05:39:19.219Z",
+      "type": "gemini",
+      "content": "[redacted:content:133]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:134]",
+          "description": "[redacted:description:135]",
+          "timestamp": "2026-01-20T05:39:17.996Z"
+        },
+        {
+          "subject": "[redacted:subject:136]",
+          "description": "[redacted:description:137]",
+          "timestamp": "2026-01-20T05:39:19.064Z"
+        }
+      ],
+      "tokens": {
+        "input": 28632,
+        "output": 65,
+        "cached": 27492,
+        "thoughts": 145,
+        "tool": 0,
+        "total": 28842
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0138",
+          "name": "run_shell_command",
+          "args": {
+            "command": "[redacted:command:139]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0138",
+                "name": "run_shell_command",
+                "response": {
+                  "output": "[redacted:output:140]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:39:19.367Z",
+          "resultDisplay": "[redacted:resultDisplay:141]",
+          "displayName": "Shell",
+          "description": "[redacted:description:142]",
+          "renderOutputAsMarkdown": false
+        }
+      ]
+    },
+    {
+      "id": "id-0143",
+      "timestamp": "2026-01-20T05:39:23.685Z",
+      "type": "gemini",
+      "content": "[redacted:content:144]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:145]",
+          "description": "[redacted:description:146]",
+          "timestamp": "2026-01-20T05:39:23.550Z"
+        },
+        {
+          "subject": "[redacted:subject:147]",
+          "description": "[redacted:description:148]",
+          "timestamp": "2026-01-20T05:39:23.554Z"
+        }
+      ],
+      "tokens": {
+        "input": 29529,
+        "output": 78,
+        "cached": 27584,
+        "thoughts": 84,
+        "tool": 0,
+        "total": 29691
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0149",
+          "name": "run_shell_command",
+          "args": {
+            "command": "[redacted:command:150]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0149",
+                "name": "run_shell_command",
+                "response": {
+                  "output": "[redacted:output:151]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:39:23.802Z",
+          "resultDisplay": "[redacted:resultDisplay:152]",
+          "displayName": "Shell",
+          "description": "[redacted:description:153]",
+          "renderOutputAsMarkdown": false
+        }
+      ]
+    },
+    {
+      "id": "id-0154",
+      "timestamp": "2026-01-20T05:39:28.191Z",
+      "type": "gemini",
+      "content": "[redacted:content:155]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:156]",
+          "description": "[redacted:description:157]",
+          "timestamp": "2026-01-20T05:39:28.056Z"
+        },
+        {
+          "subject": "[redacted:subject:158]",
+          "description": "[redacted:description:159]",
+          "timestamp": "2026-01-20T05:39:28.057Z"
+        }
+      ],
+      "tokens": {
+        "input": 29700,
+        "output": 84,
+        "cached": 27545,
+        "thoughts": 86,
+        "tool": 0,
+        "total": 29870
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0160",
+          "name": "run_shell_command",
+          "args": {
+            "command": "[redacted:command:161]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0160",
+                "name": "run_shell_command",
+                "response": {
+                  "output": "[redacted:output:162]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:39:28.309Z",
+          "resultDisplay": "[redacted:resultDisplay:163]",
+          "displayName": "Shell",
+          "description": "[redacted:description:164]",
+          "renderOutputAsMarkdown": false
+        }
+      ]
+    },
+    {
+      "id": "id-0165",
+      "timestamp": "2026-01-20T05:39:35.362Z",
+      "type": "gemini",
+      "content": "[redacted:content:166]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:167]",
+          "description": "[redacted:description:168]",
+          "timestamp": "2026-01-20T05:39:33.039Z"
+        },
+        {
+          "subject": "[redacted:subject:169]",
+          "description": "[redacted:description:170]",
+          "timestamp": "2026-01-20T05:39:35.099Z"
+        }
+      ],
+      "tokens": {
+        "input": 29885,
+        "output": 103,
+        "cached": 27508,
+        "thoughts": 261,
+        "tool": 0,
+        "total": 30249
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0171",
+          "name": "send_message",
+          "args": {
+            "sender_name": "[redacted:sender_name:172]",
+            "body_md": "[redacted:body_md:173]",
+            "subject": "[redacted:subject:174]",
+            "to": [
+              "[redacted:to:175]",
+              "[redacted:to:176]"
+            ],
+            "project_key": "[redacted:project_key:177]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0171",
+                "name": "send_message",
+                "response": {
+                  "error": "[redacted:error:178]"
+                }
+              }
+            }
+          ],
+          "status": "error",
+          "timestamp": "2026-01-20T05:39:36.653Z",
+          "resultDisplay": "[redacted:resultDisplay:179]",
+          "displayName": "send_message (mcp-agent-mail MCP Server)",
+          "description": "[redacted:description:180]",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    },
+    {
+      "id": "id-0181",
+      "timestamp": "2026-01-20T05:39:47.744Z",
+      "type": "gemini",
+      "content": "[redacted:content:182]",
+      "thoughts": [
+        {
+          "subject": "[redacted:subject:183]",
+          "description": "[redacted:description:184]",
+          "timestamp": "2026-01-20T05:39:40.478Z"
+        },
+        {
+          "subject": "[redacted:subject:185]",
+          "description": "[redacted:description:186]",
+          "timestamp": "2026-01-20T05:39:43.708Z"
+        },
+        {
+          "subject": "[redacted:subject:187]",
+          "description": "[redacted:description:188]",
+          "timestamp": "2026-01-20T05:39:46.257Z"
+        }
+      ],
+      "tokens": {
+        "input": 30162,
+        "output": 166,
+        "cached": 27362,
+        "thoughts": 660,
+        "tool": 0,
+        "total": 30988
+      },
+      "model": "gemini-3-pro-preview",
+      "toolCalls": [
+        {
+          "id": "id-0189",
+          "name": "request_contact",
+          "args": {
+            "to_agent": "[redacted:to_agent:190]",
+            "from_agent": "[redacted:from_agent:191]",
+            "reason": "[redacted:reason:192]",
+            "project_key": "[redacted:project_key:193]",
+            "to_project": "[redacted:to_project:194]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0189",
+                "name": "request_contact",
+                "response": {
+                  "error": "[redacted:error:195]"
+                }
+              }
+            }
+          ],
+          "status": "error",
+          "timestamp": "2026-01-20T05:39:51.662Z",
+          "resultDisplay": "[redacted:resultDisplay:196]",
+          "displayName": "request_contact (mcp-agent-mail MCP Server)",
+          "description": "[redacted:description:197]",
+          "renderOutputAsMarkdown": true
+        },
+        {
+          "id": "id-0198",
+          "name": "request_contact",
+          "args": {
+            "to_project": "[redacted:to_project:199]",
+            "from_agent": "[redacted:from_agent:200]",
+            "reason": "[redacted:reason:201]",
+            "to_agent": "[redacted:to_agent:202]",
+            "project_key": "[redacted:project_key:203]"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "id-0198",
+                "name": "request_contact",
+                "response": {
+                  "output": "[redacted:output:204]"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-20T05:39:51.662Z",
+          "resultDisplay": "[redacted:resultDisplay:205]",
+          "displayName": "request_contact (mcp-agent-mail MCP Server)",
+          "description": "[redacted:description:206]",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    }
+  ],
+  "summary": "[redacted:summary:207]"
+}

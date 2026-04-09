@@ -1,0 +1,8 @@
+{"type":"session_meta","timestamp":1737200000.0,"payload":{"id":"codex-exec-001","cwd":"/data/projects/demo","originator":"codex_exec"}}
+{"type":"event_msg","timestamp":1737200001.0,"payload":{"type":"user_message","message":"List the files in the current directory"}}
+{"type":"response_item","timestamp":1737200002.0,"payload":{"role":"assistant","content":[{"type":"output_text","text":"I will list the files for you."}]}}
+{"type":"response_item","timestamp":1737200003.0,"payload":{"type":"function_call","call_id":"call_001","name":"shell","arguments":"{\"command\":\"ls -la\"}"}}
+{"type":"response_item","timestamp":1737200004.0,"payload":{"type":"function_call_output","call_id":"call_001","output":"total 42\ndrwxr-xr-x  3 user user 4096 README.md\n"}}
+{"type":"response_item","timestamp":1737200005.0,"payload":{"role":"assistant","content":[{"type":"output_text","text":"Here are the files in the current directory."}]}}
+{"type":"event_msg","timestamp":1737200006.0,"payload":{"type":"user_message","message":"Thanks!"}}
+{"type":"response_item","timestamp":1737200007.0,"payload":{"role":"assistant","content":[{"type":"output_text","text":"You're welcome!"}]}}

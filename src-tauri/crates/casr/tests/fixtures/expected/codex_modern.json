@@ -1,0 +1,16 @@
+{
+  "fixture_id": "codex_modern",
+  "provider_slug": "codex",
+  "session_id": "codex-modern-001",
+  "workspace": "/data/projects/backend",
+  "title": "Optimize the database query in users.rs",
+  "message_count": 4,
+  "roles": ["User", "Assistant", "User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": null,
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "Modern JSONL envelope format with session_meta, event_msg(user_message), and response_item entries. 2 user + 2 assistant messages."
+}

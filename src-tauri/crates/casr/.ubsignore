@@ -1,0 +1,17 @@
+# UBS ignore globs for casr.
+#
+# UBS is most valuable on production Rust sources. Our test suite intentionally
+# uses `panic!`, `unwrap()`, and other patterns that are noise for UBS.
+
+tests/**
+scripts/**
+docs/**
+.beads/**
+target/**
+
+# UBS staged/diff mode scans a shadow workspace that may include path prefixes.
+**/tests/**
+**/scripts/**
+**/docs/**
+**/.beads/**
+**/target/**

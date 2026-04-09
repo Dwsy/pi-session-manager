@@ -1,0 +1,16 @@
+{
+  "fixture_id": "codex_reasoning",
+  "provider_slug": "codex",
+  "session_id": "codex-reasoning-001",
+  "workspace": "/data/projects/compiler",
+  "title": "Fix the type checker bug with generic bounds",
+  "message_count": 6,
+  "roles": ["User", "Assistant", "Assistant", "User", "Assistant", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": null,
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "Includes agent_reasoning event_msg entries which are extracted as Assistant messages with author='reasoning'. Results in consecutive assistant messages (reasoning + response_item)."
+}

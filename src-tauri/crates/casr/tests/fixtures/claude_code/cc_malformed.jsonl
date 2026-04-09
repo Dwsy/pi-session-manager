@@ -1,0 +1,7 @@
+{"parentUuid":null,"isSidechain":false,"userType":"external","cwd":"/data/projects/robust","sessionId":"cc-malformed-001","version":"1.0.27","type":"user","message":{"role":"user","content":"First valid message"},"uuid":"mf-001","timestamp":"2026-01-18T12:00:00.000Z"}
+this is not valid json at all
+{"truncated json": "missing close brace
+{"parentUuid":"mf-001","isSidechain":false,"userType":"external","cwd":"/data/projects/robust","sessionId":"cc-malformed-001","version":"1.0.27","type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Second valid message, after garbage lines"}],"model":"claude-sonnet-4-5-20250929"},"uuid":"mf-002","timestamp":"2026-01-18T12:00:10.000Z"}
+
+{"parentUuid":"mf-002","isSidechain":false,"userType":"external","cwd":"/data/projects/robust","sessionId":"cc-malformed-001","version":"1.0.27","type":"user","message":{"role":"user","content":"Third valid message"},"uuid":"mf-003","timestamp":"2026-01-18T12:00:20.000Z"}
+{"parentUuid":"mf-003","isSidechain":false,"userType":"external","cwd":"/data/projects/robust","sessionId":"cc-malformed-001","version":"1.0.27","type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Fourth valid message"}],"model":"claude-sonnet-4-5-20250929"},"uuid":"mf-004","timestamp":"2026-01-18T12:00:30.000Z"}

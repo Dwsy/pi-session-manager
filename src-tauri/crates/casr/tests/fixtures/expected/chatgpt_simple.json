@@ -1,0 +1,16 @@
+{
+  "fixture_id": "chatgpt_simple",
+  "provider_slug": "chatgpt",
+  "session_id": "chatgpt-conv-001",
+  "workspace": null,
+  "title": "Understanding Rust lifetimes",
+  "message_count": 4,
+  "roles": ["User", "Assistant", "User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": null,
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": ["workspace"],
+  "notes": "ChatGPT mapping-format JSON with parent chain traversal. Float timestamps. Model from metadata.model_slug."
+}

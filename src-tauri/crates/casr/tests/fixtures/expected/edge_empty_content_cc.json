@@ -1,0 +1,16 @@
+{
+  "fixture_id": "edge_empty_content_cc",
+  "provider_slug": "claude-code",
+  "session_id": "edge-empty-001",
+  "workspace": "/data/projects/edge",
+  "title": "Real message before empties",
+  "message_count": 2,
+  "roles": ["User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "claude-sonnet-4-5-20250929",
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": ["empty and whitespace-only assistant messages dropped"],
+  "notes": "Contains 2 empty/whitespace-only assistant messages (ee-002, ee-003) that should be skipped. Only the first user message and the last valid assistant message survive."
+}

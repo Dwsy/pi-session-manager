@@ -1,0 +1,381 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    name: Check, Lint, Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --lib
+
+      - name: CASS independence guardrail
+        run: |
+          # Fail if Cargo.toml or Cargo.lock references coding_agent_session_search
+          if grep -q 'coding_agent_session_search' Cargo.toml Cargo.lock 2>/dev/null; then
+            echo "::error::Cargo.toml or Cargo.lock references coding_agent_session_search. casr must not depend on CASS at runtime."
+            exit 1
+          fi
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Integration tests
+        run: cargo test --tests -- --test-threads=4
+        env:
+          NO_COLOR: "1"
+
+  test-report:
+    name: Test Report (JSON)
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run tests (libtest JSONL)
+        run: |
+          set -euo pipefail
+          cargo test --all-targets -- \
+            --test-threads=1 \
+            -Z unstable-options \
+            --format json \
+            --report-time \
+            --show-output \
+            | grep -E '^[[:space:]]*\\{' \
+            | tee test-report.jsonl
+        env:
+          NO_COLOR: "1"
+
+      - name: Generate consolidated JSON report
+        run: python3 scripts/test_report.py --input test-report.jsonl --output test-report.json
+
+      - name: Upload test report artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: casr-test-report
+          path: |
+            test-report.json
+            test-report.jsonl
+
+  coverage:
+    name: Coverage (llvm-cov)
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: llvm-tools-preview
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Run tests with coverage instrumentation
+        run: cargo llvm-cov --all-targets --no-report
+        env:
+          NO_COLOR: "1"
+
+      - name: Generate lcov summary
+        run: cargo llvm-cov report --lcov --summary-only --output-path lcov.info
+        env:
+          NO_COLOR: "1"
+
+      - name: Enforce coverage thresholds
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+
+          def main():
+              workspace = os.path.abspath(os.environ.get("GITHUB_WORKSPACE", os.getcwd()))
+              src_dir = os.path.join(workspace, "src") + os.sep
+
+              lcov_path = os.path.join(workspace, "lcov.info")
+              if not os.path.exists(lcov_path):
+                  print("::error::lcov.info not found (cargo llvm-cov step failed?)")
+                  return 1
+
+              records = {}
+              cur_sf = None
+              cur_lf = None
+              cur_lh = None
+
+              def flush():
+                  nonlocal cur_sf, cur_lf, cur_lh
+                  if cur_sf is None:
+                      return
+                  sf = cur_sf
+                  if not os.path.isabs(sf):
+                      sf = os.path.abspath(os.path.join(workspace, sf))
+                  lf = int(cur_lf or 0)
+                  lh = int(cur_lh or 0)
+                  prev_lf, prev_lh = records.get(sf, (0, 0))
+                  records[sf] = (prev_lf + lf, prev_lh + lh)
+                  cur_sf = None
+                  cur_lf = None
+                  cur_lh = None
+
+              with open(lcov_path, "r", encoding="utf-8", errors="replace") as f:
+                  for raw in f:
+                      line = raw.strip()
+                      if line.startswith("SF:"):
+                          flush()
+                          cur_sf = line[3:]
+                      elif line.startswith("LF:"):
+                          try:
+                              cur_lf = int(line[3:])
+                          except ValueError:
+                              cur_lf = 0
+                      elif line.startswith("LH:"):
+                          try:
+                              cur_lh = int(line[3:])
+                          except ValueError:
+                              cur_lh = 0
+                      elif line == "end_of_record":
+                          flush()
+              flush()
+
+              src_tot_lf = 0
+              src_tot_lh = 0
+              per_rel = {}
+
+              for sf, (lf, lh) in records.items():
+                  if not sf.startswith(src_dir):
+                      continue
+                  src_tot_lf += lf
+                  src_tot_lh += lh
+                  rel = os.path.relpath(sf, workspace).replace(os.sep, "/")
+                  prev_lf, prev_lh = per_rel.get(rel, (0, 0))
+                  per_rel[rel] = (prev_lf + lf, prev_lh + lh)
+
+              def pct(hit, found):
+                  return (100.0 * hit / found) if found else 0.0
+
+              ok = True
+
+              overall = pct(src_tot_lh, src_tot_lf)
+              print(f"overall(src): {overall:.2f}% ({src_tot_lh}/{src_tot_lf})")
+              if overall + 1e-9 < 70.0:
+                  print(
+                      f"::error::Overall src coverage {overall:.2f}% < 70.00% ({src_tot_lh}/{src_tot_lf})"
+                  )
+                  ok = False
+
+              def require(rel, min_pct):
+                  nonlocal ok
+                  lf, lh = per_rel.get(rel, (0, 0))
+                  if lf == 0:
+                      print(f"::error::No line coverage data found for {rel}")
+                      ok = False
+                      return
+                  p = pct(lh, lf)
+                  print(f"{rel}: {p:.2f}% ({lh}/{lf})")
+                  if p + 1e-9 < min_pct:
+                      print(f"::error::{rel} coverage {p:.2f}% < {min_pct:.2f}% ({lh}/{lf})")
+                      ok = False
+
+              require("src/model.rs", 80.0)
+              require("src/pipeline.rs", 80.0)
+
+              return 0 if ok else 1
+
+          sys.exit(main())
+          PY
+
+      - name: Generate HTML report
+        run: cargo llvm-cov report --html
+        env:
+          NO_COLOR: "1"
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: llvm-cov
+          path: |
+            lcov.info
+            target/llvm-cov/html
+
+  roundtrip:
+    name: Roundtrip Fidelity Matrix
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Roundtrip tests
+        run: cargo test --test roundtrip_test -- --test-threads=1 --nocapture
+        env:
+          NO_COLOR: "1"
+
+  perf-regression:
+    name: Perf Regression Gates
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Scalability regression test
+        run: cargo test --test scalability_test -- --nocapture --test-threads=1
+        env:
+          NO_COLOR: "1"
+          CASR_PERF_METRICS_FILE: perf-metrics.json
+
+      - name: Validate perf metrics artifact
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          def main() -> int:
+              path = os.environ.get("CASR_PERF_METRICS_FILE", "perf-metrics.json")
+              if not os.path.exists(path):
+                  print(f"::error::{path} not found (scalability_test did not write metrics)")
+                  return 1
+
+              with open(path, "r", encoding="utf-8") as f:
+                  metrics = json.load(f)
+
+              ok = True
+
+              suite = metrics.get("suite")
+              if suite != "scalability_regression":
+                  print(f"::error::unexpected suite={suite!r}")
+                  ok = False
+
+              discovery = metrics.get("discovery") or {}
+
+              def check_leq(name: str, value, budget) -> None:
+                  nonlocal ok
+                  if value is None or budget is None:
+                      print(f"::error::missing {name} value/budget")
+                      ok = False
+                      return
+                  if value > budget:
+                      print(f"::error::{name} exceeded: {value}ms > {budget}ms")
+                      ok = False
+                  print(f"{name}: {value}ms (budget {budget}ms)")
+
+              check_leq(
+                  "discovery(found)",
+                  discovery.get("found_elapsed_ms"),
+                  discovery.get("found_budget_ms"),
+              )
+              check_leq(
+                  "discovery(miss)",
+                  discovery.get("miss_elapsed_ms"),
+                  discovery.get("miss_budget_ms"),
+              )
+
+              min_tp = metrics.get("min_reader_throughput_msg_per_sec")
+              if min_tp is None:
+                  print("::error::missing min_reader_throughput_msg_per_sec")
+                  ok = False
+                  min_tp = 0.0
+
+              readers = metrics.get("readers")
+              if not isinstance(readers, list) or not readers:
+                  print("::error::missing readers metrics")
+                  ok = False
+              else:
+                  for r in readers:
+                      provider = r.get("provider", "<unknown>")
+                      tp = r.get("throughput_msg_per_sec")
+                      if tp is None:
+                          print(f"::error::{provider} missing throughput_msg_per_sec")
+                          ok = False
+                          continue
+                      if tp < min_tp:
+                          print(
+                              f"::error::{provider} throughput too low: {tp:.2f} < {min_tp:.2f} msg/s"
+                          )
+                          ok = False
+                      print(f"{provider}: {tp:.2f} msg/s (min {min_tp:.2f})")
+
+              return 0 if ok else 1
+
+          sys.exit(main())
+          PY
+
+      - name: Upload perf metrics artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: casr-perf-metrics
+          path: perf-metrics.json
+
+  e2e:
+    name: End-to-End Shell Tests
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build debug binary
+        run: cargo build
+
+      - name: Run e2e test script
+        run: VERBOSE=1 bash scripts/e2e_test.sh
+        env:
+          NO_COLOR: "1"
+
+  build:
+    name: Release build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build release
+        run: cargo build --release

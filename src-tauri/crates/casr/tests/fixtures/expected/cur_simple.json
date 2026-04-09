@@ -1,0 +1,16 @@
+{
+  "fixture_id": "cur_simple",
+  "provider_slug": "cursor",
+  "session_id": "cur-composer-001",
+  "workspace": "/home/user/webapp",
+  "title": "Implement database connection pooling",
+  "message_count": 4,
+  "roles": ["User", "Assistant", "User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "gpt-4",
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "Cursor state.vscdb SQLite with modern v0.40+ fullConversationHeadersOnly format. Workspace from bubble workspaceProjectDir."
+}

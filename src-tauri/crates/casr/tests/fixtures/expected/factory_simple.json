@@ -1,0 +1,16 @@
+{
+  "fixture_id": "factory_simple",
+  "provider_slug": "factory",
+  "session_id": "factory-sess-001",
+  "workspace": "/home/user/webapp",
+  "title": "Refactor authentication module",
+  "message_count": 4,
+  "roles": ["User", "Assistant", "User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": null,
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "Factory JSONL with session_start header, 4 message entries. Workspace from cwd in header. Model from message entries."
+}

@@ -1,0 +1,4 @@
+{"role":"user","content":"Can you help me understand how async works in Rust?","timestamp":"2025-01-27T03:30:00.000Z"}
+{"role":"assistant","content":"Async in Rust uses futures and the async/await syntax. A future represents a value that may not be available yet. When you mark a function as `async`, it returns a `Future` that must be polled to completion by an executor like tokio.","timestamp":"2025-01-27T03:30:05.000Z"}
+{"role":"user","content":"What about pinning? When do I need Pin?","timestamp":"2025-01-27T03:31:00.000Z"}
+{"role":"assistant","content":"You need `Pin` when a future is self-referential — meaning it contains pointers to its own data. Most commonly you encounter this with `Box::pin()` when storing futures in collections or returning them from trait methods. The `pin!` macro helps with stack-pinning local futures.","timestamp":"2025-01-27T03:31:08.000Z"}

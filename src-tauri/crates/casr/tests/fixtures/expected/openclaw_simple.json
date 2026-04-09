@@ -1,0 +1,16 @@
+{
+  "fixture_id": "openclaw_simple",
+  "provider_slug": "openclaw",
+  "session_id": "openclaw_simple",
+  "workspace": "/home/user/project",
+  "title": "Add error handling to the database connection pool",
+  "message_count": 4,
+  "roles": ["User", "Assistant", "User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "claude-opus-4-5",
+  "has_tool_calls": true,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "OpenClaw JSONL with session header and sequential message IDs. Has toolCall content blocks in assistant messages."
+}

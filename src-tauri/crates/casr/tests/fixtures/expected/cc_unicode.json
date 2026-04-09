@@ -1,0 +1,16 @@
+{
+  "fixture_id": "cc_unicode",
+  "provider_slug": "claude-code",
+  "session_id": "cc-unicode-001",
+  "workspace": "/data/projects/i18n-app",
+  "title_starts_with": "Add Japanese localization",
+  "message_count": 2,
+  "roles": ["User", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "claude-sonnet-4-5-20250929",
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "Session with Japanese, Chinese, and emoji characters in content. Verifies UTF-8 round-trip fidelity."
+}

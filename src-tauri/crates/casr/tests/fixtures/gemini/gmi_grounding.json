@@ -1,0 +1,37 @@
+{
+  "sessionId": "gmi-grounding-001",
+  "startTime": "2026-01-16T11:00:00.000Z",
+  "lastUpdated": "2026-01-16T11:10:00.000Z",
+  "messages": [
+    {
+      "type": "user",
+      "content": "What's the latest Rust edition and its key features?",
+      "timestamp": "2026-01-16T11:00:00.000Z"
+    },
+    {
+      "type": "model",
+      "content": [
+        {"type": "text", "text": "The Rust 2024 edition introduces several key features including gen blocks, let chains in if/while, and improved async support."},
+        {"type": "grounding", "source": "doc://rust-edition-guide"}
+      ],
+      "timestamp": "2026-01-16T11:00:30.000Z",
+      "groundingMetadata": {"sourceCount": 1},
+      "citations": [{"uri": "doc://rust-edition-guide", "title": "Rust Edition Guide"}]
+    },
+    {
+      "type": "user",
+      "content": "How do gen blocks work?",
+      "timestamp": "2026-01-16T11:05:00.000Z"
+    },
+    {
+      "type": "model",
+      "content": [
+        {"type": "text", "text": "Gen blocks allow you to define iterators inline using yield syntax. They simplify creating complex iterators."},
+        {"type": "grounding", "source": "doc://rust-gen-blocks"}
+      ],
+      "timestamp": "2026-01-16T11:06:00.000Z",
+      "groundingMetadata": {"sourceCount": 1},
+      "citations": [{"uri": "doc://rust-gen-blocks", "title": "Gen Blocks RFC"}]
+    }
+  ]
+}

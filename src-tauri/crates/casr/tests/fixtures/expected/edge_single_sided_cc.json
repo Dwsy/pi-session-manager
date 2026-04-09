@@ -1,0 +1,16 @@
+{
+  "fixture_id": "edge_single_sided_cc",
+  "provider_slug": "claude-code",
+  "session_id": "edge-single-001",
+  "workspace": "/data/projects/edge",
+  "title": "First user message only",
+  "message_count": 3,
+  "roles": ["User", "User", "User"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": null,
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "All 3 messages are user-only. No assistant ever responded. Validation should flag this as an error (missing assistant messages). Tests single-sided conversation handling."
+}

@@ -1,0 +1,27 @@
+{
+  "sessionId": "gmi-simple-001",
+  "startTime": "2026-01-14T16:00:00.000Z",
+  "lastUpdated": "2026-01-14T16:05:00.000Z",
+  "messages": [
+    {
+      "type": "user",
+      "content": "Create a REST API endpoint for user profiles",
+      "timestamp": "2026-01-14T16:00:00.000Z"
+    },
+    {
+      "type": "model",
+      "content": "I'll create a REST endpoint at /api/users/:id with GET, PUT, and DELETE methods.",
+      "timestamp": "2026-01-14T16:00:30.000Z"
+    },
+    {
+      "type": "user",
+      "content": "Add input validation too",
+      "timestamp": "2026-01-14T16:02:00.000Z"
+    },
+    {
+      "type": "model",
+      "content": "Added validation for email format, username length (3-50 chars), and required fields.",
+      "timestamp": "2026-01-14T16:03:00.000Z"
+    }
+  ]
+}

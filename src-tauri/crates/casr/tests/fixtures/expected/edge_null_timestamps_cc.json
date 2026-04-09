@@ -1,0 +1,16 @@
+{
+  "fixture_id": "edge_null_timestamps_cc",
+  "provider_slug": "claude-code",
+  "session_id": "edge-nots-001",
+  "workspace": "/data/projects/edge",
+  "title": "Message with no timestamp at all",
+  "message_count": 4,
+  "roles": ["User", "Assistant", "User", "Assistant"],
+  "started_at_present": false,
+  "ended_at_present": false,
+  "model_name": "claude-sonnet-4-5-20250929",
+  "has_tool_calls": false,
+  "has_tool_results": false,
+  "known_lossy_fields": [],
+  "notes": "All messages lack timestamp fields entirely. started_at and ended_at should be None. Message timestamps should all be None."
+}
