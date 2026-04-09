@@ -233,13 +233,7 @@ pub fn render_session(
         {
             msg.tool_results
                 .iter()
-                .map(|tr| {
-                    if tr.is_error {
-                        format!("[Tool Error] {}", tr.content)
-                    } else {
-                        format!("[Tool Output] {}", tr.content)
-                    }
-                })
+                .map(|tr| tr.content.clone())
                 .collect::<Vec<_>>()
                 .join("\n")
         } else {
@@ -297,10 +291,6 @@ fn flatten_pi_content(content: &Value) -> String {
                     .get("thinking")
                     .and_then(|t| t.as_str())
                     .map(String::from),
-                Some("toolCall") => block
-                    .get("name")
-                    .and_then(|n| n.as_str())
-                    .map(|n| format!("[Tool: {n}]")),
                 _ => None,
             })
             .collect::<Vec<_>>()

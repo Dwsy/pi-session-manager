@@ -392,19 +392,22 @@ fn response_content(msg: &CanonicalMessage) -> Value {
     }
     for tc in &msg.tool_calls {
         blocks.push(json!({
-            "type": "function_call",
-            "call_id": tc.id.as_deref().unwrap_or(""),
+            "type": "tool_use",
+            "id": tc.id.as_deref().unwrap_or(""),
             "name": tc.name,
-            "arguments": tc.arguments,
+            "input": tc.arguments,
         }));
     }
     for tr in &msg.tool_results {
         blocks.push(json!({
-            "type": "function_call_output",
-            "call_id": tr.call_id.as_deref().unwrap_or(""),
-            "output": tr.content,
+            "type": "tool_result",
+            "tool_use_id": tr.call_id.as_deref().unwrap_or(""),
+            "content": tr.content,
             "is_error": tr.is_error,
         }));
+    }
+    if blocks.is_empty() {
+        blocks.push(json!({"type": text_type, "text": msg.content}));
     }
     Value::Array(blocks)
 }

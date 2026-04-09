@@ -146,11 +146,15 @@ pub fn verify_written_session(
                 index
             ));
         }
-        if normalize_verify_text(&expected.content) != normalize_verify_text(&actual.content) {
+        let expected_text = verification_text(expected);
+        let actual_text = verification_text(actual);
+        if expected_text != actual_text {
             return Err(format!(
-                "Read-back verification failed for {} at message {}: content mismatch",
+                "Read-back verification failed for {} at message {}: content mismatch (expected={:?}, actual={:?})",
                 target.display_name(),
-                index
+                index,
+                truncate_verify_debug(&expected_text),
+                truncate_verify_debug(&actual_text),
             ));
         }
     }
@@ -180,6 +184,34 @@ fn verification_role_bucket(role: &MessageRole) -> &'static str {
 
 fn normalize_verify_text(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn verification_text(message: &CanonicalMessage) -> String {
+    if !message.content.trim().is_empty() {
+        return normalize_verify_text(&message.content);
+    }
+    if !message.tool_results.is_empty() {
+        return normalize_verify_text(
+            &message
+                .tool_results
+                .iter()
+                .map(|result| result.content.as_str())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
+    String::new()
+}
+
+fn truncate_verify_debug(text: &str) -> String {
+    const MAX: usize = 120;
+    let chars = text.chars().collect::<Vec<_>>();
+    if chars.len() <= MAX {
+        return text.to_string();
+    }
+    let mut out = chars.into_iter().take(MAX.saturating_sub(3)).collect::<String>();
+    out.push_str("...");
+    out
 }
 
 fn next_backup_path(target_path: &Path) -> PathBuf {
