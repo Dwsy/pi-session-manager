@@ -1,3 +1,5 @@
+#![allow(unknown_lints)]
+
 use crate::config::{Config, DatasetRegistryEntry, SessionSourceMode};
 use crate::core::scanner::{collect_jsonl_files, parallel_parse_files};
 use crate::data::sqlite;
@@ -260,6 +262,7 @@ async fn download_dataset_files(
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
+    #[allow(clippy::redundant_iter_cloned)]
     let tasks = files.iter().cloned().map(|entry| {
         let client = client.clone();
         let source = source.clone();
