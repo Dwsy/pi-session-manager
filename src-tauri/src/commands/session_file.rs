@@ -337,9 +337,9 @@ pub(super) async fn read_session_file_incremental_offset_impl(
 }
 
 pub(super) async fn get_file_stats_impl(path: String) -> Result<FileStats, String> {
-    let metadata = fs::metadata(crate::domain::session_bridge::backing_file_path(
-        Path::new(&path),
-    ))
+    let metadata = fs::metadata(crate::domain::session_bridge::backing_file_path(Path::new(
+        &path,
+    )))
     .map_err(|e| format!("Failed to get file metadata: {e}"))?;
 
     let modified = metadata

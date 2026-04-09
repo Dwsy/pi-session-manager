@@ -191,10 +191,9 @@ pub async fn open_path_in_system(path: String) -> Result<(), String> {
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn detect_session_format(path: String) -> Result<String, String> {
-    let (provider, _) =
-        crate::domain::session_bridge::read_canonical_session_from_path(
-            std::path::Path::new(&path),
-        )?;
+    let (provider, _) = crate::domain::session_bridge::read_canonical_session_from_path(
+        std::path::Path::new(&path),
+    )?;
     Ok(provider.display_name().to_string())
 }
 
@@ -202,15 +201,13 @@ pub async fn detect_session_format(path: String) -> Result<String, String> {
 pub async fn list_supported_session_providers() -> Result<Vec<SessionProviderInfo>, String> {
     Ok(crate::domain::session_bridge::SessionBridgeSource::ALL
         .into_iter()
-        .map(|source| {
-            SessionProviderInfo {
-                slug: source.slug().replace('_', "-"),
-                display_name: source.display_name().to_string(),
-                capabilities: SessionProviderCapabilities {
-                    can_scan: source.can_scan(),
-                    can_convert_target: source.can_convert_target(),
-                },
-            }
+        .map(|source| SessionProviderInfo {
+            slug: source.slug().replace('_', "-"),
+            display_name: source.display_name().to_string(),
+            capabilities: SessionProviderCapabilities {
+                can_scan: source.can_scan(),
+                can_convert_target: source.can_convert_target(),
+            },
         })
         .collect())
 }

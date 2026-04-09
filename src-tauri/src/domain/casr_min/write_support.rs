@@ -209,7 +209,10 @@ fn truncate_verify_debug(text: &str) -> String {
     if chars.len() <= MAX {
         return text.to_string();
     }
-    let mut out = chars.into_iter().take(MAX.saturating_sub(3)).collect::<String>();
+    let mut out = chars
+        .into_iter()
+        .take(MAX.saturating_sub(3))
+        .collect::<String>();
     out.push_str("...");
     out
 }

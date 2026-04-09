@@ -8,8 +8,8 @@ pub use crate::domain::casr_min::adapters::{
 use crate::domain::casr_min::providers::{detect_provider, ProviderKind};
 use crate::domain::casr_min::write_support;
 use crate::domain::session_bridge::types::{
-    map_read_result, CanonicalSession, SessionBridgeConvertOptions,
-    SessionBridgeConvertResult, SessionBridgeSource,
+    map_read_result, CanonicalSession, SessionBridgeConvertOptions, SessionBridgeConvertResult,
+    SessionBridgeSource,
 };
 
 pub fn default_session_dirs() -> Vec<PathBuf> {
@@ -128,11 +128,7 @@ pub fn convert_session_format(
     options: SessionBridgeConvertOptions,
 ) -> Result<SessionBridgeConvertResult, String> {
     if !options.dry_run {
-        return super::vendor::convert_session_format(
-            path,
-            target,
-            options.force,
-        );
+        return super::vendor::convert_session_format(path, target, options.force);
     }
 
     let (source, canonical) = read_canonical_session_from_path(path)?;

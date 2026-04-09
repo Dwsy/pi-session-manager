@@ -301,9 +301,8 @@ pub(crate) async fn parallel_parse_files(files: Vec<PathBuf>) -> Vec<ParsedFileR
     for file_path in files {
         set.spawn(async move {
             let path_str = file_path.to_string_lossy().to_string();
-            let metadata = fs::metadata(crate::domain::session_bridge::backing_file_path(
-                &file_path,
-            ));
+            let metadata =
+                fs::metadata(crate::domain::session_bridge::backing_file_path(&file_path));
             let file_modified: DateTime<Utc> = match metadata {
                 Ok(m) => DateTime::from(m.modified().unwrap_or(std::time::SystemTime::now())),
                 Err(e) => {
