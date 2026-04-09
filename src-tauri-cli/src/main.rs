@@ -449,7 +449,7 @@ async fn dispatch_command(
                 .unwrap_or(fallback)))
         }
         "get_available_shells" => Ok(serde_json::json!(terminal::scan_shells())),
-        _ => pi_session_manager::dispatch::dispatch(&None, command, payload).await,
+        _ => pi_session_manager::dispatch::dispatch(command, payload).await,
     }
 }
 
