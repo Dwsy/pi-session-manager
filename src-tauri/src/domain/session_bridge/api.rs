@@ -40,16 +40,15 @@ pub fn read_canonical_session_from_path(
         .any(|source| source.matches_path(path));
 
     if should_try_vendor {
-        match super::vendor::read_canonical_session_from_path(path) {
-            Ok(result) => return Ok(result),
-            Err(_) => {}
+        if let Ok(result) = super::vendor::read_canonical_session_from_path(path) {
+            return Ok(result);
         }
     }
 
     if let Some(provider) = detect_provider(Some(path), "") {
         return provider
             .read_session(path)
-            .map(|canonical| (provider.into(), canonical))
+            .map(|canonical| (provider, canonical))
             .map(map_read_result);
     }
 
