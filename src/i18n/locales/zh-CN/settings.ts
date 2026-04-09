@@ -222,6 +222,15 @@ export const settings = {
   externalSessions: {
     title: "其他外部 Session",
     description: "控制是否扫描并显示其他已支持编码 Agent 的本地会话。",
+    providerMatrixTitle: "Provider 列表",
+    providerMatrixHelp:
+      "在同一个列表里管理每个 provider：开启会话扫描显示，或设为默认 Resume 目标。",
+    providerColumn: "Provider",
+    scanColumn: "显示 / 扫描",
+    resumeColumn: "默认 Resume",
+    scanNotApplicable: "内置",
+    setAsDefaultResume: "设为默认",
+    defaultResumeSelected: "已选中",
     enabledProviders: "启用的外部 Provider",
     enabledProvidersHelp: "打开后会扫描并展示这些 provider 的本地会话。",
     providerEnabledHelp: "显示并扫描该外部 provider 的会话。",
@@ -230,11 +239,11 @@ export const settings = {
       "在 session 卡片的来源徽章旁显示 provider 图标。",
     defaultExternalResumeTarget: "默认外部 Resume 目标",
     defaultExternalResumeTargetHelp:
-      "关闭询问弹窗后，非 Pi 会话会直接 Resume 到这个目标 CLI。",
+      "关闭询问弹窗后，任意会话都会直接 Resume 到这个目标 CLI。",
     resumeTargetSelectionHelp:
-      "单项勾选。取消当前选择后，打开非 Pi 会话时会先弹出目标选择窗口。",
+      "单项勾选。取消当前选择后，恢复或复制恢复命令时会先弹出目标选择窗口。",
     resumePromptFallback:
-      "当前未选择默认目标。打开非 Pi 会话时会先弹窗询问要 Resume 到哪个 CLI。",
+      "当前未选择默认目标。恢复或复制恢复命令时会先弹窗询问要使用哪个 CLI。",
   },
   search: {
     defaultSearchMode: "默认搜索模式",

@@ -261,6 +261,15 @@ export const settings = {
     title: "Other external sessions",
     description:
       "Control whether sessions from other supported coding agents should be scanned and shown in the app.",
+    providerMatrixTitle: "Providers",
+    providerMatrixHelp:
+      "Manage each provider in one place: enable scanning for external sessions, or set it as the default resume target.",
+    providerColumn: "Provider",
+    scanColumn: "Show / Scan",
+    resumeColumn: "Default Resume",
+    scanNotApplicable: "Built-in",
+    setAsDefaultResume: "Set default",
+    defaultResumeSelected: "Selected",
     enabledProviders: "Enabled external providers",
     enabledProvidersHelp:
       "Turn on the providers whose local sessions should be scanned and displayed.",
@@ -270,11 +279,11 @@ export const settings = {
       "Display the provider icon next to the source badge in session cards.",
     defaultExternalResumeTarget: "Default external resume target",
     defaultExternalResumeTargetHelp:
-      "When prompt is disabled, non-Pi sessions will be resumed into this target CLI.",
+      "When prompt is disabled, sessions will be resumed into this target CLI.",
     resumeTargetSelectionHelp:
-      "Single choice. Clear the current selection to open a target picker when resuming non-Pi sessions.",
+      "Single choice. Clear the current selection to open a target picker when resuming or copying a resume command.",
     resumePromptFallback:
-      "No default target selected. Non-Pi sessions will ask which CLI to resume into.",
+      "No default target selected. Resuming or copying a resume command will ask which CLI to use.",
   },
   search: {
     defaultSearchMode: "Default Search Mode",
