@@ -270,6 +270,12 @@ export const settings = {
     scanNotApplicable: "Built-in",
     setAsDefaultResume: "Set default",
     defaultResumeSelected: "Selected",
+    includeInStats: "Include external sessions in statistics",
+    includeInStatsHelp:
+      "When disabled, external agent sessions are excluded from dashboard and day statistics.",
+    includeInSearch: "Include external sessions in search",
+    includeInSearchHelp:
+      "When disabled, external agent sessions are excluded from sidebar search and full-text search.",
     enabledProviders: "Enabled external providers",
     enabledProvidersHelp:
       "Turn on the providers whose local sessions should be scanned and displayed.",

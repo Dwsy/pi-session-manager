@@ -11,6 +11,43 @@ const APP_SETTINGS_KEY: &str = "app_settings";
 const SERVER_SETTINGS_KEY: &str = "server_settings";
 const SESSION_PATHS_KEY: &str = "session_paths";
 
+#[cfg(feature = "gui")]
+async fn refresh_sessions_after_settings_change(
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    use tauri::Emitter;
+
+    let previous = crate::core::scanner::get_cached_sessions().unwrap_or_default();
+    crate::core::scanner::invalidate_cache();
+    let current = crate::core::scanner::scan_sessions().await?;
+
+    let previous_paths = previous
+        .iter()
+        .map(|session| session.path.clone())
+        .collect::<std::collections::HashSet<_>>();
+    let current_paths = current
+        .iter()
+        .map(|session| session.path.clone())
+        .collect::<std::collections::HashSet<_>>();
+
+    let removed = previous_paths
+        .difference(&current_paths)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    app_handle
+        .emit(
+            "sessions-changed",
+            crate::types::SessionsDiff {
+                updated: current,
+                removed,
+            },
+        )
+        .map_err(|error| format!("Failed to emit sessions-changed: {error}"))?;
+
+    Ok(())
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct ServerSettings {
     pub ws_enabled: bool,
@@ -85,6 +122,22 @@ pub async fn load_app_settings() -> Result<Value, String> {
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn save_app_settings(settings: Value) -> Result<(), String> {
+    if let Some(session) = settings.get("session").and_then(Value::as_object) {
+        let mut config = crate::config::Config::load().unwrap_or_default();
+        if let Some(value) = session
+            .get("externalSessionsIncludeInStats")
+            .and_then(Value::as_bool)
+        {
+            config.external_sessions_include_in_stats = value;
+        }
+        if let Some(value) = session
+            .get("externalSessionsIncludeInSearch")
+            .and_then(Value::as_bool)
+        {
+            config.external_sessions_include_in_search = value;
+        }
+        crate::config::save_config(&config)?;
+    }
     crate::settings_store::set(APP_SETTINGS_KEY, &settings)
 }
 
@@ -145,6 +198,14 @@ fn inject_session_source_settings(settings: &mut Value) {
                     .collect(),
             ),
         );
+        session.insert(
+            "externalSessionsIncludeInStats".to_string(),
+            Value::Bool(config.external_sessions_include_in_stats),
+        );
+        session.insert(
+            "externalSessionsIncludeInSearch".to_string(),
+            Value::Bool(config.external_sessions_include_in_search),
+        );
     }
 }
 
@@ -187,11 +248,20 @@ pub async fn save_session_paths(
 
 pub async fn save_session_scan_other_agents_core(enabled: bool) -> Result<(), String> {
     let mut config = crate::config::Config::load().unwrap_or_default();
+    let disabled_slugs = if enabled {
+        Vec::new()
+    } else {
+        config.effective_external_session_provider_slugs()
+    };
     config.scan_other_agent_jsonl = enabled;
     if !enabled {
         config.external_session_provider_slugs.clear();
     }
     crate::config::save_config(&config)?;
+    if !disabled_slugs.is_empty() {
+        let conn = crate::data::sqlite::init_db_with_config(&config)?;
+        let _ = crate::data::sqlite::delete_sessions_by_source_slugs(&conn, &disabled_slugs)?;
+    }
     crate::core::scanner::invalidate_cache();
     Ok(())
 }
@@ -214,6 +284,13 @@ pub async fn save_session_scan_other_agents(
         );
     }
 
+    if let Err(e) = refresh_sessions_after_settings_change(app_handle.clone()).await {
+        warn!(
+            "Failed to refresh sessions after save_session_scan_other_agents: {}",
+            e
+        );
+    }
+
     Ok(())
 }
 
@@ -221,6 +298,7 @@ pub async fn save_external_session_providers_core(
     provider_slugs: Vec<String>,
 ) -> Result<(), String> {
     let mut config = crate::config::Config::load().unwrap_or_default();
+    let previous = config.effective_external_session_provider_slugs();
     let mut normalized = provider_slugs
         .into_iter()
         .map(|value| value.trim().to_ascii_lowercase())
@@ -231,6 +309,14 @@ pub async fn save_external_session_providers_core(
     config.external_session_provider_slugs = normalized.clone();
     config.scan_other_agent_jsonl = !normalized.is_empty();
     crate::config::save_config(&config)?;
+    let disabled_slugs = previous
+        .into_iter()
+        .filter(|slug| !normalized.iter().any(|enabled| enabled == slug))
+        .collect::<Vec<_>>();
+    if !disabled_slugs.is_empty() {
+        let conn = crate::data::sqlite::init_db_with_config(&config)?;
+        let _ = crate::data::sqlite::delete_sessions_by_source_slugs(&conn, &disabled_slugs)?;
+    }
     crate::core::scanner::invalidate_cache();
     Ok(())
 }
@@ -249,6 +335,13 @@ pub async fn save_external_session_providers(
     {
         warn!(
             "Failed to restart file watcher after save_external_session_providers: {}",
+            e
+        );
+    }
+
+    if let Err(e) = refresh_sessions_after_settings_change(app_handle.clone()).await {
+        warn!(
+            "Failed to refresh sessions after save_external_session_providers: {}",
             e
         );
     }
@@ -538,4 +631,45 @@ pub async fn clear_cache() -> Result<ClearCacheResult, String> {
         sessions_deleted,
         details_deleted,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+
+    #[tokio::test]
+    async fn save_external_session_providers_core_clears_disabled_provider_cache() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db_path = temp.path().join("sessions.db");
+        std::env::set_var("PPM_TEST_DB", &db_path);
+
+        let mut config = Config::default();
+        config.scan_other_agent_jsonl = true;
+        config.external_session_provider_slugs = vec!["codex".to_string()];
+        crate::config::save_config(&config).expect("save config");
+
+        let conn = crate::data::sqlite::init_db_with_config(&config).expect("db");
+        let now = chrono::Utc::now();
+        conn.execute(
+            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
+             VALUES (?1, ?2, '', NULL, ?3, ?3, ?3, 0, '', '', '', '', '', '', NULL, ?3, 0, NULL)",
+            rusqlite::params![
+                "codex-1",
+                "/Users/demo/.codex/sessions/2026/01/01/rollout-a.jsonl",
+                now.to_rfc3339()
+            ],
+        ).expect("insert");
+        drop(conn);
+
+        save_external_session_providers_core(vec![]).await.expect("save");
+
+        let conn = crate::data::sqlite::init_db_with_config(&Config::default()).expect("db");
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .expect("count");
+        assert_eq!(count, 0);
+
+        std::env::remove_var("PPM_TEST_DB");
+    }
 }

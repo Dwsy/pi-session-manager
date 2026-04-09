@@ -81,6 +81,8 @@ export interface AppSettings {
     activeDatasetIds: string[];
     scanOtherAgentJsonl: boolean;
     externalSessionProviders: string[];
+    externalSessionsIncludeInStats: boolean;
+    externalSessionsIncludeInSearch: boolean;
     showAgentIconInSessionBadge: boolean;
     externalResumePromptEnabled: boolean;
     defaultExternalResumeTarget: SessionConvertTarget;
@@ -168,6 +170,8 @@ export const defaultSettings: AppSettings = {
     activeDatasetIds: [],
     scanOtherAgentJsonl: false,
     externalSessionProviders: [],
+    externalSessionsIncludeInStats: false,
+    externalSessionsIncludeInSearch: false,
     showAgentIconInSessionBadge: true,
     externalResumePromptEnabled: true,
     defaultExternalResumeTarget: "pi",

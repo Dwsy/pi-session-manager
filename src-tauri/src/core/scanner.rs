@@ -375,7 +375,15 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
         info!("Collected {} JSONL files for scanning", total_files);
 
         // Load all sessions from DB first (O(1) lookup by path)
-        let db_sessions = sqlite::get_all_sessions(&conn)?;
+        let db_sessions = sqlite::get_all_sessions(&conn)?
+            .into_iter()
+            .filter(|session| {
+                crate::domain::session_bridge::is_session_visible_under_config(
+                    Path::new(&session.path),
+                    config,
+                )
+            })
+            .collect::<Vec<_>>();
         let db_paths: std::collections::HashSet<&str> =
             db_sessions.iter().map(|s| s.path.as_str()).collect();
 
@@ -789,7 +797,10 @@ pub fn start_background_scanner(sessions_dir: PathBuf, interval_secs: u64) {
 #[cfg(test)]
 mod tests {
     use super::{collect_session_files, expand_tilde};
+    use crate::config::Config;
     use crate::domain::casr_min::model::{CanonicalMessage, CanonicalSession, MessageRole};
+    use crate::types::{SessionEntry, SessionInfo};
+    use chrono::Utc;
     use serde_json::Value;
 
     #[test]
@@ -853,5 +864,85 @@ mod tests {
                 .all(|path| path.to_string_lossy().contains("opencode.db/")),
             "expected virtual opencode session paths"
         );
+    }
+
+    #[tokio::test]
+    async fn scan_sessions_with_config_hides_disabled_external_cached_sessions() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db_path = temp.path().join("sessions.db");
+        std::env::set_var("HOME", temp.path());
+        std::env::set_var("PPM_TEST_DB", &db_path);
+
+        let pi_dir = temp
+            .path()
+            .join(".pi")
+            .join("agent")
+            .join("sessions")
+            .join("local");
+        std::fs::create_dir_all(&pi_dir).expect("pi dir");
+        let pi_file = pi_dir.join("pi.jsonl");
+        std::fs::write(
+            &pi_file,
+            r#"{"type":"session","id":"pi-1","timestamp":"2026-01-01T00:00:00Z","cwd":"/repo/pi"}
+{"type":"message","id":"m1","timestamp":"2026-01-01T00:00:01Z","message":{"role":"user","content":[{"type":"text","text":"pi"}]}}"#,
+        )
+        .expect("write pi file");
+
+        let conn = crate::data::sqlite::init_db_with_config(&Config::default()).expect("db");
+        let now = Utc::now();
+        let empty_entries: Vec<SessionEntry> = Vec::new();
+
+        let pi_session = SessionInfo {
+            path: pi_file.to_string_lossy().to_string(),
+            id: "pi-1".to_string(),
+            cwd: "/repo/pi".to_string(),
+            name: Some("Pi".to_string()),
+            created: now,
+            modified: now,
+            message_count: 10,
+            first_message: "pi".to_string(),
+            all_messages_text: String::new(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
+            last_message: String::new(),
+            last_message_role: "assistant".to_string(),
+            parent_session_path: None,
+        };
+        let codex_session = SessionInfo {
+            path: "/Users/demo/.codex/sessions/2026/01/01/rollout-a.jsonl".to_string(),
+            id: "codex-1".to_string(),
+            cwd: "/repo/codex".to_string(),
+            name: Some("Codex".to_string()),
+            created: now,
+            modified: now,
+            message_count: 20,
+            first_message: "codex".to_string(),
+            all_messages_text: String::new(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
+            last_message: String::new(),
+            last_message_role: "assistant".to_string(),
+            parent_session_path: None,
+        };
+
+        crate::data::sqlite::upsert_session(&conn, &pi_session, now, Some(&empty_entries))
+            .expect("upsert pi");
+        crate::data::sqlite::upsert_session(&conn, &codex_session, now, Some(&empty_entries))
+            .expect("upsert codex");
+        drop(conn);
+
+        let mut config = Config::default();
+        config.scan_other_agent_jsonl = false;
+        config.external_session_provider_slugs.clear();
+
+        let sessions = super::scan_sessions_with_config(&config)
+            .await
+            .expect("scan");
+
+        assert!(sessions.iter().any(|session| session.path == pi_session.path));
+        assert!(!sessions.iter().any(|session| session.path == codex_session.path));
+
+        std::env::remove_var("PPM_TEST_DB");
+        std::env::remove_var("HOME");
     }
 }

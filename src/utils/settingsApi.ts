@@ -91,6 +91,10 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
     activeDatasetId: activeDatasetIds[0] || "",
     activeDatasetIds,
     externalSessionProviders,
+    externalSessionsIncludeInStats:
+      rawSession?.externalSessionsIncludeInStats === true,
+    externalSessionsIncludeInSearch:
+      rawSession?.externalSessionsIncludeInSearch === true,
     showAgentIconInSessionBadge:
       rawSession?.showAgentIconInSessionBadge !== false,
     externalResumePromptEnabled:

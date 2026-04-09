@@ -243,6 +243,38 @@ export default function ExternalSessionsSettings({
 
           <SettingsToggleRow
             title={t(
+              "settings.externalSessions.includeInStats",
+              "Include external sessions in statistics",
+            )}
+            description={t(
+              "settings.externalSessions.includeInStatsHelp",
+              "When disabled, external agent sessions are excluded from dashboard and day statistics.",
+            )}
+            checked={settings.session.externalSessionsIncludeInStats === true}
+            onChange={(checked) =>
+              onUpdate("session", "externalSessionsIncludeInStats", checked)
+            }
+            className="items-start py-0"
+          />
+
+          <SettingsToggleRow
+            title={t(
+              "settings.externalSessions.includeInSearch",
+              "Include external sessions in search",
+            )}
+            description={t(
+              "settings.externalSessions.includeInSearchHelp",
+              "When disabled, external agent sessions are excluded from sidebar search and full-text search.",
+            )}
+            checked={settings.session.externalSessionsIncludeInSearch === true}
+            onChange={(checked) =>
+              onUpdate("session", "externalSessionsIncludeInSearch", checked)
+            }
+            className="items-start py-0"
+          />
+
+          <SettingsToggleRow
+            title={t(
               "settings.externalSessions.showAgentIconInSessionBadge",
               "Show agent icon in SessionBadge",
             )}

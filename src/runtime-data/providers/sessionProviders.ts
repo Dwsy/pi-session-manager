@@ -33,6 +33,7 @@ import {
 } from "@/browser-dataset";
 import { getCachedSettings } from "@/utils/settingsApi";
 import { filterSessions } from "@/utils/sessionFilters";
+import { getSessionSourceSlug } from "@/utils/session";
 import { getRuntimeMode } from "../runtimeMode";
 import { browserTagsProvider } from "./tagsProviders";
 import type {
@@ -105,6 +106,19 @@ function sortSessions(
   });
 }
 
+function filterSessionsForExternalAnalytics(
+  sessions: SessionInfo[],
+  includeExternal: boolean,
+): SessionInfo[] {
+  if (includeExternal) {
+    return sessions;
+  }
+  return sessions.filter((session) => {
+    const slug = getSessionSourceSlug(session.path);
+    return !slug || slug === "pi";
+  });
+}
+
 function getDescendantIds(tags: Tag[], tagId: string): string[] {
   const descendants: string[] = [];
   const walk = (currentId: string) => {
@@ -169,7 +183,13 @@ export const backendSessionProvider: SessionProvider = {
     });
   },
   async getStats(sessions) {
-    const statsSessions: SessionStatsInput[] = sessions.map((session) => ({
+    const includeExternal =
+      getCachedSettings().session?.externalSessionsIncludeInStats === true;
+    const filteredSessions = filterSessionsForExternalAnalytics(
+      sessions,
+      includeExternal,
+    );
+    const filteredStatsInputs: SessionStatsInput[] = filteredSessions.map((session) => ({
       path: session.path,
       cwd: session.cwd,
       modified: session.modified,
@@ -178,18 +198,26 @@ export const backendSessionProvider: SessionProvider = {
 
     try {
       return await invoke<SessionStats>("get_session_stats_light", {
-        sessions: statsSessions,
+        sessions: filteredStatsInputs,
       });
     } catch (error: any) {
       const message = typeof error === "string" ? error : error?.message;
       if (message && String(message).includes("get_session_stats_light")) {
-        return invoke<SessionStats>("get_session_stats", { sessions });
+        return invoke<SessionStats>("get_session_stats", {
+          sessions: filteredSessions,
+        });
       }
       throw error;
     }
   },
   async getDayStats(date, sessions) {
-    return invoke<DayStats>("get_day_stats", { date, sessions });
+    const includeExternal =
+      getCachedSettings().session?.externalSessionsIncludeInStats === true;
+    const filteredSessions = filterSessionsForExternalAnalytics(
+      sessions,
+      includeExternal,
+    );
+    return invoke<DayStats>("get_day_stats", { date, sessions: filteredSessions });
   },
   async paginateSessions(options) {
     const normalizedSortKey = `${options.sortBy}_${options.sortOrder}`;

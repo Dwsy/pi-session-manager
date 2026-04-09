@@ -8,6 +8,11 @@
 
 use serde_json::Value;
 
+#[cfg(feature = "gui")]
+type DispatchAppState = crate::app_state::SharedAppState;
+#[cfg(not(feature = "gui"))]
+type DispatchAppState = ();
+
 // Re-export for backward compatibility
 use crate::utils::payload::extract_optional_string;
 pub use crate::utils::payload::{
@@ -35,14 +40,20 @@ fn unpack_pi_rpc_response(response: Value) -> Result<Value, String> {
 /// by the caller in ws_adapter.rs.
 #[cfg(not(feature = "gui"))]
 pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
-    let _ = command;
-    let _ = payload;
-    Err("dispatch unavailable in CLI mode".to_string())
+    dispatch_impl(&None, command, payload).await
 }
 
 #[cfg(feature = "gui")]
 pub async fn dispatch(
     app_state: &Option<crate::app_state::SharedAppState>,
+    command: &str,
+    payload: &Value,
+) -> Result<Value, String> {
+    dispatch_impl(app_state, command, payload).await
+}
+
+async fn dispatch_impl(
+    app_state: &Option<DispatchAppState>,
     command: &str,
     payload: &Value,
 ) -> Result<Value, String> {
@@ -1039,5 +1050,35 @@ pub async fn dispatch(
         "toggle_devtools" => Err("toggle_devtools is not supported via WebSocket".to_string()),
 
         _ => Err(format!("Unknown command: {command}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(not(feature = "gui"))]
+    #[tokio::test]
+    async fn cli_dispatch_supports_scan_sessions_paginated() {
+        let result = dispatch(
+            "scan_sessions_paginated",
+            &serde_json::json!({
+                "offset": 0,
+                "limit": 1,
+                "sortBy": "modified_desc"
+            }),
+        )
+        .await;
+
+        assert!(
+            result.is_ok(),
+            "expected CLI dispatch to support scan_sessions_paginated, got {result:?}"
+        );
+
+        let parsed: crate::domain::session_list::PaginatedSessionsResult =
+            serde_json::from_value(result.expect("dispatch result"))
+                .expect("valid paginated sessions result");
+        assert_eq!(parsed.offset, 0);
+        assert_eq!(parsed.limit, 1);
     }
 }

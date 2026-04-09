@@ -333,6 +333,85 @@ async fn test_full_text_search_command_basic() {
 }
 
 #[tokio::test]
+async fn test_full_text_search_excludes_external_sessions_by_default() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+
+    let temp_dir = tempdir().unwrap();
+    let home = temp_dir.path();
+    std::env::set_var("HOME", home);
+
+    let pi_dir = home.join(".pi").join("agent").join("sessions").join("local");
+    std::fs::create_dir_all(&pi_dir).unwrap();
+    let codex_dir = home.join(".codex").join("sessions").join("2026").join("01").join("01");
+    std::fs::create_dir_all(&codex_dir).unwrap();
+
+    let pi_path = pi_dir.join("pi-test.jsonl");
+    std::fs::write(
+        &pi_path,
+        make_session_file(
+            "pi-test",
+            "/repo/pi",
+            &[("user", "shared needle"), ("assistant", "pi answer")],
+        ),
+    )
+    .unwrap();
+
+    let codex_path = codex_dir.join("rollout-codex-test.jsonl");
+    std::fs::write(
+        &codex_path,
+        [
+            serde_json::json!({
+                "type": "session_meta",
+                "timestamp": "2026-01-01T00:00:00.000Z",
+                "payload": { "id": "codex-test", "cwd": "/repo/codex" }
+            }),
+            serde_json::json!({
+                "type": "response_item",
+                "timestamp": "2026-01-01T00:00:01.000Z",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{ "type": "input_text", "text": "shared needle" }]
+                }
+            }),
+        ]
+        .iter()
+        .map(|value| serde_json::to_string(value).unwrap())
+        .collect::<Vec<_>>()
+        .join("\n"),
+    )
+    .unwrap();
+
+    let config = Config::default();
+    pi_session_manager::config::save_config(&config).unwrap();
+    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+
+    let (pi_session, pi_entries) = scanner::parse_session_info(&pi_path).unwrap();
+    sqlite_cache::upsert_session(&conn, &pi_session, Utc::now(), Some(&pi_entries)).unwrap();
+
+    let (codex_session, codex_entries) = scanner::parse_session_info(&codex_path).unwrap();
+    sqlite_cache::upsert_session(&conn, &codex_session, Utc::now(), Some(&codex_entries))
+        .unwrap();
+    drop(conn);
+
+    let response = full_text_search(
+        "shared needle".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        20,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    assert!(!response.hits.is_empty());
+    assert!(response.hits.iter().all(|hit| hit.session_path.contains("/.pi/agent/sessions/")));
+}
+
+#[tokio::test]
 async fn test_full_text_search_pagination_across_sessions() {
     let _lock = TEST_DB_LOCK.lock().unwrap();
 

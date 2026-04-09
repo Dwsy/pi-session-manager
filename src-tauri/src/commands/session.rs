@@ -1,6 +1,34 @@
 use crate::types::{SessionEntry, SessionInfo};
 use crate::{export, scanner, stats};
 
+fn filter_sessions_for_stats(sessions: Vec<SessionInfo>) -> Vec<SessionInfo> {
+    let config = crate::config::Config::load().unwrap_or_default();
+    sessions
+        .into_iter()
+        .filter(|session| {
+            crate::domain::session_bridge::is_session_allowed_in_stats(
+                std::path::Path::new(&session.path),
+                &config,
+            )
+        })
+        .collect()
+}
+
+fn filter_session_stat_inputs_for_stats(
+    sessions: Vec<stats::SessionStatsInput>,
+) -> Vec<stats::SessionStatsInput> {
+    let config = crate::config::Config::load().unwrap_or_default();
+    sessions
+        .into_iter()
+        .filter(|session| {
+            crate::domain::session_bridge::is_session_allowed_in_stats(
+                std::path::Path::new(&session.path),
+                &config,
+            )
+        })
+        .collect()
+}
+
 // Re-export from domain
 pub use crate::domain::session_bridge::SessionBridgeConvertResult;
 pub use crate::domain::session_list::PaginatedSessionsResult;
@@ -149,14 +177,16 @@ pub async fn fork_session(
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_stats(sessions: Vec<SessionInfo>) -> Result<stats::SessionStats, String> {
-    Ok(stats::calculate_stats(&sessions))
+    Ok(stats::calculate_stats(&filter_sessions_for_stats(sessions)))
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_stats_light(
     sessions: Vec<stats::SessionStatsInput>,
 ) -> Result<stats::SessionStats, String> {
-    Ok(stats::calculate_stats_from_inputs(&sessions))
+    Ok(stats::calculate_stats_from_inputs(
+        &filter_session_stat_inputs_for_stats(sessions),
+    ))
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -164,6 +194,7 @@ pub async fn get_day_stats(
     date: String,
     sessions: Vec<SessionInfo>,
 ) -> Result<stats::DayStats, String> {
+    let sessions = filter_sessions_for_stats(sessions);
     stats::get_day_stats(&date, &sessions)
 }
 
@@ -233,4 +264,52 @@ pub async fn convert_session_format(
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_by_path(path: String) -> Result<Option<SessionInfo>, String> {
     super::session_file::get_session_by_path_impl(path).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    #[tokio::test]
+    async fn get_session_stats_excludes_external_sessions_by_default() {
+        let pi_session = SessionInfo {
+            path: "/Users/demo/.pi/agent/sessions/foo/pi.jsonl".to_string(),
+            id: "pi-1".to_string(),
+            cwd: "/repo/pi".to_string(),
+            name: Some("Pi".to_string()),
+            created: Utc::now(),
+            modified: Utc::now(),
+            message_count: 10,
+            first_message: "hello".to_string(),
+            all_messages_text: String::new(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
+            last_message: String::new(),
+            last_message_role: "assistant".to_string(),
+            parent_session_path: None,
+        };
+        let codex_session = SessionInfo {
+            path: "/Users/demo/.codex/sessions/2026/01/01/rollout-a.jsonl".to_string(),
+            id: "codex-1".to_string(),
+            cwd: "/repo/codex".to_string(),
+            name: Some("Codex".to_string()),
+            created: Utc::now(),
+            modified: Utc::now(),
+            message_count: 20,
+            first_message: "world".to_string(),
+            all_messages_text: String::new(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
+            last_message: String::new(),
+            last_message_role: "assistant".to_string(),
+            parent_session_path: None,
+        };
+
+        let stats = get_session_stats(vec![pi_session, codex_session])
+            .await
+            .expect("stats");
+        assert_eq!(stats.total_sessions, 1);
+        assert_eq!(stats.total_messages, 10);
+    }
 }

@@ -169,6 +169,13 @@ export type SessionConvertTarget =
   | 'gemini'
   | 'factory'
   | 'clawdbot'
+  | 'cursor'
+  | 'cline'
+  | 'aider'
+  | 'amp'
+  | 'chatgpt'
+  | 'openclaw'
+  | 'vibe'
 
 export interface SessionProviderCapabilities {
   canScan: boolean

@@ -6,6 +6,13 @@ use rusqlite::ToSql;
 use std::time::Instant;
 use tokio::time::Duration;
 
+fn session_allowed_in_search(path: &str, config: &crate::config::Config) -> bool {
+    crate::domain::session_bridge::is_session_allowed_in_search(
+        std::path::Path::new(path),
+        config,
+    )
+}
+
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn search_sessions(
     sessions: Vec<SessionInfo>,
@@ -24,6 +31,11 @@ pub async fn search_sessions(
         "assistant" => search::RoleFilter::Assistant,
         _ => search::RoleFilter::All,
     };
+    let config = config::load_config()?;
+    let sessions = sessions
+        .into_iter()
+        .filter(|session| session_allowed_in_search(&session.path, &config))
+        .collect::<Vec<_>>();
 
     Ok(search::search_sessions(
         &sessions,
@@ -43,6 +55,9 @@ pub async fn search_sessions_fts(query: String, limit: usize) -> Result<Vec<Sess
 
     let mut sessions = Vec::new();
     for path in paths {
+        if !session_allowed_in_search(&path, &config) {
+            continue;
+        }
         if let Some(session) = crate::data::sqlite::get_session(&conn, &path)? {
             sessions.push(session);
         }
@@ -395,6 +410,7 @@ pub async fn full_text_search(
                         })
                     },
                 )
+                .filter(|hit| session_allowed_in_search(&hit.session_path, &config))
                 .collect();
 
             let session_id_count = session_id_matches.len();
@@ -435,46 +451,12 @@ pub async fn full_text_search(
                 params.push(project_path);
             }
 
-            // --- Count total message hits after per-session limit (max 3 per session) ---
-            let count_sql = format!(
-                "SELECT COUNT(*) FROM (
-                    WITH ranked AS (
-                        SELECT
-                            m.entry_id,
-                            m.session_path,
-                            m.timestamp,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY m.session_path, m.entry_id
-                                ORDER BY CASE m.source_type WHEN 'user' THEN 0 WHEN 'assistant' THEN 1 ELSE 2 END, m.timestamp DESC
-                            ) as rn_in_entry
-                        FROM message_entries m
-                        JOIN message_fts ON m.rowid = message_fts.rowid
-                        {where_clause}
-                    ),
-                    deduped AS (
-                        SELECT
-                            entry_id,
-                            session_path,
-                            timestamp,
-                            ROW_NUMBER() OVER (PARTITION BY session_path ORDER BY timestamp DESC, entry_id DESC) as rn_in_session
-                        FROM ranked
-                        WHERE rn_in_entry = 1
-                    )
-                    SELECT 1 FROM deduped WHERE rn_in_session <= 3
-                )"
-            );
-            let mut count_stmt = conn
-                .prepare(&count_sql)
-                .map_err(|e| format!("Failed to prepare total count query: {e}"))?;
-            let message_total_hits: usize = count_stmt
-                .query_row(params.as_slice(), |row| row.get::<_, i64>(0))
-                .map_err(|e| format!("Failed to get total hits count: {e}"))?
-                as usize;
-
             let message_offset = global_offset.saturating_sub(session_id_count);
             let message_limit = page_size.saturating_sub(all_hits.len());
 
-            if message_limit > 0 && message_offset < message_total_hits {
+            let mut message_total_hits = 0usize;
+
+            if message_limit > 0 {
                 let rank_expr = if use_content_like { "-1.0" } else { "message_fts.rank" };
 
                 // Sort expressions.
@@ -540,7 +522,6 @@ pub async fn full_text_search(
                     FROM filtered f
                     JOIN message_entries m ON f.entry_id = m.entry_id AND f.session_path = m.session_path AND f.source_type = m.source_type
                     JOIN sessions s ON s.path = f.session_path
-                    WHERE f.global_rn > ? AND f.global_rn <= ?
                     ORDER BY FINAL_ORDER_EXPR"
                 );
 
@@ -549,11 +530,7 @@ pub async fn full_text_search(
                     .replace("ORDER_BY_EXPR", bare_order)
                     .replace("FINAL_ORDER_EXPR", final_order);
 
-                let offset_i64 = message_offset as i64;
-                let limit_i64 = message_offset.saturating_add(message_limit) as i64;
-                let mut data_params: Vec<&dyn rusqlite::ToSql> = params.clone();
-                data_params.push(&offset_i64);
-                data_params.push(&limit_i64);
+                let data_params: Vec<&dyn rusqlite::ToSql> = params.clone();
 
                 let mut stmt = conn
                     .prepare(&data_sql)
@@ -577,6 +554,8 @@ pub async fn full_text_search(
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|e| format!("Failed to collect message FTS results: {e}"))?;
 
+                let mut filtered_message_hits = Vec::new();
+
                 for (
                     entry_id,
                     session_path,
@@ -599,7 +578,7 @@ pub async fn full_text_search(
                         }
                     };
 
-                    all_hits.push(FullTextSearchHit {
+                    let hit = FullTextSearchHit {
                         session_id,
                         session_path,
                         session_name,
@@ -610,8 +589,21 @@ pub async fn full_text_search(
                         timestamp,
                         score: rank,
                         match_reason: Some("content".to_string()),
-                    });
+                    };
+                    if session_allowed_in_search(&hit.session_path, &config) {
+                        filtered_message_hits.push(hit);
+                    }
                 }
+
+                message_total_hits = filtered_message_hits.len();
+                let message_page_start = message_offset.min(message_total_hits);
+                let message_page_end =
+                    message_offset.saturating_add(message_limit).min(message_total_hits);
+                all_hits.extend(
+                    filtered_message_hits[message_page_start..message_page_end]
+                        .iter()
+                        .cloned(),
+                );
             }
 
             let total_hits = session_id_count + message_total_hits;

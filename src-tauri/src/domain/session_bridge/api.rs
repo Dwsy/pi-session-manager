@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::config::Config;
 use crate::types::{SessionEntry, SessionInfo};
 
 pub use crate::domain::casr_min::adapters::{
@@ -30,6 +31,40 @@ pub fn default_external_session_provider_slugs() -> Vec<String> {
         .filter(|source| *source != SessionBridgeSource::Pi)
         .map(|source| source.slug().replace('_', "-"))
         .collect()
+}
+
+pub fn source_from_path(path: &Path) -> Option<SessionBridgeSource> {
+    SessionBridgeSource::ALL
+        .into_iter()
+        .find(|source| source.matches_path(path))
+}
+
+pub fn is_external_source(source: SessionBridgeSource) -> bool {
+    source != SessionBridgeSource::Pi
+}
+
+pub fn is_session_visible_under_config(path: &Path, config: &Config) -> bool {
+    match source_from_path(path) {
+        None | Some(SessionBridgeSource::Pi) => true,
+        Some(source) => config
+            .effective_external_session_provider_slugs()
+            .iter()
+            .any(|slug| slug == &source.slug().replace('_', "-")),
+    }
+}
+
+pub fn is_session_allowed_in_stats(path: &Path, config: &Config) -> bool {
+    match source_from_path(path) {
+        None | Some(SessionBridgeSource::Pi) => true,
+        Some(_) => config.external_sessions_include_in_stats,
+    }
+}
+
+pub fn is_session_allowed_in_search(path: &Path, config: &Config) -> bool {
+    match source_from_path(path) {
+        None | Some(SessionBridgeSource::Pi) => true,
+        Some(_) => config.external_sessions_include_in_search,
+    }
 }
 
 pub fn read_canonical_session_from_path(
@@ -164,4 +199,37 @@ pub fn convert_session_format(
         dry_run: true,
         warnings: vec!["Dry run only; no files were written.".to_string()],
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn visibility_and_analytics_policy_respect_config() {
+        let mut config = Config::default();
+        config.external_session_provider_slugs = vec!["codex".to_string()];
+        config.scan_other_agent_jsonl = true;
+        config.external_sessions_include_in_stats = false;
+        config.external_sessions_include_in_search = false;
+
+        let pi_path = Path::new("/Users/demo/.pi/agent/sessions/foo/session.jsonl");
+        let codex_path = Path::new("/Users/demo/.codex/sessions/2026/01/01/rollout-a.jsonl");
+        let claude_path =
+            Path::new("/Users/demo/.claude/projects/-Users-demo-work/a-session.jsonl");
+
+        assert!(is_session_visible_under_config(pi_path, &config));
+        assert!(is_session_visible_under_config(codex_path, &config));
+        assert!(!is_session_visible_under_config(claude_path, &config));
+
+        assert!(is_session_allowed_in_stats(pi_path, &config));
+        assert!(!is_session_allowed_in_stats(codex_path, &config));
+        assert!(is_session_allowed_in_search(pi_path, &config));
+        assert!(!is_session_allowed_in_search(codex_path, &config));
+
+        config.external_sessions_include_in_stats = true;
+        config.external_sessions_include_in_search = true;
+        assert!(is_session_allowed_in_stats(codex_path, &config));
+        assert!(is_session_allowed_in_search(codex_path, &config));
+    }
 }

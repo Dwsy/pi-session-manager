@@ -56,6 +56,12 @@ pub struct Config {
     #[serde(default)]
     pub external_session_provider_slugs: Vec<String>,
 
+    #[serde(default = "default_external_sessions_include_in_stats")]
+    pub external_sessions_include_in_stats: bool,
+
+    #[serde(default = "default_external_sessions_include_in_search")]
+    pub external_sessions_include_in_search: bool,
+
     #[serde(default)]
     pub session_source_mode: SessionSourceMode,
 
@@ -99,6 +105,14 @@ fn default_scan_other_agent_jsonl() -> bool {
     false
 }
 
+fn default_external_sessions_include_in_stats() -> bool {
+    false
+}
+
+fn default_external_sessions_include_in_search() -> bool {
+    false
+}
+
 fn default_metrics_enabled() -> bool {
     false
 }
@@ -122,6 +136,8 @@ impl Default for Config {
             session_paths: vec![],
             scan_other_agent_jsonl: false,
             external_session_provider_slugs: vec![],
+            external_sessions_include_in_stats: false,
+            external_sessions_include_in_search: false,
             session_source_mode: SessionSourceMode::Local,
             active_dataset_id: None,
             active_dataset_ids: vec![],

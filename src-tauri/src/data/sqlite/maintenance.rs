@@ -35,10 +35,40 @@ pub fn needs_reindexing(conn: &Connection, path: &str) -> Result<bool, String> {
 pub fn delete_session(conn: &Connection, path: &str) -> Result<(), String> {
     // Also delete from message_entries (FOREIGN KEY CASCADE should handle but we do explicitly for safety)
     let _ = delete_message_entries_for_session(conn, path);
+    let _ = conn.execute("DELETE FROM session_details_cache WHERE path = ?", params![path]);
+    let _ = conn.execute("DELETE FROM subagent_meta_cache WHERE path = ?", params![path]);
 
     conn.execute("DELETE FROM sessions WHERE path = ?", params![path])
         .map_err(|e| format!("Failed to delete session: {e}"))?;
     Ok(())
+}
+
+pub fn delete_sessions_by_source_slugs(
+    conn: &Connection,
+    source_slugs: &[String],
+) -> Result<usize, String> {
+    if source_slugs.is_empty() {
+        return Ok(0);
+    }
+
+    let sessions = super::sessions::get_all_sessions(conn)?;
+    let mut deleted = 0usize;
+
+    for session in sessions {
+        let path = Path::new(&session.path);
+        let matches = source_slugs.iter().any(|slug| {
+            crate::domain::session_bridge::SessionBridgeSource::ALL
+                .into_iter()
+                .find(|source| source.slug().replace('_', "-") == *slug)
+                .is_some_and(|source| source.matches_path(path))
+        });
+        if matches {
+            delete_session(conn, &session.path)?;
+            deleted += 1;
+        }
+    }
+
+    Ok(deleted)
 }
 
 pub fn get_session_count(conn: &Connection) -> Result<usize, String> {
@@ -160,4 +190,53 @@ pub fn clear_all_cache(conn: &Connection) -> Result<(usize, usize), String> {
     vacuum(conn)?;
 
     Ok((sessions_deleted, details_deleted))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::data::sqlite::init_db_with_path;
+
+    #[test]
+    fn delete_sessions_by_source_slugs_removes_matching_rows() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db_path = temp.path().join("sessions.db");
+        let conn = init_db_with_path(&db_path, &Config::default()).expect("db");
+
+        conn.execute(
+            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
+             VALUES (?1, ?2, '', NULL, ?3, ?3, ?3, 0, '', '', '', '', '', '', NULL, ?3, 0, NULL)",
+            params![
+                "pi-1",
+                "/Users/demo/.pi/agent/sessions/foo/a.jsonl",
+                chrono::Utc::now().to_rfc3339()
+            ],
+        )
+        .expect("insert pi");
+        conn.execute(
+            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
+             VALUES (?1, ?2, '', NULL, ?3, ?3, ?3, 0, '', '', '', '', '', '', NULL, ?3, 0, NULL)",
+            params![
+                "codex-1",
+                "/Users/demo/.codex/sessions/2026/01/01/rollout-a.jsonl",
+                chrono::Utc::now().to_rfc3339()
+            ],
+        )
+        .expect("insert codex");
+
+        let deleted =
+            delete_sessions_by_source_slugs(&conn, &["codex".to_string()]).expect("delete");
+        assert_eq!(deleted, 1);
+
+        let remaining: i64 = conn
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .expect("count");
+        assert_eq!(remaining, 1);
+
+        let remaining_path: String = conn
+            .query_row("SELECT path FROM sessions", [], |row| row.get(0))
+            .expect("path");
+        assert!(remaining_path.contains("/.pi/agent/sessions/"));
+    }
 }
