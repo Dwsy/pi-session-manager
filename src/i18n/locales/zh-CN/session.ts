@@ -93,6 +93,8 @@ export const session = {
   resumeDialog: {
     title: '恢复到其他 CLI',
     copyTitle: '选择用于复制恢复命令的 CLI',
+    resumeHelp: '选择当前 session 要恢复到哪个 CLI。',
+    copyHelp: '选择要为当前 session 复制哪个 CLI 的恢复命令。',
   },
   rename: {
     title: '重命名session',

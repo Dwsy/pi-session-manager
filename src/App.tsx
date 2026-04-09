@@ -13,6 +13,7 @@ import { useSessionActions } from "./hooks/useSessionActions";
 import { useAppearance } from "./hooks/useAppearance";
 import { useToolStyles } from "./hooks/useToolStyles";
 import { useIsMobile } from "./hooks/useIsMobile";
+import { useClipboard } from "./hooks/useClipboard";
 import { useAppBootstrap } from "./hooks/app/useAppBootstrap";
 import { useAppUiEffects } from "./hooks/app/useAppUiEffects";
 import { useUpdateChecker } from "./hooks/app/useUpdateChecker";
@@ -137,6 +138,7 @@ function App() {
 
   const { terminal, piPath, customCommand, resumeCommand, loadSettings } =
     useAppSettings();
+  const { copyText } = useClipboard();
   const { handleExportSession, handleConvertSession } = useSessionActions();
   const { getBadgeType, clearBadge } = useSessionBadges(
     sessions,
@@ -376,9 +378,9 @@ function App() {
         piPath,
         resumeCommand,
       });
-      await navigator.clipboard.writeText(command);
+      await copyText(command);
     },
-    [piPath, resumeCommand],
+    [copyText, piPath, resumeCommand],
   );
 
   const requestCopyResumeCommand = useCallback(

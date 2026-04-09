@@ -22,6 +22,7 @@ interface OpenInTerminalButtonProps {
   onError?: (error: string) => void
   onWebResume?: () => void
   onResumeSession?: (session: SessionInfo) => Promise<void> | void
+  allowDirectOpenFallback?: boolean
   children?: React.ReactNode
 }
 
@@ -41,6 +42,7 @@ export default function OpenInTerminalButton({
   onError,
   onWebResume,
   onResumeSession,
+  allowDirectOpenFallback = false,
   children,
 }: OpenInTerminalButtonProps) {
   const { t } = useTranslation()
@@ -84,8 +86,16 @@ export default function OpenInTerminalButton({
       return
     }
 
-    if (!isTauri()) {
+  if (!isTauri()) {
       onWebResume?.()
+      return
+    }
+
+    if (!allowDirectOpenFallback) {
+      const errorMessage =
+        'Managed resume handler is missing. Refusing to fall back to legacy direct terminal open.'
+      console.error(errorMessage, { path: session.path })
+      onError?.(errorMessage)
       return
     }
 

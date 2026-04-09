@@ -93,6 +93,8 @@ export const session = {
   resumeDialog: {
     title: 'Resume in another CLI',
     copyTitle: 'Choose a CLI for copy resume',
+    resumeHelp: 'Choose which CLI this session should resume into.',
+    copyHelp: 'Choose which CLI command should be copied for this session.',
   },
   rename: {
     title: 'Rename Session',

@@ -106,6 +106,17 @@ export default function ResumeSessionDialog({
           <div className="mt-1 text-xs text-muted-foreground">
             {t("session.convert.source")}: {sourceLabel}
           </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {mode === "copy"
+              ? t(
+                  "session.resumeDialog.copyHelp",
+                  "Choose which CLI command should be copied for this session.",
+                )
+              : t(
+                  "session.resumeDialog.resumeHelp",
+                  "Choose which CLI this session should resume into.",
+                )}
+          </div>
         </div>
 
         <div className="space-y-2">
