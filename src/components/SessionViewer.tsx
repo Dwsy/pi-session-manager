@@ -115,6 +115,14 @@ function SessionViewerContent({
   const treeRef = useRef<SessionTreeRef>(null);
   const messagesRef = useRef<SessionViewerMessagesRef>(null);
 
+  const handleResume = useCallback(() => {
+    if (onResumeSession) {
+      void onResumeSession(session);
+      return;
+    }
+    onWebResume?.();
+  }, [onResumeSession, onWebResume, session]);
+
   useEffect(() => {
     resetToolExpansionOverrides();
   }, [resetToolExpansionOverrides, session.path]);
@@ -304,7 +312,7 @@ function SessionViewerContent({
           onFork={onFork}
           onExport={onExport}
           onConvert={onConvert}
-          onResume={onWebResume}
+          onResume={handleResume}
           liveSession={liveSession}
           desktopResumeButton={
             <KbdTooltip shortcut="Cmd+R">

@@ -401,6 +401,7 @@ export default function KanbanBoard({
             ? () => onConvertSession(previewSession)
             : undefined
         }
+        onResumeSession={onResumeSession}
         terminal={terminal}
         piPath={piPath}
         customCommand={customCommand}

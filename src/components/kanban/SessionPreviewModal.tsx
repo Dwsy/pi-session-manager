@@ -17,6 +17,7 @@ export interface SessionPreviewModalProps {
   onExport?: () => void
   onConvert?: () => void
   onRename?: () => void
+  onResumeSession?: (session: SessionInfo) => Promise<void> | void
   terminal?: TerminalType
   piPath?: string
   customCommand?: string
@@ -49,6 +50,7 @@ export default function SessionPreviewModal({
   onExport = () => {},
   onConvert,
   onRename = () => {},
+  onResumeSession,
   terminal,
   piPath,
   customCommand,
@@ -293,6 +295,7 @@ export default function SessionPreviewModal({
             onConvert={onConvert}
             onRename={onRename}
             onBack={handleCloseWithAnimation}
+            onResumeSession={onResumeSession}
             terminal={terminal}
             piPath={piPath}
             customCommand={customCommand}

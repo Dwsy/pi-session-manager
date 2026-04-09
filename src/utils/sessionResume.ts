@@ -102,13 +102,7 @@ export async function buildCopyResumeCommandForTarget(
   overrides: ResumeCommandOverrides = {},
 ): Promise<string> {
   const sourceSlug = getSessionSourceSlug(session.path);
-  if (!sourceSlug || sourceSlug === "pi" || target === "pi") {
-    if (!sourceSlug || sourceSlug === "pi") {
-      return buildPiResumeCommand(session, overrides);
-    }
-  }
-
-  if (!sourceSlug || sourceSlug === "pi") {
+  if ((!sourceSlug || sourceSlug === "pi") && target === "pi") {
     return buildPiResumeCommand(session, overrides);
   }
 

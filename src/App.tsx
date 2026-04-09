@@ -331,7 +331,7 @@ function App() {
   const handleResumeSessionWithTarget = useCallback(
     async (session: SessionInfo, target: SessionConvertTarget) => {
       const sourceSlug = getSessionSourceSlug(session.path);
-      if (!sourceSlug || sourceSlug === "pi") {
+      if ((!sourceSlug || sourceSlug === "pi") && target === "pi") {
         const command = isTauri() ? null : buildResumeCommand(session);
         await openResumeCommandInTerminal(session.path, session.cwd, command);
         return;
@@ -358,22 +358,14 @@ function App() {
 
   const requestResumeSession = useCallback(
     async (session: SessionInfo) => {
-      const sourceSlug = getSessionSourceSlug(session.path);
-      if (!sourceSlug || sourceSlug === "pi") {
-        await handleResumeSessionWithTarget(session, "pi");
-        return;
-      }
-
-      const defaultTarget = getFallbackExternalResumeTarget();
-      const promptEnabled = getConfiguredExternalResumeTarget() === null;
-
+      const configuredTarget = getConfiguredExternalResumeTarget();
       setSelectedSession(session);
-      if (promptEnabled) {
+      if (!configuredTarget) {
         setResumeDialogMode("resume");
         setShowResumeDialog(true);
         return;
       }
-      await handleResumeSessionWithTarget(session, defaultTarget);
+      await handleResumeSessionWithTarget(session, configuredTarget);
     },
     [handleResumeSessionWithTarget],
   );
@@ -391,12 +383,6 @@ function App() {
 
   const requestCopyResumeCommand = useCallback(
     async (session: SessionInfo) => {
-      const sourceSlug = getSessionSourceSlug(session.path);
-      if (!sourceSlug || sourceSlug === "pi") {
-        await handleCopyResumeCommandWithTarget(session, "pi");
-        return;
-      }
-
       const configuredTarget = getConfiguredExternalResumeTarget();
       setSelectedSession(session);
       if (!configuredTarget) {
@@ -819,6 +805,7 @@ function App() {
       onRename={() => setShowRenameDialog(true)}
       onFork={() => setShowForkDialog(true)}
       onBack={() => setSelectedSession(null)}
+      onResumeSession={requestResumeSession}
       onWebResume={() => {
         if (selectedSession) {
           setTerminalPendingCommand(buildResumeCommand(selectedSession));

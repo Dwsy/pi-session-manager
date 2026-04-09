@@ -29,12 +29,28 @@ pub fn build_resume_command(
     custom_template: Option<&str>,
 ) -> String {
     match custom_template {
-        Some(template) if !template.trim().is_empty() => template
-            .replace("{cwd}", cwd)
-            .replace("{path}", path)
-            .replace("{pi}", pi_cmd),
+        Some(template) if !template.trim().is_empty() => {
+            let rendered = template
+                .replace("{cwd}", cwd)
+                .replace("{path}", path)
+                .replace("{pi}", pi_cmd);
+            if template_contains_cwd_handling(template) {
+                rendered
+            } else {
+                format!("cd {} && {}", shell_single_quote(cwd), rendered)
+            }
+        }
         _ => build_unix_resume_command(cwd, path, pi_cmd),
     }
+}
+
+fn template_contains_cwd_handling(template: &str) -> bool {
+    let normalized = template.trim().to_ascii_lowercase();
+    normalized.contains("{cwd}")
+        || normalized.contains("cd ")
+        || normalized.contains("pushd ")
+        || normalized.contains("--cwd")
+        || normalized.contains("workdir")
 }
 
 #[cfg(target_os = "windows")]
