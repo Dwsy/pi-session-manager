@@ -285,7 +285,7 @@ impl Provider for Codex {
         for msg in &session.messages {
             let msg_ts = msg
                 .timestamp
-                .and_then(|ts| chrono::DateTime::from_timestamp_millis(ts))
+                .and_then(chrono::DateTime::from_timestamp_millis)
                 .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
                 .unwrap_or_else(|| now_iso.clone());
 
