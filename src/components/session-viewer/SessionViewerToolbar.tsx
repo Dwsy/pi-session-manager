@@ -75,9 +75,9 @@ export default function SessionViewerToolbar({
     ? t("session.toolbar.hideUserMarkers", "Hide message markers")
     : t("session.toolbar.showUserMarkers", "Show message markers");
   const toggleButtonBase =
-    "rounded border transition-colors text-foreground";
+    "rounded border border-border/90 transition-colors text-foreground";
   const toggleButtonActive =
-    "border-primary/45 bg-primary/14 hover:bg-primary/18 active:bg-primary/18";
+    " bg-primary/14 hover:bg-primary/18 active:bg-primary/18";
   const toggleButtonInactive =
     "border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover";
   const mobileQuickActionBase =
@@ -208,8 +208,14 @@ export default function SessionViewerToolbar({
                   <button
                     onClick={onOpenSystemPromptDialog}
                     className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
-                    title={t("session.systemPromptAndTools", "System prompt & tools")}
-                    aria-label={t("session.systemPromptAndTools", "System prompt & tools")}
+                    title={t(
+                      "session.systemPromptAndTools",
+                      "System prompt & tools",
+                    )}
+                    aria-label={t(
+                      "session.systemPromptAndTools",
+                      "System prompt & tools",
+                    )}
                   >
                     <Bot className="h-3.5 w-3.5" />
                   </button>

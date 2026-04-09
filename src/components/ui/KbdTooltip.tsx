@@ -1,15 +1,16 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react'
-import { useIsMobile } from '@/hooks/useIsMobile'
+import { useState, useRef, useEffect, type ReactNode } from "react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
-const isMac = navigator.platform.toUpperCase().includes('MAC')
-  || navigator.userAgent.includes('Macintosh')
+const isMac =
+  navigator.platform.toUpperCase().includes("MAC") ||
+  navigator.userAgent.includes("Macintosh");
 
 interface KbdTooltipProps {
-  shortcut: string
-  label?: string
-  children: ReactNode
-  position?: 'top' | 'bottom'
-  delay?: number
+  shortcut: string;
+  label?: string;
+  children: ReactNode;
+  position?: "top" | "bottom";
+  delay?: number;
 }
 
 /**
@@ -20,40 +21,45 @@ export default function KbdTooltip({
   shortcut,
   label,
   children,
-  position = 'bottom',
+  position = "bottom",
   delay = 400,
 }: KbdTooltipProps) {
-  const isMobile = useIsMobile()
-  const [visible, setVisible] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>()
-  const ref = useRef<HTMLDivElement>(null)
+  const isMobile = useIsMobile();
+  const [visible, setVisible] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => () => clearTimeout(timerRef.current), [])
+  useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  if (isMobile) return <>{children}</>
+  if (isMobile) return <>{children}</>;
 
   const show = () => {
-    timerRef.current = setTimeout(() => setVisible(true), delay)
-  }
+    timerRef.current = setTimeout(() => setVisible(true), delay);
+  };
   const hide = () => {
-    clearTimeout(timerRef.current)
-    setVisible(false)
-  }
+    clearTimeout(timerRef.current);
+    setVisible(false);
+  };
 
   // Platform-aware modifier mapping
   const macMap: Record<string, string> = {
-    Cmd: '⌘', Ctrl: '⌃', Alt: '⌥', Shift: '⇧',
-  }
+    Cmd: "⌘",
+    Ctrl: "⌃",
+    Alt: "⌥",
+    Shift: "⇧",
+  };
   const otherMap: Record<string, string> = {
-    Cmd: 'Ctrl', Ctrl: 'Ctrl', Alt: 'Alt', Shift: 'Shift',
-  }
-  const modMap = isMac ? macMap : otherMap
+    Cmd: "Ctrl",
+    Ctrl: "Ctrl",
+    Alt: "Alt",
+    Shift: "Shift",
+  };
+  const modMap = isMac ? macMap : otherMap;
 
-  const keys = shortcut.split('+').map(k => modMap[k] ?? k)
+  const keys = shortcut.split("+").map((k) => modMap[k] ?? k);
 
-  const posClass = position === 'top'
-    ? 'bottom-full mb-1.5'
-    : 'top-full mt-1.5'
+  const posClass =
+    position === "top" ? "bottom-full mb-1.5" : "top-full mt-1.5";
 
   return (
     <div
@@ -84,5 +90,5 @@ export default function KbdTooltip({
         </div>
       )}
     </div>
-  )
+  );
 }
