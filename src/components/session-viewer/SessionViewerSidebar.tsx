@@ -1,8 +1,25 @@
-import type { CSSProperties, MouseEventHandler, RefObject } from "react";
+import { useMemo, type CSSProperties, type MouseEventHandler, type RefObject } from "react";
 
 import SessionTree, { type SessionTreeRef } from "@/components/session-tree/SessionTree";
 
 import type { SessionEntry } from "@/types";
+
+/** Resolve label entries into a targetId → label text map (latest-wins by file order) */
+function resolveLabelsFromEntries(entries: SessionEntry[]): Record<string, string> {
+  const labels = new Map<string, string>();
+  for (const entry of entries) {
+    if (entry.type !== "label" || !entry.targetId?.trim()) {
+      continue;
+    }
+    const text = entry.label?.trim() ?? "";
+    if (text) {
+      labels.set(entry.targetId, text);
+    } else {
+      labels.delete(entry.targetId);
+    }
+  }
+  return Object.fromEntries(labels);
+}
 
 export interface SessionViewerSidebarProps {
   showSidebar: boolean;
@@ -37,6 +54,11 @@ export default function SessionViewerSidebar({
   outlineTitle,
   hideSidebarTitle,
 }: SessionViewerSidebarProps) {
+  const resolvedLabelsByTargetId = useMemo(
+    () => resolveLabelsFromEntries(entries),
+    [entries],
+  );
+
   if (!showSidebar) {
     return null;
   }
@@ -104,6 +126,7 @@ export default function SessionViewerSidebar({
             entries={entries}
             activeLeafId={activeEntryId ?? undefined}
             onNodeClick={onNodeClick}
+            resolvedLabelsByTargetId={resolvedLabelsByTargetId}
           />
         </div>
       </aside>

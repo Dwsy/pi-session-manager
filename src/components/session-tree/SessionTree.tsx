@@ -116,6 +116,7 @@ interface SessionTreeProps {
   entries: SessionEntry[];
   activeLeafId?: string;
   onNodeClick?: (leafId: string, targetId: string) => void;
+  resolvedLabelsByTargetId?: Record<string, string>;
   filter?:
     | "default"
     | "no-tools"
@@ -149,6 +150,7 @@ const SessionTree = memo(
       entries,
       activeLeafId,
       onNodeClick,
+      resolvedLabelsByTargetId,
       filter = "no-tools",
     }: SessionTreeProps,
     ref,
@@ -245,6 +247,7 @@ const SessionTree = memo(
             parentNode.push({
               entry,
               children: childrenMap.get(entry.id) || [],
+              label: resolvedLabelsByTargetId?.[entry.id],
             });
           }
         }
@@ -256,6 +259,7 @@ const SessionTree = memo(
           const node: TreeNodeData = {
             entry,
             children: childrenMap.get(entry.id) || [],
+            label: resolvedLabelsByTargetId?.[entry.id],
           };
           roots.push(node);
         }
@@ -273,9 +277,9 @@ const SessionTree = memo(
       roots.forEach(sortChildren);
 
       return roots;
-    }, [entries]);
+   }, [entries, resolvedLabelsByTargetId]);
 
-    // Flatten tree with proper indentation and connectors
+     // Flatten tree with proper indentation and connectors
     const flatNodes = useMemo(() => {
       const result: FlatNode[] = [];
       const multipleRoots = treeData.length > 1;
