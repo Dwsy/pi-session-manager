@@ -203,7 +203,8 @@ function normalizeSessionEntry(raw: any): SessionEntry | null {
     type === 'toolCall' ||
     type === 'custom_message' ||
     type === 'compaction' ||
-    type === 'branch_summary'
+    type === 'branch_summary' ||
+    type === 'label'
   ) {
     return raw as SessionEntry
   }
