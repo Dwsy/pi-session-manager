@@ -43,7 +43,7 @@ fn transformed_session_cache(
 }
 
 fn file_modified_ms(path: &str) -> Result<u128, String> {
-    let backing_path = crate::domain::casr_min::bridge_ops::backing_file_path(Path::new(path));
+    let backing_path = crate::domain::session_bridge::backing_file_path(Path::new(path));
     let modified = fs::metadata(backing_path)
         .map_err(|e| format!("Failed to get session file metadata: {e}"))?
         .modified()
@@ -57,12 +57,12 @@ fn file_modified_ms(path: &str) -> Result<u128, String> {
 fn transformed_session_content(path: &str) -> Result<Option<String>, String> {
     let session_path = Path::new(path);
     let Ok((source, canonical)) =
-        crate::domain::casr_min::bridge_ops::read_canonical_session_from_path(session_path)
+        crate::domain::session_bridge::read_canonical_session_from_path(session_path)
     else {
         return Ok(None);
     };
 
-    if source == crate::domain::casr_min::providers::ProviderKind::Pi {
+    if source == crate::domain::session_bridge::SessionBridgeSource::Pi {
         return Ok(None);
     }
 
@@ -75,7 +75,7 @@ fn transformed_session_content(path: &str) -> Result<Option<String>, String> {
         }
     }
 
-    let content = crate::domain::casr_min::bridge_ops::preview_session_for_viewer(&canonical)?;
+    let content = crate::domain::session_bridge::preview_canonical_for_viewer(&canonical)?;
 
     if let Ok(mut guard) = transformed_session_cache().write() {
         guard.insert(
@@ -337,7 +337,7 @@ pub(super) async fn read_session_file_incremental_offset_impl(
 }
 
 pub(super) async fn get_file_stats_impl(path: String) -> Result<FileStats, String> {
-    let metadata = fs::metadata(crate::domain::casr_min::bridge_ops::backing_file_path(
+    let metadata = fs::metadata(crate::domain::session_bridge::backing_file_path(
         Path::new(&path),
     ))
     .map_err(|e| format!("Failed to get file metadata: {e}"))?;
@@ -395,7 +395,7 @@ pub(super) async fn get_session_entries_impl(path: String) -> Result<Vec<Session
         }
         return Ok(entries);
     }
-    crate::domain::casr_min::bridge_ops::parse_session_entries_from_path(Path::new(&path))
+    crate::domain::session_bridge::parse_session_entries_from_path(Path::new(&path))
 }
 
 pub(super) async fn get_session_by_path_impl(

@@ -207,9 +207,9 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                             let is_jsonl =
                                 path.extension().map(|ext| ext == "jsonl").unwrap_or(false);
                             let is_gemini_json =
-                                crate::domain::casr_min::providers::gemini::is_session_file(path);
-                            let is_opencode_db = path.file_name().and_then(|value| value.to_str())
-                                == Some(crate::domain::casr_min::providers::opencode::DB_FILENAME);
+                                crate::domain::session_bridge::is_gemini_session_file(path);
+                            let is_opencode_db =
+                                crate::domain::session_bridge::is_opencode_db_path(path);
 
                             if is_jsonl || is_opencode_db || is_gemini_json {
                                 // Skip non-pi-session files: subagent artifacts and

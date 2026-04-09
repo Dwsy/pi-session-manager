@@ -16,7 +16,7 @@ pub struct SessionModelUsage {
 /// Parse session file to extract detailed statistics
 pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
     if let Ok((_, session)) =
-        crate::domain::casr_min::bridge_ops::read_canonical_session_from_str(jsonl_content, None)
+        crate::domain::session_bridge::read_canonical_session_from_str(jsonl_content, None)
     {
         let mut details = SessionDetails::default();
         let mut model_set: HashSet<String> = HashSet::new();
@@ -25,17 +25,17 @@ pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
 
         for message in session.messages {
             match message.role {
-                crate::domain::casr_min::model::MessageRole::User => details.user_messages += 1,
-                crate::domain::casr_min::model::MessageRole::Assistant => {
+                crate::domain::session_bridge::MessageRole::User => details.user_messages += 1,
+                crate::domain::session_bridge::MessageRole::Assistant => {
                     details.assistant_messages += 1;
                     if let Some(author) = message.author.clone().filter(|value| !value.is_empty()) {
                         model_set.insert(author.clone());
                         details.model_usage.entry(author).or_default().messages += 1;
                     }
                 }
-                crate::domain::casr_min::model::MessageRole::Tool => details.tool_results += 1,
-                crate::domain::casr_min::model::MessageRole::System
-                | crate::domain::casr_min::model::MessageRole::Other(_) => {}
+                crate::domain::session_bridge::MessageRole::Tool => details.tool_results += 1,
+                crate::domain::session_bridge::MessageRole::System
+                | crate::domain::session_bridge::MessageRole::Other(_) => {}
             }
 
             if let Some(timestamp_ms) = message.timestamp {

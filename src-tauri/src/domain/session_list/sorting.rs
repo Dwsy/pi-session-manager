@@ -14,7 +14,7 @@ fn resolve_session_name(session: &SessionInfo) -> String {
 }
 
 fn get_session_size_bytes(path: &str) -> u64 {
-    fs::metadata(crate::domain::casr_min::bridge_ops::backing_file_path(
+    fs::metadata(crate::domain::session_bridge::backing_file_path(
         std::path::Path::new(path),
     ))
     .map(|metadata| metadata.len())

@@ -211,18 +211,19 @@ pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
 
     fn extend_candidate(path: &Path, files: &mut Vec<PathBuf>) {
         let is_jsonl = path.extension().map(|ext| ext == "jsonl").unwrap_or(false);
-        let is_gemini_json = crate::domain::casr_min::providers::gemini::is_session_file(path);
-        let is_opencode_db = path.file_name().and_then(|value| value.to_str())
-            == Some(crate::domain::casr_min::providers::opencode::DB_FILENAME);
+        let is_gemini_json = crate::domain::session_bridge::is_gemini_session_file(path);
+        let is_opencode_db = crate::domain::session_bridge::is_opencode_db_path(path);
 
         if !is_jsonl && !is_opencode_db && !is_gemini_json {
             return;
         }
 
         if is_opencode_db {
-            match crate::domain::casr_min::providers::opencode::list_session_paths_in_db(path) {
-                Ok(paths) if !paths.is_empty() => files.extend(paths),
-                Ok(_) | Err(_) => files.push(path.to_path_buf()),
+            let paths = crate::domain::session_bridge::expand_opencode_session_paths(path);
+            if paths.is_empty() {
+                files.push(path.to_path_buf());
+            } else {
+                files.extend(paths);
             }
             return;
         }
@@ -300,7 +301,7 @@ pub(crate) async fn parallel_parse_files(files: Vec<PathBuf>) -> Vec<ParsedFileR
     for file_path in files {
         set.spawn(async move {
             let path_str = file_path.to_string_lossy().to_string();
-            let metadata = fs::metadata(crate::domain::casr_min::bridge_ops::backing_file_path(
+            let metadata = fs::metadata(crate::domain::session_bridge::backing_file_path(
                 &file_path,
             ));
             let file_modified: DateTime<Utc> = match metadata {
@@ -393,7 +394,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                         sqlite::get_cached_file_modified(&conn, &path_str)
                     {
                         if let Ok(metadata) = std::fs::metadata(
-                            crate::domain::casr_min::bridge_ops::backing_file_path(path),
+                            crate::domain::session_bridge::backing_file_path(path),
                         ) {
                             let file_modified: chrono::DateTime<chrono::Utc> = DateTime::from(
                                 metadata
@@ -492,7 +493,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
 /// Optimization: Use BufReader for streaming to reduce memory usage on large files
 /// Returns: (SessionInfo, Vec<SessionEntry>) - session info and message entry list
 pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
-    crate::domain::casr_min::bridge_ops::parse_session_info_from_path(path)
+    crate::domain::session_bridge::parse_session_info_from_path(path)
 }
 
 pub fn extract_message_text(entry: &Value) -> String {
@@ -531,15 +532,14 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
 
     for path_str in &changed_paths {
         let path = PathBuf::from(path_str);
-        let is_opencode_db = path.file_name().and_then(|value| value.to_str())
-            == Some(crate::domain::casr_min::providers::opencode::DB_FILENAME);
+        let is_opencode_db = crate::domain::session_bridge::is_opencode_db_path(&path);
 
         if !path.exists() {
             let removed_paths = sessions
                 .iter()
                 .filter(|session| {
                     session.path == *path_str
-                        || crate::domain::casr_min::bridge_ops::backing_file_path(Path::new(
+                        || crate::domain::session_bridge::backing_file_path(Path::new(
                             &session.path,
                         )) == path
                 })
@@ -560,8 +560,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
         }
 
         let expanded_paths = if is_opencode_db {
-            crate::domain::casr_min::providers::opencode::list_session_paths_in_db(&path)
-                .unwrap_or_else(|_| vec![path.clone()])
+            crate::domain::session_bridge::expand_opencode_session_paths(&path)
         } else {
             vec![path.clone()]
         };
@@ -572,7 +571,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                 Ok((info, entries)) => {
                     seen_paths.insert(info.path.clone());
                     let file_modified = match fs::metadata(
-                        crate::domain::casr_min::bridge_ops::backing_file_path(&expanded_path),
+                        crate::domain::session_bridge::backing_file_path(&expanded_path),
                     )
                     .and_then(|m| m.modified())
                     {
@@ -615,7 +614,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             let removed_paths = sessions
                 .iter()
                 .filter(|session| {
-                    crate::domain::casr_min::bridge_ops::backing_file_path(Path::new(&session.path))
+                    crate::domain::session_bridge::backing_file_path(Path::new(&session.path))
                         == path
                         && !seen_paths.contains(&session.path)
                 })
