@@ -154,6 +154,10 @@ export default function PiLiveChatInput({
   }, [input]);
 
   useEffect(() => {
+    if (!isLiveProp) {
+      setCommands([]);
+      return;
+    }
     let cancelled = false;
     setCommandsLoading(true);
     getCommands(sessionId)
@@ -176,7 +180,7 @@ export default function PiLiveChatInput({
     return () => {
       cancelled = true;
     };
-  }, [getCommands, sessionId]);
+  }, [getCommands, sessionId, isLiveProp]);
 
   const slashQuery = useMemo(() => {
     const trimmedStart = input.trimStart();
