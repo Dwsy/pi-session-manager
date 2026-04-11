@@ -110,20 +110,17 @@ interface TreeNode {
 function buildTree(entries: SessionEntry[]): TreeNode[] {
   const byId = new Map<string, SessionEntry>()
   const childrenMap = new Map<string, TreeNode[]>()
+  for (const e of entries) { byId.set(e.id, e); childrenMap.set(e.id, []) }
   for (const e of entries) {
-    byId.set(e.id, e)
-    childrenMap.set(e.id, [])
-  }
-  for (const e of entries) {
-    if (e.parentId && byId.has(e.parentId)) {
-      childrenMap.get(e.parentId)!.push({ entry: e, children: childrenMap.get(e.id) || [] })
-    }
+    const pid = e.parentId
+    const ep = (pid == null || pid === "None" || pid === "null" || pid === "NONE") ? null : pid
+    if (ep && byId.has(ep)) childrenMap.get(ep)!.push({ entry: e, children: childrenMap.get(e.id) || [] })
   }
   const roots: TreeNode[] = []
   for (const e of entries) {
-    if (!e.parentId || !byId.has(e.parentId)) {
-      roots.push({ entry: e, children: childrenMap.get(e.id) || [] })
-    }
+    const pid = e.parentId
+    const ep = (pid == null || pid === "None" || pid === "null" || pid === "NONE") ? null : pid
+    if (!ep || !byId.has(ep)) roots.push({ entry: e, children: childrenMap.get(e.id) || [] })
   }
   const sort = (n: TreeNode) => {
     n.children.sort((a, b) => new Date(a.entry.timestamp || 0).getTime() - new Date(b.entry.timestamp || 0).getTime())
@@ -165,11 +162,11 @@ function isSignificant(node: TreeNode, filter: FilterMode): boolean {
 function matchesFilter(entry: SessionEntry, filter: FilterMode): boolean {
   switch (filter) {
     case 'default':
-      // user messages + meta events
       if (entry.type !== 'message') return true
-      return entry.message?.role === 'user'
+      return entry.message?.role === 'user' || entry.message?.role === 'assistant'
 
     case 'no-tools':
+      if (entry.type === 'message' && entry.message?.role === 'toolResult') return false
       if (entry.type !== 'message') return true
       return entry.message?.role === 'user' || entry.message?.role === 'assistant'
 
@@ -183,9 +180,8 @@ function matchesFilter(entry: SessionEntry, filter: FilterMode): boolean {
       return entry.type === 'message' && entry.message?.role === 'user'
 
     default:
-      // Dynamic tool filter (e.g., 'tool-bash', 'tool-read', etc.)
       if (filter.startsWith('tool-')) {
-        const toolName = filter.slice(5) // Remove 'tool-' prefix
+        const toolName = filter.slice(5)
         if (entry.type === 'message' && entry.message?.role === 'user') return true
         if (entry.type === 'message' && entry.message?.role === 'assistant') {
           const content = Array.isArray(entry.message.content) ? entry.message.content : []
@@ -368,8 +364,9 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default
     let cur = byId.get(activeLeafId)
     while (cur) {
       ids.add(cur.id)
-      if (!cur.parentId || cur.parentId === cur.id) break
-      cur = byId.get(cur.parentId)
+      const pid = cur.parentId
+      if (!pid || pid === cur.id || pid === "None" || pid === "null" || pid === "NONE") break
+      cur = byId.get(pid)
     }
     return ids
   }, [entries, activeLeafId])
@@ -402,7 +399,9 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default
     const childrenMap = new Map<string, SessionEntry[]>()
     for (const e of entries) { byId.set(e.id, e); childrenMap.set(e.id, []) }
     for (const e of entries) {
-      if (e.parentId && byId.has(e.parentId)) childrenMap.get(e.parentId)!.push(e)
+      const pid = e.parentId
+      const ep = (pid == null || pid === "None" || pid === "null" || pid === "NONE") ? null : pid
+      if (ep && byId.has(ep)) childrenMap.get(ep)!.push(e)
     }
     let current = nodeId
     while (true) {

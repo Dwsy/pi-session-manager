@@ -67,6 +67,7 @@ export interface SessionViewerMessagesProps {
   isScrollMarkersFeatureEnabled: boolean;
   isTimelineNavEnabled?: boolean;
   previewMode?: boolean;
+  openPosition?: 'top' | 'bottom';
 }
 
 const SessionViewerMessages = forwardRef<
@@ -107,6 +108,7 @@ const SessionViewerMessages = forwardRef<
   isScrollMarkersFeatureEnabled,
   isTimelineNavEnabled = false,
   previewMode = false,
+  openPosition = 'top',
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
   const { ensureToolExpandedForSearch } = useSessionView();
@@ -139,6 +141,7 @@ const SessionViewerMessages = forwardRef<
     sessionPath,
     isAtBottomRef,
     onReachBottom,
+    openPosition,
   });
 
   useEffect(() => {

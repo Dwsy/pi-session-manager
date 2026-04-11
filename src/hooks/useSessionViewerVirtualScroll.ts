@@ -31,6 +31,8 @@ export interface UseSessionViewerVirtualScrollOptions {
   sessionPath: string
   isAtBottomRef?: MutableRefObject<boolean>
   onReachBottom?: () => void
+  /** Scroll position when switching sessions: 'top' or 'bottom' */
+  openPosition?: 'top' | 'bottom'
 }
 
 export interface UseSessionViewerVirtualScrollResult {
@@ -57,6 +59,7 @@ export function useSessionViewerVirtualScroll({
   sessionPath,
   isAtBottomRef: externalIsAtBottomRef,
   onReachBottom,
+  openPosition = 'top',
 }: UseSessionViewerVirtualScrollOptions): UseSessionViewerVirtualScrollResult {
   const [isAtBottom, setIsAtBottom] = useState(true)
 
@@ -140,6 +143,24 @@ export function useSessionViewerVirtualScroll({
     measuredHeightsRef.current.clear()
     hasTriggeredReachBottomRef.current = false
   }, [expandedToolIds, sessionPath, toolsExpanded])
+
+  // Reset scroll position when switching sessions
+  useEffect(() => {
+    if (!sessionPath || loading) return
+
+    const rafId = requestAnimationFrame(() => {
+      if (renderableEntries.length === 0) return
+
+      if (openPosition === 'bottom') {
+        const lastIndex = renderableEntries.length - 1
+        rowVirtualizer.scrollToIndex(lastIndex, { align: 'end', behavior: 'auto' })
+      } else {
+        rowVirtualizer.scrollToIndex(0, { align: 'start' })
+      }
+    })
+
+    return () => cancelAnimationFrame(rafId)
+  }, [sessionPath, loading, openPosition, renderableEntries.length, rowVirtualizer])
 
   useEffect(() => {
     if (loading || error || renderableEntries.length === 0) return

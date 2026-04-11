@@ -87,6 +87,8 @@ function SessionViewerContent({
     getSessionSetting('scrollMarkersEnabled') ?? false;
   const timelineNavEnabledSetting =
     getSessionSetting('timelineNavEnabled') ?? false;
+  const openPositionSetting =
+    getSessionSetting('openPosition') ?? 'top';
   const timelineNavEnabled = previewMode ? false : timelineNavEnabledSetting;
   const scrollMarkersEnabled = previewMode
     ? false
@@ -401,6 +403,7 @@ function SessionViewerContent({
           isScrollMarkersFeatureEnabled={previewMode ? false : scrollMarkersEnabled}
           isTimelineNavEnabled={previewMode ? false : timelineNavEnabled}
           previewMode={previewMode}
+          openPosition={openPositionSetting}
         />
 
         {!previewMode && (

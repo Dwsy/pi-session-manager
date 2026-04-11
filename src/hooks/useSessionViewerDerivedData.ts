@@ -13,6 +13,7 @@ export interface SessionViewerDerivedData {
 function resolvePathEntryIds(
   activeEntryId: string | null,
   entryById: ReadonlyMap<string, SessionEntry>,
+  allEntries: SessionEntry[],
 ): Set<string> | null {
   if (!activeEntryId || entryById.size === 0) return null
 
@@ -21,10 +22,21 @@ function resolvePathEntryIds(
 
   while (currentEntry) {
     pathEntryIds.add(currentEntry.id)
-    if (!currentEntry.parentId || currentEntry.parentId === currentEntry.id) {
-      break
+    const pid = currentEntry.parentId
+    if (!pid || pid === currentEntry.id || pid === "None" || pid === "null" || pid === "NONE") break
+    const parent = entryById.get(pid)
+    if (parent) {
+      currentEntry = parent
+    } else {
+      // Parent not found in entries (may have been filtered out).
+      // Fallback: use the previous entry in the flat list as the path.
+      const idx = allEntries.findIndex(e => e.id === currentEntry!.id)
+      if (idx > 0) {
+        currentEntry = allEntries[idx - 1]
+      } else {
+        break
+      }
     }
-    currentEntry = entryById.get(currentEntry.parentId)
   }
 
   return pathEntryIds
@@ -36,6 +48,7 @@ function isRenderableMessageEntry(
   isLive?: boolean,
 ): boolean {
   if (entry.type !== 'message') return false
+  // Non-live mode: only show entries on the active path
   if (!isLive && pathEntryIds && !pathEntryIds.has(entry.id)) return false
 
   const role = entry.message?.role
@@ -63,7 +76,7 @@ export function useSessionViewerDerivedData(
       entryById.set(entry.id, entry)
     }
 
-    const pathEntryIds = resolvePathEntryIds(activeEntryId, entryById)
+    const pathEntryIds = resolvePathEntryIds(activeEntryId, entryById, entries)
     const renderableEntries: SessionEntry[] = []
     const toolResultByCallId = new Map<string, SessionEntry>()
     const messageEntries: SessionEntry[] = []
