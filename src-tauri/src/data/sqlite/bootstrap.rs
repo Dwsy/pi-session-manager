@@ -153,6 +153,10 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         conn.execute("PRAGMA synchronous=NORMAL;", [])
             .map_err(|e| format!("Failed to set synchronous mode: {e}"))?;
 
+        // Enable busy timeout to handle concurrent write locks gracefully
+        conn.busy_timeout(std::time::Duration::from_secs(5))
+            .map_err(|e| format!("Failed to set busy_timeout: {e}"))?;
+
         // Enable foreign key constraints
         conn.execute("PRAGMA foreign_keys=ON;", [])
             .map_err(|e| format!("Failed to enable foreign keys: {e}"))?;
