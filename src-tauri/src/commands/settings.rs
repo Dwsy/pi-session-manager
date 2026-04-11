@@ -640,15 +640,23 @@ mod tests {
 
     #[tokio::test]
     async fn save_external_session_providers_core_clears_disabled_provider_cache() {
+        // Ensure clean state - remove any leftover env vars
+        std::env::remove_var("PPM_TEST_DB");
+        std::env::remove_var("HOME");
+
         let temp = tempfile::tempdir().expect("tempdir");
         let db_path = temp.path().join("sessions.db");
+        // Set both HOME and PPM_TEST_DB so Config::load() and init_db() use the same path
+        std::env::set_var("HOME", temp.path());
         std::env::set_var("PPM_TEST_DB", &db_path);
 
+        // Create config with codex provider enabled
         let mut config = Config::default();
         config.scan_other_agent_jsonl = true;
         config.external_session_provider_slugs = vec!["codex".to_string()];
         crate::config::save_config(&config).expect("save config");
 
+        // Insert a codex session (path must match codex source slug pattern)
         let conn = crate::data::sqlite::init_db_with_config(&config).expect("db");
         let now = chrono::Utc::now();
         conn.execute(
@@ -662,16 +670,38 @@ mod tests {
         ).expect("insert");
         drop(conn);
 
+        // Verify session exists before clearing
+        let conn_before = crate::data::sqlite::init_db_with_config(&config).expect("db");
+        let count_before: i64 = conn_before
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .expect("count before");
+        assert_eq!(count_before, 1, "Should have 1 session before clearing");
+        drop(conn_before);
+
+        // Clear all providers
         save_external_session_providers_core(vec![])
             .await
             .expect("save");
 
-        let conn = crate::data::sqlite::init_db_with_config(&Config::default()).expect("db");
+        // Reload config - the clear should have set scan_other_agent_jsonl = false
+        let new_config = crate::config::Config::load().expect("load config");
+        assert!(
+            !new_config.scan_other_agent_jsonl,
+            "scan_other_agent_jsonl should be false after clearing"
+        );
+
+        // Verify the codex session was deleted (matched by path pattern)
+        let conn = crate::data::sqlite::init_db_with_config(&new_config).expect("db");
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
-            .expect("count");
-        assert_eq!(count, 0);
+            .expect("count after");
+        assert_eq!(
+            count, 0,
+            "Expected 0 sessions after clearing, but found {}",
+            count
+        );
 
         std::env::remove_var("PPM_TEST_DB");
+        std::env::remove_var("HOME");
     }
 }

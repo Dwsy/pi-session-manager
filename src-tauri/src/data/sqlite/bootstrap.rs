@@ -392,6 +392,9 @@ mod tests {
 
     #[test]
     fn uses_primary_db_for_local_mode() {
+        // Ensure clean state - remove any leftover PPM_TEST_DB
+        std::env::remove_var("PPM_TEST_DB");
+
         let config = Config::default();
         let db_path = get_db_path_for_config(&config).expect("db path");
         assert!(db_path.ends_with("sessions.db"));
@@ -399,6 +402,9 @@ mod tests {
 
     #[test]
     fn uses_dataset_db_for_dataset_mode() {
+        // Ensure clean state - remove any leftover PPM_TEST_DB
+        std::env::remove_var("PPM_TEST_DB");
+
         let config = Config {
             session_source_mode: crate::config::SessionSourceMode::Dataset,
             active_dataset_id: Some("badlogicgames/pi-mono".to_string()),
@@ -418,7 +424,15 @@ mod tests {
 
         let db_path = get_db_path_for_config(&config).expect("dataset db path");
         let path_str = db_path.to_string_lossy();
-        assert!(path_str.contains("/datasets/badlogicgames__pi-mono/"));
-        assert!(path_str.ends_with("/sessions.db"));
+        // Use Path instead of string contains for cross-platform compatibility
+        assert!(
+            db_path.components().any(|c| c.as_os_str() == "datasets")
+                && db_path
+                    .components()
+                    .any(|c| c.as_os_str() == "badlogicgames__pi-mono"),
+            "Path should contain datasets/badlogicgames__pi-mono: {}",
+            path_str
+        );
+        assert!(db_path.ends_with("sessions.db"));
     }
 }
