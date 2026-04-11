@@ -2,7 +2,11 @@ import type { ReactNode } from "react";
 import { MessageSquare, Bot, User } from "lucide-react";
 import { BaseSearchPlugin } from "@/plugins/base/BaseSearchPlugin";
 import type { SearchContext, SearchPluginResult } from "@/plugins/types";
-import type { SessionInfo, FullTextSearchHit } from "@/types";
+import type {
+  SessionInfo,
+  FullTextSearchHit,
+  FullTextSearchSourceFilter,
+} from "@/types";
 import { getPathBasename, getPathParentName } from "@/utils/path";
 import { parseQuotedQuery } from "@/utils/search";
 import { formatShortSessionId } from "@/utils/session";
@@ -39,6 +43,8 @@ export interface MessageSearchPluginOptions {
   roleFilter?: "user" | "assistant" | "all";
   /** Glob pattern for path filtering */
   globPattern?: string;
+  /** Source filter: all/labels/content */
+  sourceFilter?: FullTextSearchSourceFilter;
   /** Sort mode: score/newest/oldest */
   sortMode?: "score" | "newest" | "oldest";
   /** Page number (0-indexed) */
@@ -409,6 +415,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       roleFilter: options?.roleFilter ?? this.ftsOptions.roleFilter ?? "all",
       globPattern:
         options?.globPattern ?? this.ftsOptions.globPattern ?? undefined,
+      sourceFilter: options?.sourceFilter ?? this.ftsOptions.sourceFilter ?? "all",
       sortMode: options?.sortMode ?? this.ftsOptions.sortMode ?? "score",
       page: options?.page ?? this.ftsOptions.page ?? 0,
       pageSize:
@@ -425,6 +432,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
       const response = await fullTextSearchRuntime({
         query,
         roleFilter: ftsOptions.roleFilter || "all",
+        sourceFilter: ftsOptions.sourceFilter || "all",
         globPattern: ftsOptions.globPattern || undefined,
         projectPath: context.searchCurrentProjectOnly
           ? context.selectedProject

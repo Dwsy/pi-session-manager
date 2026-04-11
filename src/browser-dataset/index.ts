@@ -11,6 +11,7 @@ export {
 } from "./cache";
 export {
   getBrowserDatasetSessionByPath,
+  getBrowserDatasetSessionLabels,
   getBrowserDatasetSessions,
   readBrowserDatasetChunk,
 } from "./sessions";

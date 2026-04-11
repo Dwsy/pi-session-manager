@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 
+use crate::domain::pi_session;
 use crate::types::{SessionEntry, SessionInfo};
 
 use super::adapters;
@@ -62,14 +63,22 @@ pub fn read_canonical_session_from_str(
 pub fn parse_session_info_from_path(
     path: &Path,
 ) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
-    let (_, canonical) = read_canonical_session_from_path(path)?;
     let modified = file_modified_time(path)?;
+    if detect_provider_from_path_or_content(path)? == Some(ProviderKind::Pi) {
+        return pi_session::parse_pi_session_info(path, modified);
+    }
+
+    let (_, canonical) = read_canonical_session_from_path(path)?;
     let entries = adapters::canonical_to_session_entries(&canonical);
     let info = adapters::canonical_to_session_info(&canonical, path, modified);
     Ok((info, entries))
 }
 
 pub fn parse_session_entries_from_path(path: &Path) -> Result<Vec<SessionEntry>, String> {
+    if detect_provider_from_path_or_content(path)? == Some(ProviderKind::Pi) {
+        return pi_session::parse_pi_session_entries(path);
+    }
+
     let (_, canonical) = read_canonical_session_from_path(path)?;
     Ok(adapters::canonical_to_session_entries(&canonical))
 }
@@ -154,6 +163,16 @@ pub fn convert_canonical_session(
         dry_run: false,
         warnings: Vec::new(),
     })
+}
+
+fn detect_provider_from_path_or_content(path: &Path) -> Result<Option<ProviderKind>, String> {
+    if let Some(provider) = detect_provider(Some(path), "") {
+        return Ok(Some(provider));
+    }
+
+    let content = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read session file {}: {e}", path.display()))?;
+    Ok(detect_provider(Some(path), &content))
 }
 
 pub fn backing_file_path(path: &Path) -> PathBuf {

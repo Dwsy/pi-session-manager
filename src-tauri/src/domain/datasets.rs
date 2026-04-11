@@ -254,7 +254,7 @@ fn remove_existing_dataset_artifacts(slug: &str) -> Result<(), String> {
 async fn download_dataset_files(
     task_id: &str,
     source: &ParsedDatasetSource,
-    files: &[HuggingFaceTreeEntry],
+    files: Vec<HuggingFaceTreeEntry>,
 ) -> Result<(), String> {
     let target_root = dataset_sessions_dir(&source.slug)?;
     let client = reqwest::Client::builder()
@@ -262,8 +262,7 @@ async fn download_dataset_files(
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
-    #[allow(clippy::redundant_iter_cloned)]
-    let tasks = files.iter().cloned().map(|entry| {
+    let tasks = files.into_iter().map(|entry| {
         let client = client.clone();
         let source = source.clone();
         let target_root = target_root.clone();
@@ -412,14 +411,15 @@ async fn run_dataset_import(task_id: String, source: ParsedDatasetSource) -> Res
         return Err("No JSONL files found in dataset".to_string());
     }
 
+    let jsonl_file_count = jsonl_files.len();
     let total_bytes = jsonl_files.iter().map(|item| item.size.unwrap_or(0)).sum();
     update_import_status(&task_id, |state| {
         state.phase = "downloading".to_string();
-        state.total_files = jsonl_files.len();
+        state.total_files = jsonl_file_count;
         state.total_bytes = total_bytes;
     })?;
 
-    download_dataset_files(&task_id, &source, &jsonl_files).await?;
+    download_dataset_files(&task_id, &source, jsonl_files).await?;
 
     update_import_status(&task_id, |state| {
         state.phase = "building".to_string();
@@ -430,7 +430,7 @@ async fn run_dataset_import(task_id: String, source: ParsedDatasetSource) -> Res
         .await
         .map_err(|e| format!("Dataset indexing task failed: {e}"))??;
 
-    let dataset = upsert_dataset_registry_entry(&source, jsonl_files.len(), total_bytes)?;
+    let dataset = upsert_dataset_registry_entry(&source, jsonl_file_count, total_bytes)?;
     write_dataset_manifest(&dataset)?;
 
     update_import_status(&task_id, |state| {

@@ -3,6 +3,7 @@ import { useCommandMenu } from '@/hooks/useCommandMenu'
 import type { SearchContext, SearchPluginResult } from '@/plugins/types'
 import CommandMenu from './CommandMenu'
 import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
+import type { FullTextSearchSourceFilter } from '@/types'
 
 interface CommandPaletteProps {
   context: SearchContext
@@ -15,6 +16,7 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
   const [ftsOptions, setFtsOptions] = useState<MessageSearchPluginOptions>({
     ftsMode: true,
     roleFilter: 'all',
+    sourceFilter: 'all' as FullTextSearchSourceFilter,
     globPattern: undefined,
     sortMode: 'newest',
     page: 0,

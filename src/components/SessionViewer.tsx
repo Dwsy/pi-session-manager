@@ -270,6 +270,7 @@ function SessionViewerContent({
           sidebarWidth={sidebarWidth}
           isResizing={isResizing}
           entries={entries}
+          sessionPath={session.path}
           activeEntryId={activeEntryId}
           onCloseSidebar={() => setShowSidebar(false)}
           onNodeClick={handleTreeNodeClick}

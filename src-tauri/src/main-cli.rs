@@ -645,12 +645,11 @@ async fn init_http_adapter(
         }
     }
 
-    async fn v1_search_fulltext(Json(req): Json<api_readonly::SearchRequest>) -> Json<Value> {
-        let query_text = match api_readonly::require_query(req.query.clone()) {
-            Ok(query) => query,
-            Err(error) => return json_error(error),
-        };
-        let top_k = req.top_k.unwrap_or(10).clamp(1, 100);
+    async fn v1_search_fulltext(
+        Json(req): Json<api_readonly::FullTextSearchRequest>,
+    ) -> Json<Value> {
+        let query_text = req.query.clone();
+        let page_size = req.page_size.unwrap_or(10).clamp(1, 100);
 
         match api_readonly::full_text_search(
             &cli_dispatch,
@@ -658,12 +657,14 @@ async fn init_http_adapter(
                 query: query_text.clone(),
                 role_filter: req.role_filter,
                 glob_pattern: req.glob_pattern,
-                project: None,
-                from: None,
-                to: None,
-                page: Some(0),
-                page_size: Some(top_k),
-                match_mode: Some("any".to_string()),
+                project: req.project,
+                from: req.from,
+                to: req.to,
+                page: Some(req.page.unwrap_or(0)),
+                page_size: Some(page_size),
+                match_mode: req.match_mode,
+                sort_order: req.sort_order,
+                source_filter: req.source_filter,
             },
             false,
         )

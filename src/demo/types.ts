@@ -1,5 +1,6 @@
 import type {
   FavoriteItem,
+  FullTextSearchSourceFilter,
   SessionEntry,
   SessionInfo,
   SessionTag,
@@ -36,6 +37,7 @@ export interface DemoSearchOptions {
 export interface DemoFullTextSearchOptions {
   query: string
   roleFilter?: 'all' | 'user' | 'assistant'
+  sourceFilter?: FullTextSearchSourceFilter
   globPattern?: string | null
   projectPath?: string | null
   includeThinking?: boolean

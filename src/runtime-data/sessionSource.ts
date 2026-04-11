@@ -1,6 +1,7 @@
 import type {
   DayStats,
   FullTextSearchResponse,
+  FullTextSearchSourceFilter,
   SearchResult,
   SessionChunk,
   SessionInfo,
@@ -55,6 +56,7 @@ export async function searchRuntimeSessions(
 export async function fullTextSearchRuntime(options: {
   query: string;
   roleFilter: "all" | "user" | "assistant";
+  sourceFilter?: FullTextSearchSourceFilter;
   globPattern?: string | null;
   projectPath?: string | null;
   page: number;
@@ -63,6 +65,12 @@ export async function fullTextSearchRuntime(options: {
   sortOrder?: "score" | "newest" | "oldest";
 }): Promise<FullTextSearchResponse> {
   return resolveSessionProvider().fullTextSearch(options);
+}
+
+export async function getRuntimeSessionLabels(
+  path: string,
+): Promise<Record<string, string>> {
+  return resolveSessionProvider().getSessionLabels(path);
 }
 
 export async function getRuntimeStats(

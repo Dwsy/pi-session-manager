@@ -136,6 +136,8 @@ pub fn canonical_to_session_entries(canonical: &CanonicalSession) -> Vec<Session
             parent_id: previous_id.clone(),
             timestamp,
             message: Some(Message { role, content }),
+            target_id: None,
+            label: None,
         });
         previous_id = Some(id);
     }

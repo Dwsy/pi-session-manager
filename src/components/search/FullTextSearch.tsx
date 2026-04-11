@@ -1,4 +1,11 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import {
   Search,
   X,
@@ -8,12 +15,22 @@ import {
   FileText,
   Globe,
   ArrowUpDown,
+  Tag,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { shortenPath } from "@/utils/format";
 import { getPathParentName } from "@/utils/path";
-import { parseQuotedQuery } from "@/utils/search";
-import type { FullTextSearchHit, SessionInfo } from "@/types";
+import {
+  applyLeadingSourceFilterToken,
+  formatSourceFilterToken,
+  parseLeadingSourceFilterToken,
+  parseQuotedQuery,
+} from "@/utils/search";
+import type {
+  FullTextSearchHit,
+  FullTextSearchSourceFilter,
+  SessionInfo,
+} from "@/types";
 import {
   fullTextSearchRuntime,
   getRuntimeSessionByPath,
@@ -58,16 +75,24 @@ interface FullTextSearchProps {
   onSelectResult: (session: SessionInfo, entryId: string) => void;
 }
 
+const SOURCE_FILTERS: FullTextSearchSourceFilter[] = [
+  "all",
+  "labels_only",
+  "content_only",
+];
+
 export default function FullTextSearch({
   isOpen,
   onClose,
   onSelectResult,
 }: FullTextSearchProps) {
   const { t } = useTranslation();
-  const [query, setQuery] = useState("");
+  const [queryInput, setQueryInput] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "user" | "assistant">(
     "all",
   );
+  const [sourceFilter, setSourceFilter] =
+    useState<FullTextSearchSourceFilter>("all");
   const [globPattern, setGlobPattern] = useState("");
   const [allHits, setAllHits] = useState<FullTextSearchHit[]>([]);
   const [totalHitsCount, setTotalHitsCount] = useState(0);
@@ -83,11 +108,59 @@ export default function FullTextSearch({
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const pageSize = 20;
-  const highlightTerms = useMemo(() => getHighlightTerms(query), [query]);
+  const parsedToken = useMemo(
+    () => parseLeadingSourceFilterToken(queryInput),
+    [queryInput],
+  );
+  const normalizedQuery = parsedToken.sourceFilter
+    ? parsedToken.normalizedQuery
+    : queryInput;
+  const effectiveSourceFilter = parsedToken.sourceFilter || sourceFilter;
+  const isLabelsBrowseMode =
+    effectiveSourceFilter === "labels_only" && !normalizedQuery.trim();
+  const effectiveSortMode =
+    isLabelsBrowseMode && sortMode === "score" ? "newest" : sortMode;
+  const highlightTerms = useMemo(
+    () => getHighlightTerms(normalizedQuery),
+    [normalizedQuery],
+  );
+
+  const sourceFilterSuggestions = useMemo(() => {
+    const trimmed = queryInput.trim();
+    if (!trimmed.startsWith("#") || /\s/.test(trimmed)) {
+      return [];
+    }
+
+    const prefix = trimmed.toLowerCase();
+    return SOURCE_FILTERS.filter((value) =>
+      formatSourceFilterToken(value).startsWith(prefix),
+    );
+  }, [queryInput]);
+
+  const getSourceFilterLabel = useCallback(
+    (value: FullTextSearchSourceFilter) => {
+      const key =
+        value === "labels_only"
+          ? "search.fullText.source.labels"
+          : value === "content_only"
+            ? "search.fullText.source.content"
+            : "search.fullText.source.all";
+      return t(key);
+    },
+    [t],
+  );
+
+  const rewriteInputWithSourceFilter = useCallback(
+    (
+      currentValue: string,
+      nextSourceFilter: FullTextSearchSourceFilter,
+    ): string => applyLeadingSourceFilterToken(currentValue, nextSourceFilter),
+    [],
+  );
 
   const sortedHits = useMemo(() => {
     const sorted = [...allHits];
-    switch (sortMode) {
+    switch (effectiveSortMode) {
       case "newest":
         sorted.sort(
           (a, b) =>
@@ -104,7 +177,7 @@ export default function FullTextSearch({
         sorted.sort((a, b) => b.score - a.score);
     }
     return sorted;
-  }, [allHits, sortMode]);
+  }, [allHits, effectiveSortMode]);
 
   const sessionCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -151,65 +224,80 @@ export default function FullTextSearch({
     async (
       searchQuery: string,
       role: string,
+      source: FullTextSearchSourceFilter,
       glob: string,
       pageNum: number,
       append = false,
     ) => {
-      if (!searchQuery.trim()) {
+      const allowsEmptyQuery = source === "labels_only" && !searchQuery.trim();
+      if (!searchQuery.trim() && !allowsEmptyQuery) {
         setAllHits([]);
         setTotalHitsCount(0);
         setHitsPage(0);
         return;
       }
+
       setIsSearching(true);
       setError(null);
       try {
         const response = await fullTextSearchRuntime({
           query: searchQuery,
           roleFilter: role as "all" | "user" | "assistant",
+          sourceFilter: source,
           globPattern: glob || null,
           projectPath: null,
           page: pageNum,
           pageSize: pageSize,
           matchMode: "any",
-          sortOrder: sortMode === "score" ? "score" : sortMode,
+          sortOrder: effectiveSortMode,
         });
         setAllHits((prev) =>
           append ? [...prev, ...response.hits] : response.hits,
         );
         setTotalHitsCount(response.total_hits);
         setHitsPage(pageNum);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Full text search failed:", err);
-        setError((err as string) || "Search failed");
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message || "Search failed");
       } finally {
         setIsSearching(false);
       }
     },
-    [pageSize],
+    [effectiveSortMode, pageSize],
   );
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     const timeout = setTimeout(() => {
       setHitsPage(0);
-      performSearch(query, roleFilter, globPattern, 0);
+      performSearch(
+        normalizedQuery,
+        roleFilter,
+        effectiveSourceFilter,
+        globPattern,
+        0,
+      );
     }, 300);
     searchTimeoutRef.current = timeout;
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
-  }, [query, roleFilter, globPattern, performSearch]);
+  }, [
+    normalizedQuery,
+    roleFilter,
+    effectiveSourceFilter,
+    globPattern,
+    performSearch,
+  ]);
 
-  // Memoization cache for highlighted HTML to avoid repeated string processing
   const highlightCache = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
-    // Clear cache when query changes
     highlightCache.current.clear();
-  }, [query]);
+  }, [normalizedQuery]);
 
-  useEffect(() => setHitsPage(0), [sortMode]);
+  useEffect(() => setHitsPage(0), [sortMode, effectiveSourceFilter]);
 
   const highlightContent = useCallback(
     (content: string): string => {
@@ -231,12 +319,10 @@ export default function FullTextSearch({
     [highlightTerms],
   );
 
-  // Infinite scroll: load more when sentinel enters viewport
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
 
-    // Get the scroll container by ID (the element with #search-results-wrapper)
     const scrollContainer = document.getElementById("search-results-wrapper");
     const root = scrollContainer || sentinel.parentElement;
 
@@ -257,9 +343,16 @@ export default function FullTextSearch({
     return () => {
       observer.unobserve(sentinel);
     };
-  }, [remainingToFetch, isSearching, hitsPage, query, roleFilter, globPattern]);
+  }, [
+    remainingToFetch,
+    isSearching,
+    hitsPage,
+    normalizedQuery,
+    roleFilter,
+    effectiveSourceFilter,
+    globPattern,
+  ]);
 
-  // Auto-focus search input when opened
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
@@ -267,7 +360,6 @@ export default function FullTextSearch({
     }
   }, [isOpen]);
 
-  // ESC key to close modal
   useEffect(() => {
     if (!isOpen) return;
 
@@ -284,7 +376,14 @@ export default function FullTextSearch({
 
   const handleLoadMore = () => {
     const nextPage = hitsPage + 1;
-    performSearch(query, roleFilter, globPattern, nextPage, true);
+    performSearch(
+      normalizedQuery,
+      roleFilter,
+      effectiveSourceFilter,
+      globPattern,
+      nextPage,
+      true,
+    );
   };
 
   const handleSelect = async (hit: FullTextSearchHit) => {
@@ -305,10 +404,15 @@ export default function FullTextSearch({
       newest: "search.fullText.sortNewest",
       oldest: "search.fullText.sortOldest",
     };
-    return t(keys[sortMode]);
+    return t(keys[effectiveSortMode]);
   };
 
   const cycleSort = () => {
+    if (isLabelsBrowseMode) {
+      setSortMode((current) => (current === "oldest" ? "newest" : "oldest"));
+      return;
+    }
+
     const modes: ("score" | "newest" | "oldest")[] = [
       "score",
       "newest",
@@ -318,7 +422,49 @@ export default function FullTextSearch({
     setSortMode(modes[(currentIndex + 1) % 3]);
   };
 
+  const handleQueryChange = (value: string) => {
+    setQueryInput(value);
+    const parsed = parseLeadingSourceFilterToken(value);
+    if (parsed.sourceFilter) {
+      setSourceFilter(parsed.sourceFilter);
+    }
+  };
+
+  const handleSourceFilterChange = (nextSourceFilter: FullTextSearchSourceFilter) => {
+    setSourceFilter(nextSourceFilter);
+    setQueryInput((currentValue) =>
+      rewriteInputWithSourceFilter(currentValue, nextSourceFilter),
+    );
+  };
+
+  const applySuggestedSourceFilter = (nextSourceFilter: FullTextSearchSourceFilter) => {
+    setSourceFilter(nextSourceFilter);
+    setQueryInput((currentValue) => {
+      const trimmed = currentValue.trim();
+      if (trimmed.startsWith("#") && !/\s/.test(trimmed)) {
+        return `${formatSourceFilterToken(nextSourceFilter)} `;
+      }
+      return rewriteInputWithSourceFilter(currentValue, nextSourceFilter);
+    });
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const handleInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (
+      sourceFilterSuggestions.length > 0 &&
+      (event.key === "Tab" || event.key === "Enter")
+    ) {
+      event.preventDefault();
+      applySuggestedSourceFilter(sourceFilterSuggestions[0]);
+    }
+  };
+
   if (!isOpen) return null;
+
+  const inputPlaceholder =
+    effectiveSourceFilter === "labels_only"
+      ? t("search.fullText.labelsPlaceholder")
+      : t("search.fullText.placeholder");
 
   return (
     <div
@@ -330,7 +476,6 @@ export default function FullTextSearch({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-4 border-b border-[#2a2b36] bg-[#1f2029] relative">
-          {/* Close button - top right corner */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-1.5 rounded-md hover:bg-[#2a2b36] motion-surface motion-color motion-press focus-ring flex-shrink-0 z-10"
@@ -342,14 +487,36 @@ export default function FullTextSearch({
 
           <div className="relative flex items-center gap-3 mb-4 pr-8">
             <Search className="w-5 h-5 text-blue-400 flex-shrink-0" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("search.fullText.placeholder")}
-              className="flex-1 bg-transparent border-none p-0 outline-none text-base font-medium text-foreground placeholder:text-muted-foreground"
-            />
+            <div className="relative flex-1">
+              <input
+                ref={inputRef}
+                type="text"
+                value={queryInput}
+                onChange={(e) => handleQueryChange(e.target.value)}
+                onKeyDown={handleInputKeyDown}
+                placeholder={inputPlaceholder}
+                className="w-full bg-transparent border-none p-0 outline-none text-base font-medium text-foreground placeholder:text-muted-foreground"
+              />
+              {sourceFilterSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-2 rounded-lg border border-[#2a2b36] bg-[#16161e] shadow-xl overflow-hidden z-20">
+                  {sourceFilterSuggestions.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => applySuggestedSourceFilter(value)}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-[#252636] motion-surface motion-color"
+                    >
+                      <span className="font-mono text-blue-300">
+                        {formatSourceFilterToken(value)}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {getSourceFilterLabel(value)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex bg-[#252636]/50 p-1 rounded-lg border border-[#2a2b36]/50">
@@ -390,6 +557,29 @@ export default function FullTextSearch({
                 {t("search.fullText.role.assistant")}
               </button>
             </div>
+            <div className="flex bg-[#252636]/50 p-1 rounded-lg border border-[#2a2b36]/50">
+              {SOURCE_FILTERS.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => handleSourceFilterChange(value)}
+                  className={`px-3 py-1.5 text-xs rounded-md motion-surface motion-color motion-press focus-ring flex items-center gap-1 ${
+                    effectiveSourceFilter === value
+                      ? "bg-blue-500/90 text-white shadow-md shadow-blue-500/25"
+                      : "text-muted-foreground hover:bg-[#2a2b36] hover:text-foreground"
+                  }`}
+                >
+                  {value === "labels_only" ? (
+                    <Tag className="w-3 h-3 flex-shrink-0" />
+                  ) : value === "content_only" ? (
+                    <FileText className="w-3 h-3 flex-shrink-0" />
+                  ) : (
+                    <Search className="w-3 h-3 flex-shrink-0" />
+                  )}
+                  {getSourceFilterLabel(value)}
+                </button>
+              ))}
+            </div>
             <div className="flex-1 min-w-[200px] relative">
               <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/70" />
               <input
@@ -403,7 +593,7 @@ export default function FullTextSearch({
             <button
               onClick={cycleSort}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border font-medium motion-surface motion-color motion-press focus-ring ${
-                sortMode === "score"
+                effectiveSortMode === "score"
                   ? "bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-blue-400/30 text-blue-300 shadow-sm shadow-blue-500/10"
                   : "bg-[#252636]/50 border-[#2a2b36]/50 text-muted-foreground hover:border-blue-400/30 hover:text-blue-300 hover:bg-blue-500/5"
               }`}
@@ -445,18 +635,26 @@ export default function FullTextSearch({
             ) : isSearching && allHits.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground/50">
                 <Loader2 className="w-16 h-16 mb-4 animate-spin" />
-                <p className="text-lg font-medium">{t("search.searching")}</p>
+                <p className="text-lg font-medium">
+                  {isLabelsBrowseMode
+                    ? t("search.fullText.labelsPlaceholder")
+                    : t("search.searching")}
+                </p>
               </div>
             ) : paginatedHits.length === 0 ? (
-              !isSearching && query ? (
+              !isSearching && (normalizedQuery.trim() || isLabelsBrowseMode) ? (
                 <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground/50">
                   <Search className="w-16 h-16 mb-4 opacity-30" />
                   <p className="text-lg font-medium mb-1">
-                    {t("search.noResults")}
+                    {isLabelsBrowseMode
+                      ? t("search.fullText.noLabels")
+                      : t("search.noResults")}
                   </p>
-                  <p className="text-sm">
-                    Try adjusting your search terms or filters
-                  </p>
+                  {!isLabelsBrowseMode && (
+                    <p className="text-sm">
+                      Try adjusting your search terms or filters
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground/30">
@@ -479,9 +677,9 @@ export default function FullTextSearch({
                   const isSessionIdMatch =
                     hit.match_reason === "session_id_exact" ||
                     hit.match_reason === "session_id_prefix";
+                  const isLabelMatch = hit.match_reason === "label";
 
-                  // Memoized highlight rendering
-                  const cacheKey = `${hit.entry_id || `session:${hit.session_id}`}|${query}`;
+                  const cacheKey = `${hit.entry_id || `session:${hit.session_id}`}|${normalizedQuery}`;
                   let highlightedHtml = highlightCache.current.get(cacheKey);
                   if (highlightedHtml === undefined) {
                     highlightedHtml = highlightContent(hit.content);
@@ -500,7 +698,7 @@ export default function FullTextSearch({
 
                   return (
                     <button
-                      key={hit.session_id + hit.entry_id}
+                      key={hit.session_id + hit.entry_id + hit.timestamp}
                       onClick={() => handleSelect(hit)}
                       className="group relative w-full p-4 rounded-xl border border-transparent hover:border-blue-500/30 hover:bg-blue-500/5 motion-surface motion-color focus-ring flex flex-col overflow-hidden shadow-sm hover:shadow-md hover:shadow-blue-500/10"
                     >
@@ -541,6 +739,11 @@ export default function FullTextSearch({
                                   )}
                                 </span>
                               )}
+                              {isLabelMatch && (
+                                <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
+                                  {t("search.fullText.labelMatch")}
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground/70 mt-1">
                               <span
@@ -569,7 +772,6 @@ export default function FullTextSearch({
                     </button>
                   );
                 })}
-                {/* Infinite scroll sentinel */}
                 {remainingToFetch > 0 && (
                   <div ref={sentinelRef} className="h-1" aria-hidden="true" />
                 )}
