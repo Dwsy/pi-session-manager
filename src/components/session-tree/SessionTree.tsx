@@ -1,1233 +1,301 @@
-import {
-  useState,
-  useMemo,
-  useCallback,
-  useEffect,
-  forwardRef,
-  memo,
-  useRef,
-  useImperativeHandle,
-  lazy,
-  Suspense,
-  type ReactNode,
-} from "react";
+import { useState, useMemo, useCallback, useEffect, forwardRef, memo, useRef, useImperativeHandle, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import type { SessionEntry } from "@/types";
-import SessionTreeSearch, {
-  type SessionTreeSearchRef,
-} from "./SessionTreeSearch";
+import SessionTreeSearch, { type SessionTreeSearchRef } from "./SessionTreeSearch";
 import { getCachedSettings } from "@/utils/settingsApi";
-import { parseQuotedQuery } from "@/utils/search";
-import { getPathBasename } from "@/utils/path";
-import { useSessionTreeLookup } from "@/hooks/useSessionTreeLookup";
 
-// Known tools map to CSS variable names: var(--tool-color-<name>)
-// Unknown tools use palette variables: var(--tool-palette-<N>)
-const KNOWN_TOOLS = new Set([
-  "read",
-  "edit",
-  "write",
-  "bash",
-  "search",
-  "web_fetch",
-]);
+const KNOWN_TOOLS = new Set(["read", "edit", "write", "bash", "search", "web_fetch"]);
 const TOOL_PALETTE_SIZE = 8;
-const TREE_SETTINGS_TYPES = new Set([
-  "session",
-  "session_info",
-  "label",
-  "model_change",
-  "thinking_level_change",
-]);
-
-function hashToolName(name: string): number {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function getToolColorVar(toolName: string): string {
-  if (KNOWN_TOOLS.has(toolName))
-    return `var(--tool-color-${toolName.replace(/_/g, "-")})`;
-  return `var(--tool-palette-${hashToolName(toolName) % TOOL_PALETTE_SIZE})`;
-}
-
+function hashToolName(name: string): number { let h = 0; for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0; return Math.abs(h); }
+function getToolColorVar(n: string): string { if (KNOWN_TOOLS.has(n)) return `var(--tool-color-${n.replace(/_/g, "-")})`; return `var(--tool-palette-${hashToolName(n) % TOOL_PALETTE_SIZE})`; }
 const SessionFlowView = lazy(() => import("../session-viewer/SessionFlowView"));
 
-// Highlight search keywords
-function highlightText(text: string, tokens: string[]): ReactNode {
-  if (!tokens.length || !text) return text;
+export interface SessionTreeRef { focusSearch: () => void; }
 
-  const regex = new RegExp(
-    `(${tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
-    "gi",
-  );
-  const parts = text.split(regex);
+interface TreeNodeData { entry: SessionEntry; children: TreeNodeData[]; label?: string; }
+interface FlatNode { node: TreeNodeData; indent: number; showConnector: boolean; isLast: boolean; gutters: Array<{ position: number; show: boolean }>; isVirtualRootChild: boolean; multipleRoots: boolean; }
 
-  return parts.map((part, i) => {
-    const isMatch = tokens.some((t) => part.toLowerCase() === t.toLowerCase());
-    return isMatch ? (
-      <mark key={i} className="search-keyword">
-        {part}
-      </mark>
-    ) : (
-      part
-    );
-  });
-}
+const SessionTree = memo(forwardRef<SessionTreeRef, { entries: SessionEntry[]; activeLeafId?: string; onNodeClick?: (leafId: string, targetId: string) => void; filter?: "default" | "no-tools" | "user-only" | "labeled-only" | "all" | `tool-${string}` }>(function SessionTree({ entries, activeLeafId, onNodeClick, filter = "no-tools" }, ref) {
+  const { t } = useTranslation();
+  const searchRef = useRef<SessionTreeSearchRef>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentFilter, setCurrentFilter] = useState(filter);
+  const [currentResultIndex, setCurrentResultIndex] = useState(0);
+  const [searchResults, setSearchResults] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"tree" | "flow" | "hierarchy">("tree");
 
-// Extract matching summary
-function extractSnippet(
-  text: string,
-  tokens: string[],
-  maxLen = 60,
-): string | null {
-  if (!text || !tokens.length) return null;
+  useImperativeHandle(ref, () => ({ focusSearch: () => searchRef.current?.focus() }), []);
 
-  const lowerText = text.toLowerCase();
-  let firstMatchIdx = -1;
-
-  for (const token of tokens) {
-    const idx = lowerText.indexOf(token.toLowerCase());
-    if (idx !== -1 && (firstMatchIdx === -1 || idx < firstMatchIdx)) {
-      firstMatchIdx = idx;
+  // ========== BUILD TREE ==========
+  const treeData = useMemo(() => {
+    const byId = new Map<string, SessionEntry>();
+    const cm = new Map<string, TreeNodeData[]>();
+    const labelMap = new Map<string, string>();
+    for (const e of entries) { byId.set(e.id, e); cm.set(e.id, []); }
+    for (const e of entries) { if (e.type === "label" && e.targetId && e.label) labelMap.set(e.targetId, e.label); }
+    for (const e of entries) {
+      const pid = e.parentId;
+      const ep = (pid == null || pid === "None" || pid === "null" || pid === "NONE") ? null : pid;
+      if (ep && byId.has(ep)) cm.get(ep)!.push({ entry: e, children: cm.get(e.id)!, label: labelMap.get(e.id) });
     }
-  }
-
-  if (firstMatchIdx === -1) return null;
-
-  const start = Math.max(0, firstMatchIdx - 20);
-  const end = Math.min(text.length, firstMatchIdx + maxLen);
-  let snippet = text.slice(start, end).trim();
-
-  if (start > 0) snippet = "..." + snippet;
-  if (end < text.length) snippet = snippet + "...";
-
-  return snippet;
-}
-
-export interface SessionTreeRef {
-  focusSearch: () => void;
-}
-
-interface SessionTreeProps {
-  entries: SessionEntry[];
-  activeLeafId?: string;
-  onNodeClick?: (leafId: string, targetId: string) => void;
-  filter?:
-    | "default"
-    | "no-tools"
-    | "user-only"
-    | "labeled-only"
-    | "all"
-    | `tool-${string}`;
-}
-
-interface TreeNodeData {
-  entry: SessionEntry;
-  children: TreeNodeData[];
-  label?: string;
-}
-
-interface FlatNode {
-  node: TreeNodeData;
-  indent: number;
-  showConnector: boolean;
-  isLast: boolean;
-  gutters: Array<{ position: number; show: boolean }>;
-  isVirtualRootChild: boolean;
-  multipleRoots: boolean;
-  hasChildren: boolean;
-  isBranchPoint: boolean;
-}
-
-const SessionTree = memo(
-  forwardRef<SessionTreeRef, SessionTreeProps>(function SessionTree(
-    {
-      entries,
-      activeLeafId,
-      onNodeClick,
-      filter = "no-tools",
-    }: SessionTreeProps,
-    ref,
-  ) {
-    const { t } = useTranslation();
-    const searchRef = useRef<SessionTreeSearchRef>(null);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [currentFilter, setCurrentFilter] = useState(filter);
-    const [currentResultIndex, setCurrentResultIndex] = useState(0);
-    const [searchResults, setSearchResults] = useState<string[]>([]);
-    const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(
-      new Set(),
-    );
-    const [viewMode, setViewMode] = useState<"tree" | "flow" | "hierarchy">(
-      "tree",
-    );
-
-    useImperativeHandle(ref, () => ({
-      focusSearch: () => {
-        searchRef.current?.focus();
-      },
-    }));
-
-    const toggleCollapse = useCallback(
-      (nodeId: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setCollapsedNodes((prev) => {
-          const next = new Set(prev);
-          if (next.has(nodeId)) {
-            next.delete(nodeId);
-          } else {
-            next.add(nodeId);
-          }
-          return next;
-        });
-      },
-      [],
-    );
-
-    const searchTerms = useMemo(() => {
-      if (!searchQuery.trim()) {
-        return [];
-      }
-
-      const parsedQuery = parseQuotedQuery(searchQuery);
-      return (
-        parsedQuery.hasPhrases
-          ? [...parsedQuery.phrases, ...parsedQuery.remainderTokens]
-          : parsedQuery.remainderTokens
-      )
-        .map((term) => term.toLowerCase())
-        .filter(Boolean);
-    }, [searchQuery]);
-
-    const { activePathIds, resolveScrollTarget, getToolResultMeta } =
-      useSessionTreeLookup(entries, activeLeafId);
-
-    // Extract all unique tool names from current session
-    const availableTools = useMemo(() => {
-      const toolSet = new Set<string>();
-
-      for (const entry of entries) {
-        if (entry.type === "message" && entry.message?.role === "assistant") {
-          const content = Array.isArray(entry.message.content)
-            ? entry.message.content
-            : [];
-          const toolCalls = content.filter((c: any) => c.type === "toolCall");
-          for (const toolCall of toolCalls) {
-            if (toolCall.name) {
-              toolSet.add(toolCall.name);
-            }
-          }
-        }
-      }
-
-      // Return sorted array
-      return Array.from(toolSet).sort();
-    }, [entries]);
-
-    // Build tree structure
-    const treeData = useMemo(() => {
-      const byId = new Map<string, SessionEntry>();
-      const childrenMap = new Map<string, TreeNodeData[]>();
-
-      for (const entry of entries) {
-        byId.set(entry.id, entry);
-        childrenMap.set(entry.id, []);
-      }
-
-      for (const entry of entries) {
-        if (entry.parentId && byId.has(entry.parentId)) {
-          const parentNode = childrenMap.get(entry.parentId);
-          if (parentNode) {
-            parentNode.push({
-              entry,
-              children: childrenMap.get(entry.id) || [],
-            });
-          }
-        }
-      }
-
-      const roots: TreeNodeData[] = [];
-      for (const entry of entries) {
-        if (!entry.parentId || !byId.has(entry.parentId)) {
-          const node: TreeNodeData = {
-            entry,
-            children: childrenMap.get(entry.id) || [],
-          };
-          roots.push(node);
-        }
-      }
-
-      // Sort children by timestamp
-      function sortChildren(node: TreeNodeData) {
-        node.children.sort(
-          (a, b) =>
-            new Date(a.entry.timestamp || 0).getTime() -
-            new Date(b.entry.timestamp || 0).getTime(),
-        );
-        node.children.forEach(sortChildren);
-      }
-      roots.forEach(sortChildren);
-
-      return roots;
-    }, [entries]);
-
-    // Flatten tree with proper indentation and connectors
-    const flatNodes = useMemo(() => {
-      const result: FlatNode[] = [];
-      const multipleRoots = treeData.length > 1;
-
-      // Mark which subtrees contain the active leaf
-      const containsActive = new Map<TreeNodeData, boolean>();
-      function markActive(node: TreeNodeData): boolean {
-        let has = activePathIds.has(node.entry.id);
-        for (const child of node.children) {
-          if (markActive(child)) has = true;
-        }
-        containsActive.set(node, has);
-        return has;
-      }
-      treeData.forEach(markActive);
-
-      // Stack: [node, indent, justBranched, showConnector, isLast, gutters, isVirtualRootChild]
-      const stack: Array<
-        [
-          TreeNodeData,
-          number,
-          boolean,
-          boolean,
-          boolean,
-          Array<{ position: number; show: boolean }>,
-          boolean,
-        ]
-      > = [];
-
-      // Add roots (prioritize branch containing active leaf)
-      const orderedRoots = [...treeData].sort(
-        (a, b) => Number(containsActive.get(b)) - Number(containsActive.get(a)),
-      );
-      for (let i = orderedRoots.length - 1; i >= 0; i--) {
-        const isLast = i === orderedRoots.length - 1;
-        stack.push([
-          orderedRoots[i],
-          multipleRoots ? 1 : 0,
-          multipleRoots,
-          multipleRoots,
-          isLast,
-          [],
-          multipleRoots,
-        ]);
-      }
-
-      while (stack.length > 0) {
-        const [
-          node,
-          indent,
-          justBranched,
-          showConnector,
-          isLast,
-          gutters,
-          isVirtualRootChild,
-        ] = stack.pop()!;
-        const hasChildren = node.children.length > 0;
-        const isBranchPoint = node.children.length > 1;
-
-        result.push({
-          node,
-          indent,
-          showConnector,
-          isLast,
-          gutters,
-          isVirtualRootChild,
-          multipleRoots,
-          hasChildren,
-          isBranchPoint,
-        });
-
-        // If current node is collapsed, skip children
-        if (collapsedNodes.has(node.entry.id)) {
-          continue;
-        }
-
-        const children = node.children;
-        const multipleChildren = children.length > 1;
-
-        // Order children (active branch first)
-        const orderedChildren = [...children].sort(
-          (a, b) =>
-            Number(containsActive.get(b)) - Number(containsActive.get(a)),
-        );
-
-        // Calculate child indent
-        let childIndent: number;
-        if (multipleChildren) {
-          childIndent = indent + 1;
-        } else if (justBranched && indent > 0) {
-          childIndent = indent + 1;
-        } else {
-          childIndent = indent;
-        }
-
-        // Build gutters for children
-        const connectorDisplayed = showConnector && !isVirtualRootChild;
-        const currentDisplayIndent = multipleRoots
-          ? Math.max(0, indent - 1)
-          : indent;
-        const connectorPosition = Math.max(0, currentDisplayIndent - 1);
-        const childGutters = connectorDisplayed
-          ? [...gutters, { position: connectorPosition, show: !isLast }]
-          : gutters;
-
-        // Add children in reverse order for stack
-        for (let i = orderedChildren.length - 1; i >= 0; i--) {
-          const childIsLast = i === orderedChildren.length - 1;
-          stack.push([
-            orderedChildren[i],
-            childIndent,
-            multipleChildren,
-            multipleChildren,
-            childIsLast,
-            childGutters,
-            false,
-          ]);
-        }
-      }
-
-      return result;
-    }, [treeData, activePathIds, collapsedNodes]);
-
-    // Build tree prefix (ASCII art)
-    const buildTreePrefix = (flatNode: FlatNode): string => {
-      const {
-        indent,
-        showConnector,
-        isLast,
-        gutters,
-        isVirtualRootChild,
-        multipleRoots,
-      } = flatNode;
-      const displayIndent = multipleRoots ? Math.max(0, indent - 1) : indent;
-      const connector =
-        showConnector && !isVirtualRootChild ? (isLast ? "└─ " : "├─ ") : "";
-      const connectorPosition = connector ? displayIndent - 1 : -1;
-
-      const totalChars = displayIndent * 3;
-      const prefixChars: string[] = [];
-      for (let i = 0; i < totalChars; i++) {
-        const level = Math.floor(i / 3);
-        const posInLevel = i % 3;
-
-        const gutter = gutters.find((g) => g.position === level);
-        if (gutter) {
-          prefixChars.push(posInLevel === 0 ? (gutter.show ? "│" : " ") : " ");
-        } else if (connector && level === connectorPosition) {
-          if (posInLevel === 0) {
-            prefixChars.push(isLast ? "└" : "├");
-          } else if (posInLevel === 1) {
-            prefixChars.push("─");
-          } else {
-            prefixChars.push(" ");
-          }
-        } else {
-          prefixChars.push(" ");
-        }
-      }
-      return prefixChars.join("");
-    };
-
-    // Build ancestor path map for efficient nearest-visible-ancestor lookup
-    // Key insight: instead of walking up the tree for each node, precompute all ancestor paths
-    const ancestorPathMap = useMemo(() => {
-      const map = new Map<string, string[]>(); // nodeId -> array of ancestors [root, ..., parent]
-
-      function buildPaths(node: TreeNodeData, path: string[]) {
-        const currentPath = [...path, node.entry.id];
-        map.set(node.entry.id, currentPath);
-        for (const child of node.children) {
-          buildPaths(child, currentPath);
-        }
-      }
-
-      for (const root of treeData) {
-        buildPaths(root, []);
-      }
-
-      return map;
-    }, [treeData]);
-
-    // Find nearest visible ancestor using precomputed paths (O(depth) instead of O(n))
-    const findNearestVisibleAncestor = useCallback(
-      (nodeId: string, visibleIds: Set<string>): string | null => {
-        const path = ancestorPathMap.get(nodeId);
-        if (!path) return null;
-
-        // Walk backwards from parent to root, find first visible
-        for (let i = path.length - 2; i >= 0; i--) {
-          if (visibleIds.has(path[i])) {
-            return path[i];
-          }
-        }
-        return null; // No visible ancestor (root-level)
-      },
-      [ancestorPathMap],
-    );
-
-    // Recalculate visual structure for filtered view
-    // When nodes are filtered, children attach to nearest visible ancestor
-    // This keeps tree structure intact without visual drift
-    const recalculateVisualStructure = useCallback(
-      (filteredNodes: FlatNode[]): FlatNode[] => {
-        if (filteredNodes.length === 0) return filteredNodes;
-
-        const visibleIds = new Set(filteredNodes.map((n) => n.node.entry.id));
-
-        // Build visible tree structure using precomputed ancestor paths (O(n))
-        const visibleChildren = new Map<string | null, string[]>();
-        visibleChildren.set(null, []); // root-level nodes
-
-        for (const flatNode of filteredNodes) {
-          const nodeId = flatNode.node.entry.id;
-          const ancestorId = findNearestVisibleAncestor(nodeId, visibleIds);
-          if (!visibleChildren.has(ancestorId ?? null)) {
-            visibleChildren.set(ancestorId ?? null, []);
-          }
-          visibleChildren.get(ancestorId ?? null)!.push(nodeId);
-        }
-
-        // Update multipleRoots based on visible roots
-        const visibleRootIds = visibleChildren.get(null) ?? [];
-        const multipleRoots = visibleRootIds.length > 1;
-
-        // Build a map for quick lookup: nodeId → FlatNode
-        const filteredNodeMap = new Map<string, FlatNode>();
-        for (const flatNode of filteredNodes) {
-          filteredNodeMap.set(flatNode.node.entry.id, flatNode);
-        }
-
-        // DFS traversal of visible tree, applying same indentation rules as flattenTree()
-        // Stack items: [nodeId, indent, justBranched, showConnector, isLast, gutters, isVirtualRootChild]
-        const stack: Array<
-          [string, number, boolean, boolean, boolean, Array<{ position: number; show: boolean }>, boolean]
-        > = [];
-
-        // Add visible roots in reverse order (to process in forward order via stack)
-        for (let i = visibleRootIds.length - 1; i >= 0; i--) {
-          const isLast = i === visibleRootIds.length - 1;
-          stack.push([
-            visibleRootIds[i],
-            multipleRoots ? 1 : 0,
-            multipleRoots,
-            multipleRoots,
-            isLast,
-            [],
-            multipleRoots,
-          ]);
-        }
-
-        while (stack.length > 0) {
-          const [
-            nodeId,
-            indent,
-            justBranched,
-            showConnector,
-            isLast,
-            gutters,
-            isVirtualRootChild,
-          ] = stack.pop()!;
-
-          const flatNode = filteredNodeMap.get(nodeId);
-          if (!flatNode) continue;
-
-          // Update this node's visual properties
-          flatNode.indent = indent;
-          flatNode.showConnector = showConnector;
-          flatNode.isLast = isLast;
-          flatNode.gutters = gutters;
-          flatNode.isVirtualRootChild = isVirtualRootChild;
-          flatNode.multipleRoots = multipleRoots;
-
-          // Get visible children of this node
-          const children = visibleChildren.get(nodeId) ?? [];
-          const multipleChildren = children.length > 1;
-
-          // Calculate child indent using same rules as flattenTree()
-          let childIndent: number;
-          if (multipleChildren) {
-            childIndent = indent + 1;
-          } else if (justBranched && indent > 0) {
-            childIndent = indent + 1;
-          } else {
-            childIndent = indent;
-          }
-
-          // Build gutters for children (same logic as flattenTree)
-          const connectorDisplayed = showConnector && !isVirtualRootChild;
-          const currentDisplayIndent = multipleRoots
-            ? Math.max(0, indent - 1)
-            : indent;
-          const connectorPosition = Math.max(0, currentDisplayIndent - 1);
-          const childGutters = connectorDisplayed
-            ? [...gutters, { position: connectorPosition, show: !isLast }]
-            : gutters;
-
-          // Add children in reverse order (to process in forward order via stack)
-          for (let i = children.length - 1; i >= 0; i--) {
-            const childIsLast = i === children.length - 1;
-            stack.push([
-              children[i],
-              childIndent,
-              multipleChildren,
-              multipleChildren,
-              childIsLast,
-              childGutters,
-              false,
-            ]);
-          }
-        }
-
-        return filteredNodes;
-      },
-      [findNearestVisibleAncestor],
-    );
-
-    // Filter nodes with visual structure recalculation
-    const filteredNodes = useMemo(() => {
-      const isSettingsEntry = (entry: SessionEntry) => {
-        if (TREE_SETTINGS_TYPES.has(entry.type)) {
-          return true;
-        }
-
-        if (entry.type === "message" && entry.message?.role === "assistant") {
-          const content = entry.message.content || [];
-          return content.some(
-            (c: any) => c.type === "text" && c.text?.trim() === "",
-          );
-        }
-        return false;
-      };
-
-      const extractContent = (content: any): string => {
-        if (typeof content === "string") return content;
-        if (Array.isArray(content)) {
-          return content
-            .filter((c) => c.type === "text" && c.text)
-            .map((c) => c.text)
-            .join("");
-        }
-        return "";
-      };
-
-      const getSearchableText = (
-        entry: SessionEntry,
-        label?: string,
-      ): string => {
+    const roots: TreeNodeData[] = [];
+    for (const e of entries) {
+      const pid = e.parentId;
+      const ep = (pid == null || pid === "None" || pid === "null" || pid === "NONE") ? null : pid;
+      if (!ep || !byId.has(ep)) roots.push({ entry: e, children: cm.get(e.id)!, label: labelMap.get(e.id) });
+    }
+    // Sort children AND roots by timestamp — STABLE ORDER
+    const sc = (n: TreeNodeData) => { n.children.sort((a, b) => new Date(a.entry.timestamp || 0).getTime() - new Date(b.entry.timestamp || 0).getTime()); n.children.forEach(sc); };
+    roots.forEach(sc);
+    return roots;
+  }, [entries]);
+
+  // ========== ACTIVE PATH ==========
+  const byId = useMemo(() => { const m = new Map<string, SessionEntry>(); for (const e of entries) m.set(e.id, e); return m; }, [entries]);
+  const activePathIds = useMemo(() => {
+    const ids = new Set<string>();
+    let cur: string | undefined = activeLeafId;
+    while (cur) { ids.add(cur); const e = byId.get(cur); if (!e?.parentId || e.parentId === e.id) break; cur = e.parentId; }
+    return ids;
+  }, [activeLeafId, byId]);
+
+  // ========== FLATTEN TREE — NO SORTING BY containsActive ==========
+  // Key fix: flatNodes order depends ONLY on treeData (timestamp-sorted), NOT on activeLeafId.
+  // This means clicking any node NEVER changes the tree order.
+  const flatNodes = useMemo(() => {
+    const result: FlatNode[] = [];
+    const multipleRoots = treeData.length > 1;
+    type StackItem = [TreeNodeData, number, boolean, boolean, boolean, Array<{ position: number; show: boolean }>, boolean];
+    const stack: StackItem[] = [];
+    // Roots in timestamp order (treeData is already sorted)
+    for (let i = treeData.length - 1; i >= 0; i--) stack.push([treeData[i], multipleRoots ? 1 : 0, multipleRoots, multipleRoots, i === treeData.length - 1, [], multipleRoots]);
+
+    while (stack.length > 0) {
+      const [node, indent, justBranched, showConnector, isLast, gutters, isVirtualRootChild] = stack.pop()!;
+      result.push({ node, indent, showConnector, isLast, gutters, isVirtualRootChild, multipleRoots });
+
+      const children = node.children;
+      const multipleChildren = children.length > 1;
+      // NO containsActive sorting — children stay in timestamp order
+      const childIndent = multipleChildren ? indent + 1 : (justBranched && indent > 0 ? indent + 1 : indent);
+      const conn = showConnector && !isVirtualRootChild;
+      const disp = multipleRoots ? Math.max(0, indent - 1) : indent;
+      const pos = Math.max(0, disp - 1);
+      const childGutters = conn ? [...gutters, { position: pos, show: !isLast }] : gutters;
+      for (let i = children.length - 1; i >= 0; i--) stack.push([children[i], childIndent, multipleChildren, multipleChildren, i === children.length - 1, childGutters, false]);
+    }
+    return result;
+  }, [treeData]);
+
+  // ========== FILTER ==========
+  const extractContent = (c: unknown): string => { if (typeof c === "string") return c; if (Array.isArray(c)) return c.filter((x: any) => x.type === "text" && x.text).map((x: any) => x.text).join(""); return ""; };
+  const isSettings = (e: SessionEntry) => ["session", "session_info", "label", "model_change", "thinking_level_change"].includes(e.type);
+  const terms = useMemo(() => searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean), [searchQuery]);
+
+  const filteredNodes = useMemo(() => {
+    const baseFiltered = flatNodes.filter(fn => {
+      const entry = fn.node.entry;
+      if (terms.length > 0) {
         const parts: string[] = [];
-        if (label) parts.push(label);
-
-        switch (entry.type) {
-          case "message": {
-            const msg = entry.message;
-            if (msg) {
-              parts.push(msg.role);
-              if (msg.content) parts.push(extractContent(msg.content));
+        if (entry.type === "message" && entry.message) { parts.push(entry.message.role); if (entry.message.content) parts.push(extractContent(entry.message.content)); }
+        if (entry.type === "compaction") parts.push("compaction");
+        if (entry.type === "branch_summary") parts.push(entry.summary || "");
+        if (entry.type === "model_change") parts.push(entry.modelId || "");
+        if (!terms.every(t => parts.join(" ").toLowerCase().includes(t))) return false;
+      }
+      switch (currentFilter) {
+        case "user-only": return entry.type === "message" && entry.message?.role === "user";
+        case "no-tools": if (entry.type === "message" && entry.message?.role === "toolResult") return false; return !isSettings(entry);
+        case "default": return !isSettings(entry);
+        case "labeled-only": return !!fn.node.label;
+        case "all": return true;
+        default:
+          if (currentFilter.startsWith("tool-")) {
+            const tn = currentFilter.slice(5);
+            if (entry.type === "message" && entry.message?.role === "assistant") {
+              const c = Array.isArray(entry.message.content) ? entry.message.content : [];
+              return c.some((x: any) => x.type === "toolCall" && x.name === tn);
             }
-            break;
-          }
-          case "custom_message":
-            parts.push(entry.customType || "");
-            parts.push(
-              typeof entry.content === "string"
-                ? entry.content
-                : extractContent(entry.content),
-            );
-            break;
-          case "compaction":
-            parts.push("compaction");
-            break;
-          case "branch_summary":
-            parts.push("branch summary", entry.summary || "");
-            break;
-          case "model_change":
-            parts.push("model", entry.modelId || "");
-            break;
-        }
-
-        return parts.join(" ").toLowerCase();
-      };
-
-      const baseFiltered = flatNodes.filter((flatNode) => {
-        const entry = flatNode.node.entry;
-        const label = flatNode.node.label;
-
-        // Search filter
-        if (searchTerms.length > 0) {
-          const text = getSearchableText(entry, label);
-          if (!searchTerms.every((term) => text.includes(term))) {
             return false;
           }
-        }
-
-        // Type filter
-        switch (currentFilter) {
-          case "default":
-            return !isSettingsEntry(entry);
-
-          case "no-tools":
-            if (
-              entry.type === "message" &&
-              entry.message?.role === "toolResult"
-            ) {
-              return false;
-            }
-            return !isSettingsEntry(entry);
-
-          case "user-only":
-            return entry.type === "message" && entry.message?.role === "user";
-
-          case "labeled-only":
-            return !!label;
-
-          case "all":
-            return true;
-
-          default:
-            // Dynamic tool filter (e.g., 'tool-bash', 'tool-read', etc.)
-            if (currentFilter.startsWith("tool-")) {
-              const toolName = currentFilter.slice(5); // Remove 'tool-' prefix
-              if (
-                entry.type === "message" &&
-                entry.message?.role === "assistant"
-              ) {
-                const content = Array.isArray(entry.message.content)
-                  ? entry.message.content
-                  : [];
-                return content.some(
-                  (c: any) => c.type === "toolCall" && c.name === toolName,
-                );
-              }
-              return false;
-            }
-            return true;
-        }
-      });
-
-      // Recalculate visual structure when filtering (only if not default view)
-      if (
-        searchTerms.length > 0 ||
-        currentFilter !== "no-tools"
-      ) {
-        return recalculateVisualStructure(baseFiltered);
+          return true;
       }
+    });
 
-      return baseFiltered;
-    }, [flatNodes, searchTerms, currentFilter, recalculateVisualStructure]);
-
-    // Get node display text
-    const getNodeDisplayText = (
-      entry: SessionEntry,
-      label?: string,
-    ): string => {
-      if (label) return label;
-
-      switch (entry.type) {
-        case "message": {
-          const msg = entry.message;
-          if (!msg) return "Unknown";
-
-          if (msg.role === "user") {
-            const content = Array.isArray(msg.content) ? msg.content : [];
-            const text = content
-              .filter((c: any) => c.type === "text" && c.text)
-              .map((c: any) => c.text)
-              .join(" ");
-            return text.slice(0, 100) || "User message";
-          } else if (msg.role === "assistant") {
-            const toolCalls = Array.isArray(msg.content)
-              ? msg.content.filter((c: any) => c.type === "toolCall")
-              : [];
-
-            if (toolCalls.length > 0) {
-              const firstTool = toolCalls[0];
-              const toolName = firstTool.name || "unknown";
-              const suffix =
-                toolCalls.length > 1 ? ` +${toolCalls.length - 1}` : "";
-
-              if (toolName === "bash") {
-                const command = firstTool.arguments?.command || "";
-                return `bash: ${command}${suffix}`;
-              } else if (toolName === "read") {
-                const path =
-                  firstTool.arguments?.path ||
-                  firstTool.arguments?.file_path ||
-                  "";
-                const fileName = getPathBasename(path);
-                return `read: ${fileName}${suffix}`;
-              } else if (toolName === "write") {
-                const path =
-                  firstTool.arguments?.path ||
-                  firstTool.arguments?.file_path ||
-                  "";
-                const fileName = getPathBasename(path);
-                return `write: ${fileName}${suffix}`;
-              } else if (toolName === "edit") {
-                const path =
-                  firstTool.arguments?.path ||
-                  firstTool.arguments?.file_path ||
-                  "";
-                const fileName = getPathBasename(path);
-                return `edit: ${fileName}${suffix}`;
-              } else {
-                return `${toolName}${suffix}`;
-              }
-            }
-
-            return "Assistant";
-          } else if (msg.role === "toolResult") {
-            const toolResultMeta = getToolResultMeta(entry);
-            if (toolResultMeta) {
-              const hasError =
-                msg.errorMessage ||
-                (msg.exitCode !== undefined && msg.exitCode !== 0);
-              const status = hasError ? " ✗" : " ✓";
-              return `${toolResultMeta.toolName} result${status}`;
-            }
-
-            const hasError =
-              msg.errorMessage ||
-              (msg.exitCode !== undefined && msg.exitCode !== 0);
-            return hasError ? "tool result ✗" : "tool result ✓";
-          }
-          return msg.role;
-        }
-        case "model_change":
-          return `Model: ${entry.modelId}`;
-        case "thinking_level_change":
-          return `Thinking: ${entry.thinkingLevel || "default"}`;
-        case "session":
-        case "session_info":
-          return "Session";
-        case "compaction":
-          return "Compaction";
-        case "branch_summary":
-          return "Branch Summary";
-        case "custom_message":
-          return entry.customType || "Custom";
-        default:
-          return entry.type;
-      }
-    };
-
-    // Get node role class
-    const getNodeRoleClass = (entry: SessionEntry): string => {
-      switch (entry.type) {
-        case "message": {
-          const role = entry.message?.role;
-          if (role === "user") return "tree-role-user";
-          if (role === "assistant") return "tree-role-assistant";
-          if (role === "toolResult") return "tree-role-tool";
-          return "";
-        }
-        case "compaction":
-          return "tree-compaction";
-        case "branch_summary":
-          return "tree-branch-summary";
-        case "custom_message":
-          return "tree-custom-message";
-        default:
-          return "tree-muted";
-      }
-    };
-
-    // Extract primary tool name from an assistant message entry
-    const getEntryToolName = (entry: SessionEntry): string | null => {
-      if (entry.type !== "message" || entry.message?.role !== "assistant")
+    // recalculateVisualStructure when filtering
+    if (terms.length > 0 || currentFilter !== "no-tools") {
+      if (baseFiltered.length === 0) return baseFiltered;
+      const visibleIds = new Set(baseFiltered.map(n => n.node.entry.id));
+      const entryMap = new Map<string, FlatNode>();
+      for (const fn of flatNodes) entryMap.set(fn.node.entry.id, fn);
+      const findVisibleAncestor = (nid: string): string | null => {
+        let cid: string | undefined = entryMap.get(nid)?.node.entry.parentId;
+        while (cid != null) { if (visibleIds.has(cid)) return cid; cid = entryMap.get(cid)?.node.entry.parentId; }
         return null;
-      const content = Array.isArray(entry.message.content)
-        ? entry.message.content
-        : [];
-      const firstToolCall = content.find((c: any) => c.type === "toolCall");
-      return firstToolCall?.name || null;
-    };
+      };
+      const visibleChildren = new Map<string | null, string[]>();
+      visibleChildren.set(null, []);
+      for (const fn of baseFiltered) { const nid = fn.node.entry.id; const aid = findVisibleAncestor(nid); if (!visibleChildren.has(aid ?? null)) visibleChildren.set(aid ?? null, []); visibleChildren.get(aid ?? null)!.push(nid); }
+      const visibleRootIds = visibleChildren.get(null) ?? [];
+      const mr = visibleRootIds.length > 1;
+      const fMap = new Map<string, FlatNode>();
+      for (const fn of baseFiltered) fMap.set(fn.node.entry.id, fn);
+      type StackItem = [string, number, boolean, boolean, boolean, Array<{ position: number; show: boolean }>, boolean];
+      const stack: StackItem[] = [];
+      for (let i = visibleRootIds.length - 1; i >= 0; i--) stack.push([visibleRootIds[i], mr ? 1 : 0, mr, mr, i === visibleRootIds.length - 1, [], mr]);
+      while (stack.length > 0) {
+        const [nid, indent, justBranched, showConnector, isLast, gutters, isVirtualRootChild] = stack.pop()!;
+        const fn = fMap.get(nid); if (!fn) continue;
+        fn.indent = indent; fn.showConnector = showConnector; fn.isLast = isLast; fn.gutters = gutters; fn.isVirtualRootChild = isVirtualRootChild; fn.multipleRoots = mr;
+        const children = visibleChildren.get(nid) ?? [];
+        const mc = children.length > 1;
+        const ci = mc ? indent + 1 : (justBranched && indent > 0 ? indent + 1 : indent);
+        const conn = showConnector && !isVirtualRootChild;
+        const disp = mr ? Math.max(0, indent - 1) : indent;
+        const pos = Math.max(0, disp - 1);
+        const cg = conn ? [...gutters, { position: pos, show: !isLast }] : gutters;
+        for (let i = children.length - 1; i >= 0; i--) stack.push([children[i], ci, mc, mc, i === children.length - 1, cg, false]);
+      }
+    }
+    return baseFiltered;
+  }, [flatNodes, terms, currentFilter]);
 
-    const colorizeEnabled =
-      getCachedSettings().session?.colorizeToolCalls !== false;
-
-    // Get full text for summary
-    const getFullText = (entry: SessionEntry, label?: string): string => {
+  // ========== SEARCH ==========
+  const matchedIds = useMemo(() => {
+    if (!terms.length) return [];
+    const ids: string[] = [];
+    for (const fn of flatNodes) {
+      const e = fn.node.entry;
       const parts: string[] = [];
-      if (label) parts.push(label);
+      if (e.type === "message" && e.message) { parts.push(e.message.role); if (e.message.content) parts.push(extractContent(e.message.content)); }
+      if (e.type === "compaction") parts.push("compaction");
+      if (e.type === "branch_summary") parts.push(e.summary || "");
+      if (terms.every(t => parts.join(" ").toLowerCase().includes(t))) ids.push(e.id);
+    }
+    return ids;
+  }, [flatNodes, terms]);
+  useEffect(() => { setSearchResults(matchedIds); setCurrentResultIndex(0); }, [matchedIds]);
+  const searchResultSet = useMemo(() => new Set(searchResults), [searchResults]);
+  const currentSearchResultId = searchResults[currentResultIndex];
 
-      switch (entry.type) {
-        case "message": {
-          const msg = entry.message;
-          if (msg?.content) {
-            if (Array.isArray(msg.content)) {
-              msg.content.forEach((c: any) => {
-                if (c.type === "text" && c.text) parts.push(c.text);
-              });
-            } else if (typeof msg.content === "string") {
-              parts.push(msg.content);
-            }
-          }
-          break;
-        }
-        case "custom_message":
-          if (typeof entry.content === "string") parts.push(entry.content);
-          break;
-        case "branch_summary":
-          if (entry.summary) parts.push(entry.summary);
-          break;
-      }
-      return parts.join(" ");
+  // ========== NEWEST LEAF ==========
+  const newestLeafById = useMemo(() => {
+    const map = new Map<string, string>();
+    const walk = (n: TreeNodeData): string => {
+      let leaf = n.entry.id;
+      for (const c of n.children) walk(c);
+      if (n.children.length > 0) { const lc = n.children[n.children.length - 1]; leaf = map.get(lc.entry.id) || lc.entry.id; }
+      map.set(n.entry.id, leaf);
+      return leaf;
     };
+    treeData.forEach(walk);
+    return map;
+  }, [treeData]);
+  const findNewestLeaf = useCallback((nid: string): string => newestLeafById.get(nid) || nid, [newestLeafById]);
 
-    // Calculate search results list
-    const matchedEntryIds = useMemo(() => {
-      if (searchTerms.length === 0) return [];
+  // ========== DISPLAY ==========
+  const buildPrefix = (fn: FlatNode): string => {
+    const { indent, showConnector, isLast, gutters, isVirtualRootChild, multipleRoots } = fn;
+    const disp = multipleRoots ? Math.max(0, indent - 1) : indent;
+    const conn = showConnector && !isVirtualRootChild ? (isLast ? "└─ " : "├─ ") : "";
+    const cp = conn ? disp - 1 : -1;
+    const chars: string[] = [];
+    for (let i = 0; i < disp * 3; i++) { const lv = Math.floor(i / 3), pi2 = i % 3; const g = gutters.find(x => x.position === lv); if (g) chars.push(pi2 === 0 ? (g.show ? "│" : " ") : " "); else if (conn && lv === cp) chars.push(pi2 === 0 ? (isLast ? "└" : "├") : pi2 === 1 ? "─" : " "); else chars.push(" "); }
+    return chars.join("");
+  };
 
-      const matched: string[] = [];
-
-      flatNodes.forEach((flatNode) => {
-        const entry = flatNode.node.entry;
-        const label = flatNode.node.label;
-
-        const parts: string[] = [];
-        if (label) parts.push(label);
-
-        switch (entry.type) {
-          case "message": {
-            const msg = entry.message;
-            if (msg) {
-              parts.push(msg.role);
-              if (msg.content) {
-                const content = Array.isArray(msg.content)
-                  ? msg.content
-                      .filter((c: any) => c.type === "text" && c.text)
-                      .map((c: any) => c.text)
-                      .join("")
-                  : msg.content;
-                parts.push(content);
-              }
-            }
-            break;
-          }
-          case "custom_message":
-            parts.push(entry.customType || "");
-            parts.push(typeof entry.content === "string" ? entry.content : "");
-            break;
-          case "compaction":
-            parts.push("compaction");
-            break;
-          case "branch_summary":
-            parts.push("branch summary", entry.summary || "");
-            break;
-          case "model_change":
-            parts.push("model", entry.modelId || "");
-            break;
-        }
-
-        const text = parts.join(" ").toLowerCase();
-        if (searchTerms.every((term) => text.includes(term))) {
-          matched.push(entry.id);
-        }
-      });
-
-      return matched;
-    }, [flatNodes, searchTerms]);
-
-    // Update search results
-    useEffect(() => {
-      setSearchResults(matchedEntryIds);
-      setCurrentResultIndex(0);
-    }, [matchedEntryIds]);
-
-    const searchResultSet = useMemo(
-      () => new Set(searchResults),
-      [searchResults],
-    );
-    const currentSearchResultId = searchResults[currentResultIndex];
-
-    // Search navigation
-    const handleSearchNext = useCallback(() => {
-      if (searchResults.length === 0) return;
-      const newIndex = (currentResultIndex + 1) % searchResults.length;
-      setCurrentResultIndex(newIndex);
-      const entryId = searchResults[newIndex];
-      if (onNodeClick) {
-        onNodeClick(entryId, resolveScrollTarget(entryId));
+  const getDisplayText = (e: SessionEntry, label?: string): string => {
+    if (label) return label;
+    const tr = (s: string, m = 100) => s.length <= m ? s : s.slice(0, m) + "...";
+    if (e.type === "message" && e.message) {
+      if (e.message.role === "user") { const t = extractContent(e.message.content); return tr(t) || "User"; }
+      if (e.message.role === "assistant") {
+        const c = Array.isArray(e.message.content) ? e.message.content : [];
+        const tc = c.find((x: any) => x.type === "toolCall") as { name?: string; arguments?: unknown } | undefined;
+        if (tc?.name) { const a = tc.arguments as Record<string, unknown> | undefined; const p = a?.path || a?.file_path || ""; const cmd = a?.command || ""; return `${tc.name}: ${tr(String(p || cmd), 50)}`; }
+        return tr(extractContent(e.message.content)) || "Assistant";
       }
-    }, [searchResults, currentResultIndex, onNodeClick, resolveScrollTarget]);
+      if (e.message.role === "toolResult") return "tool result";
+    }
+    if (e.type === "model_change") return `Model: ${e.modelId}`;
+    if (e.type === "compaction") return "Compaction";
+    if (e.type === "custom_message") return e.customType || "Custom";
+    return e.type;
+  };
+  const getRoleClass = (e: SessionEntry): string => {
+    if (e.type === "message" && e.message?.role === "user") return "tree-role-user";
+    if (e.type === "message" && e.message?.role === "assistant") return "tree-role-assistant";
+    if (e.type === "message" && e.message?.role === "toolResult") return "tree-role-tool";
+    if (e.type === "compaction") return "tree-compaction";
+    return "tree-muted";
+  };
+  const getToolName = (e: SessionEntry): string | null => {
+    if (e.type !== "message" || e.message?.role !== "assistant") return null;
+    const c = Array.isArray(e.message.content) ? e.message.content : [];
+    return (c.find((x: any) => x.type === "toolCall") as { name?: string } | undefined)?.name || null;
+  };
 
-    const handleSearchPrevious = useCallback(() => {
-      if (searchResults.length === 0) return;
-      const newIndex =
-        (currentResultIndex - 1 + searchResults.length) % searchResults.length;
-      setCurrentResultIndex(newIndex);
-      const entryId = searchResults[newIndex];
-      if (onNodeClick) {
-        onNodeClick(entryId, resolveScrollTarget(entryId));
-      }
-    }, [searchResults, currentResultIndex, onNodeClick, resolveScrollTarget]);
+  // ========== HANDLERS ==========
+  const handleNodeClick = useCallback((fn: FlatNode) => {
+    const e = fn.node.entry;
+    const leafId = findNewestLeaf(e.id);
+    if (onNodeClick) onNodeClick(leafId, e.id);
+  }, [findNewestLeaf, onNodeClick]);
+  const handleSearchNext = useCallback(() => {
+    if (!searchResults.length) return; const ni = (currentResultIndex + 1) % searchResults.length; setCurrentResultIndex(ni); const id = searchResults[ni]; if (onNodeClick) onNodeClick(findNewestLeaf(id), id);
+  }, [searchResults, currentResultIndex, onNodeClick, findNewestLeaf]);
+  const handleSearchPrev = useCallback(() => {
+    if (!searchResults.length) return; const ni = (currentResultIndex - 1 + searchResults.length) % searchResults.length; setCurrentResultIndex(ni); const id = searchResults[ni]; if (onNodeClick) onNodeClick(findNewestLeaf(id), id);
+  }, [searchResults, currentResultIndex, onNodeClick, findNewestLeaf]);
 
-    const handleSearchClose = useCallback(() => {
-      setSearchQuery("");
-      setSearchResults([]);
-      setCurrentResultIndex(0);
-    }, []);
+  const colorize = getCachedSettings().session?.colorizeToolCalls !== false;
 
-    const handleSearchChange = useCallback((query: string) => {
-      setSearchQuery(query);
-    }, []);
-
-    const newestLeafById = useMemo(() => {
-      const map = new Map<string, string>();
-
-      function walk(node: TreeNodeData): string {
-        let newestLeafId = node.entry.id;
-
-        for (const child of node.children) {
-          walk(child);
-        }
-
-        if (node.children.length > 0) {
-          const lastChild = node.children[node.children.length - 1];
-          newestLeafId = map.get(lastChild.entry.id) || lastChild.entry.id;
-        }
-
-        map.set(node.entry.id, newestLeafId);
-        return newestLeafId;
-      }
-
-      treeData.forEach(walk);
-      return map;
-    }, [treeData]);
-
-    // Find the newest leaf reachable from a given node (follow last child at each level)
-    const findNewestLeaf = useCallback(
-      (nodeId: string): string => {
-        return newestLeafById.get(nodeId) || nodeId;
-      },
-      [newestLeafById],
-    );
-
-    const handleNodeClick = (flatNode: FlatNode) => {
-      const entry = flatNode.node.entry;
-      const leafId = findNewestLeaf(entry.id);
-      const scrollTargetId = resolveScrollTarget(entry.id);
-
-      if (onNodeClick) {
-        onNodeClick(leafId, scrollTargetId);
-      }
-    };
-
-    return (
-      <div className="flex flex-col h-full">
-        <SessionTreeSearch
-          ref={searchRef}
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          onClear={handleSearchClose}
-          onNext={handleSearchNext}
-          onPrevious={handleSearchPrevious}
-          currentIndex={currentResultIndex}
-          totalResults={searchResults.length}
-        />
-
-        {/* View mode toggle */}
-        <div className="sidebar-filters sidebar-filters-view-mode">
-          <button
-            className={`filter-btn ${viewMode === "tree" ? "active" : ""}`}
-            onClick={() => setViewMode("tree")}
-          >
-            Tree
-          </button>
-          <button
-            className={`filter-btn ${viewMode === "flow" ? "active" : ""}`}
-            onClick={() => setViewMode("flow")}
-          >
-            Flow
-          </button>
-          <button
-            className={`filter-btn ${viewMode === "hierarchy" ? "active" : ""}`}
-            onClick={() => setViewMode("hierarchy")}
-          >
-            Hierarchy
-          </button>
-        </div>
-
-        {/* Filters */}
-        <div className="sidebar-filters">
-          <button
-            className={`filter-btn ${currentFilter === "default" ? "active" : ""}`}
-            onClick={() => setCurrentFilter("default")}
-          >
-            Default
-          </button>
-          <button
-            className={`filter-btn ${currentFilter === "no-tools" ? "active" : ""}`}
-            onClick={() => setCurrentFilter("no-tools")}
-          >
-            No Tools
-          </button>
-          <button
-            className={`filter-btn ${currentFilter === "user-only" ? "active" : ""}`}
-            onClick={() => setCurrentFilter("user-only")}
-          >
-            User
-          </button>
-          <button
-            className={`filter-btn ${currentFilter === "labeled-only" ? "active" : ""}`}
-            onClick={() => setCurrentFilter("labeled-only")}
-          >
-            Labeled
-          </button>
-          <button
-            className={`filter-btn ${currentFilter === "all" ? "active" : ""}`}
-            onClick={() => setCurrentFilter("all")}
-          >
-            All
-          </button>
-        </div>
-
-        {/* Dynamic Tool Filters */}
-        {availableTools.length > 0 && (
-          <div className="sidebar-filters sidebar-filters-tools">
-            {availableTools.map((toolName) => (
-              <button
-                key={toolName}
-                className={`filter-btn ${currentFilter === `tool-${toolName}` ? "active" : ""}`}
-                onClick={() => setCurrentFilter(`tool-${toolName}`)}
-                style={
-                  colorizeEnabled
-                    ? { color: getToolColorVar(toolName) }
-                    : undefined
-                }
-              >
-                {toolName}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {viewMode === "flow" || viewMode === "hierarchy" ? (
-          <div className="flex-1 min-h-0">
-            <Suspense
-              fallback={
-                <div
-                  style={{ padding: 12, color: "var(--color-text-secondary)" }}
-                >
-                  {t("session.tree.loading")}
-                </div>
-              }
-            >
-              <SessionFlowView
-                entries={entries}
-                activeLeafId={activeLeafId}
-                onNodeClick={onNodeClick}
-                filter={currentFilter}
-                viewMode={viewMode === "hierarchy" ? "hierarchy" : "flow"}
-                onViewModeChange={(mode) =>
-                  setViewMode(mode === "hierarchy" ? "hierarchy" : "flow")
-                }
-              />
-            </Suspense>
-          </div>
-        ) : (
-          <>
-            {/* Tree */}
-            <div className="tree-container">
-              {filteredNodes.map((flatNode, index) => {
-                const entry = flatNode.node.entry;
-                const label = flatNode.node.label;
-                const isActive = entry.id === activeLeafId;
-                const isInPath = activePathIds.has(entry.id);
-                const prefix = buildTreePrefix(flatNode);
-                const marker = isInPath ? "• " : "· ";
-                const displayText = getNodeDisplayText(entry, label);
-                const roleClass = getNodeRoleClass(entry);
-                const isCollapsed = collapsedNodes.has(entry.id);
-
-                const isSearchMatch = searchResultSet.has(entry.id);
-                const isCurrentMatch =
-                  isSearchMatch && currentSearchResultId === entry.id;
-
-                let snippet: string | null = null;
-                if (isSearchMatch && searchTerms.length > 0) {
-                  const fullText = getFullText(entry, label);
-                  snippet = extractSnippet(fullText, searchTerms);
-                }
-
-                return (
-                  <div
-                    key={`${entry.id}-${index}`}
-                    className={`tree-node ${isActive ? "active" : ""} ${isInPath ? "in-path" : ""} ${isSearchMatch ? "search-match" : ""} ${isCurrentMatch ? "search-match-current" : ""}`}
-                    onClick={() => handleNodeClick(flatNode)}
-                  >
-                    <span className="tree-prefix">{prefix}</span>
-                    {flatNode.isBranchPoint ? (
-                      <span
-                        className="tree-toggle"
-                        onClick={(e) => toggleCollapse(entry.id, e)}
-                      >
-                        {isCollapsed ? "▸ " : "▾ "}
-                      </span>
-                    ) : (
-                      <span className="tree-marker">{marker}</span>
-                    )}
-                    {entry.type === "message" &&
-                    entry.message?.role === "user" ? (
-                      <span
-                        className={`tree-content tree-content-user ${roleClass}`}
-                      >
-                        <p className="tree-user-label">
-                          User:
-                          <span className="tree-user-text">{displayText}</span>
-                        </p>
-                      </span>
-                    ) : (
-                      <span
-                        className={`tree-content ${roleClass}`}
-                        style={
-                          colorizeEnabled && getEntryToolName(entry)
-                            ? {
-                                color: getToolColorVar(
-                                  getEntryToolName(entry)!,
-                                ),
-                              }
-                            : undefined
-                        }
-                      >
-                        {displayText}
-                      </span>
-                    )}
-                    {isCollapsed && flatNode.isBranchPoint && (
-                      <span className="tree-collapsed-hint">...</span>
-                    )}
-                    {snippet && (
-                      <span className="tree-snippet">
-                        {highlightText(snippet, searchTerms)}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Status */}
-            <div className="tree-status">
-              {filteredNodes.length} / {flatNodes.length}{" "}
-              {t("session.tree.nodes")}
-            </div>
-          </>
-        )}
+  return (
+    <div className="flex flex-col h-full">
+      <SessionTreeSearch ref={searchRef} searchQuery={searchQuery} onSearchChange={setSearchQuery} onClear={() => { setSearchQuery(""); setSearchResults([]); setCurrentResultIndex(0); }} onNext={handleSearchNext} onPrevious={handleSearchPrev} currentIndex={currentResultIndex} totalResults={searchResults.length} />
+      <div className="sidebar-filters sidebar-filters-view-mode">
+        <button className={`filter-btn ${viewMode === "tree" ? "active" : ""}`} onClick={() => setViewMode("tree")}>Tree</button>
+        <button className={`filter-btn ${viewMode === "flow" ? "active" : ""}`} onClick={() => setViewMode("flow")}>Flow</button>
+        <button className={`filter-btn ${viewMode === "hierarchy" ? "active" : ""}`} onClick={() => setViewMode("hierarchy")}>Hierarchy</button>
       </div>
-    );
-  }),
-);
-
-SessionTree.displayName = "SessionTree";
+      <div className="sidebar-filters">
+        <button className={`filter-btn ${currentFilter === "default" ? "active" : ""}`} onClick={() => setCurrentFilter("default")}>Default</button>
+        <button className={`filter-btn ${currentFilter === "no-tools" ? "active" : ""}`} onClick={() => setCurrentFilter("no-tools")}>No Tools</button>
+        <button className={`filter-btn ${currentFilter === "user-only" ? "active" : ""}`} onClick={() => setCurrentFilter("user-only")}>User</button>
+        <button className={`filter-btn ${currentFilter === "labeled-only" ? "active" : ""}`} onClick={() => setCurrentFilter("labeled-only")}>Labeled</button>
+        <button className={`filter-btn ${currentFilter === "all" ? "active" : ""}`} onClick={() => setCurrentFilter("all")}>All</button>
+      </div>
+      {viewMode === "flow" || viewMode === "hierarchy" ? (
+        <div className="flex-1 min-h-0"><Suspense fallback={<div style={{ padding: 12, color: "var(--color-text-secondary)" }}>{t("session.tree.loading")}</div>}><SessionFlowView entries={entries} activeLeafId={activeLeafId} onNodeClick={onNodeClick} filter={currentFilter} viewMode={viewMode === "hierarchy" ? "hierarchy" : "flow"} onViewModeChange={(mode) => setViewMode(mode === "hierarchy" ? "hierarchy" : "flow")} /></Suspense></div>
+      ) : (
+        <div className="tree-container">
+          {filteredNodes.map(fn => {
+            const entry = fn.node.entry;
+            const prefix = buildPrefix(fn);
+            const isActive = entry.id === activeLeafId;
+            const isInPath = activePathIds.has(entry.id);
+            const marker = isInPath ? "•" : "·";
+            const displayText = getDisplayText(entry, fn.node.label);
+            const roleClass = getRoleClass(entry);
+            const isSearchMatch = searchResultSet.has(entry.id);
+            const isCurrentMatch = isSearchMatch && currentSearchResultId === entry.id;
+            return (
+              <div key={entry.id} className={`tree-node ${isActive ? "active" : ""} ${isInPath ? "in-path" : ""} ${isSearchMatch ? "search-match" : ""} ${isCurrentMatch ? "search-match-current" : ""}`} onClick={() => handleNodeClick(fn)}>
+                <span className="tree-prefix">{prefix}</span>
+                <span className="tree-marker">{marker}</span>
+                {entry.type === "message" && entry.message?.role === "user" ? (
+                  <span className={`tree-content tree-content-user ${roleClass}`}><p className="tree-user-label">User:<span className="tree-user-text">{displayText}</span></p></span>
+                ) : (
+                  <span className={`tree-content ${roleClass}`} style={colorize && getToolName(entry) ? { color: getToolColorVar(getToolName(entry)!) } : undefined}>{displayText}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="tree-status">{filteredNodes.length} / {flatNodes.length} entries</div>
+    </div>
+  );
+}));
 
 export default SessionTree;
