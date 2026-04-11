@@ -868,9 +868,8 @@ mod tests {
 
     #[tokio::test]
     async fn scan_sessions_with_config_hides_disabled_external_cached_sessions() {
-        // Ensure clean state - remove any leftover env vars from other tests
+        // Ensure clean state - only remove PPM_TEST_DB, don't touch HOME
         std::env::remove_var("PPM_TEST_DB");
-        std::env::remove_var("HOME");
 
         let temp = tempfile::tempdir().expect("tempdir");
         let db_path = temp.path().join("sessions.db");
