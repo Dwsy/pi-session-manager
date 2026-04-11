@@ -7,10 +7,7 @@ use std::time::Instant;
 use tokio::time::Duration;
 
 fn session_allowed_in_search(path: &str, config: &crate::config::Config) -> bool {
-    crate::domain::session_bridge::is_session_allowed_in_search(
-        std::path::Path::new(path),
-        config,
-    )
+    crate::domain::session_bridge::is_session_allowed_in_search(std::path::Path::new(path), config)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]

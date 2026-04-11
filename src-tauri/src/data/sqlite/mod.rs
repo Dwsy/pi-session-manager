@@ -23,8 +23,8 @@ pub use favorites::{
 pub use legacy_fts::{full_rebuild_fts, search_fts5};
 pub use maintenance::{
     cleanup_missing_files, clear_all_cache, delete_session, delete_sessions_by_source_slugs,
-    get_cached_file_modified,
-    get_session_count, needs_reindexing, optimize_database, preload_recent_sessions, vacuum,
+    get_cached_file_modified, get_session_count, needs_reindexing, optimize_database,
+    preload_recent_sessions, vacuum,
 };
 pub use message_index::{
     delete_message_entries_for_session, ensure_message_fts_schema, insert_message_entries,

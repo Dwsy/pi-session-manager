@@ -662,7 +662,9 @@ mod tests {
         ).expect("insert");
         drop(conn);
 
-        save_external_session_providers_core(vec![]).await.expect("save");
+        save_external_session_providers_core(vec![])
+            .await
+            .expect("save");
 
         let conn = crate::data::sqlite::init_db_with_config(&Config::default()).expect("db");
         let count: i64 = conn

@@ -340,9 +340,18 @@ async fn test_full_text_search_excludes_external_sessions_by_default() {
     let home = temp_dir.path();
     std::env::set_var("HOME", home);
 
-    let pi_dir = home.join(".pi").join("agent").join("sessions").join("local");
+    let pi_dir = home
+        .join(".pi")
+        .join("agent")
+        .join("sessions")
+        .join("local");
     std::fs::create_dir_all(&pi_dir).unwrap();
-    let codex_dir = home.join(".codex").join("sessions").join("2026").join("01").join("01");
+    let codex_dir = home
+        .join(".codex")
+        .join("sessions")
+        .join("2026")
+        .join("01")
+        .join("01");
     std::fs::create_dir_all(&codex_dir).unwrap();
 
     let pi_path = pi_dir.join("pi-test.jsonl");
@@ -408,7 +417,10 @@ async fn test_full_text_search_excludes_external_sessions_by_default() {
     .unwrap();
 
     assert!(!response.hits.is_empty());
-    assert!(response.hits.iter().all(|hit| hit.session_path.contains("/.pi/agent/sessions/")));
+    assert!(response
+        .hits
+        .iter()
+        .all(|hit| hit.session_path.contains("/.pi/agent/sessions/")));
 }
 
 #[tokio::test]

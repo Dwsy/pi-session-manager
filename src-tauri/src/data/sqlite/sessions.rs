@@ -29,8 +29,8 @@ pub fn upsert_session(
             Ok(()) => {
                 if let Err(e) = tx.commit() {
                     let err_msg = format!("Failed to commit transaction: {e}");
-                    let is_locked = err_msg.contains("database is locked")
-                        || err_msg.contains("busy");
+                    let is_locked =
+                        err_msg.contains("database is locked") || err_msg.contains("busy");
                     if is_locked && attempt < MAX_RETRIES - 1 {
                         last_error = Some(err_msg);
                         continue;

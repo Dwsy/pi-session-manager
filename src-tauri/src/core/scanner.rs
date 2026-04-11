@@ -939,8 +939,12 @@ mod tests {
             .await
             .expect("scan");
 
-        assert!(sessions.iter().any(|session| session.path == pi_session.path));
-        assert!(!sessions.iter().any(|session| session.path == codex_session.path));
+        assert!(sessions
+            .iter()
+            .any(|session| session.path == pi_session.path));
+        assert!(!sessions
+            .iter()
+            .any(|session| session.path == codex_session.path));
 
         std::env::remove_var("PPM_TEST_DB");
         std::env::remove_var("HOME");

@@ -35,8 +35,14 @@ pub fn needs_reindexing(conn: &Connection, path: &str) -> Result<bool, String> {
 pub fn delete_session(conn: &Connection, path: &str) -> Result<(), String> {
     // Also delete from message_entries (FOREIGN KEY CASCADE should handle but we do explicitly for safety)
     let _ = delete_message_entries_for_session(conn, path);
-    let _ = conn.execute("DELETE FROM session_details_cache WHERE path = ?", params![path]);
-    let _ = conn.execute("DELETE FROM subagent_meta_cache WHERE path = ?", params![path]);
+    let _ = conn.execute(
+        "DELETE FROM session_details_cache WHERE path = ?",
+        params![path],
+    );
+    let _ = conn.execute(
+        "DELETE FROM subagent_meta_cache WHERE path = ?",
+        params![path],
+    );
 
     conn.execute("DELETE FROM sessions WHERE path = ?", params![path])
         .map_err(|e| format!("Failed to delete session: {e}"))?;
