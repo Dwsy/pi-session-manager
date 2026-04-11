@@ -23,6 +23,8 @@
 - Full-text search via SQLite FTS + Tantivy-backed indexing/search flows.
 - In-session message search with inline highlights, current-match navigation, and keyboard-friendly close/reset behavior. `Cmd/Ctrl + F` behavior is configurable (search vs. sidebar toggle).
 - Built-in terminal (PTY) and one-click resume of Pi sessions.
+- **External Sessions** — scan and browse sessions from other coding agents (Claude, OpenCode, etc.) with unified settings UI for scan control and default resume targets.
+- **Dataset Browser** — download and explore session datasets from HuggingFace with local caching, search, tags, favorites, and statistics.
 - Multi-protocol runtime: Tauri IPC, WebSocket, HTTP, SSE.
 - Rich **demo data engine** and dedicated static demo page build mode.
 - i18n packs: `en-US`, `zh-CN`, `ja-JP`, `de-DE`, `fr-FR`, `es-ES`.

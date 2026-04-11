@@ -22,6 +22,8 @@
 - 全文检索：SQLite FTS5 + Tantivy 双引擎，支持精确短语搜索。
 - 会话内消息搜索：命中高亮、结果分页跳转、可配置 `Cmd/Ctrl+F` 行为。
 - 会话恢复：内置 PTY 终端，一键恢复 Pi 会话。
+- **外部会话** — 扫描和管理来自其他编程 Agent（Claude、OpenCode 等）的会话，统一设置界面控制扫描开关和默认恢复目标。
+- **数据集浏览器** — 从 HuggingFace 下载并浏览会话数据集，支持本地缓存、搜索、标签、收藏和统计分析。
 - 多协议访问：Tauri IPC、WebSocket、HTTP、SSE。
 - 完整 Demo 数据引擎 + 独立静态 Demo 页面构建模式。
 - 内置多语言包：`en-US`、`zh-CN`、`ja-JP`、`de-DE`、`fr-FR`、`es-ES`。
