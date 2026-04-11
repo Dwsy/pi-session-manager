@@ -340,9 +340,10 @@ fn main() {
                         };
 
                         let mut flush_error = false;
+                        let mut conn = conn; // make mutable
                         for entry in &sessions {
                             if let Err(e) = pi_session_manager::data::sqlite::upsert_session(
-                                &conn,
+                                &mut conn,
                                 &entry.session,
                                 entry.file_modified,
                                 None,
@@ -383,11 +384,11 @@ fn main() {
                     pi_session_manager::core::write_buffer::force_flush_all()
                 {
                     match pi_session_manager::data::sqlite::init_db() {
-                        Ok(conn) => {
+                        Ok(mut conn) => {
                             let mut flush_error = false;
                             for entry in &sessions {
                                 if let Err(e) = pi_session_manager::data::sqlite::upsert_session(
-                                    &conn,
+                                    &mut conn,
                                     &entry.session,
                                     entry.file_modified,
                                     None,

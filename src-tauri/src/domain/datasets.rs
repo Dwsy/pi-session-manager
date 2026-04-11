@@ -308,14 +308,14 @@ fn build_dataset_db_blocking(slug: &str) -> Result<usize, String> {
     let sessions_dir = dataset_sessions_dir(slug)?;
     let db_path = dataset_db_path(slug)?;
     let config = Config::default();
-    let conn = sqlite::init_db_with_path(&db_path, &config)?;
+    let mut conn = sqlite::init_db_with_path(&db_path, &config)?;
     let files = collect_jsonl_files(&[sessions_dir]);
     let handle = tokio::runtime::Handle::current();
     let parsed_results = handle.block_on(parallel_parse_files(files));
 
     for parsed in &parsed_results {
         sqlite::upsert_session(
-            &conn,
+            &mut conn,
             &parsed.info,
             parsed.file_modified,
             Some(&parsed.entries),

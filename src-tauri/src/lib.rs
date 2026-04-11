@@ -186,10 +186,10 @@ pub fn run() {
                     if let Some((sessions, details)) = write_buffer::check_and_take_flush_data() {
                         let sessions_count = sessions.len();
                         let details_count = details.len();
-                        if let Ok(conn) = sqlite_cache::init_db() {
+                        if let Ok(mut conn) = sqlite_cache::init_db() {
                             for entry in sessions {
                                 let _ = sqlite_cache::upsert_session(
-                                    &conn,
+                                    &mut conn,
                                     &entry.session,
                                     entry.file_modified,
                                     None,
@@ -214,10 +214,10 @@ pub fn run() {
             let app_handle_clone = app.handle().clone();
             app_handle_clone.listen("tauri://exit", |_| {
                 if let Some((sessions, details)) = write_buffer::force_flush_all() {
-                    if let Ok(conn) = sqlite_cache::init_db() {
+                    if let Ok(mut conn) = sqlite_cache::init_db() {
                         for entry in sessions {
                             let _ = sqlite_cache::upsert_session(
-                                &conn,
+                                &mut conn,
                                 &entry.session,
                                 entry.file_modified,
                                 None,

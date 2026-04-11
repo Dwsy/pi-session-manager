@@ -309,13 +309,13 @@ async fn run_once(
     let config = Config::default();
 
     let init_started = Instant::now();
-    let conn = sqlite_cache::init_db_with_config(&config).map_err(boxed_error)?;
+    let mut conn = sqlite_cache::init_db_with_config(&config).map_err(boxed_error)?;
     let init_ms = init_started.elapsed().as_secs_f64() * 1000.0;
 
     let ingest_started = Instant::now();
     for session_path in &session_paths {
         let (session, entries) = scanner::parse_session_info(session_path).map_err(boxed_error)?;
-        sqlite_cache::upsert_session(&conn, &session, session.modified, Some(&entries))
+        sqlite_cache::upsert_session(&mut conn, &session, session.modified, Some(&entries))
             .map_err(boxed_error)?;
     }
     let ingest_ms = ingest_started.elapsed().as_secs_f64() * 1000.0;

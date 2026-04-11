@@ -353,7 +353,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
     loop {
         attempt += 1;
         // Initialize database connection (may fail if corrupted)
-        let conn = match sqlite::init_db_with_config(config) {
+        let mut conn = match sqlite::init_db_with_config(config) {
             Ok(conn) => conn,
             Err(e) => {
                 if is_corruption_error(&e) && attempt <= MAX_RETRIES {
@@ -446,7 +446,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             } else {
                 // Historical file: upsert to DB
                 if let Err(e) = sqlite::upsert_session(
-                    &conn,
+                    &mut conn,
                     &result.info,
                     result.file_modified,
                     Some(&result.entries),
@@ -535,7 +535,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
     };
 
     let config = Config::load().unwrap_or_default();
-    let conn = crate::data::sqlite::init_db_with_config(&config)?;
+    let mut conn = crate::data::sqlite::init_db_with_config(&config)?;
 
     for path_str in &changed_paths {
         let path = PathBuf::from(path_str);
@@ -594,7 +594,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                     };
 
                     if let Err(e) = crate::data::sqlite::upsert_session(
-                        &conn,
+                        &mut conn,
                         &info,
                         file_modified,
                         Some(&entries),
@@ -697,7 +697,7 @@ impl ScannerScheduler {
             return Ok("No files to scan".to_string());
         }
 
-        let conn = sqlite::init_db_with_config(&self.config)?;
+        let mut conn = sqlite::init_db_with_config(&self.config)?;
         let realtime_cutoff = Utc::now() - Duration::days(self.config.realtime_cutoff_days);
 
         // Use parallel parse
@@ -720,7 +720,7 @@ impl ScannerScheduler {
                 }
                 Some(_) => {
                     sqlite::upsert_session(
-                        &conn,
+                        &mut conn,
                         &result.info,
                         file_modified,
                         Some(&result.entries),
@@ -729,7 +729,7 @@ impl ScannerScheduler {
                 }
                 None => {
                     sqlite::upsert_session(
-                        &conn,
+                        &mut conn,
                         &result.info,
                         file_modified,
                         Some(&result.entries),
@@ -888,7 +888,7 @@ mod tests {
         )
         .expect("write pi file");
 
-        let conn = crate::data::sqlite::init_db_with_config(&Config::default()).expect("db");
+        let mut conn = crate::data::sqlite::init_db_with_config(&Config::default()).expect("db");
         let now = Utc::now();
         let empty_entries: Vec<SessionEntry> = Vec::new();
 
@@ -925,9 +925,9 @@ mod tests {
             parent_session_path: None,
         };
 
-        crate::data::sqlite::upsert_session(&conn, &pi_session, now, Some(&empty_entries))
+        crate::data::sqlite::upsert_session(&mut conn, &pi_session, now, Some(&empty_entries))
             .expect("upsert pi");
-        crate::data::sqlite::upsert_session(&conn, &codex_session, now, Some(&empty_entries))
+        crate::data::sqlite::upsert_session(&mut conn, &codex_session, now, Some(&empty_entries))
             .expect("upsert codex");
         drop(conn);
 

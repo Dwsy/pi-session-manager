@@ -600,9 +600,9 @@ pub async fn fork_session_impl(
 
     // Update cache
     let config = config::load_config().map_err(|e| format!("Failed to load config: {e}"))?;
-    let conn = crate::data::sqlite::init_db_with_config(&config)?;
+    let mut conn = crate::data::sqlite::init_db_with_config(&config)?;
     let file_modified = now;
-    crate::data::sqlite::upsert_session(&conn, &session_info, file_modified, None)?;
+    crate::data::sqlite::upsert_session(&mut conn, &session_info, file_modified, None)?;
 
     // Invalidate scanner cache so next scan picks up the new session
     crate::core::scanner::invalidate_cache();

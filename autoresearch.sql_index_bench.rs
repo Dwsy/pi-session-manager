@@ -314,7 +314,7 @@ async fn run_once(
     let ingest_started = Instant::now();
     for session_path in &session_paths {
         let (session, entries) = scanner::parse_session_info(session_path).map_err(boxed_error)?;
-        sqlite_cache::upsert_session(&conn, &session, session.modified, Some(&entries))
+        sqlite_cache::upsert_session(&mut conn, &session, session.modified, Some(&entries))
             .map_err(boxed_error)?;
     }
     let ingest_ms = ingest_started.elapsed().as_secs_f64() * 1000.0;

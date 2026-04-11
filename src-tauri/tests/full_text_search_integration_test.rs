@@ -89,7 +89,7 @@ fn setup_test_db(sessions: &[(&str, &str, &[(&str, &str)])]) -> tempfile::TempDi
     env::set_var("HOME", temp_dir.path());
 
     let config = Config::default();
-    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+    let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
 
     for (id, cwd, messages) in sessions {
         let path = sessions_dir.join(format!("{id}.jsonl"));
@@ -97,7 +97,7 @@ fn setup_test_db(sessions: &[(&str, &str, &[(&str, &str)])]) -> tempfile::TempDi
         fs::write(&path, content).unwrap();
 
         let (session, entries) = scanner::parse_session_info(&path).unwrap();
-        sqlite_cache::upsert_session(&conn, &session, Utc::now(), Some(&entries)).unwrap();
+        sqlite_cache::upsert_session(&mut conn, &session, Utc::now(), Some(&entries)).unwrap();
         // No separate upsert_message_entries; it's handled inside upsert_session
     }
 
@@ -384,13 +384,13 @@ async fn test_full_text_search_excludes_external_sessions_by_default() {
 
     let config = Config::default();
     pi_session_manager::config::save_config(&config).unwrap();
-    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+    let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
 
     let (pi_session, pi_entries) = scanner::parse_session_info(&pi_path).unwrap();
-    sqlite_cache::upsert_session(&conn, &pi_session, Utc::now(), Some(&pi_entries)).unwrap();
+    sqlite_cache::upsert_session(&mut conn, &pi_session, Utc::now(), Some(&pi_entries)).unwrap();
 
     let (codex_session, codex_entries) = scanner::parse_session_info(&codex_path).unwrap();
-    sqlite_cache::upsert_session(&conn, &codex_session, Utc::now(), Some(&codex_entries))
+    sqlite_cache::upsert_session(&mut conn, &codex_session, Utc::now(), Some(&codex_entries))
         .unwrap();
     drop(conn);
 
@@ -657,7 +657,7 @@ async fn test_full_text_search_cascade_delete() {
 
     // Open a connection to perform DELETE
     let config = Config::default();
-    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+    let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
 
     // Verify both searchable
     let resp_before: FullTextSearchResponse = full_text_search(
@@ -989,7 +989,7 @@ async fn test_full_text_search_ignores_tool_result_entries_during_upsert() {
     env::set_var("HOME", temp_dir.path());
 
     let config = Config::default();
-    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+    let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
 
     let path = sessions_dir.join("tool-result.jsonl");
     fs::write(
@@ -1005,7 +1005,7 @@ async fn test_full_text_search_ignores_tool_result_entries_during_upsert() {
     .unwrap();
 
     let (session, entries) = scanner::parse_session_info(&path).unwrap();
-    sqlite_cache::upsert_session(&conn, &session, Utc::now(), Some(&entries)).unwrap();
+    sqlite_cache::upsert_session(&mut conn, &session, Utc::now(), Some(&entries)).unwrap();
 
     let indexed_rows: i64 = conn
         .query_row(
@@ -1036,7 +1036,7 @@ async fn test_full_text_search_thinking_toggle() {
 
     write_app_settings(false);
     let config = Config::default();
-    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+    let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
 
     let path = sessions_dir.join("thinking.jsonl");
     fs::write(
@@ -1054,7 +1054,7 @@ async fn test_full_text_search_thinking_toggle() {
     .unwrap();
 
     let (session, entries) = scanner::parse_session_info(&path).unwrap();
-    sqlite_cache::upsert_session(&conn, &session, Utc::now(), Some(&entries)).unwrap();
+    sqlite_cache::upsert_session(&mut conn, &session, Utc::now(), Some(&entries)).unwrap();
     drop(conn);
 
     let disabled = full_text_search(
@@ -1072,9 +1072,9 @@ async fn test_full_text_search_thinking_toggle() {
     assert_eq!(disabled.total_hits, 0);
 
     write_app_settings(true);
-    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+    let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
     let (session, entries) = scanner::parse_session_info(&path).unwrap();
-    sqlite_cache::upsert_session(&conn, &session, Utc::now(), Some(&entries)).unwrap();
+    sqlite_cache::upsert_session(&mut conn, &session, Utc::now(), Some(&entries)).unwrap();
     drop(conn);
 
     let enabled = full_text_search(
