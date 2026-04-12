@@ -1,0 +1,3 @@
+[submodule "extensions/pi-session-bridge"]
+	path = extensions/pi-session-bridge
+	url = https://github.com/Dwsy/psm-bridge.git
