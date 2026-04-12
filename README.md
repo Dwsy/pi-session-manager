@@ -142,10 +142,44 @@ pnpm install
 
 ## Extension System
 
-### Pi Plugin (pi-session-bridge)
+### psm-bridge (Pi Plugin)
 
+Bridge Pi agent sessions to PSM with live sync, search, tags, and context recall.
+
+**Repository**: [Dwsy/psm-bridge](https://github.com/Dwsy/psm-bridge)
+
+**Install**:
+```bash
+pi install Dwsy/psm-bridge
 ```
-extensions/pi-session-bridge/index.ts
+
+**Features**:
+- Live mode: real-time session sync via WebSocket
+- Search: full-text search across indexed sessions
+- Tags: SQLite-backed session tagging
+- Context: recall and context from past sessions
+
+**Usage**:
+```bash
+/psm-live on      # Enable live mode
+/session_search   # Search sessions
+/state-set wip    # Set tag
+```
+
+**Local Development**:
+```bash
+# Already included as submodule
+git clone --recurse-submodules https://github.com/Dwsy/pi-session-manager.git
+```
+
+**Update submodule**:
+```bash
+cd extensions/psm-bridge
+git pull  # Update code
+git push  # Push to psm-bridge repo
+cd ../..
+git add extensions/psm-bridge
+git commit -m "Update psm-bridge"
 ```
 
 ### Tool Render Plugins
