@@ -12,3 +12,4 @@ pub mod session_bridge;
 pub mod session_list;
 pub mod stats;
 pub mod terminal;
+pub mod trace;

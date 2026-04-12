@@ -262,6 +262,12 @@ async fn dispatch_impl(
             let result = crate::stats::calculate_stats_from_inputs(&sessions);
             Ok(to_val(result, "serialize result")?)
         }
+        "get_session_trace_analytics" => {
+            let session_path = extract(payload, "sessionPath")
+                .or_else(|_| extract(payload, "session_path"))?;
+            let result = crate::domain::trace::extract_trace_analytics(&session_path)?;
+            Ok(to_val(result, "serialize result")?)
+        }
 
         // ═══════════════════════════════════════════════════════════════
         // Search
