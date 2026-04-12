@@ -673,6 +673,11 @@ fn extract_tool_calls(msg: &Value) -> Vec<TraceToolCall> {
                 id,
                 name,
                 arguments_preview: args_preview,
+                arguments_raw: if args_str.is_empty() {
+                    None
+                } else {
+                    Some(args_str.to_string())
+                },
                 status: "running".to_string(),
                 result_preview: None,
             }

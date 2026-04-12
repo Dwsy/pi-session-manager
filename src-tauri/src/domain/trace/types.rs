@@ -51,6 +51,7 @@ pub struct TraceToolCall {
     pub id: String,
     pub name: String,
     pub arguments_preview: String,
+    pub arguments_raw: Option<String>,
     pub status: String,
     pub result_preview: Option<String>,
 }

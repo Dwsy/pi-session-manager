@@ -18,6 +18,7 @@ export interface TraceToolCall {
   id: string;
   name: string;
   arguments_preview: string;
+  arguments_raw: string | null;
   status: string;
   result_preview: string | null;
 }
