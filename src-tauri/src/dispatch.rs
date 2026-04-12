@@ -161,6 +161,11 @@ async fn dispatch_impl(
             let result = crate::get_session_entries(path).await?;
             Ok(to_val(result, "serialize result")?)
         }
+        "get_session_labels" => {
+            let path = extract(payload, "path")?;
+            let result = crate::get_session_labels(path).await?;
+            Ok(to_val(result, "serialize result")?)
+        }
         "detect_session_format" => {
             let path = extract(payload, "path")?;
             let result = crate::detect_session_format(path).await?;
@@ -330,6 +335,11 @@ async fn dispatch_impl(
                 .or_else(|| payload.get("sortOrder"))
                 .and_then(|v| v.as_str())
                 .map(String::from);
+            let source_filter = payload
+                .get("source_filter")
+                .or_else(|| payload.get("sourceFilter"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
             let result = crate::full_text_search(
                 query,
                 role_filter,
@@ -339,6 +349,7 @@ async fn dispatch_impl(
                 page_size,
                 match_mode,
                 sort_order,
+                source_filter,
             )
             .await?;
             Ok(to_val(result, "serialize result")?)

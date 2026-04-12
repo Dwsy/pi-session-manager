@@ -161,6 +161,70 @@ function rankContent(content: string, terms: string[]): number {
   }, 0)
 }
 
+interface ResolvedLabel {
+  text: string
+  labeledAt: string
+}
+
+function resolveLatestLabels(entries: SessionEntry[]): Map<string, ResolvedLabel> {
+  const labels = new Map<string, ResolvedLabel>()
+
+  for (const entry of entries) {
+    if (entry.type !== 'label' || typeof entry.targetId !== 'string' || !entry.targetId) {
+      continue
+    }
+
+    const label = typeof entry.label === 'string' ? entry.label : ''
+    if (label.trim()) {
+      labels.set(entry.targetId, {
+        text: label,
+        labeledAt: entry.timestamp,
+      })
+      continue
+    }
+
+    labels.delete(entry.targetId)
+  }
+
+  return labels
+}
+
+function sourcePrecedence(sourceType: FullTextSearchHit['source_type']): number {
+  switch (sourceType) {
+    case 'label':
+      return 0
+    case 'user':
+      return 1
+    case 'assistant':
+      return 2
+    default:
+      return 3
+  }
+}
+
+function chooseWinningHit(
+  existing: FullTextSearchHit | undefined,
+  candidate: FullTextSearchHit,
+): FullTextSearchHit {
+  if (!existing) {
+    return candidate
+  }
+
+  const precedenceDiff = sourcePrecedence(candidate.source_type) - sourcePrecedence(existing.source_type)
+  if (precedenceDiff < 0) {
+    return candidate
+  }
+  if (precedenceDiff > 0) {
+    return existing
+  }
+
+  if (candidate.timestamp > existing.timestamp) {
+    return candidate
+  }
+
+  return existing
+}
+
 function compareBySort(
   left: SessionInfo,
   right: SessionInfo,
@@ -203,6 +267,26 @@ function compareBySort(
   return left.path.localeCompare(right.path)
 }
 
+function sortFullTextHits(
+  hits: FullTextSearchHit[],
+  sortOrder: 'score' | 'newest' | 'oldest',
+): FullTextSearchHit[] {
+  return [...hits].sort((left, right) => {
+    if (sortOrder === 'newest') {
+      return right.timestamp.localeCompare(left.timestamp)
+    }
+    if (sortOrder === 'oldest') {
+      return left.timestamp.localeCompare(right.timestamp)
+    }
+
+    return (
+      right.score - left.score ||
+      right.timestamp.localeCompare(left.timestamp) ||
+      left.session_path.localeCompare(right.session_path)
+    )
+  })
+}
+
 export function searchDemoSessionsInStore(state: DemoStore, options: DemoSearchOptions): SearchResult[] {
   const queryText = options.query.trim().toLowerCase()
   if (!queryText) {
@@ -242,7 +326,10 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
   has_more: boolean
 } {
   const query = options.query?.trim() || ''
-  if (!query) {
+  const sourceFilter = options.sourceFilter || 'all'
+  const isLabelsBrowseMode = sourceFilter === 'labels_only' && !query
+
+  if (!query && !isLabelsBrowseMode) {
     return { hits: [], total_hits: 0, has_more: false }
   }
 
@@ -250,11 +337,16 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
   const page = Math.max(0, options.page || 0)
   const pageSize = Math.max(1, options.pageSize || 20)
   const matchMode = options.matchMode || 'any'
+  const sortOrder = options.sortOrder || 'score'
 
   const terms = parseQueryTerms(query)
-  if (terms.length === 0) {
+  if (!terms.length && !isLabelsBrowseMode) {
     return { hits: [], total_hits: 0, has_more: false }
   }
+
+  const includeSessionIdMatches = sourceFilter === 'all'
+  const includeLabelHits = sourceFilter !== 'content_only'
+  const includeContentHits = sourceFilter !== 'labels_only'
 
   const idHits: FullTextSearchHit[] = []
   const hits: FullTextSearchHit[] = []
@@ -268,71 +360,111 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
       continue
     }
 
-    const sessionIdMatchKind = getSessionIdMatchKind(session.id, query)
-    if (sessionIdMatchKind) {
-      const preview = session.last_message || session.first_message || session.name || session.cwd
-      const role = session.last_message_role === 'user' ? 'user' : 'assistant'
-      if (roleFilter === 'all' || roleFilter === role) {
-        idHits.push({
-          session_id: session.id,
-          session_path: session.path,
-          session_name: session.name,
-          entry_id: '',
-          role,
-          source_type: role,
-          content: preview,
-          timestamp: session.modified,
-          score: sessionIdMatchKind === 'exact' ? 1_000_000 : 999_000,
-          match_reason: sessionIdMatchKind === 'exact' ? 'session_id_exact' : 'session_id_prefix',
-        })
+    if (includeSessionIdMatches) {
+      const sessionIdMatchKind = getSessionIdMatchKind(session.id, query)
+      if (sessionIdMatchKind) {
+        const preview = session.last_message || session.first_message || session.name || session.cwd
+        const role = session.last_message_role === 'user' ? 'user' : 'assistant'
+        if (roleFilter === 'all' || roleFilter === role) {
+          idHits.push({
+            session_id: session.id,
+            session_path: session.path,
+            session_name: session.name,
+            entry_id: '',
+            role,
+            source_type: role,
+            content: preview,
+            timestamp: session.modified,
+            score: sessionIdMatchKind === 'exact' ? 1_000_000 : 999_000,
+            match_reason: sessionIdMatchKind === 'exact' ? 'session_id_exact' : 'session_id_prefix',
+          })
+        }
       }
     }
 
     const entries = state.entriesByPath.get(session.path)
     if (!entries) continue
 
-    for (const entry of entries) {
-      if (entry.type !== 'message') continue
-      const role = entry.message?.role
-      if (role !== 'user' && role !== 'assistant') continue
-      if (roleFilter !== 'all' && role !== roleFilter) continue
+    const bestHitsByEntryId = new Map<string, FullTextSearchHit>()
+    const entriesById = new Map(entries.map((entry) => [entry.id, entry]))
 
-      const content = extractMessageText(entry, options.includeThinking === true)
-      if (!content) continue
-      if (!matchMessageByTerms(content, terms, matchMode)) continue
+    if (includeLabelHits) {
+      const labelsByTargetId = resolveLatestLabels(entries)
 
-      const score = rankContent(content, terms) + 1
+      for (const [targetId, resolvedLabel] of labelsByTargetId) {
+        const targetEntry = entriesById.get(targetId)
+        if (targetEntry?.type !== 'message') {
+          continue
+        }
 
-      hits.push({
-        session_id: session.id,
-        session_path: session.path,
-        session_name: session.name,
-        entry_id: entry.id,
-        role,
-        source_type: role,
-        content,
-        timestamp: entry.timestamp,
-        score,
-        match_reason: 'content',
-      })
+        const role = targetEntry.message?.role
+        if (role !== 'user' && role !== 'assistant') {
+          continue
+        }
+        if (roleFilter !== 'all' && role !== roleFilter) {
+          continue
+        }
+        if (!isLabelsBrowseMode && !matchMessageByTerms(resolvedLabel.text, terms, matchMode)) {
+          continue
+        }
+
+        const candidate: FullTextSearchHit = {
+          session_id: session.id,
+          session_path: session.path,
+          session_name: session.name,
+          entry_id: targetEntry.id,
+          role,
+          source_type: 'label',
+          content: resolvedLabel.text,
+          timestamp: resolvedLabel.labeledAt,
+          score: 10_000 + (isLabelsBrowseMode ? 0 : rankContent(resolvedLabel.text, terms)),
+          match_reason: 'label',
+        }
+        bestHitsByEntryId.set(
+          targetEntry.id,
+          chooseWinningHit(bestHitsByEntryId.get(targetEntry.id), candidate),
+        )
+      }
     }
+
+    if (includeContentHits) {
+      for (const entry of entries) {
+        if (entry.type !== 'message') continue
+        const role = entry.message?.role
+        if (role !== 'user' && role !== 'assistant') continue
+        if (roleFilter !== 'all' && role !== roleFilter) continue
+
+        const content = extractMessageText(entry, options.includeThinking === true)
+        if (!content) continue
+        if (!matchMessageByTerms(content, terms, matchMode)) continue
+
+        const score = rankContent(content, terms) + 1
+        const candidate: FullTextSearchHit = {
+          session_id: session.id,
+          session_path: session.path,
+          session_name: session.name,
+          entry_id: entry.id,
+          role,
+          source_type: role,
+          content,
+          timestamp: entry.timestamp,
+          score,
+          match_reason: 'content',
+        }
+        bestHitsByEntryId.set(
+          entry.id,
+          chooseWinningHit(bestHitsByEntryId.get(entry.id), candidate),
+        )
+      }
+    }
+
+    hits.push(...bestHitsByEntryId.values())
   }
 
-  idHits.sort((left, right) => {
-    if (right.score !== left.score) {
-      return right.score - left.score
-    }
-    return right.timestamp.localeCompare(left.timestamp)
-  })
-
-  hits.sort((left, right) => {
-    if (right.score !== left.score) {
-      return right.score - left.score
-    }
-    return right.timestamp.localeCompare(left.timestamp)
-  })
-
-  const combinedHits = [...idHits, ...hits]
+  const combinedHits = [
+    ...sortFullTextHits(idHits, 'score'),
+    ...sortFullTextHits(hits, sortOrder),
+  ]
   const start = page * pageSize
   const end = start + pageSize
   const pagedHits = combinedHits.slice(start, end)
@@ -377,13 +509,14 @@ export function listDemoSessionsPaginatedInStore(
 
   sessions.sort((left, right) => compareBySort(left, right, sortBy, sortOrder, state))
 
-  const page = sessions.slice(offset, offset + limit)
+  const total = sessions.length
+  const paged = sessions.slice(offset, offset + limit)
 
   return {
-    sessions: page,
-    total: sessions.length,
+    sessions: paged,
+    total,
     offset,
     limit,
-    has_more: offset + limit < sessions.length,
+    has_more: offset + limit < total,
   }
 }

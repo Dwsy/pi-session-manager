@@ -200,6 +200,10 @@ function normalizeSessionEntry(raw: any): SessionEntry | null {
   }
 
   if (
+    type === 'session_info' ||
+    type === 'label' ||
+    type === 'model_change' ||
+    type === 'thinking_level_change' ||
     type === 'toolCall' ||
     type === 'custom_message' ||
     type === 'compaction' ||

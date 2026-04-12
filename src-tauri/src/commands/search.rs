@@ -1,10 +1,87 @@
 use crate::metrics;
 use crate::types::{FullTextSearchHit, FullTextSearchResponse, SessionInfo};
-use crate::{config, search, sqlite_cache};
-use chrono::{DateTime, Utc};
+use crate::{config, search};
 use rusqlite::ToSql;
 use std::time::Instant;
 use tokio::time::Duration;
+
+const PER_SESSION_LIMIT: usize = 3;
+const SESSION_ID_EXACT_SCORE: f32 = 1_000_000.0;
+const SESSION_ID_PREFIX_SCORE: f32 = 999_000.0;
+// These constants intentionally encode the user-facing ranking hierarchy:
+// session-id rediscovery, intentional label rediscovery, ordinary content similarity
+const LABEL_MATCH_BASE_SCORE: f32 = 500_000.0;
+const CONTENT_LIKE_SCORE: f32 = 1.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SourceFilter {
+    All,
+    LabelsOnly,
+    ContentOnly,
+}
+
+impl SourceFilter {
+    fn parse(value: Option<&str>) -> Result<Self, String> {
+        match value.unwrap_or("all") {
+            "all" => Ok(Self::All),
+            "labels_only" => Ok(Self::LabelsOnly),
+            "content_only" => Ok(Self::ContentOnly),
+            other => Err(format!("Invalid source_filter: {other}")),
+        }
+    }
+
+    fn includes_session_id(self) -> bool {
+        matches!(self, Self::All)
+    }
+
+    fn message_source_condition(self) -> &'static str {
+        match self {
+            Self::All => "1=1",
+            Self::LabelsOnly => "m.source_type = 'label'",
+            Self::ContentOnly => "m.source_type IN ('user', 'assistant', 'thinking')",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SortMode {
+    Relevance,
+    Newest,
+    Oldest,
+}
+
+impl SortMode {
+    fn parse(value: Option<&str>, force_timestamp_sort: bool) -> Self {
+        if force_timestamp_sort {
+            return match value {
+                Some("oldest") => Self::Oldest,
+                _ => Self::Newest,
+            };
+        }
+
+        match value.unwrap_or("relevance") {
+            "newest" => Self::Newest,
+            "oldest" => Self::Oldest,
+            "score" | "relevance" => Self::Relevance,
+            _ => Self::Relevance,
+        }
+    }
+
+    fn global_order_sql(self) -> &'static str {
+        match self {
+            Self::Newest => "timestamp DESC, score DESC, session_path ASC, entry_id ASC",
+            Self::Oldest => "timestamp ASC, score DESC, session_path ASC, entry_id ASC",
+            Self::Relevance => "score DESC, timestamp DESC, session_path ASC, entry_id ASC",
+        }
+    }
+
+    fn label_browse_order_sql(self) -> &'static str {
+        match self {
+            Self::Oldest => "m.timestamp ASC, s.path ASC, m.entry_id ASC",
+            _ => "m.timestamp DESC, s.path ASC, m.entry_id ASC",
+        }
+    }
+}
 
 fn session_allowed_in_search(path: &str, config: &crate::config::Config) -> bool {
     crate::domain::session_bridge::is_session_allowed_in_search(std::path::Path::new(path), config)
@@ -74,10 +151,52 @@ pub async fn full_text_search(
     page_size: usize,
     match_mode: Option<String>,
     sort_order: Option<String>,
+    source_filter: Option<String>,
 ) -> Result<FullTextSearchResponse, String> {
-    // Quick validation
-    let trimmed = query.trim();
-    if trimmed.is_empty() {
+    let result = tokio::time::timeout(
+        Duration::from_secs(5),
+        tokio::task::spawn_blocking(move || {
+            full_text_search_blocking(
+                query,
+                role_filter,
+                glob_pattern,
+                project_path,
+                page,
+                page_size,
+                match_mode,
+                sort_order,
+                source_filter,
+            )
+        }),
+    )
+    .await;
+
+    match result {
+        Ok(Ok(inner)) => inner,
+        Ok(Err(e)) => Err(format!("Task panicked: {e}")),
+        Err(_) => Err("Search query timed out after 5 seconds".to_string()),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn full_text_search_blocking(
+    query: String,
+    role_filter: String,
+    glob_pattern: Option<String>,
+    project_path: Option<String>,
+    page: usize,
+    page_size: usize,
+    match_mode: Option<String>,
+    sort_order: Option<String>,
+    source_filter: Option<String>,
+) -> Result<FullTextSearchResponse, String> {
+    let start = Instant::now();
+    let trimmed = query.trim().to_string();
+    let source_filter = SourceFilter::parse(source_filter.as_deref())?;
+    let is_labels_browse_mode = source_filter == SourceFilter::LabelsOnly && trimmed.is_empty();
+    let sort_mode = SortMode::parse(sort_order.as_deref(), is_labels_browse_mode);
+
+    if trimmed.is_empty() && !is_labels_browse_mode {
         return Ok(FullTextSearchResponse {
             hits: vec![],
             total_hits: 0,
@@ -85,475 +204,530 @@ pub async fn full_text_search(
         });
     }
 
-    // Wrap all blocking DB operations in spawn_blocking with timeout
-    let sort_order = sort_order.unwrap_or_else(|| "relevance".to_string());
-    let result = tokio::time::timeout(
-        Duration::from_secs(5),
-        tokio::task::spawn_blocking(move || {
-            // Compute trimmed query inside closure (query moved)
-            let trimmed = query.trim();
-            let start = Instant::now();
+    let config = config::load_config().map_err(|e| format!("Failed to load config: {e}"))?;
+    let conn = crate::data::sqlite::init_db_with_config(&config)
+        .map_err(|e| format!("Failed to init database: {e}"))?;
+    conn.execute("PRAGMA query_timeout = 5000", [])
+        .map_err(|e| format!("Failed to set query_timeout: {e}"))?;
 
-            // Load config (blocking file I/O)
-            let config = config::load_config()
-                .map_err(|e| format!("Failed to load config: {e}"))?;
-            // Open database
-            let conn = crate::data::sqlite::init_db_with_config(&config)
-                .map_err(|e| format!("Failed to init database: {e}"))?;
-            // Set query timeout at SQLite level (in milliseconds)
-            conn.execute("PRAGMA query_timeout = 5000", [])
-                .map_err(|e| format!("Failed to set query_timeout: {e}"))?;
+    let normalized_role_filter = role_filter.to_lowercase();
+    let role_opt = match normalized_role_filter.as_str() {
+        "user" => Some("user"),
+        "assistant" => Some("assistant"),
+        _ => None,
+    };
 
-            // Determine role filter for message FTS (case-insensitive)
-            let role_filter = role_filter.to_lowercase();
-            let role_opt = match role_filter.as_str() {
-                "user" => Some("user"),
-                "assistant" => Some("assistant"),
-                _ => None,
-            };
+    let like_pattern = glob_pattern
+        .as_ref()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(|value| glob_to_like(&value));
+    let project_path_owned = project_path
+        .as_ref()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
 
-            // Build FTS query based on match_mode
-            // Determine match mode: default "any"
-            let mode = match match_mode.as_deref() {
-                Some("all") => "all",
-                Some("phrase") => "phrase",
-                _ => "any", // default to any (OR)
-            };
+    let response = if is_labels_browse_mode {
+        browse_all_labels(
+            &conn,
+            role_opt,
+            like_pattern.as_ref(),
+            project_path_owned.as_ref(),
+            page,
+            page_size,
+            sort_mode,
+            &config,
+        )?
+    } else {
+        let session_id_matches = if source_filter.includes_session_id() {
+            search_session_id_matches(
+                &conn,
+                &trimmed,
+                role_opt,
+                like_pattern.as_ref(),
+                project_path_owned.as_ref(),
+                &config,
+            )?
+        } else {
+            Vec::new()
+        };
 
-            fn escape_fts_term(term: &str) -> String {
-                let mut escaped = String::new();
-                for ch in term.chars() {
-                    match ch {
-                        '"' => escaped.push_str("\"\""),
-                        '\\' => escaped.push_str("\\\\"),
-                        _ => escaped.push(ch),
-                    }
-                }
-                escaped
-            }
+        let session_id_count = session_id_matches.len();
+        let global_offset = page * page_size;
+        let global_limit = global_offset.saturating_add(page_size);
+        let session_id_page_start = global_offset.min(session_id_count);
+        let session_id_page_end = global_limit.min(session_id_count);
+        let mut hits = session_id_matches[session_id_page_start..session_id_page_end].to_vec();
 
-            fn parse_quoted_terms(query: &str) -> (Vec<String>, Vec<String>, bool) {
-                let normalized_query = query.replace(['“', '”'], "\"");
-                let quote_count = normalized_query.chars().filter(|ch| *ch == '"').count();
-                if quote_count == 0 || quote_count % 2 != 0 {
-                    let words = normalized_query
-                        .split_whitespace()
-                        .map(|word| word.to_string())
-                        .collect::<Vec<String>>();
-                    return (vec![], words, false);
-                }
+        let message_offset = global_offset.saturating_sub(session_id_count);
+        let message_limit = page_size.saturating_sub(hits.len());
+        let message_result = search_message_hits(
+            &conn,
+            &trimmed,
+            role_opt,
+            like_pattern.as_ref(),
+            project_path_owned.as_ref(),
+            message_offset,
+            message_limit,
+            match_mode.as_deref(),
+            sort_mode,
+            source_filter,
+            &config,
+        )?;
 
-                let mut phrases = Vec::new();
-                let mut remainder = String::new();
-                let mut current_phrase = String::new();
-                let mut in_phrase = false;
+        hits.extend(message_result.hits);
 
-                for ch in normalized_query.chars() {
-                    if ch == '"' {
-                        if in_phrase {
-                            if !current_phrase.trim().is_empty() {
-                                phrases.push(current_phrase.clone());
-                            }
-                            current_phrase.clear();
-                        }
-                        in_phrase = !in_phrase;
-                        continue;
-                    }
+        FullTextSearchResponse {
+            hits,
+            total_hits: session_id_count + message_result.total_hits,
+            has_more: global_limit < session_id_count + message_result.total_hits,
+        }
+    };
 
-                    if in_phrase {
-                        current_phrase.push(ch);
-                    } else {
-                        remainder.push(ch);
-                    }
-                }
+    let latency = start.elapsed();
+    metrics::record_search_latency(latency);
+    metrics::inc_search_queries();
+    metrics::add_search_results(response.hits.len());
 
-                let words = remainder
-                    .split_whitespace()
-                    .map(|word| word.to_string())
-                    .collect::<Vec<String>>();
+    Ok(response)
+}
 
-                if phrases.is_empty() {
-                    let fallback_words = normalized_query
-                        .split_whitespace()
-                        .map(|word| word.to_string())
-                        .collect::<Vec<String>>();
-                    return (vec![], fallback_words, false);
-                }
+#[allow(clippy::too_many_arguments)]
+fn browse_all_labels(
+    conn: &rusqlite::Connection,
+    role_opt: Option<&str>,
+    like_pattern: Option<&String>,
+    project_path: Option<&String>,
+    page: usize,
+    page_size: usize,
+    sort_mode: SortMode,
+    config: &crate::config::Config,
+) -> Result<FullTextSearchResponse, String> {
+    let role_condition = match role_opt {
+        Some("user") => "m.role = 'user'",
+        Some("assistant") => "m.role = 'assistant'",
+        _ => "1=1",
+    };
 
-                (phrases, words, true)
-            }
+    let mut where_clause = format!("WHERE m.source_type = 'label' AND {role_condition}");
+    let mut params: Vec<&dyn ToSql> = Vec::new();
 
-            fn contains_cjk(value: &str) -> bool {
-                value.chars().any(|ch| matches!(ch as u32, 0x4E00..=0x9FFF | 0x3400..=0x4DBF | 0xF900..=0xFAFF))
-            }
+    if let Some(pattern) = like_pattern {
+        where_clause = format!("{where_clause} AND m.session_path LIKE ? ESCAPE '\\'");
+        params.push(pattern);
+    }
 
-            fn build_fts_query(trimmed_query: &str, mode: &str) -> String {
-                let (phrases, words, has_phrases) = parse_quoted_terms(trimmed_query);
+    if let Some(project_path) = project_path {
+        where_clause = format!(
+            "{where_clause} AND EXISTS (SELECT 1 FROM sessions s2 WHERE s2.path = m.session_path AND s2.cwd = ?)"
+        );
+        params.push(project_path);
+    }
 
-                if mode == "phrase" {
-                    if has_phrases && words.is_empty() && phrases.len() == 1 {
-                        let escaped = escape_fts_term(&phrases[0]);
-                        return format!("\"{escaped}\"");
-                    }
+    let order_sql = sort_mode.label_browse_order_sql();
+    let data_sql = format!(
+        "SELECT
+            s.id,
+            m.session_path,
+            s.name,
+            m.entry_id,
+            m.role,
+            m.source_type,
+            m.content,
+            m.timestamp
+         FROM message_entries m
+         JOIN sessions s ON s.path = m.session_path
+         {where_clause}
+         ORDER BY {order_sql}"
+    );
 
-                    let escaped = escape_fts_term(trimmed_query);
-                    return format!("\"{escaped}\"");
-                }
+    let mut stmt = conn
+        .prepare(&data_sql)
+        .map_err(|e| format!("Failed to prepare label browse query: {e}"))?;
 
-                if !has_phrases {
-                    let escaped_words: Vec<String> = words
-                        .iter()
-                        .map(|word| {
-                            let escaped = escape_fts_term(word);
-                            if word
-                                .chars()
-                                .any(|ch| !ch.is_alphanumeric() && ch != '_')
-                            {
-                                format!("\"{escaped}\"")
-                            } else {
-                                escaped
-                            }
-                        })
-                        .collect();
+    let rows = stmt
+        .query_map(params.as_slice(), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
+            ))
+        })
+        .map_err(|e| format!("Failed to execute label browse query: {e}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect label browse hits: {e}"))?;
 
-                    if mode == "all" {
-                        return escaped_words.join(" ");
-                    }
+    // session_allowed_in_search() depends on runtime config + provider/path policy rather than
+    // a persisted searchable flag, so we apply it after SQL. This keeps the fix simple and
+    // correct; if it becomes hot, revisit with a persisted eligibility bit or bounded over-fetch.
+    let allowed_rows = rows
+        .into_iter()
+        .filter(|(_, session_path, _, _, _, _, _, _)| {
+            session_allowed_in_search(session_path, config)
+        })
+        .collect::<Vec<_>>();
 
-                    return escaped_words.join(" OR ");
-                }
+    let total_hits = allowed_rows.len();
+    let offset = page.saturating_mul(page_size);
 
-                let mut terms: Vec<String> = words.iter().map(|word| escape_fts_term(word)).collect();
-                terms.extend(
-                    phrases
-                        .iter()
-                        .map(|phrase| format!("\"{}\"", escape_fts_term(phrase))),
-                );
-
-                if terms.is_empty() {
-                    let escaped = escape_fts_term(trimmed_query);
-                    return format!("\"{escaped}\"");
-                }
-
-                if mode == "all" {
-                    terms.join(" ")
-                } else {
-                    terms.join(" OR ")
-                }
-            }
-
-            fn glob_to_like(pattern_str: &str) -> String {
-                let mut like_pattern = String::new();
-                for ch in pattern_str.chars() {
-                    match ch {
-                        '*' => like_pattern.push('%'),
-                        '?' => like_pattern.push('_'),
-                        '%' | '_' => {
-                            like_pattern.push('\\');
-                            like_pattern.push(ch);
-                        }
-                        '\\' => {
-                            like_pattern.push('\\');
-                            like_pattern.push('\\');
-                        }
-                        _ => like_pattern.push(ch),
-                    }
-                }
-                like_pattern
-            }
-
-            // Build the query string. CJK terms fall back to substring matching because unicode61 tokenization is unreliable for Chinese words.
-            let use_content_like = contains_cjk(trimmed);
-            let fts_query = build_fts_query(trimmed, mode);
-            let content_like_query = trimmed.to_lowercase();
-            let exact_session_id_query = search::normalize_session_id_query(trimmed);
-            let session_id_exact_only = search::session_id_query_is_exact(trimmed);
-            let session_id_supports_prefix = !session_id_exact_only && exact_session_id_query.len() >= 3;
-            let like_pattern = glob_pattern
-                .as_ref()
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty())
-                .map(|value| glob_to_like(&value));
-            let project_path_owned: Option<String> = project_path
-                .as_ref()
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty());
-
-            let mut session_id_where_clause = if session_id_supports_prefix {
-                "WHERE (lower(s.id) = ? OR substr(lower(s.id), 1, length(?)) = ?)".to_string()
-            } else {
-                "WHERE lower(s.id) = ?".to_string()
-            };
-            let mut session_id_params: Vec<&dyn rusqlite::ToSql> = if session_id_supports_prefix {
-                vec![
-                    &exact_session_id_query,
-                    &exact_session_id_query,
-                    &exact_session_id_query,
-                ]
-            } else {
-                vec![&exact_session_id_query]
-            };
-
-            if let Some(pattern) = like_pattern.as_ref() {
-                session_id_where_clause =
-                    format!("{session_id_where_clause} AND s.path LIKE ? ESCAPE '\\'");
-                session_id_params.push(pattern);
-            }
-
-            if let Some(project_path) = project_path_owned.as_ref() {
-                session_id_where_clause = format!("{session_id_where_clause} AND s.cwd = ?");
-                session_id_params.push(project_path);
-            }
-
-            let session_id_order_query = exact_session_id_query.clone();
-            let session_id_sql = format!(
-                "SELECT
-                    s.id,
-                    s.path,
-                    s.name,
-                    s.first_message,
-                    s.last_message,
-                    s.last_message_role,
-                    s.modified
-                FROM sessions s
-                {session_id_where_clause}
-                ORDER BY CASE WHEN lower(s.id) = ? THEN 0 ELSE 1 END, s.modified DESC, s.path ASC"
-            );
-            session_id_params.push(&session_id_order_query);
-
-            let mut session_id_stmt = conn
-                .prepare(&session_id_sql)
-                .map_err(|e| format!("Failed to prepare session id query: {e}"))?;
-            let session_id_rows = session_id_stmt
-                .query_map(session_id_params.as_slice(), |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, Option<String>>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, String>(4)?,
-                        row.get::<_, String>(5)?,
-                        row.get::<_, String>(6)?,
-                    ))
-                })
-                .map_err(|e| format!("Failed to query sessions by id: {e}"))?
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| format!("Failed to collect session id results: {e}"))?;
-
-            let session_id_matches: Vec<FullTextSearchHit> = session_id_rows
-                .into_iter()
-                .filter_map(
-                    |(
-                        session_id,
-                        session_path,
-                        session_name,
-                        first_message,
-                        last_message,
-                        last_message_role,
-                        modified_str,
-                    )| {
-                        let timestamp = match chrono::DateTime::parse_from_rfc3339(&modified_str) {
-                            Ok(dt) => dt.with_timezone(&chrono::Utc),
-                            Err(e) => {
-                                eprintln!(
-                                    "[FTS] Invalid modified timestamp '{modified_str}' for session {session_id}: {e}"
-                                );
-                                return None;
-                            }
-                        };
-
-                        let match_kind = search::session_id_match_kind(&session_id, trimmed)?;
-                        let preview = if !last_message.trim().is_empty() {
-                            last_message.clone()
-                        } else if !first_message.trim().is_empty() {
-                            first_message.clone()
-                        } else {
-                            session_name
-                                .clone()
-                                .unwrap_or_else(|| session_path.clone())
-                        };
-                        let role = match last_message_role.as_str() {
-                            "user" | "assistant" => last_message_role,
-                            _ => "assistant".to_string(),
-                        };
-
-                        if let Some(expected_role) = role_opt {
-                            if role != expected_role {
-                                return None;
-                            }
-                        }
-
-                        Some(FullTextSearchHit {
-                            session_id,
-                            session_path,
-                            session_name,
-                            entry_id: String::new(),
-                            role: role.clone(),
-                            source_type: role,
-                            content: preview,
-                            timestamp,
-                            score: match match_kind {
-                                search::SessionIdMatchKind::Exact => 1_000_000.0,
-                                search::SessionIdMatchKind::Prefix => 999_000.0,
-                            },
-                            match_reason: Some(match match_kind {
-                                search::SessionIdMatchKind::Exact => {
-                                    "session_id_exact".to_string()
-                                }
-                                search::SessionIdMatchKind::Prefix => {
-                                    "session_id_prefix".to_string()
-                                }
-                            }),
-                        })
-                    },
-                )
-                .filter(|hit| session_allowed_in_search(&hit.session_path, &config))
-                .collect();
-
-            let session_id_count = session_id_matches.len();
-            let global_offset = page * page_size;
-            let global_limit = global_offset.saturating_add(page_size);
-            let session_id_page_start = global_offset.min(session_id_count);
-            let session_id_page_end = global_limit.min(session_id_count);
-            let mut all_hits = session_id_matches[session_id_page_start..session_id_page_end].to_vec();
-
-            // Build the base WHERE clause for message search and role filter.
-            let role_condition = match role_opt {
-                Some("user") => "m.role = 'user'",
-                Some("assistant") => "m.role = 'assistant'",
-                _ => "1=1",
-            };
-            let mut where_clause = if use_content_like {
-                format!("WHERE lower(m.content) LIKE ? AND {role_condition}")
-            } else {
-                format!("WHERE message_fts MATCH ? AND {role_condition}")
-            };
-            let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
-            let like_content_pattern = format!("%{content_like_query}%");
-            if use_content_like {
-                params.push(&like_content_pattern);
-            } else {
-                params.push(&fts_query);
-            }
-
-            if let Some(pattern) = like_pattern.as_ref() {
-                where_clause = format!("{where_clause} AND m.session_path LIKE ? ESCAPE '\\'");
-                params.push(pattern);
-            }
-
-            if let Some(project_path) = project_path_owned.as_ref() {
-                where_clause = format!(
-                    "{where_clause} AND EXISTS (SELECT 1 FROM sessions s WHERE s.path = m.session_path AND s.cwd = ?)"
-                );
-                params.push(project_path);
-            }
-
-            let message_offset = global_offset.saturating_sub(session_id_count);
-            let message_limit = page_size.saturating_sub(all_hits.len());
-
-            let mut message_total_hits = 0usize;
-
-            if message_limit > 0 {
-                let rank_expr = if use_content_like { "-1.0" } else { "message_fts.rank" };
-
-                // Sort expressions.
-                // filtered CTE has no table aliases — use bare column names.
-                // final ORDER BY sees f (filtered) and m (message_entries) — needs f. prefix.
-                let bare_order = match sort_order.as_str() {
-                    "newest" => "timestamp DESC",
-                    "oldest" => "timestamp ASC",
-                    _ => "rank",
-                };
-                let final_order = match sort_order.as_str() {
-                    "newest" => "f.timestamp DESC",
-                    "oldest" => "f.timestamp ASC",
-                    _ => "f.rank",
-                };
-
-                let data_sql = format!(
-                    "WITH ranked AS (
-                        SELECT
-                            m.entry_id,
-                            m.session_path,
-                            m.role,
-                            m.source_type,
-                            m.timestamp,
-                            {rank_expr} as rank,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY m.session_path, m.entry_id
-                                ORDER BY CASE m.source_type WHEN 'user' THEN 0 WHEN 'assistant' THEN 1 ELSE 2 END, m.timestamp DESC
-                            ) as rn_in_entry
-                        FROM message_entries m
-                        JOIN message_fts ON m.rowid = message_fts.rowid
-                        {where_clause}
-                    ),
-                    deduped AS (
-                        SELECT
-                            entry_id, session_path, role, source_type, timestamp, rank,
-                            ROW_NUMBER() OVER (PARTITION BY session_path ORDER BY timestamp DESC, entry_id DESC) as rn_in_session
-                        FROM ranked
-                        WHERE rn_in_entry = 1
-                    ),
-                    filtered AS (
-                        SELECT
-                            entry_id,
-                            session_path,
-                            role,
-                            source_type,
-                            timestamp,
-                            rank,
-                            ROW_NUMBER() OVER (ORDER BY ORDER_BY_EXPR) as global_rn
-                        FROM deduped
-                        WHERE rn_in_session <= 3
+    let hits = allowed_rows
+        .into_iter()
+        .skip(offset)
+        .take(page_size)
+        .map(
+            |(
+                session_id,
+                session_path,
+                session_name,
+                entry_id,
+                role,
+                source_type,
+                content,
+                timestamp_str,
+            )| {
+                let timestamp = try_parse_timestamp(&timestamp_str).ok_or_else(|| {
+                    format!(
+                        "Invalid label browse timestamp for session {} entry {}: {}",
+                        session_path, entry_id, timestamp_str
                     )
-                    SELECT
-                        f.entry_id,
-                        f.session_path,
-                        s.id,
-                        s.name,
-                        f.role,
-                        f.source_type,
-                        m.content,
-                        f.timestamp,
-                        f.rank
-                    FROM filtered f
-                    JOIN message_entries m ON f.entry_id = m.entry_id AND f.session_path = m.session_path AND f.source_type = m.source_type
-                    JOIN sessions s ON s.path = f.session_path
-                    ORDER BY FINAL_ORDER_EXPR"
-                );
+                })?;
+                Ok(FullTextSearchHit {
+                    session_id,
+                    session_path,
+                    session_name,
+                    entry_id,
+                    role,
+                    source_type,
+                    content,
+                    timestamp,
+                    score: LABEL_MATCH_BASE_SCORE,
+                    match_reason: Some("label".to_string()),
+                })
+            },
+        )
+        .collect::<Result<Vec<_>, String>>()?;
 
-                // Insert sort order (safe, only valid sort expressions)
-                let data_sql = data_sql
-                    .replace("ORDER_BY_EXPR", bare_order)
-                    .replace("FINAL_ORDER_EXPR", final_order);
+    Ok(FullTextSearchResponse {
+        hits,
+        total_hits,
+        has_more: offset + page_size < total_hits,
+    })
+}
 
-                let data_params: Vec<&dyn rusqlite::ToSql> = params.clone();
+fn search_session_id_matches(
+    conn: &rusqlite::Connection,
+    trimmed: &str,
+    role_opt: Option<&str>,
+    like_pattern: Option<&String>,
+    project_path: Option<&String>,
+    config: &crate::config::Config,
+) -> Result<Vec<FullTextSearchHit>, String> {
+    let exact_session_id_query = search::normalize_session_id_query(trimmed);
+    let session_id_exact_only = search::session_id_query_is_exact(trimmed);
+    let session_id_supports_prefix = !session_id_exact_only && exact_session_id_query.len() >= 3;
 
-                let mut stmt = conn
-                    .prepare(&data_sql)
-                    .map_err(|e| format!("Failed to prepare data query: {e}"))?;
+    let mut session_id_where_clause = if session_id_supports_prefix {
+        "WHERE (lower(s.id) = ? OR substr(lower(s.id), 1, length(?)) = ?)".to_string()
+    } else {
+        "WHERE lower(s.id) = ?".to_string()
+    };
+    let mut session_id_params: Vec<&dyn ToSql> = if session_id_supports_prefix {
+        vec![
+            &exact_session_id_query,
+            &exact_session_id_query,
+            &exact_session_id_query,
+        ]
+    } else {
+        vec![&exact_session_id_query]
+    };
 
-                let rows = stmt
-                    .query_map(data_params.as_slice(), |row| {
-                        Ok((
-                            row.get::<_, String>(0)?,
-                            row.get::<_, String>(1)?,
-                            row.get::<_, String>(2)?,
-                            row.get::<_, Option<String>>(3)?,
-                            row.get::<_, String>(4)?,
-                            row.get::<_, String>(5)?,
-                            row.get::<_, String>(6)?,
-                            row.get::<_, String>(7)?,
-                            row.get::<_, f32>(8)?,
-                        ))
-                    })
-                    .map_err(|e| format!("Failed to query message FTS: {e}"))?
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|e| format!("Failed to collect message FTS results: {e}"))?;
+    if let Some(pattern) = like_pattern {
+        session_id_where_clause =
+            format!("{session_id_where_clause} AND s.path LIKE ? ESCAPE '\\'");
+        session_id_params.push(pattern);
+    }
 
-                let mut filtered_message_hits = Vec::new();
+    if let Some(project_path) = project_path {
+        session_id_where_clause = format!("{session_id_where_clause} AND s.cwd = ?");
+        session_id_params.push(project_path);
+    }
 
-                for (
+    let session_id_order_query = exact_session_id_query.clone();
+    let session_id_sql = format!(
+        "SELECT
+            s.id,
+            s.path,
+            s.name,
+            s.first_message,
+            s.last_message,
+            s.last_message_role,
+            s.modified
+         FROM sessions s
+         {session_id_where_clause}
+         ORDER BY CASE WHEN lower(s.id) = ? THEN 0 ELSE 1 END, s.modified DESC, s.path ASC"
+    );
+    session_id_params.push(&session_id_order_query);
+
+    let mut stmt = conn
+        .prepare(&session_id_sql)
+        .map_err(|e| format!("Failed to prepare session id query: {e}"))?;
+    let rows = stmt
+        .query_map(session_id_params.as_slice(), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+            ))
+        })
+        .map_err(|e| format!("Failed to query sessions by id: {e}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect session id results: {e}"))?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(
+            |(
+                session_id,
+                session_path,
+                session_name,
+                first_message,
+                last_message,
+                last_message_role,
+                modified_str,
+            )| {
+                if !session_allowed_in_search(&session_path, config) {
+                    return None;
+                }
+
+                let timestamp = match try_parse_timestamp(&modified_str) {
+                    Some(timestamp) => timestamp,
+                    None => return None,
+                };
+
+                let match_kind = search::session_id_match_kind(&session_id, trimmed)?;
+                let preview = if !last_message.trim().is_empty() {
+                    last_message.clone()
+                } else if !first_message.trim().is_empty() {
+                    first_message.clone()
+                } else {
+                    session_name.clone().unwrap_or_else(|| session_path.clone())
+                };
+                let role = match last_message_role.as_str() {
+                    "user" | "assistant" => last_message_role,
+                    _ => "assistant".to_string(),
+                };
+
+                if let Some(expected_role) = role_opt {
+                    if role != expected_role {
+                        return None;
+                    }
+                }
+
+                Some(FullTextSearchHit {
+                    session_id,
+                    session_path,
+                    session_name,
+                    entry_id: String::new(),
+                    role: role.clone(),
+                    source_type: role,
+                    content: preview,
+                    timestamp,
+                    score: match match_kind {
+                        search::SessionIdMatchKind::Exact => SESSION_ID_EXACT_SCORE,
+                        search::SessionIdMatchKind::Prefix => SESSION_ID_PREFIX_SCORE,
+                    },
+                    match_reason: Some(match match_kind {
+                        search::SessionIdMatchKind::Exact => "session_id_exact".to_string(),
+                        search::SessionIdMatchKind::Prefix => "session_id_prefix".to_string(),
+                    }),
+                })
+            },
+        )
+        .collect())
+}
+
+struct MessageQueryResult {
+    hits: Vec<FullTextSearchHit>,
+    total_hits: usize,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn search_message_hits(
+    conn: &rusqlite::Connection,
+    trimmed: &str,
+    role_opt: Option<&str>,
+    like_pattern: Option<&String>,
+    project_path: Option<&String>,
+    message_offset: usize,
+    message_limit: usize,
+    match_mode: Option<&str>,
+    sort_mode: SortMode,
+    source_filter: SourceFilter,
+    config: &crate::config::Config,
+) -> Result<MessageQueryResult, String> {
+    let use_content_like = contains_cjk(trimmed);
+    let fts_query = build_fts_query(trimmed, match_mode);
+    let content_like_pattern = format!("%{}%", trimmed.to_lowercase());
+    let role_condition = match role_opt {
+        Some("user") => "m.role = 'user'",
+        Some("assistant") => "m.role = 'assistant'",
+        _ => "1=1",
+    };
+    let source_condition = source_filter.message_source_condition();
+    let from_clause = if use_content_like {
+        "FROM message_entries m"
+    } else {
+        "FROM message_entries m JOIN message_fts ON m.rowid = message_fts.rowid"
+    };
+    let text_condition = if use_content_like {
+        "lower(m.content) LIKE ?"
+    } else {
+        "message_fts MATCH ?"
+    };
+    let mut where_clause =
+        format!("WHERE {text_condition} AND {role_condition} AND {source_condition}");
+
+    let mut params: Vec<&dyn ToSql> = Vec::new();
+    if use_content_like {
+        params.push(&content_like_pattern);
+    } else {
+        params.push(&fts_query);
+    }
+
+    if let Some(pattern) = like_pattern {
+        where_clause = format!("{where_clause} AND m.session_path LIKE ? ESCAPE '\\'");
+        params.push(pattern);
+    }
+
+    if let Some(project_path) = project_path {
+        where_clause = format!(
+            "{where_clause} AND EXISTS (SELECT 1 FROM sessions s WHERE s.path = m.session_path AND s.cwd = ?)"
+        );
+        params.push(project_path);
+    }
+
+    let source_precedence =
+        "CASE m.source_type WHEN 'label' THEN 0 WHEN 'user' THEN 1 WHEN 'assistant' THEN 2 ELSE 3 END";
+    let text_score_expr = if use_content_like {
+        CONTENT_LIKE_SCORE.to_string()
+    } else {
+        "-message_fts.rank".to_string()
+    };
+    let score_expr = format!(
+        "CASE WHEN m.source_type = 'label' THEN {LABEL_MATCH_BASE_SCORE} + ({text_score_expr}) ELSE ({text_score_expr}) END"
+    );
+
+    let global_order = sort_mode.global_order_sql();
+    let data_sql = format!(
+        "WITH ranked AS (
+            SELECT
+                m.entry_id,
+                m.session_path,
+                m.role,
+                m.source_type,
+                m.content,
+                m.timestamp,
+                {score_expr} AS score,
+                ROW_NUMBER() OVER (
+                    PARTITION BY m.session_path, m.entry_id
+                    ORDER BY {source_precedence}, m.timestamp DESC
+                ) AS rn_in_entry
+            {from_clause}
+            {where_clause}
+        ),
+        deduped AS (
+            SELECT
+                entry_id,
+                session_path,
+                role,
+                source_type,
+                content,
+                timestamp,
+                score,
+                ROW_NUMBER() OVER (
+                    PARTITION BY session_path
+                    ORDER BY timestamp DESC, entry_id DESC
+                ) AS rn_in_session
+            FROM ranked
+            WHERE rn_in_entry = 1
+        ),
+        filtered AS (
+            SELECT
+                entry_id,
+                session_path,
+                role,
+                source_type,
+                content,
+                timestamp,
+                score,
+                ROW_NUMBER() OVER (ORDER BY {global_order}) AS global_rn
+            FROM deduped
+            WHERE rn_in_session <= {PER_SESSION_LIMIT}
+        )
+        SELECT
+            f.entry_id,
+            f.session_path,
+            s.id,
+            s.name,
+            f.role,
+            f.source_type,
+            f.content,
+            f.timestamp,
+            f.score
+        FROM filtered f
+        JOIN sessions s ON s.path = f.session_path
+        ORDER BY f.global_rn"
+    );
+
+    let mut stmt = conn
+        .prepare(&data_sql)
+        .map_err(|e| format!("Failed to prepare message search query: {e}"))?;
+    let rows = stmt
+        .query_map(params.as_slice(), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
+                row.get::<_, f32>(8)?,
+            ))
+        })
+        .map_err(|e| format!("Failed to execute message search query: {e}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect message search hits: {e}"))?;
+
+    // session_allowed_in_search() is not represented in SQL. We post-filter in Rust, then
+    // paginate the surviving rows; PER_SESSION_LIMIT still bounds row growth per session.
+    let allowed_rows = rows
+        .into_iter()
+        .filter(|(_, session_path, _, _, _, _, _, _, _)| {
+            session_allowed_in_search(session_path, config)
+        })
+        .collect::<Vec<_>>();
+
+    let total_hits = allowed_rows.len();
+    let hits = if message_limit == 0 || message_offset >= total_hits {
+        Vec::new()
+    } else {
+        allowed_rows
+            .into_iter()
+            .skip(message_offset)
+            .take(message_limit)
+            .map(
+                |(
                     entry_id,
                     session_path,
                     session_id,
@@ -562,67 +736,189 @@ pub async fn full_text_search(
                     source_type,
                     content,
                     timestamp_str,
-                    rank,
-                ) in rows
-                {
-                    let timestamp = match chrono::DateTime::parse_from_rfc3339(&timestamp_str) {
-                        Ok(dt) => dt.with_timezone(&chrono::Utc),
-                        Err(e) => {
-                            eprintln!(
-                                "[FTS] Invalid timestamp '{timestamp_str}' for entry {entry_id}: {e}"
-                            );
-                            continue;
-                        }
-                    };
-
-                    let hit = FullTextSearchHit {
-                        session_id,
-                        session_path,
-                        session_name,
+                    score,
+                )| {
+                    let timestamp = try_parse_timestamp(&timestamp_str).ok_or_else(|| {
+                        format!(
+                            "Invalid search hit timestamp for session {} entry {}: {}",
+                            session_path, entry_id, timestamp_str
+                        )
+                    })?;
+                    Ok(FullTextSearchHit {
                         entry_id,
+                        session_path,
+                        session_id,
+                        session_name,
                         role,
-                        source_type,
+                        source_type: source_type.clone(),
                         content,
                         timestamp,
-                        score: rank,
-                        match_reason: Some("content".to_string()),
-                    };
-                    if session_allowed_in_search(&hit.session_path, &config) {
-                        filtered_message_hits.push(hit);
-                    }
-                }
+                        score,
+                        match_reason: Some(if source_type == "label" {
+                            "label".to_string()
+                        } else {
+                            "content".to_string()
+                        }),
+                    })
+                },
+            )
+            .collect::<Result<Vec<_>, String>>()?
+    };
 
-                message_total_hits = filtered_message_hits.len();
-                let message_page_start = message_offset.min(message_total_hits);
-                let message_page_end =
-                    message_offset.saturating_add(message_limit).min(message_total_hits);
-                all_hits.extend(
-                    filtered_message_hits[message_page_start..message_page_end]
-                        .iter()
-                        .cloned(),
-                );
-            }
+    Ok(MessageQueryResult { hits, total_hits })
+}
 
-            let total_hits = session_id_count + message_total_hits;
-            let has_more = global_limit < total_hits;
+fn try_parse_timestamp(value: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+    chrono::DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|timestamp| timestamp.with_timezone(&chrono::Utc))
+}
 
-            // Record metrics
-            let latency = start.elapsed();
-            metrics::record_search_latency(latency);
-            metrics::inc_search_queries();
-            metrics::add_search_results(all_hits.len());
-
-            Ok(FullTextSearchResponse {
-                hits: all_hits,
-                total_hits,
-                has_more,
-            })
-        })
-    ).await;
-
-    match result {
-        Ok(Ok(inner)) => inner,
-        Ok(Err(e)) => Err(format!("Task panicked: {e}")),
-        Err(_) => Err("Search query timed out after 5 seconds".to_string()),
+fn escape_fts_term(term: &str) -> String {
+    let mut escaped = String::new();
+    for ch in term.chars() {
+        match ch {
+            '"' => escaped.push_str("\"\""),
+            '\\' => escaped.push_str("\\\\"),
+            _ => escaped.push(ch),
+        }
     }
+    escaped
+}
+
+fn parse_quoted_terms(query: &str) -> (Vec<String>, Vec<String>, bool) {
+    let normalized_query = query.replace(['“', '”'], "\"");
+    let quote_count = normalized_query.chars().filter(|ch| *ch == '"').count();
+    if quote_count == 0 || quote_count % 2 != 0 {
+        let words = normalized_query
+            .split_whitespace()
+            .map(|word| word.to_string())
+            .collect::<Vec<String>>();
+        return (vec![], words, false);
+    }
+
+    let mut phrases = Vec::new();
+    let mut remainder = String::new();
+    let mut current_phrase = String::new();
+    let mut in_phrase = false;
+
+    for ch in normalized_query.chars() {
+        if ch == '"' {
+            if in_phrase {
+                if !current_phrase.trim().is_empty() {
+                    phrases.push(current_phrase.clone());
+                }
+                current_phrase.clear();
+            }
+            in_phrase = !in_phrase;
+            continue;
+        }
+
+        if in_phrase {
+            current_phrase.push(ch);
+        } else {
+            remainder.push(ch);
+        }
+    }
+
+    let words = remainder
+        .split_whitespace()
+        .map(|word| word.to_string())
+        .collect::<Vec<String>>();
+
+    if phrases.is_empty() {
+        let fallback_words = normalized_query
+            .split_whitespace()
+            .map(|word| word.to_string())
+            .collect::<Vec<String>>();
+        return (vec![], fallback_words, false);
+    }
+
+    (phrases, words, true)
+}
+
+fn build_fts_query(trimmed_query: &str, mode: Option<&str>) -> String {
+    let mode = match mode {
+        Some("all") => "all",
+        Some("phrase") => "phrase",
+        _ => "any",
+    };
+    let (phrases, words, has_phrases) = parse_quoted_terms(trimmed_query);
+
+    if mode == "phrase" {
+        if has_phrases && words.is_empty() && phrases.len() == 1 {
+            let escaped = escape_fts_term(&phrases[0]);
+            return format!("\"{escaped}\"");
+        }
+
+        let escaped = escape_fts_term(trimmed_query);
+        return format!("\"{escaped}\"");
+    }
+
+    if !has_phrases {
+        let escaped_words: Vec<String> = words
+            .iter()
+            .map(|word| {
+                let escaped = escape_fts_term(word);
+                if word.chars().any(|ch| !ch.is_alphanumeric() && ch != '_') {
+                    format!("\"{escaped}\"")
+                } else {
+                    escaped
+                }
+            })
+            .collect();
+
+        if mode == "all" {
+            return escaped_words.join(" ");
+        }
+
+        return escaped_words.join(" OR ");
+    }
+
+    let mut terms: Vec<String> = words.iter().map(|word| escape_fts_term(word)).collect();
+    terms.extend(
+        phrases
+            .iter()
+            .map(|phrase| format!("\"{}\"", escape_fts_term(phrase))),
+    );
+
+    if terms.is_empty() {
+        let escaped = escape_fts_term(trimmed_query);
+        return format!("\"{escaped}\"");
+    }
+
+    if mode == "all" {
+        terms.join(" ")
+    } else {
+        terms.join(" OR ")
+    }
+}
+
+fn contains_cjk(value: &str) -> bool {
+    value.chars().any(|ch| {
+        matches!(
+            ch as u32,
+            0x4E00..=0x9FFF | 0x3400..=0x4DBF | 0xF900..=0xFAFF
+        )
+    })
+}
+
+fn glob_to_like(pattern_str: &str) -> String {
+    let mut like_pattern = String::new();
+    for ch in pattern_str.chars() {
+        match ch {
+            '*' => like_pattern.push('%'),
+            '?' => like_pattern.push('_'),
+            '%' | '_' => {
+                like_pattern.push('\\');
+                like_pattern.push(ch);
+            }
+            '\\' => {
+                like_pattern.push('\\');
+                like_pattern.push('\\');
+            }
+            _ => like_pattern.push(ch),
+        }
+    }
+    like_pattern
 }

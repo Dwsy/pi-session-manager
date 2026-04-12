@@ -1,3 +1,5 @@
+import type { FullTextSearchSourceFilter } from '@/types'
+
 import { escapeHtml } from './markdown'
 
 /**
@@ -16,7 +18,26 @@ export interface SearchMatchRange {
   text: string
 }
 
+export type SearchSourceFilter = FullTextSearchSourceFilter
+
+export interface ParsedLeadingSourceFilterToken {
+  sourceFilter: SearchSourceFilter | null
+  normalizedQuery: string
+  token: '#all' | '#labels' | '#content' | null
+}
+
 const SEARCH_HIGHLIGHT_MARKUP = '<mark class="search-highlight">'
+const SOURCE_FILTER_TOKEN_TO_VALUE = {
+  '#all': 'all',
+  '#labels': 'labels_only',
+  '#content': 'content_only',
+} as const
+
+const SOURCE_FILTER_VALUE_TO_TOKEN: Record<SearchSourceFilter, '#all' | '#labels' | '#content'> = {
+  all: '#all',
+  labels_only: '#labels',
+  content_only: '#content',
+}
 
 function escapeRegex(term: string): string {
   return term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -92,6 +113,55 @@ export function parseQuotedQuery(query: string): ParsedQuotedQuery {
     remainderTokens,
     hasPhrases: phrases.length > 0,
   }
+}
+
+export function parseLeadingSourceFilterToken(
+  query: string,
+): ParsedLeadingSourceFilterToken {
+  const match = query.match(/^(#\S+)(?:\s+(.*))?$/)
+  if (!match) {
+    return {
+      sourceFilter: null,
+      normalizedQuery: query,
+      token: null,
+    }
+  }
+
+  const token = match[1].toLowerCase() as keyof typeof SOURCE_FILTER_TOKEN_TO_VALUE
+  const sourceFilter = SOURCE_FILTER_TOKEN_TO_VALUE[token] ?? null
+  if (!sourceFilter) {
+    return {
+      sourceFilter: null,
+      normalizedQuery: query,
+      token: null,
+    }
+  }
+
+  return {
+    sourceFilter,
+    normalizedQuery: match[2] ?? '',
+    token: token as '#all' | '#labels' | '#content',
+  }
+}
+
+export function formatSourceFilterToken(sourceFilter: SearchSourceFilter): string {
+  return SOURCE_FILTER_VALUE_TO_TOKEN[sourceFilter]
+}
+
+export function applyLeadingSourceFilterToken(
+  query: string,
+  sourceFilter: SearchSourceFilter,
+): string {
+  const parsed = parseLeadingSourceFilterToken(query)
+  const normalizedQuery = parsed.sourceFilter ? parsed.normalizedQuery : query
+
+  if (sourceFilter === 'all') {
+    return normalizedQuery
+  }
+
+  const trimmed = normalizedQuery.trimStart()
+  const prefix = formatSourceFilterToken(sourceFilter)
+  return trimmed ? `${prefix} ${trimmed}` : `${prefix} `
 }
 
 /**

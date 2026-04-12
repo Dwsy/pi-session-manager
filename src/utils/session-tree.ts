@@ -1,276 +1,635 @@
-import type { SessionEntry } from "@/types"
+import type { SessionEntry } from "@/types";
 
 export interface TreeNodeData {
-  entry: SessionEntry
-  children: TreeNodeData[]
-  label?: string
+  entry: SessionEntry;
+  children: TreeNodeData[];
+  label?: string;
 }
 
 export interface FlatNode {
-  node: TreeNodeData
-  indent: number
-  showConnector: boolean
-  isLast: boolean
-  gutters: Array<{ position: number; show: boolean }>
-  isVirtualRootChild: boolean
-  multipleRoots: boolean
+  node: TreeNodeData;
+  indent: number;
+  showConnector: boolean;
+  isLast: boolean;
+  gutters: Array<{ position: number; show: boolean }>;
+  isVirtualRootChild: boolean;
+  multipleRoots: boolean;
 }
 
-export function isNoneParent(pid: unknown): boolean {
-  return pid == null || pid === "None" || pid === "null" || pid === "NONE"
+const TREE_SETTINGS_TYPES = new Set([
+  "session",
+  "session_info",
+  "label",
+  "model_change",
+  "thinking_level_change",
+]);
+
+export function isNoneParent(parentId: unknown): boolean {
+  return (
+    parentId == null ||
+    parentId === "None" ||
+    parentId === "null" ||
+    parentId === "NONE"
+  );
 }
 
-export function buildTree(entries: SessionEntry[]): TreeNodeData[] {
-  const byId = new Map<string, SessionEntry>()
-  const cm = new Map<string, TreeNodeData[]>()
-  const labelMap = new Map<string, string>()
-  for (const e of entries) { byId.set(e.id, e); cm.set(e.id, []); }
-  for (const e of entries) { if (e.type === "label" && e.targetId && e.label) labelMap.set(e.targetId, e.label); }
+export function buildTree(
+  entries: SessionEntry[],
+  resolvedLabelsByTargetId: Record<string, string> = {},
+): TreeNodeData[] {
+  const entriesById = new Map<string, SessionEntry>();
+  const childrenById = new Map<string, TreeNodeData[]>();
 
-  // Build parent-child links. If parent not in entries, treat entry as root.
-  for (const e of entries) {
-    const ep = isNoneParent(e.parentId) ? null : e.parentId
-    if (ep && byId.has(ep)) {
-      cm.get(ep)!.push({ entry: e, children: cm.get(e.id)!, label: labelMap.get(e.id) })
+  for (const entry of entries) {
+    entriesById.set(entry.id, entry);
+    childrenById.set(entry.id, []);
+  }
+
+  const createNode = (entry: SessionEntry): TreeNodeData => ({
+    entry,
+    children: childrenById.get(entry.id) ?? [],
+    label: resolvedLabelsByTargetId[entry.id],
+  });
+
+  for (const entry of entries) {
+    const parentId = isNoneParent(entry.parentId) ? null : entry.parentId;
+    if (parentId && entriesById.has(parentId)) {
+      childrenById.get(parentId)?.push(createNode(entry));
     }
-    // If parent is null or parent not in entries, entry becomes a root (handled below)
   }
 
-  const roots: TreeNodeData[] = []
-  for (const e of entries) {
-    const ep = isNoneParent(e.parentId) ? null : e.parentId
-    if (!ep || !byId.has(ep)) roots.push({ entry: e, children: cm.get(e.id)!, label: labelMap.get(e.id) })
-  }
+  const roots = entries
+    .filter((entry) => {
+      const parentId = isNoneParent(entry.parentId) ? null : entry.parentId;
+      return !parentId || !entriesById.has(parentId);
+    })
+    .map(createNode);
 
-  const sort = (n: TreeNodeData) => {
-    n.children.sort((a, b) => new Date(a.entry.timestamp || 0).getTime() - new Date(b.entry.timestamp || 0).getTime())
-    n.children.forEach(sort)
-  }
-  roots.forEach(sort)
-  return roots
+  const sortChildren = (node: TreeNodeData) => {
+    node.children.sort(
+      (left, right) =>
+        new Date(left.entry.timestamp || 0).getTime() -
+        new Date(right.entry.timestamp || 0).getTime(),
+    );
+    node.children.forEach(sortChildren);
+  };
+
+  roots.forEach(sortChildren);
+  return roots;
 }
 
-export function flattenTree(roots: TreeNodeData[], _activePathIds: Set<string>): FlatNode[] {
-  const result: FlatNode[] = []
-  const multipleRoots = roots.length > 1
+export function flattenTree(
+  roots: TreeNodeData[],
+  _activePathIds: Set<string>,
+): FlatNode[] {
+  const result: FlatNode[] = [];
+  const multipleRoots = roots.length > 1;
 
-  type StackItem = [TreeNodeData, number, boolean, boolean, boolean, Array<{ position: number; show: boolean }>, boolean]
-  const stack: StackItem[] = []
-  for (let i = roots.length - 1; i >= 0; i--) {
-    stack.push([roots[i], multipleRoots ? 1 : 0, multipleRoots, multipleRoots, i === roots.length - 1, [], multipleRoots])
+  type StackItem = [
+    TreeNodeData,
+    number,
+    boolean,
+    boolean,
+    boolean,
+    Array<{ position: number; show: boolean }>,
+    boolean,
+  ];
+
+  const stack: StackItem[] = [];
+  for (let index = roots.length - 1; index >= 0; index -= 1) {
+    stack.push([
+      roots[index],
+      multipleRoots ? 1 : 0,
+      multipleRoots,
+      multipleRoots,
+      index === roots.length - 1,
+      [],
+      multipleRoots,
+    ]);
   }
 
   while (stack.length > 0) {
-    const [node, indent, justBranched, showConnector, isLast, gutters, isVirtualRootChild] = stack.pop()!
-    result.push({ node, indent, showConnector, isLast, gutters, isVirtualRootChild, multipleRoots })
+    const [
+      node,
+      indent,
+      justBranched,
+      showConnector,
+      isLast,
+      gutters,
+      isVirtualRootChild,
+    ] = stack.pop()!;
 
-    const children = node.children
-    const multipleChildren = children.length > 1
-    const childIndent = multipleChildren ? indent + 1 : (justBranched && indent > 0 ? indent + 1 : indent)
-    const conn = showConnector && !isVirtualRootChild
-    const disp = multipleRoots ? Math.max(0, indent - 1) : indent
-    const pos = Math.max(0, disp - 1)
-    const childGutters = conn ? [...gutters, { position: pos, show: !isLast }] : gutters
+    result.push({
+      node,
+      indent,
+      showConnector,
+      isLast,
+      gutters,
+      isVirtualRootChild,
+      multipleRoots,
+    });
 
-    for (let i = children.length - 1; i >= 0; i--) {
-      stack.push([children[i], childIndent, multipleChildren, multipleChildren, i === children.length - 1, childGutters, false])
+    const children = node.children;
+    const multipleChildren = children.length > 1;
+    const childIndent = multipleChildren
+      ? indent + 1
+      : justBranched && indent > 0
+        ? indent + 1
+        : indent;
+    const connectorDisplayed = showConnector && !isVirtualRootChild;
+    const displayIndent = multipleRoots ? Math.max(0, indent - 1) : indent;
+    const connectorPosition = Math.max(0, displayIndent - 1);
+    const childGutters = connectorDisplayed
+      ? [...gutters, { position: connectorPosition, show: !isLast }]
+      : gutters;
+
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      stack.push([
+        children[index],
+        childIndent,
+        multipleChildren,
+        multipleChildren,
+        index === children.length - 1,
+        childGutters,
+        false,
+      ]);
     }
   }
-  return result
+
+  return result;
 }
 
-export function buildActivePathIds(activeLeafId: string | null | undefined, entries: SessionEntry[]): Set<string> {
-  if (!activeLeafId) return new Set()
-  const byId = new Map<string, SessionEntry>()
-  for (const e of entries) byId.set(e.id, e)
-
-  const ids = new Set<string>()
-  let cur: string | undefined = activeLeafId
-  while (cur) {
-    ids.add(cur)
-    const e = byId.get(cur)
-    if (!e) break
-    const pid = e.parentId
-    if (isNoneParent(pid) || pid === e.id) break
-    const parent = byId.get(pid as string)
-    if (parent) { cur = parent.id }
-    else { const idx = entries.findIndex(x => x.id === cur); if (idx > 0) cur = entries[idx - 1]?.id; else break; }
+export function buildActivePathIds(
+  activeLeafId: string | null | undefined,
+  entries: SessionEntry[],
+): Set<string> {
+  if (!activeLeafId) {
+    return new Set();
   }
-  return ids
+
+  const entriesById = new Map<string, SessionEntry>();
+  for (const entry of entries) {
+    entriesById.set(entry.id, entry);
+  }
+
+  const ids = new Set<string>();
+  let currentId: string | undefined = activeLeafId;
+
+  while (currentId) {
+    ids.add(currentId);
+    const entry = entriesById.get(currentId);
+    if (!entry) {
+      break;
+    }
+
+    const parentId = entry.parentId;
+    if (isNoneParent(parentId) || parentId === entry.id) {
+      break;
+    }
+
+    const parentEntry = entriesById.get(parentId as string);
+    if (parentEntry) {
+      currentId = parentEntry.id;
+      continue;
+    }
+
+    const entryIndex = entries.findIndex((candidate) => candidate.id === currentId);
+    if (entryIndex > 0) {
+      currentId = entries[entryIndex - 1]?.id;
+      continue;
+    }
+
+    break;
+  }
+
+  return ids;
 }
 
 export function findNewestLeaf(treeData: TreeNodeData[]): Map<string, string> {
-  const map = new Map<string, string>()
-  const walk = (n: TreeNodeData): string => {
-    let leaf = n.entry.id
-    for (const c of n.children) walk(c)
-    if (n.children.length > 0) {
-      const lc = n.children[n.children.length - 1]
-      leaf = map.get(lc.entry.id) || lc.entry.id
+  const newestLeafById = new Map<string, string>();
+
+  const visit = (node: TreeNodeData): string => {
+    let newestLeafId = node.entry.id;
+    for (const child of node.children) {
+      visit(child);
     }
-    map.set(n.entry.id, leaf)
-    return leaf
+
+    if (node.children.length > 0) {
+      const lastChild = node.children[node.children.length - 1];
+      newestLeafId = newestLeafById.get(lastChild.entry.id) || lastChild.entry.id;
+    }
+
+    newestLeafById.set(node.entry.id, newestLeafId);
+    return newestLeafId;
+  };
+
+  treeData.forEach(visit);
+  return newestLeafById;
+}
+
+export function getSearchableText(
+  entry: SessionEntry,
+  extractContent: (content: unknown) => string,
+  label?: string,
+): string {
+  const parts: string[] = [];
+
+  if (label) {
+    parts.push(label);
   }
-  treeData.forEach(walk)
-  return map
+
+  switch (entry.type) {
+    case "message": {
+      const message = entry.message;
+      if (message) {
+        parts.push(message.role);
+        if (message.content) {
+          parts.push(extractContent(message.content));
+        }
+      }
+      break;
+    }
+    case "custom_message":
+      parts.push(entry.customType || "");
+      parts.push(
+        typeof entry.content === "string"
+          ? entry.content
+          : extractContent(entry.content),
+      );
+      break;
+    case "compaction":
+      parts.push("compaction");
+      break;
+    case "branch_summary":
+      parts.push("branch summary", entry.summary || "");
+      break;
+    case "label":
+      parts.push("label", entry.label || "");
+      break;
+    case "session_info":
+      parts.push("session", entry.name || "");
+      break;
+    case "model_change":
+      parts.push("model", entry.modelId || "");
+      break;
+    case "thinking_level_change":
+      parts.push("thinking", entry.thinkingLevel || "");
+      break;
+    default:
+      break;
+  }
+
+  return parts.join(" ");
+}
+
+function isSettingsEntry(entry: SessionEntry): boolean {
+  if (TREE_SETTINGS_TYPES.has(entry.type)) {
+    return true;
+  }
+
+  if (entry.type === "message" && entry.message?.role === "assistant") {
+    const content = Array.isArray(entry.message.content)
+      ? entry.message.content
+      : [];
+    return content.some(
+      (block: any) => block.type === "text" && block.text?.trim() === "",
+    );
+  }
+
+  return false;
 }
 
 export function filterFlatNodes(
   flatNodes: FlatNode[],
   searchTerms: string[],
   currentFilter: string,
-  extractContent: (c: unknown) => string,
+  extractContent: (content: unknown) => string,
 ): FlatNode[] {
-  const isSettings = (e: SessionEntry) =>
-    ["session", "session_info", "label", "model_change", "thinking_level_change"].includes(e.type)
+  const baseFiltered = flatNodes.filter((flatNode) => {
+    const entry = flatNode.node.entry;
+    const label = flatNode.node.label;
 
-  const baseFiltered = flatNodes.filter(fn => {
-    const entry = fn.node.entry
     if (searchTerms.length > 0) {
-      const parts: string[] = []
-      if (entry.type === "message" && entry.message) {
-        parts.push(entry.message.role)
-        if (entry.message.content) parts.push(extractContent(entry.message.content))
+      const searchableText = getSearchableText(entry, extractContent, label)
+        .toLowerCase();
+      if (!searchTerms.every((term) => searchableText.includes(term.toLowerCase()))) {
+        return false;
       }
-      if (entry.type === "compaction") parts.push("compaction")
-      if (entry.type === "branch_summary") parts.push(entry.summary || "")
-      if (entry.type === "model_change") parts.push(entry.modelId || "")
-      if (!searchTerms.every(t => parts.join(" ").toLowerCase().includes(t))) return false
     }
+
     switch (currentFilter) {
-      case "user-only": return entry.type === "message" && entry.message?.role === "user"
-      case "no-tools": if (entry.type === "message" && entry.message?.role === "toolResult") return false; return !isSettings(entry)
-      case "default": return !isSettings(entry)
-      case "labeled-only": return !!fn.node.label
-      case "all": return true
+      case "user-only":
+        return entry.type === "message" && entry.message?.role === "user";
+      case "no-tools":
+        if (entry.type === "message" && entry.message?.role === "toolResult") {
+          return false;
+        }
+        return !isSettingsEntry(entry);
+      case "default":
+        return !isSettingsEntry(entry);
+      case "labeled-only":
+        return !!label;
+      case "all":
+        return true;
       default:
         if (currentFilter.startsWith("tool-")) {
-          const tn = currentFilter.slice(5)
+          const toolName = currentFilter.slice(5);
           if (entry.type === "message" && entry.message?.role === "assistant") {
-            const c = Array.isArray(entry.message.content) ? entry.message.content : []
-            return c.some((x: any) => x.type === "toolCall" && x.name === tn)
+            const content = Array.isArray(entry.message.content)
+              ? entry.message.content
+              : [];
+            return content.some(
+              (block: any) => block.type === "toolCall" && block.name === toolName,
+            );
           }
-          return false
+          return false;
         }
-        return true
+        return true;
     }
-  })
+  });
 
   if (searchTerms.length > 0 || currentFilter !== "no-tools") {
-    return recalculateVisualStructure(baseFiltered, flatNodes)
+    return recalculateVisualStructure(baseFiltered, flatNodes);
   }
-  return baseFiltered
+
+  return baseFiltered;
 }
 
-export function recalculateVisualStructure(filteredNodes: FlatNode[], allFlatNodes: FlatNode[]): FlatNode[] {
-  if (filteredNodes.length === 0) return filteredNodes
-  const visibleIds = new Set(filteredNodes.map(n => n.node.entry.id))
-  const entryMap = new Map<string, FlatNode>()
-  for (const fn of allFlatNodes) entryMap.set(fn.node.entry.id, fn)
-
-  const findVisibleAncestor = (nid: string): string | null => {
-    let cid: string | undefined = entryMap.get(nid)?.node.entry.parentId
-    while (cid != null) {
-      if (visibleIds.has(cid)) return cid
-      cid = entryMap.get(cid)?.node.entry.parentId
-    }
-    return null
+export function recalculateVisualStructure(
+  filteredNodes: FlatNode[],
+  allFlatNodes: FlatNode[],
+): FlatNode[] {
+  if (filteredNodes.length === 0) {
+    return filteredNodes;
   }
 
-  const visibleChildren = new Map<string | null, string[]>()
-  visibleChildren.set(null, [])
-  for (const fn of filteredNodes) {
-    const nid = fn.node.entry.id
-    const aid = findVisibleAncestor(nid)
-    if (!visibleChildren.has(aid ?? null)) visibleChildren.set(aid ?? null, [])
-    visibleChildren.get(aid ?? null)!.push(nid)
+  const visibleIds = new Set(filteredNodes.map((node) => node.node.entry.id));
+  const flatNodeById = new Map<string, FlatNode>();
+  for (const flatNode of allFlatNodes) {
+    flatNodeById.set(flatNode.node.entry.id, flatNode);
   }
 
-  const visibleRootIds = visibleChildren.get(null) ?? []
-  const mr = visibleRootIds.length > 1
-  const fMap = new Map<string, FlatNode>()
-  for (const fn of filteredNodes) fMap.set(fn.node.entry.id, fn)
-
-  type StackItem = [string, number, boolean, boolean, boolean, Array<{ position: number; show: boolean }>, boolean]
-  const stack: StackItem[] = []
-  for (let i = visibleRootIds.length - 1; i >= 0; i--) {
-    stack.push([visibleRootIds[i], mr ? 1 : 0, mr, mr, i === visibleRootIds.length - 1, [], mr])
-  }
-  while (stack.length > 0) {
-    const [nid, indent, justBranched, showConnector, isLast, gutters, isVirtualRootChild] = stack.pop()!
-    const fn = fMap.get(nid); if (!fn) continue
-    fn.indent = indent; fn.showConnector = showConnector; fn.isLast = isLast
-    fn.gutters = gutters; fn.isVirtualRootChild = isVirtualRootChild; fn.multipleRoots = mr
-
-    const children = visibleChildren.get(nid) ?? []
-    const mc = children.length > 1
-    const ci = mc ? indent + 1 : (justBranched && indent > 0 ? indent + 1 : indent)
-    const conn = showConnector && !isVirtualRootChild
-    const disp = mr ? Math.max(0, indent - 1) : indent
-    const pos = Math.max(0, disp - 1)
-    const cg = conn ? [...gutters, { position: pos, show: !isLast }] : gutters
-    for (let i = children.length - 1; i >= 0; i--) {
-      stack.push([children[i], ci, mc, mc, i === children.length - 1, cg, false])
-    }
-  }
-  return filteredNodes
-}
-
-export function buildTreePrefix(fn: FlatNode): string {
-  const { indent, showConnector, isLast, gutters, isVirtualRootChild, multipleRoots } = fn
-  const disp = multipleRoots ? Math.max(0, indent - 1) : indent
-  const conn = showConnector && !isVirtualRootChild ? (isLast ? "└─ " : "├─ ") : ""
-  const cp = conn ? disp - 1 : -1
-  const chars: string[] = []
-  for (let i = 0; i < disp * 3; i++) {
-    const lv = Math.floor(i / 3), pi2 = i % 3
-    const g = gutters.find(x => x.position === lv)
-    if (g) chars.push(pi2 === 0 ? (g.show ? "│" : " ") : " ")
-    else if (conn && lv === cp) chars.push(pi2 === 0 ? (isLast ? "└" : "├") : pi2 === 1 ? "─" : " ")
-    else chars.push(" ")
-  }
-  return chars.join("")
-}
-
-export function getEntryDisplayText(e: SessionEntry, label?: string): string {
-  if (label) return label
-  const trunc = (s: string, m = 100) => s.length <= m ? s : s.slice(0, m) + "..."
-  const extractContent = (c: unknown): string => {
-    if (typeof c === "string") return c
-    if (Array.isArray(c)) return c.filter((x: any) => x.type === "text" && x.text).map((x: any) => x.text).join("")
-    return ""
-  }
-  if (e.type === "message" && e.message) {
-    if (e.message.role === "user") { const t = extractContent(e.message.content); return trunc(t) || "User" }
-    if (e.message.role === "assistant") {
-      const c = Array.isArray(e.message.content) ? e.message.content : []
-      const tc = c.find((x: any) => x.type === "toolCall") as { name?: string; arguments?: unknown } | undefined
-      if (tc?.name) {
-        const a = tc.arguments as Record<string, unknown> | undefined
-        const p = a?.path || a?.file_path || ""
-        const cmd = a?.command || ""
-        return `${tc.name}: ${trunc(String(p || cmd), 50)}`
+  const findVisibleAncestor = (nodeId: string): string | null => {
+    let currentId: string | undefined = flatNodeById.get(nodeId)?.node.entry.parentId;
+    while (currentId != null) {
+      if (visibleIds.has(currentId)) {
+        return currentId;
       }
-      return trunc(extractContent(e.message.content)) || "Assistant"
+      currentId = flatNodeById.get(currentId)?.node.entry.parentId;
     }
-    if (e.message.role === "toolResult") return "tool result"
+    return null;
+  };
+
+  const visibleChildren = new Map<string | null, string[]>();
+  visibleChildren.set(null, []);
+
+  for (const filteredNode of filteredNodes) {
+    const nodeId = filteredNode.node.entry.id;
+    const ancestorId = findVisibleAncestor(nodeId);
+    if (!visibleChildren.has(ancestorId ?? null)) {
+      visibleChildren.set(ancestorId ?? null, []);
+    }
+    visibleChildren.get(ancestorId ?? null)?.push(nodeId);
   }
-  if (e.type === "model_change") return `Model: ${e.modelId}`
-  if (e.type === "compaction") return "Compaction"
-  if (e.type === "custom_message") return e.customType || "Custom"
-  return e.type
+
+  const visibleRootIds = visibleChildren.get(null) ?? [];
+  const multipleRoots = visibleRootIds.length > 1;
+  const filteredNodeById = new Map<string, FlatNode>();
+  for (const filteredNode of filteredNodes) {
+    filteredNodeById.set(filteredNode.node.entry.id, filteredNode);
+  }
+
+  type StackItem = [
+    string,
+    number,
+    boolean,
+    boolean,
+    boolean,
+    Array<{ position: number; show: boolean }>,
+    boolean,
+  ];
+
+  const stack: StackItem[] = [];
+  for (let index = visibleRootIds.length - 1; index >= 0; index -= 1) {
+    stack.push([
+      visibleRootIds[index],
+      multipleRoots ? 1 : 0,
+      multipleRoots,
+      multipleRoots,
+      index === visibleRootIds.length - 1,
+      [],
+      multipleRoots,
+    ]);
+  }
+
+  while (stack.length > 0) {
+    const [
+      nodeId,
+      indent,
+      justBranched,
+      showConnector,
+      isLast,
+      gutters,
+      isVirtualRootChild,
+    ] = stack.pop()!;
+
+    const flatNode = filteredNodeById.get(nodeId);
+    if (!flatNode) {
+      continue;
+    }
+
+    flatNode.indent = indent;
+    flatNode.showConnector = showConnector;
+    flatNode.isLast = isLast;
+    flatNode.gutters = gutters;
+    flatNode.isVirtualRootChild = isVirtualRootChild;
+    flatNode.multipleRoots = multipleRoots;
+
+    const children = visibleChildren.get(nodeId) ?? [];
+    const multipleChildren = children.length > 1;
+    const childIndent = multipleChildren
+      ? indent + 1
+      : justBranched && indent > 0
+        ? indent + 1
+        : indent;
+    const connectorDisplayed = showConnector && !isVirtualRootChild;
+    const displayIndent = multipleRoots ? Math.max(0, indent - 1) : indent;
+    const connectorPosition = Math.max(0, displayIndent - 1);
+    const childGutters = connectorDisplayed
+      ? [...gutters, { position: connectorPosition, show: !isLast }]
+      : gutters;
+
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      stack.push([
+        children[index],
+        childIndent,
+        multipleChildren,
+        multipleChildren,
+        index === children.length - 1,
+        childGutters,
+        false,
+      ]);
+    }
+  }
+
+  return filteredNodes;
 }
 
-export function getEntryRoleClass(e: SessionEntry): string {
-  if (e.type === "message" && e.message?.role === "user") return "tree-role-user"
-  if (e.type === "message" && e.message?.role === "assistant") return "tree-role-assistant"
-  if (e.type === "message" && e.message?.role === "toolResult") return "tree-role-tool"
-  if (e.type === "compaction") return "tree-compaction"
-  return "tree-muted"
+export function buildTreePrefix(flatNode: FlatNode): string {
+  const {
+    indent,
+    showConnector,
+    isLast,
+    gutters,
+    isVirtualRootChild,
+    multipleRoots,
+  } = flatNode;
+
+  const displayIndent = multipleRoots ? Math.max(0, indent - 1) : indent;
+  const connector =
+    showConnector && !isVirtualRootChild ? (isLast ? "└─ " : "├─ ") : "";
+  const connectorPosition = connector ? displayIndent - 1 : -1;
+  const prefixChars: string[] = [];
+
+  for (let index = 0; index < displayIndent * 3; index += 1) {
+    const level = Math.floor(index / 3);
+    const positionInLevel = index % 3;
+    const gutter = gutters.find((candidate) => candidate.position === level);
+
+    if (gutter) {
+      prefixChars.push(
+        positionInLevel === 0 ? (gutter.show ? "│" : " ") : " ",
+      );
+      continue;
+    }
+
+    if (connector && level === connectorPosition) {
+      prefixChars.push(
+        positionInLevel === 0
+          ? isLast
+            ? "└"
+            : "├"
+          : positionInLevel === 1
+            ? "─"
+            : " ",
+      );
+      continue;
+    }
+
+    prefixChars.push(" ");
+  }
+
+  return prefixChars.join("");
 }
 
-export function getEntryToolName(e: SessionEntry): string | null {
-  if (e.type !== "message" || e.message?.role !== "assistant") return null
-  const c = Array.isArray(e.message.content) ? e.message.content : []
-  return (c.find((x: any) => x.type === "toolCall") as { name?: string } | undefined)?.name || null
+export function getEntryDisplayText(entry: SessionEntry, label?: string): string {
+  if (label) {
+    return label;
+  }
+
+  const truncate = (value: string, maxLength = 100) =>
+    value.length <= maxLength ? value : `${value.slice(0, maxLength)}...`;
+  const extractContent = (content: unknown): string => {
+    if (typeof content === "string") {
+      return content;
+    }
+    if (Array.isArray(content)) {
+      return content
+        .filter((block: any) => block.type === "text" && block.text)
+        .map((block: any) => block.text)
+        .join("");
+    }
+    return "";
+  };
+
+  if (entry.type === "label") {
+    return entry.label ? `Label: ${entry.label}` : "Label cleared";
+  }
+
+  if (entry.type === "message" && entry.message) {
+    if (entry.message.role === "user") {
+      const text = truncate(extractContent(entry.message.content));
+      return text || "User";
+    }
+
+    if (entry.message.role === "assistant") {
+      const content = Array.isArray(entry.message.content)
+        ? entry.message.content
+        : [];
+      const toolCall = content.find((block: any) => block.type === "toolCall") as
+        | { name?: string; arguments?: Record<string, unknown> }
+        | undefined;
+
+      if (toolCall?.name) {
+        const path = String(
+          toolCall.arguments?.path || toolCall.arguments?.file_path || "",
+        );
+        const command = String(toolCall.arguments?.command || "");
+        return `${toolCall.name}: ${truncate(path || command, 50)}`;
+      }
+
+      const text = truncate(extractContent(entry.message.content));
+      return text || "Assistant";
+    }
+
+    if (entry.message.role === "toolResult") {
+      return "Tool result";
+    }
+  }
+
+  switch (entry.type) {
+    case "model_change":
+      return entry.modelId ? `Model: ${entry.modelId}` : "Model";
+    case "thinking_level_change":
+      return `Thinking: ${entry.thinkingLevel || "default"}`;
+    case "session":
+      return "Session";
+    case "session_info":
+      return entry.name ? `Session: ${entry.name}` : "Session";
+    case "compaction":
+      return "Compaction";
+    case "branch_summary":
+      return "Branch Summary";
+    case "custom_message":
+      return entry.customType || "Custom";
+    default:
+      return entry.type;
+  }
+}
+
+export function getEntryRoleClass(entry: SessionEntry): string {
+  if (entry.type === "message" && entry.message?.role === "user") {
+    return "tree-role-user";
+  }
+  if (entry.type === "message" && entry.message?.role === "assistant") {
+    return "tree-role-assistant";
+  }
+  if (entry.type === "message" && entry.message?.role === "toolResult") {
+    return "tree-role-tool";
+  }
+  if (entry.type === "compaction") {
+    return "tree-compaction";
+  }
+  if (entry.type === "branch_summary") {
+    return "tree-branch-summary";
+  }
+  if (entry.type === "custom_message") {
+    return "tree-custom-message";
+  }
+  return "tree-muted";
+}
+
+export function getEntryToolName(entry: SessionEntry): string | null {
+  if (entry.type !== "message" || entry.message?.role !== "assistant") {
+    return null;
+  }
+
+  const content = Array.isArray(entry.message.content)
+    ? entry.message.content
+    : [];
+  const toolCall = content.find((block: any) => block.type === "toolCall") as
+    | { name?: string }
+    | undefined;
+
+  return toolCall?.name || null;
 }

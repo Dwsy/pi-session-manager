@@ -13,6 +13,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             4 => migration_4(conn)?,
             5 => migration_5(conn)?,
             6 => migration_6(conn)?,
+            7 => migration_7(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -122,7 +123,7 @@ fn migration_4(conn: &Connection) -> Result<(), String> {
             entry_id TEXT NOT NULL,
             session_path TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
-            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking')),
+            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking', 'label')),
             content TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
@@ -190,5 +191,43 @@ fn migration_6(conn: &Connection) -> Result<(), String> {
         .map_err(|e| format!("Migration 6 failed adding turns column: {e}"))?;
     }
 
+    Ok(())
+}
+
+/// Migration to version 7: allow label-derived rows in message_entries.source_type.
+fn migration_7(conn: &Connection) -> Result<(), String> {
+    conn.execute("DROP TABLE IF EXISTS message_fts", [])
+        .map_err(|e| format!("Migration 7 failed dropping message_fts: {e}"))?;
+    conn.execute("DROP TABLE IF EXISTS message_entries", [])
+        .map_err(|e| format!("Migration 7 failed dropping message_entries: {e}"))?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS message_entries (
+            id TEXT PRIMARY KEY,
+            entry_id TEXT NOT NULL,
+            session_path TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking', 'label')),
+            content TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
+        )",
+        [],
+    )
+    .map_err(|e| format!("Migration 7 failed creating message_entries: {e}"))?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)",
+        [],
+    )
+    .map_err(|e| format!("Migration 7 failed creating session index: {e}"))?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id)",
+        [],
+    )
+    .map_err(|e| format!("Migration 7 failed creating entry index: {e}"))?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_message_entries_session_time ON message_entries(session_path, timestamp)",
+        [],
+    )
+    .map_err(|e| format!("Migration 7 failed creating session/timestamp index: {e}"))?;
     Ok(())
 }

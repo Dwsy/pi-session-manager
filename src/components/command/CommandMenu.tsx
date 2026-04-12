@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import {
   Search,
   Loader2,
   FolderOpen,
   MessageSquare,
   FileText,
+  Tag,
   SlidersHorizontal,
   Globe,
   User,
@@ -22,7 +23,12 @@ import CommandHints from './CommandHints'
 import CommandError from './CommandError'
 import SessionPreviewPanel from './SessionPreviewPanel'
 import { getPathBasename } from '@/utils/path'
+import {
+  formatSourceFilterToken,
+  parseLeadingSourceFilterToken,
+} from '@/utils/search'
 import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
+import type { FullTextSearchSourceFilter } from '@/types'
 
 interface CommandMenuProps {
   query: string
@@ -50,6 +56,8 @@ const TABS: { id: TabType; key: string; pluginId?: string; Icon: typeof Search }
   { id: 'session', key: 'tabs.session', pluginId: 'session-search', Icon: FileText },
   { id: 'project', key: 'tabs.project', pluginId: 'project-search', Icon: FolderOpen },
 ]
+
+const SOURCE_FILTERS: FullTextSearchSourceFilter[] = ['all', 'labels_only', 'content_only']
 
 function formatResultTime(result: SearchPluginResult): string | null {
   const meta = result.metadata as any
@@ -119,6 +127,12 @@ function getRoleFilterLabel(value: 'all' | 'user' | 'assistant') {
   return 'AI'
 }
 
+function getSourceFilterLabel(t: any, value: FullTextSearchSourceFilter) {
+  if (value === 'labels_only') return t('search.fullText.source.labels', 'Labels')
+  if (value === 'content_only') return t('search.fullText.source.content', 'Content')
+  return t('search.fullText.source.all', 'All')
+}
+
 function getSortLabel(value: 'newest' | 'oldest' | 'score') {
   if (value === 'newest') return 'Newest'
   if (value === 'oldest') return 'Oldest'
@@ -163,11 +177,35 @@ export default function CommandMenu({
   const currentProjectName = context.selectedProject
     ? getPathBasename(context.selectedProject)
     : null
+  const parsedSourceToken = useMemo(() => parseLeadingSourceFilterToken(query), [query])
+  const supportsMessageFilters = activeTab === 'all' || activeTab === 'message'
+  const normalizedQuery = supportsMessageFilters && parsedSourceToken.sourceFilter
+    ? parsedSourceToken.normalizedQuery
+    : query
+  const effectiveSourceFilter = supportsMessageFilters
+    ? (parsedSourceToken.sourceFilter || ftsOptions.sourceFilter || 'all')
+    : 'all'
+  const isLabelsBrowseMode = supportsMessageFilters && effectiveSourceFilter === 'labels_only' && !normalizedQuery.trim()
+  const effectiveSortMode = isLabelsBrowseMode && ftsOptions.sortMode === 'score'
+    ? 'newest'
+    : (ftsOptions.sortMode || 'newest')
+  const sourceFilterSuggestions = useMemo(() => {
+    if (!supportsMessageFilters || !query.startsWith('#') || /\s/.test(query)) {
+      return []
+    }
+
+    const prefix = query.toLowerCase()
+    return SOURCE_FILTERS.filter(value => formatSourceFilterToken(value).startsWith(prefix) && formatSourceFilterToken(value) !== prefix)
+  }, [query, supportsMessageFilters])
 
   const scopedPluginIds = useMemo(() => {
+    if (activeTab === 'all' && effectiveSourceFilter !== 'all') {
+      return ['message-search']
+    }
+
     const currentTab = TABS.find(tab => tab.id === activeTab)
     return currentTab?.pluginId ? [currentTab.pluginId] : undefined
-  }, [activeTab])
+  }, [activeTab, effectiveSourceFilter])
 
   useEffect(() => {
     requestIdRef.current += 1
@@ -176,7 +214,7 @@ export default function CommandMenu({
     if (abortControllerRef.current) abortControllerRef.current.abort()
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
-    if (!query.trim()) {
+    if (!normalizedQuery.trim() && !isLabelsBrowseMode) {
       setResults([])
       setIsSearching(false)
       setSearchError(undefined)
@@ -203,8 +241,9 @@ export default function CommandMenu({
           ;(messagePlugin as any).setFTSOptions({
             ftsMode: true,
             roleFilter: ftsOptions.roleFilter,
+            sourceFilter: effectiveSourceFilter,
             globPattern: ftsOptions.globPattern,
-            sortMode: ftsOptions.sortMode,
+            sortMode: effectiveSortMode,
             page: ftsOptions.page || 0,
             pageSize: ftsOptions.pageSize || 20,
           })
@@ -212,10 +251,13 @@ export default function CommandMenu({
 
         const parts: string[] = [activeTab]
         if (ftsOptions.roleFilter !== 'all') parts.push(ftsOptions.roleFilter!)
-        if (ftsOptions.sortMode !== 'newest') parts.push(ftsOptions.sortMode!)
+        if (effectiveSourceFilter !== 'all') parts.push(effectiveSourceFilter)
+        if (effectiveSortMode !== 'newest') parts.push(effectiveSortMode)
         if (ftsOptions.page) parts.push(String(ftsOptions.page))
 
-        const searchPromise = search(query, { pluginIds: scopedPluginIds, cacheKeyParts: parts })
+        const searchPromise = isLabelsBrowseMode && messagePlugin
+          ? messagePlugin.search('', context)
+          : search(normalizedQuery, { pluginIds: scopedPluginIds, cacheKeyParts: parts })
         const pageResults = await Promise.race([searchPromise, timeoutPromise])
         if (controller.signal.aborted || currentRequestId !== requestIdRef.current) return
 
@@ -241,7 +283,10 @@ export default function CommandMenu({
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
   }, [
-    query,
+    normalizedQuery,
+    isLabelsBrowseMode,
+    effectiveSourceFilter,
+    effectiveSortMode,
     search,
     setIsSearching,
     setResults,
@@ -252,7 +297,6 @@ export default function CommandMenu({
     scopedPluginIds,
     registry,
     ftsOptions.roleFilter,
-    ftsOptions.sortMode,
     ftsOptions.page,
     ftsOptions.globPattern,
   ])
@@ -297,21 +341,78 @@ export default function CommandMenu({
     onClose()
   }, [selectedResult, selectedPlugin, context, onClose])
 
-  const showAdvancedMessageFilters = showFilters && (activeTab === 'all' || activeTab === 'message')
+  const showAdvancedMessageFilters = showFilters && supportsMessageFilters
+  const inputPlaceholder = effectiveSourceFilter === 'labels_only'
+    ? t('search.fullText.labelsPlaceholder', 'Browse all labels...')
+    : t('command.placeholder', 'Search sessions, projects, messages...')
+
+  const handleQueryChange = useCallback((value: string) => {
+    setQuery(value)
+    if (!supportsMessageFilters) {
+      return
+    }
+
+    const parsed = parseLeadingSourceFilterToken(value)
+    setFtsOptions({
+      ...ftsOptionsRef.current,
+      sourceFilter: parsed.sourceFilter || ftsOptionsRef.current.sourceFilter || 'all',
+      page: 0,
+    })
+  }, [setFtsOptions, setQuery, supportsMessageFilters])
+
+  const handleSourceFilterChange = useCallback((nextSourceFilter: FullTextSearchSourceFilter) => {
+    setFtsOptions({ ...ftsOptionsRef.current, sourceFilter: nextSourceFilter, page: 0 })
+    const parsed = parseLeadingSourceFilterToken(query)
+    setQuery(parsed.sourceFilter ? parsed.normalizedQuery : query)
+  }, [query, setFtsOptions, setQuery])
+
+  const applySuggestedSourceFilter = useCallback((nextSourceFilter: FullTextSearchSourceFilter) => {
+    setFtsOptions({ ...ftsOptionsRef.current, sourceFilter: nextSourceFilter, page: 0 })
+    setQuery(`${formatSourceFilterToken(nextSourceFilter)} `)
+  }, [setFtsOptions, setQuery])
+
+  const handleInputKeyDown = useCallback((event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (sourceFilterSuggestions.length > 0 && (event.key === 'Tab' || event.key === 'Enter')) {
+      event.preventDefault()
+      applySuggestedSourceFilter(sourceFilterSuggestions[0])
+    }
+  }, [applySuggestedSourceFilter, sourceFilterSuggestions])
 
   return (
     <div className="w-full h-full min-h-0 flex flex-col overflow-hidden bg-background">
       <div className="px-5 pt-5 pb-4 border-b border-border/80 bg-background/95 flex-shrink-0">
         <div className="flex items-center gap-3 rounded-xl border border-border/80 bg-background px-4 py-3 shadow-sm">
           <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('command.placeholder', 'Search sessions, projects, messages...')}
-            className="flex-1 bg-transparent border-0 outline-none text-[15px] font-medium text-foreground placeholder:text-muted-foreground/70"
-            autoFocus
-          />
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => handleQueryChange(e.target.value)}
+              onKeyDown={handleInputKeyDown}
+              placeholder={inputPlaceholder}
+              className="w-full bg-transparent border-0 outline-none text-[15px] font-medium text-foreground placeholder:text-muted-foreground/70"
+              autoFocus
+            />
+            {sourceFilterSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-border/80 bg-background shadow-xl">
+                {sourceFilterSuggestions.map(value => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => applySuggestedSourceFilter(value)}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-surface"
+                  >
+                    <span className="font-mono text-[12px] text-blue-600">
+                      {formatSourceFilterToken(value)}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {getSourceFilterLabel(t, value)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {isSearching && <Loader2 className="w-4 h-4 text-muted-foreground animate-spin flex-shrink-0" />}
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
@@ -397,12 +498,31 @@ export default function CommandMenu({
                 </div>
 
                 <div className="flex items-center gap-1 rounded-full border border-border/70 bg-background p-1">
+                  {SOURCE_FILTERS.map(value => (
+                    <button
+                      key={value}
+                      onClick={() => handleSourceFilterChange(value)}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                        effectiveSourceFilter === value
+                          ? 'bg-foreground/[0.06] text-foreground font-medium'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {value === 'labels_only' && <Tag className="w-3 h-3" />}
+                      {value === 'content_only' && <FileText className="w-3 h-3" />}
+                      {value === 'all' && <Search className="w-3 h-3" />}
+                      <span>{getSourceFilterLabel(t, value)}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1 rounded-full border border-border/70 bg-background p-1">
                   {(['newest', 'oldest', 'score'] as const).map(mode => (
                     <button
                       key={mode}
                       onClick={() => setFtsOptions({ ...ftsOptions, sortMode: mode, page: 0 })}
                       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
-                        ftsOptions.sortMode === mode
+                        effectiveSortMode === mode
                           ? 'bg-foreground/[0.06] text-foreground font-medium'
                           : 'text-muted-foreground hover:text-foreground'
                       }`}
@@ -433,7 +553,7 @@ export default function CommandMenu({
         </div>
       </div>
 
-      {!!query && !isSearching && !searchError && (
+      {(!!normalizedQuery.trim() || isLabelsBrowseMode) && !isSearching && !searchError && (
         <div className="px-5 py-2 border-b border-border/60 text-[11px] text-muted-foreground flex items-center justify-between gap-3 flex-shrink-0 bg-surface/20">
           <span className="font-medium">{t('command.summary.results', { count: results.length, defaultValue: `${results.length} results` })}</span>
           {activeTab !== 'all' && (
@@ -449,8 +569,19 @@ export default function CommandMenu({
           <div id="search-results-wrapper" className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
             {isSearching && <CommandLoading />}
             {!isSearching && searchError && <CommandError error={searchError} />}
-            {!isSearching && !searchError && results.length === 0 && query && <CommandEmpty query={query} />}
-            {!isSearching && !searchError && !query && <CommandHints />}
+            {!isSearching && !searchError && results.length === 0 && (normalizedQuery.trim() || isLabelsBrowseMode) && (
+              isLabelsBrowseMode ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Tag className="mb-3 h-12 w-12 text-amber-500/50" />
+                  <p className="text-sm text-muted-foreground">
+                    {t('search.fullText.noLabels', 'No labels found')}
+                  </p>
+                </div>
+              ) : (
+                <CommandEmpty query={normalizedQuery} />
+              )
+            )}
+            {!isSearching && !searchError && !normalizedQuery.trim() && !isLabelsBrowseMode && <CommandHints />}
             {!isSearching && !searchError && Object.entries(groupedResults).map(([pluginId, pluginResults]) => {
               if (activeTab !== 'all' && activeTab !== TABS.find(tab => tab.pluginId === pluginId)?.id) return null
               const plugin = registry.get(pluginId)
@@ -471,6 +602,7 @@ export default function CommandMenu({
                       const metaLine = getResultMetaLine(result)
                       const timeLabel = formatResultTime(result)
                       const isMessageResult = result.pluginId === 'message-search'
+                      const isLabelMatch = (result.metadata as any)?.matchReason === 'label'
 
                       return (
                         <div
@@ -526,6 +658,11 @@ export default function CommandMenu({
                                         )}
                                       </div>
                                       <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                                        {isLabelMatch && (
+                                          <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-200">
+                                            {t('search.fullText.labelMatch', 'label')}
+                                          </span>
+                                        )}
                                         {roleBadge && (
                                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${roleBadge.className}`}>
                                             {roleBadge.label}
@@ -553,6 +690,11 @@ export default function CommandMenu({
                                         )}
                                       </div>
                                       <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                                        {isLabelMatch && (
+                                          <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-200">
+                                            {t('search.fullText.labelMatch', 'label')}
+                                          </span>
+                                        )}
                                         {roleBadge && (
                                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${roleBadge.className}`}>
                                             {roleBadge.label}

@@ -2,6 +2,7 @@ import type {
   DayStats,
   FavoriteItem,
   FullTextSearchResponse,
+  FullTextSearchSourceFilter,
   SearchResult,
   SessionChunk,
   SessionInfo,
@@ -41,6 +42,7 @@ export interface SessionProvider {
   fullTextSearch(options: {
     query: string;
     roleFilter: "all" | "user" | "assistant";
+    sourceFilter?: FullTextSearchSourceFilter;
     globPattern?: string | null;
     projectPath?: string | null;
     page: number;
@@ -48,6 +50,7 @@ export interface SessionProvider {
     matchMode?: "any" | "all" | "phrase";
     sortOrder?: "score" | "newest" | "oldest";
   }): Promise<FullTextSearchResponse>;
+  getSessionLabels(path: string): Promise<Record<string, string>>;
   getStats(sessions: SessionInfo[]): Promise<SessionStats>;
   getDayStats(date: string, sessions: SessionInfo[]): Promise<DayStats>;
   paginateSessions(options: {

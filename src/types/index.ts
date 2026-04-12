@@ -13,11 +13,11 @@ export interface FullTextSearchHit {
   session_name?: string
   entry_id: string
   role: 'user' | 'assistant'
-  source_type: 'user' | 'assistant' | 'thinking'
+  source_type: 'user' | 'assistant' | 'thinking' | 'label'
   content: string
   timestamp: string
   score: number
-  match_reason?: 'content' | 'session_id_exact' | 'session_id_prefix'
+  match_reason?: 'content' | 'label' | 'session_id_exact' | 'session_id_prefix'
 }
 
 export interface FullTextSearchResponse {

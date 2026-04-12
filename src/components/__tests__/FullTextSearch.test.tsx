@@ -59,9 +59,7 @@ describe('FullTextSearch', () => {
       expect(mockInvoke).toHaveBeenCalledWith('full_text_search', expect.anything());
     });
 
-    // Title should be directory name 'alpha' extracted from session_path
     expect(screen.getByText('alpha')).toBeInTheDocument();
-    // Subtitle should be truncated (or full if under limit) path
     expect(screen.getByText('/projects/alpha/session.jsonl')).toBeInTheDocument();
   });
 
@@ -91,10 +89,8 @@ describe('FullTextSearch', () => {
       expect(mockInvoke).toHaveBeenCalled();
     });
 
-    // Find the snippet container with class fts-snippet
     const snippetContainer = document.querySelector('.fts-snippet');
     expect(snippetContainer).not.toBeNull();
-    // The snippet should contain <b>bold</b> in its innerHTML
     expect(snippetContainer?.innerHTML).toContain('<b>bold</b>');
   });
 
@@ -130,8 +126,7 @@ describe('FullTextSearch', () => {
   });
 
   it('shows loading spinner when search is in progress and no hits yet', async () => {
-    // Simulate a pending promise so spinner remains
-    mockInvoke.mockReturnValue(new Promise(() => {})); // never resolves
+    mockInvoke.mockReturnValue(new Promise(() => {}));
 
     vi.useFakeTimers();
     renderFullTextSearch(true);
@@ -139,10 +134,8 @@ describe('FullTextSearch', () => {
     const input = screen.getByPlaceholderText(/search all sessions/i);
     fireEvent.change(input, { target: { value: 'test' } });
 
-    // Fast-forward the debounce (300ms) so performSearch starts
     await vi.runAllTimersAsync();
 
-    // After debounce, performSearch sets isSearching true; central spinner should be visible
     const spinner = document.querySelector('svg.animate-spin');
     expect(spinner).toBeInTheDocument();
 
@@ -152,18 +145,14 @@ describe('FullTextSearch', () => {
   it('closes modal when ESC key is pressed, even when input is focused', async () => {
     const { onClose } = renderFullTextSearch(true);
 
-    // Verify modal is open
     const overlay = document.querySelector('[class*="fixed inset-0"]');
     expect(overlay).toBeInTheDocument();
 
-    // Focus the input
     const input = screen.getByPlaceholderText(/full-text/i);
     input.focus();
 
-    // Press ESC key on window
     fireEvent.keyDown(window, { key: 'Escape' });
 
-    // onClose should have been called
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

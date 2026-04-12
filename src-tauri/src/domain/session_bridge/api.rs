@@ -106,19 +106,11 @@ pub fn read_canonical_session_from_str(
 pub fn parse_session_info_from_path(
     path: &Path,
 ) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
-    let (_, canonical) = read_canonical_session_from_path(path)?;
-    let modified = std::fs::metadata(backing_file_path(path))
-        .and_then(|metadata| metadata.modified())
-        .map(chrono::DateTime::<chrono::Utc>::from)
-        .map_err(|error| format!("Failed to get modified time: {error}"))?;
-    let entries = canonical_to_session_entries(&canonical);
-    let info = canonical_to_session_info(&canonical, path, modified);
-    Ok((info, entries))
+    crate::domain::casr_min::bridge_ops::parse_session_info_from_path(path)
 }
 
 pub fn parse_session_entries_from_path(path: &Path) -> Result<Vec<SessionEntry>, String> {
-    let (_, canonical) = read_canonical_session_from_path(path)?;
-    Ok(canonical_to_session_entries(&canonical))
+    crate::domain::casr_min::bridge_ops::parse_session_entries_from_path(path)
 }
 
 pub fn preview_session_format(path: &Path, target: SessionBridgeSource) -> Result<String, String> {

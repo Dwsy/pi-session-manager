@@ -1,8 +1,21 @@
-import type { CSSProperties, MouseEventHandler, RefObject } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type MouseEventHandler,
+  type RefObject,
+} from "react";
 
 import SessionTree, { type SessionTreeRef } from "@/components/session-tree/SessionTree";
+import { getRuntimeSessionLabels } from "@/runtime-data/sessionSource";
 
 import type { SessionEntry } from "@/types";
+
+interface SessionLabelState {
+  sessionPath: string;
+  labels: Record<string, string>;
+}
 
 export interface SessionViewerSidebarProps {
   showSidebar: boolean;
@@ -10,6 +23,7 @@ export interface SessionViewerSidebarProps {
   sidebarWidth: number;
   isResizing: boolean;
   entries: SessionEntry[];
+  sessionPath: string;
   activeEntryId: string | null;
   onCloseSidebar: () => void;
   onNodeClick: (leafId: string, targetId: string) => void;
@@ -27,6 +41,7 @@ export default function SessionViewerSidebar({
   sidebarWidth,
   isResizing,
   entries,
+  sessionPath,
   activeEntryId,
   onCloseSidebar,
   onNodeClick,
@@ -37,6 +52,41 @@ export default function SessionViewerSidebar({
   outlineTitle,
   hideSidebarTitle,
 }: SessionViewerSidebarProps) {
+  const [labelState, setLabelState] = useState<SessionLabelState>({
+    sessionPath,
+    labels: {},
+  });
+
+  useEffect(() => {
+    if (!showSidebar) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void getRuntimeSessionLabels(sessionPath)
+      .then((labels) => {
+        if (!cancelled) {
+          setLabelState({ sessionPath, labels });
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("[SessionViewerSidebar] Failed to load session labels:", error);
+          setLabelState({ sessionPath, labels: {} });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showSidebar, sessionPath, entries.length]);
+
+  const resolvedLabelsByTargetId = useMemo(
+    () => (labelState.sessionPath === sessionPath ? labelState.labels : {}),
+    [labelState, sessionPath],
+  );
+
   if (!showSidebar) {
     return null;
   }
@@ -104,6 +154,7 @@ export default function SessionViewerSidebar({
             entries={entries}
             activeLeafId={activeEntryId ?? undefined}
             onNodeClick={onNodeClick}
+            resolvedLabelsByTargetId={resolvedLabelsByTargetId}
           />
         </div>
       </aside>

@@ -600,6 +600,10 @@ fn test_backfill_when_message_entries_empty() {
 
 #[test]
 fn test_fts_escaping_and_snippet_tags() {
+    let temp_dir = tempdir().unwrap();
+    let session_path = temp_dir.path().join("session.jsonl");
+    fs::write(&session_path, make_session_file("sess1", "/test", &[])).unwrap();
+
     // Minimal in-memory database with FTS schema
     let conn = rusqlite::Connection::open_in_memory().unwrap();
 
@@ -633,7 +637,7 @@ fn test_fts_escaping_and_snippet_tags() {
         "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
         params![
             "sess1",
-            "/test/session.jsonl",
+            session_path.to_string_lossy().to_string(),
             "/test",
             "2025-01-01T00:00:00Z",
             "2025-01-01T00:00:00Z",
@@ -674,7 +678,7 @@ fn test_fts_escaping_and_snippet_tags() {
         params![
             "m1:user",
             "m1",
-            "/test/session.jsonl",
+            session_path.to_string_lossy().to_string(),
             "user",
             "user",
             "This contains \"double quotes\" and \\ backslash in the text",

@@ -3,6 +3,8 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
+use tempfile::tempdir;
+
 /// Helper to create a test ZIP bundle
 fn create_test_bundle(path: &PathBuf, files: &[(&str, &[u8])]) {
     use std::io::Cursor;
@@ -123,21 +125,13 @@ fn test_bundle_metadata_format() {
 
 #[test]
 fn test_backup_directory_creation() {
-    let backup_dir = if let Some(home) = dirs::home_dir() {
-        home.join(".pi/agent/backups/config-bundles/test-backup")
-    } else {
-        PathBuf::from("/tmp/pi-config-backups/test-backup")
-    };
+    let temp_dir = tempdir().unwrap();
+    let backup_dir = temp_dir
+        .path()
+        .join(".pi/agent/backups/config-bundles/test-backup");
 
-    // Clean up if exists
-    let _ = fs::remove_dir_all(&backup_dir);
-
-    // Create directory
     fs::create_dir_all(&backup_dir).unwrap();
     assert!(backup_dir.exists(), "Backup directory should be created");
-
-    // Clean up
-    let _ = fs::remove_dir_all(&backup_dir.parent().unwrap());
 }
 
 #[test]

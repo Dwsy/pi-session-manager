@@ -39,6 +39,10 @@ pub struct SessionEntry {
     pub parent_id: Option<String>,
     pub timestamp: DateTime<Utc>,
     pub message: Option<Message>,
+    #[serde(rename = "targetId", skip_serializing_if = "Option::is_none")]
+    pub target_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
