@@ -18,7 +18,6 @@ import {
   YAxis,
   Cell,
 } from 'recharts';
-import { AnimatePresence, motion } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react';
 
@@ -431,7 +430,34 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
   const treeRows = useMemo(() => {
     const rows: Array<{ kind: 'group' | 'event'; id: string; label: string; type: TraceEventType; event?: TraceEvent; depth: number; count?: number }> = [];
     for (const group of groups) {
-      rows.push({ kind: 'group', id: group.id, label: group.label, type: group.type, depth: 0, count: group.events.length });
+      const first = group.events[0];
+      const last = group.events[group.events.length - 1];
+      const aggregateDuration = Math.max(
+        150,
+        (last.offset_ms + Math.max(last.duration_ms, 150)) - first.offset_ms,
+      );
+      const aggregateEvent: TraceEvent = {
+        ...first,
+        id: `${group.id}__aggregate`,
+        offset_ms: first.offset_ms,
+        duration_ms: aggregateDuration,
+        content_preview: group.label,
+        tool_calls: [],
+        thinking: null,
+        is_error: group.events.some(evt => evt.is_error),
+        error_message: group.events.find(evt => evt.error_message)?.error_message ?? null,
+      };
+
+      rows.push({
+        kind: 'group',
+        id: group.id,
+        label: group.label,
+        type: group.type,
+        event: aggregateEvent,
+        depth: 0,
+        count: group.events.length,
+      });
+
       if (!collapsedGroups.has(group.id)) {
         for (const evt of group.events) {
           rows.push({ kind: 'event', id: evt.id, label: summarizeEvent(evt), type: evt.event_type, event: evt, depth: 1 });
@@ -535,6 +561,9 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
                       if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
                       return next;
                     });
+                    if (row.event) {
+                      onSelectEvent(selectedEvent?.id === row.event.id ? null : row.event);
+                    }
                   } else if (row.event) {
                     onSelectEvent(selectedEvent?.id === row.event.id ? null : row.event);
                   }
@@ -588,19 +617,11 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
           </div>
         </div>
 
-        <AnimatePresence initial={false}>
-          {selectedEvent && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 420, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-              className="h-full shrink-0 overflow-hidden border-l border-border"
-            >
-              <EventInspector event={selectedEvent} onClose={() => onSelectEvent(null)} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {selectedEvent && (
+          <div className="h-full w-[420px] shrink-0 overflow-hidden border-l border-border bg-background">
+            <EventInspector event={selectedEvent} onClose={() => onSelectEvent(null)} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -673,16 +694,14 @@ function EventInspector({ event, onClose }: { event: TraceEvent; onClose: () => 
       </div>
 
       <div className="flex-1 overflow-auto p-3 text-xs">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={tab} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }}>
-            {tab === 'content' && <InspectorContent event={event} />}
-            {tab === 'result' && <InspectorResult event={event} />}
-            {tab === 'usage' && <InspectorUsage event={event} />}
-            {tab === 'raw' && (
-              <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-all font-mono leading-relaxed">{JSON.stringify(event, null, 2)}</pre>
-            )}
-          </motion.div>
-        </AnimatePresence>
+        <div key={tab}>
+          {tab === 'content' && <InspectorContent event={event} />}
+          {tab === 'result' && <InspectorResult event={event} />}
+          {tab === 'usage' && <InspectorUsage event={event} />}
+          {tab === 'raw' && (
+            <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-all font-mono leading-relaxed">{JSON.stringify(event, null, 2)}</pre>
+          )}
+        </div>
       </div>
     </div>
   );
