@@ -12,6 +12,7 @@ import SessionViewerMessages, {
 import SessionViewerSearchBar from "./session-viewer/SessionViewerSearchBar";
 import SessionViewerSidebar from "./session-viewer/SessionViewerSidebar";
 import SessionViewerToolbar from "./session-viewer/SessionViewerToolbar";
+import TraceView from "./trace/TraceView";
 
 import {
   SessionViewProvider,
@@ -110,6 +111,7 @@ function SessionViewerContent({
   });
   const [showSystemPromptDialog, setShowSystemPromptDialog] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [traceMode, setTraceMode] = useState(false);
 
   const sessionDataIsAtBottomRef = useRef(true);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -310,6 +312,8 @@ function SessionViewerContent({
           onOpenSystemPromptDialog={() => setShowSystemPromptDialog(true)}
           onScrollToTop={handleScrollToTop}
           onScrollToBottom={handleScrollToBottom}
+          onToggleTraceMode={previewMode ? undefined : () => setTraceMode(prev => !prev)}
+          traceModeActive={traceMode}
           onRename={onRename}
           onFork={onFork}
           onExport={onExport}
@@ -367,6 +371,10 @@ function SessionViewerContent({
           />
         )}
 
+        {traceMode ? (
+          <TraceView session={session} onClose={() => setTraceMode(false)} />
+        ) : (
+          <>
         <SessionViewerMessages
           ref={messagesRef}
           loading={loading}
@@ -417,6 +425,8 @@ function SessionViewerContent({
               messagesRef.current?.scrollToBottom()
             }}
           />
+        )}
+          </>
         )}
       </div>
       {!previewMode && (

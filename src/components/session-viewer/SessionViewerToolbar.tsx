@@ -39,6 +39,8 @@ export default function SessionViewerToolbar({
   isScrollMarkersFeatureEnabled,
   isSearchOpen,
   previewMode = false,
+  onToggleTraceMode,
+  traceModeActive = false,
   onBack,
   onToggleSidebar,
   onToggleThinking,
@@ -219,6 +221,23 @@ export default function SessionViewerToolbar({
                   >
                     <Bot className="h-3.5 w-3.5" />
                   </button>
+                  {onToggleTraceMode && (
+                    <button
+                      onClick={onToggleTraceMode}
+                      className={`p-1.5 text-xs rounded border transition-colors ${
+                        traceModeActive
+                          ? 'border-primary/40 bg-primary/14 text-primary'
+                          : 'border-border/70 bg-secondary hover:bg-secondary-hover text-muted-foreground hover:text-foreground'
+                      }`}
+                      title={t("trace.toggle", "Trace mode")}
+                      aria-label={t("trace.toggle", "Trace mode")}
+                      aria-pressed={traceModeActive}
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                      </svg>
+                    </button>
+                  )}
                 </>
               )}
               <button

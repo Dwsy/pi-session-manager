@@ -73,8 +73,20 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
     let mut tool_call_counts: HashMap<String, usize> = HashMap::new();
     let mut bash_cmd_counts: HashMap<String, usize> = HashMap::new();
 
-    let mut total_tokens = TraceTokens { input: 0, output: 0, cache_read: 0, cache_write: 0, total: 0 };
-    let mut total_cost = TraceCost { input: 0.0, output: 0.0, cache_read: 0.0, cache_write: 0.0, total: 0.0 };
+    let mut total_tokens = TraceTokens {
+        input: 0,
+        output: 0,
+        cache_read: 0,
+        cache_write: 0,
+        total: 0,
+    };
+    let mut total_cost = TraceCost {
+        input: 0.0,
+        output: 0.0,
+        cache_read: 0.0,
+        cache_write: 0.0,
+        total: 0.0,
+    };
 
     let mut total_user = 0usize;
     let mut total_assistant = 0usize;
@@ -124,7 +136,8 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                         if first_user_ts.is_none() {
                             first_user_ts = Some(ts_ms);
                         }
-                        let content_preview = extract_text_content(msg).map(|s| truncate(&s, CONTENT_PREVIEW_MAX));
+                        let content_preview =
+                            extract_text_content(msg).map(|s| truncate(&s, CONTENT_PREVIEW_MAX));
 
                         events.push(TraceEvent {
                             id,
@@ -173,9 +186,16 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                             total_tokens.cache_write += t.cache_write;
                             total_tokens.total += t.total;
 
-                            let mt = tokens_by_model.entry(model_key.clone()).or_insert(TraceTokens {
-                                input: 0, output: 0, cache_read: 0, cache_write: 0, total: 0,
-                            });
+                            let mt =
+                                tokens_by_model
+                                    .entry(model_key.clone())
+                                    .or_insert(TraceTokens {
+                                        input: 0,
+                                        output: 0,
+                                        cache_read: 0,
+                                        cache_write: 0,
+                                        total: 0,
+                                    });
                             mt.input += t.input;
                             mt.output += t.output;
                             mt.cache_read += t.cache_read;
@@ -190,7 +210,11 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                             total_cost.total += c.total;
 
                             let mc = cost_by_model.entry(model_key.clone()).or_insert(TraceCost {
-                                input: 0.0, output: 0.0, cache_read: 0.0, cache_write: 0.0, total: 0.0,
+                                input: 0.0,
+                                output: 0.0,
+                                cache_read: 0.0,
+                                cache_write: 0.0,
+                                total: 0.0,
                             });
                             mc.input += c.input;
                             mc.output += c.output;
@@ -200,7 +224,8 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                         }
 
                         // Thinking
-                        let thinking = msg.get("thinking")
+                        let thinking = msg
+                            .get("thinking")
                             .and_then(|v| v.as_str())
                             .map(|s| truncate(s, CONTENT_PREVIEW_MAX));
 
@@ -234,7 +259,9 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                                             event_files_edited.push(path.to_string());
                                         }
                                         "bash" => {
-                                            if let Some(cmd) = args.get("command").and_then(|v| v.as_str()) {
+                                            if let Some(cmd) =
+                                                args.get("command").and_then(|v| v.as_str())
+                                            {
                                                 let prefix = truncate(cmd, CMD_PREFIX_MAX);
                                                 *bash_cmd_counts.entry(prefix).or_insert(0) += 1;
                                             }
@@ -245,7 +272,8 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                             }
                         }
 
-                        let content_preview = extract_text_content(msg).map(|s| truncate(&s, CONTENT_PREVIEW_MAX));
+                        let content_preview =
+                            extract_text_content(msg).map(|s| truncate(&s, CONTENT_PREVIEW_MAX));
 
                         events.push(TraceEvent {
                             id: id.clone(),
@@ -284,10 +312,14 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                             None
                         };
 
-                        let result_preview = extract_text_content(msg).map(|s| truncate(&s, CONTENT_PREVIEW_MAX));
+                        let result_preview =
+                            extract_text_content(msg).map(|s| truncate(&s, CONTENT_PREVIEW_MAX));
 
                         // Store for matching with tool calls
-                        tool_results.insert(tool_call_id.clone(), (is_error, result_preview.unwrap_or_default()));
+                        tool_results.insert(
+                            tool_call_id.clone(),
+                            (is_error, result_preview.unwrap_or_default()),
+                        );
 
                         events.push(TraceEvent {
                             id,
@@ -376,12 +408,18 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                     role: None,
                     model: None,
                     provider: None,
-                    thinking: raw.value.get("summary").and_then(|v| v.as_str())
+                    thinking: raw
+                        .value
+                        .get("summary")
+                        .and_then(|v| v.as_str())
                         .map(|s| truncate(s, CONTENT_PREVIEW_MAX)),
                     tool_calls: vec![],
                     tokens: None,
                     cost: None,
-                    content_preview: raw.value.get("summary").and_then(|v| v.as_str())
+                    content_preview: raw
+                        .value
+                        .get("summary")
+                        .and_then(|v| v.as_str())
                         .map(|s| truncate(s, CONTENT_PREVIEW_MAX)),
                     is_error: false,
                     error_message: None,
@@ -406,7 +444,10 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                     tool_calls: vec![],
                     tokens: None,
                     cost: None,
-                    content_preview: raw.value.get("content").and_then(|v| v.as_str())
+                    content_preview: raw
+                        .value
+                        .get("content")
+                        .and_then(|v| v.as_str())
                         .map(|s| truncate(s, CONTENT_PREVIEW_MAX)),
                     is_error: false,
                     error_message: None,
@@ -427,12 +468,18 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                     role: None,
                     model: None,
                     provider: None,
-                    thinking: raw.value.get("summary").and_then(|v| v.as_str())
+                    thinking: raw
+                        .value
+                        .get("summary")
+                        .and_then(|v| v.as_str())
                         .map(|s| truncate(s, CONTENT_PREVIEW_MAX)),
                     tool_calls: vec![],
                     tokens: None,
                     cost: None,
-                    content_preview: raw.value.get("summary").and_then(|v| v.as_str())
+                    content_preview: raw
+                        .value
+                        .get("summary")
+                        .and_then(|v| v.as_str())
                         .map(|s| truncate(s, CONTENT_PREVIEW_MAX)),
                     is_error: false,
                     error_message: None,
@@ -450,14 +497,19 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
     for event in &mut events {
         for tc in &mut event.tool_calls {
             if let Some((is_error, result_preview)) = tool_results.get(&tc.id) {
-                tc.status = if *is_error { "error".to_string() } else { "completed".to_string() };
+                tc.status = if *is_error {
+                    "error".to_string()
+                } else {
+                    "completed".to_string()
+                };
                 tc.result_preview = Some(result_preview.clone());
             }
         }
     }
 
     // Compute derived values
-    let primary_model = model_counts.iter()
+    let primary_model = model_counts
+        .iter()
         .max_by_key(|(_, &count)| count)
         .map(|(model, _)| model.clone())
         .unwrap_or_else(|| "unknown".to_string());
@@ -466,7 +518,10 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
     models_used.sort();
 
     let duration_secs = if total_raw > 0 {
-        (raw_entries[total_raw - 1].timestamp_ms.saturating_sub(header_ts)) / 1000
+        (raw_entries[total_raw - 1]
+            .timestamp_ms
+            .saturating_sub(header_ts))
+            / 1000
     } else {
         0
     };
@@ -476,7 +531,8 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
         _ => 0,
     };
 
-    let bash_commands: Vec<BashCommandStat> = bash_cmd_counts.into_iter()
+    let bash_commands: Vec<BashCommandStat> = bash_cmd_counts
+        .into_iter()
         .map(|(cmd, count)| BashCommandStat {
             command_prefix: cmd,
             count,
@@ -489,7 +545,8 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
         cwd,
         name,
         created: header_ts_str.to_string(),
-        modified: raw_entries.last()
+        modified: raw_entries
+            .last()
             .map(|r| r.value["timestamp"].as_str().unwrap_or("").to_string())
             .unwrap_or_else(|| header_ts_str.to_string()),
         duration_secs,
@@ -600,12 +657,14 @@ fn extract_tool_calls(msg: &Value) -> Vec<TraceToolCall> {
         None => return vec![],
     };
 
-    content.iter()
+    content
+        .iter()
         .filter(|block| block["type"].as_str() == Some("toolCall"))
         .map(|block| {
             let id = block["id"].as_str().unwrap_or("").to_string();
             let name = block["name"].as_str().unwrap_or("unknown").to_string();
-            let args_str = block.get("arguments")
+            let args_str = block
+                .get("arguments")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             let args_preview = truncate(args_str, ARGS_PREVIEW_MAX);
@@ -624,8 +683,7 @@ fn extract_tool_calls(msg: &Value) -> Vec<TraceToolCall> {
 fn parse_tool_args(msg: &Value, tool_call_id: &str) -> Option<Value> {
     let content = msg.get("content").and_then(|v| v.as_array())?;
     for block in content {
-        if block["type"].as_str() == Some("toolCall")
-            && block["id"].as_str() == Some(tool_call_id)
+        if block["type"].as_str() == Some("toolCall") && block["id"].as_str() == Some(tool_call_id)
         {
             if let Some(args_str) = block.get("arguments").and_then(|v| v.as_str()) {
                 if let Ok(args) = serde_json::from_str::<Value>(args_str) {

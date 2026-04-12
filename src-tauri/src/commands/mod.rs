@@ -19,9 +19,9 @@ mod session_open;
 mod settings;
 mod skills;
 mod tags;
-mod trace;
 #[cfg(feature = "gui")]
 pub mod terminal;
+mod trace;
 
 pub use auth::*;
 pub use config_bundle::*;
@@ -40,9 +40,9 @@ pub use session_open::*;
 pub use settings::*;
 pub use skills::*;
 pub use tags::*;
-pub use trace::*;
 #[cfg(feature = "gui")]
 pub use terminal::*;
+pub use trace::*;
 
 #[cfg(feature = "gui")]
 #[tauri::command]
