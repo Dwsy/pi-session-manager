@@ -7,7 +7,6 @@ import {
   MessageSquare,
   Wrench,
   AlertTriangle,
-  Search,
 } from 'lucide-react';
 import {
   Bar,
@@ -18,7 +17,6 @@ import {
   YAxis,
   Cell,
 } from 'recharts';
-import { useDrag } from '@use-gesture/react';
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react';
 
 import { useSessionTrace } from '@/hooks/useSessionTrace';
@@ -477,57 +475,6 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
     }));
   }, [viewportStartMs, viewportRange]);
 
-  const dragBind = useDrag(({ first, movement: [mx], memo }) => {
-    if (!containerRef.current) return memo;
-    const width = containerRef.current.clientWidth || 1;
-    const range = viewportEndMs - viewportStartMs;
-    if (first) memo = { start: viewportStartMs, end: viewportEndMs, width, range };
-    const shift = -(mx / memo.width) * memo.range;
-    let nextStart = memo.start + shift;
-    let nextEnd = memo.end + shift;
-    if (nextStart < 0) {
-      nextEnd -= nextStart;
-      nextStart = 0;
-    }
-    if (nextEnd > totalDuration) {
-      const overshoot = nextEnd - totalDuration;
-      nextStart = Math.max(0, nextStart - overshoot);
-      nextEnd = totalDuration;
-    }
-    setViewportStartMs(nextStart);
-    setViewportEndMs(nextEnd);
-    return memo;
-  });
-
-  const onWheel: React.WheelEventHandler<HTMLDivElement> = (e) => {
-    if (!containerRef.current || totalDuration <= 0) return;
-    e.preventDefault();
-    const rect = containerRef.current.getBoundingClientRect();
-    const mousePct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const range = viewportEndMs - viewportStartMs;
-    const zoomFactor = e.deltaY > 0 ? 1.15 : 0.87;
-    const pivot = viewportStartMs + range * mousePct;
-    let nextStart = pivot - (pivot - viewportStartMs) * zoomFactor;
-    let nextEnd = pivot + (viewportEndMs - pivot) * zoomFactor;
-    const minRange = Math.max(totalDuration * 0.005, 500);
-    if (nextEnd - nextStart < minRange) {
-      const center = (nextStart + nextEnd) / 2;
-      nextStart = center - minRange / 2;
-      nextEnd = center + minRange / 2;
-    }
-    if (nextStart < 0) {
-      nextEnd -= nextStart;
-      nextStart = 0;
-    }
-    if (nextEnd > totalDuration) {
-      const overshoot = nextEnd - totalDuration;
-      nextStart = Math.max(0, nextStart - overshoot);
-      nextEnd = totalDuration;
-    }
-    setViewportStartMs(nextStart);
-    setViewportEndMs(nextEnd);
-  };
-
   return (
     <div className="h-full flex flex-col bg-background">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0 text-xs">
@@ -535,11 +482,14 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
         <span className="px-2 py-1 rounded-full border border-border/60 bg-background text-foreground font-mono">{a.total_tool_calls} tools</span>
         <span className={cx('px-2 py-1 rounded-full border font-mono', a.total_errors > 0 ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'border-border/60 bg-background text-foreground')}>{a.total_errors} errors</span>
         <span className="text-muted-foreground font-mono">{a.primary_model}</span>
-        <button className="ml-auto inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setViewportStartMs(0); setViewportEndMs(totalDuration || 1); }}>
-          <Search className="w-3 h-3" />
-          {zoomRatio < 0.98 ? `Viewing ${formatOffset(viewportStartMs)} – ${formatOffset(viewportEndMs)}` : 'Full range'}
-          {zoomRatio < 0.98 && <span className="underline">reset</span>}
-        </button>
+        <div className="ml-auto flex items-center gap-2 text-muted-foreground font-mono">
+          <span>{zoomRatio < 0.98 ? `Viewing ${formatOffset(viewportStartMs)} – ${formatOffset(viewportEndMs)}` : 'Full range'}</span>
+          {zoomRatio < 0.98 && (
+            <button className="underline hover:text-foreground transition-colors" onClick={() => { setViewportStartMs(0); setViewportEndMs(totalDuration || 1); }}>
+              reset
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -592,7 +542,7 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
               <div key={i} className="absolute text-[10px] text-muted-foreground -translate-x-1/2 top-2" style={{ left: `${m.pct}%` }}>{m.label}</div>
             ))}
           </div>
-          <div ref={containerRef} className="flex-1 overflow-auto relative" onWheel={onWheel} {...dragBind()}>
+          <div ref={containerRef} className="flex-1 overflow-auto relative">
             {hoveredRow !== null && (
               <div className="absolute left-0 right-0 pointer-events-none bg-foreground/[0.025] border-y border-foreground/10 z-0" style={{ top: hoveredRow * ROW_H, height: ROW_H }} />
             )}
@@ -615,6 +565,15 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
               );
             })}
           </div>
+          <MiniTimelineScrubber
+            totalDuration={totalDuration}
+            viewportStartMs={viewportStartMs}
+            viewportEndMs={viewportEndMs}
+            onChange={(start, end) => {
+              setViewportStartMs(start);
+              setViewportEndMs(end);
+            }}
+          />
         </div>
 
         {selectedEvent && (
@@ -658,6 +617,95 @@ function TimelineBar({ evt, viewportStartMs, viewportEndMs, selected }: { evt: T
         </span>
       )}
     </>
+  );
+}
+
+function MiniTimelineScrubber({
+  totalDuration,
+  viewportStartMs,
+  viewportEndMs,
+  onChange,
+}: {
+  totalDuration: number;
+  viewportStartMs: number;
+  viewportEndMs: number;
+  onChange: (start: number, end: number) => void;
+}) {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{ mode: 'window' | 'left' | 'right' | null; startX: number; startStart: number; startEnd: number } | null>(null);
+
+  const handlePointerDown = (mode: 'window' | 'left' | 'right') => (e: React.PointerEvent) => {
+    if (totalDuration <= 0) return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    dragStateRef.current = {
+      mode,
+      startX: e.clientX,
+      startStart: viewportStartMs,
+      startEnd: viewportEndMs,
+    };
+  };
+
+  const handlePointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
+    const state = dragStateRef.current;
+    if (!state || !trackRef.current || totalDuration <= 0) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    const deltaPct = (e.clientX - state.startX) / rect.width;
+    const deltaMs = deltaPct * totalDuration;
+    const minRange = Math.max(totalDuration * 0.01, 1000);
+
+    if (state.mode === 'window') {
+      let nextStart = state.startStart + deltaMs;
+      let nextEnd = state.startEnd + deltaMs;
+      if (nextStart < 0) {
+        nextEnd -= nextStart;
+        nextStart = 0;
+      }
+      if (nextEnd > totalDuration) {
+        nextStart -= nextEnd - totalDuration;
+        nextEnd = totalDuration;
+      }
+      onChange(Math.max(0, nextStart), Math.min(totalDuration, nextEnd));
+      return;
+    }
+
+    if (state.mode === 'left') {
+      let nextStart = Math.max(0, Math.min(state.startStart + deltaMs, state.startEnd - minRange));
+      onChange(nextStart, state.startEnd);
+      return;
+    }
+
+    let nextEnd = Math.min(totalDuration, Math.max(state.startEnd + deltaMs, state.startStart + minRange));
+    onChange(state.startStart, nextEnd);
+  };
+
+  const handlePointerUp: React.PointerEventHandler<HTMLDivElement> = () => {
+    dragStateRef.current = null;
+  };
+
+  const startPct = totalDuration > 0 ? (viewportStartMs / totalDuration) * 100 : 0;
+  const widthPct = totalDuration > 0 ? ((viewportEndMs - viewportStartMs) / totalDuration) * 100 : 100;
+
+  return (
+    <div className="h-14 border-t border-border bg-background/95 shrink-0 px-3 py-3">
+      <div
+        ref={trackRef}
+        className="relative h-8 rounded-md border border-border/70 bg-muted/20 overflow-hidden"
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+      >
+        <div className="absolute inset-y-0 left-0 right-0 bg-[linear-gradient(to_right,transparent_0%,rgba(255,255,255,0.03)_50%,transparent_100%)]" />
+        <div className="absolute inset-y-1 rounded bg-foreground/10 border border-foreground/15"
+          style={{ left: `${startPct}%`, width: `${widthPct}%` }}
+          onPointerDown={handlePointerDown('window')}
+        >
+          <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize bg-foreground/15 hover:bg-foreground/25" onPointerDown={handlePointerDown('left')} />
+          <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize bg-foreground/15 hover:bg-foreground/25" onPointerDown={handlePointerDown('right')} />
+        </div>
+      </div>
+    </div>
   );
 }
 
