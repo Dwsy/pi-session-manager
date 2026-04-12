@@ -301,19 +301,24 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                     "toolResult" => {
                         total_tool_results += 1;
                         let tool_call_id = msg["toolCallId"].as_str().unwrap_or("").to_string();
+                        let tool_name = msg["toolName"].as_str().unwrap_or("result").to_string();
                         let is_error = msg["isError"].as_bool().unwrap_or(false);
                         if is_error {
                             total_errors += 1;
                         }
 
+                        let raw_preview = extract_text_content(msg).map(|s| truncate(&s, CONTENT_PREVIEW_MAX));
+                        let result_preview = raw_preview.clone();
+                        let content_preview = match raw_preview {
+                            Some(text) if !text.is_empty() => Some(format!("{tool_name}: {text}")),
+                            _ => Some(tool_name.clone()),
+                        };
+
                         let error_message = if is_error {
-                            extract_text_content(msg).map(|s| truncate(&s, CONTENT_PREVIEW_MAX))
+                            content_preview.clone()
                         } else {
                             None
                         };
-
-                        let result_preview =
-                            extract_text_content(msg).map(|s| truncate(&s, CONTENT_PREVIEW_MAX));
 
                         // Store for matching with tool calls
                         tool_results.insert(
@@ -335,7 +340,7 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                             tool_calls: vec![],
                             tokens: None,
                             cost: None,
-                            content_preview: None,
+                            content_preview,
                             is_error,
                             error_message,
                             files_read: vec![],
@@ -663,21 +668,23 @@ fn extract_tool_calls(msg: &Value) -> Vec<TraceToolCall> {
         .map(|block| {
             let id = block["id"].as_str().unwrap_or("").to_string();
             let name = block["name"].as_str().unwrap_or("unknown").to_string();
-            let args_str = block
-                .get("arguments")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let args_preview = truncate(args_str, ARGS_PREVIEW_MAX);
+
+            let args_raw = match block.get("arguments") {
+                Some(Value::String(s)) => Some(s.clone()),
+                Some(other) if !other.is_null() => serde_json::to_string_pretty(other).ok(),
+                _ => None,
+            };
+
+            let args_preview = args_raw
+                .as_deref()
+                .map(|s| truncate(s, ARGS_PREVIEW_MAX))
+                .unwrap_or_default();
 
             TraceToolCall {
                 id,
                 name,
                 arguments_preview: args_preview,
-                arguments_raw: if args_str.is_empty() {
-                    None
-                } else {
-                    Some(args_str.to_string())
-                },
+                arguments_raw: args_raw,
                 status: "running".to_string(),
                 result_preview: None,
             }
@@ -690,10 +697,16 @@ fn parse_tool_args(msg: &Value, tool_call_id: &str) -> Option<Value> {
     for block in content {
         if block["type"].as_str() == Some("toolCall") && block["id"].as_str() == Some(tool_call_id)
         {
-            if let Some(args_str) = block.get("arguments").and_then(|v| v.as_str()) {
-                if let Ok(args) = serde_json::from_str::<Value>(args_str) {
-                    return Some(args);
+            match block.get("arguments") {
+                Some(Value::String(args_str)) => {
+                    if let Ok(args) = serde_json::from_str::<Value>(args_str) {
+                        return Some(args);
+                    }
                 }
+                Some(other) if !other.is_null() => {
+                    return Some(other.clone());
+                }
+                _ => {}
             }
         }
     }

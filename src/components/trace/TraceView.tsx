@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   X,
@@ -8,18 +8,11 @@ import {
   Wrench,
   AlertTriangle,
 } from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  Cell,
-} from 'recharts';
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react';
 
 import { useSessionTrace } from '@/hooks/useSessionTrace';
+import { useTheme } from '@/hooks/useAppearance';
+import { parseMarkdown, renderCodeHtml } from '@/utils/markdown';
 import type {
   SessionTraceAnalytics,
   TraceEvent,
@@ -60,7 +53,7 @@ const EVENT_LABELS: Record<TraceEventType, string> = {
   system_event: 'System',
 };
 
-const TOKEN_BAR_COLORS = ['#3b82f6', '#22c55e', '#a78bfa', '#f59e0b'];
+const TOKEN_BAR_COLORS = ['#4f8cff', '#24c37d', '#9b7bff', '#f59e0b'];
 const TOOL_COLORS = ['#eab308', '#3b82f6', '#a855f7', '#22c55e', '#f97316', '#ef4444', '#14b8a6', '#6366f1'];
 const ROW_H = 32;
 
@@ -156,6 +149,7 @@ function useEventGroups(events: TraceEvent[]) {
 
 export default function TraceView({ session, onClose }: TraceViewProps) {
   const { t } = useTranslation();
+  useTheme();
   const { analytics, loading, error } = useSessionTrace(session.path);
   const [activeTab, setActiveTab] = useState<TraceTab>('details');
   const [selectedEvent, setSelectedEvent] = useState<TraceEvent | null>(null);
@@ -269,68 +263,80 @@ function KV({ label, value, bold }: { label: string; value: string; bold?: boole
   );
 }
 
+function MetricRow({
+  label,
+  value,
+  barValue,
+  color,
+  valueText,
+}: {
+  label: string;
+  value: string;
+  barValue: number;
+  color: string;
+  valueText?: string;
+}) {
+  return (
+    <div className="grid grid-cols-[140px_1fr_100px] items-center gap-4 py-2">
+      <div className="text-sm text-muted-foreground">{label}</div>
+      <div className="h-2 rounded-full bg-secondary/60 overflow-hidden">
+        <div className="h-full rounded-full transition-[width] duration-200" style={{ width: `${Math.max(0, Math.min(100, barValue))}%`, backgroundColor: color }} />
+      </div>
+      <div className="text-right text-sm font-mono text-foreground">{valueText || value}</div>
+    </div>
+  );
+}
+
 function DetailsTab({ analytics: a }: { analytics: SessionTraceAnalytics }) {
-  const tokenData = [
-    { name: 'Input', value: a.total_tokens.input },
-    { name: 'Output', value: a.total_tokens.output },
-    { name: 'Cache R', value: a.total_tokens.cache_read },
-    { name: 'Cache W', value: a.total_tokens.cache_write },
-  ];
-  const costData = [
-    { name: 'Input', value: a.total_cost.input },
-    { name: 'Output', value: a.total_cost.output },
-    { name: 'Cache R', value: a.total_cost.cache_read },
-    { name: 'Cache W', value: a.total_cost.cache_write },
-  ];
+  const tokenMax = Math.max(a.total_tokens.input, a.total_tokens.output, a.total_tokens.cache_read, a.total_tokens.cache_write, 1);
+  const costMax = Math.max(a.total_cost.input, a.total_cost.output, a.total_cost.cache_read, a.total_cost.cache_write, 0.0001);
 
   return (
     <div className="h-full overflow-auto p-4 space-y-4 bg-gradient-to-b from-background to-muted/10">
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          ['Duration', formatDuration(a.active_secs || a.duration_secs)],
+          ['Messages', `${a.total_messages}`],
+          ['Tools', `${a.total_tool_calls}`],
+          ['Errors', `${a.total_errors}`],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-border/70 bg-background/90 px-3 py-3 shadow-sm">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">{label}</div>
+            <div className="text-lg font-semibold text-foreground font-mono">{value}</div>
+          </div>
+        ))}
+      </div>
+
       <Section title="Tokens">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm mb-4">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm mb-4">
           <KV label="Input" value={formatTokens(a.total_tokens.input)} />
           <KV label="Output" value={formatTokens(a.total_tokens.output)} />
           <KV label="Cache Read" value={formatTokens(a.total_tokens.cache_read)} />
           <KV label="Cache Write" value={formatTokens(a.total_tokens.cache_write)} />
           <KV label="Total" value={formatTokens(a.total_tokens.total)} bold />
         </div>
-        {a.total_tokens.total > 0 && (
-          <div className="h-40 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={tokenData} barSize={36}>
-                <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} stroke="#6a6f85" />
-                <YAxis fontSize={10} tickLine={false} axisLine={false} stroke="#6a6f85" tickFormatter={(v: number) => formatTokens(v)} />
-                <Tooltip formatter={(v: unknown) => formatTokens(Number(v))} contentStyle={{ fontSize: 11, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)' }} />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                  {tokenData.map((_, i) => <Cell key={i} fill={TOKEN_BAR_COLORS[i]} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+        <div className="space-y-1">
+          <MetricRow label="Input" value={formatTokens(a.total_tokens.input)} barValue={(a.total_tokens.input / tokenMax) * 100} color={TOKEN_BAR_COLORS[0]} />
+          <MetricRow label="Output" value={formatTokens(a.total_tokens.output)} barValue={(a.total_tokens.output / tokenMax) * 100} color={TOKEN_BAR_COLORS[1]} />
+          <MetricRow label="Cache Read" value={formatTokens(a.total_tokens.cache_read)} barValue={(a.total_tokens.cache_read / tokenMax) * 100} color={TOKEN_BAR_COLORS[2]} />
+          <MetricRow label="Cache Write" value={formatTokens(a.total_tokens.cache_write)} barValue={(a.total_tokens.cache_write / tokenMax) * 100} color={TOKEN_BAR_COLORS[3]} />
+        </div>
       </Section>
 
       <Section title="Cost">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm mb-4">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm mb-4">
           <KV label="Input" value={formatCost(a.total_cost.input)} />
           <KV label="Output" value={formatCost(a.total_cost.output)} />
           <KV label="Cache Read" value={formatCost(a.total_cost.cache_read)} />
           <KV label="Cache Write" value={formatCost(a.total_cost.cache_write)} />
           <KV label="Total" value={formatCost(a.total_cost.total)} bold />
         </div>
-        {a.total_cost.total > 0 && (
-          <div className="h-40 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={costData} barSize={36}>
-                <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} stroke="#6a6f85" />
-                <YAxis fontSize={10} tickLine={false} axisLine={false} stroke="#6a6f85" tickFormatter={(v: number) => formatCost(v)} />
-                <Tooltip formatter={(v: unknown) => formatCost(Number(v))} contentStyle={{ fontSize: 11, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)' }} />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                  {costData.map((_, i) => <Cell key={i} fill={TOKEN_BAR_COLORS[i]} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+        <div className="space-y-1">
+          <MetricRow label="Input" value={formatCost(a.total_cost.input)} barValue={(a.total_cost.input / costMax) * 100} color={TOKEN_BAR_COLORS[0]} />
+          <MetricRow label="Output" value={formatCost(a.total_cost.output)} barValue={(a.total_cost.output / costMax) * 100} color={TOKEN_BAR_COLORS[1]} />
+          <MetricRow label="Cache Read" value={formatCost(a.total_cost.cache_read)} barValue={(a.total_cost.cache_read / costMax) * 100} color={TOKEN_BAR_COLORS[2]} />
+          <MetricRow label="Cache Write" value={formatCost(a.total_cost.cache_write)} barValue={(a.total_cost.cache_write / costMax) * 100} color={TOKEN_BAR_COLORS[3]} />
+        </div>
       </Section>
 
       <Section title={`Models Used (${a.models_used.length})`}>
@@ -356,24 +362,23 @@ function DetailsTab({ analytics: a }: { analytics: SessionTraceAnalytics }) {
 
 function AnalyticsTab({ analytics: a }: { analytics: SessionTraceAnalytics }) {
   const toolEntries = useMemo(() => Object.entries(a.tool_call_counts).sort(([, aa], [, bb]) => bb - aa).map(([tool, count]) => ({ tool, count })), [a.tool_call_counts]);
+  const toolMax = Math.max(...toolEntries.map(item => item.count), 1);
 
   return (
     <div className="h-full overflow-auto p-4 space-y-4 bg-gradient-to-b from-background to-muted/10">
       <Section title="Tool Calls">
         {toolEntries.length > 0 ? (
-          <div className="h-52 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={toolEntries} barSize={24} layout="vertical" margin={{ left: 16 }}>
-                <XAxis type="number" fontSize={10} tickLine={false} axisLine={false} stroke="#6a6f85" />
-                <YAxis type="category" dataKey="tool" fontSize={10} tickLine={false} axisLine={false} stroke="#6a6f85" width={92} tick={({ x, y, payload }) => (
-                  <text x={x} y={Number(y) + 4} textAnchor="end" fill="#6a6f85" fontSize={10} fontFamily="monospace">{String(payload.value)}</text>
-                )} />
-                <Tooltip formatter={(v: unknown) => [`${v} calls`] as [string]} contentStyle={{ fontSize: 11, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)' }} />
-                <Bar dataKey="count" radius={[0, 6, 6, 0]}>
-                  {toolEntries.map((_, i) => <Cell key={i} fill={TOOL_COLORS[i % TOOL_COLORS.length]} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="space-y-1">
+            {toolEntries.map((item, idx) => (
+              <MetricRow
+                key={item.tool}
+                label={item.tool}
+                value={`${item.count}`}
+                barValue={(item.count / toolMax) * 100}
+                color={TOOL_COLORS[idx % TOOL_COLORS.length]}
+                valueText={`${item.count} calls`}
+              />
+            ))}
           </div>
         ) : (
           <div className="text-sm text-muted-foreground">No tool calls</div>
@@ -418,7 +423,9 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
   const [viewportEndMs, setViewportEndMs] = useState(totalDuration || 1);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const treeScrollRef = useRef<HTMLDivElement | null>(null);
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const syncingScrollRef = useRef(false);
   const viewportRange = Math.max(1, viewportEndMs - viewportStartMs);
   const zoomRatio = totalDuration > 0 ? viewportRange / totalDuration : 1;
 
@@ -426,7 +433,17 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
   const groups = useEventGroups(visibleEvents);
 
   const treeRows = useMemo(() => {
-    const rows: Array<{ kind: 'group' | 'event'; id: string; label: string; type: TraceEventType; event?: TraceEvent; depth: number; count?: number }> = [];
+    const rows: Array<{
+      kind: 'group' | 'event';
+      id: string;
+      label: string;
+      type: TraceEventType;
+      event?: TraceEvent;
+      depth: number;
+      count?: number;
+      collapsible?: boolean;
+    }> = [];
+
     for (const group of groups) {
       const first = group.events[0];
       const last = group.events[group.events.length - 1];
@@ -446,6 +463,30 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
         error_message: group.events.find(evt => evt.error_message)?.error_message ?? null,
       };
 
+      if (group.events.length === 1) {
+        const evt = group.events[0];
+        const singleLabel = (() => {
+          if (evt.event_type === 'thinking_level_change') {
+            return evt.thinking ? `${group.label} · ${evt.thinking}` : group.label;
+          }
+          if (evt.event_type === 'model_change') {
+            return evt.model ? `${group.label} · ${evt.model}` : group.label;
+          }
+          return summarizeEvent(evt) || group.label;
+        })();
+
+        rows.push({
+          kind: 'event',
+          id: evt.id,
+          label: singleLabel,
+          type: evt.event_type,
+          event: evt,
+          depth: 0,
+          collapsible: false,
+        });
+        continue;
+      }
+
       rows.push({
         kind: 'group',
         id: group.id,
@@ -454,11 +495,20 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
         event: aggregateEvent,
         depth: 0,
         count: group.events.length,
+        collapsible: true,
       });
 
       if (!collapsedGroups.has(group.id)) {
         for (const evt of group.events) {
-          rows.push({ kind: 'event', id: evt.id, label: summarizeEvent(evt), type: evt.event_type, event: evt, depth: 1 });
+          rows.push({
+            kind: 'event',
+            id: evt.id,
+            label: summarizeEvent(evt),
+            type: evt.event_type,
+            event: evt,
+            depth: 1,
+            collapsible: false,
+          });
         }
       }
     }
@@ -474,6 +524,16 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
       pct: (i / steps) * 100,
     }));
   }, [viewportStartMs, viewportRange]);
+
+  const syncVerticalScroll = (source: 'tree' | 'timeline', top: number) => {
+    if (syncingScrollRef.current) return;
+    syncingScrollRef.current = true;
+    const target = source === 'tree' ? timelineScrollRef.current : treeScrollRef.current;
+    if (target) target.scrollTop = top;
+    requestAnimationFrame(() => {
+      syncingScrollRef.current = false;
+    });
+  };
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -493,7 +553,11 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
       </div>
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="w-[280px] shrink-0 h-full overflow-auto border-r border-border bg-muted/15">
+        <div
+          ref={treeScrollRef}
+          className="w-[280px] shrink-0 h-full overflow-auto border-r border-border bg-muted/15"
+          onScroll={(e) => syncVerticalScroll('tree', e.currentTarget.scrollTop)}
+        >
           <div className="sticky top-0 z-10 h-8 px-3 flex items-center text-[11px] uppercase tracking-[0.16em] text-muted-foreground border-b border-border bg-background/95 backdrop-blur-sm">Service & Operation</div>
           {treeRows.map((row, idx) => {
             const isSelected = row.event && selectedEvent?.id === row.event.id;
@@ -505,7 +569,7 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
                 onMouseEnter={() => setHoveredRow(idx)}
                 onMouseLeave={() => setHoveredRow(null)}
                 onClick={() => {
-                  if (row.kind === 'group') {
+                  if (row.kind === 'group' && row.collapsible) {
                     setCollapsedGroups(prev => {
                       const next = new Set(prev);
                       if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
@@ -519,10 +583,12 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
                   }
                 }}
               >
-                {row.kind === 'group' ? (
+                {row.kind === 'group' && row.collapsible ? (
                   <span className="text-muted-foreground text-[10px]">{collapsedGroups.has(row.id) ? '▸' : '▾'}</span>
-                ) : (
+                ) : row.depth > 0 ? (
                   <span className="text-muted-foreground text-[10px] ml-4">▸</span>
+                ) : (
+                  <span className="w-[10px] shrink-0" />
                 )}
                 <span className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: EVENT_COLORS[row.type] }} />
                 <span className={cx('flex-1 truncate text-sm', row.kind === 'group' ? 'font-mono text-foreground' : 'text-muted-foreground')} title={row.label}>{row.label}</span>
@@ -537,12 +603,28 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
         </div>
 
         <div className="flex-1 min-w-0 h-full flex flex-col overflow-hidden">
-          <div className="relative h-8 border-b border-border shrink-0 bg-background/95 backdrop-blur-sm sticky top-0 z-10 pl-3 pr-4">
-            {timeMarkers.map((m, i) => (
-              <div key={i} className="absolute text-[10px] text-muted-foreground -translate-x-1/2 top-2" style={{ left: `${m.pct}%` }}>{m.label}</div>
-            ))}
+          <div className="relative h-8 border-b border-border shrink-0 bg-background/95 backdrop-blur-sm sticky top-0 z-10 pl-8 pr-10">
+            {timeMarkers.map((m, i) => {
+              const isFirst = i === 0;
+              const isLast = i === timeMarkers.length - 1;
+              return (
+                <div
+                  key={i}
+                  className="absolute text-[10px] text-muted-foreground top-2 whitespace-nowrap"
+                  style={
+                    isFirst
+                      ? { left: 8 }
+                      : isLast
+                        ? { right: 10 }
+                        : { left: `${m.pct}%`, transform: 'translateX(-50%)' }
+                  }
+                >
+                  {m.label}
+                </div>
+              );
+            })}
           </div>
-          <div ref={containerRef} className="flex-1 overflow-auto relative">
+          <div ref={timelineScrollRef} className="flex-1 overflow-auto relative" onScroll={(e) => syncVerticalScroll('timeline', e.currentTarget.scrollTop)}>
             {hoveredRow !== null && (
               <div className="absolute left-0 right-0 pointer-events-none bg-foreground/[0.025] border-y border-foreground/10 z-0" style={{ top: hoveredRow * ROW_H, height: ROW_H }} />
             )}
@@ -567,6 +649,7 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
           </div>
           <MiniTimelineScrubber
             totalDuration={totalDuration}
+            events={a.events}
             viewportStartMs={viewportStartMs}
             viewportEndMs={viewportEndMs}
             onChange={(start, end) => {
@@ -588,8 +671,17 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
 
 function TimelineBar({ evt, viewportStartMs, viewportEndMs, selected }: { evt: TraceEvent; viewportStartMs: number; viewportEndMs: number; selected: boolean }) {
   const viewportRange = Math.max(1, viewportEndMs - viewportStartMs);
-  const leftPct = Math.max(((evt.offset_ms - viewportStartMs) / viewportRange) * 100, 0);
-  const widthPct = Math.max((Math.max(evt.duration_ms, 150) / viewportRange) * 100, 0.18);
+  const eventStart = evt.offset_ms;
+  const eventEnd = evt.offset_ms + Math.max(evt.duration_ms, 150);
+  const clippedStart = Math.max(eventStart, viewportStartMs);
+  const clippedEnd = Math.min(eventEnd, viewportEndMs);
+
+  if (clippedEnd <= clippedStart) {
+    return null;
+  }
+
+  const leftPct = ((clippedStart - viewportStartMs) / viewportRange) * 100;
+  const widthPct = Math.max(((clippedEnd - clippedStart) / viewportRange) * 100, 0.18);
   const color = EVENT_COLORS[evt.event_type] || '#64748b';
   const label = evt.duration_ms >= 1000 ? formatOffset(evt.duration_ms) : `${evt.duration_ms}ms`;
 
@@ -611,45 +703,73 @@ function TimelineBar({ evt, viewportStartMs, viewportEndMs, selected }: { evt: T
       {evt.is_error && (
         <div className="absolute top-1 bottom-1 w-0.5 bg-destructive" style={{ left: `${leftPct}%` }} />
       )}
-      {widthPct > 2.5 && (
-        <span className="absolute top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground" style={{ left: `calc(${leftPct}% + ${Math.max(widthPct, 0.4)}%)` }}>
-          {label}
-        </span>
-      )}
+      <span
+        className="absolute top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground whitespace-nowrap"
+        style={{ left: `calc(${leftPct}% + ${Math.max(widthPct, 0.35)}% + 4px)` }}
+      >
+        {label}
+      </span>
     </>
   );
 }
 
 function MiniTimelineScrubber({
   totalDuration,
+  events,
   viewportStartMs,
   viewportEndMs,
   onChange,
 }: {
   totalDuration: number;
+  events: TraceEvent[];
   viewportStartMs: number;
   viewportEndMs: number;
   onChange: (start: number, end: number) => void;
 }) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<{ mode: 'window' | 'left' | 'right' | null; startX: number; startStart: number; startEnd: number } | null>(null);
+  const [hoverMs, setHoverMs] = useState<number | null>(null);
+  const [localViewport, setLocalViewport] = useState({ start: viewportStartMs, end: viewportEndMs });
+  const localViewportRef = useRef(localViewport);
+
+  useEffect(() => {
+    localViewportRef.current = localViewport;
+  }, [localViewport]);
+
+  useEffect(() => {
+    if (dragStateRef.current === null) {
+      setLocalViewport({ start: viewportStartMs, end: viewportEndMs });
+    }
+  }, [viewportStartMs, viewportEndMs]);
+
+  const emitChange = (start: number, end: number, immediate = false) => {
+    setLocalViewport({ start, end });
+    if (immediate) {
+      onChange(start, end);
+    }
+  };
 
   const handlePointerDown = (mode: 'window' | 'left' | 'right') => (e: React.PointerEvent) => {
     if (totalDuration <= 0) return;
     e.preventDefault();
+    e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     dragStateRef.current = {
       mode,
       startX: e.clientX,
-      startStart: viewportStartMs,
-      startEnd: viewportEndMs,
+      startStart: localViewportRef.current.start,
+      startEnd: localViewportRef.current.end,
     };
   };
 
   const handlePointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
-    const state = dragStateRef.current;
-    if (!state || !trackRef.current || totalDuration <= 0) return;
+    if (!trackRef.current || totalDuration <= 0) return;
     const rect = trackRef.current.getBoundingClientRect();
+    const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    setHoverMs(pct * totalDuration);
+
+    const state = dragStateRef.current;
+    if (!state) return;
     const deltaPct = (e.clientX - state.startX) / rect.width;
     const deltaMs = deltaPct * totalDuration;
     const minRange = Math.max(totalDuration * 0.01, 1000);
@@ -665,45 +785,113 @@ function MiniTimelineScrubber({
         nextStart -= nextEnd - totalDuration;
         nextEnd = totalDuration;
       }
-      onChange(Math.max(0, nextStart), Math.min(totalDuration, nextEnd));
+      emitChange(Math.max(0, nextStart), Math.min(totalDuration, nextEnd));
       return;
     }
 
     if (state.mode === 'left') {
-      let nextStart = Math.max(0, Math.min(state.startStart + deltaMs, state.startEnd - minRange));
-      onChange(nextStart, state.startEnd);
+      const nextStart = Math.max(0, Math.min(state.startStart + deltaMs, state.startEnd - minRange));
+      emitChange(nextStart, state.startEnd);
       return;
     }
 
-    let nextEnd = Math.min(totalDuration, Math.max(state.startEnd + deltaMs, state.startStart + minRange));
-    onChange(state.startStart, nextEnd);
+    const nextEnd = Math.min(totalDuration, Math.max(state.startEnd + deltaMs, state.startStart + minRange));
+    emitChange(state.startStart, nextEnd);
   };
 
   const handlePointerUp: React.PointerEventHandler<HTMLDivElement> = () => {
+    const pending = localViewportRef.current;
     dragStateRef.current = null;
+    onChange(pending.start, pending.end);
   };
 
-  const startPct = totalDuration > 0 ? (viewportStartMs / totalDuration) * 100 : 0;
-  const widthPct = totalDuration > 0 ? ((viewportEndMs - viewportStartMs) / totalDuration) * 100 : 100;
+  const startPct = totalDuration > 0 ? (localViewport.start / totalDuration) * 100 : 0;
+  const widthPct = totalDuration > 0 ? ((localViewport.end - localViewport.start) / totalDuration) * 100 : 100;
+  const hoverPct = hoverMs !== null && totalDuration > 0 ? (hoverMs / totalDuration) * 100 : null;
+
+  const miniBars = useMemo(() => {
+    if (totalDuration <= 0) return [] as Array<{ left: number; width: number; color: string; evt: TraceEvent }>;
+    return events.map(evt => ({
+      evt,
+      left: (evt.offset_ms / totalDuration) * 100,
+      width: Math.max((Math.max(evt.duration_ms, 150) / totalDuration) * 100, 0.16),
+      color: EVENT_COLORS[evt.event_type] || '#64748b',
+    }));
+  }, [events, totalDuration]);
+
+  const hoverEvent = useMemo(() => {
+    if (hoverMs === null) return null;
+    return events.find(evt => evt.offset_ms <= hoverMs && hoverMs <= evt.offset_ms + Math.max(evt.duration_ms, 150))
+      ?? events.reduce<TraceEvent | null>((closest, evt) => {
+        const center = evt.offset_ms + Math.max(evt.duration_ms, 150) / 2;
+        if (!closest) return evt;
+        const closestCenter = closest.offset_ms + Math.max(closest.duration_ms, 150) / 2;
+        return Math.abs(center - hoverMs) < Math.abs(closestCenter - hoverMs) ? evt : closest;
+      }, null);
+  }, [events, hoverMs]);
 
   return (
-    <div className="h-14 border-t border-border bg-background/95 shrink-0 px-3 py-3">
-      <div
-        ref={trackRef}
-        className="relative h-8 rounded-md border border-border/70 bg-muted/20 overflow-hidden"
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-      >
-        <div className="absolute inset-y-0 left-0 right-0 bg-[linear-gradient(to_right,transparent_0%,rgba(255,255,255,0.03)_50%,transparent_100%)]" />
-        <div className="absolute inset-y-1 rounded bg-foreground/10 border border-foreground/15"
-          style={{ left: `${startPct}%`, width: `${widthPct}%` }}
-          onPointerDown={handlePointerDown('window')}
+    <div className="h-20 border-t border-border bg-background/95 shrink-0 px-3 py-3">
+      <div className="relative">
+        <div
+          ref={trackRef}
+          className="relative h-12 rounded-md border border-border/70 bg-[#161823] overflow-hidden cursor-pointer select-none"
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onPointerLeave={() => {
+            handlePointerUp({} as React.PointerEvent<HTMLDivElement>);
+            setHoverMs(null);
+          }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize bg-foreground/15 hover:bg-foreground/25" onPointerDown={handlePointerDown('left')} />
-          <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize bg-foreground/15 hover:bg-foreground/25" onPointerDown={handlePointerDown('right')} />
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_0%,transparent_20%,transparent_80%,rgba(255,255,255,0.02)_100%)]" />
+          <div className="absolute inset-y-0 left-0 right-0">
+            {miniBars.map((bar, idx) => (
+              <div
+                key={idx}
+                className="absolute top-1/2 -translate-y-1/2 rounded-sm opacity-95"
+                style={{
+                  left: `${bar.left}%`,
+                  width: `${bar.width}%`,
+                  minWidth: 2,
+                  height: 10,
+                  backgroundColor: bar.color,
+                  boxShadow: `0 0 0 1px ${bar.color}22`,
+                }}
+                title={summarizeEvent(bar.evt)}
+              />
+            ))}
+          </div>
+
+          {hoverPct !== null && (
+            <div className="absolute top-0 bottom-0 w-px bg-white/60 pointer-events-none" style={{ left: `${hoverPct}%` }} />
+          )}
+
+          <div
+            className="absolute inset-y-1 rounded-md bg-white/10 border-2 border-white/55 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_0_20px_rgba(255,255,255,0.08)] cursor-grab active:cursor-grabbing"
+            style={{ left: `${startPct}%`, width: `${widthPct}%` }}
+            onPointerDown={handlePointerDown('window')}
+          >
+            <div className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize bg-white/25 hover:bg-white/40 border-r border-white/30" onPointerDown={handlePointerDown('left')} />
+            <div className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize bg-white/25 hover:bg-white/40 border-l border-white/30" onPointerDown={handlePointerDown('right')} />
+          </div>
         </div>
+
+        {hoverEvent && hoverPct !== null && (
+          <div
+            className="absolute -top-20 z-10 w-96 rounded-md border border-border/70 bg-[#1d2030] px-3 py-2 text-[11px] shadow-xl pointer-events-none"
+            style={{ left: `min(calc(${hoverPct}% + 8px), calc(100% - 24rem))` }}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: EVENT_COLORS[hoverEvent.event_type] || '#64748b' }} />
+              <span className="font-mono text-foreground">{EVENT_LABELS[hoverEvent.event_type] || hoverEvent.event_type}</span>
+              <span className="ml-auto text-muted-foreground font-mono">{formatOffset(hoverEvent.offset_ms)}</span>
+            </div>
+            <div className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words max-h-16 overflow-hidden" title={summarizeEvent(hoverEvent)}>
+              {summarizeEvent(hoverEvent)}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -747,7 +935,9 @@ function EventInspector({ event, onClose }: { event: TraceEvent; onClose: () => 
           {tab === 'result' && <InspectorResult event={event} />}
           {tab === 'usage' && <InspectorUsage event={event} />}
           {tab === 'raw' && (
-            <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-all font-mono leading-relaxed">{JSON.stringify(event, null, 2)}</pre>
+            <div className="rounded-lg border border-border/60 bg-secondary/40 p-2 overflow-auto">
+              <pre className="text-[10px] whitespace-pre-wrap break-all font-mono leading-relaxed hljs" dangerouslySetInnerHTML={{ __html: renderCodeHtml(JSON.stringify(event, null, 2), 'json') }} />
+            </div>
           )}
         </div>
       </div>
@@ -761,7 +951,12 @@ function InspectorContent({ event }: { event: TraceEvent }) {
       {event.content_preview && (
         <div>
           <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">Content</div>
-          <pre className="whitespace-pre-wrap break-words text-muted-foreground bg-secondary/50 rounded-lg p-2.5 font-mono text-[11px] leading-relaxed">{event.content_preview}</pre>
+          <div className="rounded-lg border border-border/60 bg-secondary/40 p-2.5 overflow-auto">
+            <div
+              className="text-sm text-foreground break-words [&_p]:my-2 [&_pre]:my-2 [&_code]:font-mono [&_pre]:overflow-auto [&_ul]:pl-5 [&_ol]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3"
+              dangerouslySetInnerHTML={{ __html: parseMarkdown(event.content_preview) }}
+            />
+          </div>
         </div>
       )}
 
@@ -790,8 +985,20 @@ function InspectorContent({ event }: { event: TraceEvent }) {
                         }}
                       />
                     </div>
+                  ) : tc.arguments_raw ? (
+                    <div className="rounded-lg border border-border/60 bg-background/70 overflow-auto max-h-[420px]">
+                      <pre
+                        className="text-[11px] leading-relaxed font-mono p-3 hljs"
+                        dangerouslySetInnerHTML={{ __html: renderCodeHtml(tc.arguments_raw, 'json') }}
+                      />
+                    </div>
                   ) : tc.arguments_preview ? (
-                    <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-words font-mono bg-background/60 rounded p-2">{tc.arguments_preview}</pre>
+                    <div className="rounded-lg border border-border/60 bg-background/70 overflow-auto max-h-[420px]">
+                      <pre
+                        className="text-[11px] leading-relaxed font-mono p-3 hljs"
+                        dangerouslySetInnerHTML={{ __html: renderCodeHtml(tc.arguments_preview, 'json') }}
+                      />
+                    </div>
                   ) : null}
                   {tc.result_preview && <div className="text-[10px] text-success mt-2">{tc.result_preview}</div>}
                 </div>
