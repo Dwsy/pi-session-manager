@@ -265,7 +265,7 @@ function SessionViewerContent({
     <div
       className={`h-full flex relative ${showToolExpandIndicator ? "" : "tool-expand-indicators-hidden"} ${previewMode ? "session-viewer-preview" : ""}`}
     >
-      {!previewMode && (
+      {!previewMode && !traceMode && (
         <SessionViewerSidebar
           showSidebar={showSidebar}
           isMobile={isMobile}
@@ -287,7 +287,7 @@ function SessionViewerContent({
       <div
         className="flex-1 flex flex-col min-w-0 min-h-0"
         style={{
-          paddingLeft: !previewMode && showSidebar && !isMobile ? `${sidebarWidth}px` : 0,
+          paddingLeft: !previewMode && !traceMode && showSidebar && !isMobile ? `${sidebarWidth}px` : 0,
         }}
       >
         <SessionViewerToolbar

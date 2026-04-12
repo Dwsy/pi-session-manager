@@ -20,7 +20,6 @@ import {
 } from 'recharts';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
-import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react';
 
 import { useSessionTrace } from '@/hooks/useSessionTrace';
@@ -505,7 +504,7 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
 
   return (
     <div className="h-full flex flex-col bg-background">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0 text-xs">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0 text-xs">
         <span className="px-2 py-1 rounded-full border border-border/60 bg-background text-foreground font-mono">{a.total_events} events</span>
         <span className="px-2 py-1 rounded-full border border-border/60 bg-background text-foreground font-mono">{a.total_tool_calls} tools</span>
         <span className={cx('px-2 py-1 rounded-full border font-mono', a.total_errors > 0 ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'border-border/60 bg-background text-foreground')}>{a.total_errors} errors</span>
@@ -517,97 +516,92 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
         </button>
       </div>
 
-      <PanelGroup orientation="horizontal" className="flex-1 min-h-0">
-        <Panel defaultSize={22} minSize={14} maxSize={34}>
-          <div className="h-full overflow-auto border-r border-border bg-muted/15">
-            <div className="sticky top-0 z-10 h-8 px-4 flex items-center text-[11px] uppercase tracking-[0.16em] text-muted-foreground border-b border-border bg-background/95 backdrop-blur-sm">Service & Operation</div>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="w-[280px] shrink-0 h-full overflow-auto border-r border-border bg-muted/15">
+          <div className="sticky top-0 z-10 h-8 px-3 flex items-center text-[11px] uppercase tracking-[0.16em] text-muted-foreground border-b border-border bg-background/95 backdrop-blur-sm">Service & Operation</div>
+          {treeRows.map((row, idx) => {
+            const isSelected = row.event && selectedEvent?.id === row.event.id;
+            return (
+              <div
+                key={row.id}
+                className={cx('flex items-center gap-2 px-3 border-b border-border/40 cursor-pointer transition-colors', hoveredRow === idx && 'bg-foreground/[0.03]', isSelected && 'bg-secondary/60')}
+                style={{ height: ROW_H }}
+                onMouseEnter={() => setHoveredRow(idx)}
+                onMouseLeave={() => setHoveredRow(null)}
+                onClick={() => {
+                  if (row.kind === 'group') {
+                    setCollapsedGroups(prev => {
+                      const next = new Set(prev);
+                      if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
+                      return next;
+                    });
+                  } else if (row.event) {
+                    onSelectEvent(selectedEvent?.id === row.event.id ? null : row.event);
+                  }
+                }}
+              >
+                {row.kind === 'group' ? (
+                  <span className="text-muted-foreground text-[10px]">{collapsedGroups.has(row.id) ? '▸' : '▾'}</span>
+                ) : (
+                  <span className="text-muted-foreground text-[10px] ml-4">▸</span>
+                )}
+                <span className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: EVENT_COLORS[row.type] }} />
+                <span className={cx('flex-1 truncate text-sm', row.kind === 'group' ? 'font-mono text-foreground' : 'text-muted-foreground')} title={row.label}>{row.label}</span>
+                {row.kind === 'group' ? (
+                  <span className="text-[10px] font-mono text-muted-foreground">{row.count}</span>
+                ) : row.event ? (
+                  <span className="text-[10px] font-mono text-muted-foreground shrink-0">({row.event.duration_ms >= 1000 ? formatOffset(row.event.duration_ms) : `${row.event.duration_ms}ms`})</span>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex-1 min-w-0 h-full flex flex-col overflow-hidden">
+          <div className="relative h-8 border-b border-border shrink-0 bg-background/95 backdrop-blur-sm sticky top-0 z-10 pl-3 pr-4">
+            {timeMarkers.map((m, i) => (
+              <div key={i} className="absolute text-[10px] text-muted-foreground -translate-x-1/2 top-2" style={{ left: `${m.pct}%` }}>{m.label}</div>
+            ))}
+          </div>
+          <div ref={containerRef} className="flex-1 overflow-auto relative" onWheel={onWheel} {...dragBind()}>
+            {hoveredRow !== null && (
+              <div className="absolute left-0 right-0 pointer-events-none bg-foreground/[0.025] border-y border-foreground/10 z-0" style={{ top: hoveredRow * ROW_H, height: ROW_H }} />
+            )}
             {treeRows.map((row, idx) => {
-              const isSelected = row.event && selectedEvent?.id === row.event.id;
+              const evt = row.event;
+              const isSelected = !!evt && selectedEvent?.id === evt.id;
               return (
                 <div
                   key={row.id}
-                  className={cx('flex items-center gap-2 px-3 border-b border-border/40 cursor-pointer transition-colors', hoveredRow === idx && 'bg-foreground/[0.03]', isSelected && 'bg-secondary/60')}
+                  className={cx('relative border-b border-border/40', hoveredRow === idx && 'bg-foreground/[0.02]')}
                   style={{ height: ROW_H }}
                   onMouseEnter={() => setHoveredRow(idx)}
                   onMouseLeave={() => setHoveredRow(null)}
-                  onClick={() => {
-                    if (row.kind === 'group') {
-                      setCollapsedGroups(prev => {
-                        const next = new Set(prev);
-                        if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
-                        return next;
-                      });
-                    } else if (row.event) {
-                      onSelectEvent(selectedEvent?.id === row.event.id ? null : row.event);
-                    }
-                  }}
+                  onClick={() => evt && onSelectEvent(isSelected ? null : evt)}
                 >
-                  {row.kind === 'group' ? (
-                    <span className="text-muted-foreground text-[10px]">{collapsedGroups.has(row.id) ? '▸' : '▾'}</span>
-                  ) : (
-                    <span className="text-muted-foreground text-[10px] ml-4">▸</span>
-                  )}
-                  <span className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: EVENT_COLORS[row.type] }} />
-                  <span className={cx('flex-1 truncate text-sm', row.kind === 'group' ? 'font-mono text-foreground' : 'text-muted-foreground')} title={row.label}>{row.label}</span>
-                  {row.kind === 'group' ? (
-                    <span className="text-[10px] font-mono text-muted-foreground">{row.count}</span>
-                  ) : row.event ? (
-                    <span className="text-[10px] font-mono text-muted-foreground shrink-0">({row.event.duration_ms >= 1000 ? formatOffset(row.event.duration_ms) : `${row.event.duration_ms}ms`})</span>
+                  {evt ? (
+                    <TimelineBar evt={evt} viewportStartMs={viewportStartMs} viewportEndMs={viewportEndMs} selected={isSelected} />
                   ) : null}
                 </div>
               );
             })}
           </div>
-        </Panel>
-
-        <PanelResizeHandle className="w-px bg-border hover:bg-foreground/20 transition-colors" />
-
-        <Panel defaultSize={selectedEvent ? 53 : 78} minSize={38}>
-          <div className="h-full flex flex-col overflow-hidden">
-            <div className="relative h-8 border-b border-border shrink-0 bg-background/95 backdrop-blur-sm sticky top-0 z-10 pl-4 pr-6">
-              {timeMarkers.map((m, i) => (
-                <div key={i} className="absolute text-[10px] text-muted-foreground -translate-x-1/2 top-2" style={{ left: `${m.pct}%` }}>{m.label}</div>
-              ))}
-            </div>
-            <div ref={containerRef} className="flex-1 overflow-auto relative" onWheel={onWheel} {...dragBind()}>
-              {hoveredRow !== null && (
-                <div className="absolute left-0 right-0 pointer-events-none bg-foreground/[0.025] border-y border-foreground/10 z-0" style={{ top: hoveredRow * ROW_H, height: ROW_H }} />
-              )}
-              {treeRows.map((row, idx) => {
-                const evt = row.event;
-                const isSelected = !!evt && selectedEvent?.id === evt.id;
-                return (
-                  <div
-                    key={row.id}
-                    className={cx('relative border-b border-border/40', hoveredRow === idx && 'bg-foreground/[0.02]')}
-                    style={{ height: ROW_H }}
-                    onMouseEnter={() => setHoveredRow(idx)}
-                    onMouseLeave={() => setHoveredRow(null)}
-                    onClick={() => evt && onSelectEvent(isSelected ? null : evt)}
-                  >
-                    {evt ? (
-                      <TimelineBar evt={evt} viewportStartMs={viewportStartMs} viewportEndMs={viewportEndMs} selected={isSelected} />
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </Panel>
+        </div>
 
         <AnimatePresence initial={false}>
           {selectedEvent && (
-            <>
-              <PanelResizeHandle className="w-px bg-border hover:bg-foreground/20 transition-colors" />
-              <Panel defaultSize={25} minSize={20} maxSize={40}>
-                <motion.div initial={{ x: 28, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 28, opacity: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 28 }} className="h-full">
-                  <EventInspector event={selectedEvent} onClose={() => onSelectEvent(null)} />
-                </motion.div>
-              </Panel>
-            </>
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 420, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+              className="h-full shrink-0 overflow-hidden border-l border-border"
+            >
+              <EventInspector event={selectedEvent} onClose={() => onSelectEvent(null)} />
+            </motion.div>
           )}
         </AnimatePresence>
-      </PanelGroup>
+      </div>
     </div>
   );
 }
