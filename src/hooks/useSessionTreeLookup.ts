@@ -81,6 +81,14 @@ export function useSessionTreeLookup(
       const entry = entryById.get(entryId);
       if (!entry) return entryId;
 
+      if (
+        entry.type === "label" &&
+        typeof entry.targetId === "string" &&
+        entry.targetId
+      ) {
+        return entry.targetId;
+      }
+
       const toolResultId = getToolResultId(entry);
       if (!toolResultId) return entryId;
 

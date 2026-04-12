@@ -1,7 +1,7 @@
 use crate::types::SessionEntry;
 use serde_json::Value;
 use std::cmp;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
@@ -34,12 +34,20 @@ struct TransformedSessionCacheEntry {
     content: String,
 }
 
-fn transformed_session_cache(
-) -> &'static RwLock<std::collections::HashMap<String, TransformedSessionCacheEntry>> {
-    static CACHE: OnceLock<
-        RwLock<std::collections::HashMap<String, TransformedSessionCacheEntry>>,
-    > = OnceLock::new();
-    CACHE.get_or_init(|| RwLock::new(std::collections::HashMap::new()))
+#[derive(Clone)]
+struct SessionLabelsCacheEntry {
+    modified_at_ms: u128,
+    labels: HashMap<String, String>,
+}
+
+fn transformed_session_cache() -> &'static RwLock<HashMap<String, TransformedSessionCacheEntry>> {
+    static CACHE: OnceLock<RwLock<HashMap<String, TransformedSessionCacheEntry>>> = OnceLock::new();
+    CACHE.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+fn session_labels_cache() -> &'static RwLock<HashMap<String, SessionLabelsCacheEntry>> {
+    static CACHE: OnceLock<RwLock<HashMap<String, SessionLabelsCacheEntry>>> = OnceLock::new();
+    CACHE.get_or_init(|| RwLock::new(HashMap::new()))
 }
 
 fn file_modified_ms(path: &str) -> Result<u128, String> {
@@ -52,6 +60,66 @@ fn file_modified_ms(path: &str) -> Result<u128, String> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_millis())
         .map_err(|e| format!("Failed to convert modified time: {e}"))
+}
+
+fn detect_session_provider(
+    path: &Path,
+) -> Result<Option<crate::domain::casr_min::providers::ProviderKind>, String> {
+    if let Some(provider) = crate::domain::casr_min::providers::detect_provider(Some(path), "") {
+        return Ok(Some(provider));
+    }
+
+    let backing_path = crate::domain::casr_min::bridge_ops::backing_file_path(path);
+    let content = fs::read_to_string(&backing_path).map_err(|e| {
+        format!(
+            "Failed to read session file {}: {e}",
+            backing_path.display()
+        )
+    })?;
+    Ok(crate::domain::casr_min::providers::detect_provider(
+        Some(path),
+        &content,
+    ))
+}
+
+fn resolve_pi_session_labels(path: &Path) -> Result<HashMap<String, String>, String> {
+    let entries = crate::domain::pi_session::parse_pi_session_entries(path)?;
+    Ok(crate::domain::pi_session::resolve_labels(&entries)
+        .into_iter()
+        .map(|(target_id, resolved)| (target_id, resolved.text))
+        .collect())
+}
+
+fn get_session_labels_sync(path: &str) -> Result<HashMap<String, String>, String> {
+    let session_path = Path::new(path);
+    if detect_session_provider(session_path)?
+        != Some(crate::domain::casr_min::providers::ProviderKind::Pi)
+    {
+        return Ok(HashMap::new());
+    }
+
+    let modified_at_ms = file_modified_ms(path)?;
+    if let Ok(guard) = session_labels_cache().read() {
+        if let Some(entry) = guard.get(path) {
+            if entry.modified_at_ms == modified_at_ms {
+                return Ok(entry.labels.clone());
+            }
+        }
+    }
+
+    let labels = resolve_pi_session_labels(session_path)?;
+
+    if let Ok(mut guard) = session_labels_cache().write() {
+        guard.insert(
+            path.to_string(),
+            SessionLabelsCacheEntry {
+                modified_at_ms,
+                labels: labels.clone(),
+            },
+        );
+    }
+
+    Ok(labels)
 }
 
 fn transformed_session_content(path: &str) -> Result<Option<String>, String> {
@@ -379,6 +447,14 @@ fn parse_session_entry(line: &str) -> Option<SessionEntry> {
         parent_id,
         timestamp,
         message,
+        target_id: value
+            .get("targetId")
+            .and_then(|field| field.as_str())
+            .map(|field| field.to_string()),
+        label: value
+            .get("label")
+            .and_then(|field| field.as_str())
+            .map(|field| field.to_string()),
     })
 }
 
@@ -396,6 +472,14 @@ pub(super) async fn get_session_entries_impl(path: String) -> Result<Vec<Session
         return Ok(entries);
     }
     crate::domain::session_bridge::parse_session_entries_from_path(Path::new(&path))
+}
+
+pub(super) async fn get_session_labels_impl(
+    path: String,
+) -> Result<HashMap<String, String>, String> {
+    tokio::task::spawn_blocking(move || get_session_labels_sync(&path))
+        .await
+        .map_err(|e| format!("Failed to join get_session_labels task: {e}"))?
 }
 
 pub(super) async fn get_session_by_path_impl(
@@ -438,34 +522,50 @@ pub(super) async fn delete_sessions_impl(
 }
 
 fn update_session_name_lines(lines: &mut [String], new_name: &str) -> Result<bool, String> {
-    for line in lines {
+    let mut session_info_index = None;
+    let mut header_index = None;
+
+    for (index, line) in lines.iter().enumerate() {
         if line.trim().is_empty() {
             continue;
         }
 
-        if let Ok(mut value) = serde_json::from_str::<Value>(line) {
-            if value["type"] == "session_info" || value["type"] == "session" {
-                if let Some(obj) = value.as_object_mut() {
-                    obj.insert(
-                        "name".to_string(),
-                        serde_json::Value::String(new_name.to_string()),
-                    );
-                    *line = serde_json::to_string(&value)
-                        .map_err(|e| format!("Failed to serialize: {e}"))?;
-                    return Ok(true);
-                }
-            }
+        let Ok(value) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        match value.get("type").and_then(Value::as_str) {
+            Some("session_info") => session_info_index = Some(index),
+            Some("session") if header_index.is_none() => header_index = Some(index),
+            _ => {}
         }
     }
 
-    Ok(false)
+    let Some(target_index) = session_info_index.or(header_index) else {
+        return Ok(false);
+    };
+
+    let mut value = serde_json::from_str::<Value>(&lines[target_index])
+        .map_err(|e| format!("Failed to parse session metadata line: {e}"))?;
+    let Some(obj) = value.as_object_mut() else {
+        return Ok(false);
+    };
+    obj.insert(
+        "name".to_string(),
+        serde_json::Value::String(new_name.to_string()),
+    );
+    lines[target_index] =
+        serde_json::to_string(&value).map_err(|e| format!("Failed to serialize: {e}"))?;
+    Ok(true)
 }
 
 fn build_session_info_line(new_name: &str) -> Result<String, String> {
+    let now = chrono::Utc::now();
     let session_info = serde_json::json!({
         "type": "session_info",
+        "id": format!("session-info-{}", now.timestamp_millis()),
+        "parentId": serde_json::Value::Null,
         "name": new_name,
-        "timestamp": chrono::Utc::now().to_rfc3339()
+        "timestamp": now.to_rfc3339()
     });
     serde_json::to_string(&session_info).map_err(|e| format!("Failed to serialize: {e}"))
 }
@@ -613,11 +713,30 @@ pub async fn fork_session_impl(
 #[cfg(test)]
 mod tests {
     use super::{
-        read_session_file_chunk_impl, read_session_file_incremental_impl,
-        read_session_file_incremental_offset_impl, rename_session_impl_with_db_path, utf8_safe_cut,
+        file_modified_ms, get_session_labels_impl, read_session_file_chunk_impl,
+        read_session_file_incremental_impl, read_session_file_incremental_offset_impl,
+        rename_session_impl_with_db_path, session_labels_cache, utf8_safe_cut,
     };
+    use std::collections::HashMap;
     use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::path::Path;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use tempfile::tempdir;
+
+    fn rewrite_until_modified(path: &Path, contents: &str, previous_modified_at_ms: u128) -> u128 {
+        for _ in 0..20 {
+            std::thread::sleep(Duration::from_millis(10));
+            fs::write(path, contents).expect("rewrite session content");
+
+            let modified_at_ms =
+                file_modified_ms(path.to_str().expect("path utf8")).expect("read modified time");
+            if modified_at_ms != previous_modified_at_ms {
+                return modified_at_ms;
+            }
+        }
+
+        panic!("session modified time did not change after rewrite")
+    }
 
     #[test]
     fn utf8_safe_cut_trims_incomplete_multibyte_suffix() {
@@ -709,7 +828,93 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rename_session_updates_existing_session_info_line() {
+    async fn get_session_labels_returns_empty_for_non_pi_sessions() {
+        let temp_dir = tempdir().expect("tempdir");
+        let path = temp_dir.path().join("session.jsonl");
+        fs::write(&path, "[]").expect("write session content");
+
+        let labels = get_session_labels_impl(path.to_str().expect("path utf8").to_string())
+            .await
+            .expect("non-pi labels should succeed");
+
+        assert!(labels.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_session_labels_returns_latest_wins_labels_for_all_targets() {
+        let temp_dir = tempdir().expect("tempdir");
+        let path = temp_dir.path().join("session.jsonl");
+        fs::write(
+            &path,
+            concat!(
+                "{\"type\":\"session\",\"version\":3,\"id\":\"sess-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace\"}\n",
+                "{\"type\":\"message\",\"id\":\"m1\",\"parentId\":null,\"timestamp\":\"2026-04-09T10:01:00Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}]}}\n",
+                "{\"type\":\"session_info\",\"id\":\"info-1\",\"parentId\":\"m1\",\"timestamp\":\"2026-04-09T10:01:30Z\",\"name\":\"Tree node\"}\n",
+                "{\"type\":\"label\",\"id\":\"l1\",\"parentId\":\"m1\",\"timestamp\":\"2026-04-09T10:02:00Z\",\"targetId\":\"m1\",\"label\":\"first\"}\n",
+                "{\"type\":\"label\",\"id\":\"l2\",\"parentId\":\"l1\",\"timestamp\":\"2026-04-09T10:03:00Z\",\"targetId\":\"m1\",\"label\":\"second\"}\n",
+                "{\"type\":\"label\",\"id\":\"l3\",\"parentId\":\"info-1\",\"timestamp\":\"2026-04-09T10:04:00Z\",\"targetId\":\"info-1\",\"label\":\"sidebar marker\"}\n"
+            ),
+        )
+        .expect("write session content");
+
+        let labels = get_session_labels_impl(path.to_str().expect("path utf8").to_string())
+            .await
+            .expect("pi labels should succeed");
+
+        let expected = HashMap::from([
+            ("info-1".to_string(), "sidebar marker".to_string()),
+            ("m1".to_string(), "second".to_string()),
+        ]);
+        assert_eq!(labels, expected);
+    }
+
+    #[tokio::test]
+    async fn get_session_labels_refreshes_cache_when_modified_time_changes() {
+        let temp_dir = tempdir().expect("tempdir");
+        let path = temp_dir.path().join("session.jsonl");
+        fs::write(
+            &path,
+            concat!(
+                "{\"type\":\"session\",\"version\":3,\"id\":\"sess-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace\"}\n",
+                "{\"type\":\"message\",\"id\":\"m1\",\"parentId\":null,\"timestamp\":\"2026-04-09T10:01:00Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}]}}\n",
+                "{\"type\":\"label\",\"id\":\"l1\",\"parentId\":\"m1\",\"timestamp\":\"2026-04-09T10:02:00Z\",\"targetId\":\"m1\",\"label\":\"before\"}\n"
+            ),
+        )
+        .expect("write session content");
+
+        let path_str = path.to_str().expect("path utf8").to_string();
+        let initial = get_session_labels_impl(path_str.clone())
+            .await
+            .expect("initial labels should succeed");
+        assert_eq!(initial.get("m1").map(String::as_str), Some("before"));
+
+        let previous_modified_at_ms = file_modified_ms(&path_str).expect("read modified time");
+        let updated_modified_at_ms = rewrite_until_modified(
+            &path,
+            concat!(
+                "{\"type\":\"session\",\"version\":3,\"id\":\"sess-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace\"}\n",
+                "{\"type\":\"message\",\"id\":\"m1\",\"parentId\":null,\"timestamp\":\"2026-04-09T10:01:00Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}]}}\n",
+                "{\"type\":\"label\",\"id\":\"l1\",\"parentId\":\"m1\",\"timestamp\":\"2026-04-09T10:02:00Z\",\"targetId\":\"m1\",\"label\":\"after\"}\n"
+            ),
+            previous_modified_at_ms,
+        );
+
+        let refreshed = get_session_labels_impl(path_str.clone())
+            .await
+            .expect("refreshed labels should succeed");
+        assert_eq!(refreshed.get("m1").map(String::as_str), Some("after"));
+
+        let cache = session_labels_cache().read().expect("cache lock");
+        let cache_entry = cache.get(&path_str).expect("cache entry");
+        assert_eq!(cache_entry.modified_at_ms, updated_modified_at_ms);
+        assert_eq!(
+            cache_entry.labels.get("m1").map(String::as_str),
+            Some("after")
+        );
+    }
+
+    #[tokio::test]
+    async fn rename_session_updates_latest_session_info_line() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system time after epoch")
@@ -721,7 +926,11 @@ mod tests {
         let db_path = base_dir.join("test.db");
         fs::write(
             &path,
-            "{\"type\":\"session_info\",\"name\":\"old\"}\n{\"type\":\"message\",\"id\":\"m1\"}\n",
+            concat!(
+                "{\"type\":\"session\",\"id\":\"sess-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace\",\"name\":\"header-name\"}\n",
+                "{\"type\":\"session_info\",\"id\":\"info-1\",\"timestamp\":\"2026-04-09T10:01:00Z\",\"name\":\"old\"}\n",
+                "{\"type\":\"message\",\"id\":\"m1\"}\n"
+            ),
         )
         .expect("write session content");
 
@@ -734,9 +943,12 @@ mod tests {
         .expect("rename should succeed");
 
         let content = fs::read_to_string(&path).expect("read updated session");
-        assert!(content.contains("\"type\":\"session_info\""));
-        assert!(content.contains("\"name\":\"new-name\""));
-        assert!(content.contains("\"id\":\"m1\""));
+        let lines: Vec<&str> = content.lines().collect();
+        assert!(lines[0].contains("\"name\":\"header-name\""));
+        assert!(lines[1].contains("\"type\":\"session_info\""));
+        assert!(lines[1].contains("\"name\":\"new-name\""));
+        assert!(lines[1].contains("\"id\":\"info-1\""));
+        assert!(lines[2].contains("\"id\":\"m1\""));
 
         let _ = fs::remove_file(&path);
         let _ = fs::remove_dir_all(&base_dir);
@@ -769,6 +981,8 @@ mod tests {
         assert!(lines[0].contains("\"id\":\"m1\""));
         assert!(lines[1].contains("\"type\":\"session_info\""));
         assert!(lines[1].contains("\"name\":\"added-name\""));
+        assert!(lines[1].contains("\"id\":\"session-info-"));
+        assert!(lines[1].contains("\"parentId\":null"));
 
         let _ = fs::remove_file(&path);
         let _ = fs::remove_dir_all(&base_dir);

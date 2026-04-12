@@ -332,7 +332,7 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             entry_id TEXT NOT NULL,
             session_path TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
-            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking')),
+            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking', 'label')),
             content TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
@@ -358,6 +358,12 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             [],
         )
         .map_err(|e| format!("Failed to create entry_id index on message_entries: {e}"))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_message_entries_session_time ON message_entries(session_path, timestamp)",
+            [],
+        )
+        .map_err(|e| format!("Failed to create session/timestamp index on message_entries: {e}"))?;
 
         if config.enable_fts5 {
             // init_fts5(&conn)?; // DISABLED: sessions_fts incompatible with sessions schema (TEXT PRIMARY KEY)

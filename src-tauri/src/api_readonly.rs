@@ -97,6 +97,10 @@ pub struct FullTextSearchRequest {
     pub page_size: Option<usize>,
     #[serde(default)]
     pub match_mode: Option<String>,
+    #[serde(default)]
+    pub sort_order: Option<String>,
+    #[serde(default)]
+    pub source_filter: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -310,35 +314,86 @@ where
     D: Fn(&'static str, Value) -> Fut,
     Fut: Future<Output = Result<Value, String>>,
 {
-    if req.query.trim().is_empty() {
+    let source_filter = req.source_filter.clone();
+    let allows_empty_query = matches!(source_filter.as_deref(), Some("labels_only"));
+    if req.query.trim().is_empty() && !allows_empty_query {
         return Err(ApiReadonlyError::bad_request("query is required"));
     }
 
     let from = parse_time_opt(&req.from)?;
     let to = parse_time_opt(&req.to)?;
-    let effective_glob = effective_glob(req.glob_pattern.clone(), req.project.as_deref());
-    let payload = serde_json::json!({
-        "query": req.query,
-        "role_filter": req.role_filter.unwrap_or_else(|| "all".to_string()),
-        "glob_pattern": effective_glob,
-        "page": req.page.unwrap_or(0),
-        "page_size": req.page_size.unwrap_or(20),
-        "match_mode": req.match_mode,
-    });
+    let effective_glob = effective_glob(req.glob_pattern.clone(), None);
+    let requested_page = req.page.unwrap_or(0);
+    let requested_page_size = req.page_size.unwrap_or(20);
+    let role_filter = req.role_filter.unwrap_or_else(|| "all".to_string());
+    let project_path = req.project.clone();
+    let needs_post_filter = from.is_some() || to.is_some();
 
-    let data = dispatch("full_text_search", payload)
-        .await
-        .map_err(ApiReadonlyError::bad_request)?;
-    let mut response: FullTextSearchResponse = serde_json::from_value(data)
+    let build_payload = |page: usize, page_size: usize| {
+        serde_json::json!({
+            "query": req.query,
+            "role_filter": role_filter,
+            "glob_pattern": effective_glob,
+            "project_path": project_path,
+            "page": page,
+            "page_size": page_size,
+            "match_mode": req.match_mode,
+            "sort_order": req.sort_order,
+            "source_filter": source_filter,
+        })
+    };
+
+    if needs_post_filter && normalize_filtered {
+        let mut backend_page = 0usize;
+        let fetch_page_size = requested_page_size.max(100);
+        let mut filtered_hits = Vec::new();
+
+        loop {
+            let data = dispatch(
+                "full_text_search",
+                build_payload(backend_page, fetch_page_size),
+            )
+            .await
+            .map_err(ApiReadonlyError::bad_request)?;
+            let response: FullTextSearchResponse = serde_json::from_value(data)
+                .map_err(|e| ApiReadonlyError::internal(format!("Invalid search response: {e}")))?;
+
+            filtered_hits.extend(
+                response
+                    .hits
+                    .into_iter()
+                    .filter(|hit| hit_matches_scope(hit, None, from, to)),
+            );
+
+            if !response.has_more {
+                break;
+            }
+            backend_page += 1;
+        }
+
+        let total_hits = filtered_hits.len();
+        let start = requested_page.saturating_mul(requested_page_size);
+        let hits = filtered_hits
+            .into_iter()
+            .skip(start)
+            .take(requested_page_size)
+            .collect::<Vec<_>>();
+        return Ok(FullTextSearchResponse {
+            has_more: start.saturating_add(hits.len()) < total_hits,
+            total_hits,
+            hits,
+        });
+    }
+
+    let data = dispatch(
+        "full_text_search",
+        build_payload(requested_page, requested_page_size),
+    )
+    .await
+    .map_err(ApiReadonlyError::bad_request)?;
+    let response: FullTextSearchResponse = serde_json::from_value(data)
         .map_err(|e| ApiReadonlyError::internal(format!("Invalid search response: {e}")))?;
 
-    response
-        .hits
-        .retain(|hit| hit_matches_scope(hit, req.project.as_deref(), from, to));
-    response.total_hits = response.hits.len();
-    if normalize_filtered {
-        response.has_more = false;
-    }
     Ok(response)
 }
 
@@ -363,6 +418,8 @@ where
             page: Some(0),
             page_size: Some(top_k),
             match_mode: Some("any".to_string()),
+            sort_order: None,
+            source_filter: None,
         },
         true,
     )

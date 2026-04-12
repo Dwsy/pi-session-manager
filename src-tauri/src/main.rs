@@ -489,6 +489,7 @@ fn main() {
             pi_session_manager::read_session_file_incremental_offset,
             pi_session_manager::get_file_stats,
             pi_session_manager::get_session_entries,
+            pi_session_manager::get_session_labels,
             pi_session_manager::detect_session_format,
             pi_session_manager::list_supported_session_providers,
             pi_session_manager::convert_session_format,

@@ -6,6 +6,14 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Added
 
+- **Pi tree node-label search and source filtering** — labels are now first-class searchable node metadata in global full-text search and the in-session tree
+  - Added Pi-specific raw label parsing with latest-wins / empty-label-clears semantics
+  - Indexed resolved labels as `source_type = "label"` hits tied to target nodes
+  - Added global `sourceFilter` modes: `all`, `labels_only`, `content_only`
+  - Added browse-all-labels behavior for `labels_only + empty query`
+  - Added backend/runtime `get_session_labels` lookup for chunked session trees
+  - Added label-aware session-tree display, local search, labeled-only filtering, and target-node navigation
+
 - **Pi Live session integration** — real-time session sync with pi agent
   - Unified TypeScript type definitions for live sessions
   - Live session indicator in sidebar and dashboard

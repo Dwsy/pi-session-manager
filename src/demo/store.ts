@@ -230,6 +230,28 @@ export function fullTextSearchDemo(options: DemoFullTextSearchOptions) {
   return fullTextSearchDemoInStore(state, options)
 }
 
+export function getDemoSessionLabels(path: string): Record<string, string> {
+  const state = ensureStore()
+  const entries = state.entriesByPath.get(path) || []
+  const labels = new Map<string, string>()
+
+  for (const entry of entries) {
+    if (entry.type !== 'label' || typeof entry.targetId !== 'string' || !entry.targetId) {
+      continue
+    }
+
+    const label = typeof entry.label === 'string' ? entry.label : ''
+    if (label.trim()) {
+      labels.set(entry.targetId, label)
+      continue
+    }
+
+    labels.delete(entry.targetId)
+  }
+
+  return Object.fromEntries(labels)
+}
+
 export function getDemoStats() {
   const state = ensureStore()
   return getDemoStatsFromStore(state)

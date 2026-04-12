@@ -8,6 +8,7 @@ export {
   getDemoFavorites,
   getDemoSessionByPath,
   getDemoSessionContent,
+  getDemoSessionLabels,
   getDemoSessionTags,
   getDemoSessions,
   getDemoStats,

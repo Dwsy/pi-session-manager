@@ -3,7 +3,7 @@
 
 use chrono::Utc;
 use lazy_static::lazy_static;
-use pi_session_manager::commands::full_text_search;
+use pi_session_manager::commands::full_text_search as backend_full_text_search;
 use pi_session_manager::config::Config;
 use pi_session_manager::scanner;
 use pi_session_manager::sqlite_cache;
@@ -105,6 +105,101 @@ fn setup_test_db(sessions: &[(&str, &str, &[(&str, &str)])]) -> tempfile::TempDi
     drop(conn);
 
     temp_dir
+}
+
+fn setup_test_db_from_raw_sessions(sessions: &[(&str, &str)]) -> tempfile::TempDir {
+    let temp_dir = tempdir().unwrap();
+    let sessions_dir = temp_dir.path().join("sessions");
+    fs::create_dir_all(&sessions_dir).unwrap();
+    env::set_var("HOME", temp_dir.path());
+
+    let config = Config::default();
+    let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
+
+    for (id, content) in sessions {
+        let path = sessions_dir.join(format!("{id}.jsonl"));
+        fs::write(&path, content).unwrap();
+        let (session, entries) = scanner::parse_session_info(&path).unwrap();
+        sqlite_cache::upsert_session(&mut conn, &session, Utc::now(), Some(&entries)).unwrap();
+    }
+
+    drop(conn);
+    temp_dir
+}
+
+fn make_session_file_with_labels(id: &str, cwd: &str, entries: &[&str]) -> String {
+    let header = format!(
+        r#"{{"type":"session","version":3,"id":"{id}","timestamp":"2026-02-10T22:00:00Z","cwd":"{cwd}"}}"#
+    );
+    std::iter::once(header)
+        .chain(entries.iter().map(|entry| entry.to_string()))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+async fn full_text_search(
+    query: String,
+    role_filter: String,
+    glob_pattern: Option<String>,
+    project_path: Option<String>,
+    page: usize,
+    page_size: usize,
+    match_mode: Option<String>,
+    sort_order: Option<String>,
+) -> Result<FullTextSearchResponse, String> {
+    backend_full_text_search(
+        query,
+        role_filter,
+        glob_pattern,
+        project_path,
+        page,
+        page_size,
+        match_mode,
+        sort_order,
+        None,
+    )
+    .await
+}
+
+async fn full_text_search_with_source_filter(
+    query: String,
+    role_filter: String,
+    source_filter: Option<String>,
+    page: usize,
+    page_size: usize,
+) -> Result<FullTextSearchResponse, String> {
+    backend_full_text_search(
+        query,
+        role_filter,
+        None,
+        None,
+        page,
+        page_size,
+        None,
+        None,
+        source_filter,
+    )
+    .await
+}
+
+fn make_codex_session_file(id: &str, cwd: &str, user_text: &str) -> String {
+    serde_json::json!([
+        {
+            "type": "session_meta",
+            "timestamp": "2026-04-08T10:00:00.000Z",
+            "payload": { "id": id, "cwd": cwd }
+        },
+        {
+            "type": "response_item",
+            "timestamp": "2026-04-08T10:00:01.000Z",
+            "payload": {
+                "type": "message",
+                "role": "user",
+                "content": [{ "type": "input_text", "text": user_text }]
+            }
+        }
+    ])
+    .to_string()
 }
 
 #[tokio::test]
@@ -1133,6 +1228,374 @@ async fn test_full_text_search_cjk_substring_query() {
     assert_eq!(response.hits.len(), 1);
     assert_eq!(response.hits[0].entry_id, "cjk1-msg0");
     assert!(response.hits[0].content.contains("弱智"));
+}
+
+#[tokio::test]
+async fn test_full_text_search_excludes_external_sessions_when_search_disabled() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+
+    let temp_dir = tempdir().unwrap();
+    env::set_var("HOME", temp_dir.path());
+
+    let pi_sessions_dir = temp_dir
+        .path()
+        .join(".pi")
+        .join("agent")
+        .join("sessions")
+        .join("project");
+    let codex_sessions_dir = temp_dir
+        .path()
+        .join(".codex")
+        .join("sessions")
+        .join("2026")
+        .join("04")
+        .join("11");
+    fs::create_dir_all(&pi_sessions_dir).unwrap();
+    fs::create_dir_all(&codex_sessions_dir).unwrap();
+
+    let pi_path = pi_sessions_dir.join("pi-alpha.jsonl");
+    let codex_path = codex_sessions_dir.join("codex-alpha.jsonl");
+
+    fs::write(
+        &pi_path,
+        make_session_file(
+            "pi-alpha",
+            "/repo/pi",
+            &[("user", "alpha visible in pi search")],
+        ),
+    )
+    .unwrap();
+    fs::write(
+        &codex_path,
+        make_codex_session_file(
+            "codex-alpha",
+            "/repo/codex",
+            "alpha hidden in external search",
+        ),
+    )
+    .unwrap();
+
+    let mut config = Config::default();
+    config.external_sessions_include_in_search = false;
+    pi_session_manager::config::save_config(&config).unwrap();
+
+    let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
+    for path in [&pi_path, &codex_path] {
+        let (session, entries) = scanner::parse_session_info(path).unwrap();
+        sqlite_cache::upsert_session(&mut conn, &session, Utc::now(), Some(&entries)).unwrap();
+    }
+    drop(conn);
+
+    let content_results = full_text_search(
+        "alpha".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    let pi_path_str = pi_path.to_string_lossy().to_string();
+    assert!(content_results
+        .hits
+        .iter()
+        .all(|hit| hit.session_path == pi_path_str.as_str()));
+    assert!(content_results
+        .hits
+        .iter()
+        .all(|hit| hit.session_id != "codex-alpha"));
+
+    let session_id_results = full_text_search(
+        "codex-alpha".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    assert!(session_id_results.hits.is_empty());
+    assert_eq!(session_id_results.total_hits, 0);
+}
+
+#[tokio::test]
+async fn test_full_text_search_prioritizes_label_hits_for_same_node() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+
+    let _temp_dir = setup_test_db_from_raw_sessions(&[
+        (
+            "label-priority",
+            &make_session_file_with_labels(
+                "label-priority",
+                "/workspace/labels",
+                &[
+                    r#"{"type":"message","id":"label-priority-msg0","timestamp":"2026-02-10T22:00:01Z","message":{"role":"assistant","content":[{"type":"text","text":"alpha appears in ordinary content"}]}}"#,
+                    r#"{"type":"label","id":"label-priority-label0","parentId":"label-priority-msg0","targetId":"label-priority-msg0","timestamp":"2026-02-10T22:00:05Z","label":"alpha priority label"}"#,
+                ],
+            ),
+        ),
+        (
+            "content-fallback",
+            &make_session_file(
+                "content-fallback",
+                "/workspace/content",
+                &[("user", "alpha only appears in ordinary content")],
+            ),
+        ),
+    ]);
+
+    let response = full_text_search(
+        "alpha".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    assert!(response.total_hits >= 2);
+    assert_eq!(response.hits[0].session_id, "label-priority");
+    assert_eq!(response.hits[0].entry_id, "label-priority-msg0");
+    assert_eq!(response.hits[0].source_type, "label");
+    assert_eq!(response.hits[0].match_reason.as_deref(), Some("label"));
+    assert!(response
+        .hits
+        .iter()
+        .any(|hit| { hit.session_id == "content-fallback" && hit.source_type != "label" }));
+}
+
+#[tokio::test]
+async fn test_full_text_search_source_filters_and_label_browse_mode() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+
+    let _temp_dir = setup_test_db_from_raw_sessions(&[
+        (
+            "labels-a",
+            &make_session_file_with_labels(
+                "labels-a",
+                "/workspace/labels-a",
+                &[
+                    r#"{"type":"message","id":"labels-a-msg0","timestamp":"2026-02-10T22:00:01Z","message":{"role":"assistant","content":[{"type":"text","text":"alpha content body"}]}}"#,
+                    r#"{"type":"label","id":"labels-a-label0","parentId":"labels-a-msg0","targetId":"labels-a-msg0","timestamp":"2026-02-10T22:00:02Z","label":"alpha label"}"#,
+                ],
+            ),
+        ),
+        (
+            "labels-b",
+            &make_session_file_with_labels(
+                "labels-b",
+                "/workspace/labels-b",
+                &[
+                    r#"{"type":"message","id":"labels-b-msg0","timestamp":"2026-02-10T22:00:03Z","message":{"role":"user","content":[{"type":"text","text":"beta content body"}]}}"#,
+                    r#"{"type":"label","id":"labels-b-label0","parentId":"labels-b-msg0","targetId":"labels-b-msg0","timestamp":"2026-02-10T22:00:04Z","label":"beta label"}"#,
+                ],
+            ),
+        ),
+        (
+            "feedface-1111",
+            &make_session_file(
+                "feedface-1111",
+                "/workspace/session-id",
+                &[("assistant", "session id rediscovery preview")],
+            ),
+        ),
+        (
+            "content-only-session",
+            &make_session_file(
+                "content-only-session",
+                "/workspace/content-only",
+                &[("user", "feedface shows up only in message content")],
+            ),
+        ),
+    ]);
+
+    let labels_only = full_text_search_with_source_filter(
+        "alpha".to_string(),
+        "all".to_string(),
+        Some("labels_only".to_string()),
+        0,
+        10,
+    )
+    .await
+    .unwrap();
+    assert_eq!(labels_only.total_hits, 1);
+    assert!(labels_only
+        .hits
+        .iter()
+        .all(|hit| hit.source_type == "label"));
+    assert!(labels_only
+        .hits
+        .iter()
+        .all(|hit| hit.match_reason.as_deref() == Some("label")));
+
+    let content_only = full_text_search_with_source_filter(
+        "alpha".to_string(),
+        "all".to_string(),
+        Some("content_only".to_string()),
+        0,
+        10,
+    )
+    .await
+    .unwrap();
+    assert_eq!(content_only.total_hits, 1);
+    assert!(content_only.hits.iter().all(|hit| hit.source_type == "user"
+        || hit.source_type == "assistant"
+        || hit.source_type == "thinking"));
+    assert!(content_only
+        .hits
+        .iter()
+        .all(|hit| hit.match_reason.as_deref() == Some("content")));
+
+    let all_results = full_text_search_with_source_filter(
+        "alpha".to_string(),
+        "all".to_string(),
+        Some("all".to_string()),
+        0,
+        10,
+    )
+    .await
+    .unwrap();
+    assert_eq!(all_results.total_hits, 1);
+    assert_eq!(all_results.hits[0].source_type, "label");
+    assert_eq!(all_results.hits[0].match_reason.as_deref(), Some("label"));
+
+    let labels_only_empty = full_text_search_with_source_filter(
+        "".to_string(),
+        "all".to_string(),
+        Some("labels_only".to_string()),
+        0,
+        10,
+    )
+    .await
+    .unwrap();
+    assert_eq!(labels_only_empty.total_hits, 2);
+    assert_eq!(labels_only_empty.hits.len(), 2);
+    assert!(labels_only_empty
+        .hits
+        .iter()
+        .all(|hit| hit.source_type == "label"));
+    assert_eq!(labels_only_empty.hits[0].entry_id, "labels-b-msg0");
+    assert_eq!(labels_only_empty.hits[1].entry_id, "labels-a-msg0");
+
+    let all_empty = full_text_search_with_source_filter(
+        "".to_string(),
+        "all".to_string(),
+        Some("all".to_string()),
+        0,
+        10,
+    )
+    .await
+    .unwrap();
+    assert_eq!(all_empty.total_hits, 0);
+    assert!(all_empty.hits.is_empty());
+
+    let content_only_empty = full_text_search_with_source_filter(
+        "".to_string(),
+        "all".to_string(),
+        Some("content_only".to_string()),
+        0,
+        10,
+    )
+    .await
+    .unwrap();
+    assert_eq!(content_only_empty.total_hits, 0);
+    assert!(content_only_empty.hits.is_empty());
+
+    let session_id_all = full_text_search_with_source_filter(
+        "feedface".to_string(),
+        "all".to_string(),
+        Some("all".to_string()),
+        0,
+        10,
+    )
+    .await
+    .unwrap();
+    assert_eq!(session_id_all.hits[0].entry_id, "");
+    assert_eq!(
+        session_id_all.hits[0].match_reason.as_deref(),
+        Some("session_id_prefix")
+    );
+
+    let session_id_content_only = full_text_search_with_source_filter(
+        "feedface".to_string(),
+        "all".to_string(),
+        Some("content_only".to_string()),
+        0,
+        10,
+    )
+    .await
+    .unwrap();
+    assert!(session_id_content_only
+        .hits
+        .iter()
+        .all(|hit| hit.match_reason.as_deref() == Some("content")));
+    assert!(session_id_content_only
+        .hits
+        .iter()
+        .all(|hit| hit.entry_id != ""));
+
+    let session_id_labels_only = full_text_search_with_source_filter(
+        "feedface".to_string(),
+        "all".to_string(),
+        Some("labels_only".to_string()),
+        0,
+        10,
+    )
+    .await
+    .unwrap();
+    assert_eq!(session_id_labels_only.total_hits, 0);
+    assert!(session_id_labels_only.hits.is_empty());
+}
+
+#[tokio::test]
+async fn test_full_text_search_does_not_match_role_or_source_type_metadata() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+
+    let _temp_dir = setup_test_db_from_raw_sessions(&[(
+        "metadata-guard",
+        &make_session_file_with_labels(
+            "metadata-guard",
+            "/workspace/metadata",
+            &[
+                r#"{"type":"message","id":"metadata-guard-msg0","timestamp":"2026-02-10T22:00:01Z","message":{"role":"assistant","content":[{"type":"text","text":"plain content"}]}}"#,
+                r#"{"type":"label","id":"metadata-guard-label0","parentId":"metadata-guard-msg0","targetId":"metadata-guard-msg0","timestamp":"2026-02-10T22:00:02Z","label":"bookmark"}"#,
+            ],
+        ),
+    )]);
+
+    let content_only = full_text_search_with_source_filter(
+        "assistant".to_string(),
+        "all".to_string(),
+        Some("content_only".to_string()),
+        0,
+        10,
+    )
+    .await
+    .unwrap();
+    assert_eq!(content_only.total_hits, 0);
+
+    let labels_only = full_text_search_with_source_filter(
+        "label".to_string(),
+        "all".to_string(),
+        Some("labels_only".to_string()),
+        0,
+        10,
+    )
+    .await
+    .unwrap();
+    assert_eq!(labels_only.total_hits, 0);
 }
 
 #[tokio::test]

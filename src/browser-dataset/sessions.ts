@@ -13,6 +13,37 @@ export async function getBrowserDatasetSessionByPath(
   return cache.sessionByPath.get(path)?.info || null;
 }
 
+export async function getBrowserDatasetSessionLabels(
+  path: string,
+): Promise<Record<string, string>> {
+  const cache = await loadDatasetCache();
+  const session = cache.sessionByPath.get(path);
+  if (!session) {
+    throw new Error(`Dataset session not found: ${path}`);
+  }
+
+  const labels = new Map<string, string>();
+  for (const entry of session.entries) {
+    if (
+      entry.type !== "label" ||
+      typeof entry.targetId !== "string" ||
+      !entry.targetId
+    ) {
+      continue;
+    }
+
+    const label = typeof entry.label === "string" ? entry.label : "";
+    if (label.trim()) {
+      labels.set(entry.targetId, label);
+      continue;
+    }
+
+    labels.delete(entry.targetId);
+  }
+
+  return Object.fromEntries(labels);
+}
+
 export async function readBrowserDatasetChunk(
   path: string,
   offset = 0,

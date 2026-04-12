@@ -15,6 +15,7 @@ import {
   fullTextSearchDemo,
   getDemoDayStats,
   getDemoSessionByPath,
+  getDemoSessionLabels,
   getDemoSessions,
   getDemoStats,
   listDemoSessionsPaginated,
@@ -26,6 +27,7 @@ import {
   fullTextSearchBrowserDataset,
   getBrowserDatasetDayStats,
   getBrowserDatasetSessionByPath,
+  getBrowserDatasetSessionLabels,
   getBrowserDatasetSessions,
   getBrowserDatasetStats,
   readBrowserDatasetChunk,
@@ -173,6 +175,7 @@ export const backendSessionProvider: SessionProvider = {
     return invoke<FullTextSearchResponse>("full_text_search", {
       query: options.query,
       roleFilter: options.roleFilter,
+      sourceFilter: options.sourceFilter || "all",
       globPattern: options.globPattern || null,
       projectPath: options.projectPath || null,
       includeThinking: getCachedSettings().search.includeThinkingInSearch,
@@ -181,6 +184,9 @@ export const backendSessionProvider: SessionProvider = {
       matchMode: options.matchMode || "any",
       sortOrder: options.sortOrder || "newest",
     });
+  },
+  async getSessionLabels(path) {
+    return invoke<Record<string, string>>("get_session_labels", { path });
   },
   async getStats(sessions) {
     const includeExternal =
@@ -277,6 +283,7 @@ export const demoSessionProvider: SessionProvider = {
       includeThinking: getCachedSettings().search.includeThinkingInSearch,
       query: options.query,
       roleFilter: options.roleFilter,
+      sourceFilter: options.sourceFilter,
       globPattern: options.globPattern,
       projectPath: options.projectPath,
       page: options.page,
@@ -284,6 +291,7 @@ export const demoSessionProvider: SessionProvider = {
       matchMode: options.matchMode === "all" ? "all" : "any",
       sortOrder: options.sortOrder,
     }),
+  getSessionLabels: async (path) => getDemoSessionLabels(path),
   getStats: async () => getDemoStats(),
   getDayStats: async (date, sessions) => getDemoDayStats(date, sessions),
   paginateSessions: async (options) =>
@@ -315,6 +323,7 @@ export const browserSessionProvider: SessionProvider = {
   searchSessions: async (query, sessions) =>
     searchBrowserDatasetSessions(query, sessions),
   fullTextSearch: async (options) => fullTextSearchBrowserDataset(options),
+  getSessionLabels: async (path) => getBrowserDatasetSessionLabels(path),
   getStats: async (sessions) => getBrowserDatasetStats(sessions),
   getDayStats: async (date, sessions) =>
     getBrowserDatasetDayStats(date, sessions),

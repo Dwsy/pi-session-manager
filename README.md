@@ -20,7 +20,7 @@
 ## Highlights
 
 - Session browser with list/project/kanban views, favorites, tags, rename, delete, and export.
-- Full-text search via SQLite FTS + Tantivy-backed indexing/search flows.
+- Full-text search via SQLite FTS + Tantivy-backed indexing/search flows, including tree node label search and node content vs. label source filtering.
 - In-session message search with inline highlights, current-match navigation, and keyboard-friendly close/reset behavior. `Cmd/Ctrl + F` behavior is configurable (search vs. sidebar toggle).
 - Built-in terminal (PTY) and one-click resume of Pi sessions.
 - **External Sessions** — scan and browse sessions from other coding agents (Claude, OpenCode, etc.) with unified settings UI for scan control and default resume targets.

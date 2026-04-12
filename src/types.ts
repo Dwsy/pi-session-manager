@@ -161,6 +161,8 @@ export interface SessionChunk {
   has_more: boolean
 }
 
+export type FullTextSearchSourceFilter = 'all' | 'labels_only' | 'content_only'
+
 export type SessionConvertTarget =
   | 'pi'
   | 'claude-code'
@@ -314,11 +316,11 @@ export interface FullTextSearchHit {
   session_name?: string
   entry_id: string
   role: string
-  source_type: 'user' | 'assistant' | 'thinking'
+  source_type: 'user' | 'assistant' | 'thinking' | 'label'
   content: string
   timestamp: string
   score: number
-  match_reason?: 'content' | 'session_id_exact' | 'session_id_prefix'
+  match_reason?: 'content' | 'label' | 'session_id_exact' | 'session_id_prefix'
 }
 
 export interface FullTextSearchResponse {

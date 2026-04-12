@@ -1,10 +1,24 @@
 use super::deps::*;
+use crate::domain::pi_session::resolve_labels;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum MessageEntriesBackfillState {
     InProgress,
-    Done,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MessageEntryRow {
+    row_id: String,
+    entry_id: String,
+    session_path: String,
+    role: String,
+    source_type: String,
+    content: String,
+    timestamp: String,
+}
+
+const INSERT_CHUNK_SIZE: usize = 32;
+const MESSAGE_INDEX_ROW_VERSION: &str = "2";
 
 static MESSAGE_ENTRIES_BACKFILL_STATE: Mutex<Option<HashMap<String, MessageEntriesBackfillState>>> =
     Mutex::new(None);
@@ -23,13 +37,6 @@ fn try_claim_message_entries_backfill(db_key: &str) -> Result<bool, String> {
             );
             Ok(false)
         }
-        Some(MessageEntriesBackfillState::Done) => {
-            debug!(
-                "[Migration] message_entries backfill already completed for db {}, skipping duplicate trigger",
-                db_key
-            );
-            Ok(false)
-        }
         None => {
             states.insert(db_key.to_string(), MessageEntriesBackfillState::InProgress);
             Ok(true)
@@ -37,19 +44,15 @@ fn try_claim_message_entries_backfill(db_key: &str) -> Result<bool, String> {
     }
 }
 
-fn finish_message_entries_backfill(db_key: &str, mark_done: bool) -> Result<(), String> {
+fn finish_message_entries_backfill(db_key: &str, _mark_done: bool) -> Result<(), String> {
     let mut guard = MESSAGE_ENTRIES_BACKFILL_STATE
         .lock()
         .map_err(|_| "Failed to lock backfill state guard".to_string())?;
     let states = guard.get_or_insert_with(HashMap::new);
 
-    if mark_done {
-        states.insert(db_key.to_string(), MessageEntriesBackfillState::Done);
-    } else {
-        states.remove(db_key);
-        if states.is_empty() {
-            *guard = None;
-        }
+    states.remove(db_key);
+    if states.is_empty() {
+        *guard = None;
     }
 
     Ok(())
@@ -68,7 +71,43 @@ fn clear_message_entries_backfill_state_for_tests(db_key: &str) {
     }
 }
 
-fn backfill_missing_message_entries(conn: &Connection) -> Result<(), String> {
+fn ensure_message_index_state_table(conn: &Connection) -> Result<(), String> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS message_index_state (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )",
+        [],
+    )
+    .map_err(|e| format!("Failed to create message_index_state: {e}"))?;
+    Ok(())
+}
+
+fn get_message_index_row_version(conn: &Connection) -> Result<Option<String>, String> {
+    conn.query_row(
+        "SELECT value FROM message_index_state WHERE key = 'row_version'",
+        [],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(|e| format!("Failed to read message index row version: {e}"))
+}
+
+fn set_message_index_row_version(conn: &Connection, version: &str) -> Result<(), String> {
+    conn.execute(
+        "INSERT INTO message_index_state (key, value) VALUES ('row_version', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![version],
+    )
+    .map_err(|e| format!("Failed to persist message index row version: {e}"))?;
+    Ok(())
+}
+
+fn backing_store_exists(session_path: &str) -> bool {
+    crate::domain::casr_min::bridge_ops::backing_file_path(Path::new(session_path)).exists()
+}
+
+fn refresh_message_entries_if_needed(conn: &Connection) -> Result<(), String> {
     let db_key = conn
         .path()
         .map(|path| path.to_string())
@@ -79,114 +118,22 @@ fn backfill_missing_message_entries(conn: &Connection) -> Result<(), String> {
     }
 
     let result = (|| -> Result<bool, String> {
-        let sessions_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
-            .map_err(|e| format!("Failed to count sessions for message_entries backfill: {e}"))?;
-        if sessions_count == 0 {
-            return Ok(false);
+        ensure_message_index_state_table(conn)?;
+
+        let stored_row_version = get_message_index_row_version(conn)?;
+        let needs_full_rebuild = stored_row_version.as_deref() != Some(MESSAGE_INDEX_ROW_VERSION);
+
+        if needs_full_rebuild {
+            let rebuilt_count = rebuild_all_message_entries(conn)?;
+            info!(
+                "[Migration] Rebuilt message_entries rows for {} sessions with row version {}",
+                rebuilt_count, MESSAGE_INDEX_ROW_VERSION
+            );
+            return Ok(true);
         }
 
-        let indexed_sessions_count: i64 = conn
-            .query_row(
-                "SELECT COUNT(DISTINCT session_path) FROM message_entries",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(|e| {
-                format!("Failed to count indexed sessions for message_entries backfill: {e}")
-            })?;
-
-        if indexed_sessions_count >= sessions_count {
-            return Ok(false);
-        }
-
-        let mut stmt = conn
-            .prepare(
-                "SELECT s.path
-                 FROM sessions s
-                 WHERE (
-                     COALESCE(s.first_message, '') <> ''
-                     OR COALESCE(s.last_message, '') <> ''
-                     OR COALESCE(s.user_messages_text, '') <> ''
-                     OR COALESCE(s.assistant_messages_text, '') <> ''
-                 )
-                 AND NOT EXISTS (
-                     SELECT 1 FROM message_entries m WHERE m.session_path = s.path
-                 )
-                 ORDER BY s.modified DESC",
-            )
-            .map_err(|e| {
-                format!("Failed to prepare missing session paths for message_entries backfill: {e}")
-            })?;
-
-        let missing_paths: Vec<String> = stmt
-            .query_map([], |row| row.get(0))
-            .map_err(|e| {
-                format!("Failed to query missing session paths for message_entries backfill: {e}")
-            })?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| {
-                format!("Failed to collect missing session paths for message_entries backfill: {e}")
-            })?;
-
-        if missing_paths.is_empty() {
-            return Ok(false);
-        }
-
-        info!(
-            "[Migration] message_entries indexed sessions {}/{}. Backfilling {} missing sessions...",
-            indexed_sessions_count,
-            sessions_count,
-            missing_paths.len()
-        );
-
-        let mut backfilled = 0usize;
-        for path in &missing_paths {
-            let session = SessionInfo {
-                path: path.clone(),
-                id: String::new(),
-                cwd: String::new(),
-                name: None,
-                created: Utc::now(),
-                modified: Utc::now(),
-                message_count: 0,
-                first_message: String::new(),
-                all_messages_text: String::new(),
-                user_messages_text: String::new(),
-                assistant_messages_text: String::new(),
-                last_message: String::new(),
-                last_message_role: String::new(),
-                parent_session_path: None,
-            };
-            if let Err(e) = insert_message_entries(conn, &session) {
-                if Path::new(path).exists() {
-                    warn!(
-                        "[Migration] Failed to backfill missing message entries for session {}: {}",
-                        path, e
-                    );
-                } else {
-                    warn!(
-                        "[Migration] Removing stale session cache entry for missing file: {}",
-                        path
-                    );
-                    if let Err(delete_err) = super::maintenance::delete_session(conn, path) {
-                        warn!(
-                            "[Migration] Failed to remove stale session cache entry {}: {}",
-                            path, delete_err
-                        );
-                    }
-                }
-            } else {
-                backfilled += 1;
-            }
-        }
-
-        info!(
-            "[Migration] Backfilled message entries for {} missing sessions",
-            backfilled
-        );
-
-        Ok(true)
+        let backfilled = backfill_missing_message_entries(conn)?;
+        Ok(backfilled > 0)
     })();
 
     match result {
@@ -201,8 +148,132 @@ fn backfill_missing_message_entries(conn: &Connection) -> Result<(), String> {
     }
 }
 
+fn rebuild_all_message_entries(conn: &Connection) -> Result<usize, String> {
+    let session_paths = list_all_session_paths(conn)?;
+    conn.execute_batch("BEGIN IMMEDIATE TRANSACTION")
+        .map_err(|e| format!("Failed to begin message_entries rebuild transaction: {e}"))?;
+
+    let rebuild_result = (|| -> Result<usize, String> {
+        if session_paths.is_empty() {
+            conn.execute("DELETE FROM message_entries", [])
+                .map_err(|e| {
+                    format!("Failed to clear message_entries during empty rebuild: {e}")
+                })?;
+            set_message_index_row_version(conn, MESSAGE_INDEX_ROW_VERSION)?;
+            return Ok(0);
+        }
+
+        conn.execute("DELETE FROM message_entries", [])
+            .map_err(|e| format!("Failed to clear message_entries for rebuild: {e}"))?;
+
+        let mut rebuilt_count = 0usize;
+        for path in session_paths {
+            if !backing_store_exists(&path) {
+                warn!(
+                    "[Migration] Removing stale session cache entry for missing backing file: {}",
+                    path
+                );
+                if let Err(delete_err) = super::maintenance::delete_session(conn, &path) {
+                    warn!(
+                        "[Migration] Failed to remove stale session cache entry {}: {}",
+                        path, delete_err
+                    );
+                }
+                continue;
+            }
+
+            insert_message_entries_for_path(conn, &path)?;
+            rebuilt_count += 1;
+        }
+
+        set_message_index_row_version(conn, MESSAGE_INDEX_ROW_VERSION)?;
+        Ok(rebuilt_count)
+    })();
+
+    match rebuild_result {
+        Ok(rebuilt_count) => {
+            conn.execute_batch("COMMIT").map_err(|e| {
+                format!("Failed to commit message_entries rebuild transaction: {e}")
+            })?;
+            Ok(rebuilt_count)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch("ROLLBACK");
+            Err(error)
+        }
+    }
+}
+
+fn list_all_session_paths(conn: &Connection) -> Result<Vec<String>, String> {
+    let mut stmt = conn
+        .prepare("SELECT path FROM sessions ORDER BY modified DESC, path ASC")
+        .map_err(|e| format!("Failed to prepare session path listing for rebuild: {e}"))?;
+
+    let rows = stmt
+        .query_map([], |row| row.get(0))
+        .map_err(|e| format!("Failed to query session paths for rebuild: {e}"))?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect session paths for rebuild: {e}"))
+}
+
+fn backfill_missing_message_entries(conn: &Connection) -> Result<usize, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT s.path
+             FROM sessions s
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM message_entries m WHERE m.session_path = s.path
+             )
+             ORDER BY s.modified DESC, s.path ASC",
+        )
+        .map_err(|e| {
+            format!("Failed to prepare missing session paths for message_entries backfill: {e}")
+        })?;
+
+    let missing_paths: Vec<String> = stmt
+        .query_map([], |row| row.get(0))
+        .map_err(|e| {
+            format!("Failed to query missing session paths for message_entries backfill: {e}")
+        })?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| {
+            format!("Failed to collect missing session paths for message_entries backfill: {e}")
+        })?;
+
+    if missing_paths.is_empty() {
+        return Ok(0);
+    }
+
+    info!(
+        "[Migration] Backfilling message_entries rows for {} missing sessions",
+        missing_paths.len()
+    );
+
+    let mut backfilled = 0usize;
+    for path in missing_paths {
+        if !backing_store_exists(&path) {
+            warn!(
+                "[Migration] Removing stale session cache entry for missing backing file: {}",
+                path
+            );
+            if let Err(delete_err) = super::maintenance::delete_session(conn, &path) {
+                warn!(
+                    "[Migration] Failed to remove stale session cache entry {}: {}",
+                    path, delete_err
+                );
+            }
+            continue;
+        }
+
+        insert_message_entries_for_path(conn, &path)?;
+        backfilled += 1;
+    }
+
+    Ok(backfilled)
+}
+
 pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
-    // Check and migrate message_entries schema: add any missing columns (non-destructive)
     let mut stmt = conn
         .prepare("PRAGMA table_info(message_entries)")
         .map_err(|e| format!("Failed to query message_entries schema: {e}"))?;
@@ -239,7 +310,6 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
         debug!("[Schema] message_entries columns OK: {:?}", me_columns);
     }
 
-    // Ensure message_fts exists with correct schema (no triggers needed for content-bearing FTS5)
     let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_fts'")
         .map_err(|e| format!("Failed to check message_fts existence: {e}"))?;
@@ -252,7 +322,6 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
         create_message_fts5(conn)?;
         rebuild_message_fts_index(conn)?;
     } else {
-        // Check if FTS has required columns
         let mut stmt = conn
             .prepare("PRAGMA table_info(message_fts)")
             .map_err(|e| format!("Failed to query message_fts schema: {e}"))?;
@@ -267,56 +336,52 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
             .all(|&col| fts_columns.contains(&col.to_string()));
 
         if !fts_has_all {
-            error!("[Migration] message_fts schema incomplete. Has columns: {:?}. Recreating virtual table...", fts_columns);
+            error!(
+                "[Migration] message_fts schema incomplete. Has columns: {:?}. Recreating virtual table...",
+                fts_columns
+            );
             conn.execute("DROP TABLE IF EXISTS message_fts", [])
                 .map_err(|e| format!("Failed to drop old message_fts: {e}"))?;
             create_message_fts5(conn)?;
             rebuild_message_fts_index(conn)?;
-            // Index will be automatically rebuilt from message_entries content.
             info!("[Migration] Recreated message_fts virtual table");
         } else {
             debug!("[Schema] message_fts columns OK: {:?}", fts_columns);
-            // Check if it's using auto-sync with content='message_entries'
             let mut stmt_sql = conn
                 .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='message_fts'")
                 .map_err(|e| format!("Failed to query message_fts definition: {e}"))?;
             let sql: String = stmt_sql
                 .query_row([], |row| row.get(0))
                 .map_err(|e| format!("Failed to read message_fts sql: {e}"))?;
-            // Detect if content='message_entries' is present
             let is_auto_sync = sql.contains("content='message_entries'")
                 || sql.contains("content=\"message_entries\"");
-            if !is_auto_sync {
+            let has_metadata_columns_unindexed =
+                sql.contains("role UNINDEXED") && sql.contains("source_type UNINDEXED");
+            if !is_auto_sync || !has_metadata_columns_unindexed {
                 error!(
-                    "[Migration] message_fts is manual (no content=). Converting to auto-sync..."
+                    "[Migration] message_fts schema is outdated. Recreating content-synced content-only FTS index..."
                 );
                 conn.execute("DROP TABLE IF EXISTS message_fts", [])
-                    .map_err(|e| format!("Failed to drop manual message_fts: {e}"))?;
+                    .map_err(|e| format!("Failed to drop outdated message_fts: {e}"))?;
                 create_message_fts5(conn)?;
                 rebuild_message_fts_index(conn)?;
-                // Index will be automatically rebuilt from message_entries content.
-                info!("[Migration] Converted message_fts to auto-sync");
+                info!("[Migration] Recreated message_fts with updated schema");
             } else {
                 debug!("[Schema] message_fts already auto-sync");
             }
         }
     }
 
-    // Ensure triggers exist to keep message_fts in sync with message_entries.
     create_message_entries_triggers(conn)?;
 
-    if let Err(e) = backfill_missing_message_entries(conn) {
-        error!(
-            "[Migration] Failed to backfill missing message entries: {}",
-            e
-        );
+    if let Err(e) = refresh_message_entries_if_needed(conn) {
+        error!("[Migration] Failed to refresh message entries: {}", e);
     }
 
     Ok(())
 }
 
 pub(crate) fn drop_message_entries_triggers(conn: &Connection) -> Result<(), String> {
-    // Drop legacy manual triggers; with content='message_entries' auto-sync, they are not needed.
     conn.execute("DROP TRIGGER IF EXISTS message_entries_ai", [])
         .map_err(|e| format!("Failed to drop trigger message_entries_ai: {e}"))?;
     conn.execute("DROP TRIGGER IF EXISTS message_entries_ad", [])
@@ -327,7 +392,6 @@ pub(crate) fn drop_message_entries_triggers(conn: &Connection) -> Result<(), Str
 }
 
 fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
-    // Insert trigger
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS message_entries_ai AFTER INSERT ON message_entries BEGIN
          INSERT INTO message_fts(rowid, session_path, role, source_type, content)
@@ -336,7 +400,6 @@ fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create trigger message_entries_ai: {e}"))?;
 
-    // Delete trigger (use 'delete' command)
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS message_entries_ad AFTER DELETE ON message_entries BEGIN
          INSERT INTO message_fts(message_fts, rowid, session_path, role, source_type, content)
@@ -345,7 +408,6 @@ fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create trigger message_entries_ad: {e}"))?;
 
-    // Update trigger (delete old, insert new)
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS message_entries_au AFTER UPDATE ON message_entries BEGIN
          INSERT INTO message_fts(message_fts, rowid, session_path, role, source_type, content)
@@ -361,13 +423,11 @@ fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
 }
 
 fn create_message_fts5(conn: &Connection) -> Result<(), String> {
-    // Create virtual FTS5 table that is automatically maintained by SQLite
-    // because it specifies content='message_entries'. No triggers needed.
     conn.execute(
         "CREATE VIRTUAL TABLE IF NOT EXISTS message_fts USING fts5(
             session_path UNINDEXED,
-            role,
-            source_type,
+            role UNINDEXED,
+            source_type UNINDEXED,
             content,
             content='message_entries',
             content_rowid='rowid',
@@ -388,9 +448,6 @@ fn rebuild_message_fts_index(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
-// ============ Message-level FTS support ============
-
-/// Delete all message entries for a session (used before re-inserting)
 pub fn delete_message_entries_for_session(
     conn: &Connection,
     session_path: &str,
@@ -400,20 +457,11 @@ pub fn delete_message_entries_for_session(
         session_path
     );
 
-    // Check if message_entries table exists
-    let mut stmt = conn
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'")
-        .map_err(|e| format!("Failed to check message_entries existence: {e}"))?;
-    let exists: bool = stmt
-        .query_row([], |row| Ok(row.get::<_, String>(0)? == "message_entries"))
-        .unwrap_or(false);
-
-    if !exists {
+    if !message_entries_table_exists(conn)? {
         debug!("[Delete] message_entries table does not exist, skipping delete");
         return Ok(());
     }
 
-    // Validate schema has all required columns before attempting DELETE
     let mut col_stmt = conn
         .prepare("PRAGMA table_info(message_entries)")
         .map_err(|e| format!("Failed to query message_entries schema: {e}"))?;
@@ -432,28 +480,9 @@ pub fn delete_message_entries_for_session(
         error!("[Delete] message_entries schema incomplete. Columns: {:?}. Required: {:?}. Triggering migration...",
             column_names, required);
         ensure_message_fts_schema(conn)?;
-        // Retry after migration
-        let mut col_stmt2 = conn
-            .prepare("PRAGMA table_info(message_entries)")
-            .map_err(|e| format!("Failed to prepare PRAGMA after migration: {e}"))?;
-        let columns2: Vec<String> = col_stmt2
-            .query_map([], |row| row.get(1))
-            .map_err(|e| format!("Failed to query columns after migration: {e}"))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("Failed to collect columns after migration: {e}"))?;
-        if !required
-            .iter()
-            .all(|&col| columns2.contains(&col.to_string()))
-        {
-            return Err(format!(
-                "message_entries schema still incomplete after migration: {columns2:?}"
-            ));
-        }
-        debug!("[Delete] Schema migration successful, retrying delete");
         return delete_message_entries_for_session(conn, session_path);
     }
 
-    // Debug logging
     if cfg!(debug_assertions) {
         debug!("[Delete] message_entries schema OK: {:?}", column_names);
     }
@@ -477,7 +506,6 @@ pub fn delete_message_entries_for_session(
                 e.sqlite_error_code()
             );
 
-            // Always attempt recovery via migration, then retry
             error!("[Delete] Attempting schema migration recovery...");
             if let Err(migrate_err) = ensure_message_fts_schema(conn) {
                 error!("[Delete] Migration recovery failed: {}", migrate_err);
@@ -495,6 +523,16 @@ pub fn delete_message_entries_for_session(
     Ok(())
 }
 
+fn message_entries_table_exists(conn: &Connection) -> Result<bool, String> {
+    let mut stmt = conn
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'")
+        .map_err(|e| format!("Failed to check message_entries existence: {e}"))?;
+    let exists = stmt
+        .query_row([], |row| Ok(row.get::<_, String>(0)? == "message_entries"))
+        .unwrap_or(false);
+    Ok(exists)
+}
+
 fn load_include_thinking_in_search() -> bool {
     crate::settings_store::get::<Value>("app_settings")
         .ok()
@@ -508,195 +546,104 @@ fn load_include_thinking_in_search() -> bool {
         .unwrap_or(false)
 }
 
-fn build_message_index_rows(
-    entry: &Value,
-    session_path: &str,
-    include_thinking: bool,
-) -> Vec<(String, String, String, String, String, String, String)> {
-    let Some(message) = entry.get("message") else {
-        return vec![];
-    };
-
-    let role = message
-        .get("role")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .to_string();
-    if role != "user" && role != "assistant" {
-        return vec![];
-    }
-
-    let entry_id = entry
-        .get("id")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .trim()
-        .to_string();
-    if entry_id.is_empty() {
-        return vec![];
-    }
-
-    let timestamp = entry
-        .get("timestamp")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .to_string();
-
-    extract_index_segments(entry, include_thinking)
-        .into_iter()
-        .map(|(source_type, content)| {
-            (
-                format!("{entry_id}:{source_type}"),
-                entry_id.clone(),
-                session_path.to_string(),
-                role.clone(),
-                source_type,
-                content,
-                timestamp.clone(),
-            )
-        })
-        .collect()
+fn build_row_id(session_path: &str, entry_id: &str, source_type: &str) -> String {
+    format!("{session_path}::{entry_id}::{source_type}")
 }
 
-/// Insert message entries from a session file into message_entries table
-pub fn insert_message_entries(conn: &Connection, session: &SessionInfo) -> Result<(), String> {
-    use serde_json::Value;
-    use std::io::BufReader;
-
-    let mut stmt = conn
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'")
-        .map_err(|e| format!("Failed to check message_entries existence: {e}"))?;
-    let exists: bool = stmt
-        .query_row([], |row| Ok(row.get::<_, String>(0)? == "message_entries"))
-        .unwrap_or(false);
-
-    if !exists {
-        return Ok(());
-    }
-
-    let include_thinking = load_include_thinking_in_search();
-    let file = fs::File::open(&session.path)
-        .map_err(|e| format!("Failed to open file for message entries: {e}"))?;
-    let reader = BufReader::new(file);
-
-    let mut inserted_count = 0;
-    for line_result in reader.lines() {
-        let line: String = line_result.map_err(|e| e.to_string())?;
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        if let Ok(entry) = serde_json::from_str::<Value>(&line) {
-            for (id, entry_id, session_path, role, source_type, content, timestamp) in
-                build_message_index_rows(&entry, &session.path, include_thinking)
-            {
-                conn.execute(
-                    "INSERT OR REPLACE INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                    params![id, entry_id, session_path, role, source_type, content, timestamp],
-                )
-                .map_err(|e| format!("Failed to insert message entry (session: {}, row: {}): {}", session.path, id, e))?;
-                inserted_count += 1;
-            }
-        }
-    }
-
-    debug!(
-        "Inserted {} message entries for session: {}",
-        inserted_count, session.path
-    );
-    Ok(())
-}
-
-/// Upsert message entries into message_entries table from a pre-parsed list.
-/// This is more efficient than insert_message_entries because it avoids re-reading the session file.
-/// Callers are responsible for clearing stale rows before invoking this helper.
-pub fn upsert_message_entries(
-    conn: &Connection,
+fn build_rows_from_session_entries(
     session_path: &str,
     entries: &[SessionEntry],
-) -> Result<(), String> {
-    struct MessageEntryRow {
-        row_id: String,
-        entry_id: String,
-        role: String,
-        source_type: String,
-        content: String,
-        timestamp: String,
-    }
-
-    const INSERT_CHUNK_SIZE: usize = 32;
-
-    let mut stmt = conn
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'")
-        .map_err(|e| format!("Failed to check message_entries existence: {e}"))?;
-    let exists: bool = stmt
-        .query_row([], |row| Ok(row.get::<_, String>(0)? == "message_entries"))
-        .unwrap_or(false);
-
-    if !exists {
-        return Ok(());
-    }
-
-    drop(stmt);
-
-    let include_thinking = load_include_thinking_in_search();
+    include_thinking: bool,
+) -> Vec<MessageEntryRow> {
     let mut rows = Vec::new();
+    let mut message_roles_by_entry_id = HashMap::new();
 
     for entry in entries {
-        let Some(ref msg) = entry.message else {
+        let Some(message) = entry.message.as_ref() else {
             continue;
         };
-
-        if msg.role != "user" && msg.role != "assistant" {
+        if message.role != "user" && message.role != "assistant" {
             continue;
         }
 
-        let mut visible_parts = Vec::new();
-        let mut thinking_parts = Vec::new();
-        for item in &msg.content {
-            match item.content_type.as_str() {
-                "thinking" => {
-                    if include_thinking {
-                        if let Some(text) = item.text.as_deref() {
-                            let trimmed = text.trim();
-                            if !trimmed.is_empty() {
-                                thinking_parts.push(trimmed.to_string());
-                            }
-                        }
-                    }
-                }
-                _ => {
-                    if let Some(text) = item.text.as_deref() {
-                        let trimmed = text.trim();
-                        if !trimmed.is_empty() {
-                            visible_parts.push(trimmed.to_string());
-                        }
-                    }
-                }
-            }
-        }
+        message_roles_by_entry_id.insert(entry.id.clone(), message.role.clone());
 
-        let mut segments = Vec::new();
-        if !visible_parts.is_empty() {
-            segments.push((msg.role.clone(), visible_parts.join("\n")));
-        }
-        if include_thinking && !thinking_parts.is_empty() {
-            segments.push(("thinking".to_string(), thinking_parts.join("\n")));
-        }
-
+        let (visible_text, thinking_text) = extract_message_segments(message, include_thinking);
         let timestamp = entry.timestamp.to_rfc3339();
-        for (source_type, content) in segments {
+
+        rows.push(MessageEntryRow {
+            row_id: build_row_id(session_path, &entry.id, &message.role),
+            entry_id: entry.id.clone(),
+            session_path: session_path.to_string(),
+            role: message.role.clone(),
+            source_type: message.role.clone(),
+            content: visible_text.unwrap_or_default(),
+            timestamp: timestamp.clone(),
+        });
+
+        if let Some(content) = thinking_text {
             rows.push(MessageEntryRow {
-                row_id: format!("{}:{}", entry.id, source_type),
+                row_id: build_row_id(session_path, &entry.id, "thinking"),
                 entry_id: entry.id.clone(),
-                role: msg.role.clone(),
-                source_type,
+                session_path: session_path.to_string(),
+                role: message.role.clone(),
+                source_type: "thinking".to_string(),
                 content,
-                timestamp: timestamp.clone(),
+                timestamp,
             });
         }
     }
 
+    for (target_id, resolved_label) in resolve_labels(entries) {
+        let Some(role) = message_roles_by_entry_id.get(&target_id) else {
+            continue;
+        };
+
+        rows.push(MessageEntryRow {
+            row_id: build_row_id(session_path, &target_id, "label"),
+            entry_id: target_id.clone(),
+            session_path: session_path.to_string(),
+            role: role.clone(),
+            source_type: "label".to_string(),
+            content: resolved_label.text,
+            timestamp: resolved_label.labeled_at.to_rfc3339(),
+        });
+    }
+
+    rows
+}
+
+fn extract_message_segments(
+    message: &crate::types::Message,
+    include_thinking: bool,
+) -> (Option<String>, Option<String>) {
+    let mut visible_parts = Vec::new();
+    let mut thinking_parts = Vec::new();
+
+    for item in &message.content {
+        let Some(text) = item.text.as_deref() else {
+            continue;
+        };
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if item.content_type == "thinking" {
+            if include_thinking {
+                thinking_parts.push(trimmed.to_string());
+            }
+        } else {
+            visible_parts.push(trimmed.to_string());
+        }
+    }
+
+    let visible_text = (!visible_parts.is_empty()).then(|| visible_parts.join("\n"));
+    let thinking_text = (!thinking_parts.is_empty()).then(|| thinking_parts.join("\n"));
+    (visible_text, thinking_text)
+}
+
+fn insert_message_entries_rows(conn: &Connection, rows: &[MessageEntryRow]) -> Result<(), String> {
     for chunk in rows.chunks(INSERT_CHUNK_SIZE) {
         let values_sql = (0..chunk.len())
             .map(|index| {
@@ -723,17 +670,51 @@ pub fn upsert_message_entries(
         for row in chunk {
             params.push(&row.row_id);
             params.push(&row.entry_id);
-            params.push(&session_path);
+            params.push(&row.session_path);
             params.push(&row.role);
             params.push(&row.source_type);
             params.push(&row.content);
             params.push(&row.timestamp);
         }
 
-        conn.execute(&sql, params.as_slice()).map_err(|e| {
-            format!("Failed to bulk insert message entries for {session_path}: {e}")
-        })?;
+        conn.execute(&sql, params.as_slice())
+            .map_err(|e| format!("Failed to bulk insert message entries: {e}"))?;
     }
+
+    Ok(())
+}
+
+fn insert_message_entries_for_path(conn: &Connection, session_path: &str) -> Result<(), String> {
+    let include_thinking = load_include_thinking_in_search();
+    let entries = crate::domain::casr_min::bridge_ops::parse_session_entries_from_path(Path::new(
+        session_path,
+    ))?;
+    let rows = build_rows_from_session_entries(session_path, &entries, include_thinking);
+    delete_message_entries_for_session(conn, session_path)?;
+    insert_message_entries_rows(conn, &rows)
+}
+
+pub fn insert_message_entries(conn: &Connection, session: &SessionInfo) -> Result<(), String> {
+    if !message_entries_table_exists(conn)? {
+        return Ok(());
+    }
+
+    insert_message_entries_for_path(conn, &session.path)
+}
+
+pub fn upsert_message_entries(
+    conn: &Connection,
+    session_path: &str,
+    entries: &[SessionEntry],
+) -> Result<(), String> {
+    if !message_entries_table_exists(conn)? {
+        return Ok(());
+    }
+
+    let include_thinking = load_include_thinking_in_search();
+    let rows = build_rows_from_session_entries(session_path, entries, include_thinking);
+    delete_message_entries_for_session(conn, session_path)?;
+    insert_message_entries_rows(conn, &rows)?;
 
     debug!(
         "Upserted {} message entry rows for session: {}",
@@ -743,8 +724,6 @@ pub fn upsert_message_entries(
     Ok(())
 }
 
-/// Search message-level FTS5 index and return matching message entries
-/// Returns (entry_id, session_path, role, snippet, timestamp, rank)
 #[allow(clippy::type_complexity)]
 pub fn search_message_fts(
     conn: &Connection,
@@ -752,12 +731,11 @@ pub fn search_message_fts(
     role_filter: Option<&str>,
     limit: usize,
 ) -> Result<Vec<(String, String, String, String, String, f32)>, String> {
-    // Escape and treat query as a literal phrase for FTS5 MATCH
     let trimmed = query.trim();
     if trimmed.is_empty() {
         return Ok(vec![]);
     }
-    // Escape double quotes and backslashes per FTS5 requirements
+
     let mut escaped = String::new();
     for ch in trimmed.chars() {
         match ch {
@@ -766,10 +744,8 @@ pub fn search_message_fts(
             _ => escaped.push(ch),
         }
     }
-    // Wrap in double quotes to match as a phrase
     let fts_query = format!("\"{escaped}\"");
 
-    // Build role filter condition
     let role_condition = match role_filter {
         Some("user") => "m.role = 'user'",
         Some("assistant") => "m.role = 'assistant'",
@@ -777,18 +753,18 @@ pub fn search_message_fts(
     };
 
     let sql = format!(
-        "SELECT \
-            m.entry_id, \
-            m.session_path, \
-            m.role, \
-            snippet(message_fts, 3, '<b>', '</b>', '...', 80) as snippet, \
-            m.timestamp, \
-            bm25(message_fts) as rank \
-         FROM message_entries m \
-         JOIN message_fts ON m.rowid = message_fts.rowid \
-         WHERE message_fts MATCH ? \
-         AND {role_condition} \
-         ORDER BY m.rowid \
+        "SELECT
+            m.entry_id,
+            m.session_path,
+            m.role,
+            snippet(message_fts, 3, '<b>', '</b>', '...', 80) as snippet,
+            m.timestamp,
+            bm25(message_fts) as rank
+         FROM message_entries m
+         JOIN message_fts ON m.rowid = message_fts.rowid
+         WHERE message_fts MATCH ?
+         AND {role_condition}
+         ORDER BY m.rowid
          LIMIT ?"
     );
 
@@ -799,26 +775,79 @@ pub fn search_message_fts(
     let rows = stmt
         .query_map(params![fts_query, limit as i64], |row| {
             Ok((
-                row.get::<_, String>(0)?, // entry_id
-                row.get::<_, String>(1)?, // session_path
-                row.get::<_, String>(2)?, // role
-                row.get::<_, String>(3)?, // snippet with <b> tags
-                row.get::<_, String>(4)?, // timestamp
-                row.get::<_, f32>(5)?,    // rank
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, f32>(5)?,
             ))
         })
-        .map_err(|e| format!("Failed to query message FTS: {e}"))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect message FTS results: {e}"))?;
+        .map_err(|e| format!("Failed to query message FTS: {e}"))?;
 
-    Ok(rows)
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect message FTS results: {e}"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{DateTime, Utc};
     use std::sync::{Arc, Barrier};
     use std::thread;
+
+    fn parse_test_timestamp(value: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(value)
+            .expect("valid timestamp")
+            .with_timezone(&Utc)
+    }
+
+    fn message_entry(id: &str, timestamp: &str, role: &str, text: &str) -> SessionEntry {
+        SessionEntry {
+            entry_type: "message".to_string(),
+            id: id.to_string(),
+            parent_id: None,
+            timestamp: parse_test_timestamp(timestamp),
+            message: Some(crate::types::Message {
+                role: role.to_string(),
+                content: vec![crate::types::Content {
+                    content_type: "text".to_string(),
+                    text: Some(text.to_string()),
+                }],
+            }),
+            target_id: None,
+            label: None,
+        }
+    }
+
+    fn label_entry(
+        id: &str,
+        timestamp: &str,
+        target_id: &str,
+        label: Option<&str>,
+    ) -> SessionEntry {
+        SessionEntry {
+            entry_type: "label".to_string(),
+            id: id.to_string(),
+            parent_id: None,
+            timestamp: parse_test_timestamp(timestamp),
+            message: None,
+            target_id: Some(target_id.to_string()),
+            label: label.map(ToString::to_string),
+        }
+    }
+
+    fn model_change_entry(id: &str, timestamp: &str) -> SessionEntry {
+        SessionEntry {
+            entry_type: "model_change".to_string(),
+            id: id.to_string(),
+            parent_id: None,
+            timestamp: parse_test_timestamp(timestamp),
+            message: None,
+            target_id: None,
+            label: None,
+        }
+    }
 
     #[test]
     fn backfill_claim_allows_only_one_concurrent_winner_per_db() {
@@ -849,7 +878,7 @@ mod tests {
     }
 
     #[test]
-    fn backfill_claim_can_retry_after_noop_but_blocks_after_done() {
+    fn backfill_claim_can_retry_after_completion() {
         let db_key = "/tmp/test-claim-retry.db";
         clear_message_entries_backfill_state_for_tests(db_key);
 
@@ -858,8 +887,78 @@ mod tests {
         assert!(try_claim_message_entries_backfill(db_key).unwrap());
 
         finish_message_entries_backfill(db_key, true).unwrap();
-        assert!(!try_claim_message_entries_backfill(db_key).unwrap());
+        assert!(try_claim_message_entries_backfill(db_key).unwrap());
 
         clear_message_entries_backfill_state_for_tests(db_key);
+    }
+
+    #[test]
+    fn row_builder_emits_label_rows_for_message_targets() {
+        let rows = build_rows_from_session_entries(
+            "/tmp/session.jsonl",
+            &[
+                message_entry("m1", "2026-04-09T10:01:00Z", "user", "hello world"),
+                label_entry("l1", "2026-04-09T10:02:00Z", "m1", Some("important")),
+            ],
+            false,
+        );
+
+        assert_eq!(rows.len(), 2);
+        let label_row = rows
+            .iter()
+            .find(|row| row.source_type == "label")
+            .expect("label row");
+        assert_eq!(label_row.entry_id, "m1");
+        assert_eq!(label_row.role, "user");
+        assert_eq!(label_row.content, "important");
+        assert_eq!(label_row.timestamp, "2026-04-09T10:02:00+00:00");
+    }
+
+    #[test]
+    fn row_builder_omits_cleared_labels() {
+        let rows = build_rows_from_session_entries(
+            "/tmp/session.jsonl",
+            &[
+                message_entry("m1", "2026-04-09T10:01:00Z", "assistant", "hello world"),
+                label_entry("l1", "2026-04-09T10:02:00Z", "m1", Some("bookmark")),
+                label_entry("l2", "2026-04-09T10:03:00Z", "m1", Some("   ")),
+            ],
+            false,
+        );
+
+        assert_eq!(rows.len(), 1);
+        assert!(rows.iter().all(|row| row.source_type != "label"));
+    }
+
+    #[test]
+    fn row_builder_skips_non_message_label_targets() {
+        let rows = build_rows_from_session_entries(
+            "/tmp/session.jsonl",
+            &[
+                model_change_entry("mc1", "2026-04-09T10:01:00Z"),
+                label_entry("l1", "2026-04-09T10:02:00Z", "mc1", Some("settings")),
+            ],
+            false,
+        );
+
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn row_ids_are_session_scoped() {
+        let entries = vec![message_entry(
+            "shared-id",
+            "2026-04-09T10:01:00Z",
+            "user",
+            "hello",
+        )];
+        let rows_a = build_rows_from_session_entries("/tmp/a.jsonl", &entries, false);
+        let rows_b = build_rows_from_session_entries("/tmp/b.jsonl", &entries, false);
+
+        assert_eq!(rows_a.len(), 1);
+        assert_eq!(rows_b.len(), 1);
+        assert_ne!(rows_a[0].row_id, rows_b[0].row_id);
+        assert!(rows_a[0].row_id.contains("/tmp/a.jsonl"));
+        assert!(rows_b[0].row_id.contains("/tmp/b.jsonl"));
     }
 }

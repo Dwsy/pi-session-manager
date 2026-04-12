@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::types::{SessionEntry, SessionInfo};
 use crate::{export, scanner, stats};
 
@@ -140,6 +142,11 @@ pub async fn get_file_stats(path: String) -> Result<FileStats, String> {
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_entries(path: String) -> Result<Vec<SessionEntry>, String> {
     super::session_file::get_session_entries_impl(path).await
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn get_session_labels(path: String) -> Result<HashMap<String, String>, String> {
+    super::session_file::get_session_labels_impl(path).await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
