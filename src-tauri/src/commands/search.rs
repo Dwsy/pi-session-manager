@@ -392,8 +392,7 @@ fn browse_all_labels(
             )| {
                 let timestamp = try_parse_timestamp(&timestamp_str).ok_or_else(|| {
                     format!(
-                        "Invalid label browse timestamp for session {} entry {}: {}",
-                        session_path, entry_id, timestamp_str
+                        "Invalid label browse timestamp for session {session_path} entry {entry_id}: {timestamp_str}"
                     )
                 })?;
                 Ok(FullTextSearchHit {
@@ -740,8 +739,7 @@ fn search_message_hits(
                 )| {
                     let timestamp = try_parse_timestamp(&timestamp_str).ok_or_else(|| {
                         format!(
-                            "Invalid search hit timestamp for session {} entry {}: {}",
-                            session_path, entry_id, timestamp_str
+                            "Invalid search hit timestamp for session {session_path} entry {entry_id}: {timestamp_str}"
                         )
                     })?;
                     Ok(FullTextSearchHit {
