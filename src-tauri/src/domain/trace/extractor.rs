@@ -307,7 +307,8 @@ pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalyti
                             total_errors += 1;
                         }
 
-                        let raw_preview = extract_text_content(msg).map(|s| truncate(&s, CONTENT_PREVIEW_MAX));
+                        let raw_preview =
+                            extract_text_content(msg).map(|s| truncate(&s, CONTENT_PREVIEW_MAX));
                         let result_preview = raw_preview.clone();
                         let content_preview = match raw_preview {
                             Some(text) if !text.is_empty() => Some(format!("{tool_name}: {text}")),
