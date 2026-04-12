@@ -18,6 +18,7 @@
     "api",
     "cli",
     "configuration",
+    "plugins/psm-bridge",
     "---Community---",
     "contributing",
     "changelog"

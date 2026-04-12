@@ -154,6 +154,48 @@ test: add unit tests for export module
 chore: update dependencies
 ```
 
+## Extensions
+
+### psm-bridge (Pi Plugin)
+
+Bridge Pi agent sessions to PSM with live sync, search, tags, and context recall.
+
+**Repository**: [Dwsy/psm-bridge](https://github.com/Dwsy/psm-bridge)
+
+**Install**:
+```bash
+pi install Dwsy/psm-bridge
+```
+
+**Features**:
+- Live mode: real-time session sync via WebSocket
+- Search: full-text search across indexed sessions
+- Tags: SQLite-backed session tagging
+- Context: recall and context from past sessions
+
+**Commands**:
+- `/psm-live on/off` — Toggle live mode
+- `/session_search` — Full-text search
+- `/state-set <tag>` — Set session tag
+- `/flow start/done/hold` — Quick transitions
+
+**Local Development** (submodule):
+```bash
+git clone --recurse-submodules https://github.com/Dwsy/pi-session-manager.git
+```
+
+**Update submodule**:
+```bash
+cd extensions/psm-bridge
+# edit files...
+git add . && git commit && git push
+
+# Update parent repo
+cd ../..
+git add extensions/psm-bridge
+git commit -m "Update psm-bridge"
+```
+
 ## Submitting Changes
 
 <Steps>

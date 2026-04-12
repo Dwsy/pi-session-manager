@@ -1,0 +1,174 @@
+---
+title: psm-bridge
+description: Bridge Pi agent sessions to Pi Session Manager.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+
+# psm-bridge
+
+Bridge Pi agent sessions to Pi Session Manager — live sync, search, tags, and context recall.
+
+## Installation
+
+```bash
+pi install Dwsy/psm-bridge
+```
+
+<Callout type="info">
+Requires Node.js >= 21.0.0 and Pi Session Manager running on port 52131.
+</Callout>
+
+## Configuration
+
+```bash
+# PSM WebSocket URL (default)
+export PSM_URL=ws://127.0.0.1:52131/ws
+
+# Optional auth token
+export PSM_TOKEN=your-token
+```
+
+## Features
+
+### Live Mode
+
+Real-time session sync via WebSocket. Events (messages, tool calls, agent turns) are forwarded to PSM as they happen.
+
+```bash
+/psm-live on     # Enable live mode
+/psm-live off    # Disable live mode
+/psm             # Check connection status
+```
+
+### Status Indicators
+
+| Status | Meaning |
+|--------|---------|
+| `[psm]` | Connected |
+| `[retry N]` | Reconnecting (attempt N) |
+| `[timeout]` | Connection lost |
+| `[psm: off]` | Live mode disabled |
+
+### Search
+
+Full-text search across indexed sessions via PSM's HTTP API.
+
+```
+/session_search query="rust async traits"
+```
+
+**Parameters:**
+- `query` — Search query (required)
+- `roleFilter` — Filter by role: `all`, `user`, `assistant`
+- `matchMode` — Match mode: `any`, `all`, `phrase`
+- `sortOrder` — Sort: `relevance`, `newest`, `oldest`
+
+### Tags
+
+SQLite-backed session tagging with built-in and custom tags.
+
+```
+/state              # Show current session tags
+/state-set wip      # Set tag
+/state-list         # List available tags
+/state-clear        # Clear all tags
+/flow start         # Quick transition: todo -> wip
+/flow done          # Quick transition: wip -> done
+/flow hold          # Quick transition: wip -> todo
+```
+
+**Built-in Tags:**
+- `todo` — Waiting to be started
+- `wip` / `in-progress` — Currently in progress
+- `done` / `complete` — Task completed
+- `important` — High priority
+- `archive` — Archived record
+
+### Context Recall
+
+Retrieve surrounding dialogue context from past sessions.
+
+```
+/session_recall query="how to fix the bug"
+```
+
+**Parameters:**
+- `query` — Search query (required)
+- `maxResults` — Number of recall windows (1-5, default 3)
+- `before` — Entries before hit (0-10, default 2)
+- `after` — Entries after hit (0-10, default 2)
+
+### Session Rename
+
+Rename sessions using Pi's native API.
+
+```
+/session_rename name="Fix auth bug"
+```
+
+## Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `session_search` | Full-text search across indexed sessions |
+| `session_recall` | Search + retrieve surrounding dialogue context |
+| `session_context` | Fetch messages from a specific session |
+| `session_tag` | List/set/remove session tags |
+| `session_rename` | Rename the current session |
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `/psm` | Show bridge status |
+| `/psm-live on/off` | Toggle live mode |
+| `/psm-connect` | Manual connect |
+| `/psm-disconnect` | Manual disconnect |
+| `/steer` | Steer running agent |
+| `/state` | Show session tags |
+| `/state-set <tag>` | Set tag |
+| `/state-list` | List available tags |
+| `/state-clear` | Clear all tags |
+| `/flow <action>` | Quick transitions |
+
+## Architecture
+
+```
+psm-bridge/
+├── src/
+│   ├── index.ts          # Extension entry point
+│   ├── ws-bridge.ts      # WebSocket + HTTP client
+│   ├── tag-db.ts         # SQLite tag persistence
+│   ├── tag-commands.ts    # Tag commands
+│   ├── session-*.ts       # Tool implementations
+│   └── types.ts          # Shared types
+└── package.json
+```
+
+## Development
+
+```bash
+# Clone with submodules
+git clone --recurse-submodules https://github.com/Dwsy/pi-session-manager.git
+
+# Or add submodule to existing repo
+git submodule add https://github.com/Dwsy/psm-bridge.git extensions/psm-bridge
+```
+
+**Update submodule:**
+```bash
+cd extensions/psm-bridge
+# edit files...
+git add . && git commit && git push
+
+# Update parent repo
+cd ../..
+git add extensions/psm-bridge
+git commit -m "Update psm-bridge"
+```
+
+## License
+
+MIT
