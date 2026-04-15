@@ -47,8 +47,10 @@ export interface SessionProvider {
     projectPath?: string | null;
     page: number;
     pageSize: number;
-    matchMode?: "any" | "all" | "phrase";
+    matchMode?: "smart" | "any" | "all" | "phrase";
     sortOrder?: "score" | "newest" | "oldest";
+    from?: string | null;
+    to?: string | null;
   }): Promise<FullTextSearchResponse>;
   getSessionLabels(path: string): Promise<Record<string, string>>;
   getStats(sessions: SessionInfo[]): Promise<SessionStats>;

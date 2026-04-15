@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Terminal, Globe, Star, Trash2, Check, Copy, ArrowRightLeft } from 'lucide-react'
 import type { Tag } from '@/types'
+import type { DeleteSessionAnchorPoint } from '@/components/dialogs/deleteSessionTypes'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
 
 interface SessionContextMenuProps {
@@ -16,7 +17,7 @@ interface SessionContextMenuProps {
   onConvert?: () => void
   onToggleFavorite?: () => void
   onCopyResume?: () => void
-  onDelete?: () => void
+  onDelete?: (anchorPoint: DeleteSessionAnchorPoint) => void
   isFavorite?: boolean
   onClose: () => void
 }
@@ -118,7 +119,17 @@ export default function SessionContextMenu({
       {onDelete && (
         <>
           <div className="border-t border-border/50 my-1" />
-          <button onClick={() => { onDelete(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-red-500/10 motion-color motion-press focus-ring">
+          <button
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect()
+              onDelete({
+                x: rect.left + rect.width / 2,
+                y: rect.bottom,
+              })
+              onClose()
+            }}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-red-500/10 motion-color motion-press focus-ring"
+          >
             <Trash2 className="h-3.5 w-3.5 text-red-500" />
             <span className="text-xs text-red-500">{t('tags.contextMenu.delete')}</span>
           </button>

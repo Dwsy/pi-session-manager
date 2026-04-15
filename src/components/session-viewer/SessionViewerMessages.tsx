@@ -22,6 +22,7 @@ import { useSessionTimelineNav } from "@/hooks/useSessionTimelineNav";
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
 import type { LegacySessionStats, SessionEntry } from "@/types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
+import { useFoldGroups } from "@/hooks/useFoldGroups";
 
 const MESSAGE_ITEM_GAP = 16;
 const SEARCH_MATCH_RETRY_COUNT = 8;
@@ -113,7 +114,9 @@ const SessionViewerMessages = forwardRef<
   const { t } = useTranslation();
   const { ensureToolExpandedForSearch } = useSessionView();
 
-  // Timeline nav — find which entry index corresponds to current scroll position
+  // Fold groups: merge consecutive assistant entries (tools only, no text) into one group
+  const { groups: foldGroups, hiddenEntryIds } = useFoldGroups(renderableEntries);
+
   const timelineNavItems = useSessionTimelineNav({
     entries: renderableEntries,
     enabled: isTimelineNavEnabled,
@@ -142,7 +145,22 @@ const SessionViewerMessages = forwardRef<
     isAtBottomRef,
     onReachBottom,
     openPosition,
+    hiddenEntryIds,
   });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const activeTimelineEntryId = useMemo(() => {
+    if (!isTimelineNavEnabled || timelineNavItems.items.length === 0) {
+      return null;
+    }
+    const firstVisibleIndex = virtualRows[0]?.index ?? 0;
+    const currentItem =
+      [...timelineNavItems.items]
+        .reverse()
+        .find((item) => item.index <= firstVisibleIndex) ??
+      timelineNavItems.items[0];
+    return currentItem?.entryId ?? null;
+  }, [isTimelineNavEnabled, timelineNavItems.items, virtualRows]);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -205,66 +223,28 @@ const SessionViewerMessages = forwardRef<
     animationFrameId = requestAnimationFrame(tryActivateCurrentMatch);
 
     return () => {
-      clearCurrentHighlight();
       cancelAnimationFrame(animationFrameId);
-      if (retryTimeoutId !== null) {
+      if (retryTimeoutId) {
         window.clearTimeout(retryTimeoutId);
       }
     };
   }, [
-    currentSearchTarget,
-    messagesContainerRef,
-    renderableEntries,
     searchQuery,
+    currentSearchTarget,
     scrollToEntryId,
     ensureToolExpandedForSearch,
   ]);
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      scrollToTop,
-      scrollToBottom: () => {
-        scrollToBottom();
-      },
-    }),
-    [scrollToBottom, scrollToTop],
-  );
+  // Expose methods
+  useImperativeHandle(ref, () => ({
+    scrollToTop,
+    scrollToBottom,
+  }));
 
-  const virtualRows = rowVirtualizer.getVirtualItems();
-  const activeTimelineEntryId = useMemo(() => {
-    if (!isTimelineNavEnabled || timelineNavItems.items.length === 0) {
-      return null;
-    }
-
-    const firstVisibleIndex = virtualRows[0]?.index ?? 0;
-    const currentItem =
-      [...timelineNavItems.items]
-        .reverse()
-        .find((item) => item.index <= firstVisibleIndex) ??
-      timelineNavItems.items[0];
-
-    return currentItem?.entryId ?? null;
-  }, [isTimelineNavEnabled, timelineNavItems.items, virtualRows]);
-
-  if (loading) {
+  if (loading && !showLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span>{t("session.loading")}</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (showLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span>{t("session.loading")}</span>
-        </div>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -314,6 +294,13 @@ const SessionViewerMessages = forwardRef<
               {virtualRows.map((virtualRow) => {
                 const entry = renderableEntries[virtualRow.index];
                 if (!entry) return null;
+
+                // Skip hidden entries (folded into a group leader)
+                if (hiddenEntryIds.has(entry.id)) return null;
+
+                // Check if this entry is a fold group leader
+                const foldGroup = foldGroups.get(entry.id);
+
                 return (
                   <div
                     key={entry.id}
@@ -335,6 +322,7 @@ const SessionViewerMessages = forwardRef<
                       searchQuery={searchQuery}
                       isStreaming={entry.id === streamingId}
                       previewMode={previewMode}
+                      foldEntries={foldGroup?.entries}
                     />
                   </div>
                 );

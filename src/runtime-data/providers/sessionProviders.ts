@@ -181,8 +181,10 @@ export const backendSessionProvider: SessionProvider = {
       includeThinking: getCachedSettings().search.includeThinkingInSearch,
       page: options.page,
       pageSize: options.pageSize,
-      matchMode: options.matchMode || "any",
+      matchMode: options.matchMode || "smart",
       sortOrder: options.sortOrder || "newest",
+      from: options.from || null,
+      to: options.to || null,
     });
   },
   async getSessionLabels(path) {

@@ -27,7 +27,7 @@ import { SessionBadge } from "@/components/session-viewer/SessionBadge";
 import TagBadge from "@/components/tags/TagBadge";
 import TagPicker from "@/components/tags/TagPicker";
 import SessionContextMenu from "@/components/session-viewer/SessionContextMenu";
-import DeleteSessionPopover from "@/components/dialogs/DeleteSessionPopover";
+import type { DeleteSessionRequestOptions } from "@/components/dialogs/deleteSessionTypes";
 import {
   formatShortSessionId,
   MIN_SESSION_ID_PREFIX_LENGTH,
@@ -54,8 +54,14 @@ interface SessionListProps {
   sessions: SessionInfo[];
   selectedSession: SessionInfo | null;
   onSelectSession: (session: SessionInfo) => void;
-  onDeleteSession?: (session: SessionInfo) => void;
-  onDeleteSessions?: (sessions: SessionInfo[]) => void;
+  onDeleteSession?: (
+    session: SessionInfo,
+    options?: DeleteSessionRequestOptions,
+  ) => void;
+  onDeleteSessions?: (
+    sessions: SessionInfo[],
+    options?: DeleteSessionRequestOptions,
+  ) => void;
   onConvertSession?: (session: SessionInfo) => void;
   onResumeSession?: (session: SessionInfo) => void | Promise<void>;
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>;
@@ -138,12 +144,7 @@ export default function SessionList({
     y: number;
     sessionId: string;
   } | null>(null);
-  const [pendingDeleteSession, setPendingDeleteSession] = useState<{
-    sessions: SessionInfo[];
-    anchorRef: React.RefObject<HTMLElement>;
-  } | null>(null);
   const lastSelectedSessionIdRef = useRef<string | null>(null);
-  const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const selectionAnchorSessionIdRef = useRef<string | null>(null);
   const selectedSessionsRef = useRef<SessionInfo[]>([]);
   const lastSelectionModeTriggerRef = useRef(selectionModeTrigger);
@@ -194,6 +195,31 @@ export default function SessionList({
   const selectedSessions = useMemo(
     () => sessions.filter((session) => selectedSessionIds.has(session.id)),
     [sessions, selectedSessionIds],
+  );
+  const getDeleteRequestOptions = useCallback(
+    (
+      eventOrPoint:
+        | React.MouseEvent<HTMLElement>
+        | { x: number; y: number }
+        | undefined,
+    ): DeleteSessionRequestOptions | undefined => {
+      if (!eventOrPoint) {
+        return undefined;
+      }
+
+      if ("clientX" in eventOrPoint) {
+        const rect = eventOrPoint.currentTarget.getBoundingClientRect();
+        return {
+          anchorPoint: {
+            x: rect.left + rect.width / 2,
+            y: rect.bottom,
+          },
+        };
+      }
+
+      return { anchorPoint: eventOrPoint };
+    },
+    [],
   );
 
   useEffect(() => {
@@ -645,8 +671,8 @@ export default function SessionList({
               <button
                 type="button"
                 disabled={selectedSessions.length === 0}
-                onClick={() => {
-                  onDeleteSessions(selectedSessions);
+                onClick={(event) => {
+                  onDeleteSessions(selectedSessions, getDeleteRequestOptions(event));
                 }}
                 className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-[11px] text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 motion-color motion-press focus-ring"
               >
@@ -989,18 +1015,9 @@ export default function SessionList({
                             )}
                             {!isSelectionMode && onDeleteSession && (
                               <button
-                                ref={
-                                  pendingDeleteSession?.sessions[0].id ===
-                                  session.id
-                                    ? deleteButtonRef
-                                    : null
-                                }
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setPendingDeleteSession({
-                                    sessions: [session],
-                                    anchorRef: deleteButtonRef,
-                                  });
+                                  onDeleteSession(session, getDeleteRequestOptions(e));
                                 }}
                                 className="p-1 text-muted-foreground/60 hover:text-red-500 rounded motion-color motion-press focus-ring"
                                 title={t("common.deleteSession")}
@@ -1116,11 +1133,11 @@ export default function SessionList({
           isFavorite={favoriteSessionIds.has(contextMenuSession.id)}
           onDelete={
             onDeleteSession
-              ? () => {
-                  setPendingDeleteSession({
-                    sessions: [contextMenuSession],
-                    anchorRef: deleteButtonRef,
-                  });
+              ? (anchorPoint) => {
+                  onDeleteSession(
+                    contextMenuSession,
+                    getDeleteRequestOptions(anchorPoint),
+                  );
                 }
               : undefined
           }
@@ -1128,17 +1145,6 @@ export default function SessionList({
         />
       )}
 
-      {pendingDeleteSession && (
-        <DeleteSessionPopover
-          sessions={pendingDeleteSession.sessions}
-          anchorRef={pendingDeleteSession.anchorRef}
-          onConfirm={async () => {
-            await onDeleteSession?.(pendingDeleteSession.sessions[0]);
-            setPendingDeleteSession(null);
-          }}
-          onCancel={() => setPendingDeleteSession(null)}
-        />
-      )}
     </div>
   );
 }
