@@ -15,12 +15,12 @@ interface ActivityHeatmapProps {
 }
 
 const HEATMAP_COLORS = [
-  '#1a1b26',
-  '#0d4436',
-  '#1b6e54',
-  '#2e9973',
-  '#46c492',
-  '#6eebb1',
+  '#161b22', // level 0: empty
+  '#aceebb', // level 1
+  '#4ac26b', // level 2
+  '#2da44e', // level 3
+  '#116329', // level 4
+  '#0e4429', // level 5
 ]
 
 export default function ActivityHeatmap({
@@ -32,7 +32,7 @@ export default function ActivityHeatmap({
 }: ActivityHeatmapProps) {
   const { t } = useTranslation()
   const displayTitle = title || t('components.activityHeatmap.title')
-  const weeks = 20
+  const weeks = 26
   const daysPerWeek = 7
 
   const getHeatmapGrid = () => {
@@ -72,11 +72,10 @@ export default function ActivityHeatmap({
     const cell = (
       <button
         type="button"
-        className="w-full aspect-square rounded-[3px] motion-transform motion-opacity hover:scale-[1.12] focus-ring focus:ring-1 focus:ring-primary/70"
+        className="w-full aspect-square rounded-sm focus-ring focus:ring-1 focus:ring-primary/70"
         style={{
           backgroundColor: point ? HEATMAP_COLORS[point.level] : HEATMAP_COLORS[0],
-          opacity: point && point.level > 0 ? 1 : 0.16,
-          boxShadow: point && point.level > 0 ? `0 0 4px ${HEATMAP_COLORS[point.level]}40` : 'none',
+          opacity: point && point.level > 0 ? 1 : 0.1,
         }}
         onClick={() => point && onDayClick?.(point)}
         aria-label={point ? `${point.date}: ${point.total_messages}` : 'No activity'}
@@ -101,7 +100,7 @@ export default function ActivityHeatmap({
 
   return (
     <DashboardCardShell
-      className="rounded-xl p-4"
+      className="rounded-xl p-3"
       overlayClassName="bg-gradient-to-br from-success/5 via-transparent to-transparent"
     >
         {displayTitle && (
@@ -124,11 +123,11 @@ export default function ActivityHeatmap({
           </div>
         )}
 
-        <div className="space-y-[3px]">
+        <div className="space-y-[2px]">
           {grid.map((row, dayIndex) => (
             <div
               key={dayIndex}
-              className="grid gap-[3px]"
+              className="grid gap-[2px]"
               style={{ gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))` }}
             >
               {row.map((point, weekIndex) => renderCell(point, `${dayIndex}-${weekIndex}`))}

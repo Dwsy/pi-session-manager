@@ -835,7 +835,7 @@ function MiniTimelineScrubber({
       <div className="relative">
         <div
           ref={trackRef}
-          className="relative h-12 rounded-md border border-border/70 bg-[#161823] overflow-hidden cursor-pointer select-none"
+          className="relative h-12 rounded-md border border-border/70 bg-background overflow-hidden cursor-pointer select-none"
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
@@ -844,7 +844,7 @@ function MiniTimelineScrubber({
             setHoverMs(null);
           }}
         >
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_0%,transparent_20%,transparent_80%,rgba(255,255,255,0.02)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(var(--muted-fg-rgb),0.02)_0%,transparent_20%,transparent_80%,rgba(var(--muted-fg-rgb),0.02)_100%)]" />
           <div className="absolute inset-y-0 left-0 right-0">
             {miniBars.map((bar, idx) => (
               <div
@@ -864,22 +864,22 @@ function MiniTimelineScrubber({
           </div>
 
           {hoverPct !== null && (
-            <div className="absolute top-0 bottom-0 w-px bg-white/60 pointer-events-none" style={{ left: `${hoverPct}%` }} />
+            <div className="absolute top-0 bottom-0 w-px pointer-events-none" style={{ left: `${hoverPct}%`, backgroundColor: 'var(--accent)' }} />
           )}
 
           <div
-            className="absolute inset-y-1 rounded-md bg-white/10 border-2 border-white/55 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_0_20px_rgba(255,255,255,0.08)] cursor-grab active:cursor-grabbing"
-            style={{ left: `${startPct}%`, width: `${widthPct}%` }}
+            className="absolute inset-y-1 rounded-md cursor-grab active:cursor-grabbing"
+            style={{ left: `${startPct}%`, width: `${widthPct}%`, backgroundColor: 'var(--bg-inset)', boxShadow: '0 0 0 1px rgba(var(--accent-rgb),0.15),0 0 12px rgba(var(--accent-rgb),0.1)' }}
             onPointerDown={handlePointerDown('window')}
           >
-            <div className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize bg-white/25 hover:bg-white/40 border-r border-white/30" onPointerDown={handlePointerDown('left')} />
-            <div className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize bg-white/25 hover:bg-white/40 border-l border-white/30" onPointerDown={handlePointerDown('right')} />
+            <div className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize border-r border-[var(--border)] hover:bg-[var(--bg-inset-hover)]" onPointerDown={handlePointerDown('left')} />
+            <div className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize border-l border-[var(--border)] hover:bg-[var(--bg-inset-hover)]" onPointerDown={handlePointerDown('right')} />
           </div>
         </div>
 
         {hoverEvent && hoverPct !== null && (
           <div
-            className="absolute -top-20 z-10 w-96 rounded-md border border-border/70 bg-[#1d2030] px-3 py-2 text-[11px] shadow-xl pointer-events-none"
+            className="absolute -top-20 z-10 w-96 rounded-md border border-border/70 bg-background px-3 py-2 text-[11px] shadow-xl pointer-events-none"
             style={{ left: `min(calc(${hoverPct}% + 8px), calc(100% - 24rem))` }}
           >
             <div className="flex items-center gap-2 mb-1">
