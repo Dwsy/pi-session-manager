@@ -32,7 +32,6 @@ fn test_database_migration_from_old_schema() {
                 file_modified TEXT NOT NULL,
                 message_count INTEGER NOT NULL,
                 first_message TEXT,
-                all_messages_text TEXT,
                 cached_at TEXT NOT NULL
             )",
             [],
@@ -46,7 +45,6 @@ fn test_database_migration_from_old_schema() {
                 cwd,
                 name,
                 first_message,
-                all_messages_text,
                 content='sessions',
                 content_rowid='rowid'
             )",
@@ -78,7 +76,6 @@ fn test_database_migration_from_old_schema() {
                 file_modified TEXT NOT NULL,
                 message_count INTEGER NOT NULL,
                 first_message TEXT,
-                all_messages_text TEXT,
                 user_messages_text TEXT,
                 assistant_messages_text TEXT,
                 last_message TEXT,
@@ -136,7 +133,6 @@ fn test_database_migration_from_old_schema() {
                 cwd,
                 name,
                 first_message,
-                all_messages_text,
                 user_messages_text,
                 assistant_messages_text,
                 content='sessions',
@@ -245,7 +241,7 @@ fn test_fts_vtable_corruption_triggers_database_recreation() {
         // Insert a session and message to populate FTS
         let session_path = "/test/session1.jsonl".to_string();
         conn.execute(
-            "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 "s1",
                 &session_path,
@@ -329,7 +325,7 @@ fn test_fts_vtable_corruption_triggers_database_recreation() {
     // Verify that FTS can be used normally on the fresh DB by inserting new data
     let new_session_path = "/test/session2.jsonl".to_string();
     conn2.execute(
-        "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+        "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
         params![
             "s2",
             &new_session_path,
@@ -391,7 +387,7 @@ fn test_fts_rebuild_after_recreate() {
     // Insert a session and a message
     let session_path = "/test/session_rebuild.jsonl".to_string();
     conn.execute(
-        "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+        "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
         params![
             "sess_rebuild",
             &session_path,
@@ -475,7 +471,6 @@ fn test_init_db_upgrades_legacy_message_entries_before_new_indexes() {
             file_modified TEXT NOT NULL,
             message_count INTEGER NOT NULL,
             first_message TEXT,
-            all_messages_text TEXT,
             user_messages_text TEXT,
             assistant_messages_text TEXT,
             last_message TEXT,

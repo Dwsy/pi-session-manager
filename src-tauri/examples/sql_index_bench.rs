@@ -334,6 +334,8 @@ async fn run_once(
             case.match_mode.map(str::to_string),
             None,
             None,
+            None,
+            None,
         )
         .await
         .map_err(boxed_error)?;

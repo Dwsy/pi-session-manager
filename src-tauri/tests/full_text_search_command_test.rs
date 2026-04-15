@@ -35,7 +35,6 @@ fn setup_in_memory_db_with_sessions(sessions: &[(&str, &str, &[(&str, &str)])]) 
             file_modified TEXT NOT NULL,
             message_count INTEGER NOT NULL,
             first_message TEXT,
-            all_messages_text TEXT,
             user_messages_text TEXT,
             assistant_messages_text TEXT,
             last_message TEXT,
@@ -97,7 +96,7 @@ fn setup_in_memory_db_with_sessions(sessions: &[(&str, &str, &[(&str, &str)])]) 
         let last_role = messages.last().map(|(r, _)| *r).unwrap_or("").to_string();
 
         conn.execute(
-            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 id,
                 path,
@@ -108,7 +107,6 @@ fn setup_in_memory_db_with_sessions(sessions: &[(&str, &str, &[(&str, &str)])]) 
                 now,
                 messages.len() as i64,
                 first_msg,
-                all_text,
                 user_text,
                 asst_text,
                 last_msg,

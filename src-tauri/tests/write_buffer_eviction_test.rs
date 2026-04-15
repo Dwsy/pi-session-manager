@@ -18,7 +18,6 @@ fn test_write_buffer_eviction() {
             modified: Utc::now(),
             message_count: 1,
             first_message: "test".to_string(),
-            all_messages_text: "test".to_string(),
             user_messages_text: "test".to_string(),
             assistant_messages_text: "".to_string(),
             last_message: "test".to_string(),

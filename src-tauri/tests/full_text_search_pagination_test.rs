@@ -69,7 +69,6 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
             file_modified TEXT NOT NULL,
             message_count INTEGER NOT NULL,
             first_message TEXT,
-            all_messages_text TEXT,
             user_messages_text TEXT,
             assistant_messages_text TEXT,
             last_message TEXT,
@@ -107,7 +106,7 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
     let (session, _entries) = scanner::parse_session_info(&sess_path).unwrap();
     let file_modified = Utc::now();
     conn.execute(
-        "INSERT OR REPLACE INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+        "INSERT OR REPLACE INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
         params![
             &session.id,
             &session.path,
@@ -118,7 +117,6 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
             &file_modified.to_rfc3339(),
             session.message_count as i64,
             &session.first_message,
-            &session.all_messages_text,
             &session.user_messages_text,
             &session.assistant_messages_text,
             &session.last_message,
