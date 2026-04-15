@@ -589,3 +589,280 @@
 .bash-command-inline .hljs-punctuation {
   color: var(--text-secondary);
 }
+
+// Turn group (collapsed aggregate view for complete assistant turn)
+.turn-group {
+  margin: 12px 0;
+}
+
+.turn-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-size: calc(var(--font-size-base, 16px) * 0.8125);
+  color: var(--text);
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    background: rgba(var(--accent-rgb), 0.08);
+    border-color: rgba(var(--accent-rgb), 0.25);
+  }
+}
+
+.turn-group-toggle {
+  color: rgb(var(--color-muted-foreground));
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.turn-group-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.turn-group-count {
+  font-weight: 600;
+  color: var(--accent);
+  flex-shrink: 0;
+  background: rgba(var(--accent-rgb), 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.turn-group-stats {
+  color: var(--muted);
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+}
+
+.turn-group-preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+  font-style: italic;
+}
+
+.turn-group-meta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: rgba(var(--accent-rgb), 0.06);
+  border-radius: 4px;
+}
+
+.turn-group-duration {
+  color: var(--text);
+}
+
+.turn-group-cost {
+  color: var(--success);
+  font-family: var(--font-family-mono, monospace);
+}
+
+.turn-group-content {
+  padding: 12px;
+  border-left: 2px solid rgba(var(--accent-rgb), 0.3);
+  margin-left: 12px;
+  margin-top: 8px;
+}
+
+.turn-group-content .message-timestamp {
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+// Collapsed tool calls header (per assistant message)
+.tool-calls-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+  color: var(--text);
+  margin: 12px 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    background: rgba(var(--accent-rgb), 0.08);
+    border-color: rgba(var(--accent-rgb), 0.25);
+  }
+}
+
+.tool-calls-toggle {
+  color: rgb(var(--color-muted-foreground));
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tool-calls-stats {
+  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-calls-meta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: rgba(var(--accent-rgb), 0.06);
+  border-radius: 4px;
+}
+
+// Assistant fold group (per assistant message)
+.assistant-fold-group {
+  margin: 12px 0;
+  overflow-anchor: none;
+}
+
+.assistant-fold-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+  color: var(--text);
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    background: rgba(var(--accent-rgb), 0.08);
+    border-color: rgba(var(--accent-rgb), 0.25);
+  }
+}
+
+.assistant-fold-toggle {
+  color: rgb(var(--color-muted-foreground));
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.assistant-fold-stats {
+  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-fold-duration {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: rgba(var(--accent-rgb), 0.06);
+  border-radius: 4px;
+}
+
+.assistant-fold-body {
+  overflow-anchor: none;
+}
+
+// Tool call group (legacy, kept for ToolCallList internal use)
+.tool-call-group {
+  margin: 12px 0;
+}
+
+.tool-call-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+  color: var(--text);
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    background: rgba(var(--accent-rgb), 0.08);
+    border-color: rgba(var(--accent-rgb), 0.25);
+  }
+}
+
+.tool-group-toggle {
+  color: rgb(var(--color-muted-foreground));
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tool-group-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.tool-group-count {
+  font-weight: 600;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.tool-group-stats {
+  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-group-meta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: rgba(var(--accent-rgb), 0.06);
+  border-radius: 4px;
+}
+
+.tool-group-cost {
+  color: var(--success);
+  font-family: var(--font-family-mono, monospace);
+}
