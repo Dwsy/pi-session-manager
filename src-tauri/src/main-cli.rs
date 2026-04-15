@@ -296,41 +296,34 @@ fn init_embedding_service() -> Option<Arc<EmbeddingService>> {
 }
 
 fn default_config_path() -> std::path::PathBuf {
-    dirs::config_dir()
-        .unwrap_or_else(std::env::temp_dir)
-        .join("pi-session-manager.json")
+    pi_session_manager::unified_config::config_file_path()
+        .unwrap_or_else(|_| std::env::temp_dir().join("config.json"))
 }
 
 fn load_server_settings() -> ServerConfig {
-    // Load from file or use defaults
-    let config_path = default_config_path();
+    let value = pi_session_manager::unified_config::read_section("server").unwrap_or_else(|_| {
+        serde_json::json!({
+            "ws_enabled": true,
+            "http_enabled": true,
+            "ws_port": 52131,
+            "http_port": 52131,
+            "bind_addr": "127.0.0.1",
+            "auth_enabled": true,
+            "embedding_enabled": false
+        })
+    });
 
-    if let Ok(content) = std::fs::read_to_string(&config_path) {
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-            return ServerConfig {
-                ws_enabled: json["ws_enabled"].as_bool().unwrap_or(true),
-                http_enabled: json["http_enabled"].as_bool().unwrap_or(true),
-                ws_port: json["ws_port"].as_u64().unwrap_or(52130) as u16,
-                http_port: json["http_port"].as_u64().unwrap_or(52131) as u16,
-                bind_addr: json["bind_addr"]
-                    .as_str()
-                    .unwrap_or("127.0.0.1")
-                    .to_string(),
-                auth_enabled: json["auth_enabled"].as_bool().unwrap_or(true),
-                embedding_enabled: json["embedding_enabled"].as_bool().unwrap_or(false),
-            };
-        }
-    }
-
-    // Default configuration
     ServerConfig {
-        ws_enabled: true,
-        http_enabled: true,
-        ws_port: 52130,
-        http_port: 52131,
-        bind_addr: "127.0.0.1".to_string(),
-        auth_enabled: true,
-        embedding_enabled: false,
+        ws_enabled: value["ws_enabled"].as_bool().unwrap_or(true),
+        http_enabled: value["http_enabled"].as_bool().unwrap_or(true),
+        ws_port: value["ws_port"].as_u64().unwrap_or(52131) as u16,
+        http_port: value["http_port"].as_u64().unwrap_or(52131) as u16,
+        bind_addr: value["bind_addr"]
+            .as_str()
+            .unwrap_or("127.0.0.1")
+            .to_string(),
+        auth_enabled: value["auth_enabled"].as_bool().unwrap_or(true),
+        embedding_enabled: value["embedding_enabled"].as_bool().unwrap_or(false),
     }
 }
 

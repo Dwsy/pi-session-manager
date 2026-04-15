@@ -465,7 +465,8 @@ fn main() {
                 .fullscreen(false);
 
                 // Default to false to avoid accidental pinch zoom on macOS
-                let builder = builder.zoom_hotkeys_enabled(false);
+                // Enable zoom hotkeys for Cmd+/- support
+                let builder = builder.zoom_hotkeys_enabled(true);
 
                 #[cfg(target_os = "macos")]
                 let builder = builder
@@ -475,7 +476,32 @@ fn main() {
                 #[cfg(not(target_os = "macos"))]
                 let builder = builder.decorations(true);
 
-                builder.build()?;
+                // Build the window
+                let window = builder.build()?;
+
+                // Restore saved zoom level
+                tauri::async_runtime::spawn(async move {
+                    match pi_session_manager::settings_store::get::<f64>("window_zoom_level") {
+                        Ok(Some(level)) => {
+                            // Ensure zoom level is within valid range (0.75 - 2.0), default to 1.0
+                            let safe_level = if (0.75..=2.0).contains(&level) {
+                                level
+                            } else {
+                                1.0
+                            };
+                            if let Err(e) = window.set_zoom(safe_level).map_err(|e| e.to_string()) {
+                                log::warn!("Failed to restore zoom level: {e}");
+                            } else {
+                                log::debug!("Restored zoom level to {safe_level}");
+                            }
+                        }
+                        Ok(None) => {}
+                        Err(e) => log::warn!("Failed to load zoom level from settings: {e}"),
+                    }
+                });
+
+                // Note: Tauri 2 doesn't provide get_zoom API, so we can't save zoom level on exit
+                // Zoom level is now managed in frontend via localStorage
             }
 
             Ok(())
@@ -535,6 +561,7 @@ fn main() {
             pi_session_manager::save_external_session_providers,
             pi_session_manager::load_server_settings,
             pi_session_manager::save_server_settings,
+            pi_session_manager::get_psm_config_dir,
             pi_session_manager::get_session_paths,
             pi_session_manager::save_session_paths,
             pi_session_manager::get_all_session_dirs,

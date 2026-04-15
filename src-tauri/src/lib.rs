@@ -17,6 +17,7 @@ pub mod metrics;
 pub mod settings_store;
 pub mod stats;
 pub mod subagent;
+pub mod unified_config;
 
 // GUI-only
 #[cfg(feature = "gui")]
@@ -109,6 +110,7 @@ pub fn run() {
             save_external_session_providers,
             load_server_settings,
             save_server_settings,
+            get_psm_config_dir,
             get_session_paths,
             save_session_paths,
             get_all_session_dirs,
@@ -175,7 +177,8 @@ pub fn run() {
             export_config_bundle,
             preview_config_bundle,
             import_config_bundle,
-            restore_import_backup
+            restore_import_backup,
+            set_window_zoom_level
         ])
         .setup(|app| {
             let app_state = app_state::create_app_state(app.handle().clone());

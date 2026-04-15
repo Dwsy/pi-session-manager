@@ -75,17 +75,26 @@ impl Default for ServerConfig {
 }
 
 fn default_config_path() -> std::path::PathBuf {
-    dirs::config_dir()
-        .unwrap_or_else(std::env::temp_dir)
-        .join("pi-session-manager.json")
+    pi_session_manager::unified_config::config_file_path()
+        .unwrap_or_else(|_| std::env::temp_dir().join("config.json"))
 }
 
 fn load_config() -> ServerConfig {
-    let config_path = default_config_path();
-    std::fs::read_to_string(&config_path)
-        .ok()
-        .and_then(|c| serde_json::from_str(&c).ok())
-        .unwrap_or_default()
+    let value = pi_session_manager::unified_config::read_section("server").unwrap_or_else(|_| {
+        serde_json::json!({
+            "http_enabled": true,
+            "http_port": 52131,
+            "bind_addr": "0.0.0.0",
+            "auth_enabled": true
+        })
+    });
+
+    ServerConfig {
+        http_enabled: value["http_enabled"].as_bool().unwrap_or(true),
+        http_port: value["http_port"].as_u64().unwrap_or(52131) as u16,
+        bind_addr: value["bind_addr"].as_str().unwrap_or("0.0.0.0").to_string(),
+        auth_enabled: value["auth_enabled"].as_bool().unwrap_or(true),
+    }
 }
 
 #[derive(Debug, Default)]
