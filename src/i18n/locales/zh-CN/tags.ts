@@ -28,6 +28,7 @@ export const tags = {
     allProjects: '全部project',
     untitledSession: '未命名session',
     expand: '展开',
+    newSession: '新建',
   },
   contextMenu: {
     labels: '标签',

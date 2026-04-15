@@ -28,6 +28,7 @@ export const tags = {
     allProjects: 'All Projects',
     untitledSession: 'Untitled Session',
     expand: 'Expand',
+    newSession: 'New Session',
   },
   contextMenu: {
     labels: 'Labels',
