@@ -1,7 +1,6 @@
 //! Model configuration backup management
 use crate::domain::model_config::reader::{get_models_json_path, read_models_config_internal};
 use crate::domain::model_config::types::ModelConfigBackupMeta;
-use crate::utils::string::shell_single_quote;
 use chrono::Utc;
 use std::fs;
 use std::path::PathBuf;

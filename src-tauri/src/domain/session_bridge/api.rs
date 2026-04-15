@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use crate::config::Config;
 use crate::types::{SessionEntry, SessionInfo};
@@ -12,6 +13,7 @@ use crate::domain::session_bridge::types::{
     map_read_result, CanonicalSession, SessionBridgeConvertOptions, SessionBridgeConvertResult,
     SessionBridgeSource,
 };
+use tracing::{debug, warn};
 
 pub fn default_session_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
@@ -70,26 +72,76 @@ pub fn is_session_allowed_in_search(path: &Path, config: &Config) -> bool {
 pub fn read_canonical_session_from_path(
     path: &Path,
 ) -> Result<(SessionBridgeSource, CanonicalSession), String> {
+    let started_at = Instant::now();
     let should_try_vendor = SessionBridgeSource::ALL
         .into_iter()
         .any(|source| source.matches_path(path));
 
     if should_try_vendor {
-        if let Ok(result) = super::vendor::read_canonical_session_from_path(path) {
-            return Ok(result);
+        let vendor_started_at = Instant::now();
+        match super::vendor::read_canonical_session_from_path(path) {
+            Ok(result) => {
+                debug!(
+                    "session_bridge read {} via vendor in {}ms (total={}ms)",
+                    path.display(),
+                    vendor_started_at.elapsed().as_millis(),
+                    started_at.elapsed().as_millis()
+                );
+                return Ok(result);
+            }
+            Err(error) => {
+                warn!(
+                    "session_bridge vendor read failed for {} after {}ms: {}",
+                    path.display(),
+                    vendor_started_at.elapsed().as_millis(),
+                    error
+                );
+            }
         }
     }
 
     if let Some(provider) = detect_provider(Some(path), "") {
-        return provider
+        let provider_started_at = Instant::now();
+        let result = provider
             .read_session(path)
             .map(|canonical| (provider, canonical))
             .map(map_read_result);
+        match &result {
+            Ok((source, _)) => debug!(
+                "session_bridge read {} via provider {} in {}ms (total={}ms)",
+                path.display(),
+                source.display_name(),
+                provider_started_at.elapsed().as_millis(),
+                started_at.elapsed().as_millis()
+            ),
+            Err(error) => warn!(
+                "session_bridge provider read failed for {} after {}ms: {}",
+                path.display(),
+                provider_started_at.elapsed().as_millis(),
+                error
+            ),
+        }
+        return result;
     }
 
     let content = std::fs::read_to_string(path)
         .map_err(|error| format!("Failed to read session file {}: {error}", path.display()))?;
-    read_canonical_session_from_str(&content, Some(path))
+    let result = read_canonical_session_from_str(&content, Some(path));
+    match &result {
+        Ok((source, _)) => debug!(
+            "session_bridge read {} via content fallback {} in {}ms",
+            path.display(),
+            source.display_name(),
+            started_at.elapsed().as_millis()
+        ),
+        Err(error) => warn!(
+            "session_bridge content fallback failed for {} after {}ms: {}",
+            path.display(),
+            started_at.elapsed().as_millis(),
+            error
+        ),
+    }
+    result
 }
 
 pub fn read_canonical_session_from_str(

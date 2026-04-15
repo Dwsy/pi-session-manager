@@ -31,7 +31,18 @@ pub async fn scan_sessions_paginated_impl(
     let mut sessions = if let Some(cached) = scanner::get_cached_sessions_for_list() {
         cached
     } else {
-        scanner::scan_sessions().await?
+        let config = config::load_config()?;
+        let conn = crate::data::sqlite::init_db_with_config(&config)?;
+        let db_sessions = crate::data::sqlite::get_all_sessions_for_list(&conn)?;
+        if db_sessions.is_empty() {
+            scanner::scan_sessions()
+                .await?
+                .into_iter()
+                .map(|session| strip_session_list_payload(&session))
+                .collect()
+        } else {
+            db_sessions
+        }
     };
 
     // Apply project filter
@@ -72,6 +83,7 @@ pub async fn scan_sessions_paginated_impl(
 mod tests {
     use super::filtering::{session_matches_project_filter, session_matches_search_query};
     use super::pagination::{build_paginated_result, strip_session_list_payload};
+    use super::scan_sessions_paginated_impl;
     use super::sorting::sort_sessions;
     use crate::types::SessionInfo;
     use chrono::{DateTime, Utc};
@@ -239,6 +251,67 @@ mod tests {
 
         let sorted_ids: Vec<&str> = sessions.iter().map(|session| session.id.as_str()).collect();
         assert_eq!(sorted_ids, vec!["s-1", "s-3", "s-2"]);
+    }
+
+    #[test]
+    fn paginated_scan_strips_heavy_fields_when_falling_back_to_full_scan() {
+        crate::core::scanner::invalidate_cache();
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db_path = temp.path().join("sessions.db");
+        std::env::set_var("PPM_TEST_DB", &db_path);
+        std::env::set_var("HOME", temp.path());
+
+        let session_path = temp.path().join("heavy-session.jsonl");
+        std::fs::write(
+            &session_path,
+            "{\"type\":\"session\",\"id\":\"heavy-1\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"cwd\":\"/tmp/project\"}\n{\"type\":\"message\",\"id\":\"m1\",\"timestamp\":\"2026-01-01T00:00:01Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}]}}\n",
+        )
+        .expect("write session file");
+
+        let mut conn =
+            crate::data::sqlite::init_db_with_path(&db_path, &crate::config::Config::default())
+                .expect("db");
+        let now = Utc::now();
+        let session = SessionInfo {
+            path: session_path.to_string_lossy().to_string(),
+            id: "heavy-1".to_string(),
+            cwd: "/tmp/project".to_string(),
+            name: Some("heavy".to_string()),
+            created: now,
+            modified: now,
+            message_count: 1,
+            first_message: "hello".to_string(),
+            all_messages_text: "very large body".to_string(),
+            user_messages_text: "user blob".to_string(),
+            assistant_messages_text: "assistant blob".to_string(),
+            last_message: "done".to_string(),
+            last_message_role: "assistant".to_string(),
+            parent_session_path: None,
+        };
+        crate::data::sqlite::upsert_session(&mut conn, &session, now, Some(&[])).expect("upsert");
+        drop(conn);
+
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        let result = runtime
+            .block_on(scan_sessions_paginated_impl(
+                Some(0),
+                Some(10),
+                None,
+                Some(temp.path().to_string_lossy().to_string()),
+                None,
+                None,
+                None,
+            ))
+            .expect("paginated");
+        let first = result.sessions.first().expect("session");
+        assert_eq!(first.all_messages_text, "");
+        assert_eq!(first.user_messages_text, "");
+        assert_eq!(first.assistant_messages_text, "");
+
+        std::env::remove_var("PPM_TEST_DB");
+        std::env::remove_var("HOME");
+        crate::core::scanner::invalidate_cache();
     }
 
     #[test]

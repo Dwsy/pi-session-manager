@@ -18,10 +18,13 @@ pub fn generate_heatmap_data(
         let date_str = date.format("%Y-%m-%d").to_string();
         let message_count = messages_by_date.get(&date_str).copied().unwrap_or(0);
 
-        let level = if message_count == 0 {
-            0
-        } else {
-            ((message_count as f32 / max_messages as f32) * 5.0).round() as usize
+        let level = match message_count {
+            0 => 0,
+            1..=4 => 1,
+            5..=12 => 2,
+            13..=36 => 3,
+            37..=64 => 4,
+            _ => 5,
         };
 
         let total_messages = daily_stats.messages.get(&date_str).copied().unwrap_or(0);

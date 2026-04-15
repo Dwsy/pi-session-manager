@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
+use std::sync::{OnceLock, RwLock};
 
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{json, Value};
@@ -11,6 +12,38 @@ use crate::domain::casr_min::model::{
 
 pub const DB_FILENAME: &str = "opencode.db";
 const DATA_DIRNAME: &str = ".opencode";
+
+#[derive(Clone)]
+struct OpenCodePathListCacheEntry {
+    modified_at_ms: u128,
+    session_paths: Vec<PathBuf>,
+}
+
+fn session_path_cache(
+) -> &'static RwLock<std::collections::HashMap<String, OpenCodePathListCacheEntry>> {
+    static CACHE: OnceLock<RwLock<std::collections::HashMap<String, OpenCodePathListCacheEntry>>> =
+        OnceLock::new();
+    CACHE.get_or_init(|| RwLock::new(std::collections::HashMap::new()))
+}
+
+fn db_modified_ms(path: &Path) -> Result<u128, String> {
+    std::fs::metadata(path)
+        .and_then(|metadata| metadata.modified())
+        .map_err(|e| {
+            format!(
+                "OpenCode: failed to read DB metadata {}: {e}",
+                path.display()
+            )
+        })?
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .map_err(|e| {
+            format!(
+                "OpenCode: failed to normalize DB mtime {}: {e}",
+                path.display()
+            )
+        })
+}
 
 pub fn session_roots() -> Vec<PathBuf> {
     dedup_existing_dirs(candidate_data_dirs())
@@ -38,6 +71,17 @@ pub fn backing_store_path(path: &Path) -> PathBuf {
 }
 
 pub fn list_session_paths_in_db(db_path: &Path) -> Result<Vec<PathBuf>, String> {
+    let modified_at_ms = db_modified_ms(db_path)?;
+    let cache_key = db_path.to_string_lossy().to_string();
+
+    if let Ok(guard) = session_path_cache().read() {
+        if let Some(entry) = guard.get(&cache_key) {
+            if entry.modified_at_ms == modified_at_ms {
+                return Ok(entry.session_paths.clone());
+            }
+        }
+    }
+
     let conn = open_db_ro(db_path)?;
     if !table_exists(&conn, "sessions") {
         return Ok(Vec::new());
@@ -50,10 +94,22 @@ pub fn list_session_paths_in_db(db_path: &Path) -> Result<Vec<PathBuf>, String> 
         .query_map([], |row| row.get::<_, String>(0))
         .map_err(|e| format!("OpenCode: failed to query sessions: {e}"))?;
 
-    Ok(rows
+    let session_paths = rows
         .flatten()
         .map(|session_id| virtual_session_path(db_path, &session_id))
-        .collect())
+        .collect::<Vec<_>>();
+
+    if let Ok(mut guard) = session_path_cache().write() {
+        guard.insert(
+            cache_key,
+            OpenCodePathListCacheEntry {
+                modified_at_ms,
+                session_paths: session_paths.clone(),
+            },
+        );
+    }
+
+    Ok(session_paths)
 }
 
 pub fn build_target_path(
@@ -731,5 +787,57 @@ fn role_to_opencode(role: &MessageRole) -> &str {
         MessageRole::Tool => "tool",
         MessageRole::System => "system",
         MessageRole::Other(role) => role.as_str(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::casr_min::model::{CanonicalMessage, CanonicalSession, MessageRole};
+
+    fn build_session(workspace: &Path, session_id: &str, text: &str) -> CanonicalSession {
+        CanonicalSession {
+            session_id: session_id.to_string(),
+            provider_slug: "codex".to_string(),
+            workspace: Some(workspace.to_path_buf()),
+            title: Some(text.to_string()),
+            started_at: Some(1_701_388_800_000),
+            ended_at: Some(1_701_388_801_000),
+            messages: vec![CanonicalMessage {
+                idx: 0,
+                role: MessageRole::User,
+                content: text.to_string(),
+                timestamp: Some(1_701_388_800_000),
+                author: None,
+                tool_calls: vec![],
+                tool_results: vec![],
+                extra: Value::Null,
+            }],
+            metadata: Value::Null,
+            source_path: workspace.join(format!("{session_id}.jsonl")),
+            model_name: None,
+        }
+    }
+
+    #[test]
+    fn list_session_paths_in_db_refreshes_when_db_changes() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let workspace = temp.path().join("workspace");
+        std::fs::create_dir_all(&workspace).expect("workspace");
+
+        let first = build_session(&workspace, "seed-1", "first");
+        let written_path = write_session(&first, "opc-session-1").expect("write first");
+        let db_path = backing_store_path(&written_path);
+
+        let first_paths = list_session_paths_in_db(&db_path).expect("list first");
+        assert_eq!(first_paths.len(), 1);
+
+        std::thread::sleep(std::time::Duration::from_millis(20));
+
+        let second = build_session(&workspace, "seed-2", "second");
+        write_session(&second, "opc-session-2").expect("write second");
+
+        let second_paths = list_session_paths_in_db(&db_path).expect("list second");
+        assert_eq!(second_paths.len(), 2);
     }
 }
