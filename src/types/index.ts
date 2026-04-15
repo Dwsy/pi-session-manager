@@ -23,6 +23,7 @@ export interface FullTextSearchHit {
 export interface FullTextSearchResponse {
   hits: FullTextSearchHit[]
   total_hits: number
+  has_more: boolean
 }
 
 // Add other types as needed
