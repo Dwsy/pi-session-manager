@@ -6,11 +6,12 @@
 |------|------|
 | Session directory | `~/.pi/agent/sessions/` |
 | SQLite DB | `~/.pi/agent/sessions/sessions.db` |
-| Model config | `~/.pi/agent/models.json` |
-| Model backups | `~/.pi/agent/backups/models/*.json` |
-| Scan config | `~/.pi/agent/session-manager-config.toml` |
-| App settings | SQLite `settings` table |
-| CLI config | `dirs::config_dir()/pi-session-manager.json` |
+| Unified config | `~/.pi/pi-session-manager/config.json` |
+| Tags config | `~/.pi/pi-session-manager/tags_config.json` |
+| Session marks | `~/.pi/pi-session-manager/session_mark.json` |
+| Pi model config | `~/.pi/agent/models.json` |
+| Pi settings | `~/.pi/agent/settings.json` |
+| Config snapshots | `~/.pi/pi-session-manager/history/config-versions/*.json` |
 
 ## Tech Stack
 
@@ -26,4 +27,4 @@
 2. CORS: `access-control-allow-origin: *`
 3. `/metrics` has no extra auth
 4. Tauri CSP: `null`
-5. File access: `~/.pi/agent/*`
+5. File access: `~/.pi/pi-session-manager/*`

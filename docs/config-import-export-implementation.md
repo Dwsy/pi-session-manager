@@ -1,1 +1,34 @@
-# Configuration Import/Export Feature Implementation Summary ## Overview Successfully implementedunified configuration import/export system,supports packaging all Pi Agent configuration files into a ZIP archive,automatically backs up existing configuration on import,provides a clear user interface integrated into the settings panel。 ## Implementation Files ### Backend (Rust) #### 1. `src-tauri/src/commands/config_bundle.rs` (New, ~440 ) **Core Functions:** - `export_config_bundle()` - Export all configurations as ZIP archive - `preview_config_bundle()` - Preview bundle contents(without extraction) - `import_config_bundle()` - Import configuration bundle(supports automatic backup) - `restore_import_backup()` - Restore backup from before last import **Data Structures:** - `ImportResult` - Import result summary - `BundlePreview` - Bundle preview information - `BundleFileInfo` - Single file information - `BundleMetadata` - Bundle metadata **Included Configuration Files:** - `models.json` - Model provider definitions - `settings.json` - Pi Agent settings - `session-manager-config.toml` - Session manager configuration - `session-manager.json` - CLI configuration(if exists) #### 2. `src-tauri/src/commands/mod.rs` (Modified) - Added `pub mod config_bundle;` - Added `pub use config_bundle::*;` #### 3. `src-tauri/src/lib.rs` (Modified) - Registered 4 new Tauri commands: - `export_config_bundle` - `preview_config_bundle` - `import_config_bundle` - `restore_import_backup` #### 4. `src-tauri/Cargo.toml` (Modified) - Added dependencies: `zip = "2.2"`, `tempfile = "3.14"` ### Frontend (TypeScript/React) #### 1. `src/components/settings/sections/ConfigBundleManager.tsx` (New, ~400 ) **UI Components:** - Export configuration section: One-click export button - Import configuration section: File selection button - Import history list: displays recent import operations,supports restoration - Preview modal: displays bundle contents,marks files to be overwritten/new - Last import result: displays import details and warnings **Interaction Flow:** - **Export**: Click export → select save location → copy ZIP file - **Import**: select file → preview contents → confirm import → automatic backup → import complete #### 2. `src/components/settings/SettingsPanel.tsx` (Modified) - Import `ConfigBundleManager` component - Addedmenu item: "Import/Export" (`import-export`) - ContentrendermediumAddedtag #### 3. `src/components/settings/types.ts` (Modified) - `SettingsSection` TypemediumAdded `'import-export'` ### Internationalization (i18n) #### 1. `src/i18n/locales/en-US/settings.ts` (Modified) Added `importExport` : - `exportSection` - Export - `importSection` - Import - `history` - - `preview` - Preview modal - `lastResult` - Last import result #### 2. `src/i18n/locales/zh-CN/settings.ts` (Modified) Addedmedium,structureconsistent ### Testing #### `src-tauri/tests/config_bundle_test.rs` (New, ~150 ) **Test Cases:** 1. `test_export_creates_zip` - verify export creates valid ZIP file 2. `test_preview_bundle_valid_file` - verify can preview valid bundle 3. `test_import_bundle_invalid_file` - verify invalid files are correctly rejected 4. `test_bundle_metadata_format` - verify metadata format is correct 5. `test_backup_directory_creation` - verify backup directory creation 6. `test_config_file_paths` - verify configuration file path definitions **Test Results:** ✅ 6/6 ## ZIP Bundle Structure ``` pi-config-export-2026-04-03-143022.zip ├── metadata.json # bundle metadata(version/creation time/version/platform) ├── models.json # model configuration ├── settings.json # Pi settings ├── session-manager-config.toml # Session manager configuration └── session-manager.json # CLI configuration(if exists) ``` ## Backup Strategy **Backup Location:** `~/.pi/agent/backups/config-bundles/import-{timestamp}/` **Backup Contents:** - all configuration files before import - `import-meta.json` - import metadata(timestamp/source bundle) **Restore Mechanism:** - automatically find latest backup - timestampSort,restore latest backup - support selecting specific backup from import history ## Code Quality - ✅ Rust compilation passed (`cargo check`) - ✅ Clippy check passed (`cargo clippy -- -D warnings`) - ✅ All tests passed (`cargo test --test config_bundle_test`: 6/6) - ✅ uses modern Rust best practices(inline format strings, `is_some_and`, `flatten` ) - ✅ complete error handling and user-friendly error messages ## User Experience ### Export Flow 1. user clicks"ExportConfiguration"Button 2. system packages all configuration files as ZIP 3. popup save dialog to select destination 4. copy ZIP fileUserselectLocation 5. display success feedback message ### Import Flow 1. user clicks"select file"Button 2. select ZIP bundle 3. system reads and previews bundle contents: - displays file list and sizes - marks which files will be overwritten,which are new 4. user confirms"ImportBackup" 5. automatic backupWhenConfiguration 6. extract and import configuration files 7. showImport result summary ### Restore Flow 1. select backup to restore from import history 2. click "Restore" button 3. confirm restore operation 4. BackupWhenConfiguration 5. showRestoreResult ## 1. **Security**: Importautomatic backup,supportRestore 2. ****: ,User 3. ****: medium 4. **consistent**: ModelConfigCenter Designmode 5. **Internationalization**: mediumsupport,extensionother 6. **extension**: AddedConfigurationfileExportmedium ## feature | feature | Relation | |---------|------| | `model_config.rs` | feature models.json ,feature | | `pi_settings.rs` | feature settings.json ImportExport | | `config_versions.rs` | featurefileBackup,Dependency SQLite versionfast | | `settings_store.rs` | SQLite Settings( app_settings)Export | ## improvement 1. supportselectExport/Import(Configurationfile) 2. supportConfiguration(Sensitive Information Protection) 3. support() 4. supportConfiguration(Importshowchange) 5. Addedsupport(、、) 6. supportConfigurationverification(ImportConfigurationvalid) ## ### BackupWhenConfiguration ``` Settings → Import/Export → ExportConfiguration → select save location ``` ### ``` 1. Configuration 2. ZIP file 3. Configuration 4. automatic backupRestore ``` ### RestoreErrorConfiguration ``` → selectBefore → → ``` --- **Implementationdate**: 2026-04-03 **version**: 1.0 **state**: ✅ Completetest
+# Configuration Import/Export Feature
+
+## Current behavior
+
+`pi-session-manager` import/export now packages only the app's own unified config:
+
+- `~/.pi/pi-session-manager/config.json`
+
+It does **not** bundle Pi's own files such as:
+
+- `~/.pi/agent/models.json`
+- `~/.pi/agent/settings.json`
+
+Those belong to Pi itself, not to `pi-session-manager`.
+
+## Bundle contents
+
+```text
+pi-config-export-<timestamp>.zip
+├── metadata.json
+└── config.json
+```
+
+## Backup location
+
+```text
+~/.pi/pi-session-manager/backups/config-bundles/import-*/
+```
+
+## Notes
+
+- Runtime config source of truth for PSM is `~/.pi/pi-session-manager/config.json`
+- Session/cache/tag/favorite/auth data remain in SQLite
+- Config history snapshots remain separate from runtime config

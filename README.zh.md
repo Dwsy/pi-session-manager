@@ -132,12 +132,14 @@ pnpm install
 | 路径 | 说明 |
 |------|------|
 | `~/.pi/agent/sessions/` | 会话目录 |
-| `~/.pi/agent/sessions/sessions.db` | SQLite 数据库 |
-| `~/.pi/agent/session-manager-config.toml` | 扫描配置 |
-| `~/.pi/agent/skills/` | Pi Skills |
-| `~/.pi/agent/prompts/` | Pi Prompts |
+| `~/.pi/agent/sessions/sessions.db` | SQLite 数据库，仅保存会话/收藏/鉴权，不再存运行时配置 |
+| `~/.pi/pi-session-manager/config.json` | 统一外部配置（server/session/app/ui） |
+| `~/.pi/pi-session-manager/tags_config.json` | 标签定义 |
+| `~/.pi/pi-session-manager/session_mark.json` | 会话与标签绑定关系 |
+| `~/.pi/pi-session-manager/history/config-versions/` | 配置历史快照（JSON 文件） |
+| `~/.pi/pi-session-manager/backups/` | 导入导出备份 |
+| `~/.pi/agent/models.json` | Pi 模型配置 |
 | `~/.pi/agent/settings.json` | Pi 配置 |
-| `~/.config/pi-session-manager.json` | 独立 `pi-session-cli` 配置 |
 
 ## 扩展系统
 
