@@ -218,6 +218,9 @@ export const settings = {
     scrollMarkersGuideSeenHelp: "首次打开session时显示滚动标记的使用提示",
     timelineNavEnabled: "时间线导航",
     timelineNavEnabledHelp: "在右侧显示圆点时间线，hover 预览消息并快速跳转",
+    collapseToolCalls: "折叠工具调用",
+    collapseToolCallsHelp: "显示聚合的工具调用摘要，而非展开列表",
+
   },
   externalSessions: {
     title: "其他外部 Session",
@@ -487,7 +490,7 @@ export const settings = {
     exportSection: {
       title: "导出配置",
       description: "将所有配置文件打包为 ZIP 归档",
-      includes: "包含: models.json, settings.json, session-manager-config.toml",
+      includes: "包含: config.json",
       button: "导出配置",
       success: "配置已导出到 {{path}}",
       failed: "导出失败: {{reason}}",

@@ -256,6 +256,10 @@ export const settings = {
     timelineNavEnabled: "Timeline navigation",
     timelineNavEnabledHelp:
       "Show a dot timeline on the right side for quick message jumping with hover preview",
+    collapseToolCalls: "Collapse tool calls",
+    collapseToolCallsHelp:
+      "Show aggregated tool call summary instead of expanded list",
+
   },
   externalSessions: {
     title: "Other external sessions",
@@ -538,7 +542,7 @@ export const settings = {
       title: "Export Configuration",
       description: "Package all configuration files into a ZIP archive",
       includes:
-        "Includes: models.json, settings.json, session-manager-config.toml",
+        "Includes: config.json",
       button: "Export Configuration",
       success: "Configuration exported to {{path}}",
       failed: "Export failed: {{reason}}",

@@ -108,6 +108,9 @@ export const settings = {
     scrollMarkersGuideSeenHelp: 'セッションを初めて開くときに使い方のヒントを表示',
     timelineNavEnabled: 'Timeline navigation',
     timelineNavEnabledHelp: 'Show a dot timeline on the right side for quick message jumping with hover preview',
+    collapseToolCalls: "Collapse tool calls",
+    collapseToolCallsHelp:
+      "Show aggregated tool call summary instead of expanded list",
   },
   search: {
     defaultSearchMode: 'デフォルト検索モード',

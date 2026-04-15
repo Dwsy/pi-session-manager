@@ -108,6 +108,9 @@ export const settings = {
     scrollMarkersGuideSeenHelp: 'Mostrar consejos introductorios al abrir una sesión por primera vez',
     timelineNavEnabled: 'Timeline navigation',
     timelineNavEnabledHelp: 'Show a dot timeline on the right side for quick message jumping with hover preview',
+    collapseToolCalls: "Collapse tool calls",
+    collapseToolCallsHelp:
+      "Show aggregated tool call summary instead of expanded list",
   },
   search: {
     defaultSearchMode: 'Modo de búsqueda predeterminado',
