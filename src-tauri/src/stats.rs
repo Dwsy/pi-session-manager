@@ -76,7 +76,6 @@ mod tests {
             modified,
             message_count,
             first_message: "hello".to_string(),
-            all_messages_text: String::new(),
             user_messages_text: String::new(),
             assistant_messages_text: String::new(),
             last_message: String::new(),

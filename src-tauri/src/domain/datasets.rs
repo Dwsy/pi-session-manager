@@ -93,18 +93,11 @@ fn set_import_failed(task_id: &str, error: String) {
 }
 
 fn home_dir() -> Result<PathBuf, String> {
-    if let Ok(home) = std::env::var("HOME") {
-        return Ok(PathBuf::from(home));
-    }
-    dirs::home_dir().ok_or("Cannot find home directory".to_string())
+    crate::paths::home_dir()
 }
 
 fn datasets_root_dir() -> Result<PathBuf, String> {
-    let root = home_dir()?
-        .join(".pi")
-        .join("agent")
-        .join("sessions")
-        .join("datasets");
+    let root = crate::paths::pi_agent_sessions_dir()?.join("datasets");
     fs::create_dir_all(&root).map_err(|e| format!("Failed to create datasets dir: {e}"))?;
     Ok(root)
 }

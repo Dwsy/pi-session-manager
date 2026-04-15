@@ -736,9 +736,7 @@ mod tests {
     #[test]
     fn extract_from_real_session_file() {
         // Find a real session file
-        let sessions_dir = dirs::home_dir()
-            .map(|h| h.join(".pi/agent/sessions"))
-            .expect("home dir");
+        let sessions_dir = crate::paths::pi_agent_sessions_dir().expect("home dir");
 
         // Find the pi-session-manager sessions
         let psm_dir = sessions_dir.join("--Users-dengwenyu-Dev-AI-pi-session-manager--");

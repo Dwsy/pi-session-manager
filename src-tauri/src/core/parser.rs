@@ -2,6 +2,92 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
+fn get_u64_field(value: &Value, keys: &[&str]) -> u64 {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(|item| item.as_u64()))
+        .unwrap_or(0)
+}
+
+fn get_f64_field(value: &Value, keys: &[&str]) -> f64 {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(|item| item.as_f64()))
+        .unwrap_or(0.0)
+}
+
+fn find_usage_object(value: &Value) -> Option<&Value> {
+    match value {
+        Value::Object(map) => {
+            if map.contains_key("input")
+                || map.contains_key("output")
+                || map.contains_key("cacheRead")
+                || map.contains_key("cacheWrite")
+                || map.contains_key("cache_read")
+                || map.contains_key("cache_write")
+            {
+                return Some(value);
+            }
+
+            if let Some(usage) = map.get("usage") {
+                if let Some(found) = find_usage_object(usage) {
+                    return Some(found);
+                }
+            }
+
+            for nested in map.values() {
+                if let Some(found) = find_usage_object(nested) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        Value::Array(items) => items.iter().find_map(find_usage_object),
+        _ => None,
+    }
+}
+
+fn apply_usage_to_details(details: &mut SessionDetails, model_name: Option<&str>, usage: &Value) {
+    let input = get_u64_field(usage, &["input", "input_tokens"]);
+    let output = get_u64_field(usage, &["output", "output_tokens"]);
+    let cache_read = get_u64_field(usage, &["cacheRead", "cache_read", "cache_read_tokens"]);
+    let cache_write = get_u64_field(usage, &["cacheWrite", "cache_write", "cache_write_tokens"]);
+
+    details.input_tokens += input;
+    details.output_tokens += output;
+    details.cache_read_tokens += cache_read;
+    details.cache_write_tokens += cache_write;
+
+    let input_cost = usage
+        .get("cost")
+        .map(|cost| get_f64_field(cost, &["input", "input_cost"]))
+        .unwrap_or(0.0);
+    let output_cost = usage
+        .get("cost")
+        .map(|cost| get_f64_field(cost, &["output", "output_cost"]))
+        .unwrap_or(0.0);
+    let cache_read_cost = usage
+        .get("cost")
+        .map(|cost| get_f64_field(cost, &["cacheRead", "cache_read", "cache_read_cost"]))
+        .unwrap_or(0.0);
+    let cache_write_cost = usage
+        .get("cost")
+        .map(|cost| get_f64_field(cost, &["cacheWrite", "cache_write", "cache_write_cost"]))
+        .unwrap_or(0.0);
+
+    details.input_cost += input_cost;
+    details.output_cost += output_cost;
+    details.cache_read_cost += cache_read_cost;
+    details.cache_write_cost += cache_write_cost;
+
+    if let Some(model) = model_name.filter(|value| !value.is_empty()) {
+        let model_usage = details.model_usage.entry(model.to_string()).or_default();
+        model_usage.input_tokens += input;
+        model_usage.output_tokens += output;
+        model_usage.cache_read_tokens += cache_read;
+        model_usage.cache_write_tokens += cache_write;
+        model_usage.cost += input_cost + output_cost + cache_read_cost + cache_write_cost;
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SessionModelUsage {
@@ -24,11 +110,12 @@ pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
         let mut last_message_time: Option<chrono::DateTime<chrono::Utc>> = None;
 
         for message in session.messages {
+            let model_name = message.author.clone().filter(|value| !value.is_empty());
             match message.role {
                 crate::domain::session_bridge::MessageRole::User => details.user_messages += 1,
                 crate::domain::session_bridge::MessageRole::Assistant => {
                     details.assistant_messages += 1;
-                    if let Some(author) = message.author.clone().filter(|value| !value.is_empty()) {
+                    if let Some(author) = model_name.clone() {
                         model_set.insert(author.clone());
                         details.model_usage.entry(author).or_default().messages += 1;
                     }
@@ -36,6 +123,10 @@ pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
                 crate::domain::session_bridge::MessageRole::Tool => details.tool_results += 1,
                 crate::domain::session_bridge::MessageRole::System
                 | crate::domain::session_bridge::MessageRole::Other(_) => {}
+            }
+
+            if let Some(usage) = find_usage_object(&message.extra) {
+                apply_usage_to_details(&mut details, model_name.as_deref(), usage);
             }
 
             if let Some(timestamp_ms) = message.timestamp {
@@ -190,5 +281,25 @@ impl SessionDetails {
 
     pub fn total_messages(&self) -> usize {
         self.user_messages + self.assistant_messages + self.tool_results + self.custom_messages
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_session_details;
+
+    #[test]
+    fn parse_session_details_extracts_usage_from_canonical_provider_path() {
+        let content = r#"{"type":"session","id":"pi-1","timestamp":"2026-01-01T00:00:00Z","cwd":"/repo"}
+{"type":"message","id":"u1","timestamp":"2026-01-01T00:00:01Z","message":{"role":"user","content":[{"type":"text","text":"hi"}]}}
+{"type":"message","id":"a1","timestamp":"2026-01-01T00:00:02Z","message":{"role":"assistant","model":"gpt-5","provider":"openai","content":[{"type":"text","text":"hello"}],"usage":{"input":11,"output":29,"cacheRead":7,"cacheWrite":3,"cost":{"input":0.01,"output":0.02,"cacheRead":0.0,"cacheWrite":0.0}}}}"#;
+
+        let details = parse_session_details(content);
+        assert_eq!(details.input_tokens, 11);
+        assert_eq!(details.output_tokens, 29);
+        assert_eq!(details.cache_read_tokens, 7);
+        assert_eq!(details.cache_write_tokens, 3);
+        assert_eq!(details.total_tokens(), 40);
+        assert!(details.total_cost() > 0.0);
     }
 }

@@ -169,7 +169,6 @@ pub fn parse_pi_session_info(
             modified,
             message_count,
             first_message,
-            all_messages_text: all_messages.join("\n"),
             user_messages_text: user_messages.join("\n"),
             assistant_messages_text: assistant_messages.join("\n"),
             last_message,

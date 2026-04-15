@@ -12,7 +12,6 @@ pub fn strip_session_list_payload(session: &SessionInfo) -> SessionInfo {
         modified: session.modified,
         message_count: session.message_count,
         first_message: session.first_message.clone(),
-        all_messages_text: String::new(),
         user_messages_text: String::new(),
         assistant_messages_text: String::new(),
         last_message: session.last_message.clone(),

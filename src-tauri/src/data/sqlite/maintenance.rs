@@ -133,7 +133,7 @@ pub fn preload_recent_sessions(
     count: usize,
 ) -> Result<Vec<SessionInfo>, String> {
     let mut stmt = conn.prepare(
-        "SELECT id, path, cwd, name, created, modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
+        "SELECT id, path, cwd, name, created, modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
          FROM sessions
          ORDER BY last_accessed DESC, access_count DESC, modified DESC, path ASC
          LIMIT ?"
@@ -150,12 +150,11 @@ pub fn preload_recent_sessions(
                 modified: parse_timestamp(&row.get::<_, String>(5)?),
                 message_count: row.get(6)?,
                 first_message: row.get(7)?,
-                all_messages_text: row.get(8).unwrap_or_default(),
-                user_messages_text: row.get(9).unwrap_or_default(),
-                assistant_messages_text: row.get(10).unwrap_or_default(),
-                last_message: row.get(11).unwrap_or_default(),
-                last_message_role: row.get(12).unwrap_or_default(),
-                parent_session_path: row.get(13)?,
+                user_messages_text: row.get(8).unwrap_or_default(),
+                assistant_messages_text: row.get(9).unwrap_or_default(),
+                last_message: row.get(10).unwrap_or_default(),
+                last_message_role: row.get(11).unwrap_or_default(),
+                parent_session_path: row.get(12)?,
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?
@@ -226,19 +225,21 @@ mod tests {
         let db_path = temp.path().join("sessions.db");
         let conn = init_db_with_path(&db_path, &Config::default()).expect("db");
 
+        let pi_root = crate::paths::pi_agent_sessions_dir().expect("pi sessions dir");
+        let pi_path = pi_root.join("foo").join("a.jsonl");
         conn.execute(
-            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
-             VALUES (?1, ?2, '', NULL, ?3, ?3, ?3, 0, '', '', '', '', '', '', NULL, ?3, 0, NULL)",
+            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
+             VALUES (?1, ?2, '', NULL, ?3, ?3, ?3, 0, '', '', '', '', '', NULL, ?3, 0, NULL)",
             params![
                 "pi-1",
-                "/Users/demo/.pi/agent/sessions/foo/a.jsonl",
+                pi_path.to_string_lossy().to_string(),
                 chrono::Utc::now().to_rfc3339()
             ],
         )
         .expect("insert pi");
         conn.execute(
-            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
-             VALUES (?1, ?2, '', NULL, ?3, ?3, ?3, 0, '', '', '', '', '', '', NULL, ?3, 0, NULL)",
+            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
+             VALUES (?1, ?2, '', NULL, ?3, ?3, ?3, 0, '', '', '', '', '', NULL, ?3, 0, NULL)",
             params![
                 "codex-1",
                 "/Users/demo/.codex/sessions/2026/01/01/rollout-a.jsonl",
@@ -259,6 +260,7 @@ mod tests {
         let remaining_path: String = conn
             .query_row("SELECT path FROM sessions", [], |row| row.get(0))
             .expect("path");
-        assert!(remaining_path.contains("/.pi/agent/sessions/"));
+        let pi_root = crate::paths::pi_agent_sessions_dir().expect("pi sessions dir");
+        assert!(remaining_path.contains(&pi_root.to_string_lossy().replace('\\', "/")));
     }
 }

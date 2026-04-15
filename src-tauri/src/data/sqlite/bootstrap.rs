@@ -175,7 +175,6 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             file_modified TEXT NOT NULL,
             message_count INTEGER NOT NULL,
             first_message TEXT,
-            all_messages_text TEXT,
             user_messages_text TEXT,
             assistant_messages_text TEXT,
             last_message TEXT,

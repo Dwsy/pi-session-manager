@@ -53,26 +53,26 @@ fn create_sessions_triggers(conn: &Connection) -> Result<(), String> {
     // Insert trigger
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS sessions_ai AFTER INSERT ON sessions BEGIN
-         INSERT INTO sessions_fts(rowid, path, cwd, name, first_message, all_messages_text, user_messages_text, assistant_messages_text)
-         VALUES (new.rowid, new.path, new.cwd, new.name, new.first_message, new.all_messages_text, new.user_messages_text, new.assistant_messages_text); END;",
+         INSERT INTO sessions_fts(rowid, path, cwd, name, first_message, user_messages_text, assistant_messages_text)
+         VALUES (new.rowid, new.path, new.cwd, new.name, new.first_message, new.user_messages_text, new.assistant_messages_text); END;",
         [],
     ).map_err(|e| format!("Failed to create trigger sessions_ai: {e}"))?;
 
     // Delete trigger
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS sessions_ad AFTER DELETE ON sessions BEGIN
-         INSERT INTO sessions_fts(sessions_fts, rowid, path, cwd, name, first_message, all_messages_text, user_messages_text, assistant_messages_text)
-         VALUES('delete', old.rowid, old.path, old.cwd, old.name, old.first_message, old.all_messages_text, old.user_messages_text, old.assistant_messages_text); END;",
+         INSERT INTO sessions_fts(sessions_fts, rowid, path, cwd, name, first_message, user_messages_text, assistant_messages_text)
+         VALUES('delete', old.rowid, old.path, old.cwd, old.name, old.first_message, old.user_messages_text, old.assistant_messages_text); END;",
         [],
     ).map_err(|e| format!("Failed to create trigger sessions_ad: {e}"))?;
 
     // Update trigger
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS sessions_au AFTER UPDATE ON sessions BEGIN
-         INSERT INTO sessions_fts(sessions_fts, rowid, path, cwd, name, first_message, all_messages_text, user_messages_text, assistant_messages_text)
-         VALUES('delete', old.rowid, old.path, old.cwd, old.name, old.first_message, old.all_messages_text, old.user_messages_text, old.assistant_messages_text);
-         INSERT INTO sessions_fts(rowid, path, cwd, name, first_message, all_messages_text, user_messages_text, assistant_messages_text)
-         VALUES (new.rowid, new.path, new.cwd, new.name, new.first_message, new.all_messages_text, new.user_messages_text, new.assistant_messages_text); END;",
+         INSERT INTO sessions_fts(sessions_fts, rowid, path, cwd, name, first_message, user_messages_text, assistant_messages_text)
+         VALUES('delete', old.rowid, old.path, old.cwd, old.name, old.first_message, old.user_messages_text, old.assistant_messages_text);
+         INSERT INTO sessions_fts(rowid, path, cwd, name, first_message, user_messages_text, assistant_messages_text)
+         VALUES (new.rowid, new.path, new.cwd, new.name, new.first_message, new.user_messages_text, new.assistant_messages_text); END;",
         [],
     ).map_err(|e| format!("Failed to create trigger sessions_au: {e}"))?;
 
@@ -116,7 +116,6 @@ pub fn full_rebuild_fts(conn: &Connection) -> Result<(), String> {
             cwd,
             name,
             first_message,
-            all_messages_text,
             user_messages_text,
             assistant_messages_text,
             content='sessions',

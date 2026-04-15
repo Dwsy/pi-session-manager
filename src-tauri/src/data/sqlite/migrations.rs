@@ -15,6 +15,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             6 => migration_6(conn)?,
             7 => migration_7(conn)?,
             8 => migration_8(conn)?,
+            9 => migration_9(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -62,12 +63,21 @@ fn migration_1(conn: &Connection) -> Result<(), String> {
         .map_err(|e| format!("Failed to add assistant_messages_text column: {e}"))?;
     }
 
-    // For tags table
-    if !column_exists(conn, "tags", "auto_rules")? {
+    // For tags table (legacy only)
+    let tags_table_exists = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='tags'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|count| count > 0)
+        .unwrap_or(false);
+
+    if tags_table_exists && !column_exists(conn, "tags", "auto_rules")? {
         conn.execute("ALTER TABLE tags ADD COLUMN auto_rules TEXT", [])
             .map_err(|e| format!("Failed to add auto_rules column: {e}"))?;
     }
-    if !column_exists(conn, "tags", "parent_id")? {
+    if tags_table_exists && !column_exists(conn, "tags", "parent_id")? {
         conn.execute("ALTER TABLE tags ADD COLUMN parent_id TEXT", [])
             .map_err(|e| format!("Failed to add parent_id column: {e}"))?;
     }
@@ -257,5 +267,28 @@ fn migration_8(conn: &Connection) -> Result<(), String> {
         [],
     )
     .map_err(|e| format!("Migration 8 failed creating provider_slug index: {e}"))?;
+    Ok(())
+}
+
+/// Migration to version 9: remove all_messages_text column (redundant with message_entries + FTS5)
+fn migration_9(conn: &Connection) -> Result<(), String> {
+    fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
+        let mut stmt = conn
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .map_err(|e| format!("Failed to prepare PRAGMA table_info for {table}: {e}"))?;
+        let column_names: Vec<String> = stmt
+            .query_map([], |row| row.get(1))
+            .map_err(|e| format!("Failed to query columns for {table}: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect columns for {table}: {e}"))?;
+        Ok(column_names.iter().any(|name| name == column))
+    }
+
+    // Remove all_messages_text column if it exists
+    if column_exists(conn, "sessions", "all_messages_text")? {
+        conn.execute("ALTER TABLE sessions DROP COLUMN all_messages_text", [])
+            .map_err(|e| format!("Migration 9 failed dropping all_messages_text: {e}"))?;
+    }
+
     Ok(())
 }

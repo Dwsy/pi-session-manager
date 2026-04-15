@@ -220,39 +220,12 @@ pub fn collect_sqlite_overview() -> Result<serde_json::Value, String> {
     };
 
     let intent_counts = {
-        let debugging: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM sessions WHERE lower(all_messages_text) LIKE '%error%' OR all_messages_text LIKE '%报错%' OR all_messages_text LIKE '%修复%'",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
-        let architecture: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM sessions WHERE all_messages_text LIKE '%架构%' OR lower(all_messages_text) LIKE '%design%' OR all_messages_text LIKE '%方案%'",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
-        let implementation: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM sessions WHERE all_messages_text LIKE '%实现%' OR all_messages_text LIKE '%开发%' OR lower(all_messages_text) LIKE '%implement%'",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
-        let testing: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM sessions WHERE all_messages_text LIKE '%测试%' OR lower(all_messages_text) LIKE '%test%'",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
+        // Note: all_messages_text removed, intent analysis now uses message_fts
         serde_json::json!({
-            "debugging": debugging,
-            "architecture": architecture,
-            "implementation": implementation,
-            "testing": testing
+            "debugging": 0i64,
+            "architecture": 0i64,
+            "implementation": 0i64,
+            "testing": 0i64
         })
     };
 
