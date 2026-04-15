@@ -1,15 +1,23 @@
 use super::config_versions::save_config_snapshot;
 use crate::{config, sqlite_cache};
 use serde_json::Value;
-use std::fs;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "gui")]
 use tauri::Manager;
 use tracing::warn;
 
-const APP_SETTINGS_KEY: &str = "app_settings";
-const SERVER_SETTINGS_KEY: &str = "server_settings";
 const SESSION_PATHS_KEY: &str = "session_paths";
+
+fn normalized_provider_slugs(provider_slugs: Vec<String>) -> Vec<String> {
+    let mut normalized = provider_slugs
+        .into_iter()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty() && value != "pi")
+        .collect::<Vec<_>>();
+    normalized.sort();
+    normalized.dedup();
+    normalized
+}
 
 #[cfg(feature = "gui")]
 async fn refresh_sessions_after_settings_change(
@@ -77,40 +85,29 @@ impl Default for ServerSettings {
 }
 
 pub fn load_server_settings_sync() -> ServerSettings {
-    crate::settings_store::get_or_default::<ServerSettings>(SERVER_SETTINGS_KEY).unwrap_or_default()
+    load_server_settings_blocking().unwrap_or_default()
+}
+
+fn load_server_settings_blocking() -> Result<ServerSettings, String> {
+    let value = crate::unified_config::read_section("server")?;
+    serde_json::from_value(value).map_err(|e| format!("Failed to parse server settings: {e}"))
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn load_server_settings() -> Result<ServerSettings, String> {
-    crate::settings_store::get_or_default::<ServerSettings>(SERVER_SETTINGS_KEY)
+    let value = crate::unified_config::read_section("server")?;
+    serde_json::from_value(value).map_err(|e| format!("Failed to parse server settings: {e}"))
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn save_server_settings(settings: ServerSettings) -> Result<(), String> {
-    crate::settings_store::set(SERVER_SETTINGS_KEY, &settings)
+    let value = serde_json::to_value(&settings)
+        .map_err(|e| format!("Failed to serialize server settings: {e}"))?;
+    crate::unified_config::write_section("server", value)
 }
 
 pub async fn load_app_settings_internal() -> Result<Value, String> {
-    if let Some(mut v) = crate::settings_store::get::<Value>(APP_SETTINGS_KEY)? {
-        inject_session_source_settings(&mut v);
-        return Ok(v);
-    }
-
-    // Migrate from legacy JSON file if exists
-    let config_dir = dirs::config_dir().ok_or("Failed to get config directory")?;
-    let legacy_path = config_dir.join("pi-session-manager").join("settings.json");
-    if legacy_path.exists() {
-        if let Ok(content) = fs::read_to_string(&legacy_path) {
-            if let Ok(mut v) = serde_json::from_str::<Value>(&content) {
-                inject_session_source_settings(&mut v);
-                crate::settings_store::set(APP_SETTINGS_KEY, &v)?;
-                let _ = fs::remove_file(&legacy_path);
-                return Ok(v);
-            }
-        }
-    }
-
-    let mut value = serde_json::json!({});
+    let mut value = crate::unified_config::read_section("app")?;
     inject_session_source_settings(&mut value);
     Ok(value)
 }
@@ -138,7 +135,7 @@ pub async fn save_app_settings(settings: Value) -> Result<(), String> {
         }
         crate::config::save_config(&config)?;
     }
-    crate::settings_store::set(APP_SETTINGS_KEY, &settings)
+    crate::unified_config::write_section("app", settings)
 }
 
 fn inject_session_source_settings(settings: &mut Value) {
@@ -217,13 +214,16 @@ pub async fn get_session_paths() -> Result<Vec<String>, String> {
 }
 
 /// Save session paths to config (pure logic, no GUI dependency)
-pub async fn save_session_paths_core(paths: Vec<String>) -> Result<(), String> {
+pub async fn save_session_paths_core(paths: Vec<String>) -> Result<bool, String> {
     let mut config = crate::config::Config::load().unwrap_or_default();
+    if config.session_paths == paths {
+        return Ok(false);
+    }
     config.session_paths = paths.clone();
     crate::config::save_config(&config)?;
     crate::settings_store::set(SESSION_PATHS_KEY, &paths)?;
     crate::core::scanner::invalidate_cache();
-    Ok(())
+    Ok(true)
 }
 
 /// Save session paths to config and sync to settings store
@@ -233,7 +233,9 @@ pub async fn save_session_paths(
     paths: Vec<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    save_session_paths_core(paths).await?;
+    if !save_session_paths_core(paths).await? {
+        return Ok(());
+    }
 
     // Restart file watcher with new paths
     let watcher_state: tauri::State<'_, crate::file_watcher::FileWatcherState> = app_handle.state();
@@ -246,8 +248,11 @@ pub async fn save_session_paths(
     Ok(())
 }
 
-pub async fn save_session_scan_other_agents_core(enabled: bool) -> Result<(), String> {
+pub async fn save_session_scan_other_agents_core(enabled: bool) -> Result<bool, String> {
     let mut config = crate::config::Config::load().unwrap_or_default();
+    if config.scan_other_agent_jsonl == enabled {
+        return Ok(false);
+    }
     let disabled_slugs = if enabled {
         Vec::new()
     } else {
@@ -263,7 +268,7 @@ pub async fn save_session_scan_other_agents_core(enabled: bool) -> Result<(), St
         let _ = crate::data::sqlite::delete_sessions_by_source_slugs(&conn, &disabled_slugs)?;
     }
     crate::core::scanner::invalidate_cache();
-    Ok(())
+    Ok(true)
 }
 
 #[cfg(feature = "gui")]
@@ -272,7 +277,9 @@ pub async fn save_session_scan_other_agents(
     enabled: bool,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    save_session_scan_other_agents_core(enabled).await?;
+    if !save_session_scan_other_agents_core(enabled).await? {
+        return Ok(());
+    }
 
     let watcher_state: tauri::State<'_, crate::file_watcher::FileWatcherState> = app_handle.state();
     if let Err(e) =
@@ -296,16 +303,15 @@ pub async fn save_session_scan_other_agents(
 
 pub async fn save_external_session_providers_core(
     provider_slugs: Vec<String>,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     let mut config = crate::config::Config::load().unwrap_or_default();
     let previous = config.effective_external_session_provider_slugs();
-    let mut normalized = provider_slugs
-        .into_iter()
-        .map(|value| value.trim().to_ascii_lowercase())
-        .filter(|value| !value.is_empty() && value != "pi")
-        .collect::<Vec<_>>();
-    normalized.sort();
-    normalized.dedup();
+    let normalized = normalized_provider_slugs(provider_slugs);
+    if config.external_session_provider_slugs == normalized
+        && config.scan_other_agent_jsonl == !normalized.is_empty()
+    {
+        return Ok(false);
+    }
     config.external_session_provider_slugs = normalized.clone();
     config.scan_other_agent_jsonl = !normalized.is_empty();
     crate::config::save_config(&config)?;
@@ -318,7 +324,7 @@ pub async fn save_external_session_providers_core(
         let _ = crate::data::sqlite::delete_sessions_by_source_slugs(&conn, &disabled_slugs)?;
     }
     crate::core::scanner::invalidate_cache();
-    Ok(())
+    Ok(true)
 }
 
 #[cfg(feature = "gui")]
@@ -327,7 +333,9 @@ pub async fn save_external_session_providers(
     provider_slugs: Vec<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    save_external_session_providers_core(provider_slugs).await?;
+    if !save_external_session_providers_core(provider_slugs).await? {
+        return Ok(());
+    }
 
     let watcher_state: tauri::State<'_, crate::file_watcher::FileWatcherState> = app_handle.state();
     if let Err(e) =
@@ -475,17 +483,18 @@ fn read_settings_json(path: &Path) -> Result<Value, String> {
     if !path.exists() {
         return Ok(serde_json::json!({}));
     }
-    let content = fs::read_to_string(path).map_err(|e| format!("Failed to read settings: {e}"))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read settings: {e}"))?;
     serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {e}"))
 }
 
 fn write_settings_json(path: &Path, json: &Value, save_snapshot: bool) -> Result<(), String> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create dir: {e}"))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create dir: {e}"))?;
     }
     let content = serde_json::to_string_pretty(json)
         .map_err(|e| format!("Failed to serialize settings: {e}"))?;
-    fs::write(path, &content).map_err(|e| format!("Failed to write settings: {e}"))?;
+    std::fs::write(path, &content).map_err(|e| format!("Failed to write settings: {e}"))?;
 
     if save_snapshot {
         let path_str = path.to_string_lossy().to_string();
@@ -616,6 +625,13 @@ pub async fn toggle_resource(
     toggle_resource_internal(resource_type, path, enabled, scope).await
 }
 
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn get_psm_config_dir() -> Result<String, String> {
+    Ok(crate::unified_config::config_root_dir()?
+        .to_string_lossy()
+        .to_string())
+}
+
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct ClearCacheResult {
     pub sessions_deleted: usize,
@@ -639,6 +655,74 @@ mod tests {
     use crate::config::Config;
 
     #[tokio::test]
+    async fn save_session_paths_core_returns_false_when_unchanged() {
+        std::env::remove_var("HOME");
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::env::set_var("HOME", temp.path());
+
+        let changed = save_session_paths_core(vec!["/tmp/demo".to_string()])
+            .await
+            .expect("save paths");
+        assert!(changed, "first save should report change");
+
+        let changed_again = save_session_paths_core(vec!["/tmp/demo".to_string()])
+            .await
+            .expect("save paths again");
+        assert!(!changed_again, "second save should be a no-op");
+
+        std::env::remove_var("HOME");
+    }
+
+    #[tokio::test]
+    async fn save_session_scan_other_agents_core_returns_false_when_unchanged() {
+        std::env::remove_var("HOME");
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::env::set_var("HOME", temp.path());
+
+        let changed = save_session_scan_other_agents_core(false)
+            .await
+            .expect("save toggle");
+        assert!(!changed, "default false -> false should be a no-op");
+
+        let changed_enable = save_session_scan_other_agents_core(true)
+            .await
+            .expect("enable toggle");
+        assert!(changed_enable, "enabling should report change");
+
+        let changed_enable_again = save_session_scan_other_agents_core(true)
+            .await
+            .expect("enable toggle again");
+        assert!(
+            !changed_enable_again,
+            "same enabled value should be a no-op"
+        );
+
+        std::env::remove_var("HOME");
+    }
+
+    #[tokio::test]
+    async fn save_external_session_providers_core_returns_false_when_unchanged() {
+        std::env::remove_var("HOME");
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::env::set_var("HOME", temp.path());
+
+        let changed = save_external_session_providers_core(vec!["codex".to_string()])
+            .await
+            .expect("save providers");
+        assert!(changed, "first provider save should report change");
+
+        let changed_again = save_external_session_providers_core(vec!["codex".to_string()])
+            .await
+            .expect("save providers again");
+        assert!(!changed_again, "same providers should be a no-op");
+
+        std::env::remove_var("HOME");
+    }
+
+    #[tokio::test]
     async fn save_external_session_providers_core_clears_disabled_provider_cache() {
         // Ensure clean state - remove any leftover env vars
         std::env::remove_var("PPM_TEST_DB");
@@ -657,7 +741,7 @@ mod tests {
         crate::config::save_config(&config).expect("save config");
 
         // Insert a codex session (path must match codex source slug pattern)
-        let conn = crate::data::sqlite::init_db_with_config(&config).expect("db");
+        let conn = crate::data::sqlite::init_db_with_path(&db_path, &config).expect("db");
         let now = chrono::Utc::now();
         conn.execute(
             "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
@@ -668,15 +752,13 @@ mod tests {
                 now.to_rfc3339()
             ],
         ).expect("insert");
-        drop(conn);
 
         // Verify session exists before clearing
-        let conn_before = crate::data::sqlite::init_db_with_config(&config).expect("db");
-        let count_before: i64 = conn_before
+        let count_before: i64 = conn
             .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
             .expect("count before");
         assert_eq!(count_before, 1, "Should have 1 session before clearing");
-        drop(conn_before);
+        drop(conn);
 
         // Clear all providers
         save_external_session_providers_core(vec![])
@@ -691,7 +773,7 @@ mod tests {
         );
 
         // Verify the codex session was deleted (matched by path pattern)
-        let conn = crate::data::sqlite::init_db_with_config(&new_config).expect("db");
+        let conn = crate::data::sqlite::init_db_with_path(&db_path, &new_config).expect("db");
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
             .expect("count after");

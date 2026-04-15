@@ -1,53 +1,71 @@
-use rusqlite::{params, Connection};
 use serde::{de::DeserializeOwned, Serialize};
+use serde_json::{Map, Value};
 
-fn open_db() -> Result<Connection, String> {
-    let db_path = crate::data::sqlite::get_primary_db_path()?;
-    let conn =
-        Connection::open(&db_path).map_err(|e| format!("Failed to open settings DB: {e}"))?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create settings table: {e}"))?;
-    Ok(conn)
-}
-
-pub fn get<T: DeserializeOwned>(key: &str) -> Result<Option<T>, String> {
-    let conn = open_db()?;
-    let result: Option<String> = conn
-        .query_row(
-            "SELECT value FROM settings WHERE key = ?1",
-            params![key],
-            |row| row.get(0),
-        )
-        .ok();
-    match result {
-        Some(json) => {
-            let val = serde_json::from_str(&json)
-                .map_err(|e| format!("Failed to deserialize setting '{key}': {e}"))?;
-            Ok(Some(val))
-        }
-        None => Ok(None),
+fn key_to_path(key: &str) -> Vec<&str> {
+    match key {
+        "app_settings" => vec!["app"],
+        "server_settings" => vec!["server"],
+        "session_paths" => vec!["session", "sessionPaths"],
+        "window_zoom_level" => vec!["ui", "windowZoomLevel"],
+        other => vec!["app", other],
     }
 }
 
-pub fn set<T: Serialize>(key: &str, value: &T) -> Result<(), String> {
-    let conn = open_db()?;
-    let json =
-        serde_json::to_string(value).map_err(|e| format!("Failed to serialize setting: {e}"))?;
-    let now = chrono::Utc::now().to_rfc3339();
-    conn.execute(
-        "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, ?3)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
-        params![key, json, now],
-    )
-    .map_err(|e| format!("Failed to save setting: {e}"))?;
+fn get_at_path<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Value> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    Some(current)
+}
+
+fn set_at_path(root: &mut Value, path: &[&str], value: Value) -> Result<(), String> {
+    if path.is_empty() {
+        *root = value;
+        return Ok(());
+    }
+
+    let mut current = root;
+    for segment in &path[..path.len() - 1] {
+        if !current.is_object() {
+            *current = Value::Object(Map::new());
+        }
+        let object = current
+            .as_object_mut()
+            .ok_or("Unified config node is not an object".to_string())?;
+        current = object
+            .entry((*segment).to_string())
+            .or_insert_with(|| Value::Object(Map::new()));
+    }
+
+    if !current.is_object() {
+        *current = Value::Object(Map::new());
+    }
+    let object = current
+        .as_object_mut()
+        .ok_or("Unified config node is not an object".to_string())?;
+    object.insert(path[path.len() - 1].to_string(), value);
     Ok(())
+}
+
+pub fn get<T: DeserializeOwned>(key: &str) -> Result<Option<T>, String> {
+    let root = crate::unified_config::load_root()?;
+    let path = key_to_path(key);
+    let Some(value) = get_at_path(&root, &path).cloned() else {
+        return Ok(None);
+    };
+    let parsed = serde_json::from_value::<T>(value)
+        .map_err(|e| format!("Failed to deserialize setting '{key}': {e}"))?;
+    Ok(Some(parsed))
+}
+
+pub fn set<T: Serialize>(key: &str, value: &T) -> Result<(), String> {
+    let mut root = crate::unified_config::load_root()?;
+    let json = serde_json::to_value(value)
+        .map_err(|e| format!("Failed to serialize setting '{key}': {e}"))?;
+    let path = key_to_path(key);
+    set_at_path(&mut root, &path, json)?;
+    crate::unified_config::save_root(&root)
 }
 
 pub fn get_or_default<T: DeserializeOwned + Serialize + Default>(key: &str) -> Result<T, String> {
