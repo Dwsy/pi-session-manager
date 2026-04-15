@@ -257,7 +257,9 @@ mod tests {
         config.external_sessions_include_in_stats = false;
         config.external_sessions_include_in_search = false;
 
-        let pi_path = Path::new("/Users/demo/.pi/agent/sessions/foo/session.jsonl");
+        let pi_root = crate::paths::pi_agent_sessions_dir().expect("pi sessions root");
+        let pi_path_buf = pi_root.join("foo").join("session.jsonl");
+        let pi_path = pi_path_buf.as_path();
         let codex_path = Path::new("/Users/demo/.codex/sessions/2026/01/01/rollout-a.jsonl");
         let claude_path =
             Path::new("/Users/demo/.claude/projects/-Users-demo-work/a-session.jsonl");

@@ -267,8 +267,9 @@ struct ServerConfig {
 
 /// Initialize embedding service if model is available
 fn init_embedding_service() -> Option<Arc<EmbeddingService>> {
-    let home = dirs::home_dir().unwrap_or_default();
-    let model_path = home.join(".pi/models/embedding-models/embeddinggemma-300M-Q8_0.gguf");
+    let model_path = crate::paths::pi_root_dir()
+        .unwrap_or_default()
+        .join("models/embedding-models/embeddinggemma-300M-Q8_0.gguf");
 
     if !model_path.exists() {
         info!(

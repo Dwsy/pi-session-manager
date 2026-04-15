@@ -9,8 +9,8 @@ use crate::domain::casr_min::model::{
 };
 
 pub fn session_roots() -> Vec<PathBuf> {
-    dirs::home_dir()
-        .map(|h| h.join(".pi").join("agent").join("sessions"))
+    crate::paths::pi_agent_sessions_dir()
+        .ok()
         .filter(|p| p.is_dir())
         .map(|p| vec![p])
         .unwrap_or_default()
@@ -20,9 +20,9 @@ pub fn build_target_path(
     target_session_id: &str,
     now: chrono::DateTime<chrono::Utc>,
 ) -> Result<PathBuf, String> {
-    let root = dirs::home_dir()
-        .map(|h| h.join(".pi").join("agent").join("sessions").join("bridge"))
-        .ok_or_else(|| "cannot determine Pi sessions directory".to_string())?;
+    let root = crate::paths::pi_agent_sessions_dir()
+        .map(|dir| dir.join("bridge"))
+        .map_err(|_| "cannot determine Pi sessions directory".to_string())?;
     let stamp = now.format("%Y-%m-%dT%H-%M-%S%.3f").to_string();
     let suffix = target_session_id
         .chars()

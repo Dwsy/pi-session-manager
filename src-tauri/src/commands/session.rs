@@ -280,8 +280,13 @@ mod tests {
 
     #[tokio::test]
     async fn get_session_stats_excludes_external_sessions_by_default() {
+        let pi_root = crate::paths::pi_agent_sessions_dir().expect("pi sessions dir");
         let pi_session = SessionInfo {
-            path: "/Users/demo/.pi/agent/sessions/foo/pi.jsonl".to_string(),
+            path: pi_root
+                .join("foo")
+                .join("pi.jsonl")
+                .to_string_lossy()
+                .to_string(),
             id: "pi-1".to_string(),
             cwd: "/repo/pi".to_string(),
             name: Some("Pi".to_string()),
@@ -289,7 +294,6 @@ mod tests {
             modified: Utc::now(),
             message_count: 10,
             first_message: "hello".to_string(),
-            all_messages_text: String::new(),
             user_messages_text: String::new(),
             assistant_messages_text: String::new(),
             last_message: String::new(),
@@ -305,7 +309,6 @@ mod tests {
             modified: Utc::now(),
             message_count: 20,
             first_message: "world".to_string(),
-            all_messages_text: String::new(),
             user_messages_text: String::new(),
             assistant_messages_text: String::new(),
             last_message: String::new(),

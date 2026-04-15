@@ -55,8 +55,8 @@ impl SessionBridgeSource {
 
     pub fn session_roots(self) -> Vec<PathBuf> {
         match self {
-            Self::Pi => dirs::home_dir()
-                .map(|home| home.join(".pi").join("agent").join("sessions"))
+            Self::Pi => crate::paths::pi_agent_sessions_dir()
+                .ok()
                 .filter(|path| path.is_dir())
                 .map(|path| vec![path])
                 .unwrap_or_default(),
@@ -100,7 +100,10 @@ impl SessionBridgeSource {
     pub fn matches_path(self, path: &Path) -> bool {
         let normalized = path.to_string_lossy().replace('\\', "/");
         match self {
-            Self::Pi => normalized.contains("/.pi/agent/sessions/"),
+            Self::Pi => crate::paths::pi_agent_sessions_dir()
+                .ok()
+                .map(|path| path.to_string_lossy().replace('\\', "/"))
+                .is_some_and(|root| normalized.contains(&root)),
             Self::ClaudeCode => normalized.contains("/.claude/projects/"),
             Self::Codex => normalized.contains("/.codex/sessions/"),
             Self::Gemini => crate::domain::casr_min::providers::gemini::is_session_file(path),

@@ -466,12 +466,10 @@ fn settings_path_for_scope(scope: &str) -> Result<PathBuf, String> {
     match scope {
         "project" => {
             let cwd = std::env::current_dir().map_err(|e| format!("Failed to get cwd: {e}"))?;
-            Ok(cwd.join(".pi/settings.json"))
+            Ok(crate::paths::project_pi_dir(&cwd).join("settings.json"))
         }
-        _ => {
-            let home = dirs::home_dir().ok_or("Failed to get home directory")?;
-            Ok(home.join(".pi/agent/settings.json"))
-        }
+        _ => crate::paths::pi_agent_settings_path()
+            .map_err(|e| format!("Failed to get home directory: {e}")),
     }
 }
 
@@ -744,8 +742,8 @@ mod tests {
         let conn = crate::data::sqlite::init_db_with_path(&db_path, &config).expect("db");
         let now = chrono::Utc::now();
         conn.execute(
-            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, all_messages_text, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
-             VALUES (?1, ?2, '', NULL, ?3, ?3, ?3, 0, '', '', '', '', '', '', NULL, ?3, 0, NULL)",
+            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
+             VALUES (?1, ?2, '', NULL, ?3, ?3, ?3, 0, '', '', '', '', '', NULL, ?3, 0, NULL)",
             rusqlite::params![
                 "codex-1",
                 "/Users/demo/.codex/sessions/2026/01/01/rollout-a.jsonl",

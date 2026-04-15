@@ -6,8 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 fn models_backup_dir() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or("No home dir")?;
-    Ok(home.join(".pi/agent/backups/models"))
+    Ok(crate::paths::pi_agent_root_dir()?.join("backups/models"))
 }
 
 pub fn create_model_config_backup_internal(

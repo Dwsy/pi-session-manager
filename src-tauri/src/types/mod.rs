@@ -13,8 +13,6 @@ pub struct SessionInfo {
     pub message_count: usize,
     pub first_message: String,
     #[serde(default, skip_serializing)]
-    pub all_messages_text: String,
-    #[serde(default, skip_serializing)]
     pub user_messages_text: String,
     #[serde(default, skip_serializing)]
     pub assistant_messages_text: String,
@@ -152,7 +150,7 @@ mod tests {
     use super::SessionInfo;
 
     #[test]
-    fn session_info_deserializes_without_all_messages_text() {
+    fn session_info_deserializes_without_removed_large_text_field() {
         let json = serde_json::json!({
             "path": "/tmp/session.jsonl",
             "id": "abc",
@@ -169,7 +167,7 @@ mod tests {
         });
 
         let parsed: SessionInfo = serde_json::from_value(json).expect("should deserialize");
-        assert_eq!(parsed.all_messages_text, "");
+        assert_eq!(parsed.user_messages_text, "");
     }
 
     #[test]
@@ -190,7 +188,6 @@ mod tests {
             modified,
             message_count: 12,
             first_message: "hello".to_string(),
-            all_messages_text: "all-text".to_string(),
             user_messages_text: "user-text".to_string(),
             assistant_messages_text: "assistant-text".to_string(),
             last_message: "ok".to_string(),
@@ -201,7 +198,6 @@ mod tests {
         let serialized = serde_json::to_value(&session).expect("should serialize");
         let object = serialized.as_object().expect("serialized object");
 
-        assert!(!object.contains_key("all_messages_text"));
         assert!(!object.contains_key("user_messages_text"));
         assert!(!object.contains_key("assistant_messages_text"));
     }

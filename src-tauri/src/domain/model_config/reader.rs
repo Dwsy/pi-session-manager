@@ -4,8 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 
 fn models_json_path() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or("No home dir")?;
-    Ok(home.join(".pi/agent/models.json"))
+    crate::paths::pi_agent_models_path().map_err(|_| "No home dir".to_string())
 }
 
 pub fn read_models_config_internal() -> Result<serde_json::Value, String> {

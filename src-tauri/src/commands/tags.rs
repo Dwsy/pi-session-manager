@@ -122,6 +122,16 @@ fn write_json_file<T: serde::Serialize>(path: &PathBuf, value: &T) -> Result<(),
     fs::write(path, content).map_err(|e| format!("Write {}: {e}", path.display()))
 }
 
+fn table_exists(conn: &rusqlite::Connection, table: &str) -> bool {
+    conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?1",
+        rusqlite::params![table],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|count| count > 0)
+    .unwrap_or(false)
+}
+
 fn migrate_tags_if_needed() -> Result<(), String> {
     let tags_path = tags_config_path()?;
     let marks_path = session_mark_path()?;
@@ -134,10 +144,14 @@ fn migrate_tags_if_needed() -> Result<(), String> {
     let migrated_at = Some(Utc::now().to_rfc3339());
 
     if !tags_path.exists() {
-        let tags = crate::data::sqlite::get_all_tags(&conn)?
-            .into_iter()
-            .map(TagItem::from)
-            .collect::<Vec<_>>();
+        let tags = if table_exists(&conn, "tags") {
+            crate::data::sqlite::get_all_tags(&conn)?
+                .into_iter()
+                .map(TagItem::from)
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
         write_json_file(
             &tags_path,
             &TagsConfigFile {
@@ -149,10 +163,14 @@ fn migrate_tags_if_needed() -> Result<(), String> {
     }
 
     if !marks_path.exists() {
-        let session_tags = crate::data::sqlite::get_all_session_tags(&conn)?
-            .into_iter()
-            .map(SessionTagItem::from)
-            .collect::<Vec<_>>();
+        let session_tags = if table_exists(&conn, "session_tags") {
+            crate::data::sqlite::get_all_session_tags(&conn)?
+                .into_iter()
+                .map(SessionTagItem::from)
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
         write_json_file(
             &marks_path,
             &SessionMarkFile {
@@ -434,6 +452,32 @@ mod tests {
         let _guard = lock_env();
         let temp = setup_env();
         let conn = get_conn().expect("db conn");
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS tags (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                color TEXT NOT NULL,
+                icon TEXT,
+                sort_order INTEGER NOT NULL,
+                is_builtin INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                auto_rules TEXT,
+                parent_id TEXT
+            )",
+            [],
+        )
+        .expect("create legacy tags table");
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS session_tags (
+                session_id TEXT NOT NULL,
+                tag_id TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                assigned_at TEXT NOT NULL,
+                PRIMARY KEY (session_id, tag_id)
+            )",
+            [],
+        )
+        .expect("create legacy session_tags table");
 
         crate::data::sqlite::create_tag(&conn, "tag-a", "Alpha", "blue", None, None)
             .expect("create db tag");

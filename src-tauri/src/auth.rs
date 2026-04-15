@@ -1,5 +1,4 @@
 use lazy_static::lazy_static;
-use rusqlite::{params, Connection};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::net::IpAddr;
@@ -12,7 +11,7 @@ lazy_static! {
     static ref ENABLED: Mutex<bool> = Mutex::new(false);
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct TokenInfo {
     pub name: String,
     pub key_preview: String,
@@ -20,105 +19,156 @@ pub struct TokenInfo {
     pub last_used: Option<String>,
 }
 
-fn db_path() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or("Cannot find home directory")?;
-    let dir = home.join(".pi").join("agent").join("sessions");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create dir: {e}"))?;
-    Ok(dir.join("sessions.db"))
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredToken {
+    token: String,
+    name: String,
+    created_at: String,
+    last_used: Option<String>,
 }
 
-fn open_db() -> Result<Connection, String> {
-    Connection::open(db_path()?).map_err(|e| format!("Failed to open DB: {e}"))
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthTokensFile {
+    version: u32,
+    migrated_at: Option<String>,
+    tokens: Vec<StoredToken>,
 }
 
-fn ensure_columns(conn: &Connection) {
-    // Add last_used column if missing
-    let _ = conn.execute("ALTER TABLE auth_tokens ADD COLUMN last_used TEXT", []);
-}
-
-pub fn init() -> Result<String, String> {
-    let conn = open_db()?;
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS auth_tokens (
-            token TEXT PRIMARY KEY,
-            name TEXT,
-            created_at TEXT NOT NULL,
-            last_used TEXT
-        )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create auth_tokens table: {e}"))?;
-
-    ensure_columns(&conn);
-
-    let existing: Option<String> = conn
-        .query_row("SELECT token FROM auth_tokens LIMIT 1", [], |row| {
-            row.get(0)
-        })
-        .ok();
-
-    let token = match existing {
-        Some(t) => t,
-        None => {
-            let t = "pi-session-manager".to_string();
-            conn.execute(
-                "INSERT INTO auth_tokens (token, name, created_at) VALUES (?1, ?2, ?3)",
-                params![t, "default", chrono::Utc::now().to_rfc3339()],
-            )
-            .map_err(|e| format!("Failed to insert token: {e}"))?;
-            t
+impl Default for AuthTokensFile {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            migrated_at: None,
+            tokens: Vec::new(),
         }
+    }
+}
+
+fn auth_tokens_path() -> Result<PathBuf, String> {
+    Ok(crate::unified_config::config_root_dir()?.join("auth_tokens.json"))
+}
+
+fn legacy_db_path() -> Result<PathBuf, String> {
+    if let Ok(test_db) = std::env::var("PPM_TEST_DB") {
+        return Ok(PathBuf::from(test_db));
+    }
+    Ok(crate::paths::pi_agent_sessions_dir()?.join("sessions.db"))
+}
+
+fn open_legacy_db() -> Result<rusqlite::Connection, String> {
+    rusqlite::Connection::open(legacy_db_path()?).map_err(|e| format!("Failed to open DB: {e}"))
+}
+
+fn table_exists(conn: &rusqlite::Connection, table: &str) -> bool {
+    conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?1",
+        rusqlite::params![table],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|count| count > 0)
+    .unwrap_or(false)
+}
+
+fn write_tokens_file(file: &AuthTokensFile) -> Result<(), String> {
+    let path = auth_tokens_path()?;
+    let content =
+        serde_json::to_string_pretty(file).map_err(|e| format!("Serialize auth tokens: {e}"))?;
+    std::fs::write(&path, content).map_err(|e| format!("Write auth tokens: {e}"))
+}
+
+fn load_tokens_file() -> Result<AuthTokensFile, String> {
+    let path = auth_tokens_path()?;
+    if path.exists() {
+        let content =
+            std::fs::read_to_string(&path).map_err(|e| format!("Read auth tokens: {e}"))?;
+        return serde_json::from_str(&content).map_err(|e| format!("Parse auth tokens: {e}"));
+    }
+
+    let conn = open_legacy_db()?;
+    let tokens = if table_exists(&conn, "auth_tokens") {
+        let mut stmt = conn
+            .prepare("SELECT token, name, created_at, last_used FROM auth_tokens ORDER BY created_at DESC")
+            .map_err(|e| format!("Prepare auth token migration: {e}"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(StoredToken {
+                    token: row.get(0)?,
+                    name: row.get(1)?,
+                    created_at: row.get(2)?,
+                    last_used: row.get(3)?,
+                })
+            })
+            .map_err(|e| format!("Query auth token migration: {e}"))?;
+        rows.filter_map(Result::ok).collect::<Vec<_>>()
+    } else {
+        Vec::new()
     };
 
-    reload_tokens(&conn)?;
-    *ENABLED.lock().expect("mutex poisoned") = true;
-
-    Ok(token)
+    let file = AuthTokensFile {
+        version: 1,
+        migrated_at: Some(chrono::Utc::now().to_rfc3339()),
+        tokens,
+    };
+    write_tokens_file(&file)?;
+    Ok(file)
 }
 
-fn reload_tokens(conn: &Connection) -> Result<(), String> {
-    let mut stmt = conn
-        .prepare("SELECT token FROM auth_tokens")
-        .map_err(|e| format!("Failed to query tokens: {e}"))?;
-    let tokens: HashSet<String> = stmt
-        .query_map([], |row| row.get(0))
-        .map_err(|e| format!("{e}"))?
-        .filter_map(|r| r.ok())
-        .collect();
+fn reload_tokens() -> Result<(), String> {
+    let file = load_tokens_file()?;
+    let tokens = file
+        .tokens
+        .into_iter()
+        .map(|item| item.token)
+        .collect::<HashSet<_>>();
     *TOKENS.lock().expect("mutex poisoned") = tokens;
     Ok(())
 }
 
+pub fn init() -> Result<String, String> {
+    let mut file = load_tokens_file()?;
+
+    let token = if let Some(existing) = file.tokens.first() {
+        existing.token.clone()
+    } else {
+        let default = StoredToken {
+            token: "pi-session-manager".to_string(),
+            name: "default".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            last_used: None,
+        };
+        let token = default.token.clone();
+        file.tokens.push(default);
+        write_tokens_file(&file)?;
+        token
+    };
+
+    reload_tokens()?;
+    *ENABLED.lock().expect("mutex poisoned") = true;
+    Ok(token)
+}
+
 pub fn list_tokens() -> Result<Vec<TokenInfo>, String> {
-    let conn = open_db()?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT token, name, created_at, last_used FROM auth_tokens ORDER BY created_at DESC",
-        )
-        .map_err(|e| format!("{e}"))?;
-    let rows = stmt
-        .query_map([], |row| {
-            let token: String = row.get(0)?;
-            let preview = if token.len() >= 8 {
-                format!("{}…", &token[..8])
+    let file = load_tokens_file()?;
+    Ok(file
+        .tokens
+        .into_iter()
+        .map(|token| TokenInfo {
+            name: token.name,
+            key_preview: if token.token.len() >= 8 {
+                format!("{}…", &token.token[..8])
             } else {
-                token.clone()
-            };
-            Ok(TokenInfo {
-                name: row.get(1)?,
-                key_preview: preview,
-                created_at: row.get(2)?,
-                last_used: row.get(3)?,
-            })
+                token.token.clone()
+            },
+            created_at: token.created_at,
+            last_used: token.last_used,
         })
-        .map_err(|e| format!("{e}"))?;
-    rows.collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("{e}"))
+        .collect())
 }
 
 pub fn create_token(name: &str, token_value: Option<&str>) -> Result<String, String> {
-    let conn = open_db()?;
+    let mut file = load_tokens_file()?;
     let token = match token_value {
         Some(raw) => {
             let trimmed = raw.trim();
@@ -130,44 +180,40 @@ pub fn create_token(name: &str, token_value: Option<&str>) -> Result<String, Str
         None => generate_token(),
     };
 
-    conn.execute(
-        "INSERT INTO auth_tokens (token, name, created_at) VALUES (?1, ?2, ?3)",
-        params![token, name, chrono::Utc::now().to_rfc3339()],
-    )
-    .map_err(|e| {
-        if e.to_string().contains("UNIQUE constraint failed") {
-            "Token already exists".to_string()
-        } else {
-            format!("Failed to create token: {e}")
-        }
-    })?;
-    reload_tokens(&conn)?;
+    if file.tokens.iter().any(|item| item.token == token) {
+        return Err("Token already exists".to_string());
+    }
+
+    file.tokens.push(StoredToken {
+        token: token.clone(),
+        name: name.to_string(),
+        created_at: chrono::Utc::now().to_rfc3339(),
+        last_used: None,
+    });
+    write_tokens_file(&file)?;
+    reload_tokens()?;
     Ok(token)
 }
 
 pub fn revoke_token(key_preview: &str) -> Result<(), String> {
-    let conn = open_db()?;
     let prefix = key_preview.trim_end_matches('…');
-    let pattern = format!("{prefix}%");
-    let deleted = conn
-        .execute(
-            "DELETE FROM auth_tokens WHERE token LIKE ?1",
-            params![pattern],
-        )
-        .map_err(|e| format!("Failed to revoke: {e}"))?;
-    if deleted == 0 {
+    let mut file = load_tokens_file()?;
+    let before = file.tokens.len();
+    file.tokens.retain(|item| !item.token.starts_with(prefix));
+    if before == file.tokens.len() {
         return Err("Token not found".to_string());
     }
-    reload_tokens(&conn)?;
+    write_tokens_file(&file)?;
+    reload_tokens()?;
     Ok(())
 }
 
 pub fn update_last_used(token: &str) {
-    if let Ok(conn) = open_db() {
-        let _ = conn.execute(
-            "UPDATE auth_tokens SET last_used = ?1 WHERE token = ?2",
-            params![chrono::Utc::now().to_rfc3339(), token],
-        );
+    if let Ok(mut file) = load_tokens_file() {
+        if let Some(item) = file.tokens.iter_mut().find(|item| item.token == token) {
+            item.last_used = Some(chrono::Utc::now().to_rfc3339());
+            let _ = write_tokens_file(&file);
+        }
     }
 }
 
@@ -186,8 +232,6 @@ pub fn validate(token: &str) -> bool {
     false
 }
 
-/// Set runtime-only tokens (not persisted in database).
-/// Empty vector clears previously configured runtime tokens and falls back to DB tokens.
 pub fn set_runtime_tokens(tokens: Vec<String>) -> Result<(), String> {
     let mut normalized = HashSet::new();
     for token in tokens {
@@ -220,14 +264,60 @@ fn generate_token() -> String {
             return buf.iter().map(|b| format!("{b:02x}")).collect();
         }
     }
-    // Fallback
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system clock before Unix epoch")
-        .as_nanos();
-    let bytes = nanos.to_le_bytes();
-    buf[..16].copy_from_slice(&bytes);
-    buf[16..32].copy_from_slice(&std::process::id().to_le_bytes().repeat(8)[..16]);
-    buf.iter().map(|b| format!("{b:02x}")).collect()
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("psm-{nanos:x}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, OnceLock};
+    use tempfile::tempdir;
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn lock_env() -> std::sync::MutexGuard<'static, ()> {
+        env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn setup_env() -> tempfile::TempDir {
+        std::env::remove_var("HOME");
+        std::env::remove_var("PPM_TEST_DB");
+        let temp = tempdir().expect("tempdir");
+        std::env::set_var("HOME", temp.path());
+        std::env::set_var("PPM_TEST_DB", temp.path().join("sessions.db"));
+        temp
+    }
+
+    #[test]
+    fn init_creates_file_and_list_create_revoke_work() {
+        let _guard = lock_env();
+        let temp = setup_env();
+
+        let default = init().expect("init auth");
+        assert_eq!(default, "pi-session-manager");
+        assert!(auth_tokens_path().expect("auth path").exists());
+
+        let created = create_token("manual", Some("token-123")).expect("create token");
+        assert_eq!(created, "token-123");
+        assert!(validate("token-123"));
+
+        let tokens = list_tokens().expect("list tokens");
+        assert!(tokens.iter().any(|item| item.name == "manual"));
+
+        revoke_token("token-123").expect("revoke token");
+        assert!(!validate("token-123"));
+
+        drop(temp);
+        std::env::remove_var("PPM_TEST_DB");
+        std::env::remove_var("HOME");
+    }
 }

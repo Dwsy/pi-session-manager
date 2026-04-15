@@ -18,8 +18,7 @@ pub struct PromptInfo {
 }
 
 fn pi_agent_dir() -> Result<PathBuf, String> {
-    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
-    Ok(home_dir.join(".pi/agent"))
+    crate::paths::pi_agent_root_dir().map_err(|e| format!("Failed to get home directory: {e}"))
 }
 
 fn skill_markdown_path(skill_name: &str) -> Result<PathBuf, String> {
@@ -439,8 +438,8 @@ fn scan_themes_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<Res
 }
 
 pub async fn scan_all_resources_internal(cwd: Option<String>) -> Result<Vec<ResourceInfo>, String> {
-    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
-    let user_base = home_dir.join(".pi/agent");
+    let user_base = crate::paths::pi_agent_root_dir()
+        .map_err(|e| format!("Failed to get home directory: {e}"))?;
     let user_settings_path = user_base.join("settings.json");
 
     let (user_skills_cfg, user_ext_cfg, user_prompts_cfg, user_themes_cfg) =
@@ -470,7 +469,7 @@ pub async fn scan_all_resources_internal(cwd: Option<String>) -> Result<Vec<Reso
     ));
 
     if let Some(cwd_str) = cwd {
-        let project_base = PathBuf::from(&cwd_str).join(".pi");
+        let project_base = crate::paths::project_pi_dir(&PathBuf::from(&cwd_str));
         if project_base.exists() {
             let project_settings_path = project_base.join("settings.json");
             let (proj_skills_cfg, proj_ext_cfg, proj_prompts_cfg, proj_themes_cfg) =
@@ -511,12 +510,9 @@ fn resource_base_dir(scope: &str) -> Result<PathBuf, String> {
     match scope {
         "project" => {
             let cwd = std::env::current_dir().map_err(|e| format!("cwd: {e}"))?;
-            Ok(cwd.join(".pi"))
+            Ok(crate::paths::project_pi_dir(&cwd))
         }
-        _ => {
-            let home = dirs::home_dir().ok_or("No home dir")?;
-            Ok(home.join(".pi/agent"))
-        }
+        _ => crate::paths::pi_agent_root_dir().map_err(|e| format!("No home dir: {e}")),
     }
 }
 

@@ -4,24 +4,14 @@ use serde_json::{json, Map, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const CONFIG_DIR_NAME: &str = ".pi/pi-session-manager";
 const CONFIG_FILE_NAME: &str = "config.json";
-const LEGACY_AGENT_DIR: &str = ".pi/agent";
 const LEGACY_SETTINGS_FILE: &str = "settings.json";
 const LEGACY_MODELS_FILE: &str = "models.json";
 const LEGACY_SESSION_CONFIG_FILE: &str = "session-manager-config.toml";
 const LEGACY_SESSION_MANAGER_JSON: &str = "session-manager.json";
-const LEGACY_DB_FILE: &str = ".pi/agent/sessions/sessions.db";
-
-fn home_dir() -> Result<PathBuf, String> {
-    match std::env::var("HOME") {
-        Ok(value) => Ok(PathBuf::from(value)),
-        Err(_) => dirs::home_dir().ok_or("Cannot find home directory".to_string()),
-    }
-}
 
 pub fn config_root_dir() -> Result<PathBuf, String> {
-    let dir = home_dir()?.join(CONFIG_DIR_NAME);
+    let dir = crate::paths::psm_root_dir()?;
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create config root dir: {e}"))?;
     Ok(dir)
 }
@@ -145,7 +135,7 @@ fn read_json_file(path: &Path) -> Option<Value> {
 }
 
 fn legacy_agent_dir() -> Result<PathBuf, String> {
-    Ok(home_dir()?.join(LEGACY_AGENT_DIR))
+    crate::paths::pi_agent_root_dir()
 }
 
 fn legacy_config_dir() -> Option<PathBuf> {
@@ -159,7 +149,7 @@ fn legacy_db_path() -> Result<PathBuf, String> {
     if let Ok(test_db) = std::env::var("PPM_TEST_DB") {
         return Ok(PathBuf::from(test_db));
     }
-    Ok(home_dir()?.join(LEGACY_DB_FILE))
+    Ok(crate::paths::pi_agent_sessions_dir()?.join("sessions.db"))
 }
 
 fn open_legacy_settings_db() -> Option<Connection> {

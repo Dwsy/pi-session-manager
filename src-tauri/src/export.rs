@@ -120,8 +120,7 @@ process.stdout.write(prompt);
     }
 
     // Fallback: read APPEND_SYSTEM.md
-    let home = dirs::home_dir().ok_or("No home dir")?;
-    let append_path = home.join(".pi/agent/APPEND_SYSTEM.md");
+    let append_path = crate::paths::pi_agent_root_dir()?.join("APPEND_SYSTEM.md");
     if append_path.exists() {
         return fs::read_to_string(&append_path)
             .map_err(|e| format!("Failed to read APPEND_SYSTEM.md: {e}"));
