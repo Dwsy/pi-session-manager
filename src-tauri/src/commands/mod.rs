@@ -58,3 +58,11 @@ pub async fn toggle_devtools(window: tauri::WebviewWindow) -> Result<(), String>
         Ok(())
     }
 }
+
+#[cfg(feature = "gui")]
+#[tauri::command]
+pub async fn set_window_zoom_level(window: tauri::WebviewWindow, level: f64) -> Result<(), String> {
+    window.set_zoom(level).map_err(|e| e.to_string())?;
+    crate::settings_store::set("window_zoom_level", &level)?;
+    Ok(())
+}

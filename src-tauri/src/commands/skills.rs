@@ -191,22 +191,23 @@ fn read_settings_arrays(
         Ok(v) => v,
         Err(_) => return empty,
     };
-    let extract = |key: &str| -> Vec<String> {
-        json.get(key)
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(String::from))
-                    .collect()
-            })
-            .unwrap_or_default()
-    };
     (
-        extract("skills"),
-        extract("extensions"),
-        extract("prompts"),
-        extract("themes"),
+        extract_settings_array(&json, "skills"),
+        extract_settings_array(&json, "extensions"),
+        extract_settings_array(&json, "prompts"),
+        extract_settings_array(&json, "themes"),
     )
+}
+
+fn extract_settings_array(json: &serde_json::Value, key: &str) -> Vec<String> {
+    json.get(key)
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn is_resource_enabled(settings_list: &[String], relative_path: &str) -> bool {

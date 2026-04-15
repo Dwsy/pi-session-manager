@@ -703,9 +703,15 @@ pub async fn fork_session_impl(
     let mut conn = crate::data::sqlite::init_db_with_config(&config)?;
     let file_modified = now;
     crate::data::sqlite::upsert_session(&mut conn, &session_info, file_modified, None)?;
+    let _ = crate::data::sqlite::upsert_scan_state_for_session(
+        &conn,
+        &session_info,
+        file_modified,
+        "ok",
+    );
 
-    // Invalidate scanner cache so next scan picks up the new session
-    crate::core::scanner::invalidate_cache();
+    // Update scanner cache in-place so next list/read path avoids full rescan
+    crate::core::scanner::upsert_cached_session(session_info.clone());
 
     Ok(session_info)
 }
