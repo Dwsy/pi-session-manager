@@ -98,6 +98,8 @@ export interface AppSettings {
     scrollMarkersGuideSeen: boolean;
     /** Timeline navigation dots feature enabled */
     timelineNavEnabled: boolean;
+    /** Collapse tool calls into a single aggregated row */
+    collapseToolCalls: boolean;
   };
   search: {
     defaultSearchMode: "content" | "name";
@@ -183,6 +185,7 @@ export const defaultSettings: AppSettings = {
     scrollMarkersEnabled: false,
     scrollMarkersGuideSeen: false,
     timelineNavEnabled: false,
+    collapseToolCalls: true,
   },
   search: {
     defaultSearchMode: "content",

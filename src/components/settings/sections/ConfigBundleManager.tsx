@@ -293,7 +293,7 @@ export function ConfigBundleManager() {
       >
         <div className="space-y-3">
           <p className="text-sm text-muted">
-            {t('settings.importExport.exportSection.includes', 'Includes: models.json, settings.json, session-manager-config.toml')}
+            {t('settings.importExport.exportSection.includes', 'Includes: config.json')}
           </p>
           <button
             onClick={handleExport}

@@ -817,6 +817,22 @@ export default function SessionSettings({
               className="items-start pt-4 border-t border-border/60"
             />
 
+            <SettingsToggleRow
+              title={t(
+                "settings.session.collapseToolCalls",
+                "Collapse tool calls",
+              )}
+              description={t(
+                "settings.session.collapseToolCallsHelp",
+                "Show aggregated tool call summary instead of expanded list",
+              )}
+              checked={settings.session.collapseToolCalls}
+              onChange={(checked) =>
+                onUpdate("session", "collapseToolCalls", checked)
+              }
+              className="items-start pt-4 border-t border-border/60"
+            />
+
             <SettingsField
               label={t(
                 "settings.session.openPosition",

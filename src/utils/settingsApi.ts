@@ -7,6 +7,39 @@ import { saveSessionSource } from "@/utils/datasetApi";
 const CACHE_KEY = "pi-session-manager-settings";
 
 let memoryCache: AppSettings | null = null;
+let lastPersistedSettingsSignature: string | null = null;
+let lastBackendSyncSignature: string | null = null;
+
+interface BackendSyncState {
+  extraPaths: string[];
+  sourceMode: "local" | "dataset";
+  activeDatasetId: string;
+  activeDatasetIds: string[];
+  scanOtherAgentJsonl: boolean;
+  externalSessionProviders: string[];
+}
+
+function toSignature(value: unknown): string {
+  return JSON.stringify(value);
+}
+
+function buildBackendSyncState(settings: AppSettings): BackendSyncState {
+  return {
+    extraPaths: (settings.advanced.sessionDirs || []).filter(
+      (d: string) => d !== "~/.pi/agent/sessions" && d.trim() !== "",
+    ),
+    sourceMode: settings.session.sourceMode,
+    activeDatasetId: settings.session.activeDatasetId || "",
+    activeDatasetIds: settings.session.activeDatasetIds || [],
+    scanOtherAgentJsonl: settings.session.scanOtherAgentJsonl !== false,
+    externalSessionProviders: settings.session.externalSessionProviders || [],
+  };
+}
+
+function markBackendStateLoaded(settings: AppSettings) {
+  lastPersistedSettingsSignature = toSignature(settings);
+  lastBackendSyncSignature = toSignature(buildBackendSyncState(settings));
+}
 
 function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
   const advanced = { ...defaultSettings.advanced, ...raw.advanced };
@@ -165,6 +198,7 @@ export async function loadAppSettings(): Promise<AppSettings> {
     const raw = await invoke<Partial<AppSettings>>("load_app_settings");
     const settings = mergeDefaults(raw ?? {});
     writeCache(settings);
+    markBackendStateLoaded(settings);
     return settings;
   } catch (e) {
     console.warn(
@@ -181,56 +215,111 @@ export async function saveAppSettings(settings: AppSettings): Promise<void> {
     return;
   }
 
-  try {
-    await invoke("save_app_settings", { settings });
-  } catch (error) {
-    if (!isTauri()) {
-      console.warn(
-        "Failed to save settings to backend, using browser cache only:",
-        error,
-      );
-      writeCache(settings);
-      return;
+  const nextSettingsSignature = toSignature(settings);
+  const nextBackendSyncState = buildBackendSyncState(settings);
+  const nextBackendSyncSignature = toSignature(nextBackendSyncState);
+  const settingsAlreadySaved =
+    lastPersistedSettingsSignature === nextSettingsSignature;
+  const backendAlreadySynced =
+    lastBackendSyncSignature === nextBackendSyncSignature;
+
+  if (settingsAlreadySaved && backendAlreadySynced) {
+    writeCache(settings);
+    return;
+  }
+
+  if (!settingsAlreadySaved) {
+    try {
+      await invoke("save_app_settings", { settings });
+    } catch (error) {
+      if (!isTauri()) {
+        console.warn(
+          "Failed to save settings to backend, using browser cache only:",
+          error,
+        );
+        writeCache(settings);
+        lastPersistedSettingsSignature = nextSettingsSignature;
+        lastBackendSyncSignature = nextBackendSyncSignature;
+        return;
+      }
+      throw error;
     }
-    throw error;
+
+    lastPersistedSettingsSignature = nextSettingsSignature;
   }
 
   writeCache(settings);
 
-  // Sync session paths to backend config (TOML) so scanner picks them up
-  const extraPaths = (settings.advanced.sessionDirs || []).filter(
-    (d: string) => d !== "~/.pi/agent/sessions" && d.trim() !== "",
-  );
-  try {
-    await invoke("save_session_paths", { paths: extraPaths });
-  } catch (e) {
-    console.warn("Failed to sync session paths:", e);
+  const previousBackendSyncState =
+    lastBackendSyncSignature === null ? null : JSON.parse(lastBackendSyncSignature) as BackendSyncState;
+
+  let syncSucceeded = true;
+
+  if (
+    !previousBackendSyncState ||
+    toSignature(previousBackendSyncState.extraPaths) !==
+      toSignature(nextBackendSyncState.extraPaths)
+  ) {
+    try {
+      await invoke("save_session_paths", { paths: nextBackendSyncState.extraPaths });
+    } catch (e) {
+      console.warn("Failed to sync session paths:", e);
+      syncSucceeded = false;
+    }
   }
 
-  try {
-    await saveSessionSource(
-      settings.session.sourceMode,
-      settings.session.activeDatasetId,
-      settings.session.activeDatasetIds,
-    );
-  } catch (e) {
-    console.warn("Failed to sync session source:", e);
+  if (
+    !previousBackendSyncState ||
+    previousBackendSyncState.sourceMode !== nextBackendSyncState.sourceMode ||
+    previousBackendSyncState.activeDatasetId !==
+      nextBackendSyncState.activeDatasetId ||
+    toSignature(previousBackendSyncState.activeDatasetIds) !==
+      toSignature(nextBackendSyncState.activeDatasetIds)
+  ) {
+    try {
+      await saveSessionSource(
+        nextBackendSyncState.sourceMode,
+        nextBackendSyncState.activeDatasetId,
+        nextBackendSyncState.activeDatasetIds,
+      );
+    } catch (e) {
+      console.warn("Failed to sync session source:", e);
+      syncSucceeded = false;
+    }
   }
 
-  try {
-    await invoke("save_session_scan_other_agents", {
-      enabled: settings.session.scanOtherAgentJsonl !== false,
-    });
-  } catch (e) {
-    console.warn("Failed to sync other-agent session scan setting:", e);
+  if (
+    !previousBackendSyncState ||
+    previousBackendSyncState.scanOtherAgentJsonl !==
+      nextBackendSyncState.scanOtherAgentJsonl
+  ) {
+    try {
+      await invoke("save_session_scan_other_agents", {
+        enabled: nextBackendSyncState.scanOtherAgentJsonl,
+      });
+    } catch (e) {
+      console.warn("Failed to sync other-agent session scan setting:", e);
+      syncSucceeded = false;
+    }
   }
 
-  try {
-    await invoke("save_external_session_providers", {
-      providerSlugs: settings.session.externalSessionProviders || [],
-    });
-  } catch (e) {
-    console.warn("Failed to sync external session providers:", e);
+  if (
+    !previousBackendSyncState ||
+    toSignature(previousBackendSyncState.externalSessionProviders) !==
+      toSignature(nextBackendSyncState.externalSessionProviders)
+  ) {
+    try {
+      await invoke("save_external_session_providers", {
+        providerSlugs: nextBackendSyncState.externalSessionProviders,
+      });
+    } catch (e) {
+      console.warn("Failed to sync external session providers:", e);
+      syncSucceeded = false;
+    }
+  }
+
+  if (syncSucceeded) {
+    lastBackendSyncSignature = nextBackendSyncSignature;
   }
 }
 

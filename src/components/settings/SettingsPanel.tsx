@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useTranslation } from "react-i18next";
 import {
@@ -8,6 +9,7 @@ import {
   Loader2,
   Check,
   RefreshCw,
+  FolderOpen,
 } from "lucide-react";
 
 import type { AppSettings, SettingsSection } from "./types";
@@ -217,6 +219,15 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     }
   };
 
+  const openConfigFolder = async () => {
+    try {
+      const path = await invoke<string>("get_psm_config_dir");
+      await invoke("open_path_in_system", { path });
+    } catch (error) {
+      console.error("Failed to open config folder:", error);
+    }
+  };
+
   if (!shouldRender) return null;
 
   return (
@@ -248,6 +259,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             onUpdate={updateSetting}
             onClose={onClose}
             onSave={saveSettings}
+            onOpenConfigFolder={openConfigFolder}
             onReset={resetSettings}
             saving={saving}
             saved={saved}
@@ -258,6 +270,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               menuItems={SETTINGS_SECTIONS}
               activeSection={activeSection}
               onSectionChange={setActiveSection}
+              onOpenConfigFolder={openConfigFolder}
               onReset={resetSettings}
             />
             <SettingsContent
@@ -291,6 +304,7 @@ interface MobileSettingsProps {
   ) => void;
   onClose: () => void;
   onSave: () => void;
+  onOpenConfigFolder: () => void;
   onReset: () => void;
   saving: boolean;
   saved: boolean;
@@ -305,6 +319,7 @@ function MobileSettings({
   onUpdate,
   onClose,
   onSave,
+  onOpenConfigFolder,
   onReset,
   saving,
   saved,
@@ -428,13 +443,22 @@ function MobileSettings({
             </div>
 
             <div className="border-t border-border bg-background/95 px-4 py-4 backdrop-blur-sm safe-area-bottom">
-              <button
-                onClick={onReset}
-                className="w-full flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border motion-color motion-surface motion-press focus-ring"
-              >
-                <RefreshCw className="h-4 w-4" />
-                {t("settings.reset", "Reset Settings")}
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={onOpenConfigFolder}
+                  className="flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border motion-color motion-surface motion-press focus-ring"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  {t("settings.openConfigFolder", "Open Config Folder")}
+                </button>
+                <button
+                  onClick={onReset}
+                  className="flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border motion-color motion-surface motion-press focus-ring"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  {t("settings.reset", "Reset Settings")}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -521,6 +545,7 @@ interface SettingsSidebarProps {
   menuItems: typeof SETTINGS_SECTIONS;
   activeSection: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
+  onOpenConfigFolder: () => void;
   onReset: () => void;
 }
 
@@ -528,6 +553,7 @@ function SettingsSidebar({
   menuItems,
   activeSection,
   onSectionChange,
+  onOpenConfigFolder,
   onReset,
 }: SettingsSidebarProps) {
   const { t } = useTranslation();
@@ -569,7 +595,14 @@ function SettingsSidebar({
         ))}
       </nav>
 
-      <div className="p-3 border-t border-border/80 flex-shrink-0">
+      <div className="p-3 border-t border-border/80 flex-shrink-0 space-y-2">
+        <button
+          onClick={onOpenConfigFolder}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
+        >
+          <FolderOpen className="h-4 w-4" />
+          {t("settings.openConfigFolder", "Open Config Folder")}
+        </button>
         <button
           onClick={onReset}
           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
