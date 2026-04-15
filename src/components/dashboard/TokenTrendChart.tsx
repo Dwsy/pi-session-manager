@@ -16,32 +16,22 @@ export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendC
   const { t } = useTranslation()
   const prefersReducedMotion = usePrefersReducedMotion()
   const displayTitle = title || t('dashboard.tokenStats.title')
-  // Generate daily token data from messages_by_date
+  // Generate daily token data from heatmap_data instead of estimating from message count.
   const generateDailyTokenData = () => {
     const today = new Date()
+    const heatmapByDate = new Map(stats.heatmap_data.map((point) => [point.date, point]))
     const dailyData: { date: string; tokens: number; cost: number; displayDate: string }[] = []
-
-    // Estimate tokens per message (rough average)
-    const avgTokensPerMessage = stats.total_messages > 0
-      ? stats.total_tokens / stats.total_messages
-      : 0
-
-    const avgCostPerMessage = stats.total_messages > 0
-      ? stats.token_details.total_cost / stats.total_messages
-      : 0
 
     for (let i = days - 1; i >= 0; i--) {
       const date = subDays(today, i)
       const dateStr = format(date, 'yyyy-MM-dd')
-      const messageCount = stats.messages_by_date[dateStr] || 0
-      const estimatedTokens = Math.round(messageCount * avgTokensPerMessage)
-      const estimatedCost = messageCount * avgCostPerMessage
+      const point = heatmapByDate.get(dateStr)
 
       dailyData.push({
         date: dateStr,
         displayDate: format(date, 'MMM dd'),
-        tokens: estimatedTokens,
-        cost: estimatedCost,
+        tokens: point?.total_tokens || 0,
+        cost: point?.total_cost || 0,
       })
     }
 

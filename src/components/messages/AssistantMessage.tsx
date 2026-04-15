@@ -10,6 +10,7 @@ import { memo, useMemo, useState } from "react";
 import { useClipboard } from "@/hooks/useClipboard";
 import {
   buildAssistantProcessSteps,
+  shouldCollapseAssistantProcess,
   splitAssistantContent,
 } from "./assistantProcess";
 
@@ -44,14 +45,21 @@ function AssistantMessage({
     [content],
   );
 
-  const { thinkingBlocks, textBlocks } = useMemo(
-    () => getAssistantDisplayedBlocks(visibleContent),
-    [visibleContent],
-  );
-
   const processSteps = useMemo(
     () => buildAssistantProcessSteps(entryId, content, foldEntries),
     [content, entryId, foldEntries],
+  );
+
+  const shouldCollapseProcess = useMemo(
+    () => shouldCollapseAssistantProcess(processSteps),
+    [processSteps],
+  );
+
+  const displayedContent = shouldCollapseProcess ? visibleContent : content;
+
+  const { thinkingBlocks, textBlocks } = useMemo(
+    () => getAssistantDisplayedBlocks(displayedContent),
+    [displayedContent],
   );
 
   const allText = useMemo(() => textBlocks.join("\n"), [textBlocks]);
@@ -70,6 +78,14 @@ function AssistantMessage({
     <div className="assistant-message" id={`entry-${entryId}`}>
       {timestamp && (textBlocks.length > 0 || thinkingBlocks.length > 0) && (
         <div className="message-timestamp">{formatDate(timestamp)}</div>
+      )}
+
+      {shouldCollapseProcess && processSteps.length > 0 && (
+        <ToolCallList
+          processSteps={processSteps}
+          toolResultByCallId={toolResultByCallId}
+          searchQuery={searchQuery}
+        />
       )}
 
       {showThinking &&
@@ -99,14 +115,6 @@ function AssistantMessage({
             {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
           </button>
         </div>
-      )}
-
-      {processSteps.length > 0 && (
-        <ToolCallList
-          processSteps={processSteps}
-          toolResultByCallId={toolResultByCallId}
-          searchQuery={searchQuery}
-        />
       )}
     </div>
   );

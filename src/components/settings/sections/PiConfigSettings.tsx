@@ -103,7 +103,7 @@ function ResourcesTab() {
   const [resources, setResources] = useState<ResourceInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [activeType, setActiveType] = useState<ResourceType>("skills");
+  const [activeType, setActiveType] = useState<ResourceType>("extensions");
   const [toggling, setToggling] = useState<string | null>(null);
   const [viewingItem, setViewingItem] = useState<ResourceInfo | null>(null);
   const [viewContent, setViewContent] = useState<string | null>(null);

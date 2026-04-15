@@ -55,7 +55,13 @@ function isRenderableMessageEntry(
   return role === 'user' || role === 'assistant'
 }
 
-function isRenderableNonMessageEntry(entry: SessionEntry): boolean {
+function isRenderableNonMessageEntry(
+  entry: SessionEntry,
+  pathEntryIds: Set<string> | null,
+  isLive?: boolean,
+): boolean {
+  if (!isLive && pathEntryIds && !pathEntryIds.has(entry.id)) return false
+
   return (
     entry.type === 'model_change' ||
     entry.type === 'compaction' ||
@@ -102,7 +108,7 @@ export function useSessionViewerDerivedData(
         continue
       }
 
-      if (!previewMode && isRenderableNonMessageEntry(entry)) {
+      if (!previewMode && isRenderableNonMessageEntry(entry, pathEntryIds, isLive)) {
         renderableEntries.push(entry)
       }
     }

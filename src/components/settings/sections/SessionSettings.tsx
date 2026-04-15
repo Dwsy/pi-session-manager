@@ -61,7 +61,7 @@ export default function SessionSettings({
     settings.session.scrollMarkersEnabled !== false &&
     settings.session.timelineNavEnabled === false;
   const timelineNavEnabled = settings.session.timelineNavEnabled === true;
-  const [activeTab, setActiveTab] = useState<SessionInnerTab>("dataset");
+  const [activeTab, setActiveTab] = useState<SessionInnerTab>("general");
   const [datasets, setDatasets] = useState<DatasetInfo[]>([]);
   const [datasetSource, setDatasetSource] = useState("");
   const [importStatus, setImportStatus] = useState<DatasetImportStatus | null>(
@@ -279,9 +279,9 @@ export default function SessionSettings({
     <div className="space-y-6">
       <SettingsTabs
         items={[
+          { id: "general", label: "General" },
           { id: "dataset", label: "Dataset" },
           { id: "cache", label: "Cache" },
-          { id: "general", label: "General" },
         ]}
         active={activeTab}
         onChange={setActiveTab}

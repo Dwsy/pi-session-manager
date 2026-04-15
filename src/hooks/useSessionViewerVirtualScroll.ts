@@ -158,7 +158,12 @@ export function useSessionViewerVirtualScroll({
   useEffect(() => {
     measuredHeightsRef.current.clear()
     hasTriggeredReachBottomRef.current = false
-  }, [expandedToolIds, sessionPath, toolsExpanded])
+    rowVirtualizer.measure()
+  }, [hiddenEntryIds, rowVirtualizer, sessionPath, toolsExpanded])
+
+  useEffect(() => {
+    hasTriggeredReachBottomRef.current = false
+  }, [expandedToolIds])
 
   // Reset scroll position when switching sessions
   useEffect(() => {
