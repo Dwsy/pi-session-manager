@@ -76,6 +76,7 @@ export async function getBrowserDatasetStats(
   const messagesByHour: Record<string, number> = {};
   const messagesByDayOfWeek: Record<string, number> = {};
   const heatmapDateTokens = new Map<string, number>();
+  const heatmapDateCost = new Map<string, number>();
   const heatmapDateSessions = new Map<string, Set<string>>();
   const heatmapTopProject = new Map<string, Map<string, number>>();
 
@@ -107,6 +108,7 @@ export async function getBrowserDatasetStats(
       sessionTokens.output +
       sessionTokens.cacheRead +
       sessionTokens.cacheWrite;
+    const sessionTotalCost = usageToCost(sessionTokens);
 
     for (const model of sessionModels.size
       ? sessionModels
@@ -158,6 +160,10 @@ export async function getBrowserDatasetStats(
         date,
         (heatmapDateTokens.get(date) || 0) + sessionTotalTokens,
       );
+      heatmapDateCost.set(
+        date,
+        (heatmapDateCost.get(date) || 0) + sessionTotalCost,
+      );
       if (!heatmapDateSessions.has(date)) {
         heatmapDateSessions.set(date, new Set());
       }
@@ -198,6 +204,7 @@ export async function getBrowserDatasetStats(
       level,
       total_messages: totalMessagesForDay,
       total_tokens: heatmapDateTokens.get(dateKey) || 0,
+      total_cost: heatmapDateCost.get(dateKey) || 0,
       session_count: heatmapDateSessions.get(dateKey)?.size || 0,
       top_project: topProject,
     });

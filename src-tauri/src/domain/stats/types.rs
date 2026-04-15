@@ -56,6 +56,7 @@ pub struct HeatmapPoint {
     pub level: usize,
     pub total_messages: usize,
     pub total_tokens: usize,
+    pub total_cost: f64,
     pub session_count: usize,
     pub top_project: Option<String>,
 }

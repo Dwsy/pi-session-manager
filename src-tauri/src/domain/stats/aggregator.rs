@@ -11,14 +11,23 @@ use std::path::PathBuf;
 pub struct DailyStatsCollector {
     pub messages: HashMap<String, usize>,
     pub tokens: HashMap<String, usize>,
+    pub cost: HashMap<String, f64>,
     pub sessions: HashMap<String, usize>,
     pub projects: HashMap<String, HashMap<String, usize>>,
 }
 
 impl DailyStatsCollector {
-    pub fn add_session(&mut self, date: &str, project: &str, messages: usize, tokens: usize) {
+    pub fn add_session(
+        &mut self,
+        date: &str,
+        project: &str,
+        messages: usize,
+        tokens: usize,
+        cost: f64,
+    ) {
         *self.messages.entry(date.to_string()).or_insert(0) += messages;
         *self.tokens.entry(date.to_string()).or_insert(0) += tokens;
+        *self.cost.entry(date.to_string()).or_insert(0.0) += cost;
         *self.sessions.entry(date.to_string()).or_insert(0) += 1;
         *self
             .projects
@@ -143,6 +152,20 @@ pub fn calculate_stats(sessions: &[SessionInfo]) -> SessionStats {
     calculate_stats_from_inputs(&light_sessions)
 }
 
+fn should_refresh_cached_details(cached: &crate::data::sqlite::SessionDetailsCache) -> bool {
+    let has_messages = cached.user_messages + cached.assistant_messages > 0;
+    let has_no_usage = cached.input_tokens == 0
+        && cached.output_tokens == 0
+        && cached.cache_read_tokens == 0
+        && cached.cache_write_tokens == 0
+        && cached.input_cost == 0.0
+        && cached.output_cost == 0.0
+        && cached.cache_read_cost == 0.0
+        && cached.cache_write_cost == 0.0;
+
+    has_messages && has_no_usage
+}
+
 /// Process a single session's data from cache or file
 #[allow(clippy::too_many_arguments)]
 fn process_session_data(
@@ -189,6 +212,7 @@ fn process_session_data(
             project,
             msg_count,
             (details.input_tokens + details.output_tokens) as usize,
+            details.total_cost(),
         );
         add_time_and_weekday_counts(
             messages_by_hour,
@@ -219,6 +243,73 @@ fn process_session_data(
     });
 
     if let Some(cached) = cached_details {
+        let parsed_override = if should_refresh_cached_details(&cached) {
+            std::fs::read_to_string(&session.path)
+                .ok()
+                .map(|content| parse_session_details(&content))
+                .filter(|parsed| parsed.total_tokens() > 0 || parsed.total_cost() > 0.0)
+        } else {
+            None
+        };
+
+        if let Some(parsed) = parsed_override {
+            crate::core::write_buffer::buffer_details_write(
+                &session.path,
+                session_modified,
+                &parsed,
+            );
+            if let Some(conn) = conn {
+                let _ = crate::data::sqlite::upsert_session_details_cache(
+                    conn,
+                    &session.path,
+                    session_modified,
+                    &parsed,
+                );
+            }
+            if parsed.model_usage.is_empty() {
+                record_model_presence(
+                    &parsed.models,
+                    project_path,
+                    sessions_by_model,
+                    model_usage_by_project,
+                );
+            } else {
+                merge_model_usage(
+                    &parsed.model_usage,
+                    project_path,
+                    sessions_by_model,
+                    tokens_by_model,
+                    model_usage_by_project,
+                );
+            }
+
+            let msg_count = parsed.user_messages + parsed.assistant_messages;
+            let date = session_modified.format("%Y-%m-%d").to_string();
+            *messages_by_date.entry(date.clone()).or_insert(0) += msg_count;
+            daily_stats.add_session(
+                &date,
+                project,
+                msg_count,
+                (parsed.input_tokens + parsed.output_tokens) as usize,
+                parsed.total_cost(),
+            );
+            add_time_and_weekday_counts(
+                messages_by_hour,
+                messages_by_day_of_week,
+                session_modified,
+                msg_count,
+            );
+
+            return (
+                parsed.user_messages,
+                parsed.assistant_messages,
+                parsed.input_tokens as usize,
+                parsed.output_tokens as usize,
+                parsed.cache_read_tokens as usize + parsed.cache_write_tokens as usize,
+                parsed.total_cost(),
+            );
+        }
+
         match serde_json::from_str::<HashMap<String, SessionModelUsage>>(&cached.model_usage_json) {
             Ok(model_usage) if !model_usage.is_empty() => {
                 merge_model_usage(
@@ -230,34 +321,7 @@ fn process_session_data(
                 );
             }
             _ => {
-                // Legacy cache entries may not have per-model usage.
-                if let Ok(content) = std::fs::read_to_string(&session.path) {
-                    let parsed = parse_session_details(&content);
-                    if !parsed.model_usage.is_empty() {
-                        crate::core::write_buffer::buffer_details_write(
-                            &session.path,
-                            session_modified,
-                            &parsed,
-                        );
-                        merge_model_usage(
-                            &parsed.model_usage,
-                            project_path,
-                            sessions_by_model,
-                            tokens_by_model,
-                            model_usage_by_project,
-                        );
-                    } else if let Ok(models) =
-                        serde_json::from_str::<Vec<String>>(&cached.models_json)
-                    {
-                        record_model_presence(
-                            &models,
-                            project_path,
-                            sessions_by_model,
-                            model_usage_by_project,
-                        );
-                    }
-                } else if let Ok(models) = serde_json::from_str::<Vec<String>>(&cached.models_json)
-                {
+                if let Ok(models) = serde_json::from_str::<Vec<String>>(&cached.models_json) {
                     record_model_presence(
                         &models,
                         project_path,
@@ -276,6 +340,10 @@ fn process_session_data(
             project,
             msg_count,
             cached.input_tokens + cached.output_tokens,
+            cached.input_cost
+                + cached.output_cost
+                + cached.cache_read_cost
+                + cached.cache_write_cost,
         );
         add_time_and_weekday_counts(
             messages_by_hour,
@@ -331,6 +399,7 @@ fn process_session_data(
             project,
             msg_count,
             (session_stats.input_tokens + session_stats.output_tokens) as usize,
+            session_stats.total_cost(),
         );
         add_time_and_weekday_counts(
             messages_by_hour,
@@ -362,6 +431,7 @@ fn process_session_data(
         project,
         session.message_count,
         session.message_count * 100,
+        0.0,
     );
     add_time_and_weekday_counts(
         messages_by_hour,
@@ -485,5 +555,42 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
             tokens_by_model,
         },
         subagent_summary,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn calculate_stats_from_inputs_populates_daily_token_and_cost_totals() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let session_path = temp.path().join("stats-session.jsonl");
+        std::fs::write(
+            &session_path,
+            "{\"type\":\"session\",\"id\":\"pi-1\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"cwd\":\"/repo/demo\"}\n{\"type\":\"message\",\"id\":\"u1\",\"timestamp\":\"2026-01-01T00:00:01Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hi\"}]}}\n{\"type\":\"message\",\"id\":\"a1\",\"timestamp\":\"2026-01-01T00:00:02Z\",\"message\":{\"role\":\"assistant\",\"model\":\"gpt-5\",\"provider\":\"openai\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}],\"usage\":{\"input\":10,\"output\":30,\"cacheRead\":0,\"cacheWrite\":0,\"cost\":{\"input\":0.01,\"output\":0.02,\"cacheRead\":0.0,\"cacheWrite\":0.0}}}}\n",
+        )
+        .expect("write session");
+
+        let modified = chrono::Utc::now().to_rfc3339();
+        let stats = calculate_stats_from_inputs(&[SessionStatsInput {
+            path: session_path.to_string_lossy().to_string(),
+            cwd: "/repo/demo".to_string(),
+            modified: modified.clone(),
+            message_count: 2,
+        }]);
+
+        let date = parse_modified(&modified).format("%Y-%m-%d").to_string();
+        let point = stats
+            .heatmap_data
+            .iter()
+            .find(|point| point.date == date)
+            .expect("heatmap point");
+
+        assert_eq!(point.total_tokens, 40);
+        assert!(point.total_cost > 0.0);
+        assert_eq!(stats.token_details.total_input, 10);
+        assert_eq!(stats.token_details.total_output, 30);
+        assert!(stats.token_details.total_cost > 0.0);
     }
 }

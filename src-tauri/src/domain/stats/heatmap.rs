@@ -29,6 +29,7 @@ pub fn generate_heatmap_data(
 
         let total_messages = daily_stats.messages.get(&date_str).copied().unwrap_or(0);
         let total_tokens = daily_stats.tokens.get(&date_str).copied().unwrap_or(0);
+        let total_cost = daily_stats.cost.get(&date_str).copied().unwrap_or(0.0);
         let session_count = daily_stats.sessions.get(&date_str).copied().unwrap_or(0);
         let top_project = daily_stats.top_project_for_date(&date_str);
 
@@ -37,6 +38,7 @@ pub fn generate_heatmap_data(
             level,
             total_messages,
             total_tokens,
+            total_cost,
             session_count,
             top_project,
         });
