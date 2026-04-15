@@ -232,6 +232,20 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         .map_err(|e| format!("Failed to create table subagent_meta_cache: {e}"))?;
 
         conn.execute(
+            "CREATE TABLE IF NOT EXISTS scan_state (
+            path TEXT PRIMARY KEY,
+            backing_path TEXT NOT NULL,
+            provider_slug TEXT NOT NULL,
+            file_modified TEXT NOT NULL,
+            file_size INTEGER NOT NULL,
+            last_scanned_at TEXT NOT NULL,
+            last_parse_status TEXT NOT NULL
+        )",
+            [],
+        )
+        .map_err(|e| format!("Failed to create table scan_state: {e}"))?;
+
+        conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_modified ON sessions(modified DESC)",
             [],
         )
@@ -245,6 +259,18 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             [],
         )
         .map_err(|e| format!("Failed to create index idx_file_modified: {e}"))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_scan_state_backing_path ON scan_state(backing_path)",
+            [],
+        )
+        .map_err(|e| format!("Failed to create index idx_scan_state_backing_path: {e}"))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_scan_state_provider_slug ON scan_state(provider_slug)",
+            [],
+        )
+        .map_err(|e| format!("Failed to create index idx_scan_state_provider_slug: {e}"))?;
 
         // Create favorites table
         conn.execute(
@@ -364,6 +390,18 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             [],
         )
         .map_err(|e| format!("Failed to create session/timestamp index on message_entries: {e}"))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_message_entries_timestamp ON message_entries(timestamp DESC)",
+            [],
+        )
+        .map_err(|e| format!("Failed to create timestamp index on message_entries: {e}"))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_message_entries_timestamp_julianday ON message_entries(julianday(timestamp) DESC)",
+            [],
+        )
+        .map_err(|e| format!("Failed to create julianday timestamp index on message_entries: {e}"))?;
 
         if config.enable_fts5 {
             // init_fts5(&conn)?; // DISABLED: sessions_fts incompatible with sessions schema (TEXT PRIMARY KEY)

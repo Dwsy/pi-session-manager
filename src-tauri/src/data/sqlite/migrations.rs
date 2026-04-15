@@ -14,6 +14,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             5 => migration_5(conn)?,
             6 => migration_6(conn)?,
             7 => migration_7(conn)?,
+            8 => migration_8(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -229,5 +230,32 @@ fn migration_7(conn: &Connection) -> Result<(), String> {
         [],
     )
     .map_err(|e| format!("Migration 7 failed creating session/timestamp index: {e}"))?;
+    Ok(())
+}
+
+fn migration_8(conn: &Connection) -> Result<(), String> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS scan_state (
+            path TEXT PRIMARY KEY,
+            backing_path TEXT NOT NULL,
+            provider_slug TEXT NOT NULL,
+            file_modified TEXT NOT NULL,
+            file_size INTEGER NOT NULL,
+            last_scanned_at TEXT NOT NULL,
+            last_parse_status TEXT NOT NULL
+        )",
+        [],
+    )
+    .map_err(|e| format!("Migration 8 failed creating scan_state: {e}"))?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_scan_state_backing_path ON scan_state(backing_path)",
+        [],
+    )
+    .map_err(|e| format!("Migration 8 failed creating backing_path index: {e}"))?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_scan_state_provider_slug ON scan_state(provider_slug)",
+        [],
+    )
+    .map_err(|e| format!("Migration 8 failed creating provider_slug index: {e}"))?;
     Ok(())
 }

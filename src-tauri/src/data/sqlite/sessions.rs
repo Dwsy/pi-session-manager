@@ -199,6 +199,58 @@ pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
     Ok(sessions)
 }
 
+pub fn get_all_sessions_for_list(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
+    let mut stmt = conn.prepare(
+        "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path
+         FROM sessions ORDER BY modified DESC, path ASC"
+    ).map_err(|e| format!("Failed to prepare list statement: {e}"))?;
+
+    let sessions = stmt
+        .query_map([], |row| {
+            Ok(SessionInfo {
+                path: row.get(1)?,
+                id: row.get(0)?,
+                cwd: row.get(2)?,
+                name: row.get(3)?,
+                created: parse_timestamp(&row.get::<_, String>(4)?),
+                modified: parse_timestamp(&row.get::<_, String>(5)?),
+                message_count: row.get(6)?,
+                first_message: row.get(7)?,
+                all_messages_text: String::new(),
+                user_messages_text: String::new(),
+                assistant_messages_text: String::new(),
+                last_message: row.get(8).unwrap_or_default(),
+                last_message_role: row.get(9).unwrap_or_default(),
+                parent_session_path: row.get(10)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query list sessions: {e}"))?
+        .collect::<SqliteResult<Vec<_>>>()
+        .map_err(|e| format!("Failed to collect list sessions: {e}"))?;
+
+    Ok(sessions)
+}
+
+pub fn get_all_cached_file_modified(
+    conn: &Connection,
+) -> Result<HashMap<String, DateTime<Utc>>, String> {
+    let mut stmt = conn
+        .prepare("SELECT path, file_modified FROM sessions")
+        .map_err(|e| format!("Failed to prepare cached modified statement: {e}"))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let path: String = row.get(0)?;
+            let modified_raw: String = row.get(1)?;
+            Ok((path, parse_timestamp(&modified_raw)))
+        })
+        .map_err(|e| format!("Failed to query cached modified values: {e}"))?
+        .collect::<SqliteResult<Vec<_>>>()
+        .map_err(|e| format!("Failed to collect cached modified values: {e}"))?;
+
+    Ok(rows.into_iter().collect())
+}
+
 pub fn get_sessions_modified_after(
     conn: &Connection,
     cutoff: DateTime<Utc>,

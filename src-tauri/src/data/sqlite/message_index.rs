@@ -441,10 +441,20 @@ fn create_message_fts5(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
+fn optimize_message_fts_index(conn: &Connection) -> Result<(), String> {
+    conn.execute(
+        "INSERT INTO message_fts(message_fts) VALUES('optimize')",
+        [],
+    )
+    .map_err(|e| format!("Failed to optimize FTS index: {e}"))?;
+    Ok(())
+}
+
 fn rebuild_message_fts_index(conn: &Connection) -> Result<(), String> {
     info!("[FTS] Rebuilding message_fts index from message_entries...");
     conn.execute("INSERT INTO message_fts(message_fts) VALUES('rebuild')", [])
         .map_err(|e| format!("Failed to rebuild FTS index: {e}"))?;
+    optimize_message_fts_index(conn)?;
     Ok(())
 }
 
@@ -534,9 +544,8 @@ fn message_entries_table_exists(conn: &Connection) -> Result<bool, String> {
 }
 
 fn load_include_thinking_in_search() -> bool {
-    crate::settings_store::get::<Value>("app_settings")
+    crate::unified_config::read_section("app")
         .ok()
-        .flatten()
         .and_then(|settings| settings.get("search").cloned())
         .and_then(|search| {
             search

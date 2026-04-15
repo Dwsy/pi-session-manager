@@ -57,19 +57,35 @@ pub fn delete_sessions_by_source_slugs(
         return Ok(0);
     }
 
-    let sessions = super::sessions::get_all_sessions(conn)?;
-    let mut deleted = 0usize;
-
-    for session in sessions {
-        let path = Path::new(&session.path);
-        let matches = source_slugs.iter().any(|slug| {
+    let source_matchers = source_slugs
+        .iter()
+        .filter_map(|slug| {
             crate::domain::session_bridge::SessionBridgeSource::ALL
                 .into_iter()
                 .find(|source| source.slug().replace('_', "-") == *slug)
-                .is_some_and(|source| source.matches_path(path))
-        });
-        if matches {
-            delete_session(conn, &session.path)?;
+        })
+        .collect::<Vec<_>>();
+    if source_matchers.is_empty() {
+        return Ok(0);
+    }
+
+    let mut stmt = conn
+        .prepare("SELECT path FROM sessions")
+        .map_err(|e| format!("Failed to prepare session path query: {e}"))?;
+    let paths = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|e| format!("Failed to query session paths: {e}"))?
+        .collect::<SqliteResult<Vec<_>>>()
+        .map_err(|e| format!("Failed to collect session paths: {e}"))?;
+
+    let mut deleted = 0usize;
+    for path in paths {
+        let path_ref = Path::new(&path);
+        if source_matchers
+            .iter()
+            .any(|source| source.matches_path(path_ref))
+        {
+            delete_session(conn, &path)?;
             deleted += 1;
         }
     }
