@@ -7,7 +7,7 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 fn should_disable_watcher(config: &crate::config::Config) -> bool {
     config.session_source_mode == crate::config::SessionSourceMode::Dataset
@@ -251,15 +251,30 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                 .map(|p| p.to_string_lossy().to_string())
                 .collect();
 
-            debug!("Incremental rescan: {} changed files", changed.len());
+            let changed_count = changed.len();
+            let rescan_started_at = Instant::now();
+            debug!("Incremental rescan: {} changed files", changed_count);
 
             // Update backend cache, get diff
             match rt.block_on(crate::core::scanner::rescan_changed_files(changed)) {
                 Ok(diff) => {
+                    let rescan_elapsed_ms = rescan_started_at.elapsed().as_millis();
                     if diff.updated.is_empty() && diff.removed.is_empty() {
+                        info!(
+                            "Incremental rescan completed in {}ms with no effective session diff (changed_files={})",
+                            rescan_elapsed_ms,
+                            changed_count
+                        );
                         // Nothing actually changed, skip notification
                         continue;
                     }
+                    info!(
+                        "Incremental rescan completed in {}ms (changed_files={} updated={} removed={})",
+                        rescan_elapsed_ms,
+                        changed_count,
+                        diff.updated.len(),
+                        diff.removed.len()
+                    );
                     // Emit diff so frontend can merge locally without calling scan_sessions
                     let payload = serde_json::to_value(&diff).unwrap_or(Value::Null);
                     if let Err(e) = app_handle.emit("sessions-changed", payload) {
@@ -269,7 +284,11 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                     }
                 }
                 Err(e) => {
-                    error!("Failed to rescan changed files: {}", e);
+                    error!(
+                        "Failed to rescan changed files after {}ms: {}",
+                        rescan_started_at.elapsed().as_millis(),
+                        e
+                    );
                 }
             }
         }

@@ -1,8 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::PathBuf;
-
-const CONFIG_FILE: &str = "session-manager-config.toml";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
@@ -200,47 +197,23 @@ impl Config {
 }
 
 pub fn get_config_path() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or("Cannot find home directory")?;
-    let config_dir = home.join(".pi").join("agent");
-    fs::create_dir_all(&config_dir).map_err(|e| format!("Failed to create config dir: {e}"))?;
-    Ok(config_dir.join(CONFIG_FILE))
+    crate::unified_config::config_file_path()
 }
 
 pub fn load_config() -> Result<Config, String> {
-    let config_path = get_config_path()?;
-
-    if !config_path.exists() {
-        let default_config = Config::default();
-        save_config(&default_config)?;
-        return Ok(default_config);
-    }
-
-    let content =
-        fs::read_to_string(&config_path).map_err(|e| format!("Failed to read config: {e}"))?;
-
-    let config: Config =
-        toml::from_str(&content).map_err(|e| format!("Failed to parse config: {e}"))?;
-
-    Ok(config)
+    let value = crate::unified_config::read_section("session")?;
+    serde_json::from_value::<Config>(value)
+        .map_err(|e| format!("Failed to parse session config: {e}"))
 }
 
 pub fn save_config(config: &Config) -> Result<(), String> {
-    let config_path = get_config_path()?;
-
-    let content =
-        toml::to_string_pretty(config).map_err(|e| format!("Failed to serialize config: {e}"))?;
-
-    fs::write(&config_path, content).map_err(|e| format!("Failed to write config: {e}"))?;
-
-    Ok(())
+    let value = serde_json::to_value(config)
+        .map_err(|e| format!("Failed to serialize session config: {e}"))?;
+    crate::unified_config::write_section("session", value)
 }
 
 pub fn reset_config() -> Result<Config, String> {
-    let config_path = get_config_path()?;
-
-    if config_path.exists() {
-        fs::remove_file(&config_path).map_err(|e| format!("Failed to remove config: {e}"))?;
-    }
-
-    Ok(Config::default())
+    let default_config = Config::default();
+    save_config(&default_config)?;
+    Ok(default_config)
 }

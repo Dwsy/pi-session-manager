@@ -340,6 +340,11 @@ async fn dispatch_impl(
                 .or_else(|| payload.get("sourceFilter"))
                 .and_then(|v| v.as_str())
                 .map(String::from);
+            let from = payload
+                .get("from")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let to = payload.get("to").and_then(|v| v.as_str()).map(String::from);
             let result = crate::full_text_search(
                 query,
                 role_filter,
@@ -350,6 +355,8 @@ async fn dispatch_impl(
                 match_mode,
                 sort_order,
                 source_filter,
+                from,
+                to,
             )
             .await?;
             Ok(to_val(result, "serialize result")?)
@@ -690,6 +697,10 @@ async fn dispatch_impl(
             .map_err(|e| format!("Invalid settings: {e}"))?;
             crate::save_server_settings(settings).await?;
             Ok(Value::Null)
+        }
+        "get_psm_config_dir" => {
+            let result = crate::get_psm_config_dir().await?;
+            Ok(to_val(result, "serialize result")?)
         }
         "get_session_paths" => {
             let result = crate::get_session_paths().await?;
