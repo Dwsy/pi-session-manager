@@ -123,8 +123,7 @@ fn parse_quoted_query_lower(query: &str) -> ParsedQuotedQuery {
 /// Search sessions
 /// Optimizations:
 /// 1. Use lowercase query cache to avoid repeated conversions
-/// 2. Fast filtering: check if all_messages_text contains query first
-/// 3. Reduce unnecessary string allocations
+/// 2. Reduce unnecessary string allocations
 pub fn search_sessions(
     sessions: &[SessionInfo],
     query: &str,
@@ -177,12 +176,6 @@ pub fn search_sessions(
                 });
             }
         } else {
-            // Fast filter: check if all_messages_text contains query first
-            // Avoid reading file for every session
-            if !has_match_in_text(&session.all_messages_text, &query_terms) {
-                continue;
-            }
-
             // Search message content
             let matches = find_matches(session, &query_terms, role_filter, include_tools);
             if !matches.is_empty() {
@@ -207,13 +200,6 @@ pub fn search_sessions(
     results
 }
 
-/// Quickly check if text contains any query words (OR logic)
-/// Used for fast filtering - returns true if any word is found
-fn has_match_in_text(text: &str, query_words: &[&str]) -> bool {
-    let text_lower = text.to_lowercase();
-    query_words.iter().any(|word| text_lower.contains(word))
-}
-
 /// Match session name
 /// Optimization: reduce string allocations, avoid creating intermediate strings
 fn matches_session_name(session: &SessionInfo, query_words: &[&str]) -> bool {
@@ -233,9 +219,8 @@ fn matches_session_name(session: &SessionInfo, query_words: &[&str]) -> bool {
 
 /// Find matches
 /// Optimizations:
-/// 1. Remove duplicate all_messages_text check (already done in search_sessions)
-/// 2. Use BufReader to read large files line by line, avoid loading entire file at once
-/// 3. Reduce string allocations
+/// 1. Use BufReader to read large files line by line, avoid loading entire file at once
+/// 2. Reduce string allocations
 fn find_matches(
     session: &SessionInfo,
     query_words: &[&str],

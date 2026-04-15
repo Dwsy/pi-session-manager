@@ -8,7 +8,6 @@ export interface SessionInfo {
   modified: string
   message_count: number
   first_message: string
-  all_messages_text?: string
   user_messages_text?: string
   assistant_messages_text?: string
   last_message: string
@@ -335,6 +334,7 @@ export interface HeatmapPoint {
   // Enhanced fields for tooltip and modal
   total_messages: number
   total_tokens: number
+  total_cost: number
   session_count: number
   top_project?: string
 }

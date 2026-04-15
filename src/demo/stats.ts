@@ -18,6 +18,7 @@ interface DemoDailyAggregate {
   date: string
   totalMessages: number
   totalTokens: number
+  totalCost: number
   sessions: SessionInfo[]
   topProject?: string
 }
@@ -29,6 +30,7 @@ function buildDailyAggregate(state: DemoStore): Map<string, DemoDailyAggregate> 
     const date = session.modified.slice(0, 10)
     const seed = state.seedByPath.get(session.path)
     const totalTokens = seed ? seed.tokenUsage.input + seed.tokenUsage.output : session.message_count * 180
+    const totalCost = seed ? estimateCost(seed) : 0
     const existing = map.get(date)
 
     if (!existing) {
@@ -36,6 +38,7 @@ function buildDailyAggregate(state: DemoStore): Map<string, DemoDailyAggregate> 
         date,
         totalMessages: session.message_count,
         totalTokens,
+        totalCost,
         sessions: [session],
         topProject: getPathBasename(session.cwd),
       })
@@ -44,6 +47,7 @@ function buildDailyAggregate(state: DemoStore): Map<string, DemoDailyAggregate> 
 
     existing.totalMessages += session.message_count
     existing.totalTokens += totalTokens
+    existing.totalCost += totalCost
     existing.sessions.push(session)
 
     const projectCounter = new Map<string, number>()
@@ -189,6 +193,7 @@ function buildHeatmapData(state: DemoStore): HeatmapPoint[] {
       level,
       total_messages: totalMessages,
       total_tokens: aggregate?.totalTokens || 0,
+      total_cost: aggregate?.totalCost || 0,
       session_count: aggregate?.sessions.length || 0,
       top_project: aggregate?.topProject,
     })

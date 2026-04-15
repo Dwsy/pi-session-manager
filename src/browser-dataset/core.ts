@@ -297,7 +297,6 @@ function parseSessionContent(
       modified,
       message_count: messageCount,
       first_message: firstMessage,
-      all_messages_text: allMessages.join("\n"),
       user_messages_text: userMessages.join("\n"),
       assistant_messages_text: assistantMessages.join("\n"),
       last_message: lastMessage,

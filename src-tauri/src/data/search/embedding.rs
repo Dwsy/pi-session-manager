@@ -25,10 +25,10 @@ pub struct EmbeddingConfig {
 
 impl Default for EmbeddingConfig {
     fn default() -> Self {
-        let home = dirs::home_dir().unwrap_or_default();
+        let home = crate::paths::pi_root_dir().unwrap_or_default();
         Self {
             enabled: true,
-            model_path: home.join(".pi/models/embedding-models/embeddinggemma-300M-Q8_0.gguf"),
+            model_path: home.join("models/embedding-models/embeddinggemma-300M-Q8_0.gguf"),
             port: 11435,
             auto_release_minutes: 5,
             node_path: None,

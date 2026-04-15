@@ -73,15 +73,6 @@ export function estimateCost(seed: DemoSessionSeed): number {
 }
 
 export function buildSessionInfo(seed: DemoSessionSeed): SessionInfo {
-  const searchableText = [
-    seed.firstMessage,
-    seed.lastMessage,
-    seed.assistantSummary,
-    seed.toolName,
-    seed.toolOutput,
-    seed.keywords.join(' '),
-  ]
-
   return {
     id: seed.id,
     path: seed.path,
@@ -93,7 +84,6 @@ export function buildSessionInfo(seed: DemoSessionSeed): SessionInfo {
     first_message: seed.firstMessage,
     last_message: seed.lastMessage,
     last_message_role: 'assistant',
-    all_messages_text: searchableText.join(' '),
     user_messages_text: `${seed.firstMessage} ${seed.keywords.join(' ')}`,
     assistant_messages_text: `${seed.assistantSummary} ${seed.lastMessage}`,
   }
