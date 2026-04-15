@@ -33,6 +33,8 @@ export interface UseSessionViewerVirtualScrollOptions {
   onReachBottom?: () => void
   /** Scroll position when switching sessions: 'top' or 'bottom' */
   openPosition?: 'top' | 'bottom'
+  /** Entry IDs that are hidden (e.g., merged into turn groups) — estimated as 0 height */
+  hiddenEntryIds?: Set<string>
 }
 
 export interface UseSessionViewerVirtualScrollResult {
@@ -60,6 +62,7 @@ export function useSessionViewerVirtualScroll({
   isAtBottomRef: externalIsAtBottomRef,
   onReachBottom,
   openPosition = 'top',
+  hiddenEntryIds,
 }: UseSessionViewerVirtualScrollOptions): UseSessionViewerVirtualScrollResult {
   const [isAtBottom, setIsAtBottom] = useState(true)
 
@@ -84,6 +87,9 @@ export function useSessionViewerVirtualScroll({
     (index: number) => {
       const entry = renderableEntries[index]
       if (!entry) return 140 + MESSAGE_ITEM_GAP
+
+      // Hidden entries (merged into turn groups) have 0 height
+      if (hiddenEntryIds?.has(entry.id)) return 0
 
       const cachedHeight = measuredHeightsRef.current.get(entry.id)
       if (cachedHeight) return cachedHeight
@@ -118,7 +124,7 @@ export function useSessionViewerVirtualScroll({
       }
       return height + MESSAGE_ITEM_GAP
     },
-    [renderableEntries],
+    [hiddenEntryIds, renderableEntries],
   )
 
   const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
@@ -129,7 +135,17 @@ export function useSessionViewerVirtualScroll({
     lanes: 1,
     isScrollingResetDelay: 200,
     useAnimationFrameWithResizeObserver: true,
-    measureElement: (element, entry, instance) => {
+    ...({
+      shouldAdjustScrollPositionOnItemSizeChange: (
+        item: { end: number },
+        _delta: number,
+        instance: { scrollOffset: number | null },
+      ) => {
+        const scrollOffset = instance.scrollOffset ?? 0
+        return item.end < scrollOffset
+      },
+    } as const),
+    measureElement: (element: any, entry: any, instance: any) => {
       const height = measureElement(element, entry, instance)
       const entryId = element.getAttribute('data-entry-id')
       if (entryId) {
@@ -137,7 +153,7 @@ export function useSessionViewerVirtualScroll({
       }
       return height
     },
-  })
+  } as any)
 
   useEffect(() => {
     measuredHeightsRef.current.clear()

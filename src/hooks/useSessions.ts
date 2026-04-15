@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { listen } from "@/transport";
 import { useTranslation } from "react-i18next";
 import type { SessionInfo, SessionsDiff } from "@/types";
+import type {
+  DeleteSessionAnchorPoint,
+  DeleteSessionRequestOptions,
+} from "@/components/dialogs/deleteSessionTypes";
 import {
   BROWSER_DATASET_REFRESHED_EVENT,
   isBrowserDatasetModeEnabled,
@@ -19,7 +23,8 @@ import {
 export interface PendingDeleteSession {
   sessions: SessionInfo[];
   requestedAt: number;
-  anchorRef?: React.RefObject<HTMLElement>;
+  anchorRef?: React.RefObject<HTMLElement | null>;
+  anchorPoint?: DeleteSessionAnchorPoint | null;
 }
 
 interface DeleteSessionsResult {
@@ -34,10 +39,14 @@ export interface UseSessionsReturn {
   setSelectedSession: (session: SessionInfo | null) => void;
   loadSessions: () => Promise<void>;
   patchSessions: (diff: SessionsDiff) => void;
-  handleDeleteSession: (session: SessionInfo) => Promise<void>;
+  handleDeleteSession: (
+    session: SessionInfo,
+    options?: DeleteSessionRequestOptions,
+  ) => Promise<void>;
   handleDeleteSessions: (
     sessions: SessionInfo[],
-    anchorRef?: React.RefObject<HTMLElement>,
+    anchorRef?: React.RefObject<HTMLElement | null>,
+    options?: DeleteSessionRequestOptions,
   ) => Promise<void>;
   pendingDeleteSession: PendingDeleteSession | null;
   confirmDeleteSession: () => Promise<void>;
@@ -187,7 +196,8 @@ export function useSessions(): UseSessionsReturn {
   const handleDeleteSessions = useCallback(
     async (
       targets: SessionInfo[],
-      anchorRef?: React.RefObject<HTMLElement>,
+      anchorRef?: React.RefObject<HTMLElement | null>,
+      options?: DeleteSessionRequestOptions,
     ) => {
       const nextTargets: SessionInfo[] = [];
       const seen = new Set<string>();
@@ -208,14 +218,18 @@ export function useSessions(): UseSessionsReturn {
         sessions: nextTargets,
         requestedAt: Date.now(),
         anchorRef,
+        anchorPoint: options?.anchorPoint ?? null,
       });
     },
     [],
   );
 
   const handleDeleteSession = useCallback(
-    async (session: SessionInfo, anchorRef?: React.RefObject<HTMLElement>) => {
-      await handleDeleteSessions([session], anchorRef);
+    async (
+      session: SessionInfo,
+      options?: DeleteSessionRequestOptions,
+    ) => {
+      await handleDeleteSessions([session], undefined, options);
     },
     [handleDeleteSessions],
   );
