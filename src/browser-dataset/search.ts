@@ -12,6 +12,21 @@ import { getCachedSettings } from "@/utils/settingsApi";
 import { getSessionIdMatchKind } from "@/utils/session";
 import { extractTextFromMessageContent, loadDatasetCache } from "./core";
 
+const SMART_PHRASE_MATCH_BOOST = 100_000;
+const RECENT_DAY_BUCKETS = [7, 30, 180] as const;
+
+interface SearchPlan {
+  terms: string[];
+  phrase: string | null;
+  mode: "smart" | "any" | "all" | "phrase";
+  prioritizePhrase: boolean;
+}
+
+interface MatchEvaluation {
+  matched: boolean;
+  phraseMatched: boolean;
+}
+
 function normalizeText(value: string | undefined): string {
   return (value || "").toLowerCase();
 }
@@ -24,6 +39,29 @@ function parseTerms(query: string): string[] {
   return Array.from(
     new Set(terms.map((term) => term.trim().toLowerCase()).filter(Boolean)),
   );
+}
+
+function buildSearchPlan(
+  query: string,
+  mode: "smart" | "any" | "all" | "phrase" = "smart",
+): SearchPlan {
+  const parsed = parseQuotedQuery(query);
+  const terms = parseTerms(query);
+  const normalizedQuery = query.trim().toLowerCase();
+  const phrase =
+    parsed.hasPhrases && parsed.phrases.length === 1 && !parsed.remainderTokens.length
+      ? parsed.phrases[0].trim().toLowerCase()
+      : parsed.remainderTokens.length > 1
+        ? parsed.remainderTokens.join(" ").toLowerCase()
+        : normalizedQuery || null;
+
+  return {
+    terms,
+    phrase,
+    mode,
+    prioritizePhrase:
+      mode === "smart" && !parsed.hasPhrases && parsed.remainderTokens.length > 1,
+  };
 }
 
 function countMatches(content: string, terms: string[]): number {
@@ -42,6 +80,50 @@ function matchesAll(content: string, terms: string[]): boolean {
 function matchesAny(content: string, terms: string[]): boolean {
   const lower = content.toLowerCase();
   return terms.some((term) => lower.includes(term));
+}
+
+function evaluateMatch(content: string, plan: SearchPlan): MatchEvaluation {
+  const lower = content.toLowerCase();
+  const phraseMatched = Boolean(plan.phrase && lower.includes(plan.phrase));
+
+  if (plan.mode === "phrase") {
+    return { matched: phraseMatched, phraseMatched };
+  }
+  if (plan.mode === "all") {
+    return { matched: matchesAll(content, plan.terms), phraseMatched };
+  }
+  if (plan.mode === "any") {
+    return { matched: matchesAny(content, plan.terms), phraseMatched };
+  }
+  if (plan.prioritizePhrase && phraseMatched) {
+    return { matched: true, phraseMatched: true };
+  }
+
+  return { matched: matchesAny(content, plan.terms), phraseMatched };
+}
+
+function parseTimeMs(value: string | null | undefined): number | null {
+  if (!value?.trim()) return null;
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+function isTimestampInScope(
+  timestamp: string,
+  fromMs: number | null,
+  toMs: number | null,
+): boolean {
+  const timestampMs = Date.parse(timestamp);
+  if (Number.isNaN(timestampMs)) {
+    return false;
+  }
+  if (fromMs !== null && timestampMs < fromMs) {
+    return false;
+  }
+  if (toMs !== null && timestampMs > toMs) {
+    return false;
+  }
+  return true;
 }
 
 function matchGlob(
@@ -117,7 +199,12 @@ function chooseWinningHit(
   if (precedenceDiff > 0) {
     return existing;
   }
-
+  if (candidate.score > existing.score) {
+    return candidate;
+  }
+  if (candidate.score < existing.score) {
+    return existing;
+  }
   if (candidate.timestamp > existing.timestamp) {
     return candidate;
   }
@@ -143,6 +230,30 @@ function sortFullTextHits(
       left.session_path.localeCompare(right.session_path)
     );
   });
+}
+
+function sortRecentPriorityHits(hits: FullTextSearchHit[]): FullTextSearchHit[] {
+  const now = Date.now();
+  const buckets: FullTextSearchHit[][] = [[], [], [], []];
+
+  for (const hit of hits) {
+    const timestampMs = Date.parse(hit.timestamp);
+    const ageDays = Number.isNaN(timestampMs)
+      ? Number.POSITIVE_INFINITY
+      : (now - timestampMs) / 86_400_000;
+
+    if (ageDays <= RECENT_DAY_BUCKETS[0]) {
+      buckets[0].push(hit);
+    } else if (ageDays <= RECENT_DAY_BUCKETS[1]) {
+      buckets[1].push(hit);
+    } else if (ageDays <= RECENT_DAY_BUCKETS[2]) {
+      buckets[2].push(hit);
+    } else {
+      buckets[3].push(hit);
+    }
+  }
+
+  return buckets.flatMap((bucket) => sortFullTextHits(bucket, "newest"));
 }
 
 export async function searchBrowserDatasetSessions(
@@ -225,19 +336,29 @@ export async function fullTextSearchBrowserDataset(options: {
   projectPath?: string | null;
   page?: number;
   pageSize?: number;
-  matchMode?: "any" | "all" | "phrase";
+  matchMode?: "smart" | "any" | "all" | "phrase";
   sortOrder?: "score" | "newest" | "oldest";
+  from?: string | null;
+  to?: string | null;
 }): Promise<FullTextSearchResponse> {
   const query = options.query.trim();
   const sourceFilter = options.sourceFilter || "all";
   const isLabelsBrowseMode = sourceFilter === "labels_only" && !query;
+  const matchMode = options.matchMode || "smart";
+  const sortOrder = options.sortOrder || "newest";
+  const searchPlan = buildSearchPlan(query, matchMode);
+  const fromMs = parseTimeMs(options.from);
+  const toMs = parseTimeMs(options.to);
+
+  if (fromMs !== null && toMs !== null && fromMs > toMs) {
+    throw new Error("from must be earlier than or equal to to");
+  }
 
   if (!query && !isLabelsBrowseMode) {
     return { hits: [], total_hits: 0, has_more: false };
   }
 
-  const terms = parseTerms(query);
-  if (!terms.length && !isLabelsBrowseMode) {
+  if (!searchPlan.terms.length && !isLabelsBrowseMode) {
     return { hits: [], total_hits: 0, has_more: false };
   }
 
@@ -257,7 +378,7 @@ export async function fullTextSearchBrowserDataset(options: {
 
     if (includeSessionIdMatches) {
       const sessionIdMatchKind = getSessionIdMatchKind(session.info.id, query);
-      if (sessionIdMatchKind) {
+      if (sessionIdMatchKind && isTimestampInScope(session.info.modified, fromMs, toMs)) {
         const preview =
           session.info.last_message ||
           session.info.first_message ||
@@ -294,6 +415,9 @@ export async function fullTextSearchBrowserDataset(options: {
         if (targetEntry?.type !== "message" || !targetEntry.message) {
           continue;
         }
+        if (!isTimestampInScope(resolvedLabel.labeledAt, fromMs, toMs)) {
+          continue;
+        }
 
         const role = targetEntry.message.role;
         if (role !== "user" && role !== "assistant") {
@@ -303,15 +427,15 @@ export async function fullTextSearchBrowserDataset(options: {
           continue;
         }
         if (!isLabelsBrowseMode) {
-          const matched =
-            options.matchMode === "all"
-              ? matchesAll(resolvedLabel.text, terms)
-              : matchesAny(resolvedLabel.text, terms);
-          if (!matched) {
+          const evaluation = evaluateMatch(resolvedLabel.text, searchPlan);
+          if (!evaluation.matched) {
             continue;
           }
         }
 
+        const evaluation = isLabelsBrowseMode
+          ? { phraseMatched: false }
+          : evaluateMatch(resolvedLabel.text, searchPlan);
         const candidate: FullTextSearchHit = {
           session_id: session.info.id,
           session_path: session.path,
@@ -321,7 +445,10 @@ export async function fullTextSearchBrowserDataset(options: {
           source_type: "label",
           content: resolvedLabel.text,
           timestamp: resolvedLabel.labeledAt,
-          score: 10_000 + (isLabelsBrowseMode ? 0 : countMatches(resolvedLabel.text, terms)),
+          score:
+            10_000 +
+            (isLabelsBrowseMode ? 0 : countMatches(resolvedLabel.text, searchPlan.terms)) +
+            (evaluation.phraseMatched ? SMART_PHRASE_MATCH_BOOST : 0),
           match_reason: "label",
         };
         bestHitsByEntryId.set(
@@ -334,6 +461,7 @@ export async function fullTextSearchBrowserDataset(options: {
     if (includeContentHits) {
       for (const entry of session.entries) {
         if (entry.type !== "message" || !entry.message) continue;
+        if (!isTimestampInScope(entry.timestamp, fromMs, toMs)) continue;
         const role = entry.message.role;
         if (role !== "user" && role !== "assistant") continue;
         if (
@@ -364,11 +492,8 @@ export async function fullTextSearchBrowserDataset(options: {
         }
 
         for (const candidate of candidates) {
-          const matched =
-            options.matchMode === "all"
-              ? matchesAll(candidate.content, terms)
-              : matchesAny(candidate.content, terms);
-          if (!matched) continue;
+          const evaluation = evaluateMatch(candidate.content, searchPlan);
+          if (!evaluation.matched) continue;
 
           const fullTextHit: FullTextSearchHit = {
             session_id: session.info.id,
@@ -379,7 +504,9 @@ export async function fullTextSearchBrowserDataset(options: {
             source_type: candidate.source_type,
             content: candidate.content,
             timestamp: entry.timestamp,
-            score: countMatches(candidate.content, terms),
+            score:
+              countMatches(candidate.content, searchPlan.terms) +
+              (evaluation.phraseMatched ? SMART_PHRASE_MATCH_BOOST : 0),
             match_reason: "content",
           };
           bestHitsByEntryId.set(
@@ -393,10 +520,11 @@ export async function fullTextSearchBrowserDataset(options: {
     hits.push(...bestHitsByEntryId.values());
   }
 
-  const combinedHits = [
-    ...sortFullTextHits(idHits, "score"),
-    ...sortFullTextHits(hits, options.sortOrder || "score"),
-  ];
+  const orderedMessageHits =
+    sortOrder === "newest"
+      ? sortRecentPriorityHits(hits)
+      : sortFullTextHits(hits, sortOrder);
+  const combinedHits = [...sortFullTextHits(idHits, "score"), ...orderedMessageHits];
 
   const page = Math.max(0, options.page || 0);
   const pageSize = Math.max(1, options.pageSize || 20);

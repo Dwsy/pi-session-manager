@@ -1,7 +1,9 @@
 use crate::metrics;
 use crate::types::{FullTextSearchHit, FullTextSearchResponse, SessionInfo};
 use crate::{config, search};
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use rusqlite::ToSql;
+use std::collections::HashSet;
 use std::time::Instant;
 use tokio::time::Duration;
 
@@ -11,6 +13,7 @@ const SESSION_ID_PREFIX_SCORE: f32 = 999_000.0;
 // These constants intentionally encode the user-facing ranking hierarchy:
 // session-id rediscovery, intentional label rediscovery, ordinary content similarity
 const LABEL_MATCH_BASE_SCORE: f32 = 500_000.0;
+const SMART_PHRASE_MATCH_BOOST: f32 = 100_000.0;
 const CONTENT_LIKE_SCORE: f32 = 1.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,18 +72,117 @@ impl SortMode {
 
     fn global_order_sql(self) -> &'static str {
         match self {
-            Self::Newest => "timestamp DESC, score DESC, session_path ASC, entry_id ASC",
-            Self::Oldest => "timestamp ASC, score DESC, session_path ASC, entry_id ASC",
-            Self::Relevance => "score DESC, timestamp DESC, session_path ASC, entry_id ASC",
+            Self::Newest => "julianday(timestamp) DESC, score DESC, session_path ASC, entry_id ASC",
+            Self::Oldest => "julianday(timestamp) ASC, score DESC, session_path ASC, entry_id ASC",
+            Self::Relevance => {
+                "score DESC, julianday(timestamp) DESC, session_path ASC, entry_id ASC"
+            }
         }
     }
 
     fn label_browse_order_sql(self) -> &'static str {
         match self {
-            Self::Oldest => "m.timestamp ASC, s.path ASC, m.entry_id ASC",
-            _ => "m.timestamp DESC, s.path ASC, m.entry_id ASC",
+            Self::Oldest => "julianday(m.timestamp) ASC, s.path ASC, m.entry_id ASC",
+            _ => "julianday(m.timestamp) DESC, s.path ASC, m.entry_id ASC",
         }
     }
+
+    fn per_session_order_sql(self) -> &'static str {
+        match self {
+            Self::Oldest => "julianday(timestamp) ASC, entry_id ASC",
+            _ => "julianday(timestamp) DESC, entry_id DESC",
+        }
+    }
+
+    fn uses_recent_priority(self) -> bool {
+        matches!(self, Self::Newest)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MatchMode {
+    Any,
+    All,
+    Phrase,
+    Smart,
+}
+
+impl MatchMode {
+    fn parse(value: Option<&str>) -> Self {
+        match value.unwrap_or("smart") {
+            "all" => Self::All,
+            "phrase" => Self::Phrase,
+            "any" => Self::Any,
+            "smart" => Self::Smart,
+            _ => Self::Smart,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TimeScope {
+    from: Option<DateTime<Utc>>,
+    to: Option<DateTime<Utc>>,
+}
+
+impl TimeScope {
+    fn parse(from: Option<&str>, to: Option<&str>) -> Result<Self, String> {
+        let from = from
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(parse_time_bound)
+            .transpose()?;
+        let to = to
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(parse_time_bound)
+            .transpose()?;
+
+        if let (Some(from), Some(to)) = (from, to) {
+            if from > to {
+                return Err(
+                    "Invalid time range: 'from' must be earlier than or equal to 'to'".to_string(),
+                );
+            }
+        }
+
+        Ok(Self { from, to })
+    }
+
+    fn intersect(&self, other: &Self) -> Option<Self> {
+        let from = match (self.from, other.from) {
+            (Some(left), Some(right)) => Some(left.max(right)),
+            (Some(left), None) => Some(left),
+            (None, Some(right)) => Some(right),
+            (None, None) => None,
+        };
+        let to = match (self.to, other.to) {
+            (Some(left), Some(right)) => Some(left.min(right)),
+            (Some(left), None) => Some(left),
+            (None, Some(right)) => Some(right),
+            (None, None) => None,
+        };
+
+        if let (Some(from), Some(to)) = (from, to) {
+            if from > to {
+                return None;
+            }
+        }
+
+        Some(Self { from, to })
+    }
+
+    fn to_sql_params(&self) -> (Option<String>, Option<String>) {
+        (
+            self.from.map(|value| value.to_rfc3339()),
+            self.to.map(|value| value.to_rfc3339()),
+        )
+    }
+}
+
+struct ContentLikeQuery {
+    predicate: String,
+    patterns: Vec<String>,
 }
 
 fn session_allowed_in_search(path: &str, config: &crate::config::Config) -> bool {
@@ -152,6 +254,8 @@ pub async fn full_text_search(
     match_mode: Option<String>,
     sort_order: Option<String>,
     source_filter: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
 ) -> Result<FullTextSearchResponse, String> {
     let result = tokio::time::timeout(
         Duration::from_secs(5),
@@ -166,6 +270,8 @@ pub async fn full_text_search(
                 match_mode,
                 sort_order,
                 source_filter,
+                from,
+                to,
             )
         }),
     )
@@ -189,12 +295,16 @@ fn full_text_search_blocking(
     match_mode: Option<String>,
     sort_order: Option<String>,
     source_filter: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
 ) -> Result<FullTextSearchResponse, String> {
     let start = Instant::now();
     let trimmed = query.trim().to_string();
     let source_filter = SourceFilter::parse(source_filter.as_deref())?;
     let is_labels_browse_mode = source_filter == SourceFilter::LabelsOnly && trimmed.is_empty();
     let sort_mode = SortMode::parse(sort_order.as_deref(), is_labels_browse_mode);
+    let match_mode = MatchMode::parse(match_mode.as_deref());
+    let time_scope = TimeScope::parse(from.as_deref(), to.as_deref())?;
 
     if trimmed.is_empty() && !is_labels_browse_mode {
         return Ok(FullTextSearchResponse {
@@ -228,16 +338,16 @@ fn full_text_search_blocking(
         .filter(|value| !value.is_empty());
 
     let response = if is_labels_browse_mode {
-        browse_all_labels(
+        let hits = browse_all_labels_hits(
             &conn,
             role_opt,
             like_pattern.as_ref(),
             project_path_owned.as_ref(),
-            page,
-            page_size,
             sort_mode,
+            &time_scope,
             &config,
-        )?
+        )?;
+        paginate_hits(hits, page, page_size)
     } else {
         let session_id_matches = if source_filter.includes_session_id() {
             search_session_id_matches(
@@ -246,42 +356,43 @@ fn full_text_search_blocking(
                 role_opt,
                 like_pattern.as_ref(),
                 project_path_owned.as_ref(),
+                &time_scope,
                 &config,
             )?
         } else {
             Vec::new()
         };
 
-        let session_id_count = session_id_matches.len();
-        let global_offset = page * page_size;
-        let global_limit = global_offset.saturating_add(page_size);
-        let session_id_page_start = global_offset.min(session_id_count);
-        let session_id_page_end = global_limit.min(session_id_count);
-        let mut hits = session_id_matches[session_id_page_start..session_id_page_end].to_vec();
+        let message_hits = if sort_mode.uses_recent_priority() {
+            search_message_hits_recent_first(
+                &conn,
+                &trimmed,
+                role_opt,
+                like_pattern.as_ref(),
+                project_path_owned.as_ref(),
+                match_mode,
+                sort_mode,
+                source_filter,
+                &time_scope,
+                &config,
+            )?
+        } else {
+            search_message_hits(
+                &conn,
+                &trimmed,
+                role_opt,
+                like_pattern.as_ref(),
+                project_path_owned.as_ref(),
+                match_mode,
+                sort_mode,
+                source_filter,
+                &time_scope,
+                &config,
+            )?
+        };
 
-        let message_offset = global_offset.saturating_sub(session_id_count);
-        let message_limit = page_size.saturating_sub(hits.len());
-        let message_result = search_message_hits(
-            &conn,
-            &trimmed,
-            role_opt,
-            like_pattern.as_ref(),
-            project_path_owned.as_ref(),
-            message_offset,
-            message_limit,
-            match_mode.as_deref(),
-            sort_mode,
-            source_filter,
-            &config,
-        )?;
-
-        hits.extend(message_result.hits);
-
-        FullTextSearchResponse {
-            hits,
-            total_hits: session_id_count + message_result.total_hits,
-            has_more: global_limit < session_id_count + message_result.total_hits,
-        }
+        let combined_hits = append_unique_hits(session_id_matches, message_hits);
+        paginate_hits(combined_hits, page, page_size)
     };
 
     let latency = start.elapsed();
@@ -292,17 +403,62 @@ fn full_text_search_blocking(
     Ok(response)
 }
 
+fn paginate_hits(
+    hits: Vec<FullTextSearchHit>,
+    page: usize,
+    page_size: usize,
+) -> FullTextSearchResponse {
+    let total_hits = hits.len();
+    let offset = page.saturating_mul(page_size);
+    let paged_hits = if page_size == 0 || offset >= total_hits {
+        Vec::new()
+    } else {
+        hits.into_iter().skip(offset).take(page_size).collect()
+    };
+
+    FullTextSearchResponse {
+        has_more: offset.saturating_add(paged_hits.len()) < total_hits,
+        total_hits,
+        hits: paged_hits,
+    }
+}
+
+fn append_unique_hits(
+    mut primary: Vec<FullTextSearchHit>,
+    secondary: Vec<FullTextSearchHit>,
+) -> Vec<FullTextSearchHit> {
+    let mut seen = primary
+        .iter()
+        .map(hit_identity_key)
+        .collect::<HashSet<String>>();
+
+    for hit in secondary {
+        let key = hit_identity_key(&hit);
+        if seen.insert(key) {
+            primary.push(hit);
+        }
+    }
+
+    primary
+}
+
+fn hit_identity_key(hit: &FullTextSearchHit) -> String {
+    format!(
+        "{}\u{1f}{}\u{1f}{}",
+        hit.session_path, hit.entry_id, hit.source_type
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
-fn browse_all_labels(
+fn browse_all_labels_hits(
     conn: &rusqlite::Connection,
     role_opt: Option<&str>,
     like_pattern: Option<&String>,
     project_path: Option<&String>,
-    page: usize,
-    page_size: usize,
     sort_mode: SortMode,
+    time_scope: &TimeScope,
     config: &crate::config::Config,
-) -> Result<FullTextSearchResponse, String> {
+) -> Result<Vec<FullTextSearchHit>, String> {
     let role_condition = match role_opt {
         Some("user") => "m.role = 'user'",
         Some("assistant") => "m.role = 'assistant'",
@@ -311,6 +467,7 @@ fn browse_all_labels(
 
     let mut where_clause = format!("WHERE m.source_type = 'label' AND {role_condition}");
     let mut params: Vec<&dyn ToSql> = Vec::new();
+    let (from_param, to_param) = time_scope.to_sql_params();
 
     if let Some(pattern) = like_pattern {
         where_clause = format!("{where_clause} AND m.session_path LIKE ? ESCAPE '\\'");
@@ -323,6 +480,14 @@ fn browse_all_labels(
         );
         params.push(project_path);
     }
+
+    append_time_scope_sql(
+        &mut where_clause,
+        &mut params,
+        "m.timestamp",
+        from_param.as_ref(),
+        to_param.as_ref(),
+    );
 
     let order_sql = sort_mode.label_browse_order_sql();
     let data_sql = format!(
@@ -362,23 +527,8 @@ fn browse_all_labels(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect label browse hits: {e}"))?;
 
-    // session_allowed_in_search() depends on runtime config + provider/path policy rather than
-    // a persisted searchable flag, so we apply it after SQL. This keeps the fix simple and
-    // correct; if it becomes hot, revisit with a persisted eligibility bit or bounded over-fetch.
-    let allowed_rows = rows
-        .into_iter()
-        .filter(|(_, session_path, _, _, _, _, _, _)| {
-            session_allowed_in_search(session_path, config)
-        })
-        .collect::<Vec<_>>();
-
-    let total_hits = allowed_rows.len();
-    let offset = page.saturating_mul(page_size);
-
-    let hits = allowed_rows
-        .into_iter()
-        .skip(offset)
-        .take(page_size)
+    rows.into_iter()
+        .filter(|(_, session_path, _, _, _, _, _, _)| session_allowed_in_search(session_path, config))
         .map(
             |(
                 session_id,
@@ -409,13 +559,7 @@ fn browse_all_labels(
                 })
             },
         )
-        .collect::<Result<Vec<_>, String>>()?;
-
-    Ok(FullTextSearchResponse {
-        hits,
-        total_hits,
-        has_more: offset + page_size < total_hits,
-    })
+        .collect()
 }
 
 fn search_session_id_matches(
@@ -424,6 +568,7 @@ fn search_session_id_matches(
     role_opt: Option<&str>,
     like_pattern: Option<&String>,
     project_path: Option<&String>,
+    time_scope: &TimeScope,
     config: &crate::config::Config,
 ) -> Result<Vec<FullTextSearchHit>, String> {
     let exact_session_id_query = search::normalize_session_id_query(trimmed);
@@ -444,6 +589,7 @@ fn search_session_id_matches(
     } else {
         vec![&exact_session_id_query]
     };
+    let (from_param, to_param) = time_scope.to_sql_params();
 
     if let Some(pattern) = like_pattern {
         session_id_where_clause =
@@ -455,6 +601,14 @@ fn search_session_id_matches(
         session_id_where_clause = format!("{session_id_where_clause} AND s.cwd = ?");
         session_id_params.push(project_path);
     }
+
+    append_time_scope_sql(
+        &mut session_id_where_clause,
+        &mut session_id_params,
+        "s.modified",
+        from_param.as_ref(),
+        to_param.as_ref(),
+    );
 
     let session_id_order_query = exact_session_id_query.clone();
     let session_id_sql = format!(
@@ -468,7 +622,7 @@ fn search_session_id_matches(
             s.modified
          FROM sessions s
          {session_id_where_clause}
-         ORDER BY CASE WHEN lower(s.id) = ? THEN 0 ELSE 1 END, s.modified DESC, s.path ASC"
+         ORDER BY CASE WHEN lower(s.id) = ? THEN 0 ELSE 1 END, julianday(s.modified) DESC, s.path ASC"
     );
     session_id_params.push(&session_id_order_query);
 
@@ -554,9 +708,36 @@ fn search_session_id_matches(
         .collect())
 }
 
-struct MessageQueryResult {
-    hits: Vec<FullTextSearchHit>,
-    total_hits: usize,
+#[allow(clippy::too_many_arguments)]
+fn search_message_hits_recent_first(
+    conn: &rusqlite::Connection,
+    trimmed: &str,
+    role_opt: Option<&str>,
+    like_pattern: Option<&String>,
+    project_path: Option<&String>,
+    match_mode: MatchMode,
+    sort_mode: SortMode,
+    source_filter: SourceFilter,
+    time_scope: &TimeScope,
+    config: &crate::config::Config,
+) -> Result<Vec<FullTextSearchHit>, String> {
+    let mut hits = Vec::new();
+    for window_scope in build_recent_priority_scopes(time_scope) {
+        let window_hits = search_message_hits(
+            conn,
+            trimmed,
+            role_opt,
+            like_pattern,
+            project_path,
+            match_mode,
+            sort_mode,
+            source_filter,
+            &window_scope,
+            config,
+        )?;
+        hits = append_unique_hits(hits, window_hits);
+    }
+    Ok(hits)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -566,16 +747,84 @@ fn search_message_hits(
     role_opt: Option<&str>,
     like_pattern: Option<&String>,
     project_path: Option<&String>,
-    message_offset: usize,
-    message_limit: usize,
-    match_mode: Option<&str>,
+    match_mode: MatchMode,
     sort_mode: SortMode,
     source_filter: SourceFilter,
+    time_scope: &TimeScope,
     config: &crate::config::Config,
-) -> Result<MessageQueryResult, String> {
+) -> Result<Vec<FullTextSearchHit>, String> {
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    if match_mode == MatchMode::Smart && should_prioritize_phrase(trimmed) {
+        let mut phrase_hits = search_message_hits_for_mode(
+            conn,
+            trimmed,
+            role_opt,
+            like_pattern,
+            project_path,
+            MatchMode::Phrase,
+            sort_mode,
+            source_filter,
+            time_scope,
+            config,
+        )?;
+        for hit in &mut phrase_hits {
+            if hit.match_reason.as_deref() == Some("content") {
+                hit.score += SMART_PHRASE_MATCH_BOOST;
+            }
+        }
+
+        let any_hits = search_message_hits_for_mode(
+            conn,
+            trimmed,
+            role_opt,
+            like_pattern,
+            project_path,
+            MatchMode::Any,
+            sort_mode,
+            source_filter,
+            time_scope,
+            config,
+        )?;
+        return Ok(append_unique_hits(phrase_hits, any_hits));
+    }
+
+    let concrete_mode = if match_mode == MatchMode::Smart {
+        MatchMode::Any
+    } else {
+        match_mode
+    };
+
+    search_message_hits_for_mode(
+        conn,
+        trimmed,
+        role_opt,
+        like_pattern,
+        project_path,
+        concrete_mode,
+        sort_mode,
+        source_filter,
+        time_scope,
+        config,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn search_message_hits_for_mode(
+    conn: &rusqlite::Connection,
+    trimmed: &str,
+    role_opt: Option<&str>,
+    like_pattern: Option<&String>,
+    project_path: Option<&String>,
+    match_mode: MatchMode,
+    sort_mode: SortMode,
+    source_filter: SourceFilter,
+    time_scope: &TimeScope,
+    config: &crate::config::Config,
+) -> Result<Vec<FullTextSearchHit>, String> {
     let use_content_like = contains_cjk(trimmed);
-    let fts_query = build_fts_query(trimmed, match_mode);
-    let content_like_pattern = format!("%{}%", trimmed.to_lowercase());
     let role_condition = match role_opt {
         Some("user") => "m.role = 'user'",
         Some("assistant") => "m.role = 'assistant'",
@@ -587,20 +836,22 @@ fn search_message_hits(
     } else {
         "FROM message_entries m JOIN message_fts ON m.rowid = message_fts.rowid"
     };
-    let text_condition = if use_content_like {
-        "lower(m.content) LIKE ?"
-    } else {
-        "message_fts MATCH ?"
-    };
-    let mut where_clause =
-        format!("WHERE {text_condition} AND {role_condition} AND {source_condition}");
-
+    let like_query = use_content_like.then(|| build_content_like_query(trimmed, match_mode));
+    let fts_query = (!use_content_like).then(|| build_fts_query(trimmed, match_mode));
     let mut params: Vec<&dyn ToSql> = Vec::new();
-    if use_content_like {
-        params.push(&content_like_pattern);
+    let mut where_clause = if let Some(like_query) = like_query.as_ref() {
+        for pattern in &like_query.patterns {
+            params.push(pattern);
+        }
+        format!(
+            "WHERE {} AND {role_condition} AND {source_condition}",
+            like_query.predicate
+        )
     } else {
-        params.push(&fts_query);
-    }
+        params.push(fts_query.as_ref().expect("fts query must exist"));
+        format!("WHERE message_fts MATCH ? AND {role_condition} AND {source_condition}")
+    };
+    let (from_param, to_param) = time_scope.to_sql_params();
 
     if let Some(pattern) = like_pattern {
         where_clause = format!("{where_clause} AND m.session_path LIKE ? ESCAPE '\\'");
@@ -614,6 +865,14 @@ fn search_message_hits(
         params.push(project_path);
     }
 
+    append_time_scope_sql(
+        &mut where_clause,
+        &mut params,
+        "m.timestamp",
+        from_param.as_ref(),
+        to_param.as_ref(),
+    );
+
     let source_precedence =
         "CASE m.source_type WHEN 'label' THEN 0 WHEN 'user' THEN 1 WHEN 'assistant' THEN 2 ELSE 3 END";
     let text_score_expr = if use_content_like {
@@ -626,6 +885,7 @@ fn search_message_hits(
     );
 
     let global_order = sort_mode.global_order_sql();
+    let per_session_order = sort_mode.per_session_order_sql();
     let data_sql = format!(
         "WITH ranked AS (
             SELECT
@@ -638,7 +898,7 @@ fn search_message_hits(
                 {score_expr} AS score,
                 ROW_NUMBER() OVER (
                     PARTITION BY m.session_path, m.entry_id
-                    ORDER BY {source_precedence}, m.timestamp DESC
+                    ORDER BY {source_precedence}, julianday(m.timestamp) DESC
                 ) AS rn_in_entry
             {from_clause}
             {where_clause}
@@ -654,37 +914,25 @@ fn search_message_hits(
                 score,
                 ROW_NUMBER() OVER (
                     PARTITION BY session_path
-                    ORDER BY timestamp DESC, entry_id DESC
+                    ORDER BY {per_session_order}
                 ) AS rn_in_session
             FROM ranked
             WHERE rn_in_entry = 1
-        ),
-        filtered AS (
-            SELECT
-                entry_id,
-                session_path,
-                role,
-                source_type,
-                content,
-                timestamp,
-                score,
-                ROW_NUMBER() OVER (ORDER BY {global_order}) AS global_rn
-            FROM deduped
-            WHERE rn_in_session <= {PER_SESSION_LIMIT}
         )
         SELECT
-            f.entry_id,
-            f.session_path,
+            d.entry_id,
+            d.session_path,
             s.id,
             s.name,
-            f.role,
-            f.source_type,
-            f.content,
-            f.timestamp,
-            f.score
-        FROM filtered f
-        JOIN sessions s ON s.path = f.session_path
-        ORDER BY f.global_rn"
+            d.role,
+            d.source_type,
+            d.content,
+            d.timestamp,
+            d.score
+        FROM deduped d
+        JOIN sessions s ON s.path = d.session_path
+        WHERE d.rn_in_session <= {PER_SESSION_LIMIT}
+        ORDER BY {global_order}"
     );
 
     let mut stmt = conn
@@ -708,68 +956,104 @@ fn search_message_hits(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect message search hits: {e}"))?;
 
-    // session_allowed_in_search() is not represented in SQL. We post-filter in Rust, then
-    // paginate the surviving rows; PER_SESSION_LIMIT still bounds row growth per session.
-    let allowed_rows = rows
-        .into_iter()
-        .filter(|(_, session_path, _, _, _, _, _, _, _)| {
-            session_allowed_in_search(session_path, config)
-        })
-        .collect::<Vec<_>>();
-
-    let total_hits = allowed_rows.len();
-    let hits = if message_limit == 0 || message_offset >= total_hits {
-        Vec::new()
-    } else {
-        allowed_rows
-            .into_iter()
-            .skip(message_offset)
-            .take(message_limit)
-            .map(
-                |(
+    rows.into_iter()
+        .filter(|(_, session_path, _, _, _, _, _, _, _)| session_allowed_in_search(session_path, config))
+        .map(
+            |(
+                entry_id,
+                session_path,
+                session_id,
+                session_name,
+                role,
+                source_type,
+                content,
+                timestamp_str,
+                score,
+            )| {
+                let timestamp = try_parse_timestamp(&timestamp_str).ok_or_else(|| {
+                    format!(
+                        "Invalid search hit timestamp for session {session_path} entry {entry_id}: {timestamp_str}"
+                    )
+                })?;
+                Ok(FullTextSearchHit {
                     entry_id,
                     session_path,
                     session_id,
                     session_name,
                     role,
-                    source_type,
+                    source_type: source_type.clone(),
                     content,
-                    timestamp_str,
+                    timestamp,
                     score,
-                )| {
-                    let timestamp = try_parse_timestamp(&timestamp_str).ok_or_else(|| {
-                        format!(
-                            "Invalid search hit timestamp for session {session_path} entry {entry_id}: {timestamp_str}"
-                        )
-                    })?;
-                    Ok(FullTextSearchHit {
-                        entry_id,
-                        session_path,
-                        session_id,
-                        session_name,
-                        role,
-                        source_type: source_type.clone(),
-                        content,
-                        timestamp,
-                        score,
-                        match_reason: Some(if source_type == "label" {
-                            "label".to_string()
-                        } else {
-                            "content".to_string()
-                        }),
-                    })
-                },
-            )
-            .collect::<Result<Vec<_>, String>>()?
-    };
-
-    Ok(MessageQueryResult { hits, total_hits })
+                    match_reason: Some(if source_type == "label" {
+                        "label".to_string()
+                    } else {
+                        "content".to_string()
+                    }),
+                })
+            },
+        )
+        .collect()
 }
 
-fn try_parse_timestamp(value: &str) -> Option<chrono::DateTime<chrono::Utc>> {
-    chrono::DateTime::parse_from_rfc3339(value)
+fn build_recent_priority_scopes(base_scope: &TimeScope) -> Vec<TimeScope> {
+    let now = Utc::now();
+    let epsilon = ChronoDuration::microseconds(1);
+    let seven_days_ago = now - ChronoDuration::days(7);
+    let thirty_days_ago = now - ChronoDuration::days(30);
+    let one_eighty_days_ago = now - ChronoDuration::days(180);
+
+    [
+        TimeScope {
+            from: Some(seven_days_ago),
+            to: None,
+        },
+        TimeScope {
+            from: Some(thirty_days_ago),
+            to: Some(seven_days_ago - epsilon),
+        },
+        TimeScope {
+            from: Some(one_eighty_days_ago),
+            to: Some(thirty_days_ago - epsilon),
+        },
+        TimeScope {
+            from: None,
+            to: Some(one_eighty_days_ago - epsilon),
+        },
+    ]
+    .into_iter()
+    .filter_map(|window| base_scope.intersect(&window))
+    .collect()
+}
+
+fn append_time_scope_sql<'a>(
+    where_clause: &mut String,
+    params: &mut Vec<&'a dyn ToSql>,
+    column: &str,
+    from_param: Option<&'a String>,
+    to_param: Option<&'a String>,
+) {
+    if let Some(from) = from_param {
+        *where_clause = format!("{where_clause} AND julianday({column}) >= julianday(?)");
+        params.push(from);
+    }
+
+    if let Some(to) = to_param {
+        *where_clause = format!("{where_clause} AND julianday({column}) <= julianday(?)");
+        params.push(to);
+    }
+}
+
+fn try_parse_timestamp(value: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(value)
         .ok()
-        .map(|timestamp| timestamp.with_timezone(&chrono::Utc))
+        .map(|timestamp| timestamp.with_timezone(&Utc))
+}
+
+fn parse_time_bound(value: &str) -> Result<DateTime<Utc>, String> {
+    DateTime::parse_from_rfc3339(value)
+        .map(|timestamp| timestamp.with_timezone(&Utc))
+        .map_err(|error| format!("Invalid RFC3339 timestamp '{value}': {error}"))
 }
 
 fn escape_fts_term(term: &str) -> String {
@@ -835,22 +1119,34 @@ fn parse_quoted_terms(query: &str) -> (Vec<String>, Vec<String>, bool) {
     (phrases, words, true)
 }
 
-fn build_fts_query(trimmed_query: &str, mode: Option<&str>) -> String {
-    let mode = match mode {
-        Some("all") => "all",
-        Some("phrase") => "phrase",
-        _ => "any",
-    };
+fn should_prioritize_phrase(trimmed_query: &str) -> bool {
+    let (phrases, words, has_phrases) = parse_quoted_terms(trimmed_query);
+    !has_phrases && phrases.is_empty() && words.len() > 1
+}
+
+fn build_phrase_text(
+    trimmed_query: &str,
+    phrases: &[String],
+    words: &[String],
+    has_phrases: bool,
+) -> String {
+    if has_phrases && words.is_empty() && phrases.len() == 1 {
+        return phrases[0].clone();
+    }
+
+    if !words.is_empty() {
+        return words.join(" ");
+    }
+
+    trimmed_query.trim().to_string()
+}
+
+fn build_fts_query(trimmed_query: &str, mode: MatchMode) -> String {
     let (phrases, words, has_phrases) = parse_quoted_terms(trimmed_query);
 
-    if mode == "phrase" {
-        if has_phrases && words.is_empty() && phrases.len() == 1 {
-            let escaped = escape_fts_term(&phrases[0]);
-            return format!("\"{escaped}\"");
-        }
-
-        let escaped = escape_fts_term(trimmed_query);
-        return format!("\"{escaped}\"");
+    if mode == MatchMode::Phrase {
+        let phrase_text = build_phrase_text(trimmed_query, &phrases, &words, has_phrases);
+        return format!("\"{}\"", escape_fts_term(&phrase_text));
     }
 
     if !has_phrases {
@@ -866,7 +1162,12 @@ fn build_fts_query(trimmed_query: &str, mode: Option<&str>) -> String {
             })
             .collect();
 
-        if mode == "all" {
+        if escaped_words.is_empty() {
+            let escaped = escape_fts_term(trimmed_query);
+            return format!("\"{escaped}\"");
+        }
+
+        if mode == MatchMode::All {
             return escaped_words.join(" ");
         }
 
@@ -885,10 +1186,52 @@ fn build_fts_query(trimmed_query: &str, mode: Option<&str>) -> String {
         return format!("\"{escaped}\"");
     }
 
-    if mode == "all" {
+    if mode == MatchMode::All {
         terms.join(" ")
     } else {
         terms.join(" OR ")
+    }
+}
+
+fn build_content_like_query(trimmed_query: &str, mode: MatchMode) -> ContentLikeQuery {
+    let (phrases, words, has_phrases) = parse_quoted_terms(trimmed_query);
+
+    if mode == MatchMode::Phrase {
+        let phrase_text = build_phrase_text(trimmed_query, &phrases, &words, has_phrases);
+        return ContentLikeQuery {
+            predicate: "lower(m.content) LIKE ?".to_string(),
+            patterns: vec![format!("%{}%", phrase_text.to_lowercase())],
+        };
+    }
+
+    let terms = if has_phrases {
+        phrases.into_iter().chain(words).collect::<Vec<_>>()
+    } else {
+        words
+    };
+    let normalized_terms = if terms.is_empty() {
+        vec![trimmed_query.to_string()]
+    } else {
+        terms
+    };
+    let connector = if mode == MatchMode::All {
+        " AND "
+    } else {
+        " OR "
+    };
+    let predicate = normalized_terms
+        .iter()
+        .map(|_| "lower(m.content) LIKE ?")
+        .collect::<Vec<_>>()
+        .join(connector);
+    let patterns = normalized_terms
+        .into_iter()
+        .map(|term| format!("%{}%", term.to_lowercase()))
+        .collect();
+
+    ContentLikeQuery {
+        predicate,
+        patterns,
     }
 }
 

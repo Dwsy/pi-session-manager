@@ -137,28 +137,59 @@ function parseQueryTerms(rawQuery: string): string[] {
     .filter(Boolean)
 }
 
-function matchMessageByTerms(content: string, terms: string[], matchMode: 'any' | 'all'): boolean {
+function buildPhraseText(terms: string[]): string {
+  return terms.join(' ').trim()
+}
+
+function matchMessageByTerms(
+  content: string,
+  terms: string[],
+  matchMode: 'smart' | 'any' | 'all' | 'phrase',
+): boolean {
   if (!terms.length) {
     return false
   }
 
   const lower = content.toLowerCase()
+  const phrase = buildPhraseText(terms)
+
+  if (matchMode === 'phrase') {
+    return !!phrase && lower.includes(phrase)
+  }
 
   if (matchMode === 'all') {
     return terms.every((term) => lower.includes(term))
   }
 
+  if (matchMode === 'smart' && terms.length > 1 && phrase && lower.includes(phrase)) {
+    return true
+  }
+
   return terms.some((term) => lower.includes(term))
 }
 
-function rankContent(content: string, terms: string[]): number {
+function rankContent(
+  content: string,
+  terms: string[],
+  matchMode: 'smart' | 'any' | 'all' | 'phrase',
+): number {
   const lower = content.toLowerCase()
-  return terms.reduce((score, term) => {
+  const phrase = buildPhraseText(terms)
+  const base = terms.reduce((score, term) => {
     if (!term) return score
     const pieces = lower.split(term)
     if (pieces.length <= 1) return score
     return score + (pieces.length - 1)
   }, 0)
+
+  if (matchMode === 'phrase' && phrase && lower.includes(phrase)) {
+    return base + 100_000
+  }
+  if (matchMode === 'smart' && terms.length > 1 && phrase && lower.includes(phrase)) {
+    return base + 100_000
+  }
+
+  return base
 }
 
 interface ResolvedLabel {
@@ -417,7 +448,7 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
           source_type: 'label',
           content: resolvedLabel.text,
           timestamp: resolvedLabel.labeledAt,
-          score: 10_000 + (isLabelsBrowseMode ? 0 : rankContent(resolvedLabel.text, terms)),
+          score: 10_000 + (isLabelsBrowseMode ? 0 : rankContent(resolvedLabel.text, terms, matchMode)),
           match_reason: 'label',
         }
         bestHitsByEntryId.set(
@@ -438,7 +469,7 @@ export function fullTextSearchDemoInStore(state: DemoStore, options: DemoFullTex
         if (!content) continue
         if (!matchMessageByTerms(content, terms, matchMode)) continue
 
-        const score = rankContent(content, terms) + 1
+        const score = rankContent(content, terms, matchMode) + 1
         const candidate: FullTextSearchHit = {
           session_id: session.id,
           session_path: session.path,

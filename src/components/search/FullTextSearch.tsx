@@ -81,6 +81,18 @@ const SOURCE_FILTERS: FullTextSearchSourceFilter[] = [
   "content_only",
 ];
 
+function buildRecentSearchWindows() {
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const olderTo = new Date(sevenDaysAgo.getTime() - 1);
+
+  return {
+    recentFrom: sevenDaysAgo.toISOString(),
+    recentTo: now.toISOString(),
+    olderTo: olderTo.toISOString(),
+  };
+}
+
 export default function FullTextSearch({
   isOpen,
   onClose,
@@ -100,12 +112,13 @@ export default function FullTextSearch({
   const [error, setError] = useState<string | null>(null);
   const [hitsPage, setHitsPage] = useState(0);
   const [sortMode, setSortMode] = useState<"score" | "newest" | "oldest">(
-    "score",
+    "newest",
   );
 
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const inputRef = useRef<HTMLInputElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const requestIdRef = useRef(0);
 
   const pageSize = 20;
   const parsedToken = useMemo(
@@ -229,6 +242,7 @@ export default function FullTextSearch({
       pageNum: number,
       append = false,
     ) => {
+      const requestId = ++requestIdRef.current;
       const allowsEmptyQuery = source === "labels_only" && !searchQuery.trim();
       if (!searchQuery.trim() && !allowsEmptyQuery) {
         setAllHits([]);
@@ -240,6 +254,70 @@ export default function FullTextSearch({
       setIsSearching(true);
       setError(null);
       try {
+        const applyIfCurrent = (callback: () => void) => {
+          if (requestIdRef.current !== requestId) {
+            return false;
+          }
+          callback();
+          return true;
+        };
+
+        const trimmedQuery = searchQuery.trim();
+        const shouldProgressiveAppend =
+          !append &&
+          pageNum === 0 &&
+          effectiveSortMode === "newest" &&
+          trimmedQuery.length > 0 &&
+          (source !== "all" || /\s/.test(trimmedQuery));
+
+        if (shouldProgressiveAppend) {
+          const { recentFrom, recentTo, olderTo } = buildRecentSearchWindows();
+          const recentResponse = await fullTextSearchRuntime({
+            query: searchQuery,
+            roleFilter: role as "all" | "user" | "assistant",
+            sourceFilter: source,
+            globPattern: glob || null,
+            projectPath: null,
+            page: 0,
+            pageSize,
+            matchMode: "smart",
+            sortOrder: effectiveSortMode,
+            from: recentFrom,
+            to: recentTo,
+          });
+
+          if (
+            !applyIfCurrent(() => {
+              setAllHits(recentResponse.hits);
+              setTotalHitsCount(recentResponse.total_hits);
+              setHitsPage(0);
+            })
+          ) {
+            return;
+          }
+
+          const remainingPageSlots = Math.max(0, pageSize - recentResponse.hits.length);
+          const olderResponse = await fullTextSearchRuntime({
+            query: searchQuery,
+            roleFilter: role as "all" | "user" | "assistant",
+            sourceFilter: source,
+            globPattern: glob || null,
+            projectPath: null,
+            page: 0,
+            pageSize: remainingPageSlots,
+            matchMode: "smart",
+            sortOrder: effectiveSortMode,
+            to: olderTo,
+          });
+
+          applyIfCurrent(() => {
+            setAllHits([...recentResponse.hits, ...olderResponse.hits]);
+            setTotalHitsCount(recentResponse.total_hits + olderResponse.total_hits);
+            setHitsPage(0);
+          });
+          return;
+        }
+
         const response = await fullTextSearchRuntime({
           query: searchQuery,
           roleFilter: role as "all" | "user" | "assistant",
@@ -248,20 +326,26 @@ export default function FullTextSearch({
           projectPath: null,
           page: pageNum,
           pageSize: pageSize,
-          matchMode: "any",
+          matchMode: "smart",
           sortOrder: effectiveSortMode,
         });
-        setAllHits((prev) =>
-          append ? [...prev, ...response.hits] : response.hits,
-        );
-        setTotalHitsCount(response.total_hits);
-        setHitsPage(pageNum);
+        applyIfCurrent(() => {
+          setAllHits((prev) =>
+            append ? [...prev, ...response.hits] : response.hits,
+          );
+          setTotalHitsCount(response.total_hits);
+          setHitsPage(pageNum);
+        });
       } catch (err: unknown) {
         console.error("Full text search failed:", err);
         const message = err instanceof Error ? err.message : String(err);
-        setError(message || "Search failed");
+        if (requestIdRef.current === requestId) {
+          setError(message || "Search failed");
+        }
       } finally {
-        setIsSearching(false);
+        if (requestIdRef.current === requestId) {
+          setIsSearching(false);
+        }
       }
     },
     [effectiveSortMode, pageSize],

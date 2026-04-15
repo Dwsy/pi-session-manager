@@ -439,7 +439,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
           : null,
         page: ftsOptions.page || 0,
         pageSize: ftsOptions.pageSize || MAX_HITS_TO_FETCH,
-        matchMode: "any",
+        matchMode: "smart",
         sortOrder: ftsOptions.sortMode || "newest",
       });
 
