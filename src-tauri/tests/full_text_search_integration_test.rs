@@ -137,6 +137,29 @@ fn make_session_file_with_labels(id: &str, cwd: &str, entries: &[&str]) -> Strin
         .join("\n")
 }
 
+fn make_session_file_with_explicit_timestamps(
+    id: &str,
+    cwd: &str,
+    messages: &[(&str, &str, &str)],
+) -> String {
+    let header = format!(
+        r#"{{"type":"session","version":3,"id":"{id}","timestamp":"{}","cwd":"{cwd}"}}"#,
+        messages
+            .first()
+            .map(|(_, _, timestamp)| *timestamp)
+            .unwrap_or("2026-02-10T22:00:00Z")
+    );
+    let mut lines = vec![header];
+    for (i, (role, text, timestamp)) in messages.iter().enumerate() {
+        let entry_id = format!("{id}-msg{i}");
+        let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
+        lines.push(format!(
+            r#"{{"type":"message","id":"{entry_id}","parentId":null,"timestamp":"{timestamp}","message":{{"role":"{role}","content":[{{"type":"text","text":"{escaped}"}}]}}}}"#
+        ));
+    }
+    lines.join("\n")
+}
+
 async fn full_text_search(
     query: String,
     role_filter: String,
@@ -156,6 +179,8 @@ async fn full_text_search(
         page_size,
         match_mode,
         sort_order,
+        None,
+        None,
         None,
     )
     .await
@@ -178,6 +203,38 @@ async fn full_text_search_with_source_filter(
         None,
         None,
         source_filter,
+        None,
+        None,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn full_text_search_with_scope(
+    query: String,
+    role_filter: String,
+    glob_pattern: Option<String>,
+    project_path: Option<String>,
+    page: usize,
+    page_size: usize,
+    match_mode: Option<String>,
+    sort_order: Option<String>,
+    source_filter: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
+) -> Result<FullTextSearchResponse, String> {
+    backend_full_text_search(
+        query,
+        role_filter,
+        glob_pattern,
+        project_path,
+        page,
+        page_size,
+        match_mode,
+        sort_order,
+        source_filter,
+        from,
+        to,
     )
     .await
 }
@@ -1012,6 +1069,76 @@ async fn test_full_text_search_match_modes() {
     assert!(content.contains("love rust"));
 
     println!("✅ Match modes test passed!");
+}
+
+#[tokio::test]
+async fn test_full_text_search_defaults_to_smart_phrase_priority() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+
+    let _temp_dir = setup_test_db(&[(
+        "smart-default",
+        "/workspace/smart",
+        &[("user", "foo bar"), ("user", "foo only")],
+    )]);
+
+    let response = full_text_search(
+        "foo bar".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(response.total_hits, 2);
+    assert_eq!(response.hits[0].entry_id, "smart-default-msg0");
+    assert!(response
+        .hits
+        .iter()
+        .any(|hit| hit.entry_id == "smart-default-msg1"));
+}
+
+#[tokio::test]
+async fn test_full_text_search_applies_native_time_scope() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+
+    let recent_session = make_session_file_with_explicit_timestamps(
+        "recent-scope",
+        "/workspace/scope",
+        &[("user", "alpha latest", "2026-04-10T10:00:00Z")],
+    );
+    let older_session = make_session_file_with_explicit_timestamps(
+        "older-scope",
+        "/workspace/scope",
+        &[("user", "alpha older", "2026-03-01T10:00:00Z")],
+    );
+    let _temp_dir = setup_test_db_from_raw_sessions(&[
+        ("recent-scope", &recent_session),
+        ("older-scope", &older_session),
+    ]);
+
+    let response = full_text_search_with_scope(
+        "alpha".to_string(),
+        "all".to_string(),
+        None,
+        None,
+        0,
+        10,
+        None,
+        Some("newest".to_string()),
+        None,
+        Some("2026-04-01T00:00:00Z".to_string()),
+        Some("2026-04-30T23:59:59Z".to_string()),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(response.total_hits, 1);
+    assert_eq!(response.hits[0].session_id, "recent-scope");
 }
 
 #[tokio::test]

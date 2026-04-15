@@ -137,11 +137,7 @@ fn test_backup_directory_creation() {
 #[test]
 fn test_config_file_paths() {
     // Verify config file paths are correctly defined
-    let expected_files = vec![
-        "models.json",
-        "settings.json",
-        "session-manager-config.toml",
-    ];
+    let expected_files = vec!["config.json"];
 
     for file in expected_files {
         assert!(!file.is_empty(), "File name should not be empty");
