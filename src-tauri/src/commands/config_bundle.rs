@@ -48,15 +48,7 @@ pub struct BundleMetadata {
 }
 
 /// Known config files to include in the bundle.
-const CONFIG_FILES: &[(&str, &str)] = &[
-    ("models.json", "~/.pi/agent/models.json"),
-    ("settings.json", "~/.pi/agent/settings.json"),
-    (
-        "session-manager-config.toml",
-        "~/.pi/agent/session-manager-config.toml",
-    ),
-    ("session-manager.json", "~/.pi/agent/session-manager.json"),
-];
+const CONFIG_FILES: &[(&str, &str)] = &[("config.json", "~/.pi/pi-session-manager/config.json")];
 
 /// Resolve a path that may start with ~ to the home directory.
 fn resolve_home_path(path: &str) -> PathBuf {
@@ -70,11 +62,8 @@ fn resolve_home_path(path: &str) -> PathBuf {
 
 /// Get the backup directory for config bundles.
 fn backup_dir() -> PathBuf {
-    if let Some(home) = dirs::home_dir() {
-        home.join(".pi/agent/backups/config-bundles")
-    } else {
-        PathBuf::from("/tmp/pi-config-backups")
-    }
+    crate::unified_config::backup_root_dir("config-bundles")
+        .unwrap_or_else(|_| PathBuf::from("/tmp/pi-config-backups"))
 }
 
 /// Generate a timestamp-based backup ID.
