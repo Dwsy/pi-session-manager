@@ -130,13 +130,17 @@ pnpm install
 
 ## Paths & Storage
 
+> `~/.pi/...` in docs means "the current user's home directory + .pi". On macOS/Linux/Windows the actual absolute path is resolved from the user's home directory at runtime.
+
 | Path | Description |
 |------|-------------|
 | `~/.pi/agent/sessions/` | Session directory |
-| `~/.pi/agent/sessions/sessions.db` | SQLite DB for sessions/favorites/auth only, not runtime config |
+| `~/.pi/agent/sessions/sessions.db` | SQLite DB for sessions only, not runtime config |
 | `~/.pi/pi-session-manager/config.json` | Unified external config (server/session/app/ui) |
 | `~/.pi/pi-session-manager/tags_config.json` | Tag definitions |
 | `~/.pi/pi-session-manager/session_mark.json` | Session-tag assignments |
+| `~/.pi/pi-session-manager/favorites.json` | Favorites |
+| `~/.pi/pi-session-manager/auth_tokens.json` | Auth tokens |
 | `~/.pi/pi-session-manager/history/config-versions/` | Config history snapshots (JSON files) |
 | `~/.pi/pi-session-manager/backups/` | Import/export backups |
 | `~/.pi/agent/models.json` | Pi model config |

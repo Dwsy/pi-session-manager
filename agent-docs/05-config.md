@@ -1,5 +1,7 @@
 # Config
 
+> Paths written as `~/.pi/...` are logical home-relative paths. Runtime code resolves them from the current user's home directory on macOS/Linux/Windows.
+
 ## Paths
 
 | Type | Path |
@@ -9,6 +11,8 @@
 | Unified config | `~/.pi/pi-session-manager/config.json` |
 | Tags config | `~/.pi/pi-session-manager/tags_config.json` |
 | Session marks | `~/.pi/pi-session-manager/session_mark.json` |
+| Favorites | `~/.pi/pi-session-manager/favorites.json` |
+| Auth tokens | `~/.pi/pi-session-manager/auth_tokens.json` |
 | Pi model config | `~/.pi/agent/models.json` |
 | Pi settings | `~/.pi/agent/settings.json` |
 | Config snapshots | `~/.pi/pi-session-manager/history/config-versions/*.json` |

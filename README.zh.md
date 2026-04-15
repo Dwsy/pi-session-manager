@@ -129,13 +129,17 @@ pnpm install
 
 ## 数据与配置路径
 
+> 文档中的 `~/.pi/...` 表示“当前用户家目录下的 .pi”。macOS / Linux / Windows 都在运行时按用户 home 目录展开，不是硬编码绝对路径。
+
 | 路径 | 说明 |
 |------|------|
 | `~/.pi/agent/sessions/` | 会话目录 |
-| `~/.pi/agent/sessions/sessions.db` | SQLite 数据库，仅保存会话/收藏/鉴权，不再存运行时配置 |
+| `~/.pi/agent/sessions/sessions.db` | SQLite 数据库，仅保存会话，不再存运行时配置 |
 | `~/.pi/pi-session-manager/config.json` | 统一外部配置（server/session/app/ui） |
 | `~/.pi/pi-session-manager/tags_config.json` | 标签定义 |
 | `~/.pi/pi-session-manager/session_mark.json` | 会话与标签绑定关系 |
+| `~/.pi/pi-session-manager/favorites.json` | 收藏 |
+| `~/.pi/pi-session-manager/auth_tokens.json` | 鉴权 Token |
 | `~/.pi/pi-session-manager/history/config-versions/` | 配置历史快照（JSON 文件） |
 | `~/.pi/pi-session-manager/backups/` | 导入导出备份 |
 | `~/.pi/agent/models.json` | Pi 模型配置 |
