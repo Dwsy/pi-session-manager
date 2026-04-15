@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Terminal, Globe, Star, Trash2, Tag, X, Copy } from 'lucide-react'
 import type { SessionInfo, Tag as TagType, FavoriteItem } from '@/types'
+import type { DeleteSessionAnchorPoint } from '@/components/dialogs/deleteSessionTypes'
 import TagBadge from '@/components/tags/TagBadge'
 
 interface ContextMenuItem {
@@ -26,7 +27,7 @@ interface ContextMenuProps {
   onToggleFavorite: () => void
   onCopyResume?: () => void
   onToggleTag: (tagId: string, assigned: boolean) => void
-  onDelete: () => void
+  onDelete: (anchorPoint: DeleteSessionAnchorPoint) => void
 }
 
 export default function KanbanContextMenu({
@@ -120,17 +121,28 @@ export default function KanbanContextMenu({
       label: t('common.delete'),
       icon: <Trash2 size={14} />,
       danger: true,
-      onClick: onDelete,
+      onClick: () => {},
     },
   ]
 
-  const handleItemClick = useCallback((item: ContextMenuItem, e: React.MouseEvent) => {
+  const handleItemClick = useCallback((item: ContextMenuItem, e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
+
+    if (item.id === 'delete') {
+      const rect = e.currentTarget.getBoundingClientRect()
+      onDelete({
+        x: rect.left + rect.width / 2,
+        y: rect.bottom,
+      })
+      onClose()
+      return
+    }
+
     item.onClick()
     if (item.id !== 'tags') {
       onClose()
     }
-  }, [onClose])
+  }, [onClose, onDelete])
 
   if (showTagSubmenu) {
     return (
@@ -164,10 +176,11 @@ export default function KanbanContextMenu({
                     e.stopPropagation()
                     onToggleTag(tag.id, isAssigned)
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-muted motion-color focus-ring"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] hover:bg-muted motion-color focus-ring text-foreground"
                 >
-                  <div className="flex items-center gap-1.5 flex-1">
+                  <div className="flex items-center gap-2 flex-1 overflow-hidden">
                     <TagBadge tag={tag} compact />
+                    <span className="flex-1 text-left truncate">{tag.name}</span>
                   </div>
                   {isAssigned && (
                     <svg className="h-3.5 w-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">

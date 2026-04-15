@@ -1,11 +1,73 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Loader2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo } from '@/types'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import type { DeleteSessionAnchorPoint } from './deleteSessionTypes'
+
+const POPOVER_WIDTH = 280
+const VIEWPORT_PADDING = 16
+const OFFSET = 8
+
+export function getDeletePopoverPosition({
+  anchorRect,
+  anchorPoint,
+  popoverWidth = POPOVER_WIDTH,
+  popoverHeight,
+  viewportWidth,
+  viewportHeight,
+  offset = OFFSET,
+  padding = VIEWPORT_PADDING,
+}: {
+  anchorRect?: DOMRect | null
+  anchorPoint?: DeleteSessionAnchorPoint | null
+  popoverWidth?: number
+  popoverHeight: number
+  viewportWidth: number
+  viewportHeight: number
+  offset?: number
+  padding?: number
+}): { top: number; left: number } {
+  const fallbackLeft = Math.max(padding, Math.round((viewportWidth - popoverWidth) / 2))
+  const fallbackTop = Math.max(padding, Math.round((viewportHeight - popoverHeight) / 2))
+
+  if (!anchorRect && !anchorPoint) {
+    return { top: fallbackTop, left: fallbackLeft }
+  }
+
+  const anchorLeft = anchorRect?.left ?? anchorPoint?.x ?? fallbackLeft
+  const anchorRight = anchorRect?.right ?? anchorPoint?.x ?? fallbackLeft
+  const anchorTop = anchorRect?.top ?? anchorPoint?.y ?? fallbackTop
+  const anchorBottom = anchorRect?.bottom ?? anchorPoint?.y ?? fallbackTop
+
+  let left = anchorLeft
+  const maxLeft = viewportWidth - popoverWidth - padding
+  if (left > maxLeft) {
+    left = Math.max(padding, anchorRight - popoverWidth)
+  }
+  left = Math.min(Math.max(left, padding), Math.max(padding, maxLeft))
+
+  const belowTop = anchorBottom + offset
+  const aboveTop = anchorTop - popoverHeight - offset
+  let top = belowTop
+
+  if (top + popoverHeight > viewportHeight - padding && aboveTop >= padding) {
+    top = aboveTop
+  }
+
+  const maxTop = viewportHeight - popoverHeight - padding
+  top = Math.min(Math.max(top, padding), Math.max(padding, maxTop))
+
+  return {
+    top: Math.round(top),
+    left: Math.round(left),
+  }
+}
 
 interface DeleteSessionPopoverProps {
   sessions: SessionInfo[]
-  anchorRef: React.RefObject<HTMLElement>
+  anchorRef?: React.RefObject<HTMLElement | null>
+  anchorPoint?: DeleteSessionAnchorPoint | null
   onConfirm: () => Promise<void>
   onCancel: () => void
   onConfirmStart?: () => void
@@ -14,11 +76,13 @@ interface DeleteSessionPopoverProps {
 export default function DeleteSessionPopover({
   sessions,
   anchorRef,
+  anchorPoint,
   onConfirm,
   onCancel,
   onConfirmStart,
 }: DeleteSessionPopoverProps) {
   const { t } = useTranslation()
+  const isMobile = useIsMobile()
   const [isDeleting, setIsDeleting] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const popoverRef = useRef<HTMLDivElement>(null)
@@ -30,29 +94,36 @@ export default function DeleteSessionPopover({
     }
   }, [])
 
-  // Calculate position relative to anchor
+  const updatePosition = useCallback(() => {
+    if (isMobile) {
+      return
+    }
+
+    const popoverHeight = popoverRef.current?.offsetHeight ?? (sessions.length > 1 ? 212 : 176)
+    const nextPosition = getDeletePopoverPosition({
+      anchorRect: anchorRef?.current?.getBoundingClientRect() ?? null,
+      anchorPoint,
+      popoverHeight,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    })
+    setPosition(nextPosition)
+  }, [anchorPoint, anchorRef, isMobile, sessions.length])
+
   useEffect(() => {
-    const anchor = anchorRef.current
-    if (!anchor) return
+    updatePosition()
 
-    const rect = anchor.getBoundingClientRect()
-    const popoverWidth = 280
-    const popoverHeight = sessions.length > 1 ? 180 : 120
-
-    // Position below and to the right of anchor
-    let top = rect.bottom + window.scrollY + 8
-    let left = rect.left + window.scrollX
-
-    // Ensure within viewport
-    if (left + popoverWidth > window.innerWidth + window.scrollX) {
-      left = window.innerWidth + window.scrollX - popoverWidth - 16
-    }
-    if (top + popoverHeight > window.innerHeight + window.scrollY) {
-      top = rect.top + window.scrollY - popoverHeight - 8
+    if (isMobile) {
+      return
     }
 
-    setPosition({ top, left })
-  }, [anchorRef, sessions.length])
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [isMobile, updatePosition])
 
   const handleConfirm = async () => {
     if (isDeleting) return
@@ -107,8 +178,12 @@ export default function DeleteSessionPopover({
   return (
     <div
       ref={popoverRef}
-      className="fixed z-[10000] w-[280px] rounded-lg border border-border/70 bg-background shadow-2xl"
-      style={{
+      data-delete-session-dialog="true"
+      className={[
+        'fixed z-[10000] rounded-lg border border-border/70 bg-background shadow-2xl',
+        isMobile ? 'inset-x-4 top-1/2 w-auto -translate-y-1/2' : 'w-[280px]',
+      ].join(' ')}
+      style={isMobile ? undefined : {
         top: `${position.top}px`,
         left: `${position.left}px`,
       }}

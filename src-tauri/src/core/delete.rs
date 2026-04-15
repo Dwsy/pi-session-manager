@@ -37,7 +37,14 @@ pub fn delete_session_file_and_cache(path: &str) -> Result<DeleteSessionOutcome,
     if let Err(error) = cleanup_session_cache(path, canonical_session_path.as_deref()) {
         log::warn!("Session file deleted but cache cleanup failed for {path}: {error}");
     }
-    scanner::invalidate_cache();
+
+    let mut removed_paths = vec![path.to_string()];
+    if let Some(canonical) = canonical_session_path.as_deref() {
+        if canonical != path {
+            removed_paths.push(canonical.to_string());
+        }
+    }
+    scanner::remove_cached_sessions(&removed_paths);
 
     Ok(DeleteSessionOutcome {
         method: deletion_method,
@@ -49,10 +56,12 @@ fn cleanup_session_cache(path: &str, canonical_path: Option<&str>) -> Result<(),
     let connection = crate::data::sqlite::init_db_with_config(&app_config)?;
 
     crate::data::sqlite::delete_session(&connection, path)?;
+    let _ = crate::data::sqlite::delete_scan_state(&connection, path);
 
     if let Some(canonical) = canonical_path {
         if canonical != path {
             crate::data::sqlite::delete_session(&connection, canonical)?;
+            let _ = crate::data::sqlite::delete_scan_state(&connection, canonical);
         }
     }
 
