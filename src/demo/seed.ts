@@ -15,6 +15,13 @@ export interface DemoSubagentSeed {
   agent: string
 }
 
+export interface DemoMultiToolEntry {
+  name: string
+  args: Record<string, unknown>
+  output: string
+  durationMs?: number
+}
+
 export interface DemoSessionSeed {
   id: string
   path: string
@@ -38,6 +45,8 @@ export interface DemoSessionSeed {
   includeCustomMessage?: boolean
   includeToolError?: boolean
   subagent?: DemoSubagentSeed
+  /** Multiple tool calls to inject into the first assistant message (for demo/testing aggregation) */
+  extraToolCalls?: DemoMultiToolEntry[]
 }
 
 export const TOKEN_RATES: Record<string, { input: number; output: number }> = {
@@ -563,6 +572,63 @@ export const DEMO_SESSION_SEEDS: DemoSessionSeed[] = [
       model: 'gpt-4o-mini',
       agent: 'release-checker',
     },
+    /** Extra tool calls to demonstrate TurnGroup aggregation */
+    extraToolCalls: [
+      {
+        name: 'read',
+        args: { path: 'src/demo/content.ts' },
+        output: 'Loaded 420 lines of demo content generation logic.',
+        durationMs: 320,
+      },
+      {
+        name: 'read',
+        args: { path: 'src/demo/seed.ts' },
+        output: 'Loaded seed configuration with 26 demo sessions.',
+        durationMs: 280,
+      },
+      {
+        name: 'read',
+        args: { path: 'vite.config.ts' },
+        output: 'Vite config: base "/", build.outDir "dist", plugins: [react(), vitePWA()].',
+        durationMs: 190,
+      },
+      {
+        name: 'bash',
+        args: { command: 'find src/demo -name "*.ts" | wc -l' },
+        output: '8',
+        durationMs: 85,
+      },
+      {
+        name: 'bash',
+        args: { command: 'du -sh node_modules/.vite' },
+        output: '14M\tnode_modules/.vite',
+        durationMs: 120,
+      },
+      {
+        name: 'edit',
+        args: { path: 'src/demo/content.ts', diff: 'diff --git a/src/demo/content.ts b/src/demo/content.ts\n-const BASE = "https://api.example.com"\n+const BASE = __DEMO_MODE__ ? "/mock-api" : "https://api.example.com"' },
+        output: 'Edited src/demo/content.ts: 1 insertion, 1 deletion.',
+        durationMs: 450,
+      },
+      {
+        name: 'edit',
+        args: { path: 'src/demo/store.ts', diff: 'diff --git a/src/demo/store.ts b/src/demo/store.ts\n-export function getDemoSessions() {\n+export function getDemoSessions(forceRefresh = false) {' },
+        output: 'Edited src/demo/store.ts: 1 insertion, 1 deletion.',
+        durationMs: 380,
+      },
+      {
+        name: 'bash',
+        args: { command: 'pnpm tsc --noEmit 2>&1 | tail -3' },
+        output: 'TypeScript compilation completed\n✓ 0 errors',
+        durationMs: 4200,
+      },
+      {
+        name: 'read',
+        args: { path: 'package.json' },
+        output: 'Scripts: dev, build, tauri:dev, tauri:build, test.',
+        durationMs: 150,
+      },
+    ],
   },
 ]
 

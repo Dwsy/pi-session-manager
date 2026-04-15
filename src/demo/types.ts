@@ -43,8 +43,10 @@ export interface DemoFullTextSearchOptions {
   includeThinking?: boolean
   page?: number
   pageSize?: number
-  matchMode?: 'any' | 'all'
+  matchMode?: 'smart' | 'any' | 'all' | 'phrase'
   sortOrder?: 'newest' | 'oldest' | 'score'
+  from?: string | null
+  to?: string | null
 }
 
 export interface DemoListSessionsOptions {

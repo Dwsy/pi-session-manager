@@ -1,4 +1,4 @@
-import type { FavoriteItem, SessionEntry, SessionInfo, SessionTag, Tag } from '@/types'
+import type { Content, FavoriteItem, SessionEntry, SessionInfo, SessionTag, Tag } from '@/types'
 
 import {
   DEMO_FAVORITES,
@@ -216,6 +216,54 @@ function buildMainToolResultMessage(seed: DemoSessionSeed, toolCallId: string): 
 export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
   const toolCallId = `${seed.id}-tool-main`
   const mainToolResultMessage = buildMainToolResultMessage(seed, toolCallId)
+
+  // Build extra tool call entries for multi-tool demo sessions
+  const extraToolContent: { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> }[] = []
+  const extraToolResults: SessionEntry[] = []
+  let extraToolOffset = 0
+  if (seed.extraToolCalls) {
+    for (const [i, extra] of seed.extraToolCalls.entries()) {
+      const tcId = `${seed.id}-tool-extra-${i}`
+      extraToolContent.push({
+        type: 'toolCall',
+        id: tcId,
+        name: extra.name,
+        arguments: { ...extra.args },
+      })
+      extraToolResults.push({
+        type: 'message',
+        id: `${seed.id}-tool-result-extra-${i}`,
+        parentId: `${seed.id}-assistant-1`,
+        timestamp: toIsoWithOffset(seed.created, 4 + extraToolOffset),
+        message: {
+          role: 'toolResult',
+          toolCallId: tcId,
+          content: [{ type: 'text', text: extra.output }],
+          output: extra.output,
+        } as SessionEntry['message'],
+      })
+      extraToolOffset += 1
+    }
+  }
+
+  const assistantContent: Content[] = [
+    {
+      type: 'thinking',
+      thinking: `Map the critical path in ${seed.name} first, then make focused changes instead of a broad rewrite.`,
+    },
+    {
+      type: 'text',
+      text: 'I will gather context and validate the main assumptions first, then propose a canary-safe fix path.',
+    },
+    {
+      type: 'toolCall',
+      id: toolCallId,
+      name: seed.toolName,
+      arguments: { ...seed.toolArgs },
+    },
+    ...extraToolContent,
+  ]
+
   const entries: SessionEntry[] = [
     {
       type: 'session',
@@ -255,36 +303,22 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
           cacheRead: Math.floor(seed.tokenUsage.cacheRead * 0.35),
           cacheWrite: Math.floor(seed.tokenUsage.cacheWrite * 0.35),
         },
-        content: [
-          {
-            type: 'thinking',
-            thinking: `Map the critical path in ${seed.name} first, then make focused changes instead of a broad rewrite.`,
-          },
-          {
-            type: 'text',
-            text: 'I will gather context and validate the main assumptions first, then propose a canary-safe fix path.',
-          },
-          {
-            type: 'toolCall',
-            id: toolCallId,
-            name: seed.toolName,
-            arguments: { ...seed.toolArgs },
-          },
-        ],
+        content: assistantContent,
       },
     },
     {
       type: 'message',
       id: `${seed.id}-tool-result-1`,
       parentId: `${seed.id}-assistant-1`,
-      timestamp: toIsoWithOffset(seed.created, 4),
+      timestamp: toIsoWithOffset(seed.created, 4 + extraToolOffset),
       message: mainToolResultMessage,
     },
+    ...extraToolResults,
     {
       type: 'message',
       id: `${seed.id}-assistant-2`,
       parentId: `${seed.id}-tool-result-1`,
-      timestamp: toIsoWithOffset(seed.created, 6),
+      timestamp: toIsoWithOffset(seed.created, 6 + extraToolOffset),
       message: {
         role: 'assistant',
         provider: seed.provider,
