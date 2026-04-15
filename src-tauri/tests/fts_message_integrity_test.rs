@@ -644,7 +644,6 @@ fn test_fts_escaping_and_snippet_tags() {
             "",
             "",
             "",
-            "",
             Utc::now().to_rfc3339(),
             0i64,
             rusqlite::types::Null,
@@ -740,7 +739,7 @@ fn test_database_recovery_from_message_fts_corruption() {
             .expect("initial init should succeed");
         // Insert test session and message
         conn.execute(
-            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at, access_count, last_accessed) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at, access_count, last_accessed) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
             params![
                 "sess1",
                 &session_path,
@@ -787,7 +786,7 @@ fn test_database_recovery_from_message_fts_corruption() {
 
     // After full DB recovery, the previous data is gone; we need to repopulate
     conn2.execute(
-        "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at, access_count, last_accessed) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+        "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at, access_count, last_accessed) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
         params![
             "sess1",
             &session_path,
@@ -978,12 +977,12 @@ fn test_backfill_removes_stale_missing_session() {
 
     let stale_path = "/tmp/does-not-exist-session.jsonl";
     conn.execute(
-        "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at, access_count, last_accessed) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+        "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at, access_count, last_accessed) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
         params![
             "stale1",
             stale_path,
             "/cwd",
-                rusqlite::types::Null,
+            rusqlite::types::Null,
             "2025-01-01T00:00:00Z",
             "2025-01-01T00:00:00Z",
             "2025-01-01T00:00:00Z",
@@ -993,12 +992,9 @@ fn test_backfill_removes_stale_missing_session() {
             "missing file",
             "",
             "missing file",
-            "user",
             Utc::now().to_rfc3339(),
             0i64,
             rusqlite::types::Null,
-                0i64,
-                rusqlite::types::Null,
         ],
     )
     .unwrap();
