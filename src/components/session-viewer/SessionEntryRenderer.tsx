@@ -23,6 +23,8 @@ export interface SessionEntryRendererProps {
   searchQuery?: string;
   isStreaming?: boolean;
   previewMode?: boolean;
+  /** Previous assistant entries (tools only, no text) to fold into this entry */
+  foldEntries?: SessionEntry[];
 }
 
 export function renderSessionEntry(
@@ -31,6 +33,7 @@ export function renderSessionEntry(
   searchQuery = "",
   isStreaming = false,
   previewMode = false,
+  foldEntries?: SessionEntry[],
 ): JSX.Element | null {
   switch (entry.type) {
     case "message": {
@@ -60,6 +63,7 @@ export function renderSessionEntry(
             searchQuery={searchQuery}
             isStreaming={isStreaming}
             previewMode={previewMode}
+            foldEntries={foldEntries}
           />
         );
       }
@@ -144,14 +148,16 @@ export const SessionEntryRenderer = memo(
     searchQuery = "",
     isStreaming = false,
     previewMode = false,
+    foldEntries,
   }: SessionEntryRendererProps): JSX.Element | null {
-    return renderSessionEntry(entry, toolResultByCallId, searchQuery, isStreaming, previewMode);
+    return renderSessionEntry(entry, toolResultByCallId, searchQuery, isStreaming, previewMode, foldEntries);
   },
   (prev, next) =>
     prev.entry === next.entry &&
     prev.toolResultByCallId === next.toolResultByCallId &&
     prev.searchQuery === next.searchQuery &&
-    prev.previewMode === next.previewMode,
+    prev.previewMode === next.previewMode &&
+    prev.foldEntries === next.foldEntries,
 );
 
 export default SessionEntryRenderer;

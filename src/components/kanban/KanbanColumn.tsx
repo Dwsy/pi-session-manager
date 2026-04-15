@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import type { SessionInfo, Tag, FavoriteItem } from '@/types'
 import KanbanCard from './KanbanCard'
 import KanbanContextMenu from './KanbanContextMenu'
-import DeleteSessionPopover from '@/components/dialogs/DeleteSessionPopover'
+import type { DeleteSessionRequestOptions } from '@/components/dialogs/deleteSessionTypes'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
 import { invoke, isTauri } from '@/transport'
 import { useClipboard } from '@/hooks/useClipboard'
@@ -26,7 +26,10 @@ interface KanbanColumnProps {
   favorites: FavoriteItem[]
   onToggleFavorite: (item: Omit<FavoriteItem, 'addedAt'>) => void
   onToggleTag: (sessionId: string, tagId: string, assigned: boolean) => void
-  onDeleteSession?: (session: SessionInfo) => void
+  onDeleteSession?: (
+    session: SessionInfo,
+    options?: DeleteSessionRequestOptions,
+  ) => void
   onResumeSession?: (session: SessionInfo) => void | Promise<void>
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>
   terminal?: string
@@ -72,11 +75,6 @@ export default function KanbanColumn({
     session: SessionInfo
     position: { x: number; y: number }
   } | null>(null)
-  const [pendingDeleteSession, setPendingDeleteSession] = useState<{
-    sessions: SessionInfo[]
-    anchorRef: React.RefObject<HTMLElement>
-  } | null>(null)
-  const deleteButtonRef = useRef<HTMLButtonElement>(null)
 
   const handleContextMenu = (session: SessionInfo, e: React.MouseEvent) => {
     e.preventDefault()
@@ -283,27 +281,13 @@ export default function KanbanColumn({
                 }
               : undefined
           }
-          onDelete={() => {
-            setPendingDeleteSession({
-              sessions: [contextMenu.session],
-              anchorRef: deleteButtonRef,
-            })
+          onDelete={(anchorPoint) => {
+            onDeleteSession?.(contextMenu.session, { anchorPoint })
             setContextMenu(null)
           }}
         />
       )}
 
-      {pendingDeleteSession && (
-        <DeleteSessionPopover
-          sessions={pendingDeleteSession.sessions}
-          anchorRef={pendingDeleteSession.anchorRef}
-          onConfirm={async () => {
-            await onDeleteSession?.(pendingDeleteSession.sessions[0])
-            setPendingDeleteSession(null)
-          }}
-          onCancel={() => setPendingDeleteSession(null)}
-        />
-      )}
     </div>
   )
 }

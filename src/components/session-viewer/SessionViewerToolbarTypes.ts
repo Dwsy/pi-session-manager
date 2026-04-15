@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import type { LiveSessionInfo } from "@/hooks/usePiLiveSessions";
 
+export interface SessionViewerToolbarSlots {
+  /** Custom content rendered on the left side of the toolbar, after the title */
+  left?: ReactNode;
+  /** Custom content rendered on the right side of the toolbar, before action buttons */
+  right?: ReactNode;
+}
+
 export interface SessionViewerToolbarProps {
   isMobile: boolean;
   title: string;
@@ -13,6 +20,8 @@ export interface SessionViewerToolbarProps {
   isScrollMarkersFeatureEnabled: boolean;
   isSearchOpen: boolean;
   previewMode?: boolean;
+  /** Slots for custom content injection */
+  slots?: SessionViewerToolbarSlots;
   onBack?: () => void;
   onToggleSidebar: () => void;
   onToggleThinking: () => void;

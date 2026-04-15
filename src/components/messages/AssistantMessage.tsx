@@ -8,6 +8,10 @@ import { getAssistantDisplayedBlocks } from "@/utils/assistantContent";
 import { Copy, Check } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { useClipboard } from "@/hooks/useClipboard";
+import {
+  buildAssistantProcessSteps,
+  splitAssistantContent,
+} from "./assistantProcess";
 
 interface AssistantMessageProps {
   content: Content[];
@@ -17,6 +21,8 @@ interface AssistantMessageProps {
   searchQuery?: string;
   isStreaming?: boolean;
   previewMode?: boolean;
+  /** Previous assistant entries (tools only, no text) to fold into this message */
+  foldEntries?: SessionEntry[];
 }
 
 function AssistantMessage({
@@ -27,19 +33,25 @@ function AssistantMessage({
   searchQuery = "",
   isStreaming = false,
   previewMode = false,
+  foldEntries,
 }: AssistantMessageProps) {
   const { showThinking } = useSessionView();
   const [copied, setCopied] = useState(false);
   const { copyText } = useClipboard();
 
-  const { thinkingBlocks, textBlocks } = useMemo(
-    () => getAssistantDisplayedBlocks(content),
+  const { visibleContent } = useMemo(
+    () => splitAssistantContent(content),
     [content],
   );
 
-  const toolCalls = useMemo(
-    () => content.filter((item) => item.type === "toolCall"),
-    [content],
+  const { thinkingBlocks, textBlocks } = useMemo(
+    () => getAssistantDisplayedBlocks(visibleContent),
+    [visibleContent],
+  );
+
+  const processSteps = useMemo(
+    () => buildAssistantProcessSteps(entryId, content, foldEntries),
+    [content, entryId, foldEntries],
   );
 
   const allText = useMemo(() => textBlocks.join("\n"), [textBlocks]);
@@ -81,28 +93,17 @@ function AssistantMessage({
         <div className="flex justify-end mt-2">
           <button
             onClick={handleCopy}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                handleCopy();
-              }
-            }}
             className="tool-copy-button"
             aria-label={copied ? "Copied" : "Copy text"}
-            title={copied ? "Copied!" : "Copy text"}
           >
-            {copied ? (
-              <Check className="w-4 h-4" />
-            ) : (
-              <Copy className="w-4 h-4" />
-            )}
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
           </button>
         </div>
       )}
 
-      {toolCalls.length > 0 && (
+      {processSteps.length > 0 && (
         <ToolCallList
-          toolCalls={toolCalls}
+          processSteps={processSteps}
           toolResultByCallId={toolResultByCallId}
           searchQuery={searchQuery}
         />

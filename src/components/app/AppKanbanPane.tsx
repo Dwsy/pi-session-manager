@@ -24,6 +24,7 @@ type AppKanbanPaneBaseProps = Pick<
   | "onConvertSession"
   | "onResumeSession"
   | "onCopyResumeSession"
+  | "onNewSession"
   | "favorites"
   | "onToggleFavorite"
   | "terminal"
@@ -59,6 +60,7 @@ function AppKanbanPane({
   onConvertSession,
   onResumeSession,
   onCopyResumeSession,
+  onNewSession,
   favorites,
   onToggleFavorite,
   terminal,
@@ -87,6 +89,7 @@ function AppKanbanPane({
         onConvertSession={onConvertSession}
         onResumeSession={onResumeSession}
         onCopyResumeSession={onCopyResumeSession}
+        onNewSession={onNewSession}
         favorites={favorites}
         onToggleFavorite={onToggleFavorite}
         terminal={terminal}

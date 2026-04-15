@@ -57,6 +57,7 @@ import AppMobileFilterBar from "./components/app/AppMobileFilterBar";
 import AppSettingsPane from "./components/app/AppSettingsPane";
 import AppTerminalPane from "./components/app/AppTerminalPane";
 import DeleteSessionPopover from "./components/dialogs/DeleteSessionPopover";
+import type { DeleteSessionRequestOptions } from "./components/dialogs/deleteSessionTypes";
 import {
   DEFAULT_SESSION_SORT_BY,
   DEFAULT_SESSION_SORT_ORDER,
@@ -144,11 +145,12 @@ function App() {
     sessions,
     selectedSession?.id ?? null,
   );
-  const deleteButtonRef = useRef<HTMLButtonElement>(null);
-
   const handleDeleteSessionsWithRef = useCallback(
-    async (sessions: import("./types").SessionInfo[]) => {
-      await handleDeleteSessions(sessions, deleteButtonRef);
+    async (
+      sessions: import("./types").SessionInfo[],
+      options?: DeleteSessionRequestOptions,
+    ) => {
+      await handleDeleteSessions(sessions, undefined, options);
     },
     [handleDeleteSessions],
   );
@@ -395,6 +397,32 @@ function App() {
       await handleCopyResumeCommandWithTarget(session, configuredTarget);
     },
     [handleCopyResumeCommandWithTarget],
+  );
+
+  const handleNewSession = useCallback(
+    async (cwd: string) => {
+      if (!isTauri()) {
+        setTerminalPendingCommand(cwd ? `cd "${cwd}" && pi` : "pi");
+        setShowTerminal(true);
+        return;
+      }
+      // Build new session command: cd to folder, then pi (no --session)
+      const piCommand = piPath || "pi";
+      const command = cwd ? `cd "${cwd}" && ${piCommand}` : piCommand;
+      try {
+        await invoke("open_session_in_terminal", {
+          path: "",
+          cwd: cwd || "",
+          terminal: terminal === "custom" ? customCommand : terminal,
+          piPath: piPath || null,
+          resumeCommand: command,
+        });
+      } catch (err) {
+        console.error("Failed to open new session in terminal:", err);
+        throw err;
+      }
+    },
+    [terminal, customCommand, piPath],
   );
 
   const handleResumeSession = useCallback(async () => {
@@ -756,6 +784,7 @@ function App() {
       onConvertSession={handleStartConvertSession}
       onResumeSession={requestResumeSession}
       onCopyResumeSession={requestCopyResumeCommand}
+      onNewSession={handleNewSession}
       favorites={favorites}
       onToggleFavorite={toggleFavorite}
       terminal={terminal}
@@ -1053,7 +1082,8 @@ function App() {
         {pendingDeleteSession && (
           <DeleteSessionPopover
             sessions={pendingDeleteSession.sessions}
-            anchorRef={pendingDeleteSession.anchorRef || deleteButtonRef}
+            anchorRef={pendingDeleteSession.anchorRef}
+            anchorPoint={pendingDeleteSession.anchorPoint}
             onConfirm={confirmDeleteSession}
             onCancel={cancelDeleteSession}
           />

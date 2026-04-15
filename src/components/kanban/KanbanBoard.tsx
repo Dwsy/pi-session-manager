@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { Plus } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -31,10 +32,14 @@ interface KanbanBoardProps {
   onMoveSession: (sessionId: string, fromTagId: string | null, toTagId: string, position: number) => void
   getTagsForSession: (sessionId: string) => Tag[]
   onToggleTag: (sessionId: string, tagId: string, assigned: boolean) => void
-  onDeleteSession?: (session: SessionInfo) => void
+  onDeleteSession?: (
+    session: SessionInfo,
+    options?: import('@/components/dialogs/deleteSessionTypes').DeleteSessionRequestOptions,
+  ) => void
   onConvertSession?: (session: SessionInfo) => void
   onResumeSession?: (session: SessionInfo) => void | Promise<void>
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>
+  onNewSession?: (cwd: string) => void | Promise<void> // New session in terminal
   favorites?: FavoriteItem[]
   onToggleFavorite?: (item: Omit<FavoriteItem, 'addedAt'>) => void
   terminal?: TerminalType
@@ -71,6 +76,7 @@ export default function KanbanBoard({
   onConvertSession,
   onResumeSession,
   onCopyResumeSession,
+  onNewSession,
   favorites,
   onToggleFavorite,
   terminal,
@@ -100,8 +106,11 @@ export default function KanbanBoard({
       projectFilter,
       searchQuery,
       sourceFilterSlugs,
+      filterTagIds,
+      sessionTags,
+      getDescendantIds,
     })
-  }, [sessions, projectFilter, searchQuery, sourceFilterSlugs])
+  }, [sessions, projectFilter, searchQuery, sourceFilterSlugs, filterTagIds, sessionTags, getDescendantIds])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -154,7 +163,7 @@ export default function KanbanBoard({
     }
 
     return cols
-  }, [sortedTags, filteredSessions, sessionTags, sessionMap])
+  }, [sortedTags, filteredSessions, sessionTags, sessionMap, filterTagIds])
 
   // Get active session for drag overlay
   const activeSession = activeId ? sessionMap.get(activeId) : null
@@ -294,6 +303,16 @@ export default function KanbanBoard({
         <span className="text-[10px] text-muted-foreground shrink-0">
           {filteredSessions.length} {t('project.list.sessions')}
         </span>
+        {onNewSession && (
+          <button
+            onClick={() => onNewSession(projectFilter || '')}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-accent/10 text-accent hover:bg-accent/20 text-[11px] shrink-0 motion-color motion-press focus-ring"
+            title={t('kanban.newSession', 'New Session')}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>{t('kanban.newSession', 'New')}</span>
+          </button>
+        )}
       </div>
 
       {/* Board */}

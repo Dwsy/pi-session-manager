@@ -31,6 +31,7 @@ import { usePiLiveSessions } from "@/hooks/usePiLiveSessions";
 import { getPlatformDefaults } from "./settings/types";
 import type { SessionInfo } from "@/types";
 import type { TerminalType } from "./settings/types";
+import type { SessionViewerToolbarSlots } from "./session-viewer/SessionViewerToolbarTypes";
 
 interface SessionViewerProps {
   session: SessionInfo;
@@ -47,6 +48,8 @@ interface SessionViewerProps {
   resumeCommand?: string;
   initialEntryId?: string;
   previewMode?: boolean;
+  /** Slots for custom content injection into the toolbar */
+  slots?: SessionViewerToolbarSlots;
 }
 
 const SIDEBAR_MIN_WIDTH = 200;
@@ -69,6 +72,7 @@ function SessionViewerContent({
   resumeCommand,
   initialEntryId,
   previewMode = false,
+  slots,
 }: SessionViewerProps) {
   const { t } = useTranslation();
   const {
@@ -303,6 +307,7 @@ function SessionViewerContent({
           isScrollMarkersFeatureEnabled={previewMode ? false : scrollMarkersEnabled}
           isSearchOpen={isSearchOpen}
           previewMode={previewMode}
+          slots={slots}
           onBack={onBack}
           onToggleSidebar={handleToggleSidebar}
           onToggleThinking={toggleThinking}
