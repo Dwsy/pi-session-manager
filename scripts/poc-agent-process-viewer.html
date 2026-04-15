@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Process Folding POC</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0b1020;
+      --panel: #121a2b;
+      --panel-2: #172036;
+      --text: #e6edf7;
+      --muted: #8fa1bf;
+      --border: rgba(148, 163, 184, 0.22);
+      --accent: #67b3ff;
+      --user: #1f3b64;
+      --answer: #1a2b1f;
+      --thinking: #241d38;
+      --tool: #1d2638;
+      --tool-result: #142533;
+      --error: #5b1f29;
+      --shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: linear-gradient(180deg, #0a0f1d, #0d1323); color: var(--text); }
+    .shell { width: min(1280px, 100vw); margin: 0 auto; padding: 24px 20px 56px; }
+    .header { margin-bottom: 20px; }
+    .title { font-size: 24px; font-weight: 700; margin: 0 0 8px; }
+    .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 10px 14px; }
+    .legend { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.03); color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .turns { display: flex; flex-direction: column; gap: 18px; }
+    .turn { border: 1px solid var(--border); border-radius: 16px; background: rgba(255,255,255,.02); box-shadow: var(--shadow); overflow: hidden; }
+    .block { padding: 16px 18px; border-top: 1px solid var(--border); }
+    .block:first-child { border-top: 0; }
+    .block.user { background: color-mix(in srgb, var(--user) 65%, transparent); }
+    .block.answer { background: color-mix(in srgb, var(--answer) 65%, transparent); }
+    .label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+    .content { white-space: pre-wrap; line-height: 1.6; word-break: break-word; }
+    .process-toggle { width: 100%; background: color-mix(in srgb, var(--panel-2) 82%, transparent); border: 0; color: var(--text); cursor: pointer; text-align: left; padding: 14px 18px; display: flex; align-items: center; gap: 12px; }
+    .process-toggle:hover { background: color-mix(in srgb, var(--panel-2) 94%, transparent); }
+    .caret { width: 12px; display: inline-block; color: var(--accent); }
+    .summary { font-weight: 600; }
+    .summary-meta { color: var(--muted); font-size: 13px; }
+    .process-body { padding: 12px 14px 16px; background: rgba(255,255,255,.02); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+    .event { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+    .event.thinking { background: color-mix(in srgb, var(--thinking) 78%, transparent); }
+    .event.toolCall { background: color-mix(in srgb, var(--tool) 78%, transparent); }
+    .event.toolResult { background: color-mix(in srgb, var(--tool-result) 78%, transparent); }
+    .event.error { background: color-mix(in srgb, var(--error) 78%, transparent); }
+    .event-head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+    .pill { border-radius: 999px; padding: 2px 8px; font-size: 12px; background: rgba(255,255,255,.08); color: var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <h1 class="title">Agent Process Folding POC</h1>
+      <div id="meta" class="meta"></div>
+      <div class="legend">
+        渲染规则：每个 <strong>User</strong> 后面跟一个可折叠的 <strong>Agent Process</strong>，内部严格按 JSONL parent chain 原顺序显示 thinking / toolCall / toolResult；最终 <strong>Assistant Answer</strong> 永远在折叠块外。
+      </div>
+    </div>
+    <div id="turns" class="turns"></div>
+  </div>
+
+  <template id="turn-template">
+    <section class="turn"></section>
+  </template>
+
+  <script>
+    const escapeHtml = (value = '') => value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+
+    const renderText = (value = '') => `<div class="content">${escapeHtml(value)}</div>`;
+
+    const eventBody = (event) => {
+      if (event.type === 'thinking') return `<pre>${escapeHtml(event.text || '')}</pre>`;
+      if (event.type === 'toolCall') return `<pre>${escapeHtml(event.preview || '')}</pre>`;
+      if (event.type === 'toolResult') return `<pre>${escapeHtml(event.text || '')}</pre>`;
+      return '';
+    };
+
+    const eventClass = (event) => {
+      if (event.type === 'toolResult' && event.isError) return 'event toolResult error';
+      return `event ${event.type}`;
+    };
+
+    const eventHead = (event) => {
+      if (event.type === 'thinking') {
+        return `<div class="event-head"><span class="pill">Thinking</span><span class="pill mono">${escapeHtml(event.entryId)}</span></div>`;
+      }
+      if (event.type === 'toolCall') {
+        return `<div class="event-head"><span class="pill">Tool</span><span class="pill">${escapeHtml(event.name || 'unknown')}</span><span class="pill mono">${escapeHtml(event.entryId)}</span></div>`;
+      }
+      return `<div class="event-head"><span class="pill">Tool Result</span><span class="pill">${escapeHtml(event.toolName || 'unknown')}</span><span class="pill mono">${escapeHtml(event.entryId)}</span></div>`;
+    };
+
+    async function main() {
+      const response = await fetch('/api/session');
+      const data = await response.json();
+
+      document.getElementById('meta').innerHTML = [
+        `<span>path: <span class="mono">${escapeHtml(data.path)}</span></span>`,
+        `<span>turns: ${data.turns.length}</span>`,
+        `<span>chain entries: ${data.chainLength}</span>`,
+      ].join('');
+
+      const root = document.getElementById('turns');
+      for (const turn of data.turns) {
+        const section = document.getElementById('turn-template').content.firstElementChild.cloneNode(true);
+
+        section.insertAdjacentHTML('beforeend', `
+          <div class="block user">
+            <div class="label">User</div>
+            ${renderText(turn.userText || '')}
+          </div>
+        `);
+
+        if (turn.process.events.length) {
+          const expanded = turn.index === data.focusTurnIndex;
+          const processId = `process-${turn.index}`;
+          section.insertAdjacentHTML('beforeend', `
+            <button class="process-toggle" data-target="${processId}" aria-expanded="${expanded}">
+              <span class="caret">${expanded ? '▾' : '▸'}</span>
+              <span class="summary">${escapeHtml(turn.process.summary || 'agent process')}</span>
+              <span class="summary-meta">${turn.process.events.length} events</span>
+            </button>
+            <div id="${processId}" class="process-body ${expanded ? '' : 'hidden'}">
+              ${turn.process.events.map((event) => `
+                <div class="${eventClass(event)}">
+                  ${eventHead(event)}
+                  ${eventBody(event)}
+                </div>
+              `).join('')}
+            </div>
+          `);
+        }
+
+        section.insertAdjacentHTML('beforeend', `
+          <div class="block answer">
+            <div class="label">Assistant Answer</div>
+            ${renderText(turn.answerText || '')}
+          </div>
+        `);
+
+        root.appendChild(section);
+      }
+
+      root.addEventListener('click', (event) => {
+        const button = event.target.closest('.process-toggle');
+        if (!button) return;
+        const target = document.getElementById(button.dataset.target);
+        if (!target) return;
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        button.querySelector('.caret').textContent = expanded ? '▸' : '▾';
+        target.classList.toggle('hidden', expanded);
+      });
+    }
+
+    main().catch((error) => {
+      document.getElementById('turns').innerHTML = `<pre>${escapeHtml(String(error?.stack || error))}</pre>`;
+    });
+  </script>
+</body>
+</html>

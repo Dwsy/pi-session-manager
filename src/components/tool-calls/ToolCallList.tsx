@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef, useState } from 'react'
+import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, Clock } from 'lucide-react'
 
@@ -14,10 +14,12 @@ import ThinkingBlock from '@/components/messages/ThinkingBlock'
 import type { AssistantProcessStep } from '@/components/messages/assistantProcess'
 
 import {
+  captureViewportAnchor,
   flattenProcessToolCalls,
   formatToolCallDuration,
-  preserveViewportAnchor,
+  restoreViewportAnchor,
   summarizeToolCalls,
+  type ViewportAnchorSnapshot,
 } from './toolCallFolding'
 
 interface ToolCallListProps {
@@ -45,6 +47,7 @@ function ToolCallList({
 
   const [expanded, setExpanded] = useState(false)
   const headerRef = useRef<HTMLButtonElement>(null)
+  const pendingAnchorRef = useRef<ViewportAnchorSnapshot | null>(null)
 
   const processToolCalls = useMemo(
     () => flattenProcessToolCalls(processSteps),
@@ -56,7 +59,16 @@ function ToolCallList({
     [processToolCalls, toolResultByCallId],
   )
 
-  const hasProcessContent = processSteps.some((step) => step.content.length > 0)
+  const hasProcessContent = processSteps.some((step) =>
+    step.kind === 'loop' ? Boolean(step.text?.trim()) : step.content.length > 0,
+  )
+
+  useLayoutEffect(() => {
+    if (!pendingAnchorRef.current) return
+    restoreViewportAnchor(headerRef.current, pendingAnchorRef.current)
+    pendingAnchorRef.current = null
+  }, [expanded])
+
   if (!hasProcessContent) return null
 
   const renderToolCall = (toolCall: Content, index: number, key: string) => {
@@ -103,7 +115,10 @@ function ToolCallList({
         ref={headerRef}
         className="assistant-fold-header"
         type="button"
-        onClick={() => preserveViewportAnchor(headerRef.current, () => setExpanded((value) => !value))}
+        onClick={() => {
+          pendingAnchorRef.current = captureViewportAnchor(headerRef.current)
+          setExpanded((value) => !value)
+        }}
       >
         <span className="assistant-fold-toggle">
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -120,9 +135,21 @@ function ToolCallList({
       {expanded && (
         <div className="assistant-fold-body">
           {processSteps.map((step, stepIndex) => {
+            if (step.kind === 'loop') {
+              return (
+                <div key={`process-loop-${step.entryId}`} className="hook-message">
+                  <div className="hook-type">[{step.customType}]</div>
+                  <div className="markdown-content">{step.text}</div>
+                </div>
+              )
+            }
+
             let toolIndexOffset = processSteps
               .slice(0, stepIndex)
-              .reduce((sum, item) => sum + item.content.filter((block) => block.type === 'toolCall').length, 0)
+              .reduce((sum, item) => {
+                if (item.kind === 'loop') return sum
+                return sum + item.content.filter((block) => block.type === 'toolCall').length
+              }, 0)
 
             return step.content.map((item, contentIndex) => {
               if (item.type === 'thinking') {

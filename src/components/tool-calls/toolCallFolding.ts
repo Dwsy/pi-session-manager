@@ -39,8 +39,10 @@ export function flattenProcessToolCalls(steps: AssistantProcessStep[]): ProcessT
   let offset = 0
 
   for (const step of steps) {
-    const stepToolCalls = step.content.filter((item) => item.type === 'toolCall')
-    stepToolCalls.forEach((toolCall, idx) => {
+    if (step.kind !== 'assistant') continue
+
+    const stepToolCalls = step.content.filter((item: Content) => item.type === 'toolCall')
+    stepToolCalls.forEach((toolCall: Content, idx: number) => {
       merged.push({
         toolCall,
         index: idx + offset,
@@ -88,6 +90,11 @@ export function summarizeToolCalls(
   }
 }
 
+export interface ViewportAnchorSnapshot {
+  scrollContainer: HTMLElement | null
+  top: number
+}
+
 function findScrollContainer(element: HTMLElement): HTMLElement | null {
   const sessionViewer = element.closest('.session-viewer')
   if (sessionViewer instanceof HTMLElement) return sessionViewer
@@ -104,34 +111,23 @@ function findScrollContainer(element: HTMLElement): HTMLElement | null {
   return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : null
 }
 
-export function preserveViewportAnchor(
+export function captureViewportAnchor(anchorElement: HTMLElement | null): ViewportAnchorSnapshot | null {
+  if (!anchorElement) return null
+  return {
+    scrollContainer: findScrollContainer(anchorElement),
+    top: anchorElement.getBoundingClientRect().top,
+  }
+}
+
+export function restoreViewportAnchor(
   anchorElement: HTMLElement | null,
-  mutate: () => void,
+  snapshot: ViewportAnchorSnapshot | null,
 ): void {
-  if (!anchorElement) {
-    mutate()
-    return
+  if (!anchorElement || !snapshot?.scrollContainer) return
+
+  const afterTop = anchorElement.getBoundingClientRect().top
+  const delta = afterTop - snapshot.top
+  if (Math.abs(delta) > 0.5) {
+    snapshot.scrollContainer.scrollTop += delta
   }
-
-  const scrollContainer = findScrollContainer(anchorElement)
-  const beforeTop = anchorElement.getBoundingClientRect().top
-
-  mutate()
-
-  let runs = 0
-  const adjust = () => {
-    runs += 1
-    const afterTop = anchorElement.getBoundingClientRect().top
-    const delta = afterTop - beforeTop
-
-    if (scrollContainer && Math.abs(delta) > 0.5) {
-      scrollContainer.scrollTop += delta
-    }
-
-    if (runs < 3) {
-      requestAnimationFrame(adjust)
-    }
-  }
-
-  requestAnimationFrame(adjust)
 }

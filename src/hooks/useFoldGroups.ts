@@ -1,6 +1,10 @@
 import { useMemo } from 'react'
 import type { SessionEntry } from '@/types'
-import { hasVisibleAssistantText, isAssistantProcessOnlyEntry } from '@/components/messages/assistantProcess'
+import {
+  hasVisibleAssistantText,
+  isAssistantProcessOnlyEntry,
+  isLoopProcessEntry,
+} from '@/components/messages/assistantProcess'
 
 export interface FoldGroup {
   /** Entry ID of the fold group leader (the last entry in the group, which has text or is standalone) */
@@ -41,12 +45,13 @@ export function useFoldGroups(renderableEntries: SessionEntry[]): FoldGroupInfo 
     for (let i = 0; i < renderableEntries.length; i++) {
       const entry = renderableEntries[i]
       const isAssistant = entry.type === 'message' && entry.message?.role === 'assistant'
+      const isLoop = isLoopProcessEntry(entry)
 
-      if (isAssistant) {
-        if (isAssistantProcessOnlyEntry(entry)) {
+      if (isAssistant || isLoop) {
+        if (isLoop || isAssistantProcessOnlyEntry(entry)) {
           foldBuffer.push(entry)
         } else {
-          const visibleText = hasVisibleAssistantText(entry.message?.content || [])
+          const visibleText = isAssistant && hasVisibleAssistantText(entry.message?.content || [])
           if (foldBuffer.length > 0 && visibleText) {
             groups.set(entry.id, {
               leaderId: entry.id,

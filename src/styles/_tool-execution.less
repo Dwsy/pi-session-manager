@@ -260,6 +260,14 @@
   opacity: 1;
 }
 
+// Nested tool expand/collapse inside virtualized session rows cannot animate height
+// sanely; ResizeObserver + max-height transition causes repeated remeasure/jump.
+.session-viewer .tool-expand-content,
+.session-viewer .tool-output-wrapper,
+.session-viewer .tool-diff-wrapper {
+  transition: none;
+}
+
 .tool-expand-content .tool-output,
 .tool-expand-content .tool-diff,
 .tool-expand-content .tool-arguments {
