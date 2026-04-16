@@ -345,6 +345,29 @@
   word-break: break-word;
 }
 
+.tool-output-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin: 4px 12px 8px 12px;
+  background: rgba(var(--accent-rgb), 0.05);
+  border: 1px solid rgba(var(--accent-rgb), 0.1);
+  border-radius: 4px;
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
+  color: rgb(var(--color-muted-foreground));
+  font-style: normal;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tool-empty-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
 .tool-output .code-block-wrapper {
   margin: 0;
 }
