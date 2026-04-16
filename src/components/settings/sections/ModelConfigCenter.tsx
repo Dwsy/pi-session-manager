@@ -30,8 +30,9 @@ import { useModelConfig } from "./model-config/useModelConfig";
 import { modelSelectionValue, splitInputTypes, formatBytes } from "./model-config/utils";
 import { StatTile } from "./model-config/ui/StatTile";
 import { StatusBanner } from "./model-config/ui/StatusBanner";
-import { ModalShell } from "./model-config/ui/ModalShell";
 import { ConfirmDialog } from "./model-config/ui/ConfirmDialog";
+import { AddProviderModal } from "./model-config/modals/AddProviderModal";
+import { ImportModal } from "./model-config/modals/ImportModal";
 
 export default function ModelConfigCenter() {
   const vm = useModelConfig();
@@ -1547,173 +1548,25 @@ export default function ModelConfigCenter() {
         )}
       </div>
 
-      {showAddProviderModal && (
-        <ModalShell
-          title={t(
-            "settings.modelConfigCenter.dialogs.addProviderTitle",
-            "Add Provider",
-          )}
-          description={t(
-            "settings.modelConfigCenter.dialogs.addProviderDesc",
-            "Give Provider a stable name first, then continue to fill in connection info on the right after creation.",
-          )}
-          onClose={() => setShowAddProviderModal(false)}
-          footer={
-            <>
-              <button
-                type="button"
-                onClick={() => setShowAddProviderModal(false)}
-                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
-              >
-                {t("settings.modelConfigCenter.actions.cancel", "Cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateProvider}
-                className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring"
-              >
-                <Plus className="h-4 w-4" />
-                {t(
-                  "settings.modelConfigCenter.actions.createProvider",
-                  "Create Provider",
-                )}
-              </button>
-            </>
-          }
-        >
-          <SettingsField
-            label={t(
-              "settings.modelConfigCenter.fields.providerKey",
-              "Provider Key",
-            )}
-          >
-            <SettingsInput
-              autoFocus
-              value={newProviderName}
-              onChange={(event) => setNewProviderName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  handleCreateProvider();
-                }
-              }}
-              placeholder={t(
-                "settings.modelConfigCenter.placeholders.providerName",
-                "e.g., local-openai",
-              )}
-            />
-          </SettingsField>
-        </ModalShell>
-      )}
+      <AddProviderModal
+        open={showAddProviderModal}
+        newProviderName={newProviderName}
+        onNewProviderNameChange={setNewProviderName}
+        onClose={() => setShowAddProviderModal(false)}
+        onConfirm={handleCreateProvider}
+      />
 
-      {showImportModal && (
-        <ModalShell
-          title={t(
-            "settings.modelConfigCenter.dialogs.importContentTitle",
-            "Import JSON content",
-          )}
-          description={t(
-            "settings.modelConfigCenter.dialogs.importContentDesc",
-            "Paste complete models.json content here and apply according to current import mode.",
-          )}
-          onClose={() => {
-            if (busy !== "import-content") {
-              setShowImportModal(false);
-            }
-          }}
-          widthClass="max-w-2xl"
-          footer={
-            <>
-              <button
-                type="button"
-                onClick={() => setShowImportModal(false)}
-                disabled={busy === "import-content"}
-                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring disabled:opacity-60"
-              >
-                {t("settings.modelConfigCenter.actions.cancel", "Cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={() => void importFromContent()}
-                disabled={busy === "import-content"}
-                className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring disabled:opacity-60"
-              >
-                {busy === "import-content" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Upload className="h-4 w-4" />
-                )}
-                {t(
-                  "settings.modelConfigCenter.actions.importNow",
-                  "Import Now",
-                )}
-              </button>
-            </>
-          }
-        >
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/30 px-4 py-3">
-              <div>
-                <div className="text-sm font-medium text-foreground">
-                  {t(
-                    "settings.modelConfigCenter.sections.importMode",
-                    "Import Mode",
-                  )}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {t(
-                    "settings.modelConfigCenter.help.importMode",
-                    "Merge keeps existing providers, replace will directly use imported content.",
-                  )}
-                </div>
-              </div>
-              <SettingsTabs
-                items={[
-                  {
-                    id: "merge",
-                    label: t("settings.modelConfigCenter.tabs.merge", "Merge"),
-                  },
-                  {
-                    id: "replace",
-                    label: t(
-                      "settings.modelConfigCenter.tabs.replace",
-                      "Replace",
-                    ),
-                  },
-                ]}
-                active={importMode}
-                onChange={setImportMode}
-                className="inline-flex w-auto max-w-full"
-                buttonClassName="flex-none"
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => void pasteClipboardToImport()}
-                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
-              >
-                <Copy className="h-4 w-4" />
-                {t(
-                  "settings.modelConfigCenter.actions.pasteClipboard",
-                  "Paste from clipboard",
-                )}
-              </button>
-            </div>
-
-            <textarea
-              value={importContentDraft}
-              onChange={(event) => setImportContentDraft(event.target.value)}
-              placeholder={t(
-                "settings.modelConfigCenter.placeholders.importContent",
-                "Paste complete models.json content",
-              )}
-              className="min-h-[320px] w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-info focus:outline-none motion-color motion-surface"
-            />
-          </div>
-        </ModalShell>
-      )}
+      <ImportModal
+        open={showImportModal}
+        importMode={importMode}
+        onImportModeChange={setImportMode}
+        importContentDraft={importContentDraft}
+        onImportContentDraftChange={setImportContentDraft}
+        onPasteClipboard={() => void pasteClipboardToImport()}
+        onImport={() => void importFromContent()}
+        onClose={() => setShowImportModal(false)}
+        isImporting={busy === "import-content"}
+      />
 
       {confirmDialog && (
         <ConfirmDialog
