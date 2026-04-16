@@ -68,6 +68,17 @@ function createRegistry() {
     search: mockPluginSearch,
     onSelect: mockPluginOnSelect,
     setFTSOptions: mockSetFTSOptions,
+    renderItem: (result: SearchPluginResult) => (
+      <div>
+        <div>{result.title}</div>
+        {(result.metadata as any)?.snippetLines?.map((line: string, i: number) => (
+          <p key={i}>{line}</p>
+        ))}
+        {(result.metadata as any)?.matchReason === 'label' && (
+          <span>label</span>
+        )}
+      </div>
+    ),
   }
 
   return new Map([
@@ -227,5 +238,37 @@ describe('CommandMenu source filter wiring', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Labels' }))
 
     expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('important')
+  })
+
+  it('renders Chinese search results correctly', async () => {
+    mockSearch.mockResolvedValue([
+      createMessageResult({
+        id: 'zh-result-1',
+        title: '中文测试会话',
+        metadata: {
+          role: 'assistant',
+          timestamp: '2026-04-09T10:00:00Z',
+          snippetLines: ['这是一个内置默认的测试句子'],
+          matchReason: 'content',
+        },
+      }),
+    ])
+
+    render(<CommandMenuHarness />)
+
+    fireEvent.change(screen.getAllByRole('textbox')[0], {
+      target: { value: '内置默认' },
+    })
+
+    await flushSearchDebounce()
+
+    expect(mockSearch).toHaveBeenCalledWith(
+      '内置默认',
+      expect.objectContaining({
+        cacheKeyParts: expect.arrayContaining(['all']),
+      }),
+    )
+    expect(screen.getByText('中文测试会话')).not.toBeNull()
+    expect(screen.getByText('这是一个内置默认的测试句子')).not.toBeNull()
   })
 })

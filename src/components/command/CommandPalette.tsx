@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useCommandMenu } from '@/hooks/useCommandMenu'
 import type { SearchContext, SearchPluginResult } from '@/plugins/types'
 import CommandMenu from './CommandMenu'
@@ -29,7 +29,11 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
   // Store registry reference from CommandMenu for keyboard shortcut handling
   const registryRef = useRef<any>(null)
 
-  const enhancedContext: SearchContext = { ...context, closeCommandMenu: close, searchCurrentProjectOnly }
+  const enhancedContext = useMemo<SearchContext>(() => ({
+    ...context,
+    closeCommandMenu: close,
+    searchCurrentProjectOnly,
+  }), [context, close, searchCurrentProjectOnly])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
