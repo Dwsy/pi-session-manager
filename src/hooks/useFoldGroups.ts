@@ -69,11 +69,13 @@ export function useFoldGroups(
             foldBuffer = []
           } else if (foldBuffer.length > 0) {
             const leader = foldBuffer[foldBuffer.length - 1]
+            // Leader is NOT in foldEntries, NOT hidden (it renders normally with its visible text)
+            const memberEntries = foldBuffer.slice(0, -1)
             groups.set(leader.id, {
               leaderId: leader.id,
-              entries: [...foldBuffer],
+              entries: memberEntries,
             })
-            for (const fe of foldBuffer) {
+            for (const fe of memberEntries) {
               hiddenEntryIds.add(fe.id)
             }
             foldBuffer = []
@@ -82,16 +84,15 @@ export function useFoldGroups(
       } else {
         // Non-assistant entry: flush fold buffer
         if (foldBuffer.length > 0) {
-          // Create fold group with the last fold entry as leader
           const leader = foldBuffer[foldBuffer.length - 1]
+          // Leader itself should NOT be in foldEntries (avoids duplicate content in buildAssistantProcessSteps)
+          const memberEntries = foldBuffer.slice(0, -1)
           groups.set(leader.id, {
             leaderId: leader.id,
-            entries: [...foldBuffer],
+            entries: memberEntries,
           })
-          for (const fe of foldBuffer) {
-            if (fe.id !== leader.id) {
-              hiddenEntryIds.add(fe.id)
-            }
+          for (const fe of memberEntries) {
+            hiddenEntryIds.add(fe.id)
           }
           foldBuffer = []
         }
@@ -101,14 +102,14 @@ export function useFoldGroups(
     // Flush remaining fold buffer
     if (foldBuffer.length > 0) {
       const leader = foldBuffer[foldBuffer.length - 1]
+      // Leader itself should NOT be in foldEntries
+      const memberEntries = foldBuffer.slice(0, -1)
       groups.set(leader.id, {
         leaderId: leader.id,
-        entries: [...foldBuffer],
+        entries: memberEntries,
       })
-      for (const fe of foldBuffer) {
-        if (fe.id !== leader.id) {
-          hiddenEntryIds.add(fe.id)
-        }
+      for (const fe of memberEntries) {
+        hiddenEntryIds.add(fe.id)
       }
     }
 

@@ -147,8 +147,6 @@ function AssistantMessage({
               searchQuery={searchQuery}
               theme={theme}
               isMobile={isMobile}
-              isExpanded={false}
-              onToggleExpanded={() => {}}
               t={t}
               copyText={copyText}
               disableSuccessStyle={disableSuccessStyle}
@@ -206,8 +204,6 @@ interface DirectToolCallProps {
   searchQuery: string
   theme: 'light' | 'dark'
   isMobile: boolean
-  isExpanded: boolean
-  onToggleExpanded: () => void
   t: ReturnType<typeof useTranslation>['t']
   copyText: (text: string) => Promise<void>
   disableSuccessStyle: boolean
@@ -220,16 +216,16 @@ function DirectToolCall({
   searchQuery,
   theme,
   isMobile,
-  isExpanded,
-  onToggleExpanded,
   t,
   copyText,
   disableSuccessStyle,
 }: DirectToolCallProps) {
+  const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const plugin = toolRenderRegistry.findPlugin(toolCall)
   const resolvedData = plugin.resolveData?.(toolCall, index, toolResultByCallId)
     ?? defaultResolveData(toolCall, index, toolResultByCallId)
   const Component = plugin.component
+  const entryId = resolvedData.entryId
 
   return (
     <Component
@@ -237,8 +233,8 @@ function DirectToolCall({
       resolvedData={resolvedData}
       searchQuery={searchQuery}
       context={{
-        isExpanded,
-        toggleExpanded: onToggleExpanded,
+        isExpanded: isToolExpanded(entryId),
+        toggleExpanded: () => toggleToolExpanded(entryId),
         ensureExpanded: () => {},
         theme,
         isMobile,
