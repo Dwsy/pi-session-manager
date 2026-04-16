@@ -79,7 +79,6 @@ export default function ActivityHeatmap({
         style={{
           backgroundColor: point ? HEATMAP_COLORS[point.level] : HEATMAP_COLORS[0],
           opacity: point && point.level > 0 ? 1 : 0.35,
-          border: point && point.level > 0 ? undefined : '1px solid rgba(255,255,255,0.06)',
         }}
         onClick={() => point && onDayClick?.(point)}
         aria-label={point ? `${point.date}: ${point.total_messages}` : 'No activity'}

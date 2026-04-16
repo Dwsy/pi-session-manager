@@ -84,7 +84,7 @@ export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendC
 
   return (
     <DashboardCardShell
-      className="rounded-lg p-3"
+      className="rounded-lg p-3 !border-0"
       overlayClassName="bg-gradient-to-br from-success/5 via-transparent to-info/5"
     >
         <div className="flex items-center justify-between mb-3">

@@ -518,7 +518,7 @@ function StatCard({ icon: Icon, label, value, color, emphasis, onClick, hint }: 
   return (
     <button
       type="button"
-      className={`group rounded-xl border px-2.5 py-2.5 text-left w-full ${interactive ? 'border-border/18 bg-muted/15 hover:bg-muted/30 hover:border-border/35 motion-surface motion-color motion-press focus-ring' : 'border-border/14 bg-muted/10 cursor-default'}`}
+      className={`group rounded-xl px-2.5 py-2.5 text-left w-full ${interactive ? 'bg-muted/15 hover:bg-muted/30 motion-surface motion-color motion-press focus-ring' : 'bg-muted/10 cursor-default'}`}
       onClick={onClick}
       disabled={!interactive}
     >
