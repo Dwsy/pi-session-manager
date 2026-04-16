@@ -34,102 +34,23 @@ import SettingsSelect from "@/components/settings/SettingsSelect";
 import SettingsTabs from "@/components/settings/SettingsTabs";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
 
-type JsonValue = Record<string, unknown>;
-
-type FeedbackTone = "success" | "error" | "warning" | "info";
-type ImportMode = "merge" | "replace";
-type HistoryTab = "backups" | "versions";
-type ConfirmTone = "danger" | "warning" | "info";
-type ModelConfigMainTab = "configure" | "test" | "tools" | "history";
-type ConfigDetailTab = "provider" | "model";
-
-interface ModelCost {
-  input?: number;
-  output?: number;
-  cacheRead?: number;
-  cacheWrite?: number;
-}
-
-interface ModelEntry {
-  id: string;
-  name?: string;
-  api?: string;
-  reasoning?: boolean;
-  input?: string[];
-  contextWindow?: number;
-  maxTokens?: number;
-  cost?: ModelCost;
-}
-
-interface ProviderEntry {
-  baseUrl?: string;
-  api?: string;
-  apiKey?: string;
-  authHeader?: boolean;
-  headers?: Record<string, string>;
-  models?: ModelEntry[];
-}
-
-interface ModelConfigShape {
-  providers: Record<string, ProviderEntry>;
-}
-
-interface ModelConfigBackupMeta {
-  id: string;
-  filePath: string;
-  createdAt: string;
-  sizeBytes: number;
-  note?: string | null;
-}
-
-interface ConfigVersionMeta {
-  id: number;
-  filePath: string;
-  createdAt: string;
-  sizeBytes: number;
-}
-
-interface ModelHttpTestResult {
-  provider: string;
-  model: string;
-  api: string;
-  method: string;
-  url: string;
-  statusCode: number | null;
-  ok: boolean;
-  latencyMs: number;
-  curlCommand: string;
-  requestBody: string;
-  requestStyle: string;
-  responsePreview?: string | null;
-  attemptCount: number;
-  usedFallback: boolean;
-  responseBody: string;
-  error?: string | null;
-}
-
-interface FeedbackState {
-  tone: FeedbackTone;
-  message: string;
-}
-
-interface ConfirmDialogState {
-  title: string;
-  description: string;
-  confirmLabel: string;
-  tone: ConfirmTone;
-  onConfirm: () => void | Promise<void>;
-}
-
-const EMPTY_CONFIG: ModelConfigShape = { providers: {} };
-const MODEL_CONFIG_PATH = "~/.pi/agent/models.json";
-
-const API_TYPE_OPTIONS = [
-  "openai-completions",
-  "openai-responses",
-  "anthropic-messages",
-  "google-generative-ai",
-] as const;
+import type {
+  ModelConfigShape,
+  ModelConfigBackupMeta,
+  ConfigVersionMeta,
+  ModelHttpTestResult,
+  FeedbackState,
+  ConfirmDialogState,
+  ModelConfigMainTab,
+  HistoryTab,
+  ImportMode,
+  ConfigDetailTab,
+  ProviderEntry,
+  ModelEntry,
+  FeedbackTone,
+  JsonValue,
+} from "./model-config/types";
+import { EMPTY_CONFIG, MODEL_CONFIG_PATH, API_TYPE_OPTIONS } from "./model-config/types";
 
 function asModelConfigShape(raw: unknown): ModelConfigShape {
   if (!raw || typeof raw !== "object") return EMPTY_CONFIG;
