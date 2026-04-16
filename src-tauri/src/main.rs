@@ -553,6 +553,7 @@ fn main() {
             pi_session_manager::toggle_devtools,
             pi_session_manager::load_app_settings,
             pi_session_manager::save_app_settings,
+            pi_session_manager::reset_app_settings,
             pi_session_manager::list_datasets,
             pi_session_manager::start_dataset_import,
             pi_session_manager::get_dataset_import_status,

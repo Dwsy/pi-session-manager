@@ -102,6 +102,7 @@ pub fn run() {
             test_models_batch,
             load_app_settings,
             save_app_settings,
+            reset_app_settings,
             list_datasets,
             start_dataset_import,
             get_dataset_import_status,
