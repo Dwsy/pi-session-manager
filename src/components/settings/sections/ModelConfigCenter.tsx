@@ -1,15 +1,9 @@
 import { useTranslation } from "react-i18next";
 import {
-  AlertCircle,
-  Check,
-  Copy,
-  Download,
   FileJson,
   FlaskConical,
-  FolderOpen,
   History,
   Loader2,
-  Play,
   Plus,
   RefreshCw,
   Save,
@@ -33,6 +27,8 @@ import { ConfirmDialog } from "./model-config/ui/ConfirmDialog";
 import { AddProviderModal } from "./model-config/modals/AddProviderModal";
 import { ImportModal } from "./model-config/modals/ImportModal";
 import { HistoryTab } from "./model-config/tabs/HistoryTab";
+import { ToolsTab } from "./model-config/tabs/ToolsTab";
+import { TestTab } from "./model-config/tabs/TestTab";
 
 export default function ModelConfigCenter() {
   const vm = useModelConfig();
@@ -1023,349 +1019,31 @@ export default function ModelConfigCenter() {
             {(mainTab === "tools" || mainTab === "test") && (
               <div className="space-y-4">
                 {mainTab === "tools" && (
-                  <SettingsCard
-                    icon={<Upload className="h-5 w-5" />}
-                    title={t(
-                      "settings.modelConfigCenter.sections.toolsTitle",
-                      "Import & Export",
-                    )}
-                    description={t(
-                      "settings.modelConfigCenter.sections.toolsDesc",
-                      "Separates tool operations from main editor to avoid interfering with main configuration flow.",
-                    )}
-                  >
-                    <div className="space-y-4">
-                      <div className="rounded-xl border border-border/70 bg-background/30 p-4">
-                        <div className="text-sm font-medium text-foreground">
-                          {t(
-                            "settings.modelConfigCenter.sections.importMode",
-                            "Import Mode",
-                          )}
-                        </div>
-                        <SettingsTabs
-                          items={[
-                            {
-                              id: "merge",
-                              label: t(
-                                "settings.modelConfigCenter.tabs.merge",
-                                "Merge",
-                              ),
-                            },
-                            {
-                              id: "replace",
-                              label: t(
-                                "settings.modelConfigCenter.tabs.replace",
-                                "Replace",
-                              ),
-                            },
-                          ]}
-                          active={importMode}
-                          onChange={setImportMode}
-                          className="mt-3 inline-flex w-auto max-w-full"
-                          buttonClassName="flex-none"
-                        />
-                        <p className="mt-3 text-xs text-muted-foreground">
-                          {t(
-                            "settings.modelConfigCenter.help.importMode",
-                            "Merge keeps existing providers, replace will directly use imported content.",
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <button
-                          type="button"
-                          onClick={importFromPath}
-                          disabled={busy === "import-file"}
-                          className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring disabled:opacity-60"
-                        >
-                          {busy === "import-file" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <FolderOpen className="h-4 w-4" />
-                          )}
-                          {t(
-                            "settings.modelConfigCenter.actions.importFile",
-                            "Import file",
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={openImportContentModal}
-                          className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
-                        >
-                          <Upload className="h-4 w-4" />
-                          {t(
-                            "settings.modelConfigCenter.actions.importContent",
-                            "Import JSON content",
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void copyDraftJson()}
-                          className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
-                        >
-                          <Copy className="h-4 w-4" />
-                          {t(
-                            "settings.modelConfigCenter.actions.copyDraft",
-                            "Copy current draft",
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void exportToPath()}
-                          className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
-                        >
-                          <Download className="h-4 w-4" />
-                          {t(
-                            "settings.modelConfigCenter.actions.exportSaved",
-                            "Export saved file",
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="rounded-xl border border-dashed border-border px-4 py-3 text-xs text-muted-foreground">
-                        <div>
-                          {t(
-                            "settings.modelConfigCenter.help.copyDraft",
-                            '"Copy current draft" includes your unsaved changes.',
-                          )}
-                        </div>
-                        <div>
-                          {t(
-                            "settings.modelConfigCenter.help.exportSaved",
-                            '"Export saved file" reads models.json from disk, suitable for archiving.',
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </SettingsCard>
+                  <ToolsTab
+                    importMode={importMode}
+                    onImportModeChange={setImportMode}
+                    onImportFromPath={importFromPath}
+                    onOpenImportContentModal={openImportContentModal}
+                    onCopyDraftJson={copyDraftJson}
+                    onExportToPath={exportToPath}
+                    busy={busy}
+                  />
                 )}
 
                 {mainTab === "test" && (
-                  <SettingsCard
-                    icon={<FlaskConical className="h-5 w-5" />}
-                    title={t(
-                      "settings.modelConfigCenter.httpTestTitle",
-                      "Online HTTP / cURL Test",
-                    )}
-                    description={t(
-                      "settings.modelConfigCenter.httpTestDesc",
-                      "Makes real request with currently selected Provider + Model to verify configuration.",
-                    )}
-                  >
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                        <div className="rounded-xl border border-border/70 bg-background/35 px-4 py-3">
-                          <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                            {t(
-                              "settings.modelConfigCenter.fields.selectedProvider",
-                              "Current Provider",
-                            )}
-                          </div>
-                          <div className="mt-2 truncate text-sm font-medium text-foreground">
-                            {selectedProvider || "-"}
-                          </div>
-                        </div>
-                        <div className="rounded-xl border border-border/70 bg-background/35 px-4 py-3">
-                          <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                            {t(
-                              "settings.modelConfigCenter.fields.selectedModel",
-                              "Current Model",
-                            )}
-                          </div>
-                          <div className="mt-2 truncate text-sm font-medium text-foreground">
-                            {selectedModelEntry?.id?.trim() ||
-                              activeModelLabel ||
-                              "-"}
-                          </div>
-                        </div>
-                        <div className="rounded-xl border border-border/70 bg-background/35 px-4 py-3">
-                          <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                            API
-                          </div>
-                          <div className="mt-2 truncate text-sm font-medium text-foreground">
-                            {selectedProviderEntry?.api ?? "-"}
-                          </div>
-                        </div>
-                      </div>
-
-                      {!selectedProviderEntry && (
-                        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                          {t(
-                            "settings.modelConfigCenter.empty.testEmpty",
-                            "Go to config page to select Provider and model first, then come back to run test.",
-                          )}
-                        </div>
-                      )}
-
-                      {!selectedModelEntry?.id?.trim() &&
-                        selectedProviderEntry && (
-                          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-                            {t(
-                              "settings.modelConfigCenter.help.noModelId",
-                              "Current model has no ID filled, cannot make HTTP test.",
-                            )}
-                          </div>
-                        )}
-
-                      <SettingsField
-                        label={t(
-                          "settings.modelConfigCenter.fields.prompt",
-                          "Test Prompt",
-                        )}
-                      >
-                        <SettingsInput
-                          value={testPrompt}
-                          onChange={(event) =>
-                            setTestPrompt(event.target.value)
-                          }
-                          placeholder={t(
-                            "settings.modelConfigCenter.placeholders.testPrompt",
-                            "Please reply only with OK",
-                          )}
-                        />
-                      </SettingsField>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void runHttpTest()}
-                          disabled={
-                            !selectedProvider ||
-                            !selectedModelEntry?.id?.trim() ||
-                            busy === "http-test"
-                          }
-                          className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm font-medium text-white hover:bg-info/90 motion-color motion-press focus-ring disabled:opacity-60"
-                        >
-                          {busy === "http-test" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Play className="h-4 w-4" />
-                          )}
-                          {t(
-                            "settings.modelConfigCenter.actions.runTest",
-                            "Run Test",
-                          )}
-                        </button>
-                        {testResult && (
-                          <button
-                            type="button"
-                            onClick={() => void copyCurlCommand()}
-                            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
-                          >
-                            <Copy className="h-4 w-4" />
-                            {t(
-                              "settings.modelConfigCenter.actions.copyCurl",
-                              "Copy cURL",
-                            )}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setMainTab("configure")}
-                          className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
-                        >
-                          <FileJson className="h-4 w-4" />
-                          {t(
-                            "settings.modelConfigCenter.actions.backToConfigure",
-                            "Back to Config",
-                          )}
-                        </button>
-                      </div>
-
-                      {testResult && (
-                        <div className="rounded-xl border border-border/70 bg-background/30 p-4 text-sm">
-                          <div className="flex flex-wrap items-center gap-3">
-                            <span
-                              className={`inline-flex items-center gap-1.5 font-medium ${testResult.ok ? "text-green-300" : "text-red-300"}`}
-                            >
-                              {testResult.ok ? (
-                                <Check className="h-4 w-4" />
-                              ) : (
-                                <AlertCircle className="h-4 w-4" />
-                              )}
-                              {testResult.ok ? "OK" : "FAILED"}
-                            </span>
-                            <span className="text-muted-foreground">
-                              {testResult.method} {testResult.url}
-                            </span>
-                            <span className="text-muted-foreground">
-                              status: {testResult.statusCode ?? "-"}
-                            </span>
-                            <span className="text-muted-foreground">
-                              latency: {testResult.latencyMs} ms
-                            </span>
-                          </div>
-                          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3 text-xs">
-                            <div className="rounded-lg border border-border/70 bg-background/40 px-3 py-2">
-                              <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                                API
-                              </div>
-                              <div className="mt-1 font-medium text-foreground">
-                                {testResult.api}
-                              </div>
-                            </div>
-                            <div className="rounded-lg border border-border/70 bg-background/40 px-3 py-2">
-                              <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                                Request Style
-                              </div>
-                              <div className="mt-1 font-medium text-foreground">
-                                {testResult.requestStyle}
-                              </div>
-                            </div>
-                            <div className="rounded-lg border border-border/70 bg-background/40 px-3 py-2">
-                              <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                                Attempts
-                              </div>
-                              <div className="mt-1 font-medium text-foreground">
-                                {testResult.attemptCount}
-                                {testResult.usedFallback
-                                  ? " (fallback used)"
-                                  : ""}
-                              </div>
-                            </div>
-                          </div>
-                          {testResult.responsePreview && (
-                            <div className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-                              {testResult.responsePreview}
-                            </div>
-                          )}
-                          {testResult.error && (
-                            <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-                              {testResult.error}
-                            </div>
-                          )}
-                          <div className="mt-4 space-y-3 text-xs">
-                            <details>
-                              <summary className="cursor-pointer font-medium text-foreground">
-                                cURL
-                              </summary>
-                              <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg border border-border/70 bg-background/40 p-3 text-muted-foreground">
-                                {testResult.curlCommand}
-                              </pre>
-                            </details>
-                            <details>
-                              <summary className="cursor-pointer font-medium text-foreground">
-                                Request Body
-                              </summary>
-                              <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg border border-border/70 bg-background/40 p-3 text-muted-foreground">
-                                {testResult.requestBody}
-                              </pre>
-                            </details>
-                            <details open>
-                              <summary className="cursor-pointer font-medium text-foreground">
-                                Response Body
-                              </summary>
-                              <pre className="mt-2 max-h-[280px] overflow-y-auto whitespace-pre-wrap break-all rounded-lg border border-border/70 bg-background/40 p-3 text-muted-foreground">
-                                {testResult.responseBody || "(empty)"}
-                              </pre>
-                            </details>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </SettingsCard>
+                  <TestTab
+                    selectedProvider={selectedProvider}
+                    selectedProviderEntry={selectedProviderEntry}
+                    selectedModelEntry={selectedModelEntry}
+                    activeModelLabel={activeModelLabel}
+                    testPrompt={testPrompt}
+                    onTestPromptChange={setTestPrompt}
+                    testResult={testResult}
+                    onRunTest={runHttpTest}
+                    onCopyCurlCommand={copyCurlCommand}
+                    onBackToConfigure={() => setMainTab("configure")}
+                    busy={busy}
+                  />
                 )}
               </div>
             )}
