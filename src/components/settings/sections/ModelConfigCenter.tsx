@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
 import {
   open as openDialog,
   save as saveDialog,
@@ -23,7 +22,6 @@ import {
   Server,
   Trash2,
   Upload,
-  X,
 } from "lucide-react";
 import { invoke } from "@/transport";
 import { useClipboard } from "@/hooks/useClipboard";
@@ -63,161 +61,10 @@ import {
   createDefaultProvider,
   modelSelectionValue,
 } from "./model-config/utils";
-
-function StatTile({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-xl border border-border/70 bg-background/35 p-4 shadow-sm">
-      <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-2 text-2xl font-semibold text-foreground">{value}</div>
-    </div>
-  );
-}
-
-function StatusBanner({
-  tone,
-  message,
-  onClose,
-}: {
-  tone: FeedbackTone;
-  message: string;
-  onClose: () => void;
-}) {
-  const palette = {
-    success: "border-green-500/30 bg-green-500/10 text-green-300",
-    error: "border-red-500/30 bg-red-500/10 text-red-300",
-    warning: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-    info: "border-info/30 bg-info/10 text-info",
-  } as const;
-
-  return (
-    <div
-      className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${palette[tone]}`}
-    >
-      <div className="flex items-start gap-2">
-        {tone === "success" ? (
-          <Check className="mt-0.5 h-4 w-4 flex-shrink-0" />
-        ) : (
-          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-        )}
-        <span>{message}</span>
-      </div>
-      <button
-        type="button"
-        onClick={onClose}
-        className="rounded p-1 text-current/80 hover:bg-black/10 hover:text-current motion-color motion-press focus-ring"
-      >
-        <X className="h-4 w-4" />
-      </button>
-    </div>
-  );
-}
-
-function ModalShell({
-  title,
-  description,
-  children,
-  footer,
-  onClose,
-  widthClass = "max-w-lg",
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-  footer: ReactNode;
-  onClose: () => void;
-  widthClass?: string;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div
-        className={`w-full rounded-xl border border-border/70 bg-background shadow-2xl ${widthClass}`}
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
-          <div>
-            <h3 className="text-base font-semibold text-foreground">{title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-muted-foreground hover:bg-surface hover:text-foreground motion-color motion-press focus-ring"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="px-5 py-4">{children}</div>
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/60 px-5 py-4">
-          {footer}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ConfirmDialog({
-  dialog,
-  confirming,
-  cancelLabel,
-  onCancel,
-  onConfirm,
-}: {
-  dialog: ConfirmDialogState;
-  confirming: boolean;
-  cancelLabel: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const palette = {
-    danger: "bg-red-600 hover:bg-red-700 text-white",
-    warning: "bg-amber-500 hover:bg-amber-600 text-black",
-    info: "bg-info hover:bg-info/90 text-white",
-  } as const;
-
-  return (
-    <ModalShell
-      title={dialog.title}
-      description={dialog.description}
-      onClose={() => {
-        if (!confirming) onCancel();
-      }}
-      widthClass="max-w-md"
-      footer={
-        <>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={confirming}
-            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring disabled:opacity-60"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={confirming}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium motion-color motion-press focus-ring disabled:opacity-60 ${palette[dialog.tone]}`}
-          >
-            {confirming && <Loader2 className="h-4 w-4 animate-spin" />}
-            {dialog.confirmLabel}
-          </button>
-        </>
-      }
-    >
-      <div className="rounded-lg border border-border/60 bg-background/40 px-4 py-3 text-sm text-muted-foreground">
-        {dialog.description}
-      </div>
-    </ModalShell>
-  );
-}
+import { StatTile } from "./model-config/ui/StatTile";
+import { StatusBanner } from "./model-config/ui/StatusBanner";
+import { ModalShell } from "./model-config/ui/ModalShell";
+import { ConfirmDialog } from "./model-config/ui/ConfirmDialog";
 
 export default function ModelConfigCenter() {
   const { t } = useTranslation();
