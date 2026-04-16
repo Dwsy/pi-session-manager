@@ -166,23 +166,23 @@ export const backendSessionProvider: SessionProvider = {
     return invoke<SearchResult[]>("search_sessions", {
       sessions,
       query,
-      search_mode: searchPrefs.defaultSearchMode || "content",
-      role_filter: "all",
-      include_tools: searchPrefs.includeToolCalls ?? false,
+      searchMode: searchPrefs.defaultSearchMode || "content",
+      roleFilter: "all",
+      includeTools: searchPrefs.includeToolCalls ?? false,
     });
   },
   async fullTextSearch(options) {
     return invoke<FullTextSearchResponse>("full_text_search", {
       query: options.query,
-      role_filter: options.roleFilter,
-      source_filter: options.sourceFilter || "all",
-      glob_pattern: options.globPattern || null,
-      project_path: options.projectPath || null,
-      include_thinking: getCachedSettings().search.includeThinkingInSearch,
+      roleFilter: options.roleFilter,
+      sourceFilter: options.sourceFilter || "all",
+      globPattern: options.globPattern || null,
+      projectPath: options.projectPath || null,
+      includeThinking: getCachedSettings().search.includeThinkingInSearch,
       page: options.page,
-      page_size: options.pageSize,
-      match_mode: options.matchMode || "smart",
-      sort_order: options.sortOrder || "newest",
+      pageSize: options.pageSize,
+      matchMode: options.matchMode || "smart",
+      sortOrder: options.sortOrder || "newest",
       from: options.from || null,
       to: options.to || null,
     });
@@ -232,17 +232,17 @@ export const backendSessionProvider: SessionProvider = {
     return invoke<RuntimePaginatedSessionsResponse>("scan_sessions_paginated", {
       offset: options.offset,
       limit: options.limit,
-      search_query: options.searchQuery || null,
-      project_filter: options.projectFilter || null,
-      filter_tag_ids:
+      searchQuery: options.searchQuery || null,
+      projectFilter: options.projectFilter || null,
+      filterTagIds:
         options.filterTagIds && options.filterTagIds.length > 0
           ? options.filterTagIds
           : null,
-      source_filter_slugs:
+      sourceFilterSlugs:
         options.sourceFilterSlugs && options.sourceFilterSlugs.length > 0
           ? options.sourceFilterSlugs
           : null,
-      sort_by: normalizedSortKey,
+      sortBy: normalizedSortKey,
     });
   },
   async deleteSessions(paths) {
@@ -254,14 +254,14 @@ export const backendSessionProvider: SessionProvider = {
   async renameSession(path, newName) {
     await invoke("rename_session", {
       path,
-      new_name: newName,
+      newName,
     });
     return null;
   },
   async forkSession(sourcePath, targetName) {
     return invoke<SessionInfo>("fork_session", {
-      source_path: sourcePath,
-      target_name: targetName || null,
+      sourcePath,
+      targetName: targetName || null,
     });
   },
 };

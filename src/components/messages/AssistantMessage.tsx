@@ -11,6 +11,7 @@ import { useAppearance } from '@/hooks/useAppearance'
 import { useClipboard } from '@/hooks/useClipboard'
 import { useTranslation } from 'react-i18next'
 import { formatDate } from '@/utils/format'
+import { ansiToMarkdown } from '@/utils/assistantContent'
 import { memo, useMemo, useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 
@@ -162,7 +163,7 @@ function AssistantMessage({
           {thinkingBlocks.map((thinking, index) => (
             <ThinkingBlock
               key={`thinking-${index}`}
-              content={thinking}
+              content={ansiToMarkdown(thinking, { stripColor: true })}
               searchQuery={searchQuery}
             />
           ))}
