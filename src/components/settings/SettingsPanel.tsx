@@ -62,7 +62,6 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   }, [isOpen, onClose]);
 
   const settingsRef = useRef(settings);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
@@ -93,31 +92,6 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-
-    saveTimerRef.current = setTimeout(async () => {
-      try {
-        await saveAppSettings(settingsRef.current);
-        await reloadSettings();
-        setSaved(true);
-        setTimeout(() => setSaved(false), 1500);
-      } catch (error) {
-        console.error("Auto-save failed:", error);
-      }
-    }, 500);
-
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-    };
-  }, [settings, isOpen]);
 
   const loadSettingsInternal = async () => {
     setLoading(true);
@@ -207,16 +181,28 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     }));
   };
 
-  const resetSettings = () => {
+  const resetSettings = async () => {
     if (
-      confirm(
+      !confirm(
         t(
           "settings.confirmReset",
           "Are you sure you want to reset all settings?",
         ),
       )
     ) {
+      return;
+    }
+    try {
+      await invoke("reset_app_settings");
+      localStorage.removeItem("pi-session-manager-settings");
+      localStorage.removeItem("app-language");
       setSettings(defaultSettings);
+      await i18n.changeLanguage(defaultSettings.language.locale);
+      await reloadSettings();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (error) {
+      console.error("Failed to reset settings:", error);
     }
   };
 

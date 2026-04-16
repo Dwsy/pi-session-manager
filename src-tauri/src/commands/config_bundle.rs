@@ -48,7 +48,13 @@ pub struct BundleMetadata {
 }
 
 /// Known config files to include in the bundle.
-const CONFIG_FILES: &[(&str, &str)] = &[("config.json", "~/.pi/pi-session-manager/config.json")];
+const CONFIG_FILES: &[(&str, &str)] = &[
+    ("config.json", "~/.pi/pi-session-manager/config.json"),
+    ("tags_config.json", "~/.pi/pi-session-manager/tags_config.json"),
+    ("session_mark.json", "~/.pi/pi-session-manager/session_mark.json"),
+    ("favorites.json", "~/.pi/pi-session-manager/favorites.json"),
+    ("auth_tokens.json", "~/.pi/pi-session-manager/auth_tokens.json"),
+];
 
 /// Resolve a path that may start with ~ to the home directory.
 fn resolve_home_path(path: &str) -> PathBuf {
@@ -94,15 +100,14 @@ fn format_filename_timestamp() -> String {
     dt.format("%Y-%m-%d-%H%M%S").to_string()
 }
 
-/// Internal: Export all config files to a ZIP archive.
+/// Internal: Export all config files to a ZIP archive at the given path.
 /// Returns the path to the created ZIP file.
-pub async fn export_config_bundle_internal() -> Result<String, String> {
-    let output_dir = std::env::temp_dir().join("pi-session-manager-exports");
-    fs::create_dir_all(&output_dir)
-        .map_err(|e| format!("Failed to create export directory: {e}"))?;
-
-    let filename = format!("pi-config-export-{}.zip", format_filename_timestamp());
-    let zip_path = output_dir.join(&filename);
+pub async fn export_config_bundle_internal(target_path: &str) -> Result<String, String> {
+    let zip_path = PathBuf::from(target_path);
+    if let Some(parent) = zip_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create export directory: {e}"))?;
+    }
 
     // Create ZIP in memory first
     let cursor = Cursor::new(Vec::new());
@@ -158,14 +163,16 @@ pub async fn export_config_bundle_internal() -> Result<String, String> {
         return Err("No configuration files found to export".to_string());
     }
 
-    // Update metadata with actual file count
+    // Write ZIP to disk
     let mut zip = zip
         .finish()
         .map_err(|e| format!("Failed to finalize ZIP: {e}"))?;
-
-    // Write ZIP to disk
     let zip_data = zip.into_inner();
     fs::write(&zip_path, zip_data).map_err(|e| format!("Failed to write ZIP file: {e}"))?;
+
+    if !warnings.is_empty() {
+        eprintln!("Export warnings: {warnings:?}");
+    }
 
     Ok(zip_path.to_string_lossy().to_string())
 }
@@ -395,8 +402,8 @@ pub async fn restore_import_backup_internal() -> Result<String, String> {
 
 /// Tauri command: Export all config files to a ZIP bundle.
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn export_config_bundle() -> Result<String, String> {
-    export_config_bundle_internal().await
+pub async fn export_config_bundle(target_path: String) -> Result<String, String> {
+    export_config_bundle_internal(&target_path).await
 }
 
 /// Tauri command: Preview contents of a config bundle.

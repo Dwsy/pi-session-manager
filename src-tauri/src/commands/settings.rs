@@ -647,3 +647,13 @@ pub async fn clear_cache() -> Result<ClearCacheResult, String> {
     })
 }
 
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn reset_app_settings() -> Result<(), String> {
+    let mut root = crate::unified_config::load_root()?;
+    let Some(map) = root.as_object_mut() else {
+        return Err("Unified config root is not an object".to_string());
+    };
+    map.insert("app".to_string(), serde_json::json!({}));
+    crate::unified_config::save_root(&serde_json::Value::Object(map.clone()))
+}
+

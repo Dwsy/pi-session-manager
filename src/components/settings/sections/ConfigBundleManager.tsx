@@ -3,6 +3,14 @@ import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialo
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@/transport';
 import SettingsCard from '@/components/settings/SettingsCard';
+import {
+  Package,
+  FolderInput,
+  History,
+  FileCheck,
+  AlertTriangle,
+  X,
+} from 'lucide-react';
 
 interface BundleFileInfo {
   name: string;
@@ -112,8 +120,6 @@ export function ConfigBundleManager() {
   const handleExport = async () => {
     setBusy('export-config');
     try {
-      await invoke<string>('export_config_bundle');
-
       const path = await saveDialog({
         title: t('settings.importExport.exportSection.title', 'Export Configuration'),
         defaultPath: `pi-config-export-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.zip`,
@@ -122,6 +128,7 @@ export function ConfigBundleManager() {
 
       if (!path) return; // User cancelled
 
+      await invoke<string>('export_config_bundle', { targetPath: path });
       pushFeedback('success', t('settings.importExport.exportSection.success', { path }));
     } catch (err) {
       pushFeedback('error', t('settings.importExport.exportSection.failed', { reason: String(err) }));
@@ -246,10 +253,10 @@ export function ConfigBundleManager() {
     <div className="space-y-6 relative">
       {/* Feedback Toast */}
       {feedback && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg ${
-          feedback.tone === 'success' ? 'bg-green-600 text-white' :
-          feedback.tone === 'error' ? 'bg-red-600 text-white' :
-          'bg-blue-600 text-white'
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
+          feedback.tone === 'success' ? 'bg-success text-success-foreground' :
+          feedback.tone === 'error' ? 'bg-destructive text-destructive-foreground' :
+          'bg-info text-info-foreground'
         }`}>
           {feedback.message}
         </div>
@@ -257,14 +264,23 @@ export function ConfigBundleManager() {
 
       {/* Confirm Dialog */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-            <h3 className="text-lg font-semibold mb-2">{confirmDialog.title}</h3>
-            <p className="text-sm text-muted mb-6">{confirmDialog.description}</p>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertTriangle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
+                confirmDialog.tone === 'danger' ? 'text-destructive' :
+                confirmDialog.tone === 'warning' ? 'text-amber-400' :
+                'text-info'
+              }`} />
+              <div>
+                <h3 className="text-base font-semibold text-foreground">{confirmDialog.title}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{confirmDialog.description}</p>
+              </div>
+            </div>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setConfirmDialog(null)}
-                className="px-4 py-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg border border-border motion-color motion-press focus-ring"
               >
                 {t('common.cancel', 'Cancel')}
               </button>
@@ -272,10 +288,10 @@ export function ConfigBundleManager() {
                 onClick={() => {
                   void Promise.resolve(confirmDialog.onConfirm());
                 }}
-                className={`px-4 py-2 text-white rounded ${
-                  confirmDialog.tone === 'danger' ? 'bg-red-600 hover:bg-red-700' :
-                  confirmDialog.tone === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' :
-                  'bg-blue-600 hover:bg-blue-700'
+                className={`px-4 py-2 text-sm text-white rounded-lg motion-color motion-press focus-ring ${
+                  confirmDialog.tone === 'danger' ? 'bg-destructive hover:bg-destructive/90' :
+                  confirmDialog.tone === 'warning' ? 'bg-amber-500 hover:bg-amber-600' :
+                  'bg-info hover:bg-info/90'
                 }`}
               >
                 {confirmDialog.confirmLabel}
@@ -289,16 +305,16 @@ export function ConfigBundleManager() {
       <SettingsCard
         title={t('settings.importExport.exportSection.title', 'Export Configuration')}
         description={t('settings.importExport.exportSection.description', 'Package all configuration files into a ZIP archive')}
-        icon="📦"
+        icon={<Package className="h-4 w-4" />}
       >
         <div className="space-y-3">
-          <p className="text-sm text-muted">
-            {t('settings.importExport.exportSection.includes', 'Includes: config.json')}
+          <p className="text-sm text-muted-foreground">
+            {t('settings.importExport.exportSection.includes', 'Includes: config.json, tags, favorites, marks and auth tokens')}
           </p>
           <button
             onClick={handleExport}
             disabled={isBusy}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring shadow-sm disabled:opacity-50"
           >
             {t('settings.importExport.exportSection.button', 'Export Configuration')}
           </button>
@@ -309,16 +325,16 @@ export function ConfigBundleManager() {
       <SettingsCard
         title={t('settings.importExport.importSection.title', 'Import Configuration')}
         description={t('settings.importExport.importSection.description', 'Import configuration from a ZIP archive (auto-backup current config)')}
-        icon="📂"
+        icon={<FolderInput className="h-4 w-4" />}
       >
         <div className="space-y-3">
-          <p className="text-sm text-muted">
+          <p className="text-sm text-muted-foreground">
             {t('settings.importExport.importSection.autoBackup', 'Current configuration will be automatically backed up before import')}
           </p>
           <button
             onClick={handleSelectFile}
             disabled={isBusy}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring shadow-sm disabled:opacity-50"
           >
             {t('settings.importExport.importSection.button', 'Select File')}
           </button>
@@ -329,17 +345,17 @@ export function ConfigBundleManager() {
       <SettingsCard
         title={t('settings.importExport.history.title', 'Import History')}
         description={t('settings.importExport.history.description', 'Recent import operations')}
-        icon="📋"
+        icon={<History className="h-4 w-4" />}
       >
         {importHistory.length === 0 ? (
-          <p className="text-sm text-muted">{t('settings.importExport.history.noHistory', 'No import history yet')}</p>
+          <p className="text-sm text-muted-foreground">{t('settings.importExport.history.noHistory', 'No import history yet')}</p>
         ) : (
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted">{t('settings.importExport.history.records', { count: importHistory.length })}</span>
+              <span className="text-sm text-muted-foreground">{t('settings.importExport.history.records', { count: importHistory.length })}</span>
               <button
                 onClick={handleClearHistory}
-                className="text-sm text-red-600 hover:text-red-700"
+                className="text-sm text-destructive hover:text-destructive/80 hover:bg-destructive/10 px-2 py-1 rounded-lg motion-color motion-press focus-ring"
               >
                 {t('settings.importExport.history.clearHistory', 'Clear History')}
               </button>
@@ -348,18 +364,18 @@ export function ConfigBundleManager() {
               {importHistory.map((entry) => (
                 <li
                   key={entry.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded"
+                  className="flex items-center justify-between p-3 bg-surface/50 border border-border rounded-lg hover:border-border-hover/50 motion-surface motion-color"
                 >
-                  <div>
-                    <div className="font-medium">{entry.timestamp}</div>
-                    <div className="text-sm text-muted">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-foreground">{entry.timestamp}</div>
+                    <div className="text-xs text-muted-foreground truncate">
                       {entry.fileCount} files: {entry.files.join(', ')}
                     </div>
                   </div>
                   <button
                     onClick={() => handleRestoreBackup(entry)}
                     disabled={isBusy}
-                    className="px-3 py-1 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors disabled:opacity-50"
+                    className="px-3 py-1.5 text-sm text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg motion-color motion-press focus-ring disabled:opacity-50 flex-shrink-0"
                   >
                     {t('settings.importExport.history.restore', 'Restore')}
                   </button>
@@ -375,21 +391,21 @@ export function ConfigBundleManager() {
         <SettingsCard
           title={t('settings.importExport.lastResult.title', 'Last Import Result')}
           description={lastImportResult.timestamp}
-          icon="✅"
+          icon={<FileCheck className="h-4 w-4" />}
         >
-          <div className="space-y-2">
+          <div className="space-y-2 text-sm text-foreground">
             <div>{t('settings.importExport.lastResult.files', 'Imported files')}: {lastImportResult.imported_files.join(', ')}</div>
             {lastImportResult.backup_path && (
-              <div className="text-sm text-muted">
+              <div className="text-sm text-muted-foreground">
                 {t('settings.importExport.lastResult.backup', 'Backup location')}: {lastImportResult.backup_path}
               </div>
             )}
             {lastImportResult.warnings.length > 0 && (
               <details className="text-sm">
-                <summary className="cursor-pointer text-yellow-600">
+                <summary className="cursor-pointer text-amber-400 hover:text-amber-300 motion-color">
                   {t('settings.importExport.lastResult.warnings', { count: lastImportResult.warnings.length })}
                 </summary>
-                <ul className="mt-2 space-y-1 text-muted">
+                <ul className="mt-2 space-y-1 text-muted-foreground">
                   {lastImportResult.warnings.map((w, i) => (
                     <li key={i}>• {w}</li>
                   ))}
@@ -402,52 +418,64 @@ export function ConfigBundleManager() {
 
       {/* Preview Dialog */}
       {showPreview && preview && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold mb-4">{t('settings.importExport.preview.title', 'Bundle Preview')}</h3>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border/60 bg-background/50">
+              <h3 className="text-base font-semibold text-foreground tracking-tight">
+                {t('settings.importExport.preview.title', 'Bundle Preview')}
+              </h3>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg motion-color motion-press focus-ring"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
+            <div className="p-6 overflow-y-auto">
               <div className="space-y-4">
-                <div className="text-sm text-muted">
+                <div className="text-sm text-muted-foreground">
                   {t('settings.importExport.preview.files', { count: preview.file_count, size: formatBytes(preview.total_size) })}
                   {preview.created_at && ` · ${t('settings.importExport.preview.created', { time: preview.created_at })}`}
                 </div>
 
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2">{t('settings.importExport.preview.file', 'File')}</th>
-                      <th className="text-right py-2">{t('settings.importExport.preview.size', 'Size')}</th>
-                      <th className="text-center py-2">{t('settings.importExport.preview.status', 'Status')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.files.map((file) => (
-                      <tr key={file.name} className="border-b">
-                        <td className="py-2 font-mono">{file.name}</td>
-                        <td className="py-2 text-right">{formatBytes(file.size)}</td>
-                        <td className="py-2 text-center">
-                          {file.exists_locally ? (
-                            <span className="text-yellow-600">{t('settings.importExport.preview.willOverwrite', 'Will overwrite')}</span>
-                          ) : (
-                            <span className="text-green-600">{t('settings.importExport.preview.new', 'New')}</span>
-                          )}
-                        </td>
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-surface/60">
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('settings.importExport.preview.file', 'File')}</th>
+                        <th className="text-right py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('settings.importExport.preview.size', 'Size')}</th>
+                        <th className="text-center py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('settings.importExport.preview.status', 'Status')}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {preview.files.map((file) => (
+                        <tr key={file.name} className="border-b border-border last:border-b-0 hover:bg-surface/30 motion-surface">
+                          <td className="py-2.5 px-4 font-mono text-foreground">{file.name}</td>
+                          <td className="py-2.5 px-4 text-right text-muted-foreground">{formatBytes(file.size)}</td>
+                          <td className="py-2.5 px-4 text-center">
+                            {file.exists_locally ? (
+                              <span className="text-amber-400 text-xs font-medium">{t('settings.importExport.preview.willOverwrite', 'Will overwrite')}</span>
+                            ) : (
+                              <span className="text-success text-xs font-medium">{t('settings.importExport.preview.new', 'New')}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-                <div className="flex justify-end gap-3 mt-6">
+                <div className="flex justify-end gap-3 pt-2">
                   <button
                     onClick={() => setShowPreview(false)}
-                    className="px-4 py-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-800"
+                    className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg border border-border motion-color motion-press focus-ring"
                   >
                     {t('settings.importExport.preview.cancel', 'Cancel')}
                   </button>
                   <button
                     onClick={handleConfirmImport}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    className="px-4 py-2 text-sm text-white bg-info hover:bg-info/90 rounded-lg motion-color motion-press focus-ring shadow-sm"
                   >
                     {t('settings.importExport.preview.import', 'Import & Backup')}
                   </button>
