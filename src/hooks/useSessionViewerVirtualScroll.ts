@@ -103,7 +103,15 @@ export function useSessionViewerVirtualScroll({
             .reduce((sum, item) => sum + (item.text?.length ?? 0), 0)
           const baseHeight = 100
           const contentHeight = Math.ceil(textLength / 80) * 32
-          height = Math.min(baseHeight + contentHeight, 800)
+
+          // Rough estimate for tool calls so off-screen items don’t collapse to text-only height
+          const toolCalls = content.filter((item) => item.type === 'toolCall')
+          let toolHeight = 0
+          if (toolCalls.length > 0) {
+            toolHeight = toolsExpanded ? toolCalls.length * 120 : 48
+          }
+
+          height = Math.min(baseHeight + contentHeight + toolHeight, 1200)
           break
         }
         case 'model_change':
@@ -124,7 +132,7 @@ export function useSessionViewerVirtualScroll({
       }
       return height + MESSAGE_ITEM_GAP
     },
-    [hiddenEntryIds, renderableEntries],
+    [hiddenEntryIds, renderableEntries, toolsExpanded],
   )
 
   const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
@@ -145,11 +153,35 @@ export function useSessionViewerVirtualScroll({
         return item.end < scrollOffset
       },
     } as const),
-    measureElement: (element: any, entry: any, instance: any) => {
+    measureElement: (element: HTMLElement, entry: any, instance: any) => {
       const height = measureElement(element, entry, instance)
       const entryId = element.getAttribute('data-entry-id')
       if (entryId) {
-        measuredHeightsRef.current.set(entryId, height)
+        // Skip caching while an ancestor has a CSS transform scale (e.g., modal open animation),
+        // to avoid caching scaled-down heights.
+        let node: HTMLElement | null = element
+        let shouldCache = true
+        while (node) {
+          const transform = window.getComputedStyle(node).transform
+          if (transform && transform !== 'none') {
+            if (/scale\([^1]/.test(transform)) {
+              shouldCache = false
+              break
+            }
+            const m = transform.match(/matrix\(([^)]+)\)/)
+            if (m) {
+              const vals = m[1].split(',').map(Number)
+              if ((vals[0] !== 1 || vals[3] !== 1)) {
+                shouldCache = false
+                break
+              }
+            }
+          }
+          node = node.parentElement
+        }
+        if (shouldCache) {
+          measuredHeightsRef.current.set(entryId, height)
+        }
       }
       return height
     },
@@ -162,8 +194,10 @@ export function useSessionViewerVirtualScroll({
   }, [hiddenEntryIds, rowVirtualizer, sessionPath, toolsExpanded])
 
   useEffect(() => {
+    measuredHeightsRef.current.clear()
     hasTriggeredReachBottomRef.current = false
-  }, [expandedToolIds])
+    rowVirtualizer.measure()
+  }, [expandedToolIds, rowVirtualizer])
 
   // Reset scroll position when switching sessions
   useEffect(() => {

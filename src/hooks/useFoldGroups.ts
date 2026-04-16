@@ -89,7 +89,9 @@ export function useFoldGroups(
             entries: [...foldBuffer],
           })
           for (const fe of foldBuffer) {
-            hiddenEntryIds.add(fe.id)
+            if (fe.id !== leader.id) {
+              hiddenEntryIds.add(fe.id)
+            }
           }
           foldBuffer = []
         }
@@ -104,7 +106,9 @@ export function useFoldGroups(
         entries: [...foldBuffer],
       })
       for (const fe of foldBuffer) {
-        hiddenEntryIds.add(fe.id)
+        if (fe.id !== leader.id) {
+          hiddenEntryIds.add(fe.id)
+        }
       }
     }
 
