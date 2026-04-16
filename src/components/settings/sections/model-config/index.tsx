@@ -12,17 +12,17 @@ import {
 import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsTabs from "@/components/settings/SettingsTabs";
 
-import { MODEL_CONFIG_PATH } from "./model-config/types";
-import { useModelConfig } from "./model-config/useModelConfig";
-import { StatTile } from "./model-config/ui/StatTile";
-import { StatusBanner } from "./model-config/ui/StatusBanner";
-import { ConfirmDialog } from "./model-config/ui/ConfirmDialog";
-import { AddProviderModal } from "./model-config/modals/AddProviderModal";
-import { ImportModal } from "./model-config/modals/ImportModal";
-import { HistoryTab } from "./model-config/tabs/HistoryTab";
-import { ToolsTab } from "./model-config/tabs/ToolsTab";
-import { TestTab } from "./model-config/tabs/TestTab";
-import { ConfigureTab } from "./model-config/tabs/ConfigureTab";
+import { MODEL_CONFIG_PATH } from "./types";
+import { useModelConfig } from "./useModelConfig";
+import { StatTile } from "./ui/StatTile";
+import { StatusBanner } from "./ui/StatusBanner";
+import { ConfirmDialog } from "./ui/ConfirmDialog";
+import { AddProviderModal } from "./modals/AddProviderModal";
+import { ImportModal } from "./modals/ImportModal";
+import { HistoryTab } from "./tabs/HistoryTab";
+import { ToolsTab } from "./tabs/ToolsTab";
+import { TestTab } from "./tabs/TestTab";
+import { ConfigureTab } from "./tabs/ConfigureTab";
 
 export default function ModelConfigCenter() {
   const vm = useModelConfig();

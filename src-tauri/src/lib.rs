@@ -46,7 +46,6 @@ pub mod scanner_scheduler {
 pub use data::search::client as search;
 pub use data::search::embedding as embedding_service;
 pub use data::search::index as search_index;
-pub use data::search::tantivy as tantivy_search;
 pub use data::sqlite as sqlite_cache;
 #[cfg(feature = "gui")]
 pub use server::http as http_adapter;
@@ -137,8 +136,7 @@ pub fn run() {
             remove_tag_from_session,
             move_session_tag,
             reorder_tags,
-            update_tag_auto_rules,
-            evaluate_auto_rules,
+
             list_api_keys,
             create_api_key,
             revoke_api_key,

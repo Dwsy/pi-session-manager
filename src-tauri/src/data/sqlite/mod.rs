@@ -28,11 +28,12 @@ pub use maintenance::{
     preload_recent_sessions, vacuum,
 };
 pub use message_index::{
-    delete_message_entries_for_session, ensure_message_fts_schema, insert_message_entries,
-    search_message_fts, upsert_message_entries,
+    append_message_entries, delete_message_entries_for_session, ensure_message_fts_schema,
+    insert_message_entries, search_message_fts, upsert_message_entries,
 };
 pub use scan_state::{
-    delete_scan_state, get_all_scan_state, upsert_scan_state, upsert_scan_state_for_session,
+    delete_scan_state, get_all_scan_state, get_scan_state, update_scan_state_offset_and_trust,
+    upsert_scan_state, upsert_scan_state_for_session,
 };
 pub use sessions::{
     get_all_cached_file_modified, get_all_sessions, get_all_sessions_for_list, get_session,
@@ -40,7 +41,7 @@ pub use sessions::{
 };
 pub use subagent_meta::{get_cached_subagent_meta, upsert_subagent_meta};
 pub use tags::{
-    assign_tag, create_tag, delete_tag, evaluate_auto_rules, get_all_session_tags, get_all_tags,
-    move_session_tag, remove_tag_from_session, reorder_tags, update_tag, update_tag_auto_rules,
+    assign_tag, create_tag, delete_tag, get_all_session_tags, get_all_tags,
+    move_session_tag, remove_tag_from_session, reorder_tags, update_tag,
 };
 pub use types::{DbFavoriteItem, DbSessionTag, DbTag, SessionDetailsCache};

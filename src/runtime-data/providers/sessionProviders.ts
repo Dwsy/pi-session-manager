@@ -174,15 +174,15 @@ export const backendSessionProvider: SessionProvider = {
   async fullTextSearch(options) {
     return invoke<FullTextSearchResponse>("full_text_search", {
       query: options.query,
-      roleFilter: options.roleFilter,
-      sourceFilter: options.sourceFilter || "all",
-      globPattern: options.globPattern || null,
-      projectPath: options.projectPath || null,
-      includeThinking: getCachedSettings().search.includeThinkingInSearch,
+      role_filter: options.roleFilter,
+      source_filter: options.sourceFilter || "all",
+      glob_pattern: options.globPattern || null,
+      project_path: options.projectPath || null,
+      include_thinking: getCachedSettings().search.includeThinkingInSearch,
       page: options.page,
-      pageSize: options.pageSize,
-      matchMode: options.matchMode || "smart",
-      sortOrder: options.sortOrder || "newest",
+      page_size: options.pageSize,
+      match_mode: options.matchMode || "smart",
+      sort_order: options.sortOrder || "newest",
       from: options.from || null,
       to: options.to || null,
     });
@@ -232,17 +232,16 @@ export const backendSessionProvider: SessionProvider = {
     return invoke<RuntimePaginatedSessionsResponse>("scan_sessions_paginated", {
       offset: options.offset,
       limit: options.limit,
-      searchQuery: options.searchQuery || null,
-      projectFilter: options.projectFilter || null,
-      filterTagIds:
+      search_query: options.searchQuery || null,
+      project_filter: options.projectFilter || null,
+      filter_tag_ids:
         options.filterTagIds && options.filterTagIds.length > 0
           ? options.filterTagIds
           : null,
-      sourceFilterSlugs:
+      source_filter_slugs:
         options.sourceFilterSlugs && options.sourceFilterSlugs.length > 0
           ? options.sourceFilterSlugs
           : null,
-      sortBy: normalizedSortKey,
       sort_by: normalizedSortKey,
     });
   },

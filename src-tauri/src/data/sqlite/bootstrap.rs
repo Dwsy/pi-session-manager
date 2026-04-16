@@ -238,7 +238,9 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             file_modified TEXT NOT NULL,
             file_size INTEGER NOT NULL,
             last_scanned_at TEXT NOT NULL,
-            last_parse_status TEXT NOT NULL
+            last_parse_status TEXT NOT NULL,
+            read_offset INTEGER NOT NULL DEFAULT 0,
+            append_trust_count INTEGER NOT NULL DEFAULT 0
         )",
             [],
         )

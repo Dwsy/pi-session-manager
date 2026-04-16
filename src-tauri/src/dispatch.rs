@@ -38,13 +38,13 @@ fn unpack_pi_rpc_response(response: Value) -> Result<Value, String> {
 /// Dispatch a command to the appropriate handler.
 /// GUI-only commands (terminal, save_session_paths with watcher) are handled
 /// by the caller in ws_adapter.rs.
-#[cfg(not(feature = "gui"))]
+/// Dispatch a command without app_state (for CLI/external callers).
 pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
     dispatch_impl(&None, command, payload).await
 }
 
 #[cfg(feature = "gui")]
-pub async fn dispatch(
+pub async fn dispatch_with_state(
     app_state: &Option<crate::app_state::SharedAppState>,
     command: &str,
     payload: &Value,
@@ -822,18 +822,7 @@ async fn dispatch_impl(
             crate::reorder_tags(tag_ids).await?;
             Ok(Value::Null)
         }
-        "update_tag_auto_rules" => {
-            let id = extract(payload, "id")?;
-            let auto_rules = extract_optional_string(payload, "autoRules");
-            crate::update_tag_auto_rules(id, auto_rules).await?;
-            Ok(Value::Null)
-        }
-        "evaluate_auto_rules" => {
-            let session_id = extract(payload, "sessionId")?;
-            let text = extract(payload, "text")?;
-            let result = crate::evaluate_auto_rules(session_id, text).await?;
-            Ok(to_val(result, "serialize result")?)
-        }
+
 
         // ═══════════════════════════════════════════════════════════════
         // Auth / API keys

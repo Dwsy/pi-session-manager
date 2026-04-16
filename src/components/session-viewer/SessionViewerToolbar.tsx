@@ -46,6 +46,8 @@ export default function SessionViewerToolbar({
   onToggleSidebar,
   onToggleThinking,
   onToggleToolsExpanded,
+  collapseToolCalls,
+  onToggleCollapseToolCalls,
   onToggleScrollMarkers,
   onOpenSearch,
   onMobileMenuOpenChange,
@@ -70,6 +72,9 @@ export default function SessionViewerToolbar({
   const toolsToggleLabel = toolsExpanded
     ? t("session.toolbar.collapseTools", "Collapse tools")
     : t("session.toolbar.expandTools", "Expand tools");
+  const collapseToolCallsToggleLabel = collapseToolCalls
+    ? t("session.toolbar.collapseToolCallsOn", "Grouped tools")
+    : t("session.toolbar.collapseToolCallsOff", "Expanded tools");
   const searchToggleLabel = t(
     "session.toolbar.searchMessages",
     "Search messages",
@@ -211,6 +216,21 @@ export default function SessionViewerToolbar({
                       <ListTree className="h-3.5 w-3.5" />
                     </button>
                   </KbdTooltip>
+                  {onToggleCollapseToolCalls && (
+                    <button
+                      onClick={onToggleCollapseToolCalls}
+                      className={`p-1.5 text-xs ${toggleButtonBase} ${collapseToolCalls ? toggleButtonActive : toggleButtonInactive}`}
+                      title={collapseToolCallsToggleLabel}
+                      aria-label={collapseToolCallsToggleLabel}
+                      aria-pressed={collapseToolCalls}
+                    >
+                      {collapseToolCalls ? (
+                        <ListTree className="h-3.5 w-3.5" />
+                      ) : (
+                        <List className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  )}
                   <button
                     onClick={onOpenSystemPromptDialog}
                     className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
@@ -422,6 +442,22 @@ export default function SessionViewerToolbar({
               <ListTree className="h-4 w-4 text-muted-foreground" />
               {toolsToggleLabel}
             </button>
+            {onToggleCollapseToolCalls && (
+              <button
+                onClick={() => {
+                  onToggleCollapseToolCalls();
+                  closeMobileMenu();
+                }}
+                className={mobileSheetItemClass}
+              >
+                {collapseToolCalls ? (
+                  <ListTree className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <List className="h-4 w-4 text-muted-foreground" />
+                )}
+                {collapseToolCallsToggleLabel}
+              </button>
+            )}
             <button
               onClick={() => {
                 onOpenSystemPromptDialog();

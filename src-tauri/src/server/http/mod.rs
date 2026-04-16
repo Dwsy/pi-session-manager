@@ -1,6 +1,6 @@
 #[cfg(feature = "gui")]
 use crate::app_state::SharedAppState;
-use crate::dispatch::dispatch;
+use crate::dispatch::dispatch_with_state;
 #[cfg(feature = "gui")]
 use crate::server::ws::ws_dispatch;
 use axum::body::Body;
@@ -50,7 +50,7 @@ async fn handle_command(
         headers.get("accept-encoding")
     );
 
-    let result = dispatch(&Some(app_state.clone()), &req.command, &req.payload).await;
+    let result = dispatch_with_state(&Some(app_state.clone()), &req.command, &req.payload).await;
     let resp = match result {
         Ok(data) => common::HttpResponse {
             success: true,

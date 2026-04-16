@@ -296,7 +296,7 @@ impl WsAdapter {
                                         }
                                     }
 
-                                    let result = crate::dispatch::dispatch(&Some(self.app_state.clone()), &request.command, &request.payload).await;
+                                    let result = crate::dispatch::dispatch_with_state(&Some(self.app_state.clone()), &request.command, &request.payload).await;
                                     let accept_gzip = request.accept_gzip;
                                     let response = self.build_response(&request, result);
 
@@ -394,7 +394,7 @@ impl WsAdapter {
     async fn handle_request(&self, request: WsRequest) -> WsResponse {
         log::debug!("Handling command: {} (id: {})", request.command, request.id);
 
-        let result = crate::dispatch::dispatch(
+        let result = crate::dispatch::dispatch_with_state(
             &Some(self.app_state.clone()),
             &request.command,
             &request.payload,
@@ -582,7 +582,7 @@ pub async fn ws_dispatch(
     }
 
     // Delegate to shared dispatch (pure business logic)
-    crate::dispatch::dispatch(&None, command, payload).await
+    crate::dispatch::dispatch(command, payload).await
 }
 
 pub async fn init_ws_adapter(

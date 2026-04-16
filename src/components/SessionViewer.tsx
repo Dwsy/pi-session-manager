@@ -27,8 +27,10 @@ import { useSessionViewerHotkeys } from "@/hooks/useSessionViewerHotkeys";
 import { useSessionViewerInMessageSearch } from "@/hooks/useSessionViewerInMessageSearch";
 import { useSettings } from "@/hooks/useSettings";
 import { usePiLiveSessions } from "@/hooks/usePiLiveSessions";
+import { saveAppSettings } from "@/utils/settingsApi";
 
 import { getPlatformDefaults } from "./settings/types";
+import type { AppSettings } from "./settings/types";
 import type { SessionInfo } from "@/types";
 import type { TerminalType } from "./settings/types";
 import type { SessionViewerToolbarSlots } from "./session-viewer/SessionViewerToolbarTypes";
@@ -86,7 +88,8 @@ function SessionViewerContent({
     restoreSearchExpandedTools,
   } = useSessionView();
   const isMobile = useIsMobile();
-  const { getSessionSetting } = useSettings();
+  const { getSessionSetting, updateSessionSetting, settings } = useSettings();
+  const collapseToolCalls = getSessionSetting('collapseToolCalls') !== false;
   const cmdFBehavior = getSessionSetting('cmdFBehavior') ?? 'inSessionSearch';
   const scrollMarkersEnabledSetting =
     getSessionSetting('scrollMarkersEnabled') ?? false;
@@ -239,6 +242,21 @@ function SessionViewerContent({
     setHasNewMessages(false);
   }, [setHasNewMessages]);
 
+  const handleToggleCollapseToolCalls = useCallback(() => {
+    const next = !collapseToolCalls;
+    updateSessionSetting('collapseToolCalls', next);
+    const nextSettings: AppSettings = {
+      ...settings,
+      session: {
+        ...settings.session,
+        collapseToolCalls: next,
+      },
+    };
+    void saveAppSettings(nextSettings).catch((err) => {
+      console.error('Failed to save collapseToolCalls setting:', err);
+    });
+  }, [collapseToolCalls, updateSessionSetting, settings]);
+
   const {
     markers: scrollMarkers,
     showMarkers: showScrollMarkers,
@@ -312,6 +330,8 @@ function SessionViewerContent({
           onToggleSidebar={handleToggleSidebar}
           onToggleThinking={toggleThinking}
           onToggleToolsExpanded={toggleToolsExpanded}
+          collapseToolCalls={collapseToolCalls}
+          onToggleCollapseToolCalls={handleToggleCollapseToolCalls}
           onToggleScrollMarkers={toggleScrollMarkers}
           onOpenSearch={handleOpenSearch}
           onMobileMenuOpenChange={setShowMobileMenu}

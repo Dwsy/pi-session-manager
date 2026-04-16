@@ -575,15 +575,13 @@ async fn rename_session_impl_with_db_path(
     new_name: String,
     db_path: Option<&Path>,
 ) -> Result<(), String> {
-    let content =
-        fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
-
-    let mut lines: Vec<String> = content.lines().map(|line| line.to_string()).collect();
-    if !update_session_name_lines(&mut lines, &new_name)? {
-        lines.push(build_session_info_line(&new_name)?);
-    }
-
-    fs::write(&path, lines.join("\n")).map_err(|e| format!("Failed to write session file: {e}"))?;
+    let line = build_session_info_line(&new_name)?;
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&path)
+        .map_err(|e| format!("Failed to open session file for append: {e}"))?;
+    std::io::Write::write_all(&mut file, format!("{line}\n").as_bytes())
+        .map_err(|e| format!("Failed to append session info: {e}"))?;
 
     // Sync update to database cache to avoid waiting for file watcher
     let config = config::load_config().map_err(|e| format!("Failed to load config: {e}"))?;
@@ -950,11 +948,14 @@ mod tests {
 
         let content = fs::read_to_string(&path).expect("read updated session");
         let lines: Vec<&str> = content.lines().collect();
+        assert_eq!(lines.len(), 4);
         assert!(lines[0].contains("\"name\":\"header-name\""));
         assert!(lines[1].contains("\"type\":\"session_info\""));
-        assert!(lines[1].contains("\"name\":\"new-name\""));
+        assert!(lines[1].contains("\"name\":\"old\""));
         assert!(lines[1].contains("\"id\":\"info-1\""));
         assert!(lines[2].contains("\"id\":\"m1\""));
+        assert!(lines[3].contains("\"type\":\"session_info\""));
+        assert!(lines[3].contains("\"name\":\"new-name\""));
 
         let _ = fs::remove_file(&path);
         let _ = fs::remove_dir_all(&base_dir);

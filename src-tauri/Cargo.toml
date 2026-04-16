@@ -9,11 +9,6 @@ name = "pi-session-manager"
 path = "src/main.rs"
 required-features = ["gui"]
 
-[[bin]]
-name = "pi-session-cli"
-path = "src/main-cli.rs"
-required-features = ["cli"]
-
 [build-dependencies]
 tauri-build = { version = "2.5.5", features = [] }
 
@@ -31,10 +26,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.0", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
-regex = "1.11"
 glob = "0.3"
 dirs = "5.0"
-tantivy = "0.22"
 lazy_static = "1.4"
 rusqlite = { version = "0.32", features = ["bundled"] }
 tracing = "0.1"

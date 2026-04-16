@@ -38,7 +38,6 @@ pub struct DbTag {
     pub sort_order: i64,
     pub is_builtin: bool,
     pub created_at: String,
-    pub auto_rules: Option<String>,
     pub parent_id: Option<String>,
 }
 

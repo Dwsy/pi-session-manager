@@ -237,6 +237,9 @@ fn get_real_ip(socket_ip: &std::net::IpAddr, headers: &HeaderMap) -> std::net::I
 
 #[tokio::main]
 async fn main() {
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "info");
+    }
     tracing_subscriber::fmt::init();
 
     let cli_args = match parse_cli_args() {
@@ -318,7 +321,7 @@ async fn main() {
     };
 
     let addr = format!("{}:{}", config.bind_addr, config.http_port);
-    info!("🌐 http://{addr}  (API + WS + Frontend)");
+    info!("🌐 http://{addr}  (API + WS)");
     info!("═══════════════════════════════════════");
 
     let s = state.clone();

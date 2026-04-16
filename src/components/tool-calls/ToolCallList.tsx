@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, Clock } from 'lucide-react'
 
@@ -45,7 +45,12 @@ function ToolCallList({
     : appearance.theme as 'light' | 'dark'
   const disableSuccessStyle = settings.appearance.disableToolSuccessStyle
 
-  const [expanded, setExpanded] = useState(false)
+  const collapseToolCalls = settings.session.collapseToolCalls !== false
+  const [expanded, setExpanded] = useState(!collapseToolCalls)
+
+  useEffect(() => {
+    setExpanded(!collapseToolCalls)
+  }, [collapseToolCalls])
   const headerRef = useRef<HTMLButtonElement>(null)
   const pendingAnchorRef = useRef<ViewportAnchorSnapshot | null>(null)
 

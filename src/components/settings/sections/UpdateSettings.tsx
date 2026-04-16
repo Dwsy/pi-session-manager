@@ -474,7 +474,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
               'settings.update.autoCheckHelp',
               'Automatically check once per day',
             )}
-            checked={settings.update.autoCheck !== false}
+            checked={settings.update.autoCheck === true}
             onChange={(checked) => onUpdate('update', 'autoCheck', checked)}
           />
 

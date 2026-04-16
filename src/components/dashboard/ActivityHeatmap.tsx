@@ -57,7 +57,10 @@ export default function ActivityHeatmap({
         const cellDate = new Date(startDate)
         const daysOffset = weekIndex * daysPerWeek + dayOfWeek
         cellDate.setDate(startDate.getDate() + daysOffset)
-        const dateStr = cellDate.toISOString().split('T')[0]
+        const y = cellDate.getFullYear()
+        const m = String(cellDate.getMonth() + 1).padStart(2, '0')
+        const d = String(cellDate.getDate()).padStart(2, '0')
+        const dateStr = `${y}-${m}-${d}`
         row.push(dataMap.get(dateStr) || null)
       }
       grid.push(row)
@@ -75,7 +78,8 @@ export default function ActivityHeatmap({
         className="w-full aspect-square rounded-sm focus-ring focus:ring-1 focus:ring-primary/70"
         style={{
           backgroundColor: point ? HEATMAP_COLORS[point.level] : HEATMAP_COLORS[0],
-          opacity: point && point.level > 0 ? 1 : 0.1,
+          opacity: point && point.level > 0 ? 1 : 0.35,
+          border: point && point.level > 0 ? undefined : '1px solid rgba(255,255,255,0.06)',
         }}
         onClick={() => point && onDayClick?.(point)}
         aria-label={point ? `${point.date}: ${point.total_messages}` : 'No activity'}

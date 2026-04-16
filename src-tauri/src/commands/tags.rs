@@ -16,7 +16,6 @@ pub struct TagItem {
     pub sort_order: i64,
     pub is_builtin: bool,
     pub created_at: String,
-    pub auto_rules: Option<String>,
     pub parent_id: Option<String>,
 }
 
@@ -75,7 +74,6 @@ impl From<crate::data::sqlite::DbTag> for TagItem {
             sort_order: t.sort_order,
             is_builtin: t.is_builtin,
             created_at: t.created_at,
-            auto_rules: t.auto_rules,
             parent_id: t.parent_id,
         }
     }
@@ -264,7 +262,6 @@ pub async fn create_tag(
         sort_order: next_sort_order(&file.tags),
         is_builtin: false,
         created_at: Utc::now().to_rfc3339(),
-        auto_rules: None,
         parent_id,
     };
     file.tags.push(tag.clone());
@@ -367,215 +364,4 @@ pub async fn reorder_tags(tag_ids: Vec<String>) -> Result<(), String> {
     save_tags_file(&file)
 }
 
-#[cfg_attr(feature = "gui", tauri::command)]
-pub async fn update_tag_auto_rules(id: String, auto_rules: Option<String>) -> Result<(), String> {
-    let mut file = load_tags_file()?;
-    let Some(tag) = file.tags.iter_mut().find(|tag| tag.id == id) else {
-        return Err(format!("Tag not found: {id}"));
-    };
-    tag.auto_rules = auto_rules;
-    save_tags_file(&file)
-}
 
-#[cfg_attr(feature = "gui", tauri::command)]
-pub async fn evaluate_auto_rules(session_id: String, text: String) -> Result<Vec<String>, String> {
-    let tags_file = load_tags_file()?;
-    let mut marks_file = load_session_marks_file()?;
-    let mut matched = Vec::new();
-
-    for tag in &tags_file.tags {
-        let rules_json = match &tag.auto_rules {
-            Some(value) if !value.is_empty() => value,
-            _ => continue,
-        };
-        let rules: Vec<serde_json::Value> = serde_json::from_str(rules_json).unwrap_or_default();
-        for rule in &rules {
-            let enabled = rule
-                .get("enabled")
-                .and_then(|value| value.as_bool())
-                .unwrap_or(false);
-            let pattern = rule
-                .get("pattern")
-                .and_then(|value| value.as_str())
-                .unwrap_or("");
-            if !enabled || pattern.is_empty() {
-                continue;
-            }
-            if let Ok(re) = regex::Regex::new(pattern) {
-                if re.is_match(&text) {
-                    assign_tag_in_memory(&mut marks_file.session_tags, &session_id, &tag.id);
-                    matched.push(tag.id.clone());
-                    break;
-                }
-            }
-        }
-    }
-
-    if !matched.is_empty() {
-        save_session_marks_file(&marks_file)?;
-    }
-
-    Ok(matched)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::config::Config;
-    use serde_json::json;
-    use std::sync::{Mutex, OnceLock};
-    use tempfile::tempdir;
-
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
-
-    fn lock_env() -> std::sync::MutexGuard<'static, ()> {
-        env_lock()
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-
-    fn setup_env() -> tempfile::TempDir {
-        std::env::remove_var("HOME");
-        std::env::remove_var("PPM_TEST_DB");
-        let temp = tempdir().expect("tempdir");
-        std::env::set_var("HOME", temp.path());
-        std::env::set_var("PPM_TEST_DB", temp.path().join("sessions.db"));
-        crate::config::save_config(&Config::default()).expect("save config");
-        temp
-    }
-
-    #[tokio::test]
-    async fn migrates_tags_from_db_when_json_missing() {
-        let _guard = lock_env();
-        let temp = setup_env();
-        let conn = get_conn().expect("db conn");
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tags (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                color TEXT NOT NULL,
-                icon TEXT,
-                sort_order INTEGER NOT NULL,
-                is_builtin INTEGER NOT NULL,
-                created_at TEXT NOT NULL,
-                auto_rules TEXT,
-                parent_id TEXT
-            )",
-            [],
-        )
-        .expect("create legacy tags table");
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS session_tags (
-                session_id TEXT NOT NULL,
-                tag_id TEXT NOT NULL,
-                position INTEGER NOT NULL,
-                assigned_at TEXT NOT NULL,
-                PRIMARY KEY (session_id, tag_id)
-            )",
-            [],
-        )
-        .expect("create legacy session_tags table");
-
-        crate::data::sqlite::create_tag(&conn, "tag-a", "Alpha", "blue", None, None)
-            .expect("create db tag");
-        crate::data::sqlite::assign_tag(&conn, "session-1", "tag-a").expect("assign db tag");
-
-        let tags = get_all_tags().await.expect("load tags");
-        let marks = get_all_session_tags().await.expect("load marks");
-
-        assert!(tags.iter().any(|tag| tag.id == "tag-a"));
-        assert_eq!(marks.len(), 1);
-        assert_eq!(marks[0].session_id, "session-1");
-
-        let tags_file = load_tags_file().expect("tags file");
-        let marks_file = load_session_marks_file().expect("marks file");
-        assert!(tags_config_path().expect("tags path").exists());
-        assert!(session_mark_path().expect("marks path").exists());
-        assert!(tags_file.migrated_at.is_some());
-        assert!(marks_file.migrated_at.is_some());
-
-        drop(conn);
-        drop(temp);
-        std::env::remove_var("PPM_TEST_DB");
-        std::env::remove_var("HOME");
-    }
-
-    #[tokio::test]
-    async fn create_reorder_assign_and_delete_tags_in_json_files() {
-        let _guard = lock_env();
-        let temp = setup_env();
-
-        let first = create_tag("Alpha".into(), "blue".into(), None, None)
-            .await
-            .expect("create first tag");
-        let second = create_tag("Beta".into(), "green".into(), None, None)
-            .await
-            .expect("create second tag");
-
-        reorder_tags(vec![second.id.clone(), first.id.clone()])
-            .await
-            .expect("reorder tags");
-        assign_tag("session-1".into(), second.id.clone())
-            .await
-            .expect("assign second tag");
-        remove_tag_from_session("session-1".into(), second.id.clone())
-            .await
-            .expect("remove tag from session");
-        delete_tag(first.id.clone())
-            .await
-            .expect("delete first tag");
-
-        let tags = get_all_tags().await.expect("get tags after delete");
-        let marks = get_all_session_tags()
-            .await
-            .expect("get marks after delete");
-        assert!(tags.iter().any(|tag| tag.id == second.id));
-        assert!(!tags.iter().any(|tag| tag.id == first.id));
-        assert!(marks.is_empty());
-
-        let tags_file = load_tags_file().expect("tags file");
-        assert!(tags_file.tags.iter().any(|tag| tag.id == second.id));
-
-        drop(temp);
-        std::env::remove_var("PPM_TEST_DB");
-        std::env::remove_var("HOME");
-    }
-
-    #[tokio::test]
-    async fn evaluate_auto_rules_writes_session_marks() {
-        let _guard = lock_env();
-        let temp = setup_env();
-
-        let tag = create_tag("Important".into(), "red".into(), None, None)
-            .await
-            .expect("create tag");
-        let rules = json!([
-            {
-                "enabled": true,
-                "pattern": "urgent"
-            }
-        ]);
-        update_tag_auto_rules(tag.id.clone(), Some(rules.to_string()))
-            .await
-            .expect("update auto rules");
-
-        let matched = evaluate_auto_rules("session-42".into(), "this is urgent work".into())
-            .await
-            .expect("evaluate rules");
-        assert_eq!(matched, vec![tag.id.clone()]);
-
-        let marks = get_all_session_tags()
-            .await
-            .expect("marks after auto rules");
-        assert_eq!(marks.len(), 1);
-        assert_eq!(marks[0].session_id, "session-42");
-        assert_eq!(marks[0].tag_id, tag.id);
-
-        drop(temp);
-        std::env::remove_var("PPM_TEST_DB");
-        std::env::remove_var("HOME");
-    }
-}

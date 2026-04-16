@@ -61,6 +61,39 @@ export function buildPiResumeCommand(
 
   return applyResumeTemplate(template, session, piCommand);
 }
+export function buildPiForkCommand(
+  session: SessionInfo,
+  overrides: ResumeCommandOverrides = {},
+): string {
+  const settings = getCachedSettings();
+  const template =
+    overrides.resumeCommand ?? settings.terminal?.resumeCommand ?? "";
+  const piCommand = overrides.piPath ?? settings.terminal?.piCommandPath ?? "pi";
+
+  if (!template.trim()) {
+    const baseCommand = `${piCommand} --fork "${session.path}"`;
+    return session.cwd
+      ? `cd "${session.cwd}" && ${baseCommand}`
+      : baseCommand;
+  }
+
+  const hasPlaceholders =
+    template.includes("{cwd}") ||
+    template.includes("{path}") ||
+    template.includes("{pi}");
+
+  if (template.includes("new-session") && !hasPlaceholders) {
+    const sessionSuffix = session.id ? session.id.slice(0, 4) : "pi";
+    const sessionName = `pi-${sessionSuffix}`;
+    const nestedCommand = session.cwd
+      ? `cd "${session.cwd}" && ${piCommand} --fork "${session.path}"`
+      : `${piCommand} --fork "${session.path}"`;
+    return `${template.replace(/-s\\s+pi\b/, `-s ${sessionName}`)} '${nestedCommand}'`;
+  }
+
+  return applyResumeTemplate(template, session, piCommand);
+}
+
 
 export function getConfiguredExternalResumeTarget():
   | SessionConvertTarget

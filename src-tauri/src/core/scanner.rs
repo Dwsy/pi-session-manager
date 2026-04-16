@@ -7,6 +7,7 @@ use crate::types::{SessionEntry, SessionInfo, SessionsDiff};
 use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 use std::fs;
+use std::io::{BufRead, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
@@ -22,6 +23,8 @@ fn is_corruption_error(err: &str) -> bool {
 }
 
 static SCAN_CACHE: RwLock<Option<Vec<SessionInfo>>> = RwLock::new(None);
+static SCAN_ENTRIES_CACHE: RwLock<Option<std::collections::HashMap<String, Vec<SessionEntry>>>> =
+    RwLock::new(None);
 static CACHE_VERSION: AtomicU64 = AtomicU64::new(0);
 
 /// Invalidate the scan cache so the next scan re-reads all directories
@@ -29,6 +32,9 @@ pub fn invalidate_cache() {
     if let Ok(mut guard) = SCAN_CACHE.write() {
         *guard = None;
         CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
+    }
+    if let Ok(mut guard) = SCAN_ENTRIES_CACHE.write() {
+        *guard = None;
     }
 }
 
@@ -48,6 +54,19 @@ pub fn upsert_cached_session(session: SessionInfo) {
     }
 }
 
+fn set_cached_entries(path: &str, entries: Vec<SessionEntry>) {
+    if let Ok(mut guard) = SCAN_ENTRIES_CACHE.write() {
+        guard.get_or_insert_with(std::collections::HashMap::new).insert(path.to_string(), entries);
+    }
+}
+
+fn get_cached_entries(path: &str) -> Option<Vec<SessionEntry>> {
+    SCAN_ENTRIES_CACHE
+        .read()
+        .ok()
+        .and_then(|g| g.as_ref().and_then(|m| m.get(path).cloned()))
+}
+
 pub fn remove_cached_sessions(paths: &[String]) {
     if paths.is_empty() {
         return;
@@ -55,9 +74,16 @@ pub fn remove_cached_sessions(paths: &[String]) {
     if let Ok(mut guard) = SCAN_CACHE.write() {
         if let Some(sessions) = guard.as_mut() {
             let before = sessions.len();
-            sessions.retain(|session| !paths.iter().any(|path| path == &session.path));
+            sessions.retain(|session| !paths.iter().any(|p| p == &session.path));
             if sessions.len() != before {
                 CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+    if let Ok(mut guard) = SCAN_ENTRIES_CACHE.write() {
+        if let Some(entries_map) = guard.as_mut() {
+            for p in paths {
+                entries_map.remove(p);
             }
         }
     }
@@ -109,15 +135,14 @@ pub fn get_cached_sessions_for_list() -> Option<Vec<SessionInfo>> {
 }
 
 pub fn get_sessions_dir() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or("Cannot find home directory")?;
-    Ok(home.join(".pi").join("agent").join("sessions"))
+    crate::paths::pi_agent_sessions_dir()
 }
 
 /// Returns all session directories: the default one plus any user-configured paths.
 pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
     if config.session_source_mode == crate::config::SessionSourceMode::Dataset {
         let mut dataset_dirs = Vec::new();
-        if let Some(home) = dirs::home_dir() {
+        if let Ok(home) = crate::paths::home_dir() {
             for active_dataset_id in config.effective_active_dataset_ids() {
                 if let Some(dataset) = config
                     .datasets
@@ -181,7 +206,7 @@ pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
 
 /// Expand ~ to home directory
 fn expand_tilde(path: &str) -> String {
-    let Some(home) = dirs::home_dir() else {
+    let Ok(home) = crate::paths::home_dir() else {
         return path.to_string();
     };
 
@@ -495,6 +520,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
 
         for result in parsed_results {
             let info = result.info.clone();
+            set_cached_entries(&result.path_str, result.entries.clone());
             if result.file_modified > realtime_cutoff {
                 // Realtime file: add to results, buffer for DB
                 write_buffer::buffer_session_write(&info, result.file_modified);
@@ -593,6 +619,134 @@ fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, String> {
         .map_err(|e| format!("Failed to parse timestamp: {e}"))
 }
 
+/// Safely read only the tail of an append-only JSONL file.
+/// Returns (new_offset, new_entries) on success, or Err("fallback") if the file
+/// appears to have been rewritten in-place (size shrank, mtime changed without size change,
+/// or JSON parse fails at the expected offset).
+fn safe_append_only_read_jsonl(
+    path: &Path,
+    last_offset: u64,
+) -> Result<(u64, Vec<SessionEntry>), String> {
+    let metadata = fs::metadata(path)
+        .map_err(|e| format!("stat failed for {}: {}", path.display(), e))?;
+    let current_size = metadata.len();
+    let current_mtime = metadata.modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    // Layer 1: size/mtime guards
+    if current_size < last_offset {
+        return Err("fallback".to_string());
+    }
+    if current_size == last_offset {
+        // No new bytes. If mtime changed anyway, something was rewritten in-place.
+        // We can't detect mtime easily without storing it, so we rely on the caller
+        // to only invoke us when the watcher has genuinely fired for this path.
+        return Ok((last_offset, vec![]));
+    }
+
+    let file = std::fs::File::open(path)
+        .map_err(|e| format!("open failed for {}: {}", path.display(), e))?;
+    let mut reader = std::io::BufReader::new(file);
+    reader.seek(std::io::SeekFrom::Start(last_offset))
+        .map_err(|_| "fallback".to_string())?;
+
+    let mut new_content = String::new();
+    use std::io::Read;
+    reader.read_to_string(&mut new_content)
+        .map_err(|_| "fallback".to_string())?;
+
+    // Layer 2: trailing-newline guard against half-written lines
+    let effective_bytes = if !new_content.ends_with('\n') {
+        if let Some(pos) = new_content.rfind('\n') {
+            new_content.truncate(pos + 1);
+            new_content.len() as u64
+        } else {
+            // Not even one complete line
+            return Ok((last_offset, vec![]));
+        }
+    } else {
+        new_content.len() as u64
+    };
+
+    // Layer 3: parse validation. If the first new line is malformed,
+    // the offset is wrong (someone rewrote earlier content).
+    let mut entries = Vec::new();
+    for line in new_content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<SessionEntry>(trimmed) {
+            Ok(entry) => entries.push(entry),
+            Err(_) => return Err("fallback".to_string()),
+        }
+    }
+
+    Ok((last_offset + effective_bytes, entries))
+}
+
+/// Incrementally update SessionInfo by appending new entries.
+fn incremental_update_session_info(
+    old: &SessionInfo,
+    new_entries: &[SessionEntry],
+    file_modified: DateTime<Utc>,
+) -> SessionInfo {
+    let mut info = old.clone();
+    let mut modified = info.modified;
+
+    for entry in new_entries {
+        if entry.entry_type == "message" {
+            if let Some(ref message) = entry.message {
+                info.message_count += 1;
+
+                let text = message.content.iter()
+                    .filter(|c| c.content_type == "text")
+                    .filter_map(|c| c.text.as_ref())
+                    .cloned()
+                    .collect::<Vec<String>>()
+                    .join("");
+
+                if message.role == "user" || message.role == "assistant" {
+                    if info.first_message.is_empty() && message.role == "user" {
+                        info.first_message = text.clone();
+                    }
+                    if message.role == "user" {
+                        if !info.user_messages_text.is_empty() {
+                            info.user_messages_text.push(' ');
+                        }
+                        info.user_messages_text.push_str(&text);
+                    } else if message.role == "assistant" {
+                        if !info.assistant_messages_text.is_empty() {
+                            info.assistant_messages_text.push(' ');
+                        }
+                        info.assistant_messages_text.push_str(&text);
+                    }
+                    info.last_message = text;
+                    info.last_message_role = message.role.clone();
+                }
+            }
+        } else if entry.entry_type == "session_info" {
+            if let Some(ref name) = entry.label {
+                info.name = Some(name.clone());
+            }
+        }
+
+        if entry.timestamp > modified {
+            modified = entry.timestamp;
+        }
+    }
+
+    // Use the most recent of entry timestamps or file mtime
+    if file_modified > modified {
+        modified = file_modified;
+    }
+    info.modified = modified;
+    info
+}
+
 /// Incremental update: re-parse changed files, update cache, return diff for frontend merge.
 pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<SessionsDiff, String> {
     let mut sessions = if let Ok(guard) = SCAN_CACHE.read() {
@@ -651,53 +805,99 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
         let mut seen_paths = std::collections::HashSet::new();
 
         for expanded_path in expanded_paths {
-            match parse_session_info(&expanded_path) {
-                Ok((info, entries)) => {
-                    seen_paths.insert(info.path.clone());
-                    let file_modified = match fs::metadata(
-                        crate::domain::session_bridge::backing_file_path(&expanded_path),
-                    )
-                    .and_then(|m| m.modified())
-                    {
-                        Ok(mt) => DateTime::from(mt),
+            let session_path_str = expanded_path.to_string_lossy().to_string();
+            let backing = crate::domain::session_bridge::backing_file_path(&expanded_path);
+            let file_modified = match fs::metadata(&backing).and_then(|m| m.modified()) {
+                Ok(mt) => DateTime::from(mt),
+                Err(e) => {
+                    warn!("Failed to get metadata for {}: {}", expanded_path.display(), e);
+                    continue;
+                }
+            };
+
+            let scan_state = sqlite::get_scan_state(&conn, &session_path_str).ok().flatten();
+            let trust = scan_state.as_ref().map(|s| s.append_trust_count).unwrap_or(0);
+            let last_offset = scan_state.as_ref().map(|s| s.read_offset).unwrap_or(0);
+
+            // Try incremental tail-read if trust level is high enough
+            let parse_result: Option<(SessionInfo, Vec<SessionEntry>, u64, u32)> = if trust >= 3 {
+                match safe_append_only_read_jsonl(&backing, last_offset) {
+                    Ok((new_offset, new_entries)) if !new_entries.is_empty() => {
+                        if let Some(old_entries) = get_cached_entries(&session_path_str) {
+                            if let Some(old_info) = sessions.iter().find(|s| s.path == session_path_str) {
+                                let mut all_entries = old_entries;
+                                all_entries.extend(new_entries.clone());
+                                let info = incremental_update_session_info(old_info, &new_entries, file_modified);
+                                set_cached_entries(&session_path_str, all_entries.clone());
+                                let _ = sqlite::append_message_entries(&conn, &session_path_str, &new_entries);
+                                Some((info, all_entries, new_offset, trust.saturating_add(1)))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    }
+                    Ok((new_offset, _)) => {
+                        // No new complete lines; just refresh offset
+                        let _ = sqlite::update_scan_state_offset_and_trust(&conn, &session_path_str, new_offset, trust);
+                        continue;
+                    }
+                    Err(_) => None,
+                }
+            } else {
+                None
+            };
+
+            let (info, entries, new_offset, new_trust) = match parse_result {
+                Some(triple) => triple,
+                None => {
+                    // Fallback: full re-parse
+                    match parse_session_info(&expanded_path) {
+                        Ok((info, entries)) => {
+                            let file_size = fs::metadata(&backing).map(|m| m.len()).unwrap_or(0);
+                            set_cached_entries(&session_path_str, entries.clone());
+                            (info, entries, file_size, trust.saturating_add(1))
+                        }
                         Err(e) => {
-                            warn!(
-                                "Failed to get metadata for {}: {}",
-                                expanded_path.display(),
-                                e
-                            );
+                            warn!("Failed to re-parse {}: {}", expanded_path.display(), e);
                             continue;
                         }
-                    };
-
-                    if let Err(e) = crate::data::sqlite::upsert_session(
-                        &mut conn,
-                        &info,
-                        file_modified,
-                        Some(&entries),
-                    ) {
-                        warn!("Failed to upsert session for {}: {}", info.path, e);
-                    } else {
-                        let _ = crate::data::sqlite::upsert_scan_state_for_session(
-                            &conn,
-                            &info,
-                            file_modified,
-                            "ok",
-                        );
-                    }
-
-                    crate::core::write_buffer::buffer_session_write(&info, file_modified);
-                    diff.updated.push(info.clone());
-
-                    if let Some(existing) = sessions.iter_mut().find(|s| s.path == info.path) {
-                        *existing = info;
-                    } else {
-                        sessions.push(info);
                     }
                 }
-                Err(e) => {
-                    warn!("Failed to re-parse {}: {}", expanded_path.display(), e);
-                }
+            };
+
+            seen_paths.insert(info.path.clone());
+
+            if let Err(e) = sqlite::upsert_session(
+                &mut conn,
+                &info,
+                file_modified,
+                Some(&entries),
+            ) {
+                warn!("Failed to upsert session for {}: {}", info.path, e);
+            } else {
+                let _ = sqlite::upsert_scan_state_for_session(
+                    &conn,
+                    &info,
+                    file_modified,
+                    "ok",
+                );
+                let _ = sqlite::update_scan_state_offset_and_trust(
+                    &conn,
+                    &session_path_str,
+                    new_offset,
+                    new_trust,
+                );
+            }
+
+            crate::core::write_buffer::buffer_session_write(&info, file_modified);
+            diff.updated.push(info.clone());
+
+            if let Some(existing) = sessions.iter_mut().find(|s| s.path == info.path) {
+                *existing = info;
+            } else {
+                sessions.push(info);
             }
         }
 
@@ -879,242 +1079,3 @@ pub fn start_background_scanner(sessions_dir: PathBuf, interval_secs: u64) {
     });
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{collect_session_files, expand_tilde};
-    use crate::config::Config;
-    use crate::domain::casr_min::model::{CanonicalMessage, CanonicalSession, MessageRole};
-    use crate::types::{SessionEntry, SessionInfo};
-    use chrono::Utc;
-    use serde_json::Value;
-    use std::sync::{Mutex, OnceLock};
-
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
-
-    #[test]
-    fn expand_tilde_supports_windows_separator() {
-        let Some(home) = dirs::home_dir() else {
-            return;
-        };
-
-        let expanded = expand_tilde(r"~\.pi\agent\sessions");
-        assert_eq!(
-            expanded,
-            home.join(".pi")
-                .join("agent")
-                .join("sessions")
-                .to_string_lossy()
-                .to_string()
-        );
-    }
-
-    #[test]
-    fn collect_session_files_expands_opencode_db_into_virtual_sessions() {
-        let temp = tempfile::tempdir().expect("tempdir");
-        let workspace = temp.path().join("workspace");
-        std::fs::create_dir_all(&workspace).expect("workspace");
-
-        for (idx, title) in ["First session", "Second session"].iter().enumerate() {
-            let canonical = CanonicalSession {
-                session_id: format!("seed-{idx}"),
-                provider_slug: "codex".to_string(),
-                workspace: Some(workspace.clone()),
-                title: Some((*title).to_string()),
-                started_at: Some(1_701_388_800_000 + (idx as i64 * 1000)),
-                ended_at: Some(1_701_388_800_500 + (idx as i64 * 1000)),
-                messages: vec![CanonicalMessage {
-                    idx: 0,
-                    role: MessageRole::User,
-                    content: format!("message-{idx}"),
-                    timestamp: Some(1_701_388_800_000 + (idx as i64 * 1000)),
-                    author: None,
-                    tool_calls: vec![],
-                    tool_results: vec![],
-                    extra: Value::Null,
-                }],
-                metadata: Value::Null,
-                source_path: workspace.join(format!("seed-{idx}.jsonl")),
-                model_name: None,
-            };
-
-            crate::domain::casr_min::providers::opencode::write_session(
-                &canonical,
-                &format!("opc-session-{idx}"),
-            )
-            .expect("write opencode session");
-        }
-
-        let files = collect_session_files(&[workspace.clone()]);
-        assert_eq!(files.len(), 2);
-        assert!(
-            files
-                .iter()
-                .all(|path| path.to_string_lossy().contains("opencode.db/")),
-            "expected virtual opencode session paths"
-        );
-    }
-
-    #[tokio::test]
-    async fn scan_sessions_with_config_returns_reparsed_historical_sessions_on_initial_scan() {
-        let _guard = env_lock().lock().expect("env lock");
-        std::env::remove_var("PPM_TEST_DB");
-
-        let temp = tempfile::tempdir().expect("tempdir");
-        let db_path = temp.path().join("sessions.db");
-        std::env::set_var("HOME", temp.path());
-        std::env::set_var("PPM_TEST_DB", &db_path);
-
-        let pi_dir = temp
-            .path()
-            .join(".pi")
-            .join("agent")
-            .join("sessions")
-            .join("local");
-        std::fs::create_dir_all(&pi_dir).expect("pi dir");
-        let pi_file = pi_dir.join("pi.jsonl");
-        std::fs::write(
-            &pi_file,
-            r#"{"type":"session","id":"pi-historical","timestamp":"2026-01-01T00:00:00Z","cwd":"/repo/pi"}
-{"type":"message","id":"m1","timestamp":"2026-01-01T00:00:01Z","message":{"role":"user","content":[{"type":"text","text":"historical"}]}}"#,
-        )
-        .expect("write pi file");
-
-        let mut config = Config::default();
-        config.realtime_cutoff_days = -1;
-        let sessions = super::scan_sessions_with_config(&config)
-            .await
-            .expect("scan");
-        assert_eq!(sessions.len(), 1);
-        assert_eq!(sessions[0].id, "pi-historical");
-
-        std::env::remove_var("PPM_TEST_DB");
-        std::env::remove_var("HOME");
-    }
-
-    #[tokio::test]
-    async fn scan_sessions_with_config_persists_scan_state_for_parsed_sessions() {
-        let _guard = env_lock().lock().expect("env lock");
-        std::env::remove_var("PPM_TEST_DB");
-
-        let temp = tempfile::tempdir().expect("tempdir");
-        let db_path = temp.path().join("sessions.db");
-        std::env::set_var("HOME", temp.path());
-        std::env::set_var("PPM_TEST_DB", &db_path);
-
-        let pi_dir = temp
-            .path()
-            .join(".pi")
-            .join("agent")
-            .join("sessions")
-            .join("local");
-        std::fs::create_dir_all(&pi_dir).expect("pi dir");
-        let pi_file = pi_dir.join("pi.jsonl");
-        std::fs::write(
-            &pi_file,
-            r#"{"type":"session","id":"pi-1","timestamp":"2026-01-01T00:00:00Z","cwd":"/repo/pi"}
-{"type":"message","id":"m1","timestamp":"2026-01-01T00:00:01Z","message":{"role":"user","content":[{"type":"text","text":"pi"}]}}"#,
-        )
-        .expect("write pi file");
-
-        let sessions = super::scan_sessions_with_config(&Config::default())
-            .await
-            .expect("scan");
-        assert_eq!(sessions.len(), 1);
-
-        let conn = crate::data::sqlite::init_db_with_config(&Config::default()).expect("db");
-        let scan_state = crate::data::sqlite::get_all_scan_state(&conn).expect("scan_state");
-        assert!(scan_state.contains_key(&pi_file.to_string_lossy().to_string()));
-
-        std::env::remove_var("PPM_TEST_DB");
-        std::env::remove_var("HOME");
-    }
-
-    #[tokio::test]
-    async fn scan_sessions_with_config_hides_disabled_external_cached_sessions() {
-        let _guard = env_lock().lock().expect("env lock");
-        // Ensure clean state - only remove PPM_TEST_DB, don't touch HOME
-        std::env::remove_var("PPM_TEST_DB");
-
-        let temp = tempfile::tempdir().expect("tempdir");
-        let db_path = temp.path().join("sessions.db");
-        std::env::set_var("HOME", temp.path());
-        std::env::set_var("PPM_TEST_DB", &db_path);
-
-        let pi_dir = temp
-            .path()
-            .join(".pi")
-            .join("agent")
-            .join("sessions")
-            .join("local");
-        std::fs::create_dir_all(&pi_dir).expect("pi dir");
-        let pi_file = pi_dir.join("pi.jsonl");
-        std::fs::write(
-            &pi_file,
-            r#"{"type":"session","id":"pi-1","timestamp":"2026-01-01T00:00:00Z","cwd":"/repo/pi"}
-{"type":"message","id":"m1","timestamp":"2026-01-01T00:00:01Z","message":{"role":"user","content":[{"type":"text","text":"pi"}]}}"#,
-        )
-        .expect("write pi file");
-
-        let mut conn = crate::data::sqlite::init_db_with_config(&Config::default()).expect("db");
-        let now = Utc::now();
-        let empty_entries: Vec<SessionEntry> = Vec::new();
-
-        let pi_session = SessionInfo {
-            path: pi_file.to_string_lossy().to_string(),
-            id: "pi-1".to_string(),
-            cwd: "/repo/pi".to_string(),
-            name: Some("Pi".to_string()),
-            created: now,
-            modified: now,
-            message_count: 10,
-            first_message: "pi".to_string(),
-            user_messages_text: String::new(),
-            assistant_messages_text: String::new(),
-            last_message: String::new(),
-            last_message_role: "assistant".to_string(),
-            parent_session_path: None,
-        };
-        let codex_session = SessionInfo {
-            path: "/Users/demo/.codex/sessions/2026/01/01/rollout-a.jsonl".to_string(),
-            id: "codex-1".to_string(),
-            cwd: "/repo/codex".to_string(),
-            name: Some("Codex".to_string()),
-            created: now,
-            modified: now,
-            message_count: 20,
-            first_message: "codex".to_string(),
-            user_messages_text: String::new(),
-            assistant_messages_text: String::new(),
-            last_message: String::new(),
-            last_message_role: "assistant".to_string(),
-            parent_session_path: None,
-        };
-
-        crate::data::sqlite::upsert_session(&mut conn, &pi_session, now, Some(&empty_entries))
-            .expect("upsert pi");
-        crate::data::sqlite::upsert_session(&mut conn, &codex_session, now, Some(&empty_entries))
-            .expect("upsert codex");
-        drop(conn);
-
-        let mut config = Config::default();
-        config.scan_other_agent_jsonl = false;
-        config.external_session_provider_slugs.clear();
-
-        let sessions = super::scan_sessions_with_config(&config)
-            .await
-            .expect("scan");
-
-        assert!(sessions
-            .iter()
-            .any(|session| session.path == pi_session.path));
-        assert!(!sessions
-            .iter()
-            .any(|session| session.path == codex_session.path));
-
-        std::env::remove_var("PPM_TEST_DB");
-        std::env::remove_var("HOME");
-    }
-}

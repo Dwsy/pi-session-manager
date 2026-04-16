@@ -26,6 +26,8 @@ export interface SessionViewerToolbarProps {
   onToggleSidebar: () => void;
   onToggleThinking: () => void;
   onToggleToolsExpanded: () => void;
+  collapseToolCalls?: boolean;
+  onToggleCollapseToolCalls?: () => void;
   onToggleScrollMarkers?: () => void;
   onToggleTraceMode?: () => void;
   traceModeActive?: boolean;

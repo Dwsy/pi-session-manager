@@ -166,7 +166,7 @@ export default function HeatmapTooltip({
       className="block w-full"
       onMouseEnter={openTooltip}
       onMouseLeave={handleAnchorLeave}
-      onClickCapture={closeImmediately}
+      onClick={closeImmediately}
     >
       {children}
 
@@ -183,6 +183,7 @@ export default function HeatmapTooltip({
           }}
           onMouseEnter={cancelClose}
           onMouseLeave={handleTooltipLeave}
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="relative rounded-xl border border-white/20 bg-background/88 backdrop-blur-xl shadow-[0_16px_40px_rgba(0,0,0,0.2)] px-3.5 py-3 min-w-[240px] max-w-[300px]">
             <div className="text-sm font-semibold text-foreground mb-2">{formattedDate}</div>

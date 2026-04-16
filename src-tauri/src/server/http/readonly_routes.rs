@@ -2,7 +2,7 @@
 use crate::api_readonly;
 #[cfg(feature = "gui")]
 use crate::app_state::SharedAppState;
-use crate::dispatch::dispatch;
+use crate::dispatch::dispatch_with_state as dispatch;
 #[cfg(feature = "gui")]
 use crate::server::ws::ws_dispatch;
 use axum::extract::{ConnectInfo, State};

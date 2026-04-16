@@ -1,0 +1,70 @@
+name: Cleanup Old Actions Storage
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+          cutoff=$(date -d '7 days ago' -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "Artifact cutoff: $cutoff"
+          page=1
+          while true; do
+            resp=$(gh api "repos/$REPO/actions/artifacts?per_page=100&page=$page" || true)
+            [ -z "$resp" ] && break
+            total=$(echo "$resp" | jq '.total_count // 0')
+            [ "$total" -eq 0 ] && break
+            ids=$(echo "$resp" | jq --arg cutoff "$cutoff" -r '.artifacts[] | select(.created_at <= $cutoff) | .id')
+            if [ -z "$ids" ]; then
+              echo "Page $page: no old artifacts"
+            else
+              for id in $ids; do
+                echo "Deleting artifact $id"
+                gh api -X DELETE "repos/$REPO/actions/artifacts/$id" || true
+              done
+            fi
+            count=$(echo "$resp" | jq '.artifacts | length')
+            [ "$count" -lt 100 ] && break
+            page=$((page + 1))
+          done
+
+      - name: Delete old caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+          cutoff=$(date -d '7 days ago' -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "Cache cutoff: $cutoff"
+          page=1
+          while true; do
+            resp=$(gh api "repos/$REPO/actions/caches?per_page=100&page=$page" || true)
+            [ -z "$resp" ] && break
+            total=$(echo "$resp" | jq '.total_count // 0')
+            [ "$total" -eq 0 ] && break
+            ids=$(echo "$resp" | jq --arg cutoff "$cutoff" -r '.actions_caches[] | select(.created_at <= $cutoff) | .id')
+            if [ -z "$ids" ]; then
+              echo "Page $page: no old caches"
+            else
+              for id in $ids; do
+                echo "Deleting cache $id"
+                gh api -X DELETE "repos/$REPO/actions/caches/$id" || true
+              done
+            fi
+            count=$(echo "$resp" | jq '.actions_caches | length')
+            [ "$count" -lt 100 ] && break
+            page=$((page + 1))
+          done

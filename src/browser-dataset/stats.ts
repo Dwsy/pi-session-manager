@@ -130,54 +130,64 @@ export async function getBrowserDatasetStats(
       tokenByModel[model].cost += usageToCost(sessionTokens);
     }
 
+    const msgCount = session.info.message_count;
+    totalMessages += msgCount;
+
     for (const entry of session.entries) {
       if (entry.type !== "message" || !entry.message) continue;
       const role = entry.message.role;
       if (role !== "user" && role !== "assistant") continue;
 
-      totalMessages += 1;
       if (role === "user") userMessages += 1;
       if (role === "assistant") assistantMessages += 1;
 
-      const date = entry.timestamp.slice(0, 10);
-      messagesByDate[date] = (messagesByDate[date] || 0) + 1;
-
-      const hour = new Date(entry.timestamp).getUTCHours();
-      if (hour >= 0 && hour <= 23) {
-        messagesByHour[String(hour)] = (messagesByHour[String(hour)] || 0) + 1;
+      if (role === "assistant") {
+        const model = entry.message.model || "unknown";
+        if (tokenByModel[model]) {
+          tokenByModel[model].messages += 1;
+        }
       }
-
-      const dayName = new Date(`${date}T00:00:00Z`).toLocaleDateString(
-        "en-US",
-        {
-          weekday: "long",
-          timeZone: "UTC",
-        },
-      );
-      messagesByDayOfWeek[dayName] = (messagesByDayOfWeek[dayName] || 0) + 1;
-
-      heatmapDateTokens.set(
-        date,
-        (heatmapDateTokens.get(date) || 0) + sessionTotalTokens,
-      );
-      heatmapDateCost.set(
-        date,
-        (heatmapDateCost.get(date) || 0) + sessionTotalCost,
-      );
-      if (!heatmapDateSessions.has(date)) {
-        heatmapDateSessions.set(date, new Set());
-      }
-      heatmapDateSessions.get(date)!.add(session.info.path);
-      if (!heatmapTopProject.has(date)) {
-        heatmapTopProject.set(date, new Map());
-      }
-      const projectMap = heatmapTopProject.get(date)!;
-      projectMap.set(project, (projectMap.get(project) || 0) + 1);
     }
+
+    const sessionDate = session.info.modified.slice(0, 10);
+    messagesByDate[sessionDate] = (messagesByDate[sessionDate] || 0) + msgCount;
+
+    const sessionHour = new Date(session.info.modified).getUTCHours();
+    if (sessionHour >= 0 && sessionHour <= 23) {
+      messagesByHour[String(sessionHour)] =
+        (messagesByHour[String(sessionHour)] || 0) + msgCount;
+    }
+
+    const sessionDayName = new Date(
+      `${sessionDate}T00:00:00Z`,
+    ).toLocaleDateString("en-US", {
+      weekday: "long",
+      timeZone: "UTC",
+    });
+    messagesByDayOfWeek[sessionDayName] =
+      (messagesByDayOfWeek[sessionDayName] || 0) + msgCount;
+
+    heatmapDateTokens.set(
+      sessionDate,
+      (heatmapDateTokens.get(sessionDate) || 0) + sessionTotalTokens,
+    );
+    heatmapDateCost.set(
+      sessionDate,
+      (heatmapDateCost.get(sessionDate) || 0) + sessionTotalCost,
+    );
+    if (!heatmapDateSessions.has(sessionDate)) {
+      heatmapDateSessions.set(sessionDate, new Set());
+    }
+    heatmapDateSessions.get(sessionDate)!.add(session.info.path);
+    if (!heatmapTopProject.has(sessionDate)) {
+      heatmapTopProject.set(sessionDate, new Map());
+    }
+    const topProjectMap = heatmapTopProject.get(sessionDate)!;
+    topProjectMap.set(project, (topProjectMap.get(project) || 0) + msgCount);
   }
 
   const heatmapData: HeatmapPoint[] = [];
-  for (let index = 29; index >= 0; index -= 1) {
+  for (let index = 364; index >= 0; index -= 1) {
     const date = new Date();
     date.setUTCDate(date.getUTCDate() - index);
     const dateKey = date.toISOString().slice(0, 10);
@@ -230,15 +240,6 @@ export async function getBrowserDatasetStats(
     (sum, item) => sum + item.cost,
     0,
   );
-
-  for (const session of targetSessions) {
-    const sessionModels = getSessionModels(session.entries);
-    for (const model of sessionModels.size
-      ? sessionModels
-      : new Set(["unknown"])) {
-      tokenByModel[model].messages += session.info.message_count;
-    }
-  }
 
   return {
     total_sessions: targetSessions.length,

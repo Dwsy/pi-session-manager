@@ -43,6 +43,7 @@ type AppKanbanPaneBaseProps = Pick<
 export interface AppKanbanPaneProps extends AppKanbanPaneBaseProps {
   fallback: ReactNode;
   KanbanBoardComponent: LazyExoticComponent<ComponentType<KanbanBoardProps>>;
+  loading?: boolean;
 }
 
 function AppKanbanPane({
@@ -73,6 +74,7 @@ function AppKanbanPane({
   onFilterChange,
   getDescendantIds,
   liveSessionIds,
+  loading = false,
 }: AppKanbanPaneProps) {
   return (
     <Suspense fallback={fallback}>
@@ -102,6 +104,7 @@ function AppKanbanPane({
         onFilterChange={onFilterChange}
         getDescendantIds={getDescendantIds}
         liveSessionIds={liveSessionIds}
+        loading={loading}
       />
     </Suspense>
   );

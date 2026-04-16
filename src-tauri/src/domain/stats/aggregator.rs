@@ -181,7 +181,7 @@ fn process_session_data(
     messages_by_hour: &mut HashMap<String, usize>,
     messages_by_day_of_week: &mut HashMap<String, usize>,
     daily_stats: &mut DailyStatsCollector,
-) -> (usize, usize, usize, usize, usize, f64) {
+) -> (usize, usize, usize, usize, usize, usize, f64) {
     // 1. Check memory buffer first (fastest)
     let memory_cached = crate::core::write_buffer::get_buffered_details(&session.path)
         .filter(|(_, file_modified)| *file_modified >= session_modified);
@@ -226,7 +226,8 @@ fn process_session_data(
             details.assistant_messages,
             details.input_tokens as usize,
             details.output_tokens as usize,
-            details.cache_read_tokens as usize + details.cache_write_tokens as usize,
+            details.cache_read_tokens as usize,
+            details.cache_write_tokens as usize,
             details.input_cost
                 + details.output_cost
                 + details.cache_read_cost
@@ -305,7 +306,8 @@ fn process_session_data(
                 parsed.assistant_messages,
                 parsed.input_tokens as usize,
                 parsed.output_tokens as usize,
-                parsed.cache_read_tokens as usize + parsed.cache_write_tokens as usize,
+                parsed.cache_read_tokens as usize,
+                parsed.cache_write_tokens as usize,
                 parsed.total_cost(),
             );
         }
@@ -357,7 +359,8 @@ fn process_session_data(
             cached.assistant_messages,
             cached.input_tokens,
             cached.output_tokens,
-            cached.cache_read_tokens + cached.cache_write_tokens,
+            cached.cache_read_tokens,
+            cached.cache_write_tokens,
             cached.input_cost
                 + cached.output_cost
                 + cached.cache_read_cost
@@ -413,7 +416,8 @@ fn process_session_data(
             session_stats.assistant_messages,
             session_stats.input_tokens as usize,
             session_stats.output_tokens as usize,
-            session_stats.cache_read_tokens as usize + session_stats.cache_write_tokens as usize,
+            session_stats.cache_read_tokens as usize,
+            session_stats.cache_write_tokens as usize,
             session_stats.input_cost
                 + session_stats.output_cost
                 + session_stats.cache_read_cost
@@ -440,7 +444,7 @@ fn process_session_data(
         session.message_count,
     );
 
-    (0, 0, 0, 0, 0, 0.0)
+    (0, 0, 0, 0, 0, 0, 0.0)
 }
 
 pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionStats {
@@ -473,20 +477,21 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         let project = extract_project_name(&project_path);
         *sessions_by_project.entry(project.clone()).or_insert(0) += 1;
 
-        let (user_msgs, assistant_msgs, input, output, cache, cost) = process_session_data(
-            session,
-            &project,
-            &project_path,
-            session_modified,
-            conn.as_ref(),
-            &mut sessions_by_model,
-            &mut tokens_by_model,
-            &mut model_usage_by_project,
-            &mut messages_by_date,
-            &mut messages_by_hour,
-            &mut messages_by_day_of_week,
-            &mut daily_stats,
-        );
+        let (user_msgs, assistant_msgs, input, output, cache_read, cache_write, cost) =
+            process_session_data(
+                session,
+                &project,
+                &project_path,
+                session_modified,
+                conn.as_ref(),
+                &mut sessions_by_model,
+                &mut tokens_by_model,
+                &mut model_usage_by_project,
+                &mut messages_by_date,
+                &mut messages_by_hour,
+                &mut messages_by_day_of_week,
+                &mut daily_stats,
+            );
 
         total_user_messages += user_msgs;
         total_assistant_messages += assistant_msgs;
@@ -499,8 +504,8 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         total_messages += session_total_msgs;
         total_input += input;
         total_output += output;
-        total_cache_read += cache / 2; // approximate split
-        total_cache_write += cache / 2;
+        total_cache_read += cache_read;
+        total_cache_write += cache_write;
         total_cost += cost;
     }
 

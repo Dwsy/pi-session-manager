@@ -34,6 +34,7 @@ import { getCachedSettings } from "./utils/settingsApi";
 import { getSessionSourceSlug } from "./utils/session";
 import {
   buildPiResumeCommand,
+  buildPiForkCommand,
   buildCopyResumeCommandForTarget,
   getConfiguredExternalResumeTarget,
   getFallbackExternalResumeTarget,
@@ -622,6 +623,16 @@ function App() {
     if (newSession) {
       setSelectedSession(newSession);
       setShowForkDialog(false);
+      // Open terminal with `pi --fork <path>` just like resume opens with `--session`
+      const forkCommand = buildPiForkCommand(newSession, {
+        piPath,
+        resumeCommand,
+      });
+      await openResumeCommandInTerminal(
+        newSession.path,
+        newSession.cwd,
+        forkCommand,
+      );
     }
   };
 
@@ -772,6 +783,7 @@ function App() {
     <AppKanbanPane
       fallback={<LoadingSpinner />}
       KanbanBoardComponent={KanbanBoard}
+      loading={loading}
       sessions={filteredSessions}
       tags={tags}
       sessionTags={sessionTags}

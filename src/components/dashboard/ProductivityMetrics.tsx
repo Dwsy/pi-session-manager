@@ -15,14 +15,15 @@ export default function ProductivityMetrics({ stats, title = 'Productivity Metri
   const peakDay = Object.entries(stats.messages_by_day_of_week)
     .sort((a, b) => b[1] - a[1])[0]
 
-  const peakHour = stats.time_distribution
-    .reduce((max, p) => p.message_count > max.message_count ? p : max, stats.time_distribution[0])
+  const peakHour = stats.time_distribution.length > 0
+    ? stats.time_distribution.reduce((max, p) => p.message_count > max.message_count ? p : max, stats.time_distribution[0])
+    : { hour: 0, message_count: 0 }
 
   let streak = 0
   for (let i = stats.heatmap_data.length - 1; i >= 0; i--) {
     if (stats.heatmap_data[i].level > 0) {
       streak++
-    } else if (streak > 0) {
+    } else {
       break
     }
   }

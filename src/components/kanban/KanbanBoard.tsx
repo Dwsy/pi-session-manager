@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { Plus } from 'lucide-react'
+import { Plus, Loader2 } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -53,6 +53,7 @@ interface KanbanBoardProps {
   onFilterChange?: (tagIds: string[]) => void
   getDescendantIds?: (tagId: string) => string[]
   liveSessionIds?: Set<string>
+  loading?: boolean
 }
 
 interface ColumnData {
@@ -89,6 +90,7 @@ export default function KanbanBoard({
   onFilterChange,
   getDescendantIds = () => [],
   liveSessionIds,
+  loading = false,
 }: KanbanBoardProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -271,6 +273,21 @@ export default function KanbanBoard({
     setPreviewSession(null)
     setInitialClickPoint(null)
   }, [blockPreviewOpen, onSelectSession, previewSession])
+
+  if (loading) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/40 flex-shrink-0 relative z-20" data-tauri-drag-region>
+          <h2 className="text-sm font-medium text-foreground shrink-0">
+            {t('tags.kanban.title')}
+          </h2>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-full flex flex-col">

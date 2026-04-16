@@ -580,8 +580,7 @@ fn main() {
             pi_session_manager::remove_tag_from_session,
             pi_session_manager::move_session_tag,
             pi_session_manager::reorder_tags,
-            pi_session_manager::update_tag_auto_rules,
-            pi_session_manager::evaluate_auto_rules,
+
             pi_session_manager::list_api_keys,
             pi_session_manager::create_api_key,
             pi_session_manager::revoke_api_key,

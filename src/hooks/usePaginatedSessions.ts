@@ -390,7 +390,7 @@ export function usePaginatedSessions({
   return {
     sessions,
     total,
-    loading,
+    loading: (enabled && !hasLoadedOnce) || loading,
     loadingMore,
     hasMore,
     hasLoadedOnce,

@@ -104,6 +104,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     saveTimerRef.current = setTimeout(async () => {
       try {
         await saveAppSettings(settingsRef.current);
+        await reloadSettings();
         setSaved(true);
         setTimeout(() => setSaved(false), 1500);
       } catch (error) {

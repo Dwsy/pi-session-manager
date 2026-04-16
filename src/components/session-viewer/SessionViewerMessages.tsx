@@ -16,6 +16,7 @@ import SessionHeader from "@/components/session-viewer/SessionHeader";
 import SessionScrollMarkers from "@/components/session-viewer/SessionScrollMarkers";
 import SessionTimelineNav from "@/components/session-viewer/SessionTimelineNav";
 import { useSessionView } from "@/contexts/SessionViewContext";
+import { useSettings } from "@/hooks/useSettings";
 import type { SessionSearchTarget } from "@/hooks/useSessionViewerInMessageSearch";
 import { useSessionViewerVirtualScroll } from "@/hooks/useSessionViewerVirtualScroll";
 import { useSessionTimelineNav } from "@/hooks/useSessionTimelineNav";
@@ -113,9 +114,11 @@ const SessionViewerMessages = forwardRef<
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
   const { ensureToolExpandedForSearch } = useSessionView();
+  const { settings } = useSettings();
+  const collapseToolCalls = settings.session.collapseToolCalls !== false;
 
   // Fold groups: merge consecutive assistant entries (tools only, no text) into one group
-  const { groups: foldGroups, hiddenEntryIds } = useFoldGroups(renderableEntries);
+  const { groups: foldGroups, hiddenEntryIds } = useFoldGroups(renderableEntries, collapseToolCalls);
 
   const timelineNavItems = useSessionTimelineNav({
     entries: renderableEntries,

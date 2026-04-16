@@ -16,6 +16,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             7 => migration_7(conn)?,
             8 => migration_8(conn)?,
             9 => migration_9(conn)?,
+            10 => migration_10(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -288,6 +289,32 @@ fn migration_9(conn: &Connection) -> Result<(), String> {
     if column_exists(conn, "sessions", "all_messages_text")? {
         conn.execute("ALTER TABLE sessions DROP COLUMN all_messages_text", [])
             .map_err(|e| format!("Migration 9 failed dropping all_messages_text: {e}"))?;
+    }
+
+    Ok(())
+}
+
+/// Migration to version 10: add append-read tracking columns to scan_state.
+fn migration_10(conn: &Connection) -> Result<(), String> {
+    fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
+        let mut stmt = conn
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .map_err(|e| format!("Failed to prepare PRAGMA table_info for {table}: {e}"))?;
+        let column_names: Vec<String> = stmt
+            .query_map([], |row| row.get(1))
+            .map_err(|e| format!("Failed to query columns for {table}: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect columns for {table}: {e}"))?;
+        Ok(column_names.iter().any(|name| name == column))
+    }
+
+    if !column_exists(conn, "scan_state", "read_offset")? {
+        conn.execute("ALTER TABLE scan_state ADD COLUMN read_offset INTEGER NOT NULL DEFAULT 0", [])
+            .map_err(|e| format!("Migration 10 failed adding read_offset: {e}"))?;
+    }
+    if !column_exists(conn, "scan_state", "append_trust_count")? {
+        conn.execute("ALTER TABLE scan_state ADD COLUMN append_trust_count INTEGER NOT NULL DEFAULT 0", [])
+            .map_err(|e| format!("Migration 10 failed adding append_trust_count: {e}"))?;
     }
 
     Ok(())

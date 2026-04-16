@@ -3,7 +3,7 @@ use super::types::{DbSessionTag, DbTag};
 
 pub fn get_all_tags(conn: &Connection) -> Result<Vec<DbTag>, String> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, color, icon, sort_order, is_builtin, created_at, auto_rules, parent_id FROM tags ORDER BY sort_order"
+        "SELECT id, name, color, icon, sort_order, is_builtin, created_at, parent_id FROM tags ORDER BY sort_order"
     ).map_err(|e| format!("Failed to prepare tags statement: {e}"))?;
 
     let tags = stmt
@@ -16,8 +16,7 @@ pub fn get_all_tags(conn: &Connection) -> Result<Vec<DbTag>, String> {
                 sort_order: row.get(4)?,
                 is_builtin: row.get(5)?,
                 created_at: row.get(6)?,
-                auto_rules: row.get(7)?,
-                parent_id: row.get(8)?,
+                parent_id: row.get(7)?,
             })
         })
         .map_err(|e| format!("Failed to query tags: {e}"))?
@@ -180,49 +179,3 @@ pub fn reorder_tags(conn: &Connection, tag_ids: &[String]) -> Result<(), String>
     Ok(())
 }
 
-pub fn update_tag_auto_rules(
-    conn: &Connection,
-    id: &str,
-    auto_rules: Option<&str>,
-) -> Result<(), String> {
-    conn.execute(
-        "UPDATE tags SET auto_rules = ? WHERE id = ?",
-        params![auto_rules, id],
-    )
-    .map_err(|e| format!("Failed to update auto_rules: {e}"))?;
-    Ok(())
-}
-
-pub fn evaluate_auto_rules(
-    conn: &Connection,
-    session_id: &str,
-    text: &str,
-) -> Result<Vec<String>, String> {
-    let tags = get_all_tags(conn)?;
-    let mut matched = Vec::new();
-    for tag in &tags {
-        let rules_json = match &tag.auto_rules {
-            Some(r) if !r.is_empty() => r,
-            _ => continue,
-        };
-        let rules: Vec<serde_json::Value> = serde_json::from_str(rules_json).unwrap_or_default();
-        for rule in &rules {
-            let enabled = rule
-                .get("enabled")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            let pattern = rule.get("pattern").and_then(|v| v.as_str()).unwrap_or("");
-            if !enabled || pattern.is_empty() {
-                continue;
-            }
-            if let Ok(re) = regex::Regex::new(pattern) {
-                if re.is_match(text) {
-                    assign_tag(conn, session_id, &tag.id)?;
-                    matched.push(tag.id.clone());
-                    break;
-                }
-            }
-        }
-    }
-    Ok(matched)
-}

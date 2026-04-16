@@ -733,6 +733,29 @@ pub fn upsert_message_entries(
     Ok(())
 }
 
+/// Append only: insert new rows without clearing existing ones.
+/// Used for incremental tail-read optimization.
+pub fn append_message_entries(
+    conn: &Connection,
+    session_path: &str,
+    entries: &[SessionEntry],
+) -> Result<(), String> {
+    if !message_entries_table_exists(conn)? {
+        return Ok(());
+    }
+
+    let include_thinking = load_include_thinking_in_search();
+    let rows = build_rows_from_session_entries(session_path, entries, include_thinking);
+    insert_message_entries_rows(conn, &rows)?;
+
+    debug!(
+        "Appended {} message entry rows for session: {}",
+        rows.len(),
+        session_path
+    );
+    Ok(())
+}
+
 #[allow(clippy::type_complexity)]
 pub fn search_message_fts(
     conn: &Connection,
