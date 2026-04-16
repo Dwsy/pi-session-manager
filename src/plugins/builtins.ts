@@ -8,9 +8,15 @@ let registered = false
 /**
  * Register all built-in plugins
  * Prevent duplicate registration in React Strict Mode
+ * Re-register on HMR so class method changes (like renderItem) take effect
  */
 export function registerBuiltinPlugins() {
-  if (registered) {
+  // Always re-register on hot reload so plugin class updates are picked up
+  if (import.meta.hot) {
+    pluginRegistry.unregister('message-search')
+    pluginRegistry.unregister('project-search')
+    pluginRegistry.unregister('session-search')
+  } else if (registered) {
     return
   }
 

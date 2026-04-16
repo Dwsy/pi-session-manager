@@ -12,6 +12,7 @@ import { useClipboard } from '@/hooks/useClipboard'
 import { useSettings } from '@/hooks/useSettings'
 import ThinkingBlock from '@/components/messages/ThinkingBlock'
 import type { AssistantProcessStep } from '@/components/messages/assistantProcess'
+import { ansiToMarkdown } from '@/utils/assistantContent'
 
 import {
   captureViewportAnchor,
@@ -161,7 +162,7 @@ function ToolCallList({
                 return (
                   <ThinkingBlock
                     key={`process-thinking-${step.entryId}-${contentIndex}`}
-                    content={item.thinking || ''}
+                    content={ansiToMarkdown(item.thinking || '', { stripColor: true })}
                     searchQuery={searchQuery}
                   />
                 )

@@ -487,7 +487,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
 
       return results.slice(0, MAX_RESULTS);
     } catch (error) {
-      console.error("[MessageSearchPlugin] full_text_search failed:", error);
+      console.error('[MessageSearchPlugin] full_text_search failed:', error);
       return [];
     }
   }
@@ -579,6 +579,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     const isSessionIdMatch =
       metadata.matchReason === "session_id_exact" ||
       metadata.matchReason === "session_id_prefix";
+    const isLabelMatch = metadata.matchReason === "label";
 
     return (
       <div className="w-full min-w-0">
@@ -593,7 +594,15 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2.5 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isLabelMatch && (
+              <span className="inline-flex items-center h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200">
+                {this.context?.t(
+                  "search.fullText.labelMatch",
+                  "label",
+                ) || "label"}
+              </span>
+            )}
             {isSessionIdMatch && (
               <span className="inline-flex items-center h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
                 {this.context?.t(
@@ -602,12 +611,14 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
                 ) || "session id"}
               </span>
             )}
-            <span
-              className={`inline-flex items-center gap-1.5 h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border ${this.getRoleBadgeClass(metadata.role)}`}
-            >
-              {this.getRoleIcon(metadata.role)}
-              <span>{roleLabel}</span>
-            </span>
+            {!isLabelMatch && (
+              <span
+                className={`inline-flex items-center gap-1.5 h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border ${this.getRoleBadgeClass(metadata.role)}`}
+              >
+                {this.getRoleIcon(metadata.role)}
+                <span>{roleLabel}</span>
+              </span>
+            )}
             <span className="text-[11px] text-muted-foreground whitespace-nowrap">
               {this.formatDate(metadata.timestamp)}
             </span>
