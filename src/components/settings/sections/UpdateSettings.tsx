@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { check, Update } from '@tauri-apps/plugin-updater'
+import { getCurrentAppVersion } from '@/utils/updateChecker'
 import {
   AlertCircle,
   ArrowUpRight,
@@ -117,7 +118,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
           latestVersion: update.version,
         })
       } else {
-        setState({ phase: 'latest', currentVersion: '0.0.0' })
+        setState({ phase: 'latest', currentVersion: getCurrentAppVersion() })
       }
     } catch (err) {
       setState({
