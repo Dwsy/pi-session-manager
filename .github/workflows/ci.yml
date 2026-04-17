@@ -67,11 +67,13 @@ jobs:
         run: cargo check
 
       - name: Rust check (CLI)
-        run: cargo check -p pi-session-cli
+        working-directory: src-tauri-cli
+        run: cargo check
 
       - name: Rust tests (desktop)
         working-directory: src-tauri
         run: cargo test
 
       - name: Rust build CLI
-        run: cargo build -p pi-session-cli
+        working-directory: src-tauri-cli
+        run: cargo build
