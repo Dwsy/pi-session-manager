@@ -3,7 +3,9 @@ use std::time::Instant;
 #[test]
 fn test_full_text_search_builtin_default() {
     // This test connects to the real user database and verifies Chinese search works.
-    let db_path = dirs::home_dir().unwrap().join(".pi/agent/sessions/sessions.db");
+    let db_path = dirs::home_dir()
+        .unwrap()
+        .join(".pi/agent/sessions/sessions.db");
     if !db_path.exists() {
         eprintln!("User database not found at {:?}, skipping test", db_path);
         return;

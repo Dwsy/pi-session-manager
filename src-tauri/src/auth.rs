@@ -270,4 +270,3 @@ fn generate_token() -> String {
         .unwrap_or(0);
     format!("psm-{nanos:x}")
 }
-

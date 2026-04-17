@@ -50,10 +50,19 @@ pub struct BundleMetadata {
 /// Known config files to include in the bundle.
 const CONFIG_FILES: &[(&str, &str)] = &[
     ("config.json", "~/.pi/pi-session-manager/config.json"),
-    ("tags_config.json", "~/.pi/pi-session-manager/tags_config.json"),
-    ("session_mark.json", "~/.pi/pi-session-manager/session_mark.json"),
+    (
+        "tags_config.json",
+        "~/.pi/pi-session-manager/tags_config.json",
+    ),
+    (
+        "session_mark.json",
+        "~/.pi/pi-session-manager/session_mark.json",
+    ),
     ("favorites.json", "~/.pi/pi-session-manager/favorites.json"),
-    ("auth_tokens.json", "~/.pi/pi-session-manager/auth_tokens.json"),
+    (
+        "auth_tokens.json",
+        "~/.pi/pi-session-manager/auth_tokens.json",
+    ),
 ];
 
 /// Resolve a path that may start with ~ to the home directory.

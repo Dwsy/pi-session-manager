@@ -656,4 +656,3 @@ pub async fn reset_app_settings() -> Result<(), String> {
     map.insert("app".to_string(), serde_json::json!({}));
     crate::unified_config::save_root(&serde_json::Value::Object(map.clone()))
 }
-

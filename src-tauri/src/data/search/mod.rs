@@ -1,6 +1,6 @@
 pub mod client;
-pub mod index;
 pub mod embedding;
+pub mod index;
 
 pub use client::*;
 pub use embedding::*;

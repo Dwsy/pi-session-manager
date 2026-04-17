@@ -363,5 +363,3 @@ pub async fn reorder_tags(tag_ids: Vec<String>) -> Result<(), String> {
     }
     save_tags_file(&file)
 }
-
-

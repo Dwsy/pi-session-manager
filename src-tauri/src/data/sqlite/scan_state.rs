@@ -209,7 +209,8 @@ mod tests {
         assert_eq!(entry.read_offset, 0);
         assert_eq!(entry.append_trust_count, 0);
 
-        update_scan_state_offset_and_trust(&conn, "/tmp/session.jsonl", 456, 3).expect("update trust");
+        update_scan_state_offset_and_trust(&conn, "/tmp/session.jsonl", 456, 3)
+            .expect("update trust");
         let states_after = get_all_scan_state(&conn).expect("load scan_state after trust update");
         let entry_after = states_after.get("/tmp/session.jsonl").expect("entry");
         assert_eq!(entry_after.read_offset, 456);

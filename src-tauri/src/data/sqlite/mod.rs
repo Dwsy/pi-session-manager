@@ -41,7 +41,7 @@ pub use sessions::{
 };
 pub use subagent_meta::{get_cached_subagent_meta, upsert_subagent_meta};
 pub use tags::{
-    assign_tag, create_tag, delete_tag, get_all_session_tags, get_all_tags,
-    move_session_tag, remove_tag_from_session, reorder_tags, update_tag,
+    assign_tag, create_tag, delete_tag, get_all_session_tags, get_all_tags, move_session_tag,
+    remove_tag_from_session, reorder_tags, update_tag,
 };
 pub use types::{DbFavoriteItem, DbSessionTag, DbTag, SessionDetailsCache};

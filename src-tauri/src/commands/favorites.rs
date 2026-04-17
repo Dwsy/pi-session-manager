@@ -135,4 +135,3 @@ pub async fn toggle_favorite(
         Ok(true)
     }
 }
-

@@ -56,7 +56,9 @@ pub fn upsert_cached_session(session: SessionInfo) {
 
 fn set_cached_entries(path: &str, entries: Vec<SessionEntry>) {
     if let Ok(mut guard) = SCAN_ENTRIES_CACHE.write() {
-        guard.get_or_insert_with(std::collections::HashMap::new).insert(path.to_string(), entries);
+        guard
+            .get_or_insert_with(std::collections::HashMap::new)
+            .insert(path.to_string(), entries);
     }
 }
 
@@ -627,10 +629,11 @@ fn safe_append_only_read_jsonl(
     path: &Path,
     last_offset: u64,
 ) -> Result<(u64, Vec<SessionEntry>), String> {
-    let metadata = fs::metadata(path)
-        .map_err(|e| format!("stat failed for {}: {}", path.display(), e))?;
+    let metadata =
+        fs::metadata(path).map_err(|e| format!("stat failed for {}: {}", path.display(), e))?;
     let current_size = metadata.len();
-    let current_mtime = metadata.modified()
+    let current_mtime = metadata
+        .modified()
         .ok()
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64)
@@ -650,12 +653,14 @@ fn safe_append_only_read_jsonl(
     let file = std::fs::File::open(path)
         .map_err(|e| format!("open failed for {}: {}", path.display(), e))?;
     let mut reader = std::io::BufReader::new(file);
-    reader.seek(std::io::SeekFrom::Start(last_offset))
+    reader
+        .seek(std::io::SeekFrom::Start(last_offset))
         .map_err(|_| "fallback".to_string())?;
 
     let mut new_content = String::new();
     use std::io::Read;
-    reader.read_to_string(&mut new_content)
+    reader
+        .read_to_string(&mut new_content)
         .map_err(|_| "fallback".to_string())?;
 
     // Layer 2: trailing-newline guard against half-written lines
@@ -702,7 +707,9 @@ fn incremental_update_session_info(
             if let Some(ref message) = entry.message {
                 info.message_count += 1;
 
-                let text = message.content.iter()
+                let text = message
+                    .content
+                    .iter()
                     .filter(|c| c.content_type == "text")
                     .filter_map(|c| c.text.as_ref())
                     .cloned()
@@ -810,13 +817,22 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             let file_modified = match fs::metadata(&backing).and_then(|m| m.modified()) {
                 Ok(mt) => DateTime::from(mt),
                 Err(e) => {
-                    warn!("Failed to get metadata for {}: {}", expanded_path.display(), e);
+                    warn!(
+                        "Failed to get metadata for {}: {}",
+                        expanded_path.display(),
+                        e
+                    );
                     continue;
                 }
             };
 
-            let scan_state = sqlite::get_scan_state(&conn, &session_path_str).ok().flatten();
-            let trust = scan_state.as_ref().map(|s| s.append_trust_count).unwrap_or(0);
+            let scan_state = sqlite::get_scan_state(&conn, &session_path_str)
+                .ok()
+                .flatten();
+            let trust = scan_state
+                .as_ref()
+                .map(|s| s.append_trust_count)
+                .unwrap_or(0);
             let last_offset = scan_state.as_ref().map(|s| s.read_offset).unwrap_or(0);
 
             // Try incremental tail-read if trust level is high enough
@@ -824,12 +840,22 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                 match safe_append_only_read_jsonl(&backing, last_offset) {
                     Ok((new_offset, new_entries)) if !new_entries.is_empty() => {
                         if let Some(old_entries) = get_cached_entries(&session_path_str) {
-                            if let Some(old_info) = sessions.iter().find(|s| s.path == session_path_str) {
+                            if let Some(old_info) =
+                                sessions.iter().find(|s| s.path == session_path_str)
+                            {
                                 let mut all_entries = old_entries;
                                 all_entries.extend(new_entries.clone());
-                                let info = incremental_update_session_info(old_info, &new_entries, file_modified);
+                                let info = incremental_update_session_info(
+                                    old_info,
+                                    &new_entries,
+                                    file_modified,
+                                );
                                 set_cached_entries(&session_path_str, all_entries.clone());
-                                let _ = sqlite::append_message_entries(&conn, &session_path_str, &new_entries);
+                                let _ = sqlite::append_message_entries(
+                                    &conn,
+                                    &session_path_str,
+                                    &new_entries,
+                                );
                                 Some((info, all_entries, new_offset, trust.saturating_add(1)))
                             } else {
                                 None
@@ -840,7 +866,12 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                     }
                     Ok((new_offset, _)) => {
                         // No new complete lines; just refresh offset
-                        let _ = sqlite::update_scan_state_offset_and_trust(&conn, &session_path_str, new_offset, trust);
+                        let _ = sqlite::update_scan_state_offset_and_trust(
+                            &conn,
+                            &session_path_str,
+                            new_offset,
+                            trust,
+                        );
                         continue;
                     }
                     Err(_) => None,
@@ -869,20 +900,11 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
 
             seen_paths.insert(info.path.clone());
 
-            if let Err(e) = sqlite::upsert_session(
-                &mut conn,
-                &info,
-                file_modified,
-                Some(&entries),
-            ) {
+            if let Err(e) = sqlite::upsert_session(&mut conn, &info, file_modified, Some(&entries))
+            {
                 warn!("Failed to upsert session for {}: {}", info.path, e);
             } else {
-                let _ = sqlite::upsert_scan_state_for_session(
-                    &conn,
-                    &info,
-                    file_modified,
-                    "ok",
-                );
+                let _ = sqlite::upsert_scan_state_for_session(&conn, &info, file_modified, "ok");
                 let _ = sqlite::update_scan_state_offset_and_trust(
                     &conn,
                     &session_path_str,
@@ -1078,4 +1100,3 @@ pub fn start_background_scanner(sessions_dir: PathBuf, interval_secs: u64) {
         scheduler.start().await;
     });
 }
-

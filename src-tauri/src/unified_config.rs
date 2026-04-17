@@ -411,4 +411,3 @@ pub fn backup_root_dir(name: &str) -> Result<PathBuf, String> {
 pub fn snapshot_timestamp() -> String {
     Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
 }
-

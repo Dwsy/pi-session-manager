@@ -178,4 +178,3 @@ pub fn reorder_tags(conn: &Connection, tag_ids: &[String]) -> Result<(), String>
     }
     Ok(())
 }
-

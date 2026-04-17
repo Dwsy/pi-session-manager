@@ -2,7 +2,9 @@ use std::time::Instant;
 
 #[test]
 fn test_full_text_search_accepts_extra_arg_silently() {
-    let db_path = dirs::home_dir().unwrap().join(".pi/agent/sessions/sessions.db");
+    let db_path = dirs::home_dir()
+        .unwrap()
+        .join(".pi/agent/sessions/sessions.db");
     if !db_path.exists() {
         eprintln!("User database not found at {:?}, skipping test", db_path);
         return;
