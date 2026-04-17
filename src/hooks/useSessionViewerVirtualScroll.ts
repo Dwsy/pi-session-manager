@@ -31,10 +31,8 @@ export interface UseSessionViewerVirtualScrollOptions {
   sessionPath: string
   isAtBottomRef?: MutableRefObject<boolean>
   onReachBottom?: () => void
-  /** Scroll position when switching sessions: 'top' or 'bottom' */
-  openPosition?: 'top' | 'bottom'
-  /** Entry IDs that are hidden (e.g., merged into turn groups) — estimated as 0 height */
-  hiddenEntryIds?: Set<string>
+  /** Preview mode: strip tool calls from height estimation */
+  previewMode?: boolean
 }
 
 export interface UseSessionViewerVirtualScrollResult {
@@ -61,8 +59,7 @@ export function useSessionViewerVirtualScroll({
   sessionPath,
   isAtBottomRef: externalIsAtBottomRef,
   onReachBottom,
-  openPosition = 'top',
-  hiddenEntryIds,
+  previewMode = false,
 }: UseSessionViewerVirtualScrollOptions): UseSessionViewerVirtualScrollResult {
   const [isAtBottom, setIsAtBottom] = useState(true)
 
@@ -88,9 +85,6 @@ export function useSessionViewerVirtualScroll({
       const entry = renderableEntries[index]
       if (!entry) return 140 + MESSAGE_ITEM_GAP
 
-      // Hidden entries (merged into turn groups) have 0 height
-      if (hiddenEntryIds?.has(entry.id)) return 0
-
       const cachedHeight = measuredHeightsRef.current.get(entry.id)
       if (cachedHeight) return cachedHeight
 
@@ -98,20 +92,16 @@ export function useSessionViewerVirtualScroll({
       switch (entry.type) {
         case 'message': {
           const content = entry.message?.content ?? []
-          const textLength = content
+          // In previewMode, strip tool calls from height estimation
+          const textLength = (previewMode
+            ? content.filter((item) => item.type === 'text')
+            : content
+          )
             .filter((item) => item.type === 'text')
             .reduce((sum, item) => sum + (item.text?.length ?? 0), 0)
           const baseHeight = 100
           const contentHeight = Math.ceil(textLength / 80) * 32
-
-          // Rough estimate for tool calls so off-screen items don’t collapse to text-only height
-          const toolCalls = content.filter((item) => item.type === 'toolCall')
-          let toolHeight = 0
-          if (toolCalls.length > 0) {
-            toolHeight = toolsExpanded ? toolCalls.length * 120 : 48
-          }
-
-          height = Math.min(baseHeight + contentHeight + toolHeight, 1200)
+          height = Math.min(baseHeight + contentHeight, 800)
           break
         }
         case 'model_change':
@@ -132,7 +122,7 @@ export function useSessionViewerVirtualScroll({
       }
       return height + MESSAGE_ITEM_GAP
     },
-    [hiddenEntryIds, renderableEntries, toolsExpanded],
+    [renderableEntries, previewMode],
   )
 
   const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
@@ -143,79 +133,20 @@ export function useSessionViewerVirtualScroll({
     lanes: 1,
     isScrollingResetDelay: 200,
     useAnimationFrameWithResizeObserver: true,
-    ...({
-      shouldAdjustScrollPositionOnItemSizeChange: (
-        item: { end: number },
-        _delta: number,
-        instance: { scrollOffset: number | null },
-      ) => {
-        const scrollOffset = instance.scrollOffset ?? 0
-        return item.end < scrollOffset
-      },
-    } as const),
-    measureElement: (element: HTMLElement, entry: any, instance: any) => {
+    measureElement: (element, entry, instance) => {
       const height = measureElement(element, entry, instance)
       const entryId = element.getAttribute('data-entry-id')
       if (entryId) {
-        // Skip caching while an ancestor has a CSS transform scale (e.g., modal open animation),
-        // to avoid caching scaled-down heights.
-        let node: HTMLElement | null = element
-        let shouldCache = true
-        while (node) {
-          const transform = window.getComputedStyle(node).transform
-          if (transform && transform !== 'none') {
-            if (/scale\([^1]/.test(transform)) {
-              shouldCache = false
-              break
-            }
-            const m = transform.match(/matrix\(([^)]+)\)/)
-            if (m) {
-              const vals = m[1].split(',').map(Number)
-              if ((vals[0] !== 1 || vals[3] !== 1)) {
-                shouldCache = false
-                break
-              }
-            }
-          }
-          node = node.parentElement
-        }
-        if (shouldCache) {
-          measuredHeightsRef.current.set(entryId, height)
-        }
+        measuredHeightsRef.current.set(entryId, height)
       }
       return height
     },
-  } as any)
+  })
 
   useEffect(() => {
     measuredHeightsRef.current.clear()
     hasTriggeredReachBottomRef.current = false
-    rowVirtualizer.measure()
-  }, [hiddenEntryIds, rowVirtualizer, sessionPath, toolsExpanded])
-
-  useEffect(() => {
-    measuredHeightsRef.current.clear()
-    hasTriggeredReachBottomRef.current = false
-    rowVirtualizer.measure()
-  }, [expandedToolIds, rowVirtualizer])
-
-  // Reset scroll position when switching sessions
-  useEffect(() => {
-    if (!sessionPath || loading) return
-
-    const rafId = requestAnimationFrame(() => {
-      if (renderableEntries.length === 0) return
-
-      if (openPosition === 'bottom') {
-        const lastIndex = renderableEntries.length - 1
-        rowVirtualizer.scrollToIndex(lastIndex, { align: 'end', behavior: 'auto' })
-      } else {
-        rowVirtualizer.scrollToIndex(0, { align: 'start' })
-      }
-    })
-
-    return () => cancelAnimationFrame(rafId)
-  }, [sessionPath, loading, openPosition, renderableEntries.length, rowVirtualizer])
+  }, [expandedToolIds, sessionPath, toolsExpanded, previewMode])
 
   useEffect(() => {
     if (loading || error || renderableEntries.length === 0) return

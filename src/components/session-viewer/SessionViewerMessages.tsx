@@ -2,7 +2,6 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
-  useMemo,
   type Dispatch,
   type MutableRefObject,
   type PointerEvent as ReactPointerEvent,
@@ -14,16 +13,12 @@ import { useTranslation } from "react-i18next";
 
 import SessionHeader from "@/components/session-viewer/SessionHeader";
 import SessionScrollMarkers from "@/components/session-viewer/SessionScrollMarkers";
-import SessionTimelineNav from "@/components/session-viewer/SessionTimelineNav";
 import { useSessionView } from "@/contexts/SessionViewContext";
-import { useSettings } from "@/hooks/useSettings";
 import type { SessionSearchTarget } from "@/hooks/useSessionViewerInMessageSearch";
 import { useSessionViewerVirtualScroll } from "@/hooks/useSessionViewerVirtualScroll";
-import { useSessionTimelineNav } from "@/hooks/useSessionTimelineNav";
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
 import type { LegacySessionStats, SessionEntry } from "@/types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
-import { useFoldGroups } from "@/hooks/useFoldGroups";
 
 const MESSAGE_ITEM_GAP = 16;
 const SEARCH_MATCH_RETRY_COUNT = 8;
@@ -108,23 +103,12 @@ const SessionViewerMessages = forwardRef<
   onPointerUp,
   onPointerLeave,
   isScrollMarkersFeatureEnabled,
-  isTimelineNavEnabled = false,
+  isTimelineNavEnabled: _isTimelineNavEnabled = false,
   previewMode = false,
-  openPosition = 'top',
+  openPosition: _openPosition = 'top',
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
   const { ensureToolExpandedForSearch } = useSessionView();
-  const { settings } = useSettings();
-  const collapseToolCalls = settings.session.collapseToolCalls !== false;
-
-  // Fold groups: merge consecutive assistant entries (tools only, no text) into one group
-  const { groups: foldGroups, hiddenEntryIds } = useFoldGroups(renderableEntries, collapseToolCalls);
-
-  const timelineNavItems = useSessionTimelineNav({
-    entries: renderableEntries,
-    enabled: isTimelineNavEnabled,
-    previewFallback: t("session.userMessage", "User message"),
-  });
 
   const {
     messagesContainerRef,
@@ -147,23 +131,10 @@ const SessionViewerMessages = forwardRef<
     sessionPath,
     isAtBottomRef,
     onReachBottom,
-    openPosition,
-    hiddenEntryIds,
+    previewMode,
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();
-  const activeTimelineEntryId = useMemo(() => {
-    if (!isTimelineNavEnabled || timelineNavItems.items.length === 0) {
-      return null;
-    }
-    const firstVisibleIndex = virtualRows[0]?.index ?? 0;
-    const currentItem =
-      [...timelineNavItems.items]
-        .reverse()
-        .find((item) => item.index <= firstVisibleIndex) ??
-      timelineNavItems.items[0];
-    return currentItem?.entryId ?? null;
-  }, [isTimelineNavEnabled, timelineNavItems.items, virtualRows]);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -298,12 +269,6 @@ const SessionViewerMessages = forwardRef<
                 const entry = renderableEntries[virtualRow.index];
                 if (!entry) return null;
 
-                // Skip hidden entries (folded into a group leader)
-                if (hiddenEntryIds.has(entry.id)) return null;
-
-                // Check if this entry is a fold group leader
-                const foldGroup = foldGroups.get(entry.id);
-
                 return (
                   <div
                     key={entry.id}
@@ -325,7 +290,6 @@ const SessionViewerMessages = forwardRef<
                       searchQuery={searchQuery}
                       isStreaming={entry.id === streamingId}
                       previewMode={previewMode}
-                      foldEntries={foldGroup?.entries}
                     />
                   </div>
                 );
@@ -348,13 +312,6 @@ const SessionViewerMessages = forwardRef<
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerLeave}
-        />
-      )}
-      {isTimelineNavEnabled && timelineNavItems.items.length > 0 && (
-        <SessionTimelineNav
-          items={timelineNavItems.items}
-          activeEntryId={activeTimelineEntryId}
-          onNavigate={(entryId) => setScrollTargetId(entryId)}
         />
       )}
     </div>
