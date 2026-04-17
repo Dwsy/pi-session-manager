@@ -271,7 +271,8 @@ fn migration_8(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
-/// Migration to version 9: remove all_messages_text column (redundant with message_entries + FTS5)
+/// Migration to version 9: set all_messages_text to NULL for backward compatibility.
+/// Column is retained but deprecated - message_entries + FTS5 are now the source of truth.
 fn migration_9(conn: &Connection) -> Result<(), String> {
     fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
         let mut stmt = conn
@@ -285,10 +286,10 @@ fn migration_9(conn: &Connection) -> Result<(), String> {
         Ok(column_names.iter().any(|name| name == column))
     }
 
-    // Remove all_messages_text column if it exists
+    // Set column to NULL instead of dropping - preserves schema for code still referencing it
     if column_exists(conn, "sessions", "all_messages_text")? {
-        conn.execute("ALTER TABLE sessions DROP COLUMN all_messages_text", [])
-            .map_err(|e| format!("Migration 9 failed dropping all_messages_text: {e}"))?;
+        conn.execute("UPDATE sessions SET all_messages_text = NULL", [])
+            .map_err(|e| format!("Migration 9 failed nullifying all_messages_text: {e}"))?;
     }
 
     Ok(())
@@ -309,12 +310,18 @@ fn migration_10(conn: &Connection) -> Result<(), String> {
     }
 
     if !column_exists(conn, "scan_state", "read_offset")? {
-        conn.execute("ALTER TABLE scan_state ADD COLUMN read_offset INTEGER NOT NULL DEFAULT 0", [])
-            .map_err(|e| format!("Migration 10 failed adding read_offset: {e}"))?;
+        conn.execute(
+            "ALTER TABLE scan_state ADD COLUMN read_offset INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
+        .map_err(|e| format!("Migration 10 failed adding read_offset: {e}"))?;
     }
     if !column_exists(conn, "scan_state", "append_trust_count")? {
-        conn.execute("ALTER TABLE scan_state ADD COLUMN append_trust_count INTEGER NOT NULL DEFAULT 0", [])
-            .map_err(|e| format!("Migration 10 failed adding append_trust_count: {e}"))?;
+        conn.execute(
+            "ALTER TABLE scan_state ADD COLUMN append_trust_count INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
+        .map_err(|e| format!("Migration 10 failed adding append_trust_count: {e}"))?;
     }
 
     Ok(())
