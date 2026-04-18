@@ -261,6 +261,8 @@ mod tests {
             .query_row("SELECT path FROM sessions", [], |row| row.get(0))
             .expect("path");
         let pi_root = crate::paths::pi_agent_sessions_dir().expect("pi sessions dir");
-        assert!(remaining_path.contains(&pi_root.to_string_lossy().replace('\\', "/")));
+        let normalized_remaining_path = remaining_path.replace('\\', "/");
+        let normalized_pi_root = pi_root.to_string_lossy().replace('\\', "/");
+        assert!(normalized_remaining_path.contains(&normalized_pi_root));
     }
 }
