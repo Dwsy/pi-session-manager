@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { ReactNode, RefObject } from "react";
 import {
   Columns3,
+  Database,
   FolderOpen,
   LayoutDashboard,
   List,
@@ -30,6 +31,11 @@ export interface AppMobileLayoutProps {
   renderKanban: () => ReactNode;
   renderDashboard: () => ReactNode;
   renderSettings: () => ReactNode;
+  showDashboardTab?: boolean;
+  settingsLabel?: string;
+  settingsIcon?: ReactNode;
+  settingsActionOnly?: boolean;
+  onOpenSettingsAction?: () => void;
   renderOverlays: () => ReactNode;
 }
 
@@ -50,12 +56,17 @@ function AppMobileLayout({
   renderKanban,
   renderDashboard,
   renderSettings,
+  showDashboardTab = true,
+  settingsLabel,
+  settingsIcon,
+  settingsActionOnly = false,
+  onOpenSettingsAction,
   renderOverlays,
 }: AppMobileLayoutProps) {
   const { t } = useTranslation();
 
-  const tabs = useMemo<MobileNavItem[]>(
-    () => [
+  const tabs = useMemo<MobileNavItem[]>(() => {
+    const next: MobileNavItem[] = [
       {
         id: "list",
         icon: <List className="h-5 w-5" />,
@@ -71,19 +82,24 @@ function AppMobileLayout({
         icon: <Columns3 className="h-5 w-5" />,
         label: t("tags.kanban.title", "Kanban"),
       },
-      {
+    ];
+
+    if (showDashboardTab) {
+      next.push({
         id: "dashboard",
         icon: <LayoutDashboard className="h-5 w-5" />,
         label: t("dashboard.title", "Overview"),
-      },
-      {
-        id: "settings",
-        icon: <Settings className="h-5 w-5" />,
-        label: t("settings.title", "Settings"),
-      },
-    ],
-    [t],
-  );
+      });
+    }
+
+    next.push({
+      id: "settings",
+      icon: settingsIcon || (settingsActionOnly ? <Database className="h-5 w-5" /> : <Settings className="h-5 w-5" />),
+      label: settingsLabel || t("settings.title", "Settings"),
+    });
+
+    return next;
+  }, [settingsActionOnly, settingsIcon, settingsLabel, showDashboardTab, t]);
 
   return (
     <div className="relative flex flex-col h-screen-safe bg-background text-foreground safe-area-top">
@@ -105,8 +121,8 @@ function AppMobileLayout({
         {mobileTab === "list" && renderSessionList()}
         {mobileTab === "projects" && renderProjectList()}
         {mobileTab === "kanban" && renderKanban()}
-        {mobileTab === "dashboard" && renderDashboard()}
-        {mobileTab === "settings" && renderSettings()}
+        {showDashboardTab && mobileTab === "dashboard" && renderDashboard()}
+        {!settingsActionOnly && mobileTab === "settings" && renderSettings()}
       </div>
 
       {!selectedSession && (
@@ -117,10 +133,14 @@ function AppMobileLayout({
               aria-label={tab.label}
               onClick={() => {
                 triggerHaptic("light");
+                if (tab.id === "settings" && settingsActionOnly) {
+                  onOpenSettingsAction?.();
+                  return;
+                }
                 onMobileTabChange(tab.id);
               }}
               className={`flex flex-col items-center gap-1 py-1 px-1 rounded-lg motion-color motion-press focus-ring flex-1 min-w-0 max-w-[76px] ${
-                mobileTab === tab.id
+                mobileTab === tab.id && !(tab.id === "settings" && settingsActionOnly)
                   ? "text-primary"
                   : "text-muted-foreground"
               }`}

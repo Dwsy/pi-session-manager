@@ -30,6 +30,8 @@ let datasetCacheKey = "";
 let backgroundRefreshPromise: Promise<void> | null = null;
 let backgroundRefreshKey = "";
 const DATASET_REVISION = "main";
+const INITIAL_DATASET_FILE_BATCH = 24;
+const BACKGROUND_DATASET_FILE_BATCH = 24;
 export const BROWSER_DATASET_REFRESHED_EVENT = "browser-dataset:refreshed";
 
 export function getActiveDatasetId(): string {
@@ -111,20 +113,29 @@ function buildDatasetCache(
   datasetId: string,
   sessions: RemoteDatasetSession[],
 ): RemoteDatasetCache {
+  const sortedSessions = [...sessions].sort(
+    (left, right) =>
+      right.info.modified.localeCompare(left.info.modified) ||
+      left.info.path.localeCompare(right.info.path),
+  );
   return {
     datasetId,
-    sessions,
-    sessionByPath: new Map(sessions.map((session) => [session.path, session])),
+    sessions: sortedSessions,
+    sessionByPath: new Map(
+      sortedSessions.map((session) => [session.path, session]),
+    ),
   };
 }
 
 function serializeDatasetCache(
   cache: RemoteDatasetCache,
+  isComplete = true,
 ): PersistedDatasetCacheRecord {
   return {
     datasetId: cache.datasetId,
     cachedAt: Date.now(),
     revision: DATASET_REVISION,
+    isComplete,
     sessions: cache.sessions.map((session) => ({
       info: session.info,
       content: session.content,
@@ -152,9 +163,35 @@ function deserializeDatasetCache(
   return buildDatasetCache(record.datasetId, sessions);
 }
 
-async function fetchDatasetCacheFromNetwork(
+function sortDatasetFilesNewestFirst(
+  files: Array<{ path: string; type: string; size?: number }>,
+): Array<{ path: string; type: string; size?: number }> {
+  return [...files].sort((left, right) => right.path.localeCompare(left.path));
+}
+
+function mergeDatasetSessions(
+  current: RemoteDatasetSession[],
+  incoming: RemoteDatasetSession[],
+): RemoteDatasetSession[] {
+  if (incoming.length === 0) {
+    return current;
+  }
+
+  const byPath = new Map(current.map((session) => [session.path, session]));
+  for (const session of incoming) {
+    byPath.set(session.path, session);
+  }
+
+  return [...byPath.values()];
+}
+
+function datasetKeyContains(datasetId: string): boolean {
+  return datasetCacheKey.split("|").includes(datasetId);
+}
+
+async function fetchDatasetTree(
   datasetId: string,
-): Promise<RemoteDatasetCache> {
+): Promise<Array<{ path: string; type: string; size?: number }>> {
   const parseNextLink = (linkHeader: string | null): string | null => {
     if (!linkHeader) return null;
     for (const part of linkHeader.split(",")) {
@@ -183,13 +220,21 @@ async function fetchDatasetCacheFromNetwork(
     tree.push(...page);
     url = parseNextLink(treeResp.headers.get("link"));
   }
-  const jsonlFiles = tree.filter(
-    (item) => item.type === "file" && item.path.endsWith(".jsonl"),
-  );
 
+  return sortDatasetFilesNewestFirst(
+    tree.filter(
+      (item) => item.type === "file" && item.path.endsWith(".jsonl"),
+    ),
+  );
+}
+
+async function fetchDatasetSessionsForFiles(
+  datasetId: string,
+  files: Array<{ path: string; type: string; size?: number }>,
+): Promise<RemoteDatasetSession[]> {
   const sessions = (
     await Promise.all(
-      jsonlFiles.map(async (file) => {
+      files.map(async (file) => {
         const resp = await fetch(datasetFileUrl(datasetId, file.path));
         if (!resp.ok) {
           throw new Error(`Failed to load ${file.path}: HTTP ${resp.status}`);
@@ -200,13 +245,20 @@ async function fetchDatasetCacheFromNetwork(
     )
   ).filter(Boolean) as RemoteDatasetSession[];
 
-  sessions.sort(
-    (left, right) =>
-      right.info.modified.localeCompare(left.info.modified) ||
-      left.info.path.localeCompare(right.info.path),
-  );
+  return buildDatasetCache(datasetId, sessions).sessions;
+}
 
-  return buildDatasetCache(datasetId, sessions);
+async function fetchInitialDatasetCacheFromNetwork(
+  datasetId: string,
+): Promise<{ cache: RemoteDatasetCache; isComplete: boolean }> {
+  const jsonlFiles = await fetchDatasetTree(datasetId);
+  const initialFiles = jsonlFiles.slice(0, INITIAL_DATASET_FILE_BATCH);
+  const sessions = await fetchDatasetSessionsForFiles(datasetId, initialFiles);
+
+  return {
+    cache: buildDatasetCache(datasetId, sessions),
+    isComplete: initialFiles.length >= jsonlFiles.length,
+  };
 }
 
 function parseSessionContent(
@@ -326,27 +378,39 @@ export async function loadDatasetCache(): Promise<RemoteDatasetCache> {
         if (
           persisted &&
           persisted.revision === DATASET_REVISION &&
-          isPersistedDatasetCacheFresh(persisted)
+          isPersistedDatasetCacheFresh(persisted) &&
+          persisted.isComplete !== false
         ) {
           return deserializeDatasetCache(persisted);
         }
 
         if (persisted && persisted.revision === DATASET_REVISION) {
-          const stale = deserializeDatasetCache(persisted);
+          const cached = deserializeDatasetCache(persisted);
           scheduleBackgroundRefresh(singleDatasetId, persisted);
-          return stale;
+          return cached;
         }
 
         try {
-          const fresh = await fetchDatasetCacheFromNetwork(singleDatasetId);
-          await writePersistedDatasetCache(serializeDatasetCache(fresh));
-          return fresh;
+          const initial = await fetchInitialDatasetCacheFromNetwork(singleDatasetId);
+          await writePersistedDatasetCache(
+            serializeDatasetCache(initial.cache, initial.isComplete),
+          );
+          if (!initial.isComplete) {
+            scheduleBackgroundRefresh(
+              singleDatasetId,
+              serializeDatasetCache(initial.cache, false),
+            );
+          }
+          return initial.cache;
         } catch (error) {
           if (persisted && persisted.revision === DATASET_REVISION) {
             console.warn(
               "[browser-dataset] Falling back to stale cached dataset after network failure:",
               error,
             );
+            if (persisted.isComplete === false) {
+              scheduleBackgroundRefresh(singleDatasetId, persisted);
+            }
             return deserializeDatasetCache(persisted);
           }
           throw error;
@@ -385,6 +449,9 @@ export function invalidateBrowserDatasetCache(): void {
 
 function dispatchDatasetRefreshed(datasetId: string): void {
   if (typeof window === "undefined") return;
+  if (datasetKeyContains(datasetId)) {
+    datasetCachePromise = null;
+  }
   window.dispatchEvent(
     new CustomEvent(BROWSER_DATASET_REFRESHED_EVENT, {
       detail: {
@@ -406,25 +473,49 @@ function scheduleBackgroundRefresh(
   backgroundRefreshKey = datasetId;
   backgroundRefreshPromise = (async () => {
     try {
-      const fresh = await fetchDatasetCacheFromNetwork(datasetId);
-      await writePersistedDatasetCache(serializeDatasetCache(fresh));
-      if (datasetCacheKey === datasetId) {
-        datasetCachePromise = Promise.resolve(fresh);
+      const jsonlFiles = await fetchDatasetTree(datasetId);
+      let workingCache = deserializeDatasetCache(persisted);
+      const loadedPaths = new Set(workingCache.sessions.map((session) => session.path));
+      const remainingFiles = jsonlFiles.filter(
+        (file) => !loadedPaths.has(virtualPath(datasetId, file.path)),
+      );
+
+      if (remainingFiles.length === 0) {
+        if (persisted.isComplete === false) {
+          await writePersistedDatasetCache(
+            serializeDatasetCache(workingCache, true),
+          );
+          dispatchDatasetRefreshed(datasetId);
+        }
+        return;
       }
 
-      const changed =
-        fresh.sessions.length !== persisted.sessions.length ||
-        fresh.sessions.some((session, index) => {
-          const previous = persisted.sessions[index];
-          return (
-            !previous ||
-            previous.path !== session.path ||
-            previous.fileSize !== session.fileSize ||
-            previous.info.modified !== session.info.modified
-          );
-        });
+      for (
+        let index = 0;
+        index < remainingFiles.length;
+        index += BACKGROUND_DATASET_FILE_BATCH
+      ) {
+        const batch = remainingFiles.slice(
+          index,
+          index + BACKGROUND_DATASET_FILE_BATCH,
+        );
+        const fetchedSessions = await fetchDatasetSessionsForFiles(
+          datasetId,
+          batch,
+        );
+        if (fetchedSessions.length === 0) {
+          continue;
+        }
 
-      if (changed) {
+        workingCache = buildDatasetCache(
+          datasetId,
+          mergeDatasetSessions(workingCache.sessions, fetchedSessions),
+        );
+        const isComplete =
+          index + BACKGROUND_DATASET_FILE_BATCH >= remainingFiles.length;
+        await writePersistedDatasetCache(
+          serializeDatasetCache(workingCache, isComplete),
+        );
         dispatchDatasetRefreshed(datasetId);
       }
     } catch (error) {

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getPlatformDefaults } from "@/components/settings/types";
 import { useFileWatcher } from "@/hooks/useFileWatcher";
 import { registerBuiltinPlugins } from "@/plugins";
+import { getRuntimeMode } from "@/runtime-data/runtimeMode";
 import { invoke, isTauri } from "@/transport";
 import type { SessionsDiff } from "@/types";
 import { getCachedSettings } from "@/utils/settingsApi";
@@ -183,7 +184,7 @@ export function useAppBootstrap({
   }, []);
 
   useFileWatcher({
-    enabled: true,
+    enabled: getRuntimeMode() === "backend",
     debounceMs: 2000,
     onDiff: patchSessions,
   });

@@ -18,10 +18,11 @@ import { loadAppSettings, saveAppSettings } from "@/utils/settingsApi";
 import { applyPiChatTheme, resolvePiThemeColorScheme } from "@/utils/piTheme";
 import { useSettings as useAppSettingsContext } from "@/hooks/useSettings";
 import {
-  SETTINGS_GROUPS,
-  SETTINGS_SECTIONS,
+  getAvailableSettingsGroups,
+  getAvailableSettingsSections,
   renderSettingsSection,
 } from "./settingsRegistry";
+import { isStandaloneDatasetRuntime } from "@/browser-dataset";
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -31,6 +32,9 @@ interface SettingsPanelProps {
 export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const { t, i18n } = useTranslation();
   const { reloadSettings } = useAppSettingsContext();
+  const standaloneDatasetRuntime = isStandaloneDatasetRuntime();
+  const menuItems = getAvailableSettingsSections();
+  const menuGroups = getAvailableSettingsGroups();
   const [activeSection, setActiveSection] =
     useState<SettingsSection>("terminal");
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
@@ -46,6 +50,13 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       void loadSettingsInternal();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (menuItems.some((item) => item.id === activeSection)) {
+      return;
+    }
+    setActiveSection(menuItems[0]?.id || "appearance");
+  }, [activeSection, menuItems]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -193,7 +204,9 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       return;
     }
     try {
-      await invoke("reset_app_settings");
+      if (!standaloneDatasetRuntime) {
+        await invoke("reset_app_settings");
+      }
       localStorage.removeItem("pi-session-manager-settings");
       localStorage.removeItem("app-language");
       setSettings(defaultSettings);
@@ -207,6 +220,9 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   };
 
   const openConfigFolder = async () => {
+    if (standaloneDatasetRuntime) {
+      return;
+    }
     try {
       const path = await invoke<string>("get_psm_config_dir");
       await invoke("open_path_in_system", { path });
@@ -238,7 +254,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       >
         {isMobile ? (
           <MobileSettings
-            menuItems={SETTINGS_SECTIONS}
+            menuItems={menuItems}
+            menuGroups={menuGroups}
             activeSection={activeSection}
             onSectionChange={setActiveSection}
             settings={settings}
@@ -250,18 +267,21 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             onReset={resetSettings}
             saving={saving}
             saved={saved}
+            canOpenConfigFolder={!standaloneDatasetRuntime}
           />
         ) : (
           <>
             <SettingsSidebar
-              menuItems={SETTINGS_SECTIONS}
+              menuItems={menuItems}
+              menuGroups={menuGroups}
               activeSection={activeSection}
               onSectionChange={setActiveSection}
               onOpenConfigFolder={openConfigFolder}
               onReset={resetSettings}
+              canOpenConfigFolder={!standaloneDatasetRuntime}
             />
             <SettingsContent
-              menuItems={SETTINGS_SECTIONS}
+              menuItems={menuItems}
               activeSection={activeSection}
               settings={settings}
               loading={loading}
@@ -279,7 +299,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 }
 
 interface MobileSettingsProps {
-  menuItems: typeof SETTINGS_SECTIONS;
+  menuItems: ReturnType<typeof getAvailableSettingsSections>;
+  menuGroups: ReturnType<typeof getAvailableSettingsGroups>;
   activeSection: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
   settings: AppSettings;
@@ -295,10 +316,12 @@ interface MobileSettingsProps {
   onReset: () => void;
   saving: boolean;
   saved: boolean;
+  canOpenConfigFolder: boolean;
 }
 
 function MobileSettings({
   menuItems,
+  menuGroups,
   activeSection,
   onSectionChange,
   settings,
@@ -310,6 +333,7 @@ function MobileSettings({
   onReset,
   saving,
   saved,
+  canOpenConfigFolder,
 }: MobileSettingsProps) {
   const { t } = useTranslation();
   const [showDetail, setShowDetail] = useState(false);
@@ -373,7 +397,7 @@ function MobileSettings({
 
           <div className="flex-1 overflow-y-auto overscroll-contain">
             <div className="space-y-4 px-3 py-3">
-              {SETTINGS_GROUPS.map((group) => {
+              {menuGroups.map((group) => {
                 const items = group.sections
                   .map((id) => sectionMap.get(id))
                   .filter(Boolean);
@@ -430,14 +454,18 @@ function MobileSettings({
             </div>
 
             <div className="border-t border-border bg-background/95 px-4 py-4 backdrop-blur-sm safe-area-bottom">
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={onOpenConfigFolder}
-                  className="flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border motion-color motion-surface motion-press focus-ring"
-                >
-                  <FolderOpen className="h-4 w-4" />
-                  {t("settings.openConfigFolder", "Open Config Folder")}
-                </button>
+              <div
+                className={`grid gap-3 ${canOpenConfigFolder ? "grid-cols-2" : "grid-cols-1"}`}
+              >
+                {canOpenConfigFolder && (
+                  <button
+                    onClick={onOpenConfigFolder}
+                    className="flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border motion-color motion-surface motion-press focus-ring"
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                    {t("settings.openConfigFolder", "Open Config Folder")}
+                  </button>
+                )}
                 <button
                   onClick={onReset}
                   className="flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border motion-color motion-surface motion-press focus-ring"
@@ -529,19 +557,23 @@ function MobileSettings({
 }
 
 interface SettingsSidebarProps {
-  menuItems: typeof SETTINGS_SECTIONS;
+  menuItems: ReturnType<typeof getAvailableSettingsSections>;
+  menuGroups: ReturnType<typeof getAvailableSettingsGroups>;
   activeSection: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
   onOpenConfigFolder: () => void;
   onReset: () => void;
+  canOpenConfigFolder: boolean;
 }
 
 function SettingsSidebar({
   menuItems,
+  menuGroups,
   activeSection,
   onSectionChange,
   onOpenConfigFolder,
   onReset,
+  canOpenConfigFolder,
 }: SettingsSidebarProps) {
   const { t } = useTranslation();
 
@@ -556,40 +588,54 @@ function SettingsSidebar({
         </p>
       </div>
 
-      <nav className="flex-1 p-2 space-y-0.5">
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onSectionChange(item.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm motion-surface motion-color motion-press focus-ring ${
-              activeSection === item.id
-                ? "bg-info/15 text-foreground ring-1 ring-info/30"
-                : "text-muted-foreground hover:text-foreground hover:bg-surface/80"
-            }`}
-          >
-            <span className={activeSection === item.id ? "text-info" : ""}>
-              {item.icon}
-            </span>
-            <span className="flex-1 text-left">
-              {t(item.labelKey, item.fallbackLabel)}
-            </span>
-            <ChevronRight
-              className={`h-4 w-4 motion-transform text-muted-foreground/50 ${
-                activeSection === item.id ? "rotate-90 text-info/70" : ""
-              }`}
-            />
-          </button>
+      <nav className="flex-1 p-2 space-y-4">
+        {menuGroups.map((group) => (
+          <section key={group.id} className="space-y-1.5">
+            <div className="px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              {t(group.labelKey, group.fallbackLabel)}
+            </div>
+            <div className="space-y-0.5">
+              {group.sections
+                .map((id) => menuItems.find((item) => item.id === id))
+                .filter(Boolean)
+                .map((item) => (
+                  <button
+                    key={item!.id}
+                    onClick={() => onSectionChange(item!.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm motion-surface motion-color motion-press focus-ring ${
+                      activeSection === item!.id
+                        ? "bg-info/15 text-foreground ring-1 ring-info/30"
+                        : "text-muted-foreground hover:text-foreground hover:bg-surface/80"
+                    }`}
+                  >
+                    <span className={activeSection === item!.id ? "text-info" : ""}>
+                      {item!.icon}
+                    </span>
+                    <span className="flex-1 text-left">
+                      {t(item!.labelKey, item!.fallbackLabel)}
+                    </span>
+                    <ChevronRight
+                      className={`h-4 w-4 motion-transform text-muted-foreground/50 ${
+                        activeSection === item!.id ? "rotate-90 text-info/70" : ""
+                      }`}
+                    />
+                  </button>
+                ))}
+            </div>
+          </section>
         ))}
       </nav>
 
       <div className="p-3 border-t border-border/80 flex-shrink-0 space-y-2">
-        <button
-          onClick={onOpenConfigFolder}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
-        >
-          <FolderOpen className="h-4 w-4" />
-          {t("settings.openConfigFolder", "Open Config Folder")}
-        </button>
+        {canOpenConfigFolder && (
+          <button
+            onClick={onOpenConfigFolder}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
+          >
+            <FolderOpen className="h-4 w-4" />
+            {t("settings.openConfigFolder", "Open Config Folder")}
+          </button>
+        )}
         <button
           onClick={onReset}
           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
@@ -603,7 +649,7 @@ function SettingsSidebar({
 }
 
 interface SettingsContentProps {
-  menuItems: typeof SETTINGS_SECTIONS;
+  menuItems: ReturnType<typeof getAvailableSettingsSections>;
   activeSection: SettingsSection;
   settings: AppSettings;
   loading: boolean;
@@ -636,8 +682,8 @@ function SettingsContent({
       <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-background/50">
         <h3 className="text-base font-semibold text-foreground tracking-tight">
           {t(
-            menuItems.find((i) => i.id === activeSection)?.labelKey || "",
-            menuItems.find((i) => i.id === activeSection)?.fallbackLabel || "",
+            menuItems.find((item) => item.id === activeSection)?.labelKey || "",
+            menuItems.find((item) => item.id === activeSection)?.fallbackLabel || "",
           )}
         </h3>
         <button

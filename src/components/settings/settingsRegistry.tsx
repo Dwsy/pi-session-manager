@@ -32,6 +32,7 @@ import TagManagerSettings from "./sections/TagManagerSettings";
 import APITestSettings from "./sections/APITestSettings";
 import PiLiveSettings from "./sections/PiLiveSettings";
 import { ConfigBundleManager } from "./sections/ConfigBundleManager";
+import { isStandaloneDatasetRuntime } from "@/browser-dataset";
 
 export interface SettingsSectionMeta {
   id: SettingsSection;
@@ -180,6 +181,40 @@ export const SETTINGS_GROUPS: SettingsGroupMeta[] = [
     sections: ["advanced", "api-test", "import-export"],
   },
 ];
+
+const STANDALONE_DATASET_SECTION_IDS: SettingsSection[] = [
+  "appearance",
+  "language",
+  "session",
+  "tags",
+  "search",
+  "export",
+  "updates",
+  "shortcuts",
+];
+
+export function getAvailableSettingsSections(): SettingsSectionMeta[] {
+  if (!isStandaloneDatasetRuntime()) {
+    return SETTINGS_SECTIONS;
+  }
+
+  const allowed = new Set(STANDALONE_DATASET_SECTION_IDS);
+  return SETTINGS_SECTIONS.filter((item) => allowed.has(item.id));
+}
+
+export function getAvailableSettingsGroups(): SettingsGroupMeta[] {
+  if (!isStandaloneDatasetRuntime()) {
+    return SETTINGS_GROUPS;
+  }
+
+  const allowed = new Set(STANDALONE_DATASET_SECTION_IDS);
+  return SETTINGS_GROUPS
+    .map((group) => ({
+      ...group,
+      sections: group.sections.filter((section) => allowed.has(section)),
+    }))
+    .filter((group) => group.sections.length > 0);
+}
 
 export function findSettingsGroupBySection(
   section: SettingsSection,

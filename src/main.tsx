@@ -6,6 +6,10 @@ import { TransportProvider } from './contexts/TransportContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import ClipboardBridge from './components/ClipboardBridge'
+import {
+  bootstrapStandaloneDatasetSettings,
+  isStandaloneDatasetRuntime,
+} from './browser-dataset'
 import './i18n'
 import './styles/index.less'
 import { isTauri } from './transport'
@@ -44,6 +48,10 @@ function shouldBootstrapDemoSettings(): boolean {
   }
 
   return window.location.pathname.endsWith('/demo.html')
+}
+
+function shouldBootstrapStandaloneDatasetSettings(): boolean {
+  return isStandaloneDatasetRuntime()
 }
 
 function bootstrapDemoSettings(): void {
@@ -94,6 +102,11 @@ function clearDemoServiceWorkerAndCaches(): void {
 
 if (shouldBootstrapDemoSettings()) {
   bootstrapDemoSettings()
+  clearDemoServiceWorkerAndCaches()
+}
+
+if (shouldBootstrapStandaloneDatasetSettings()) {
+  bootstrapStandaloneDatasetSettings()
   clearDemoServiceWorkerAndCaches()
 }
 

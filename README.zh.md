@@ -13,7 +13,8 @@
 <p align="center">
   <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">Releases</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/">English</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/demo/">预览</a>
+  <a href="https://dwsy.github.io/pi-session-manager/demo/">Demo</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/dataset/">数据集版</a>
 </p>
 
 ## 核心功能
@@ -98,6 +99,7 @@ pnpm install
 | `npm run tauri:dev` | 桌面端联调（前后端） |
 | `npm run build` | 生产构建到 `dist/` |
 | `npm run build:demo` | 静态 Demo 到 `dist-demo/` |
+| `npm run build:dataset` | 静态数据集版到 `dist-dataset/` |
 | `npm run build:cli` | 构建独立 `pi-session-cli` 二进制 |
 | `npm run tauri:build` | 桌面端生产打包 |
 
@@ -109,6 +111,7 @@ pnpm install
 | 主二进制无头模式 | `pi-session-manager --cli` / `--headless` | 单端口 HTTP + WS(`/ws`)，默认 `52131` |
 | 独立 CLI crate | `pi-session-cli` | 单端口 HTTP + WS(`/ws`)（默认 `52131`）|
 | 静态 Demo 页面 | `dist-demo/index.html` | 不依赖后端，强制 Demo 数据 |
+| 静态数据集页面 | `dist-dataset/index.html` | 不依赖后端，浏览器数据集模式 |
 
 ### CLI 参数
 

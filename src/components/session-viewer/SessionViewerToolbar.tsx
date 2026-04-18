@@ -46,8 +46,6 @@ export default function SessionViewerToolbar({
   onToggleSidebar,
   onToggleThinking,
   onToggleToolsExpanded,
-  collapseToolCalls,
-  onToggleCollapseToolCalls,
   onToggleScrollMarkers,
   onOpenSearch,
   onMobileMenuOpenChange,
@@ -72,9 +70,6 @@ export default function SessionViewerToolbar({
   const toolsToggleLabel = toolsExpanded
     ? t("session.toolbar.collapseTools", "Collapse tools")
     : t("session.toolbar.expandTools", "Expand tools");
-  const collapseToolCallsToggleLabel = collapseToolCalls
-    ? t("session.toolbar.collapseToolCallsOn", "Grouped tools")
-    : t("session.toolbar.collapseToolCallsOff", "Expanded tools");
   const searchToggleLabel = t(
     "session.toolbar.searchMessages",
     "Search messages",
@@ -216,21 +211,21 @@ export default function SessionViewerToolbar({
                       <ListTree className="h-3.5 w-3.5" />
                     </button>
                   </KbdTooltip>
-                  {onToggleCollapseToolCalls && (
-                    <button
-                      onClick={onToggleCollapseToolCalls}
-                      className={`p-1.5 text-xs ${toggleButtonBase} ${collapseToolCalls ? toggleButtonActive : toggleButtonInactive}`}
-                      title={collapseToolCallsToggleLabel}
-                      aria-label={collapseToolCallsToggleLabel}
-                      aria-pressed={collapseToolCalls}
-                    >
-                      {collapseToolCalls ? (
-                        <ListTree className="h-3.5 w-3.5" />
-                      ) : (
-                        <List className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  )}
+                  {/*{onToggleCollapseToolCalls && (*/}
+                  {/*  <button*/}
+                  {/*    onClick={onToggleCollapseToolCalls}*/}
+                  {/*    className={`p-1.5 text-xs ${toggleButtonBase} ${collapseToolCalls ? toggleButtonActive : toggleButtonInactive}`}*/}
+                  {/*    title={collapseToolCallsToggleLabel}*/}
+                  {/*    aria-label={collapseToolCallsToggleLabel}*/}
+                  {/*    aria-pressed={collapseToolCalls}*/}
+                  {/*  >*/}
+                  {/*    {collapseToolCalls ? (*/}
+                  {/*      <ListTree className="h-3.5 w-3.5" />*/}
+                  {/*    ) : (*/}
+                  {/*      <List className="h-3.5 w-3.5" />*/}
+                  {/*    )}*/}
+                  {/*  </button>*/}
+                  {/*)}*/}
                   <button
                     onClick={onOpenSystemPromptDialog}
                     className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
@@ -266,7 +261,7 @@ export default function SessionViewerToolbar({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                        <polyline points="22 12 18 12 工具调用折叠按钮（⌘O）保留，仅隐藏聚合工具调用切换按钮。previewMode 下只显示搜索、系统提示、滚动按钮。round" />
                       </svg>
                     </button>
                   )}
@@ -290,12 +285,14 @@ export default function SessionViewerToolbar({
               </button>
               {!previewMode && (
                 <>
-                  <button
-                    onClick={onRename}
-                    className="px-2.5 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
-                  >
-                    {t("common.rename")}
-                  </button>
+                  {onRename && (
+                    <button
+                      onClick={onRename}
+                      className="px-2.5 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
+                    >
+                      {t("common.rename")}
+                    </button>
+                  )}
                   {onFork && (
                     <button
                       onClick={onFork}
@@ -432,31 +429,19 @@ export default function SessionViewerToolbar({
               <Search className="h-4 w-4 text-muted-foreground" />
               {searchToggleLabel}
             </button>
-            <button
-              onClick={() => {
-                onToggleToolsExpanded();
-                closeMobileMenu();
-              }}
-              className={mobileSheetItemClass}
-            >
-              <ListTree className="h-4 w-4 text-muted-foreground" />
-              {toolsToggleLabel}
-            </button>
-            {onToggleCollapseToolCalls && (
-              <button
-                onClick={() => {
-                  onToggleCollapseToolCalls();
-                  closeMobileMenu();
-                }}
-                className={mobileSheetItemClass}
-              >
-                {collapseToolCalls ? (
+            {!previewMode && (
+              <>
+                <button
+                  onClick={() => {
+                    onToggleToolsExpanded();
+                    closeMobileMenu();
+                  }}
+                  className={mobileSheetItemClass}
+                >
                   <ListTree className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <List className="h-4 w-4 text-muted-foreground" />
-                )}
-                {collapseToolCallsToggleLabel}
-              </button>
+                  {toolsToggleLabel}
+                </button>
+              </>
             )}
             <button
               onClick={() => {
@@ -501,16 +486,18 @@ export default function SessionViewerToolbar({
               {t("session.scrollToBottom", "Scroll to bottom")}
             </button>
             <div className="border-t border-border my-1" />
-            <button
-              onClick={() => {
-                onRename();
-                closeMobileMenu();
-              }}
-              className={mobileSheetItemClass}
-            >
-              <Pencil className="h-4 w-4 text-muted-foreground" />
-              {t("common.rename")}
-            </button>
+            {onRename && (
+              <button
+                onClick={() => {
+                  onRename();
+                  closeMobileMenu();
+                }}
+                className={mobileSheetItemClass}
+              >
+                <Pencil className="h-4 w-4 text-muted-foreground" />
+                {t("common.rename")}
+              </button>
+            )}
             {onFork && (
               <button
                 onClick={() => {

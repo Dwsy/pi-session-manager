@@ -18,6 +18,7 @@ export interface PersistedDatasetCacheRecord {
   datasetId: string;
   cachedAt: number;
   revision: string;
+  isComplete?: boolean;
   sessions: SerializableDatasetSession[];
 }
 

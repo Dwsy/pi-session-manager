@@ -20,6 +20,7 @@ const buildVersion = resolveBuildVersion()
 
 export default defineConfig(({ mode }) => {
   const isDemoBuild = mode === 'demo'
+  const isDatasetBuild = mode === 'dataset'
 
   return {
     define: {
@@ -86,7 +87,7 @@ export default defineConfig(({ mode }) => {
       }),
     ],
     build: {
-      outDir: isDemoBuild ? 'dist-demo' : 'dist',
+      outDir: isDemoBuild ? 'dist-demo' : isDatasetBuild ? 'dist-dataset' : 'dist',
       rollupOptions: {
         output: {
           manualChunks: {

@@ -9,6 +9,7 @@ on:
       - 'public/**'
       - 'index.html'
       - 'demo.html'
+      - 'dataset.html'
       - 'vite.config.ts'
       - 'package.json'
       - 'package-lock.json'
@@ -53,10 +54,15 @@ jobs:
       - name: Build static demo page
         run: pnpm run build:demo --base /pi-session-manager/demo/
 
-      - name: Merge demo into website artifact
+      - name: Build static dataset page
+        run: pnpm run build:dataset --base /pi-session-manager/dataset/
+
+      - name: Merge demo and dataset into website artifact
         run: |
           mkdir -p website/out/demo
           cp -R dist-demo/* website/out/demo/
+          mkdir -p website/out/dataset
+          cp -R dist-dataset/* website/out/dataset/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

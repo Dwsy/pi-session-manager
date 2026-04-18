@@ -2,6 +2,7 @@ import { invoke, isTauri } from "@/transport";
 import type { AppSettings } from "@/components/settings/types";
 import { defaultSettings } from "@/components/settings/types";
 import type { SessionConvertTarget } from "@/types";
+import { isStandaloneDatasetRuntime } from "@/browser-dataset";
 import { saveSessionSource } from "@/utils/datasetApi";
 
 const CACHE_KEY = "pi-session-manager-settings";
@@ -176,8 +177,12 @@ function writeCache(settings: AppSettings) {
   } catch {}
 }
 
-function isDemoRuntime(): boolean {
+function isNoBackendRuntime(): boolean {
   if (import.meta.env.MODE === "demo") {
+    return true;
+  }
+
+  if (isStandaloneDatasetRuntime()) {
     return true;
   }
 
@@ -195,7 +200,7 @@ function isDemoRuntime(): boolean {
 }
 
 export async function loadAppSettings(): Promise<AppSettings> {
-  if (isDemoRuntime()) {
+  if (isNoBackendRuntime()) {
     return getCachedSettings();
   }
 
@@ -215,7 +220,7 @@ export async function loadAppSettings(): Promise<AppSettings> {
 }
 
 export async function saveAppSettings(settings: AppSettings): Promise<void> {
-  if (isDemoRuntime()) {
+  if (isNoBackendRuntime()) {
     writeCache(settings);
     return;
   }

@@ -1,7 +1,8 @@
 import { getRuntimeMode } from "./runtimeMode";
+import { isStandaloneDatasetRuntime } from "@/browser-dataset";
 
 export function shouldSkipOnboardingForRuntime(): boolean {
-  return getRuntimeMode() === "demo";
+  return getRuntimeMode() === "demo" || isStandaloneDatasetRuntime();
 }
 
 export function shouldBypassAuthGate(): boolean {

@@ -74,7 +74,7 @@ export interface AppDesktopSidebarContentProps {
   onSelectFavoriteProject: NonNullable<FavoritesPanelProps["onSelectProject"]>;
   onSelectSession: SessionListProps["onSelectSession"];
   onSelectProject: NonNullable<ProjectListProps["onSelectProject"]>;
-  onDeleteSession: NonNullable<SessionListProps["onDeleteSession"]>;
+  onDeleteSession?: SessionListProps["onDeleteSession"];
   onRemoveFavorite: FavoritesPanelProps["onRemoveFavorite"];
   onToggleFavorite: NonNullable<ProjectListProps["onToggleFavorite"]>;
   liveSessionIds?: Set<string>;

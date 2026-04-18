@@ -56,7 +56,7 @@ export interface AppProjectListPaneProps {
   selectedSession: SessionInfo | null;
   onSelectSession: SessionListProps["onSelectSession"];
   onSelectProject: NonNullable<ProjectListProps["onSelectProject"]>;
-  onDeleteSession: NonNullable<SessionListProps["onDeleteSession"]>;
+  onDeleteSession?: SessionListProps["onDeleteSession"];
   onConvertSession?: SessionListProps["onConvertSession"];
   loading: boolean;
   terminal?: ProjectListProps["terminal"];

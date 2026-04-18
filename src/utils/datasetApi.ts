@@ -13,6 +13,8 @@ import {
 const SETTINGS_CACHE_KEY = "pi-session-manager-settings";
 const BROWSER_DATASET_RECENTS_KEY = "pi-session-manager-browser-datasets";
 
+export { DEFAULT_STANDALONE_DATASET_ID } from "@/browser-dataset";
+
 interface BrowserDatasetRecord {
   id: string;
   sourceUrl: string;
@@ -76,6 +78,17 @@ function writeBrowserDatasetRecents(records: BrowserDatasetRecord[]): void {
   try {
     localStorage.setItem(BROWSER_DATASET_RECENTS_KEY, JSON.stringify(records));
   } catch {}
+}
+
+function toBrowserDatasetRecord(source: string): BrowserDatasetRecord {
+  const parsed = parseDatasetSource(source);
+  return {
+    id: parsed.repoId,
+    sourceUrl: parsed.sourceUrl,
+    displayName: parsed.displayName,
+    slug: parsed.slug,
+    addedAt: new Date().toISOString(),
+  };
 }
 
 function getBrowserActiveDatasetIds(): string[] {
@@ -151,30 +164,30 @@ export async function startDatasetImport(
 ): Promise<DatasetImportStatus> {
   if (!isTauri()) {
     const parsed = parseDatasetSource(source);
-    const now = new Date().toISOString();
     const recents = readBrowserDatasetRecents().filter(
       (item) => item.id !== parsed.repoId,
     );
-    recents.unshift({
+    const record = {
       id: parsed.repoId,
       sourceUrl: parsed.sourceUrl,
       displayName: parsed.displayName,
       slug: parsed.slug,
-      addedAt: now,
-    });
+      addedAt: new Date().toISOString(),
+    };
+    recents.unshift(record);
     writeBrowserDatasetRecents(recents.slice(0, 10));
     return {
-      taskId: `browser-dataset-${parsed.repoId}`,
-      datasetId: parsed.repoId,
-      displayName: parsed.displayName,
-      sourceUrl: parsed.sourceUrl,
+      taskId: `browser-dataset-${record.id}`,
+      datasetId: record.id,
+      displayName: record.displayName,
+      sourceUrl: record.sourceUrl,
       phase: "completed",
       totalFiles: 0,
       downloadedFiles: 0,
       indexedFiles: 0,
       totalBytes: 0,
       downloadedBytes: 0,
-      finishedAt: now,
+      finishedAt: record.addedAt,
       error: null,
     };
   }
@@ -275,4 +288,23 @@ export async function clearAllBrowserDatasetCaches(): Promise<void> {
   }
   await clearAllPersistedDatasetCaches();
   invalidateBrowserDatasetCache();
+}
+
+export function ensureBrowserDatasetRecent(source: string): DatasetInfo {
+  const record = toBrowserDatasetRecord(source);
+  const recents = readBrowserDatasetRecents().filter(
+    (item) => item.id !== record.id,
+  );
+  recents.unshift(record);
+  writeBrowserDatasetRecents(recents.slice(0, 10));
+  return toBrowserDatasetInfo(record, getBrowserActiveDatasetIds());
+}
+
+export function removeBrowserDatasetRecent(datasetId: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const next = readBrowserDatasetRecents().filter((item) => item.id !== datasetId);
+  writeBrowserDatasetRecents(next);
 }

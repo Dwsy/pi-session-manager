@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "vite",
     "dev:demo": "vite --mode demo",
+    "dev:dataset": "vite --mode dataset",
     "build": "tsc && vite build",
     "build:demo": "tsc && vite build --mode demo",
+    "build:dataset": "tsc && vite build --mode dataset",
     "preview": "vite preview",
     "preview:demo": "vite preview --outDir dist-demo --port 4174",
+    "preview:dataset": "vite preview --outDir dist-dataset --port 4175",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",

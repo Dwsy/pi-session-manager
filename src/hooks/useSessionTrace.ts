@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@/transport';
+import {
+  getBrowserDatasetTraceAnalytics,
+  isBrowserDatasetModeEnabled,
+} from '@/browser-dataset';
 import type { SessionTraceAnalytics } from '@/types/trace';
 
 const TRACE_CACHE = new Map<string, SessionTraceAnalytics>();
@@ -31,9 +35,13 @@ export function useSessionTrace(sessionPath: string) {
     setLoading(true);
     setError(null);
 
-    invoke<SessionTraceAnalytics>('get_session_trace_analytics', {
-      sessionPath,
-    })
+    const load = isBrowserDatasetModeEnabled()
+      ? getBrowserDatasetTraceAnalytics(sessionPath)
+      : invoke<SessionTraceAnalytics>('get_session_trace_analytics', {
+          sessionPath,
+        });
+
+    load
       .then((data) => {
         if (!cancelled) {
           cacheTrace(sessionPath, data);
@@ -62,9 +70,13 @@ export function useSessionTrace(sessionPath: string) {
     setLoading(true);
     setError(null);
 
-    invoke<SessionTraceAnalytics>('get_session_trace_analytics', {
-      sessionPath,
-    })
+    const load = isBrowserDatasetModeEnabled()
+      ? getBrowserDatasetTraceAnalytics(sessionPath)
+      : invoke<SessionTraceAnalytics>('get_session_trace_analytics', {
+          sessionPath,
+        });
+
+    load
       .then((data) => {
         cacheTrace(sessionPath, data);
         setAnalytics(data);

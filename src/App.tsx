@@ -26,6 +26,7 @@ import {
 } from "./plugins/tools-render";
 import ConnectionBanner from "./components/ConnectionBanner";
 import UpdateNoticeToast from "./components/UpdateNoticeToast";
+import StandaloneDatasetOverview from "./components/dataset/StandaloneDatasetOverview";
 import { useTags } from "./hooks/useTags";
 import type { SessionConvertTarget, SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
@@ -59,6 +60,11 @@ import AppSettingsPane from "./components/app/AppSettingsPane";
 import AppTerminalPane from "./components/app/AppTerminalPane";
 import DeleteSessionPopover from "./components/dialogs/DeleteSessionPopover";
 import type { DeleteSessionRequestOptions } from "./components/dialogs/deleteSessionTypes";
+import {
+  DEFAULT_STANDALONE_DATASET_ID,
+  getActiveDatasetId,
+  isStandaloneDatasetRuntime,
+} from "./browser-dataset";
 import {
   DEFAULT_SESSION_SORT_BY,
   DEFAULT_SESSION_SORT_ORDER,
@@ -99,6 +105,7 @@ const LoadingSpinner = () => (
 
 function App() {
   const { t } = useTranslation();
+  const standaloneDatasetRuntime = isStandaloneDatasetRuntime();
 
   // Register tool render plugins
   useEffect(() => {
@@ -165,14 +172,21 @@ function App() {
     createTag,
     moveSession,
     getDescendantIds,
+    loadTags,
   } = useTags();
   useAppearance();
   useToolStyles();
-  const { liveSessionIds } = usePiLive();
+  const { liveSessionIds: runtimeLiveSessionIds } = usePiLive();
+  const liveSessionIds = standaloneDatasetRuntime
+    ? new Set<string>()
+    : runtimeLiveSessionIds;
 
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "project" | "kanban">(
     () => {
+      if (standaloneDatasetRuntime) {
+        return "list";
+      }
       const saved = getCachedSettings().session?.defaultViewMode;
       return saved === "list"
         ? "list"
@@ -210,6 +224,11 @@ function App() {
   const [showForkDialog, setShowForkDialog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [standaloneDatasetId] = useState(() =>
+    standaloneDatasetRuntime
+      ? getActiveDatasetId() || DEFAULT_STANDALONE_DATASET_ID
+      : "",
+  );
   const [sessionSortBy, setSessionSortBy] = useState(DEFAULT_SESSION_SORT_BY);
   const [sessionSortOrder, setSessionSortOrder] = useState(
     DEFAULT_SESSION_SORT_ORDER,
@@ -247,12 +266,17 @@ function App() {
     setShowTerminal(false);
   }, []);
   useEffect(() => {
+    if (standaloneDatasetRuntime) {
+      setSourceOptions([]);
+      return;
+    }
+
     void listSupportedSessionProviders().then((items) => {
       setSourceOptions(
         items.map((item) => ({ slug: item.slug, label: item.display_name })),
       );
     });
-  }, []);
+  }, [standaloneDatasetRuntime]);
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -453,15 +477,19 @@ function App() {
 
   const shortcuts = useMemo(
     () => ({
-      "cmd+r": handleResumeSession,
-      "cmd+e": handleExportAndOpen,
-      "cmd+backspace": () => {
-        if (!selectedSession || isBlockingShortcutOverlayOpen) {
-          return;
-        }
+      ...(standaloneDatasetRuntime
+        ? {}
+        : {
+            "cmd+r": handleResumeSession,
+            "cmd+e": handleExportAndOpen,
+            "cmd+backspace": () => {
+              if (!selectedSession || isBlockingShortcutOverlayOpen) {
+                return;
+              }
 
-        void handleDeleteSession(selectedSession);
-      },
+              void handleDeleteSession(selectedSession);
+            },
+          }),
       "cmd+l": () => {
         setViewMode("list");
         setSelectedProject(null);
@@ -479,7 +507,9 @@ function App() {
       },
       "cmd+,": () => setShowSettings(true),
       "cmd+`": () => {
-        if (terminalConfig.enabled) setShowTerminal((v) => !v);
+        if (!standaloneDatasetRuntime && terminalConfig.enabled) {
+          setShowTerminal((v) => !v);
+        }
       },
       escape: () => {
         if (showSettings) {
@@ -526,6 +556,7 @@ function App() {
       handleExportAndOpen,
       handleDeleteSession,
       isBlockingShortcutOverlayOpen,
+      standaloneDatasetRuntime,
       terminalConfig.enabled,
     ],
   );
@@ -610,6 +641,26 @@ function App() {
     selectionModeTrigger,
     liveSessionIds,
   });
+
+  const runtimeSessionListCommonProps = useMemo(
+    () =>
+      standaloneDatasetRuntime
+        ? {
+            ...sessionListCommonProps,
+            onDeleteSession: undefined,
+            onDeleteSessions: undefined,
+            onConvertSession: undefined,
+            onResumeSession: undefined,
+            onCopyResumeSession: undefined,
+            terminal: undefined,
+            piPath: undefined,
+            customCommand: undefined,
+            resumeCommand: undefined,
+            liveSessionIds: undefined,
+          }
+        : sessionListCommonProps,
+    [sessionListCommonProps, standaloneDatasetRuntime],
+  );
 
   const onRenameSession = async (newName: string) => {
     if (!selectedSession) return;
@@ -726,7 +777,7 @@ function App() {
       isMobile={isMobile}
       mobileFilterBar={isMobile ? renderMobileFilterBar() : null}
       listScrollRef={listScrollRef}
-      sessionListCommonProps={sessionListCommonProps}
+      sessionListCommonProps={runtimeSessionListCommonProps}
       sidebarSessions={sidebarSessions}
       sidebarLoading={sidebarLoading}
       sidebarHasMore={sidebarHasMore}
@@ -735,6 +786,7 @@ function App() {
       onRefreshMobile={async () => {
         await loadSessions();
         await loadFavorites();
+        await loadTags();
       }}
     />
   );
@@ -757,7 +809,7 @@ function App() {
       selectedProjectSummary={selectedProjectSummary}
       onBackFromProject={() => setSelectedProject(null)}
       backLabel={t("project.list.back", "Back")}
-      sessionListCommonProps={sessionListCommonProps}
+      sessionListCommonProps={runtimeSessionListCommonProps}
       sidebarSessions={sidebarSessions}
       sidebarLoading={sidebarLoading}
       sidebarHasMore={sidebarHasMore}
@@ -767,12 +819,12 @@ function App() {
       selectedSession={selectedSession}
       onSelectSession={handleSelectSession}
       onSelectProject={setSelectedProject}
-      onDeleteSession={handleDeleteSession}
+      onDeleteSession={standaloneDatasetRuntime ? undefined : handleDeleteSession}
       loading={loading}
-      terminal={terminal}
-      piPath={piPath}
-      customCommand={customCommand}
-      resumeCommand={resumeCommand}
+      terminal={standaloneDatasetRuntime ? undefined : terminal}
+      piPath={standaloneDatasetRuntime ? undefined : piPath}
+      customCommand={standaloneDatasetRuntime ? undefined : customCommand}
+      resumeCommand={standaloneDatasetRuntime ? undefined : resumeCommand}
       getBadgeType={getBadgeType}
       favorites={favorites}
       onToggleFavorite={toggleFavorite}
@@ -792,17 +844,17 @@ function App() {
       onMoveSession={moveSession}
       getTagsForSession={getTagsForSession}
       onToggleTag={handleToggleSessionTag}
-      onDeleteSession={handleDeleteSession}
-      onConvertSession={handleStartConvertSession}
-      onResumeSession={requestResumeSession}
-      onCopyResumeSession={requestCopyResumeCommand}
-      onNewSession={handleNewSession}
+      onDeleteSession={standaloneDatasetRuntime ? undefined : handleDeleteSession}
+      onConvertSession={standaloneDatasetRuntime ? undefined : handleStartConvertSession}
+      onResumeSession={standaloneDatasetRuntime ? undefined : requestResumeSession}
+      onCopyResumeSession={standaloneDatasetRuntime ? undefined : requestCopyResumeCommand}
+      onNewSession={standaloneDatasetRuntime ? undefined : handleNewSession}
       favorites={favorites}
       onToggleFavorite={toggleFavorite}
-      terminal={terminal}
-      piPath={piPath}
-      customCommand={customCommand}
-      resumeCommand={resumeCommand}
+      terminal={standaloneDatasetRuntime ? undefined : terminal}
+      piPath={standaloneDatasetRuntime ? undefined : piPath}
+      customCommand={standaloneDatasetRuntime ? undefined : customCommand}
+      resumeCommand={standaloneDatasetRuntime ? undefined : resumeCommand}
       onCreateTag={createTag}
       projectFilter={selectedProject}
       filterTagIds={filterTagIds}
@@ -813,7 +865,7 @@ function App() {
     />
   );
 
-  const handleDashboardProjectSelect = (path: string) => {
+  const handleDatasetOverviewProjectSelect = (path: string) => {
     setSelectedProject(path);
     if (isMobile) {
       setMobileTab("projects");
@@ -822,6 +874,21 @@ function App() {
     setViewMode("project");
     setShowFavorites(false);
   };
+
+  const renderStandaloneDatasetOverview = () => (
+    <StandaloneDatasetOverview
+      currentDatasetId={standaloneDatasetId || DEFAULT_STANDALONE_DATASET_ID}
+      sessions={
+        selectedProject
+          ? filteredSessions.filter((session) => session.cwd === selectedProject)
+          : filteredSessions
+      }
+      selectedProject={selectedProject}
+      onManageDatasets={() => setShowSettings(true)}
+      onSessionSelect={setSelectedSession}
+      onProjectSelect={handleDatasetOverviewProjectSelect}
+    />
+  );
 
   const renderDashboard = () => (
     <AppDashboardPane
@@ -833,7 +900,7 @@ function App() {
           : sessions
       }
       onSessionSelect={setSelectedSession}
-      onProjectSelect={handleDashboardProjectSelect}
+      onProjectSelect={handleDatasetOverviewProjectSelect}
       projectName={selectedProject || undefined}
       loading={loading}
       liveSessionIds={liveSessionIds}
@@ -844,21 +911,31 @@ function App() {
     <AppSessionViewerPane
       session={selectedSession!}
       onExport={() => setShowExportDialog(true)}
-      onConvert={() => setShowConvertDialog(true)}
-      onRename={() => setShowRenameDialog(true)}
-      onFork={() => setShowForkDialog(true)}
+      onConvert={
+        standaloneDatasetRuntime ? undefined : () => setShowConvertDialog(true)
+      }
+      onRename={
+        standaloneDatasetRuntime ? undefined : () => setShowRenameDialog(true)
+      }
+      onFork={
+        standaloneDatasetRuntime ? undefined : () => setShowForkDialog(true)
+      }
       onBack={() => setSelectedSession(null)}
-      onResumeSession={requestResumeSession}
-      onWebResume={() => {
-        if (selectedSession) {
-          setTerminalPendingCommand(buildResumeCommand(selectedSession));
-        }
-        setShowTerminal(true);
-      }}
-      terminal={terminal}
-      piPath={piPath}
-      customCommand={customCommand}
-      resumeCommand={resumeCommand}
+      onResumeSession={standaloneDatasetRuntime ? undefined : requestResumeSession}
+      onWebResume={
+        standaloneDatasetRuntime
+          ? undefined
+          : () => {
+              if (selectedSession) {
+                setTerminalPendingCommand(buildResumeCommand(selectedSession));
+              }
+              setShowTerminal(true);
+            }
+      }
+      terminal={standaloneDatasetRuntime ? undefined : terminal}
+      piPath={standaloneDatasetRuntime ? undefined : piPath}
+      customCommand={standaloneDatasetRuntime ? undefined : customCommand}
+      resumeCommand={standaloneDatasetRuntime ? undefined : resumeCommand}
       initialEntryId={pendingScrollEntryId || undefined}
     />
   );
@@ -952,8 +1029,13 @@ function App() {
           renderSessionList={renderSessionList}
           renderProjectList={renderProjectList}
           renderKanban={renderKanban}
-          renderDashboard={renderDashboard}
+          renderDashboard={
+            standaloneDatasetRuntime
+              ? renderStandaloneDatasetOverview
+              : renderDashboard
+          }
           renderSettings={renderSettings}
+          showDashboardTab={!standaloneDatasetRuntime}
           renderOverlays={renderOverlays}
         />
         <UpdateNoticeToast
@@ -1010,19 +1092,19 @@ function App() {
       loading={loading}
       loadingFavorites={loadingFavorites}
       favorites={favorites}
-      terminal={terminal}
-      piPath={piPath}
-      customCommand={customCommand}
-      resumeCommand={resumeCommand}
+      terminal={standaloneDatasetRuntime ? undefined : terminal}
+      piPath={standaloneDatasetRuntime ? undefined : piPath}
+      customCommand={standaloneDatasetRuntime ? undefined : customCommand}
+      resumeCommand={standaloneDatasetRuntime ? undefined : resumeCommand}
       getBadgeType={getBadgeType}
       listScrollRef={listScrollRef}
-      sessionListCommonProps={sessionListCommonProps}
+      sessionListCommonProps={runtimeSessionListCommonProps}
       onLoadMoreSidebarSessions={loadMoreSidebarSessions}
       onSelectKanbanFilterProject={handleSelectKanbanFilterProject}
       onSelectFavoriteProject={handleSelectFavoriteProject}
       onSelectSession={handleSelectSession}
       onSelectProject={setSelectedProject}
-      onDeleteSession={handleDeleteSession}
+      onDeleteSession={standaloneDatasetRuntime ? undefined : handleDeleteSession}
       onRemoveFavorite={removeFavorite}
       onToggleFavorite={toggleFavorite}
       liveSessionIds={liveSessionIds}
@@ -1033,9 +1115,11 @@ function App() {
     ? renderSessionViewer()
     : viewMode === "kanban"
       ? renderKanban()
-      : renderDashboard();
+      : standaloneDatasetRuntime
+        ? renderStandaloneDatasetOverview()
+        : renderDashboard();
 
-  const desktopTerminalPanel = (
+  const desktopTerminalPanel = standaloneDatasetRuntime ? null : (
     <AppTerminalPane
       enabled={terminalConfig.enabled}
       fallback={null}
@@ -1066,7 +1150,8 @@ function App() {
           startDragging={startDragging}
           viewMode={viewMode}
           showFavorites={showFavorites}
-          terminalEnabled={terminalConfig.enabled}
+          showDashboardButton={!standaloneDatasetRuntime}
+          terminalEnabled={!standaloneDatasetRuntime && terminalConfig.enabled}
           showTerminal={showTerminal}
           onShowDashboard={handleSidebarShowDashboard}
           onSelectListView={handleSidebarSelectListView}

@@ -39,7 +39,7 @@ interface SessionViewerProps {
   session: SessionInfo;
   onExport: () => void;
   onConvert?: () => void;
-  onRename: () => void;
+  onRename?: () => void;
   onFork?: () => void;
   onBack?: () => void;
   onWebResume?: () => void;
@@ -133,6 +133,7 @@ function SessionViewerContent({
     }
     onWebResume?.();
   }, [onResumeSession, onWebResume, session]);
+  const hasResumeAction = Boolean(onResumeSession || onWebResume);
 
   useEffect(() => {
     resetToolExpansionOverrides();
@@ -344,31 +345,33 @@ function SessionViewerContent({
           onFork={onFork}
           onExport={onExport}
           onConvert={onConvert}
-          onResume={handleResume}
+          onResume={hasResumeAction ? handleResume : undefined}
           liveSession={liveSession}
           desktopResumeButton={
-            <KbdTooltip shortcut="Cmd+R">
-              <OpenInTerminalButton
-                session={session}
-                terminal={terminal}
-                piPath={piPath}
-                customCommand={customCommand}
-                resumeCommand={resumeCommand}
-                onResumeSession={onResumeSession}
-                size="sm"
-                variant="ghost"
-                label={t("session.resume", "Resume")}
-                showLabel={true}
-                className="px-3 py-1"
-                onWebResume={onWebResume}
-                onError={(resumeError) =>
-                  console.error(
-                    "[SessionViewer] Failed to open in terminal:",
-                    resumeError,
-                  )
-                }
-              />
-            </KbdTooltip>
+            hasResumeAction ? (
+              <KbdTooltip shortcut="Cmd+R">
+                <OpenInTerminalButton
+                  session={session}
+                  terminal={terminal}
+                  piPath={piPath}
+                  customCommand={customCommand}
+                  resumeCommand={resumeCommand}
+                  onResumeSession={onResumeSession}
+                  size="sm"
+                  variant="ghost"
+                  label={t("session.resume", "Resume")}
+                  showLabel={true}
+                  className="px-3 py-1"
+                  onWebResume={onWebResume}
+                  onError={(resumeError) =>
+                    console.error(
+                      "[SessionViewer] Failed to open in terminal:",
+                      resumeError,
+                    )
+                  }
+                />
+              </KbdTooltip>
+            ) : undefined
           }
         />
 

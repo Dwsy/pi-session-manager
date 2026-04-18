@@ -6,6 +6,11 @@ export {
   loadDatasetCache,
 } from "./core";
 export {
+  bootstrapStandaloneDatasetSettings,
+  DEFAULT_STANDALONE_DATASET_ID,
+  isStandaloneDatasetRuntime,
+} from "./standalone";
+export {
   clearAllPersistedDatasetCaches,
   listPersistedDatasetCaches,
 } from "./cache";
@@ -15,6 +20,7 @@ export {
   getBrowserDatasetSessions,
   readBrowserDatasetChunk,
 } from "./sessions";
+export { getBrowserDatasetTraceAnalytics } from "./trace";
 export {
   fullTextSearchBrowserDataset,
   searchBrowserDatasetSessions,

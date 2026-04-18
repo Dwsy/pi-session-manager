@@ -13,6 +13,7 @@ import type {
   SessionSettingsProps,
 } from "@/components/settings/types";
 import {
+  DEFAULT_STANDALONE_DATASET_ID,
   clearAllBrowserDatasetCaches,
   clearBrowserDatasetCache,
   getBrowserDatasetCacheInfo,
@@ -21,6 +22,7 @@ import {
   listDatasets,
   startDatasetImport,
 } from "@/utils/datasetApi";
+import { isStandaloneDatasetRuntime } from "@/browser-dataset";
 
 type SessionInnerTab = "dataset" | "cache" | "general";
 
@@ -57,11 +59,14 @@ export default function SessionSettings({
   onUpdate,
 }: SessionSettingsProps) {
   const { t } = useTranslation();
+  const standaloneDatasetRuntime = isStandaloneDatasetRuntime();
   const scrollMarkersEnabled =
     settings.session.scrollMarkersEnabled !== false &&
     settings.session.timelineNavEnabled === false;
   const timelineNavEnabled = settings.session.timelineNavEnabled === true;
-  const [activeTab, setActiveTab] = useState<SessionInnerTab>("general");
+  const [activeTab, setActiveTab] = useState<SessionInnerTab>(
+    standaloneDatasetRuntime ? "dataset" : "general",
+  );
   const [datasets, setDatasets] = useState<DatasetInfo[]>([]);
   const [datasetSource, setDatasetSource] = useState("");
   const [importStatus, setImportStatus] = useState<DatasetImportStatus | null>(
@@ -170,6 +175,12 @@ export default function SessionSettings({
     onUpdate("session", "activeDatasetId", nextIds[0] || "");
   };
 
+  const applyStandaloneDataset = (datasetId: string) => {
+    onUpdate("session", "sourceMode", "dataset");
+    onUpdate("session", "activeDatasetIds", [datasetId]);
+    onUpdate("session", "activeDatasetId", datasetId);
+  };
+
   const handleImportDataset = async () => {
     const source = datasetSource.trim();
     if (!source) return;
@@ -182,6 +193,9 @@ export default function SessionSettings({
       if (task.phase === "completed") {
         const items = await listDatasets();
         setDatasets(items);
+        if (standaloneDatasetRuntime && task.datasetId) {
+          applyStandaloneDataset(task.datasetId);
+        }
       }
     } catch (error) {
       console.error("Failed to start dataset import:", error);
@@ -278,17 +292,229 @@ export default function SessionSettings({
   return (
     <div className="space-y-6">
       <SettingsTabs
-        items={[
-          { id: "general", label: "General" },
-          { id: "dataset", label: "Dataset" },
-          { id: "cache", label: "Cache" },
-        ]}
+        items={
+          standaloneDatasetRuntime
+            ? [
+                { id: "dataset", label: "Dataset" },
+                { id: "general", label: "General" },
+              ]
+            : [
+                { id: "general", label: "General" },
+                { id: "dataset", label: "Dataset" },
+                { id: "cache", label: "Cache" },
+              ]
+        }
         active={activeTab}
         onChange={setActiveTab}
       />
 
       {activeTab === "dataset" && (
         <div className="space-y-6">
+          {standaloneDatasetRuntime ? (
+            <>
+              <SettingsCard
+                title={t(
+                  "settings.session.standaloneDataset.manageAction",
+                  "Manage datasets",
+                )}
+                description={t(
+                  "settings.session.standaloneDataset.recentSessionsHelp",
+                  "Newest sessions in the current dataset. Click to open.",
+                )}
+              >
+                <div className="space-y-4">
+                  {selectedDataset ? (
+                    <div className="rounded-xl border border-info/30 bg-info/10 px-4 py-4">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="text-base font-semibold text-foreground">
+                          {selectedDataset.displayName}
+                        </div>
+                        <span className="rounded-full bg-info/15 px-2 py-0.5 text-[11px] font-medium text-info">
+                          {t(
+                            "settings.session.standaloneDataset.currentBadge",
+                            "Current",
+                          )}
+                        </span>
+                        {selectedDataset.id === DEFAULT_STANDALONE_DATASET_ID && (
+                          <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
+                            {t(
+                              "settings.session.standaloneDataset.builtinBadge",
+                              "Built-in",
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 text-sm text-muted-foreground break-all">
+                        {selectedDataset.id}
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <StatTile
+                          label={t(
+                            "settings.session.browserCacheSessions",
+                            "Cached sessions",
+                          )}
+                          value={cacheInfo?.sessionCount ?? 0}
+                        />
+                        <StatTile
+                          label={t(
+                            "settings.session.browserCacheSize",
+                            "Cache size",
+                          )}
+                          value={formatBytes(cacheInfo?.totalBytes ?? 0)}
+                        />
+                        <StatTile
+                          label={t(
+                            "settings.session.browserCacheUpdatedAt",
+                            "Cached at",
+                          )}
+                          value={formatDateTime(cacheInfo?.cachedAt ?? null)}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                      {t(
+                        "settings.session.noDatasetSelected",
+                        "No dataset selected",
+                      )}
+                    </div>
+                  )}
+
+                  <div className="rounded-xl border border-border bg-background/40 p-2 space-y-2">
+                    {datasets.length > 0 ? (
+                      datasets.map((dataset) => {
+                        const isCurrent =
+                          settings.session.activeDatasetId === dataset.id;
+                        const cacheItem = allCacheItems.find(
+                          (item) => item.datasetId === dataset.id,
+                        );
+                        const isBuiltin =
+                          dataset.id === DEFAULT_STANDALONE_DATASET_ID;
+
+                        return (
+                          <button
+                            key={dataset.id}
+                            onClick={() => applyStandaloneDataset(dataset.id)}
+                            className={`w-full rounded-lg border px-4 py-3 text-left transition-colors ${
+                              isCurrent
+                                ? "border-info bg-info/10"
+                                : "border-border bg-background/60 hover:border-border-hover"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <div className="text-sm font-medium text-foreground truncate">
+                                    {dataset.displayName}
+                                  </div>
+                                  {isCurrent && (
+                                    <span className="rounded-full bg-info/15 px-2 py-0.5 text-[10px] font-medium text-info">
+                                      {t(
+                                        "settings.session.standaloneDataset.currentBadge",
+                                        "Current",
+                                      )}
+                                    </span>
+                                  )}
+                                  {isBuiltin && (
+                                    <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
+                                      {t(
+                                        "settings.session.standaloneDataset.builtinBadge",
+                                        "Built-in",
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mt-1 text-xs text-muted-foreground break-all">
+                                  {dataset.id}
+                                </div>
+                                <div className="mt-2 text-[11px] text-muted-foreground">
+                                  {cacheItem
+                                    ? `${cacheItem.sessionCount} ${t("common.sessions", "Sessions")} · ${formatBytes(cacheItem.totalBytes)}`
+                                    : t(
+                                        "settings.session.standaloneDataset.notCachedYet",
+                                        "Not cached yet",
+                                      )}
+                                </div>
+                              </div>
+                              <div
+                                className={`mt-0.5 h-4 w-4 rounded-full border ${
+                                  isCurrent
+                                    ? "border-info bg-info"
+                                    : "border-border"
+                                }`}
+                              />
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                        {t(
+                          "settings.session.standaloneDataset.emptyDatasets",
+                          "No datasets available.",
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      value={datasetSource}
+                      onChange={(e) => setDatasetSource(e.target.value)}
+                      placeholder={t(
+                        "settings.session.standaloneDataset.addPlaceholder",
+                        "owner/name or https://huggingface.co/datasets/owner/name",
+                      )}
+                      className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                    />
+                    <button
+                      onClick={handleImportDataset}
+                      disabled={
+                        !datasetSource.trim() ||
+                        (!!importStatus &&
+                          !["completed", "failed"].includes(importStatus.phase))
+                      }
+                      className="rounded-lg border border-info bg-info/10 px-4 py-2 text-sm text-foreground transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {importStatus &&
+                      !["completed", "failed"].includes(importStatus.phase)
+                        ? t("settings.session.importingDataset", "Importing...")
+                        : t(
+                            "settings.session.standaloneDataset.addAndSwitch",
+                            "Add and switch",
+                          )}
+                    </button>
+                  </div>
+
+                  {importError && (
+                    <p className="text-xs text-destructive">{importError}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-border/60">
+                    <button
+                      onClick={handleClearBrowserCache}
+                      className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-red-400 transition-colors hover:bg-red-500/20"
+                    >
+                      {t(
+                        "settings.session.clearBrowserCache",
+                        "Clear browser cache",
+                      )}
+                    </button>
+                    <button
+                      onClick={handleClearAllBrowserCaches}
+                      className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-red-300 transition-colors hover:bg-red-500/15"
+                    >
+                      {t(
+                        "settings.session.clearAllBrowserCache",
+                        "Clear all browser caches",
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </SettingsCard>
+            </>
+          ) : (
+            <>
           <SettingsCard
             title={t("settings.session.sourceMode", "Session source")}
             description={t(
@@ -536,10 +762,12 @@ export default function SessionSettings({
               )}
             </div>
           </SettingsCard>
+            </>
+          )}
         </div>
       )}
 
-      {activeTab === "cache" && (
+      {!standaloneDatasetRuntime && activeTab === "cache" && (
         <SettingsCard
           title={t("settings.session.browserCacheTitle", "Browser cache")}
           description="Inspect cached datasets and clear browser storage when needed."

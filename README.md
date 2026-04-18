@@ -14,7 +14,8 @@
   <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">Releases</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/">Documentation</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/cn/">中文文档</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/demo/">Preview</a>
+  <a href="https://dwsy.github.io/pi-session-manager/demo/">Demo</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/dataset/">Dataset</a>
 </p>
 
 ## Highlights
@@ -99,6 +100,7 @@ pnpm install
 | `npm run tauri:dev` | Full desktop dev (frontend + Rust) |
 | `npm run build` | Production frontend build to `dist/` |
 | `npm run build:demo` | Static demo build to `dist-demo/` |
+| `npm run build:dataset` | Static dataset build to `dist-dataset/` |
 | `npm run build:cli` | Build standalone `pi-session-cli` binary |
 | `npm run tauri:build` | Desktop production bundle |
 
@@ -110,6 +112,7 @@ pnpm install
 | Headless in main binary | `pi-session-manager --cli` / `--headless` | Single-port HTTP + WS(`/ws`) on `http_port` (default `52131`) |
 | Standalone CLI crate | `pi-session-cli` | Single-port HTTP + WS(`/ws`) (default `52131`) |
 | Static demo page | `dist-demo/index.html` | No backend required, forced demo data |
+| Static dataset page | `dist-dataset/index.html` | No backend required, browser dataset mode |
 
 ### CLI Flags
 

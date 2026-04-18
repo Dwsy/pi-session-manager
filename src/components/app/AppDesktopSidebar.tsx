@@ -11,6 +11,7 @@ export interface AppDesktopSidebarProps {
   startDragging: () => void;
   viewMode: AppDesktopSidebarViewMode;
   showFavorites: boolean;
+  showDashboardButton?: boolean;
   terminalEnabled: boolean;
   showTerminal: boolean;
   onShowDashboard: () => void;
@@ -21,6 +22,8 @@ export interface AppDesktopSidebarProps {
   onOpenCommandPalette: () => void;
   onToggleTerminal: () => void;
   onOpenSettings: () => void;
+  settingsLabel?: string;
+  settingsIcon?: ReactNode;
   searchBar: ReactNode;
   content: ReactNode;
   listScrollRef: RefObject<HTMLDivElement>;
@@ -31,6 +34,7 @@ function AppDesktopSidebar({
   startDragging,
   viewMode,
   showFavorites,
+  showDashboardButton = true,
   terminalEnabled,
   showTerminal,
   onShowDashboard,
@@ -41,6 +45,8 @@ function AppDesktopSidebar({
   onOpenCommandPalette,
   onToggleTerminal,
   onOpenSettings,
+  settingsLabel,
+  settingsIcon,
   searchBar,
   content,
   listScrollRef,
@@ -56,13 +62,15 @@ function AppDesktopSidebar({
           : {})}
       >
         <div className="flex items-center gap-0.5 ml-auto no-drag">
-          <button
-            onClick={onShowDashboard}
-            className="p-1 rounded motion-color motion-press focus-ring mr-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
-            title={t("dashboard.title")}
-          >
-            <LayoutDashboard className="h-3.5 w-3.5" />
-          </button>
+          {showDashboardButton && (
+            <button
+              onClick={onShowDashboard}
+              className="p-1 rounded motion-color motion-press focus-ring mr-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
+              title={t("dashboard.title")}
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" />
+            </button>
+          )}
           <div className="flex items-center bg-surface rounded-lg p-0.5 mr-1">
             <KbdTooltip shortcut="Cmd+L" label={t("app.viewMode.list")}>
               <button
@@ -155,9 +163,9 @@ function AppDesktopSidebar({
             <button
               onClick={onOpenSettings}
               className="p-1 rounded motion-color motion-press focus-ring ml-0.5 text-muted-foreground hover:text-foreground hover:bg-secondary"
-              title={t("settings.title")}
+              title={settingsLabel || t("settings.title")}
             >
-              <Settings className="h-3.5 w-3.5" />
+              {settingsIcon || <Settings className="h-3.5 w-3.5" />}
             </button>
           </KbdTooltip>
         </div>

@@ -36,7 +36,7 @@ export interface SessionViewerToolbarProps {
   onOpenSystemPromptDialog: () => void;
   onScrollToTop: () => void;
   onScrollToBottom: () => void;
-  onRename: () => void;
+  onRename?: () => void;
   onFork?: () => void;
   onExport: () => void;
   onConvert?: () => void;
