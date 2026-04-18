@@ -30,5 +30,3 @@ mime_guess = "2"
 
 [features]
 default = []
-
-[workspace]
