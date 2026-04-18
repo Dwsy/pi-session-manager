@@ -200,7 +200,7 @@ export const defaultSettings: AppSettings = {
     includeTimestamps: true,
   },
   update: {
-    autoCheck: false,
+    autoCheck: true,
     channel: "stable",
   },
   advanced: {

@@ -66,3 +66,9 @@ pub async fn set_window_zoom_level(window: tauri::WebviewWindow, level: f64) -> 
     crate::settings_store::set("window_zoom_level", &level)?;
     Ok(())
 }
+
+#[cfg(feature = "gui")]
+#[tauri::command]
+pub async fn restart_app(app: tauri::AppHandle) -> Result<(), String> {
+    app.restart();
+}

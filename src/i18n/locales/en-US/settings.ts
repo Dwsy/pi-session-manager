@@ -333,9 +333,9 @@ export const settings = {
     cancel: "Cancel",
     openRelease: "Open Release Page",
     downloadAndInstall: "Download & Install",
-    installAndRestart: "Install & Restart",
-    ready: "Update ready to install",
-    readyDesc: "Restart to apply the update",
+    installAndRestart: "Restart Now",
+    ready: "Update installed",
+    readyDesc: "Restart to finish applying the update",
     result: {
       hasUpdate: "New version available",
       upToDate: "You are up to date!",

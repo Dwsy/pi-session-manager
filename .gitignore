@@ -39,6 +39,7 @@ src-tauri/*/target/
 .env
 .env.local
 .env.*.local
+.env.tauri-signing.local
 
 # Build artifacts
 *.dmg

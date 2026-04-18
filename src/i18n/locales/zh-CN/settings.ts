@@ -290,9 +290,9 @@ export const settings = {
     cancel: "取消",
     openRelease: "打开发布页",
     downloadAndInstall: "下载并安装",
-    installAndRestart: "安装并重启",
-    ready: "更新已就绪",
-    readyDesc: "重启应用以应用更新",
+    installAndRestart: "立即重启",
+    ready: "更新已安装",
+    readyDesc: "重启应用以完成更新",
     result: {
       hasUpdate: "发现新版本",
       upToDate: "已是最新版本！",

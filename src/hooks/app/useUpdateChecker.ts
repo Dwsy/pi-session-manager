@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getCachedSettings } from '@/utils/settingsApi'
 import {
   checkForUpdates,
   dismissUpdateVersion,
   getDismissedUpdateVersion,
-  shouldRunDailyUpdateCheck,
   type AvailableUpdateInfo,
 } from '@/utils/updateChecker'
 
@@ -18,10 +16,6 @@ export function useUpdateChecker(): UseUpdateCheckerResult {
   const [updateInfo, setUpdateInfo] = useState<AvailableUpdateInfo | null>(null)
 
   useEffect(() => {
-    const settings = getCachedSettings()
-    if (settings.update?.autoCheck === false) return
-    if (!shouldRunDailyUpdateCheck()) return
-
     let active = true
     const run = async () => {
       const result = await checkForUpdates()

@@ -7,6 +7,8 @@
 | `npm run dev` | Frontend dev |
 | `npm run tauri:dev` | Tauri GUI |
 | `npm run build && npm run tauri:build` | Production |
+| `npm run tauri:build:local-signed` | Production build using local signing env file |
+| `npm run tauri:build:local-test` | Local test build without updater artifacts/signing |
 | `npm run build:cli` | CLI standalone |
 
 ## Rust
@@ -40,3 +42,7 @@ cargo test                       # Tests
 ## Release
 
 `node scripts/release-version.mjs sync <version>` → sync package.json, Cargo.toml × 2, tauri.conf.json → git tag `v<x.y.z>`
+
+## Local Signing
+
+Copy `.env.tauri-signing.local.example` to `.env.tauri-signing.local`, fill in your local key path/password, then run `npm run tauri:build:local-signed`.

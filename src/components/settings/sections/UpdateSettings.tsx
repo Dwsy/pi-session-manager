@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { invoke } from '@tauri-apps/api/core'
 import { check, Update } from '@tauri-apps/plugin-updater'
 import { getCurrentAppVersion } from '@/utils/updateChecker'
 import {
@@ -14,7 +15,6 @@ import {
 import SettingsCard from '@/components/settings/SettingsCard'
 import SettingsField from '@/components/settings/SettingsField'
 import SettingsOptionGroup from '@/components/settings/SettingsOptionGroup'
-import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
 import type { UpdateSettingsProps } from '@/components/settings/types'
 import { getLastUpdateCheckAt } from '@/utils/updateChecker'
 
@@ -165,15 +165,15 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
     }
   }
 
-  const handleInstall = async () => {
+  const handleRestart = async () => {
     const currentState = state
     if (currentState.phase !== 'ready') return
     try {
-      await currentState.update.install()
+      await invoke('restart_app')
     } catch (err) {
       setState({
         phase: 'error',
-        message: err instanceof Error ? err.message : 'Install failed',
+        message: err instanceof Error ? err.message : 'Restart failed',
       })
     }
   }
@@ -381,10 +381,10 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground">
-                    {t('settings.update.ready', 'Update ready to install')}
+                    {t('settings.update.ready', 'Update installed')}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {t('settings.update.readyDesc', 'Restart to apply the update')}
+                    {t('settings.update.readyDesc', 'Restart to finish applying the update')}
                   </p>
                   <div className="mt-2">
                     <VersionBadge version={state.update.version} />
@@ -395,11 +395,11 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
 
             {/* Install button */}
             <button
-              onClick={handleInstall}
+              onClick={handleRestart}
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-success hover:bg-success/90 text-white text-sm font-medium motion-color motion-press focus-ring"
             >
               <Download className="h-4 w-4" />
-              {t('settings.update.installAndRestart', 'Install & Restart')}
+              {t('settings.update.installAndRestart', 'Restart Now')}
             </button>
 
             {/* Skip option */}
@@ -469,16 +469,6 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
         icon={<Download className="h-4 w-4" />}
       >
         <div className="space-y-5">
-          <SettingsToggleRow
-            title={t('settings.update.autoCheck', 'Auto check for updates')}
-            description={t(
-              'settings.update.autoCheckHelp',
-              'Automatically check once per day',
-            )}
-            checked={settings.update.autoCheck === true}
-            onChange={(checked) => onUpdate('update', 'autoCheck', checked)}
-          />
-
           {renderContent()}
         </div>
       </SettingsCard>

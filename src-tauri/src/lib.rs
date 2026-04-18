@@ -88,6 +88,7 @@ pub fn run() {
             get_day_stats,
             open_session_in_browser,
             open_path_in_system,
+            restart_app,
             open_session_in_terminal,
             scan_skills,
             scan_prompts,

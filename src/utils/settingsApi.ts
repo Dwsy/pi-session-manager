@@ -43,6 +43,11 @@ function markBackendStateLoaded(settings: AppSettings) {
 
 function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
   const advanced = { ...defaultSettings.advanced, ...raw.advanced };
+  const update = {
+    ...defaultSettings.update,
+    ...raw.update,
+    autoCheck: true,
+  };
 
   // Migrate legacy sessionDir (string) → sessionDirs (string[])
   const rawAdv = raw.advanced as Record<string, unknown> | undefined;
@@ -156,7 +161,7 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
     session,
     search: { ...defaultSettings.search, ...raw.search },
     export: { ...defaultSettings.export, ...raw.export },
-    update: { ...defaultSettings.update, ...raw.update },
+    update,
     advanced,
   };
 }

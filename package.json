@@ -1,6 +1,6 @@
 {
   "name": "pi-session-manager",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Pi Session Manager - Tauri2 Desktop App",
   "type": "module",
   "scripts": {
@@ -13,6 +13,8 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
+    "tauri:build:local-signed": "node scripts/tauri-build-local-env.mjs",
+    "tauri:build:local-test": "tauri build -c src-tauri/tauri.local-test.conf.json",
     "build:cli": "node scripts/build-cli.mjs",
     "release:version:check": "node scripts/release-version.mjs check",
     "release:version:sync": "node scripts/release-version.mjs sync",
