@@ -2,6 +2,11 @@ use std::time::Instant;
 
 #[test]
 fn test_full_text_search_accepts_extra_arg_silently() {
+    if std::env::var("RUN_REAL_DB_SEARCH_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("RUN_REAL_DB_SEARCH_TESTS!=1, skipping real database smoke test");
+        return;
+    }
+
     let db_path = dirs::home_dir()
         .unwrap()
         .join(".pi/agent/sessions/sessions.db");
