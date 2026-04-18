@@ -573,10 +573,10 @@ async fn test_full_text_search_excludes_external_sessions_by_default() {
         .unwrap()
         .to_string_lossy()
         .replace('\\', "/");
-    assert!(response
-        .hits
-        .iter()
-        .all(|hit| hit.session_path.replace('\\', "/").contains(&normalized_pi_root)));
+    assert!(response.hits.iter().all(|hit| hit
+        .session_path
+        .replace('\\', "/")
+        .contains(&normalized_pi_root)));
 }
 
 #[tokio::test]
