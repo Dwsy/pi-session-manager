@@ -110,6 +110,7 @@ export const settings = {
       kitty: { name: "kitty", description: "kitty terminal" },
       alacritty: { name: "Alacritty", description: "Alacritty terminal" },
       wezterm: { name: "WezTerm", description: "WezTerm terminal" },
+      ghostty: { name: "Ghostty", description: "Ghostty terminal" },
       windowsTerminal: {
         name: "Windows Terminal",
         description: "Windows Terminal",

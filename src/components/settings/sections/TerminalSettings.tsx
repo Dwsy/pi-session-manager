@@ -185,6 +185,14 @@ export default function TerminalSettings({
               "WezTerm terminal",
             ),
           },
+          {
+            id: "ghostty",
+            name: "Ghostty",
+            description: t(
+              "settings.terminal.options.ghostty.description",
+              "Ghostty terminal",
+            ),
+          },
           ...common,
         ];
     }
