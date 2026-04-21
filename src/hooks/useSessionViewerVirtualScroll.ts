@@ -13,6 +13,7 @@ import type { SessionEntry } from '@/types'
 type ScrollAlignment = 'auto' | 'center' | 'end' | 'start'
 
 const MESSAGE_ITEM_GAP = 16
+const PREVIEW_ITEM_GAP = 8
 const BOTTOM_THRESHOLD_PX = 8
 const HIGHLIGHT_DURATION_MS = 2000
 const HIGHLIGHT_RETRY_DELAY_MS = 50
@@ -92,15 +93,12 @@ export function useSessionViewerVirtualScroll({
       switch (entry.type) {
         case 'message': {
           const content = entry.message?.content ?? []
-          // In previewMode, strip tool calls from height estimation
-          const textLength = (previewMode
-            ? content.filter((item) => item.type === 'text')
-            : content
-          )
-            .filter((item) => item.type === 'text')
-            .reduce((sum, item) => sum + (item.text?.length ?? 0), 0)
-          const baseHeight = 100
-          const contentHeight = Math.ceil(textLength / 80) * 32
+          // In previewMode, only count text content for height estimation
+          const textItems = content.filter((item) => item.type === 'text')
+          const textLength = textItems.reduce((sum, item) => sum + (item.text?.length ?? 0), 0)
+          const role = entry.message?.role
+          const baseHeight = previewMode ? (role === 'user' ? 48 : 40) : 100
+          const contentHeight = previewMode ? Math.ceil(textLength / 90) * 24 : Math.ceil(textLength / 80) * 32
           height = Math.min(baseHeight + contentHeight, 800)
           break
         }
@@ -120,7 +118,7 @@ export function useSessionViewerVirtualScroll({
           height = 120
           break
       }
-      return height + MESSAGE_ITEM_GAP
+      return height + (previewMode ? PREVIEW_ITEM_GAP : MESSAGE_ITEM_GAP)
     },
     [renderableEntries, previewMode],
   )
@@ -146,7 +144,15 @@ export function useSessionViewerVirtualScroll({
   useEffect(() => {
     measuredHeightsRef.current.clear()
     hasTriggeredReachBottomRef.current = false
-  }, [expandedToolIds, sessionPath, toolsExpanded, previewMode])
+    // Force virtualizer to recalculate all sizes
+    rowVirtualizer.measure()
+    // Reset scroll position to top when session changes
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = 0
+    }
+    setIsAtBottom(true)
+    isAtBottomRef.current = true
+  }, [expandedToolIds, sessionPath, toolsExpanded, previewMode, rowVirtualizer])
 
   useEffect(() => {
     if (loading || error || renderableEntries.length === 0) return
