@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { buildCopyResumeCommand } from "@/utils/sessionResume";
+
 import KbdTooltip from "./ui/KbdTooltip";
 import OpenInTerminalButton from "./OpenInTerminalButton";
 import ChatInput from "./pi-live/PiLiveChatInput";
@@ -95,8 +97,6 @@ function SessionViewerContent({
     getSessionSetting('scrollMarkersEnabled') ?? false;
   const timelineNavEnabledSetting =
     getSessionSetting('timelineNavEnabled') ?? false;
-  const openPositionSetting =
-    getSessionSetting('openPosition') ?? 'top';
   const timelineNavEnabled = previewMode ? false : timelineNavEnabledSetting;
   const scrollMarkersEnabled = previewMode
     ? false
@@ -215,6 +215,19 @@ function SessionViewerContent({
     closeSearch();
   }, [closeSearch, restoreSearchExpandedTools]);
 
+  const handleCopyResumeCommand = useCallback(async () => {
+    try {
+      const command = await buildCopyResumeCommand(session, {
+        piPath,
+        resumeCommand,
+      });
+      await navigator.clipboard.writeText(command);
+      alert(t("session.copyResumeCommand.success", "Resume command copied!"));
+    } catch (err) {
+      console.error("Failed to copy resume command:", err);
+    }
+  }, [session, piPath, resumeCommand, t]);
+
   useSessionViewerHotkeys({
     enabled: !previewMode && !showSystemPromptDialog && !showMobileMenu,
     isSearchOpen,
@@ -226,6 +239,7 @@ function SessionViewerContent({
     onCloseSearch: handleCloseSearch,
     onNextSearchMatch: goToNextMatch,
     onPreviousSearchMatch: goToPreviousMatch,
+    onCopyResumeCommand: hasResumeAction ? handleCopyResumeCommand : undefined,
   });
 
   const handleReachBottom = useCallback(() => {
@@ -440,7 +454,6 @@ function SessionViewerContent({
           isScrollMarkersFeatureEnabled={previewMode ? false : scrollMarkersEnabled}
           isTimelineNavEnabled={previewMode ? false : timelineNavEnabled}
           previewMode={previewMode}
-          openPosition={openPositionSetting}
         />
 
         {!previewMode && (

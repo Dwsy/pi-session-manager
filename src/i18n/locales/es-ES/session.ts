@@ -2,6 +2,10 @@ export const session = {
   openInBrowser: 'Abrir en el navegador',
   openInTerminal: 'Abrir en Terminal (iTerm2)',
   resume: 'Reanudar',
+  copyResumeCommand: {
+    success: '¡Comando de reanudación copiado!',
+    failed: 'Error al copiar el comando de reanudación',
+  },
   scrollToTop: 'Ir al inicio',
   scrollToBottom: 'Ir al final',
   systemPromptAndTools: 'Prompt del sistema y herramientas',

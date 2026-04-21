@@ -78,7 +78,7 @@ pub fn is_known_external_terminal(terminal_id: &str) -> bool {
     {
         matches!(
             terminal_id,
-            "iterm2" | "terminal" | "vscode" | "wezterm" | "kitty" | "alacritty" | "tmux"
+            "iterm2" | "terminal" | "vscode" | "wezterm" | "ghostty" | "kitty" | "alacritty" | "tmux"
         )
     }
 
@@ -114,6 +114,7 @@ fn fallback_external_terminals() -> &'static [&'static str] {
     #[cfg(target_os = "macos")]
     {
         &[
+            "ghostty",
             "terminal",
             "iterm2",
             "wezterm",

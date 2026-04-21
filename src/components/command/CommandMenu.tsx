@@ -4,6 +4,7 @@ import {
   useState,
   useCallback,
   type KeyboardEvent as ReactKeyboardEvent,
+  memo,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowUpRight } from "lucide-react";
@@ -38,7 +39,8 @@ interface CommandMenuProps {
   registryRef: React.MutableRefObject<any>;
 }
 
-export default function CommandMenu({
+// Memoize CommandMenu to prevent unnecessary re-renders when results change
+export default memo(function CommandMenu({
   query,
   setQuery,
   results,
@@ -255,4 +257,4 @@ export default function CommandMenu({
       </div>
     </div>
   );
-}
+})

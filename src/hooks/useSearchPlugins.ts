@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useMemo } from 'react'
 import { pluginRegistry } from '@/plugins/registry'
 import type { SearchPluginResult, SearchContext } from '@/plugins/types'
 import { useSearchCache } from './useSearchCache'
@@ -14,14 +14,19 @@ interface SearchPluginOptions {
 export function useSearchPlugins(context: SearchContext) {
   const cache = useSearchCache()
   const contextRef = useRef(context)
-  const sessionsRef = useRef(context.sessions)
   const sessionsVersionRef = useRef(0)
 
   // Update context ref
   contextRef.current = context
 
-  if (sessionsRef.current !== context.sessions) {
-    sessionsRef.current = context.sessions
+  // Only increment version when sessions actually change content, not just reference
+  const sessionsSnapshot = useMemo(() => {
+    return context.sessions.map(s => s.path).join(',')
+  }, [context.sessions])
+  const prevSnapshotRef = useRef<string>('')
+
+  if (prevSnapshotRef.current !== sessionsSnapshot) {
+    prevSnapshotRef.current = sessionsSnapshot
     sessionsVersionRef.current += 1
   }
 

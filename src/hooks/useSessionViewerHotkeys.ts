@@ -11,6 +11,7 @@ export interface UseSessionViewerHotkeysOptions {
   onCloseSearch: () => void
   onNextSearchMatch: () => void
   onPreviousSearchMatch: () => void
+  onCopyResumeCommand?: () => void
 }
 
 export function useSessionViewerHotkeys({
@@ -24,6 +25,7 @@ export function useSessionViewerHotkeys({
   onCloseSearch,
   onNextSearchMatch,
   onPreviousSearchMatch,
+  onCopyResumeCommand,
 }: UseSessionViewerHotkeysOptions): void {
   useEffect(() => {
     if (!enabled) {
@@ -101,6 +103,17 @@ export function useSessionViewerHotkeys({
         event.preventDefault()
         event.stopPropagation()
         onToggleToolsExpanded()
+        return
+      }
+
+      // Cmd+Shift+C: Copy resume command
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && key === 'c') {
+        if (onCopyResumeCommand) {
+          event.preventDefault()
+          event.stopPropagation()
+          onCopyResumeCommand()
+        }
+        return
       }
     }
 
@@ -113,6 +126,7 @@ export function useSessionViewerHotkeys({
     isSearchOpen,
     cmdFBehavior,
     onCloseSearch,
+    onCopyResumeCommand,
     onNextSearchMatch,
     onOpenSearch,
     onPreviousSearchMatch,

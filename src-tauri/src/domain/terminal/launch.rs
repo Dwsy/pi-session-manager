@@ -34,9 +34,11 @@ pub fn try_launch_known_terminal_macos(
             let script = format!(
                 r#"tell application "iTerm"
     activate
-    set newWindow to (create window with default profile)
-    tell current session of newWindow
-        write text "{}"
+    tell current window
+        create tab with default profile
+        tell current session
+            write text "{}"
+        end tell
     end tell
 end tell"#,
                 escape_double_quoted(&resume_cmd)
@@ -51,7 +53,11 @@ end tell"#,
             let script = format!(
                 r#"tell application "Terminal"
     activate
-    do script "{}"
+    tell application "System Events"
+        keystroke "t" using command down
+    end tell
+    delay 0.3
+    do script "{}" in front window
 end tell"#,
                 escape_double_quoted(&resume_cmd)
             );
@@ -64,14 +70,30 @@ end tell"#,
 
             let mut command = Command::new("wezterm");
             command
-                .arg("start")
+                .arg("--new-tab")
                 .arg("--cwd")
                 .arg(cwd)
-                .arg("--")
+                .arg("-e")
                 .arg("sh")
                 .arg("-lc")
                 .arg(&resume_cmd);
             spawn_command(&mut command, "wezterm")?;
+            Ok(true)
+        }
+        "ghostty" => {
+            if !command_exists("ghostty") {
+                return Ok(false);
+            }
+
+            let mut command = Command::new("ghostty");
+            command
+                .arg("--cwd")
+                .arg(cwd)
+                .arg("-e")
+                .arg("sh")
+                .arg("-lc")
+                .arg(&resume_cmd);
+            spawn_command(&mut command, "ghostty")?;
             Ok(true)
         }
         "kitty" => {

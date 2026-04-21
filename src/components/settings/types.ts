@@ -6,6 +6,7 @@ export type TerminalType =
   | "custom"
   | "tmux"
   | "wezterm"
+  | "ghostty"
   | "kitty"
   | "alacritty"
   | "powershell"
@@ -126,9 +127,6 @@ export interface AppSettings {
   };
 }
 
-/**
- * Detect system language, preferring user-saved preference
- */
 function getDefaultLocale(): string {
   const saved = localStorage.getItem("app-language");
   if (saved) return saved;

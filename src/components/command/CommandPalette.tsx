@@ -56,10 +56,14 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
 
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => {
+      // Delay to ensure DOM is ready and avoid race conditions
+      const frameId = requestAnimationFrame(() => {
         const input = document.querySelector('[cmdk-input]') as HTMLInputElement
-        if (input) input.focus()
-      }, 100)
+        if (input && document.contains(input)) {
+          input.focus()
+        }
+      })
+      return () => cancelAnimationFrame(frameId)
     }
   }, [isOpen])
 

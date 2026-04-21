@@ -2,6 +2,10 @@ export const session = {
   openInBrowser: 'ブラウザで開く',
   openInTerminal: 'ターミナルで開く (iTerm2)',
   resume: '再開',
+  copyResumeCommand: {
+    success: '再開コマンドをコピーしました！',
+    failed: '再開コマンドのコピーに失敗しました',
+  },
   scrollToTop: '先頭へスクロール',
   scrollToBottom: '末尾へスクロール',
   systemPromptAndTools: 'システムプロンプトとツール',

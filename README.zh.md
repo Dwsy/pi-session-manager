@@ -20,7 +20,7 @@
 ## 核心功能
 
 - 会话浏览：列表/项目/看板、收藏、标签、重命名、删除、导出。
-- 全文检索：SQLite FTS5 + Tantivy 双引擎，支持精确短语搜索。
+- 全文检索：基于 SQLite FTS5 与规范化索引，支持精确短语搜索。
 - 会话内消息搜索：命中高亮、结果分页跳转、可配置 `Cmd/Ctrl+F` 行为。
 - 会话恢复：内置 PTY 终端，一键恢复 Pi 会话。
 - **外部会话** — 扫描和管理来自其他编程 Agent（Claude、OpenCode 等）的会话，统一设置界面控制扫描开关和默认恢复目标。
@@ -35,7 +35,7 @@
 
 ```
 Frontend: React + TypeScript + Vite
-Backend: Rust + Tauri 2 + Axum + SQLite + Tantivy
+Backend: Rust + Tauri 2 + Axum + SQLite + FTS5
 
 Protocols: Tauri IPC | WebSocket (/ws) | HTTP (/api) | SSE
 ```
@@ -45,7 +45,7 @@ Protocols: Tauri IPC | WebSocket (/ws) | HTTP (/api) | SSE
 ```
 Commands (thin) <- Tauri IPC / HTTP / WS
 Domain (business) <- model_config, session_list, stats, terminal
-Data <- search (Tantivy) sqlite (cache)
+Data <- search (SQLite FTS5 normalized index) sqlite (cache)
 Server (protocol) <- HTTP adapter, WebSocket adapter
 ```
 
@@ -54,7 +54,7 @@ Server (protocol) <- HTTP adapter, WebSocket adapter
 | 层级 | 技术 |
 |------|------|
 | 前端 | React 18, TypeScript 5, Vite 5, Tailwind CSS, i18next, cmdk, @dnd-kit, @xyflow/react, recharts, @xterm/xterm |
-| 后端 | Rust 2021, Tauri 2, Tokio, Axum, rusqlite, Tantivy, notify, portable-pty |
+| 后端 | Rust 2021, Tauri 2, Tokio, Axum, rusqlite, SQLite FTS5, notify, portable-pty |
 | 协议 | Tauri IPC · WebSocket (/ws) · HTTP (/api) · SSE (/api/events) |
 
 ### 代码规模
@@ -172,6 +172,23 @@ src/plugins/
 ├── project/     # 项目搜索
 └── session/     # 会话搜索
 ```
+
+## 键盘快捷键
+
+### 会话视图
+
+| 快捷键 | 功能 |
+|--------|------|
+| `Cmd/Ctrl + Shift + C` | 复制恢复命令到剪贴板 |
+| `Cmd/Ctrl + F` | 会话内搜索（或切换侧边栏，可配置） |
+| `Cmd/Ctrl + Shift + F` | 切换侧边栏（或打开搜索，可配置） |
+| `Cmd/Ctrl + T` | 切换思考显示 |
+| `Cmd/Ctrl + O` | 切换工具展开 |
+| `Cmd/Ctrl + G` | 下一个搜索结果（搜索模式下） |
+| `Cmd/Ctrl + Shift + G` | 上一个搜索结果（搜索模式下） |
+| `Cmd/Ctrl + R` | 恢复会话 |
+| `Cmd/Ctrl + E` | 导出会话 |
+| `Esc` | 关闭搜索 |
 
 ## 开发指南
 

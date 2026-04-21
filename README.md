@@ -21,7 +21,7 @@
 ## Highlights
 
 - Session browser with list/project/kanban views, favorites, tags, rename, delete, and export.
-- Full-text search via SQLite FTS + Tantivy-backed indexing/search flows, including tree node label search and node content vs. label source filtering.
+- Full-text search via SQLite FTS5 with normalized indexing/search flows, including tree node label search and node content vs. label source filtering.
 - In-session message search with inline highlights, current-match navigation, and keyboard-friendly close/reset behavior. `Cmd/Ctrl + F` behavior is configurable (search vs. sidebar toggle).
 - Built-in terminal (PTY) and one-click resume of Pi sessions.
 - **External Sessions** — scan and browse sessions from other coding agents (Claude, OpenCode, etc.) with unified settings UI for scan control and default resume targets.
@@ -36,7 +36,7 @@
 
 ```
 Frontend: React + TypeScript + Vite
-Backend: Rust + Tauri 2 + Axum + SQLite + Tantivy
+Backend: Rust + Tauri 2 + Axum + SQLite + FTS5
 
 Protocols: Tauri IPC | WebSocket (/ws) | HTTP (/api) | SSE
 ```
@@ -46,7 +46,7 @@ Protocols: Tauri IPC | WebSocket (/ws) | HTTP (/api) | SSE
 ```
 Commands (thin) <- Tauri IPC / HTTP / WS
 Domain (business) <- model_config, session_list, stats, terminal
-Data <- search (Tantivy) sqlite (cache)
+Data <- search (SQLite FTS5 normalized index) sqlite (cache)
 Server (protocol) <- HTTP adapter, WebSocket adapter
 ```
 
@@ -55,7 +55,7 @@ Server (protocol) <- HTTP adapter, WebSocket adapter
 | Layer | Tech |
 |-------|------|
 | Frontend | React 18, TypeScript 5, Vite 5, Tailwind CSS, i18next, cmdk, @dnd-kit, @xyflow/react, recharts, @xterm/xterm |
-| Backend | Rust 2021, Tauri 2, Tokio, Axum, rusqlite, Tantivy, notify, portable-pty |
+| Backend | Rust 2021, Tauri 2, Tokio, Axum, rusqlite, SQLite FTS5, notify, portable-pty |
 | Protocol | Tauri IPC · WebSocket (/ws) · HTTP (/api) · SSE (/api/events) |
 
 ### Code Scale
@@ -207,6 +207,23 @@ src/plugins/
 ├── project/     # Project search
 └── session/     # Session search
 ```
+
+## Keyboard Shortcuts
+
+### Session View
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + Shift + C` | Copy resume command to clipboard |
+| `Cmd/Ctrl + F` | Search in session (or toggle sidebar, configurable) |
+| `Cmd/Ctrl + Shift + F` | Toggle sidebar (or open search, configurable) |
+| `Cmd/Ctrl + T` | Toggle thinking display |
+| `Cmd/Ctrl + O` | Toggle tools expanded |
+| `Cmd/Ctrl + G` | Next search match (in search mode) |
+| `Cmd/Ctrl + Shift + G` | Previous search match (in search mode) |
+| `Cmd/Ctrl + R` | Resume session |
+| `Cmd/Ctrl + E` | Export session |
+| `Esc` | Close search |
 
 ## Development
 
