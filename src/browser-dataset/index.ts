@@ -12,6 +12,7 @@ export {
 } from "./standalone";
 export {
   clearAllPersistedDatasetCaches,
+  deletePersistedDatasetCache,
   listPersistedDatasetCaches,
 } from "./cache";
 export {
