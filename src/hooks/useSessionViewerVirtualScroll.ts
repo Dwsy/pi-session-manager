@@ -153,9 +153,10 @@ export function useSessionViewerVirtualScroll({
     isAtBottomRef.current = true
   }, [sessionPath, previewMode, rowVirtualizer])
 
-  // When tools expand/collapse individually, re-measure without resetting scroll
+  // When tools expand/collapse individually, re-measure without clearing cache or resetting scroll
   useEffect(() => {
-    measuredHeightsRef.current.clear()
+    // Just trigger re-measure, don't clear cache
+    // The measureElement callback will update heights for changed elements
     rowVirtualizer.measure()
   }, [expandedToolIds, rowVirtualizer])
 
