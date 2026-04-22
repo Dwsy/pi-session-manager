@@ -256,6 +256,7 @@ const SessionViewerMessages = forwardRef<
           timestamp={headerTimestamp}
           stats={stats}
           previewMode={previewMode}
+          sessionPath={sessionPath}
         />
         <div className="messages" ref={messagesWrapperRef}>
           {renderableEntries.length > 0 ? (

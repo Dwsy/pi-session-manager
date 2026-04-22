@@ -6,6 +6,7 @@ export const session = {
     success: '恢复命令已复制！',
     failed: '复制恢复命令失败',
   },
+  copyPath: '复制 JSONL 路径',
   online: '在线',
   streaming: '生成中',
   scrollToTop: '滚动到顶部',

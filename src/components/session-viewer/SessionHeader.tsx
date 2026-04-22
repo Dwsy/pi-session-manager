@@ -3,16 +3,20 @@ import type { LegacySessionStats } from '@/types'
 import { formatDate, formatTokens } from '@/utils/format'
 import { escapeHtml } from '@/utils/markdown'
 import { useTranslation } from 'react-i18next'
+import { Copy } from 'lucide-react'
+import { useClipboard } from '@/hooks/useClipboard'
 
 interface SessionHeaderProps {
   sessionId?: string
   timestamp?: string
   stats: LegacySessionStats
   previewMode?: boolean
+  sessionPath?: string
 }
 
-function SessionHeader({ sessionId, timestamp, stats, previewMode = false }: SessionHeaderProps) {
+function SessionHeader({ sessionId, timestamp, stats, previewMode = false, sessionPath }: SessionHeaderProps) {
   const { t } = useTranslation()
+  const { copyText } = useClipboard()
   const totalCost = stats.cost.input + stats.cost.output + stats.cost.cacheRead + stats.cost.cacheWrite
 
   const tokenParts = []
@@ -33,10 +37,27 @@ function SessionHeader({ sessionId, timestamp, stats, previewMode = false }: Ses
     ? (stats.models[0] || t('session.header.unknown'))
     : `${stats.models[0]} +${stats.models.length - 1}`
 
+  const handleCopyPath = () => {
+    if (sessionPath) {
+      void copyText(sessionPath)
+    }
+  }
+
   if (previewMode) {
     return (
       <div className="session-header">
-        <h1>{t('session.header.session')}: {escapeHtml(sessionId || t('session.header.unknown'))}</h1>
+        <h1>
+          {t('session.header.session')}: {escapeHtml(sessionId || t('session.header.unknown'))}
+          {sessionPath && (
+            <button
+              onClick={handleCopyPath}
+              className="ml-2 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground opacity-0 transition-opacity hover:bg-secondary hover:text-foreground group-hover:opacity-100"
+              title={t('session.copyPath', 'Copy JSONL path')}
+            >
+              <Copy className="h-3 w-3" />
+            </button>
+          )}
+        </h1>
         <div className="session-meta">
           <div className="info-item">
             <span className="info-label">{t('session.header.date')}:</span>
@@ -57,7 +78,18 @@ function SessionHeader({ sessionId, timestamp, stats, previewMode = false }: Ses
 
   return (
     <div className="session-header">
-      <h1>{t('session.header.session')}: {escapeHtml(sessionId || t('session.header.unknown'))}</h1>
+      <h1>
+        {t('session.header.session')}: {escapeHtml(sessionId || t('session.header.unknown'))}
+        {sessionPath && (
+          <button
+            onClick={handleCopyPath}
+            className="ml-2 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground opacity-0 transition-opacity hover:bg-secondary hover:text-foreground group-hover:opacity-100"
+            title={t('session.copyPath', 'Copy JSONL path')}
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+        )}
+      </h1>
       <div className="session-meta">
         <div className="info-item">
           <span className="info-label">{t('session.header.date')}:</span>

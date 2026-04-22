@@ -20,7 +20,7 @@ const HEATMAP_COLORS = [
   '#4ac26b', // level 2
   '#2da44e', // level 3
   '#116329', // level 4
-  '#004d25', // level 5 (deepest)
+  '#116329', // level 5 (deepest)
 ]
 
 export default function ActivityHeatmap({

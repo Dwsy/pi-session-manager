@@ -6,6 +6,7 @@ export const session = {
     success: 'Resume command copied!',
     failed: 'Failed to copy resume command',
   },
+  copyPath: 'Copy JSONL path',
   online: 'Live',
   streaming: 'Streaming',
   scrollToTop: 'Scroll to top',
