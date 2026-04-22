@@ -28,7 +28,6 @@ export interface UseSessionViewerVirtualScrollOptions {
   setHasNewMessages: Dispatch<SetStateAction<boolean>>
   pendingScrollToBottomRef: MutableRefObject<boolean>
   expandedToolIds: Set<string>
-  toolsExpanded: boolean
   sessionPath: string
   isAtBottomRef?: MutableRefObject<boolean>
   onReachBottom?: () => void
@@ -56,7 +55,6 @@ export function useSessionViewerVirtualScroll({
   setHasNewMessages,
   pendingScrollToBottomRef,
   expandedToolIds,
-  toolsExpanded,
   sessionPath,
   isAtBottomRef: externalIsAtBottomRef,
   onReachBottom,
@@ -141,6 +139,7 @@ export function useSessionViewerVirtualScroll({
     },
   })
 
+  // Only reset scroll when session changes, not when individual tools expand/collapse
   useEffect(() => {
     measuredHeightsRef.current.clear()
     hasTriggeredReachBottomRef.current = false
@@ -152,7 +151,13 @@ export function useSessionViewerVirtualScroll({
     }
     setIsAtBottom(true)
     isAtBottomRef.current = true
-  }, [expandedToolIds, sessionPath, toolsExpanded, previewMode, rowVirtualizer])
+  }, [sessionPath, previewMode, rowVirtualizer])
+
+  // When tools expand/collapse individually, re-measure without resetting scroll
+  useEffect(() => {
+    measuredHeightsRef.current.clear()
+    rowVirtualizer.measure()
+  }, [expandedToolIds, rowVirtualizer])
 
   useEffect(() => {
     if (loading || error || renderableEntries.length === 0) return
