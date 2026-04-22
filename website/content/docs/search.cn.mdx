@@ -7,7 +7,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 > "搜索是发现的一半。" — 塞内加尔谚语
 
-Pi Session Manager 提供强大的全文搜索功能，基于双引擎架构，可跨所有会话进行搜索。
+Pi Session Manager 提供强大的全文搜索功能，基于 SQLite FTS5，可跨所有会话进行搜索。
 
 ## 搜索引擎
 
@@ -21,16 +21,6 @@ Pi Session Manager 提供强大的全文搜索功能，基于双引擎架构，�
 - 自动同步（`content='message_entries'`，无需手动触发器）
 
 可通过[配置文件](./configuration)中的 `enable_fts5` 设置开关 FTS5。
-
-### Tantivy
-
-Rust 原生的全文搜索库（类似 Lucene），作为辅助索引在 `data/search/tantivy.rs` 中实现。Tantivy 提供：
-
-- 更精细的分词处理（unicode61）
-- 对复杂查询更好的相关性评分
-- 通过 `data/search/index.rs` 并发索引
-
-两个引擎都可通过统一的搜索客户端（`data/search/client.rs`）访问。
 
 ## 会话 ID 匹配
 
@@ -48,13 +38,14 @@ Rust 原生的全文搜索库（类似 Lucene），作为辅助索引在 `data/s
 - `session_path` — 父会话路径
 - `role` — user 或 assistant
 - `source_type` — user、assistant 或 thinking
-- `content` — 消息文本
+- `content` — 原始消息文本
+- `search_text` — 用于全文搜索的规范化文本
 
 搜索结果按 `(session_path, entry_id)` 去重，每个会话最多限制 3 条命中。
 
 ### 中日韩（CJK）支持
 
-对于中文/日文/韩文文本，FTS5 unicode61 分词不可靠。当检测到查询中包含 CJK 字符时，搜索会回退到 `LIKE` 子串匹配。
+对于中文/日文/韩文文本，搜索系统会在建索引时把原文转换成统一的 `search_text`，并在查询时使用同样的规范化规则，从而让中文和中英混合查询都直接走 FTS5，而不是回退到 `LIKE`。
 
 ## 过滤器
 

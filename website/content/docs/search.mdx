@@ -7,7 +7,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 > "Searching is half of finding." — Senegalese proverb
 
-Pi Session Manager provides powerful full-text search across all your sessions, powered by a dual-engine architecture combining SQLite FTS5 and Tantivy.
+Pi Session Manager provides full-text search across all your sessions, powered by SQLite FTS5.
 
 ## Search Engines
 
@@ -21,16 +21,6 @@ The primary search engine. All session content is indexed into an FTS5 virtual t
 - Auto-sync via `content='message_entries'` (no manual triggers needed)
 
 FTS5 can be toggled via the `enable_fts5` setting in the [configuration file](./configuration).
-
-### Tantivy
-
-A Rust-native full-text search library (similar to Lucene) used as a secondary index in `data/search/tantivy.rs`. Tantivy provides:
-
-- More sophisticated tokenization (unicode61)
-- Better relevance scoring for complex queries
-- Concurrent indexing via `data/search/index.rs`
-
-Both engines are accessible through the unified search client (`data/search/client.rs`).
 
 ## Session ID Matching
 
@@ -48,13 +38,14 @@ Each message in a session is indexed individually in `message_entries`:
 - `session_path` — path to parent session
 - `role` — user or assistant
 - `source_type` — user, assistant, or thinking
-- `content` — message text
+- `content` — original message text
+- `search_text` — normalized text used by FTS
 
 Search results are deduplicated per `(session_path, entry_id)` and limited to 3 hits per session.
 
 ### CJK Support
 
-For Chinese/Japanese/Korean text, FTS5 unicode61 tokenization is unreliable. The search falls back to `LIKE` substring matching when CJK characters are detected in the query.
+For Chinese/Japanese/Korean text, the index stores a normalized `search_text` representation and queries go through the same normalization path. That lets CJK and mixed-language queries stay on FTS5 instead of falling back to `LIKE`.
 
 ## Filters
 

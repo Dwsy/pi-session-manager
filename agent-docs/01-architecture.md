@@ -5,7 +5,7 @@
 ```
 Commands (thin) ← Tauri IPC / HTTP / WS
 Domain (business) ← model_config, session_list, stats, terminal
-Data ← search (Tantivy) sqlite (cache)
+Data ← search (SQLite FTS5 normalized index) sqlite (cache)
 Server (protocol) ← HTTP adapter, WebSocket adapter
 ```
 

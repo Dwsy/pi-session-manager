@@ -36,7 +36,7 @@ Pi Session Manager is built on a three-layer architecture: a React frontend, a R
 ┌───────────────────────────▼─────────────────────────────────────────┐
 │                    Rust Backend (Tauri 2)                           │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  Scanner · SQLite Cache · FTS5 · Tantivy · File Watcher     │   │
+│  │  Scanner · SQLite Cache · FTS5 · File Watcher               │   │
 │  │  PTY Terminal · Auth · Export · Config · Stats · Tags       │   │
 │  │  Pi Live Registry · Subagent Tracking · Write Buffer        │   │
 │  └─────────────────────────────────────────────────────────────┘   │
@@ -75,7 +75,7 @@ Pi Session Manager is built on a three-layer architecture: a React frontend, a R
 | Tokio | Async runtime for concurrent I/O |
 | Axum | HTTP/WebSocket server framework |
 | SQLite (rusqlite) | Persistent cache, settings, tags, favorites |
-| Tantivy | Secondary full-text search index (Lucene-like, results merged with FTS5) |
+| SQLite FTS5 | Full-text search with normalized indexing over `search_text` |
 | portable-pty | PTY terminal sessions |
 | rust-embed | Embed frontend assets into binary |
 | notify | File system watcher |
@@ -120,11 +120,10 @@ src-tauri/src/
 │   ├── scanner.rs            # Multi-path session scanner + incremental rescan
 │   └── write_buffer.rs       # Async write batching for SQLite
 ├── data/
-│   ├── search/               # Search engine layer
-│   │   ├── client.rs         # Unified search client (FTS5 + Tantivy merge)
-│   │   ├── embedding.rs      # Embedding service for semantic search
-│   │   ├── index.rs          # Tantivy index management
-│   │   └── tantivy.rs        # Tantivy full-text search implementation
+│   ├── search/               # Search normalization helpers
+│   │   ├── client.rs         # Session list search helpers
+│   │   ├── embedding.rs      # Embedding service stubs / helpers
+│   │   └── index.rs          # Search segment extraction utilities
 │   └── sqlite/               # SQLite data access layer
 │       ├── bootstrap.rs      # DB init, WAL mode, schema creation
 │       ├── deps.rs           # Shared SQLite dependencies

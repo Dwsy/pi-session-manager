@@ -21,7 +21,7 @@
 
 **Frontend**: React 18, TypeScript 5, Vite 5, Tailwind CSS, i18next, cmdk, @dnd-kit, @xyflow/react, recharts, @xterm/xterm
 
-**Backend**: Rust 2021, Tauri 2, Tokio, Axum, rusqlite, Tantivy, notify, portable-pty
+**Backend**: Rust 2021, Tauri 2, Tokio, Axum, rusqlite, SQLite FTS5, notify, portable-pty
 
 **Protocol**: Tauri IPC | WebSocket (/ws) | HTTP (/api, /v1/*) | SSE (/api/events, /v1/events)
 

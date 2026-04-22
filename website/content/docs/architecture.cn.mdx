@@ -36,7 +36,7 @@ Pi Session Manager 基于三层架构构建：React 前端、Rust 后端，以�
 ┌───────────────────────────▼─────────────────────────────────────────┐
 │                    Rust 后端 (Tauri 2)                               │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  扫描器 · SQLite 缓存 · FTS5 · Tantivy · 文件监听器         │   │
+│  │  扫描器 · SQLite 缓存 · FTS5 · 文件监听器                   │   │
 │  │  PTY 终端 · 认证 · 导出 · 配置 · 统计 · 标签               │   │
 │  │  Pi 实时注册 · Subagent 追踪 · 写入缓冲                     │   │
 │  └─────────────────────────────────────────────────────────────┘   │
@@ -75,7 +75,7 @@ Pi Session Manager 基于三层架构构建：React 前端、Rust 后端，以�
 | Tokio | 异步运行时，支持并发 I/O |
 | Axum | HTTP/WebSocket 服务器框架 |
 | SQLite (rusqlite) | 持久化缓存、设置、标签、收藏 |
-| Tantivy | 辅助全文搜索索引（类 Lucene，结果与 FTS5 合并） |
+| SQLite FTS5 | 基于 `search_text` 规范化索引的全文搜索 |
 | portable-pty | PTY 终端会话 |
 | rust-embed | 将前端资源嵌入二进制文件 |
 | notify | 文件系统监听器 |
@@ -120,11 +120,10 @@ src-tauri/src/
 │   ├── scanner.rs            # 多路径会话扫描器 + 增量重扫
 │   └── write_buffer.rs       # SQLite 异步写入批处理
 ├── data/
-│   ├── search/               # 搜索引擎层
-│   │   ├── client.rs         # 统一搜索客户端（FTS5 + Tantivy 合并）
-│   │   ├── embedding.rs      # 语义搜索嵌入服务
-│   │   ├── index.rs          # Tantivy 索引管理
-│   │   └── tantivy.rs        # Tantivy 全文搜索实现
+│   ├── search/               # 搜索规范化辅助层
+│   │   ├── client.rs         # 会话列表搜索辅助
+│   │   ├── embedding.rs      # 嵌入服务占位 / 辅助
+│   │   └── index.rs          # 搜索片段提取工具
 │   └── sqlite/               # SQLite 数据访问层
 │       ├── bootstrap.rs      # 数据库初始化、WAL 模式、Schema 创建
 │       ├── deps.rs           # 共享 SQLite 依赖

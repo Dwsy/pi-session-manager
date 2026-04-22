@@ -21,7 +21,7 @@ const translations = {
         {
           title: 'Full-Text Search',
           description:
-            'SQLite FTS5 + Tantivy powered search across all sessions. Find any conversation instantly.',
+            'SQLite FTS5 powered search across all sessions with normalized indexing. Find any conversation instantly.',
         },
         {
           title: 'Session Visualization',
@@ -114,7 +114,7 @@ const translations = {
         {
           title: '全文搜索',
           description:
-            'SQLite FTS5 + Tantivy 驱动，跨所有会话搜索。即时找到任何对话。',
+            '基于 SQLite FTS5 和规范化索引的跨会话搜索。即时找到任何对话。',
         },
         {
           title: '会话可视化',
