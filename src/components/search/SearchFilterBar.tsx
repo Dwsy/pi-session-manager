@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, X } from 'lucide-react'
 import LabelFilter from '@/components/tags/LabelFilter'
+import CompositionInput from '@/components/ui/CompositionInput'
 import type { Tag, SessionTag } from '@/types'
 
 interface SearchFilterBarProps {
@@ -83,11 +84,11 @@ export default function SearchFilterBar({
         }`}
       >
         <Search className={`${compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} text-muted-foreground/50 shrink-0`} />
-        <input
+        <CompositionInput
           ref={inputRef}
           type="text"
           value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
+          onChange={onSearchChange}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder || t('common.searchPlaceholder')}

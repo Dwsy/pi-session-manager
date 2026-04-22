@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search, X, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import CompositionInput from '@/components/ui/CompositionInput'
 
 interface SearchPanelProps {
   onSearch: (query: string) => void
@@ -39,11 +40,11 @@ export default function SearchPanel({ onSearch, resultCount, isSearching }: Sear
     <div className="px-3 py-2 border-b border-border/50">
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-        <input
+        <CompositionInput
           type="text"
           placeholder={t('search.panel.placeholder')}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={setQuery}
           className="w-full pl-8 pr-7 py-1.5 bg-surface border-0 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-400/50 placeholder:text-muted-foreground/60"
           autoFocus
         />

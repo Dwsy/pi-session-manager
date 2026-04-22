@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, X } from 'lucide-react'
+import CompositionInput from '@/components/ui/CompositionInput'
 
 export interface SessionTreeSearchRef {
   focus: () => void
@@ -61,11 +62,11 @@ const SessionTreeSearch = forwardRef<SessionTreeSearchRef, SessionTreeSearchProp
       <div className="session-tree-search-content">
         <div className="search-input-wrapper">
           <Search className="search-icon" size={14} />
-          <input
+          <CompositionInput
             ref={inputRef}
             type="text"
             value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={onSearchChange}
             onKeyDown={handleKeyDown}
             placeholder={t('search.placeholder')}
             className="search-input"

@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 export interface UseSessionViewerHotkeysOptions {
   enabled?: boolean
   isSearchOpen: boolean
+  isCopyFocused: boolean
   cmdFBehavior: 'inSessionSearch' | 'toggleSidebar'
   onToggleThinking: () => void
   onToggleToolsExpanded: () => void
@@ -17,6 +18,7 @@ export interface UseSessionViewerHotkeysOptions {
 export function useSessionViewerHotkeys({
   enabled = true,
   isSearchOpen,
+  isCopyFocused,
   cmdFBehavior = 'inSessionSearch',
   onToggleThinking,
   onToggleToolsExpanded,
@@ -107,8 +109,9 @@ export function useSessionViewerHotkeys({
       }
 
       // Cmd+Shift+C: Copy resume command
+      // Don't trigger when the invisible textarea is focused (user is trying to paste)
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && key === 'c') {
-        if (onCopyResumeCommand) {
+        if (onCopyResumeCommand && !isCopyFocused) {
           event.preventDefault()
           event.stopPropagation()
           onCopyResumeCommand()
@@ -124,6 +127,7 @@ export function useSessionViewerHotkeys({
   }, [
     enabled,
     isSearchOpen,
+    isCopyFocused,
     cmdFBehavior,
     onCloseSearch,
     onCopyResumeCommand,

@@ -119,12 +119,15 @@ function SessionViewerContent({
   const [showSystemPromptDialog, setShowSystemPromptDialog] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [traceMode, setTraceMode] = useState(false);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
 
   const sessionDataIsAtBottomRef = useRef(true);
   const sidebarRef = useRef<HTMLElement>(null);
   const resizeHandleRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<SessionTreeRef>(null);
   const messagesRef = useRef<SessionViewerMessagesRef>(null);
+  const copyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isCopyFocused, setIsCopyFocused] = useState(false);
 
   const handleResume = useCallback(() => {
     if (onResumeSession) {
@@ -222,9 +225,11 @@ function SessionViewerContent({
         resumeCommand,
       });
       await navigator.clipboard.writeText(command);
-      alert(t("session.copyResumeCommand.success", "Resume command copied!"));
+      // Show success toast instead of alert
+      setCopyToast(t("session.copyResumeCommand.success", "Resume command copied!"));
     } catch (err) {
       console.error("Failed to copy resume command:", err);
+      setCopyToast(t("session.copyResumeCommand.failed", "Failed to copy"));
     }
   }, [session, piPath, resumeCommand, t]);
 
@@ -232,6 +237,7 @@ function SessionViewerContent({
     enabled: !previewMode && !showSystemPromptDialog && !showMobileMenu,
     isSearchOpen,
     cmdFBehavior,
+    isCopyFocused,
     onToggleThinking: toggleThinking,
     onToggleToolsExpanded: toggleToolsExpanded,
     onToggleSidebar: handleToggleSidebar,

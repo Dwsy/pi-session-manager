@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
+import CompositionInput from "@/components/ui/CompositionInput";
 
 import type { SessionSearchScope } from "@/hooks/useSessionViewerInMessageSearch";
 
@@ -73,12 +74,11 @@ export default function SessionViewerSearchBar({
       <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-background/95 px-3 py-2 shadow-sm">
         <div className="flex items-center gap-2">
           <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-          <input
+          <CompositionInput
             ref={inputRef}
             type="text"
             value={searchQuery}
-            onChange={(event) => {
-              const value = event.target.value;
+            onChange={(value) => {
               // Debounce search to avoid excessive operations on every keystroke
               if (debounceRef.current) {
                 clearTimeout(debounceRef.current);
