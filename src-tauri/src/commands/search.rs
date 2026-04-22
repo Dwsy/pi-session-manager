@@ -14,6 +14,7 @@ const SESSION_ID_PREFIX_SCORE: f32 = 999_000.0;
 // session-id rediscovery, intentional label rediscovery, ordinary content similarity
 const LABEL_MATCH_BASE_SCORE: f32 = 500_000.0;
 const SMART_PHRASE_MATCH_BOOST: f32 = 100_000.0;
+const SEARCH_TIMEOUT_SECS: u64 = 30;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SourceFilter {
@@ -221,12 +222,12 @@ pub async fn full_text_search(
     from: Option<String>,
     to: Option<String>,
 ) -> Result<FullTextSearchResponse, String> {
-    let result = tokio::time::timeout(Duration::from_secs(5), tokio::task::spawn_blocking(move || full_text_search_blocking(query, role_filter, glob_pattern, project_path, page, page_size, match_mode, sort_order, source_filter, from, to))).await;
+    let result = tokio::time::timeout(Duration::from_secs(SEARCH_TIMEOUT_SECS), tokio::task::spawn_blocking(move || full_text_search_blocking(query, role_filter, glob_pattern, project_path, page, page_size, match_mode, sort_order, source_filter, from, to))).await;
 
     match result {
         Ok(Ok(inner)) => inner,
         Ok(Err(e)) => Err(format!("Task panicked: {e}")),
-        Err(_) => Err("Search query timed out after 5 seconds".to_string()),
+        Err(_) => Err(format!("Search query timed out after {SEARCH_TIMEOUT_SECS} seconds")),
     }
 }
 
@@ -258,7 +259,7 @@ fn full_text_search_blocking(
 
     let config = config::load_config().map_err(|e| format!("Failed to load config: {e}"))?;
     let conn = crate::data::sqlite::init_db_with_config(&config).map_err(|e| format!("Failed to init database: {e}"))?;
-    conn.execute("PRAGMA query_timeout = 5000", []).map_err(|e| format!("Failed to set query_timeout: {e}"))?;
+    conn.execute(format!("PRAGMA query_timeout = {}", SEARCH_TIMEOUT_SECS * 1000).as_str(), []).map_err(|e| format!("Failed to set query_timeout: {e}"))?;
 
     let normalized_role_filter = role_filter.to_lowercase();
     let role_opt = match normalized_role_filter.as_str() {
