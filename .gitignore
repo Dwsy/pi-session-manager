@@ -79,3 +79,4 @@ build-output/
 # Pi messenger/crew runtime files
 .pi/messenger/
 notepad/
+dist-dataset/assets/*.js

@@ -485,6 +485,32 @@ function SessionViewerContent({
           sessionPath={session.path}
         />
       )}
+
+      {/* Invisible textarea for Cmd+Shift+C clipboard handling */}
+      <textarea
+        ref={copyTextareaRef}
+        onFocus={() => setIsCopyFocused(true)}
+        onBlur={() => setIsCopyFocused(false)}
+        onCopy={() => {
+          setIsCopyFocused(false);
+        }}
+        className="sr-only fixed -left-[9999px] top-0 h-0 w-0 opacity-0"
+        tabIndex={-1}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        aria-hidden="true"
+      />
+
+      {/* Toast notification for copy feedback */}
+      {copyToast && (
+        <div className="fixed bottom-6 right-6 z-[9999] animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="rounded-lg border border-border bg-surface px-4 py-3 shadow-lg">
+            <p className="text-sm text-foreground">{copyToast}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
