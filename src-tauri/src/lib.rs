@@ -84,6 +84,7 @@ pub fn run() {
             delete_sessions,
             export_session,
             rename_session,
+            fork_session,
             get_session_stats,
             get_day_stats,
             open_session_in_browser,
