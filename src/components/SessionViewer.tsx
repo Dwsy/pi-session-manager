@@ -126,8 +126,6 @@ function SessionViewerContent({
   const resizeHandleRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<SessionTreeRef>(null);
   const messagesRef = useRef<SessionViewerMessagesRef>(null);
-  const copyTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const [isCopyFocused, setIsCopyFocused] = useState(false);
 
   const handleResume = useCallback(() => {
     if (onResumeSession) {
@@ -227,9 +225,12 @@ function SessionViewerContent({
       await navigator.clipboard.writeText(command);
       // Show success toast instead of alert
       setCopyToast(t("session.copyResumeCommand.success", "Resume command copied!"));
+      // Auto-dismiss after 2 seconds
+      setTimeout(() => setCopyToast(null), 2000);
     } catch (err) {
       console.error("Failed to copy resume command:", err);
       setCopyToast(t("session.copyResumeCommand.failed", "Failed to copy"));
+      setTimeout(() => setCopyToast(null), 2000);
     }
   }, [session, piPath, resumeCommand, t]);
 
@@ -237,7 +238,6 @@ function SessionViewerContent({
     enabled: !previewMode && !showSystemPromptDialog && !showMobileMenu,
     isSearchOpen,
     cmdFBehavior,
-    isCopyFocused,
     onToggleThinking: toggleThinking,
     onToggleToolsExpanded: toggleToolsExpanded,
     onToggleSidebar: handleToggleSidebar,
@@ -485,23 +485,6 @@ function SessionViewerContent({
           sessionPath={session.path}
         />
       )}
-
-      {/* Invisible textarea for Cmd+Shift+C clipboard handling */}
-      <textarea
-        ref={copyTextareaRef}
-        onFocus={() => setIsCopyFocused(true)}
-        onBlur={() => setIsCopyFocused(false)}
-        onCopy={() => {
-          setIsCopyFocused(false);
-        }}
-        className="sr-only fixed -left-[9999px] top-0 h-0 w-0 opacity-0"
-        tabIndex={-1}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        aria-hidden="true"
-      />
 
       {/* Toast notification for copy feedback */}
       {copyToast && (
