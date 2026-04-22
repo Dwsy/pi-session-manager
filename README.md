@@ -4,7 +4,7 @@
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Pi Session Manager" />
 </p>
 
-<h1 align="center">Pi Session Manager</h1>
+
 
 <p align="center">
   Manage <a href="https://github.com/badlogic/pi-mono">Pi</a> coding sessions with a Tauri desktop app, browser-accessible server mode, and a standalone static demo page.
@@ -17,6 +17,17 @@
   <a href="https://dwsy.github.io/pi-session-manager/demo/">Demo</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/dataset/">Dataset</a>
 </p>
+
+## UI Preview
+
+| Home | Session Page |
+|------|-------------|
+| ![Home](website/public/screenshots/home.png) | ![Session Page](website/public/screenshots/session-page.png) |
+
+| Session Tree | Kanban |
+|-------------|--------|
+| ![Session Tree](website/public/screenshots/session-tree.png) | ![Kanban](website/public/screenshots/kanban.png) |
+
 
 ## Highlights
 
@@ -66,15 +77,6 @@ Server (protocol) <- HTTP adapter, WebSocket adapter
 | Frontend Hooks | TypeScript | 40+ hooks |
 | Backend | Rust | ~27K lines |
 
-## UI Preview
-
-| Home | Session Page |
-|------|-------------|
-| ![Home](website/public/screenshots/home.png) | ![Session Page](website/public/screenshots/session-page.png) |
-
-| Session Tree | Kanban |
-|-------------|--------|
-| ![Session Tree](website/public/screenshots/session-tree.png) | ![Kanban](website/public/screenshots/kanban.png) |
 
 ## Quick Start
 
