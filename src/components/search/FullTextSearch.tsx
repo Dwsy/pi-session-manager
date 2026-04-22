@@ -36,6 +36,7 @@ import {
   getRuntimeSessionByPath,
 } from "@/runtime-data/sessionSource";
 import { formatShortSessionId } from "@/utils/session";
+import { useCompositionInput } from "@/hooks/useCompositionInput";
 
 const HIGHLIGHT_CACHE_MAX_ENTRIES = 500;
 const HTML_ESCAPE_MAP: Record<string, string> = {
@@ -100,6 +101,7 @@ export default function FullTextSearch({
 }: FullTextSearchProps) {
   const { t } = useTranslation();
   const [queryInput, setQueryInput] = useState("");
+  const { inputValue, handleChange, handleCompositionStart, handleCompositionEnd } = useCompositionInput(setQueryInput, queryInput);
   const [roleFilter, setRoleFilter] = useState<"all" | "user" | "assistant">(
     "all",
   );
@@ -506,14 +508,6 @@ export default function FullTextSearch({
     setSortMode(modes[(currentIndex + 1) % 3]);
   };
 
-  const handleQueryChange = (value: string) => {
-    setQueryInput(value);
-    const parsed = parseLeadingSourceFilterToken(value);
-    if (parsed.sourceFilter) {
-      setSourceFilter(parsed.sourceFilter);
-    }
-  };
-
   const handleSourceFilterChange = (nextSourceFilter: FullTextSearchSourceFilter) => {
     setSourceFilter(nextSourceFilter);
     setQueryInput((currentValue) =>
@@ -575,8 +569,10 @@ export default function FullTextSearch({
               <input
                 ref={inputRef}
                 type="text"
-                value={queryInput}
-                onChange={(e) => handleQueryChange(e.target.value)}
+                value={inputValue}
+                onChange={handleChange}
+                onCompositionStart={handleCompositionStart}
+                onCompositionEnd={handleCompositionEnd}
                 onKeyDown={handleInputKeyDown}
                 placeholder={inputPlaceholder}
                 className="w-full bg-transparent border-none p-0 outline-none text-base font-medium text-foreground placeholder:text-muted-foreground"

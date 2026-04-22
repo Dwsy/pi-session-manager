@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { formatSourceFilterToken } from '@/utils/search'
 import { getSourceFilterLabel } from './utils'
+import { useCompositionInput } from '@/hooks/useCompositionInput'
 import type { FullTextSearchSourceFilter } from '@/types'
 
 interface CommandSearchInputProps {
@@ -32,14 +33,18 @@ export default function CommandSearchInput({
 }: CommandSearchInputProps) {
   const { t } = useTranslation()
 
+  const { inputValue, handleChange, handleCompositionStart, handleCompositionEnd } = useCompositionInput(onChange, query)
+
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border/80 bg-background px-4 py-3 shadow-sm">
       <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
       <div className="relative flex-1">
         <input
           type="text"
-          value={query}
-          onChange={(e) => onChange(e.target.value)}
+          value={inputValue}
+          onChange={handleChange}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           onKeyDown={onKeyDown}
           placeholder={inputPlaceholder}
           className="w-full bg-transparent border-0 outline-none text-[15px] font-medium text-foreground placeholder:text-muted-foreground/70"
