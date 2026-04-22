@@ -3,10 +3,7 @@ use crate::domain::stats::aggregator::DailyStatsCollector;
 use crate::domain::stats::types::{HeatmapPoint, TimeDistributionPoint};
 use std::collections::HashMap;
 
-pub fn generate_heatmap_data(
-    messages_by_date: &HashMap<String, usize>,
-    daily_stats: &DailyStatsCollector,
-) -> Vec<HeatmapPoint> {
+pub fn generate_heatmap_data(messages_by_date: &HashMap<String, usize>, daily_stats: &DailyStatsCollector) -> Vec<HeatmapPoint> {
     let mut data = Vec::new();
     let now = chrono::Utc::now();
     let days_ago = 365;
@@ -33,35 +30,19 @@ pub fn generate_heatmap_data(
         let session_count = daily_stats.sessions.get(&date_str).copied().unwrap_or(0);
         let top_project = daily_stats.top_project_for_date(&date_str);
 
-        data.push(HeatmapPoint {
-            date: date_str,
-            level,
-            total_messages,
-            total_tokens,
-            total_cost,
-            session_count,
-            top_project,
-        });
+        data.push(HeatmapPoint { date: date_str, level, total_messages, total_tokens, total_cost, session_count, top_project });
     }
 
     data.reverse();
     data
 }
 
-pub fn generate_time_distribution(
-    messages_by_hour: &HashMap<String, usize>,
-) -> Vec<TimeDistributionPoint> {
+pub fn generate_time_distribution(messages_by_hour: &HashMap<String, usize>) -> Vec<TimeDistributionPoint> {
     let mut distribution = Vec::new();
 
     for hour in 0..24 {
-        let message_count = messages_by_hour
-            .get(&hour.to_string())
-            .copied()
-            .unwrap_or(0);
-        distribution.push(TimeDistributionPoint {
-            hour,
-            message_count,
-        });
+        let message_count = messages_by_hour.get(&hour.to_string()).copied().unwrap_or(0);
+        distribution.push(TimeDistributionPoint { hour, message_count });
     }
 
     distribution

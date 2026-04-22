@@ -23,16 +23,9 @@ fn create_sqlite_db(path: &std::path::Path, sql: &str) {
 #[test]
 fn cursor_corrupted_random_bytes() {
     let tmp = tempfile::NamedTempFile::with_suffix(".vscdb").expect("create temp file");
-    fs::write(
-        tmp.path(),
-        b"\x00\x01\x02\xff\xfe\xfd\x80\x81\x82garbage\n\x00",
-    )
-    .expect("write garbage");
+    fs::write(tmp.path(), b"\x00\x01\x02\xff\xfe\xfd\x80\x81\x82garbage\n\x00").expect("write garbage");
     let result = Cursor.read_session(tmp.path());
-    assert!(
-        result.is_err(),
-        "cursor: reading garbage .vscdb should return Err"
-    );
+    assert!(result.is_err(), "cursor: reading garbage .vscdb should return Err");
 }
 
 // ===========================================================================
@@ -48,10 +41,7 @@ fn cursor_wrong_schema_missing_table() {
          INSERT INTO wrong_table VALUES (1, 'test');",
     );
     let result = Cursor.read_session(tmp.path());
-    assert!(
-        result.is_err(),
-        "cursor: reading SQLite without cursorDiskKV should return Err"
-    );
+    assert!(result.is_err(), "cursor: reading SQLite without cursorDiskKV should return Err");
 }
 
 // ===========================================================================
@@ -61,20 +51,13 @@ fn cursor_wrong_schema_missing_table() {
 #[test]
 fn cursor_correct_schema_no_rows() {
     let tmp = tempfile::NamedTempFile::with_suffix(".vscdb").expect("create temp file");
-    create_sqlite_db(
-        tmp.path(),
-        "CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT);",
-    );
+    create_sqlite_db(tmp.path(), "CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT);");
     let result = Cursor.read_session(tmp.path());
     // Provider should return Err or Ok with 0 messages.
     match &result {
         Err(_) => {} // Fine.
         Ok(session) => {
-            assert!(
-                session.messages.is_empty(),
-                "cursor: empty cursorDiskKV should produce 0 messages, got {}",
-                session.messages.len()
-            );
+            assert!(session.messages.is_empty(), "cursor: empty cursorDiskKV should produce 0 messages, got {}", session.messages.len());
         }
     }
 }
@@ -89,10 +72,7 @@ fn cursor_truncated_sqlite_header() {
     // Write just the SQLite header magic bytes, then truncate.
     fs::write(tmp.path(), b"SQLite format 3\x00").expect("write truncated header");
     let result = Cursor.read_session(tmp.path());
-    assert!(
-        result.is_err(),
-        "cursor: truncated SQLite header should return Err"
-    );
+    assert!(result.is_err(), "cursor: truncated SQLite header should return Err");
 }
 
 // ===========================================================================
@@ -112,11 +92,7 @@ fn cursor_valid_schema_invalid_json_value() {
     match &result {
         Err(_) => {} // Fine.
         Ok(session) => {
-            assert!(
-                session.messages.is_empty(),
-                "cursor: invalid JSON composerData should produce 0 messages, got {}",
-                session.messages.len()
-            );
+            assert!(session.messages.is_empty(), "cursor: invalid JSON composerData should produce 0 messages, got {}", session.messages.len());
         }
     }
 }
@@ -133,10 +109,7 @@ fn opencode_corrupted_random_bytes() {
     let db_path = db_dir.join("opencode.db");
     fs::write(&db_path, b"\x00\x01garbage\xff\xfe").expect("write garbage");
     let result = OpenCode.read_session(&db_path);
-    assert!(
-        result.is_err(),
-        "opencode: reading garbage db should return Err"
-    );
+    assert!(result.is_err(), "opencode: reading garbage db should return Err");
 }
 
 // ===========================================================================
@@ -155,10 +128,7 @@ fn opencode_wrong_schema_missing_tables() {
          INSERT INTO wrong_table VALUES (1, 'test');",
     );
     let result = OpenCode.read_session(&db_path);
-    assert!(
-        result.is_err(),
-        "opencode: reading SQLite without sessions/messages tables should return Err"
-    );
+    assert!(result.is_err(), "opencode: reading SQLite without sessions/messages tables should return Err");
 }
 
 // ===========================================================================
@@ -199,11 +169,7 @@ fn opencode_correct_schema_no_rows() {
     match &result {
         Err(_) => {} // Fine.
         Ok(session) => {
-            assert!(
-                session.messages.is_empty(),
-                "opencode: empty tables should produce 0 messages, got {}",
-                session.messages.len()
-            );
+            assert!(session.messages.is_empty(), "opencode: empty tables should produce 0 messages, got {}", session.messages.len());
         }
     }
 }
@@ -220,10 +186,7 @@ fn opencode_truncated_sqlite_header() {
     let db_path = db_dir.join("opencode.db");
     fs::write(&db_path, b"SQLite format 3\x00").expect("write truncated header");
     let result = OpenCode.read_session(&db_path);
-    assert!(
-        result.is_err(),
-        "opencode: truncated SQLite header should return Err"
-    );
+    assert!(result.is_err(), "opencode: truncated SQLite header should return Err");
 }
 
 // ===========================================================================
@@ -267,10 +230,7 @@ fn opencode_valid_schema_invalid_json_parts() {
         Err(_) => {} // Fine.
         Ok(session) => {
             // If it tolerates the bad parts, it might return 0 messages.
-            eprintln!(
-                "opencode: invalid JSON parts returned Ok with {} messages",
-                session.messages.len()
-            );
+            eprintln!("opencode: invalid JSON parts returned Ok with {} messages", session.messages.len());
         }
     }
 }

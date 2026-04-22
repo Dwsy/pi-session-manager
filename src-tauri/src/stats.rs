@@ -5,16 +5,10 @@
 pub use crate::domain::stats::*;
 
 // Re-export for backward compatibility
-pub use crate::domain::stats::aggregator::{
-    calculate_stats, calculate_stats_from_inputs, extract_project_name, merge_model_usage,
-    parse_modified, record_model_presence, DailyStatsCollector,
-};
+pub use crate::domain::stats::aggregator::{calculate_stats, calculate_stats_from_inputs, extract_project_name, merge_model_usage, parse_modified, record_model_presence, DailyStatsCollector};
 pub use crate::domain::stats::day_stats::{get_activity_timeline, get_day_stats};
 pub use crate::domain::stats::heatmap::{generate_heatmap_data, generate_time_distribution};
-pub use crate::domain::stats::types::{
-    DailyActivity, DayProjectBreakdown, DaySession, DayStats, HeatmapPoint, ModelTokenStats,
-    SessionStats, SessionStatsInput, TimeDistributionPoint, TokenDetails,
-};
+pub use crate::domain::stats::types::{DailyActivity, DayProjectBreakdown, DaySession, DayStats, HeatmapPoint, ModelTokenStats, SessionStats, SessionStatsInput, TimeDistributionPoint, TokenDetails};
 
 #[cfg(test)]
 mod tests {
@@ -25,24 +19,8 @@ mod tests {
     #[test]
     fn calculate_stats_from_inputs_fallback_counts_messages() {
         let sessions = vec![
-            SessionStatsInput {
-                path: "/tmp/does-not-exist-1.jsonl".to_string(),
-                cwd: "/Users/example/project-alpha".to_string(),
-                modified: chrono::Utc
-                    .with_ymd_and_hms(2025, 1, 2, 10, 0, 0)
-                    .unwrap()
-                    .to_rfc3339(),
-                message_count: 5,
-            },
-            SessionStatsInput {
-                path: "/tmp/does-not-exist-2.jsonl".to_string(),
-                cwd: "/Users/example/project-beta".to_string(),
-                modified: chrono::Utc
-                    .with_ymd_and_hms(2025, 1, 3, 16, 0, 0)
-                    .unwrap()
-                    .to_rfc3339(),
-                message_count: 3,
-            },
+            SessionStatsInput { path: "/tmp/does-not-exist-1.jsonl".to_string(), cwd: "/Users/example/project-alpha".to_string(), modified: chrono::Utc.with_ymd_and_hms(2025, 1, 2, 10, 0, 0).unwrap().to_rfc3339(), message_count: 5 },
+            SessionStatsInput { path: "/tmp/does-not-exist-2.jsonl".to_string(), cwd: "/Users/example/project-beta".to_string(), modified: chrono::Utc.with_ymd_and_hms(2025, 1, 3, 16, 0, 0).unwrap().to_rfc3339(), message_count: 3 },
         ];
 
         let stats = calculate_stats_from_inputs(&sessions);
@@ -61,12 +39,7 @@ mod tests {
         assert_eq!(stats.messages_by_hour.get(&local_hour2), Some(&3));
     }
 
-    fn make_session(
-        path: &str,
-        cwd: &str,
-        modified: chrono::DateTime<chrono::Utc>,
-        message_count: usize,
-    ) -> SessionInfo {
+    fn make_session(path: &str, cwd: &str, modified: chrono::DateTime<chrono::Utc>, message_count: usize) -> SessionInfo {
         SessionInfo {
             path: path.to_string(),
             id: format!("id-{path}"),
@@ -90,20 +63,7 @@ mod tests {
         let modified_b = chrono::Utc.with_ymd_and_hms(2026, 1, 18, 8, 0, 0).unwrap();
         let target_date = modified_a.format("%Y-%m-%d").to_string();
 
-        let sessions = vec![
-            make_session(
-                "/tmp/non-existent-day-stats-a.jsonl",
-                "/Users/demo/workspace/foo-app",
-                modified_a,
-                10,
-            ),
-            make_session(
-                "/tmp/non-existent-day-stats-b.jsonl",
-                "/Users/demo/workspace/bar-app",
-                modified_b,
-                12,
-            ),
-        ];
+        let sessions = vec![make_session("/tmp/non-existent-day-stats-a.jsonl", "/Users/demo/workspace/foo-app", modified_a, 10), make_session("/tmp/non-existent-day-stats-b.jsonl", "/Users/demo/workspace/bar-app", modified_b, 12)];
 
         let stats = get_day_stats(&target_date, &sessions).expect("day stats should be calculated");
 
@@ -111,11 +71,7 @@ mod tests {
         assert_eq!(stats.project_count, 2);
         assert_eq!(stats.project_breakdown.len(), 2);
 
-        let project_paths: std::collections::HashSet<_> = stats
-            .project_breakdown
-            .iter()
-            .map(|p| p.project_path.as_str())
-            .collect();
+        let project_paths: std::collections::HashSet<_> = stats.project_breakdown.iter().map(|p| p.project_path.as_str()).collect();
         assert!(project_paths.contains("/Users/demo/workspace/foo-app"));
         assert!(project_paths.contains("/Users/demo/workspace/bar-app"));
 
@@ -130,45 +86,20 @@ mod tests {
         let modified = chrono::Utc.with_ymd_and_hms(2026, 1, 20, 3, 0, 0).unwrap();
         let target_date = modified.format("%Y-%m-%d").to_string();
 
-        let sessions = vec![
-            make_session(
-                "/tmp/non-existent-day-stats-c.jsonl",
-                "/Users/demo/workspace/a/service",
-                modified,
-                5,
-            ),
-            make_session(
-                "/tmp/non-existent-day-stats-d.jsonl",
-                "/Users/demo/workspace/b/service",
-                modified,
-                6,
-            ),
-        ];
+        let sessions = vec![make_session("/tmp/non-existent-day-stats-c.jsonl", "/Users/demo/workspace/a/service", modified, 5), make_session("/tmp/non-existent-day-stats-d.jsonl", "/Users/demo/workspace/b/service", modified, 6)];
 
         let stats = get_day_stats(&target_date, &sessions).expect("day stats should be calculated");
 
         assert_eq!(stats.project_count, 2);
         assert_eq!(stats.project_breakdown.len(), 2);
-        assert!(stats
-            .project_breakdown
-            .iter()
-            .all(|project| project.project_name == "service"));
+        assert!(stats.project_breakdown.iter().all(|project| project.project_name == "service"));
     }
 
     #[test]
     fn extract_project_name_supports_windows_path_separator() {
-        assert_eq!(
-            extract_project_name(r"C:\Users\demo\workspace\alpha"),
-            "alpha"
-        );
-        assert_eq!(
-            extract_project_name(r"C:\Users\demo\workspace\beta\"),
-            "beta"
-        );
-        assert_eq!(
-            extract_project_name(r"C:/Users/demo/workspace/gamma"),
-            "gamma"
-        );
+        assert_eq!(extract_project_name(r"C:\Users\demo\workspace\alpha"), "alpha");
+        assert_eq!(extract_project_name(r"C:\Users\demo\workspace\beta\"), "beta");
+        assert_eq!(extract_project_name(r"C:/Users/demo/workspace/gamma"), "gamma");
         assert_eq!(extract_project_name(""), "unknown");
     }
 }

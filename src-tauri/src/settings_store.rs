@@ -30,20 +30,14 @@ fn set_at_path(root: &mut Value, path: &[&str], value: Value) -> Result<(), Stri
         if !current.is_object() {
             *current = Value::Object(Map::new());
         }
-        let object = current
-            .as_object_mut()
-            .ok_or("Unified config node is not an object".to_string())?;
-        current = object
-            .entry((*segment).to_string())
-            .or_insert_with(|| Value::Object(Map::new()));
+        let object = current.as_object_mut().ok_or("Unified config node is not an object".to_string())?;
+        current = object.entry((*segment).to_string()).or_insert_with(|| Value::Object(Map::new()));
     }
 
     if !current.is_object() {
         *current = Value::Object(Map::new());
     }
-    let object = current
-        .as_object_mut()
-        .ok_or("Unified config node is not an object".to_string())?;
+    let object = current.as_object_mut().ok_or("Unified config node is not an object".to_string())?;
     object.insert(path[path.len() - 1].to_string(), value);
     Ok(())
 }
@@ -54,15 +48,13 @@ pub fn get<T: DeserializeOwned>(key: &str) -> Result<Option<T>, String> {
     let Some(value) = get_at_path(&root, &path).cloned() else {
         return Ok(None);
     };
-    let parsed = serde_json::from_value::<T>(value)
-        .map_err(|e| format!("Failed to deserialize setting '{key}': {e}"))?;
+    let parsed = serde_json::from_value::<T>(value).map_err(|e| format!("Failed to deserialize setting '{key}': {e}"))?;
     Ok(Some(parsed))
 }
 
 pub fn set<T: Serialize>(key: &str, value: &T) -> Result<(), String> {
     let mut root = crate::unified_config::load_root()?;
-    let json = serde_json::to_value(value)
-        .map_err(|e| format!("Failed to serialize setting '{key}': {e}"))?;
+    let json = serde_json::to_value(value).map_err(|e| format!("Failed to serialize setting '{key}': {e}"))?;
     let path = key_to_path(key);
     set_at_path(&mut root, &path, json)?;
     crate::unified_config::save_root(&root)

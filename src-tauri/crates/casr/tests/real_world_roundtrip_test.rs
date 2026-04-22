@@ -43,89 +43,48 @@ fn fixtures_dir() -> PathBuf {
 }
 
 fn read_cc_real_fixture() -> CanonicalSession {
-    ClaudeCode
-        .read_session(&fixtures_dir().join("cc_real_world_sanitized.jsonl"))
-        .expect("cc real fixture should parse")
+    ClaudeCode.read_session(&fixtures_dir().join("cc_real_world_sanitized.jsonl")).expect("cc real fixture should parse")
 }
 
 fn read_codex_real_fixture() -> CanonicalSession {
-    Codex
-        .read_session(&fixtures_dir().join("codex_real_world_sanitized.jsonl"))
-        .expect("codex real fixture should parse")
+    Codex.read_session(&fixtures_dir().join("codex_real_world_sanitized.jsonl")).expect("codex real fixture should parse")
 }
 
 fn read_gemini_real_fixture() -> CanonicalSession {
-    Gemini
-        .read_session(&fixtures_dir().join("gemini_real_world_sanitized.json"))
-        .expect("gemini real fixture should parse")
+    Gemini.read_session(&fixtures_dir().join("gemini_real_world_sanitized.json")).expect("gemini real fixture should parse")
 }
 
 fn write_then_read(provider: &dyn Provider, session: &CanonicalSession) -> CanonicalSession {
-    let written = provider
-        .write_session(session, &WriteOptions { force: false })
-        .unwrap_or_else(|e| panic!("{} write failed: {e}", provider.slug()));
-    provider
-        .read_session(&written.paths[0])
-        .unwrap_or_else(|e| panic!("{} read-back failed: {e}", provider.slug()))
+    let written = provider.write_session(session, &WriteOptions { force: false }).unwrap_or_else(|e| panic!("{} write failed: {e}", provider.slug()));
+    provider.read_session(&written.paths[0]).unwrap_or_else(|e| panic!("{} read-back failed: {e}", provider.slug()))
 }
 
 fn assert_fixture_is_non_trivial(session: &CanonicalSession, label: &str) {
-    assert!(
-        session.messages.len() >= 8,
-        "[{label}] expected non-trivial fixture (>=8 messages), got {}",
-        session.messages.len()
-    );
-    let tool_calls = session
-        .messages
-        .iter()
-        .map(|m| m.tool_calls.len())
-        .sum::<usize>();
-    assert!(
-        tool_calls > 0,
-        "[{label}] expected at least one tool call in fixture"
-    );
+    assert!(session.messages.len() >= 8, "[{label}] expected non-trivial fixture (>=8 messages), got {}", session.messages.len());
+    let tool_calls = session.messages.iter().map(|m| m.tool_calls.len()).sum::<usize>();
+    assert!(tool_calls > 0, "[{label}] expected at least one tool call in fixture");
 }
 
 fn collect_lossiness(original: &CanonicalSession, roundtrip: &CanonicalSession) -> Vec<String> {
     let mut losses = Vec::new();
 
     if original.messages.len() != roundtrip.messages.len() {
-        losses.push(format!(
-            "message_count: {} -> {}",
-            original.messages.len(),
-            roundtrip.messages.len()
-        ));
+        losses.push(format!("message_count: {} -> {}", original.messages.len(), roundtrip.messages.len()));
     }
 
-    for (idx, (a, b)) in original
-        .messages
-        .iter()
-        .zip(roundtrip.messages.iter())
-        .enumerate()
-    {
+    for (idx, (a, b)) in original.messages.iter().zip(roundtrip.messages.iter()).enumerate() {
         if a.role != b.role {
             losses.push(format!("msg[{idx}] role: {:?} -> {:?}", a.role, b.role));
         }
         if a.content != b.content {
-            losses.push(format!(
-                "msg[{idx}] content: '{}' -> '{}'",
-                truncate_for_diff(&a.content),
-                truncate_for_diff(&b.content)
-            ));
+            losses.push(format!("msg[{idx}] content: '{}' -> '{}'", truncate_for_diff(&a.content), truncate_for_diff(&b.content)));
         }
         if a.tool_calls.len() != b.tool_calls.len() {
-            losses.push(format!(
-                "msg[{idx}] tool_calls.len: {} -> {}",
-                a.tool_calls.len(),
-                b.tool_calls.len()
-            ));
+            losses.push(format!("msg[{idx}] tool_calls.len: {} -> {}", a.tool_calls.len(), b.tool_calls.len()));
         } else {
             for (call_idx, (ca, cb)) in a.tool_calls.iter().zip(b.tool_calls.iter()).enumerate() {
                 if ca.name != cb.name {
-                    losses.push(format!(
-                        "msg[{idx}] tool_call[{call_idx}] name: '{}' -> '{}'",
-                        ca.name, cb.name
-                    ));
+                    losses.push(format!("msg[{idx}] tool_call[{call_idx}] name: '{}' -> '{}'", ca.name, cb.name));
                 }
                 if ca.arguments != cb.arguments {
                     losses.push(format!("msg[{idx}] tool_call[{call_idx}] args changed"));
@@ -134,26 +93,14 @@ fn collect_lossiness(original: &CanonicalSession, roundtrip: &CanonicalSession) 
         }
 
         if a.tool_results.len() != b.tool_results.len() {
-            losses.push(format!(
-                "msg[{idx}] tool_results.len: {} -> {}",
-                a.tool_results.len(),
-                b.tool_results.len()
-            ));
+            losses.push(format!("msg[{idx}] tool_results.len: {} -> {}", a.tool_results.len(), b.tool_results.len()));
         } else {
-            for (res_idx, (ra, rb)) in a.tool_results.iter().zip(b.tool_results.iter()).enumerate()
-            {
+            for (res_idx, (ra, rb)) in a.tool_results.iter().zip(b.tool_results.iter()).enumerate() {
                 if ra.content != rb.content {
-                    losses.push(format!(
-                        "msg[{idx}] tool_result[{res_idx}] content: '{}' -> '{}'",
-                        truncate_for_diff(&ra.content),
-                        truncate_for_diff(&rb.content)
-                    ));
+                    losses.push(format!("msg[{idx}] tool_result[{res_idx}] content: '{}' -> '{}'", truncate_for_diff(&ra.content), truncate_for_diff(&rb.content)));
                 }
                 if ra.is_error != rb.is_error {
-                    losses.push(format!(
-                        "msg[{idx}] tool_result[{res_idx}] is_error: {} -> {}",
-                        ra.is_error, rb.is_error
-                    ));
+                    losses.push(format!("msg[{idx}] tool_result[{res_idx}] is_error: {} -> {}", ra.is_error, rb.is_error));
                 }
             }
         }
@@ -171,46 +118,20 @@ fn truncate_for_diff(text: &str) -> String {
     compact.chars().take(MAX_CHARS).collect::<String>() + "..."
 }
 
-fn assert_roundtrip_lossless(
-    original: &CanonicalSession,
-    roundtrip: &CanonicalSession,
-    label: &str,
-) {
+fn assert_roundtrip_lossless(original: &CanonicalSession, roundtrip: &CanonicalSession, label: &str) {
     let losses = collect_lossiness(original, roundtrip);
-    assert!(
-        losses.is_empty(),
-        "[{label}] lossy round-trip detected:\n{}",
-        losses.join("\n")
-    );
+    assert!(losses.is_empty(), "[{label}] lossy round-trip detected:\n{}", losses.join("\n"));
 }
 
 #[test]
 fn real_world_fixture_files_are_redacted() {
-    let redaction_patterns = [
-        "AGENTS.md",
-        "/home/ubuntu",
-        ".ssh/",
-        "contabo",
-        "ovh",
-        "BEGIN RSA PRIVATE KEY",
-        "OPENAI_API_KEY",
-    ];
+    let redaction_patterns = ["AGENTS.md", "/home/ubuntu", ".ssh/", "contabo", "ovh", "BEGIN RSA PRIVATE KEY", "OPENAI_API_KEY"];
 
-    for name in [
-        "cc_real_world_sanitized.jsonl",
-        "codex_real_world_sanitized.jsonl",
-        "gemini_real_world_sanitized.json",
-    ] {
+    for name in ["cc_real_world_sanitized.jsonl", "codex_real_world_sanitized.jsonl", "gemini_real_world_sanitized.json"] {
         let path = fixtures_dir().join(name);
-        let content = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("read {} failed: {e}", path.display()));
+        let content = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {} failed: {e}", path.display()));
         for pat in redaction_patterns {
-            assert!(
-                !content.contains(pat),
-                "fixture {} still contains sensitive marker '{}'",
-                name,
-                pat
-            );
+            assert!(!content.contains(pat), "fixture {} still contains sensitive marker '{}'", name, pat);
         }
     }
 }

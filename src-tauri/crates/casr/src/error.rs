@@ -24,31 +24,19 @@ pub struct Candidate {
 #[derive(Debug, thiserror::Error)]
 pub enum CasrError {
     /// Session ID not found in any installed provider.
-    #[error(
-        "Session '{session_id}' not found. Checked: {providers_checked:?} ({sessions_scanned} sessions scanned). Run 'casr list' to see all sessions."
-    )]
-    SessionNotFound {
-        session_id: String,
-        providers_checked: Vec<String>,
-        sessions_scanned: usize,
-    },
+    #[error("Session '{session_id}' not found. Checked: {providers_checked:?} ({sessions_scanned} sessions scanned). Run 'casr list' to see all sessions.")]
+    SessionNotFound { session_id: String, providers_checked: Vec<String>, sessions_scanned: usize },
 
     /// Session ID matched in multiple providers — user must disambiguate.
     #[error(
         "Session '{session_id}' found in multiple providers: {}. Use --source <alias> to choose.",
         candidates.iter().map(|c| c.provider.as_str()).collect::<Vec<_>>().join(", ")
     )]
-    AmbiguousSessionId {
-        session_id: String,
-        candidates: Vec<Candidate>,
-    },
+    AmbiguousSessionId { session_id: String, candidates: Vec<Candidate> },
 
     /// Unknown provider alias in CLI input.
     #[error("Unknown provider alias '{alias}'. Known aliases: {}", known_aliases.join(", "))]
-    UnknownProviderAlias {
-        alias: String,
-        known_aliases: Vec<String>,
-    },
+    UnknownProviderAlias { alias: String, known_aliases: Vec<String> },
 
     /// Provider cannot perform the requested operation.
     ///
@@ -57,58 +45,33 @@ pub enum CasrError {
     /// `resume` (the target must be launchable); reads/writes may still work
     /// if roots exist.
     #[error("{provider}: {reason}")]
-    ProviderUnavailable {
-        provider: String,
-        reason: String,
-        evidence: Vec<String>,
-    },
+    ProviderUnavailable { provider: String, reason: String, evidence: Vec<String> },
 
     /// Failed to parse a session from its native format.
     #[error("Failed to read {provider} session at {}: {detail}", path.display())]
-    SessionReadError {
-        path: PathBuf,
-        provider: String,
-        detail: String,
-    },
+    SessionReadError { path: PathBuf, provider: String, detail: String },
 
     /// Failed to write a converted session to disk.
     #[error("Failed to write {provider} session to {}: {detail}", path.display())]
-    SessionWriteError {
-        path: PathBuf,
-        provider: String,
-        detail: String,
-    },
+    SessionWriteError { path: PathBuf, provider: String, detail: String },
 
     /// Target session file already exists and `--force` was not supplied.
     #[error(
         "Session already exists at {}. Use --force to overwrite (creates .bak backup).",
         existing_path.display()
     )]
-    SessionConflict {
-        session_id: String,
-        existing_path: PathBuf,
-    },
+    SessionConflict { session_id: String, existing_path: PathBuf },
 
     /// Canonical session failed validation checks.
     ///
     /// `errors` are fatal (pipeline stops); `warnings` and `info` are
     /// surfaced in UX/JSON output but don't block conversion.
     #[error("Session validation failed: {}", errors.join("; "))]
-    ValidationError {
-        errors: Vec<String>,
-        warnings: Vec<String>,
-        info: Vec<String>,
-    },
+    ValidationError { errors: Vec<String>, warnings: Vec<String>, info: Vec<String> },
 
     /// Read-back verification failed after writing — this is a casr bug.
-    #[error(
-        "Written file(s) could not be read back ({provider}). This is a bug in casr. Detail: {detail}"
-    )]
-    VerifyFailed {
-        provider: String,
-        written_paths: Vec<PathBuf>,
-        detail: String,
-    },
+    #[error("Written file(s) could not be read back ({provider}). This is a bug in casr. Detail: {detail}")]
+    VerifyFailed { provider: String, written_paths: Vec<PathBuf>, detail: String },
 }
 
 #[cfg(test)]
@@ -117,11 +80,7 @@ mod tests {
 
     #[test]
     fn session_not_found_display() {
-        let err = CasrError::SessionNotFound {
-            session_id: "abc-123".to_string(),
-            providers_checked: vec!["claude-code".to_string(), "codex".to_string()],
-            sessions_scanned: 42,
-        };
+        let err = CasrError::SessionNotFound { session_id: "abc-123".to_string(), providers_checked: vec!["claude-code".to_string(), "codex".to_string()], sessions_scanned: 42 };
         let msg = err.to_string();
         assert!(msg.contains("abc-123"), "should contain session id");
         assert!(msg.contains("42 sessions scanned"), "should contain count");
@@ -130,19 +89,8 @@ mod tests {
 
     #[test]
     fn ambiguous_session_id_display() {
-        let err = CasrError::AmbiguousSessionId {
-            session_id: "shared-id".to_string(),
-            candidates: vec![
-                Candidate {
-                    provider: "claude-code".to_string(),
-                    path: PathBuf::from("/home/.claude/session.jsonl"),
-                },
-                Candidate {
-                    provider: "codex".to_string(),
-                    path: PathBuf::from("/home/.codex/session.jsonl"),
-                },
-            ],
-        };
+        let err =
+            CasrError::AmbiguousSessionId { session_id: "shared-id".to_string(), candidates: vec![Candidate { provider: "claude-code".to_string(), path: PathBuf::from("/home/.claude/session.jsonl") }, Candidate { provider: "codex".to_string(), path: PathBuf::from("/home/.codex/session.jsonl") }] };
         let msg = err.to_string();
         assert!(msg.contains("shared-id"));
         assert!(msg.contains("claude-code"));
@@ -152,10 +100,7 @@ mod tests {
 
     #[test]
     fn unknown_provider_alias_display() {
-        let err = CasrError::UnknownProviderAlias {
-            alias: "xyz".to_string(),
-            known_aliases: vec!["cc".to_string(), "cod".to_string(), "gmi".to_string()],
-        };
+        let err = CasrError::UnknownProviderAlias { alias: "xyz".to_string(), known_aliases: vec!["cc".to_string(), "cod".to_string(), "gmi".to_string()] };
         let msg = err.to_string();
         assert!(msg.contains("xyz"));
         assert!(msg.contains("cc"));
@@ -165,11 +110,7 @@ mod tests {
 
     #[test]
     fn provider_unavailable_display() {
-        let err = CasrError::ProviderUnavailable {
-            provider: "gemini".to_string(),
-            reason: "binary not found in PATH".to_string(),
-            evidence: vec!["which gemini: not found".to_string()],
-        };
+        let err = CasrError::ProviderUnavailable { provider: "gemini".to_string(), reason: "binary not found in PATH".to_string(), evidence: vec!["which gemini: not found".to_string()] };
         let msg = err.to_string();
         assert!(msg.contains("gemini"));
         assert!(msg.contains("binary not found"));
@@ -177,11 +118,7 @@ mod tests {
 
     #[test]
     fn session_read_error_display() {
-        let err = CasrError::SessionReadError {
-            path: PathBuf::from("/home/.codex/session.jsonl"),
-            provider: "codex".to_string(),
-            detail: "invalid JSON at line 5".to_string(),
-        };
+        let err = CasrError::SessionReadError { path: PathBuf::from("/home/.codex/session.jsonl"), provider: "codex".to_string(), detail: "invalid JSON at line 5".to_string() };
         let msg = err.to_string();
         assert!(msg.contains("codex"));
         assert!(msg.contains("session.jsonl"));
@@ -190,11 +127,7 @@ mod tests {
 
     #[test]
     fn session_write_error_display() {
-        let err = CasrError::SessionWriteError {
-            path: PathBuf::from("/home/.claude/output.jsonl"),
-            provider: "claude-code".to_string(),
-            detail: "permission denied".to_string(),
-        };
+        let err = CasrError::SessionWriteError { path: PathBuf::from("/home/.claude/output.jsonl"), provider: "claude-code".to_string(), detail: "permission denied".to_string() };
         let msg = err.to_string();
         assert!(msg.contains("claude-code"));
         assert!(msg.contains("output.jsonl"));
@@ -203,10 +136,7 @@ mod tests {
 
     #[test]
     fn session_conflict_display() {
-        let err = CasrError::SessionConflict {
-            session_id: "existing-id".to_string(),
-            existing_path: PathBuf::from("/home/.claude/existing.jsonl"),
-        };
+        let err = CasrError::SessionConflict { session_id: "existing-id".to_string(), existing_path: PathBuf::from("/home/.claude/existing.jsonl") };
         let msg = err.to_string();
         assert!(msg.contains("existing.jsonl"));
         assert!(msg.contains("--force"));
@@ -215,28 +145,17 @@ mod tests {
 
     #[test]
     fn validation_error_display() {
-        let err = CasrError::ValidationError {
-            errors: vec!["no messages".to_string(), "missing user role".to_string()],
-            warnings: vec!["missing workspace".to_string()],
-            info: vec!["tool calls present".to_string()],
-        };
+        let err = CasrError::ValidationError { errors: vec!["no messages".to_string(), "missing user role".to_string()], warnings: vec!["missing workspace".to_string()], info: vec!["tool calls present".to_string()] };
         let msg = err.to_string();
         assert!(msg.contains("no messages"));
         assert!(msg.contains("missing user role"));
         // Warnings and info are not in the Display output, only errors.
-        assert!(
-            !msg.contains("missing workspace"),
-            "Display should only show errors, not warnings"
-        );
+        assert!(!msg.contains("missing workspace"), "Display should only show errors, not warnings");
     }
 
     #[test]
     fn verify_failed_display() {
-        let err = CasrError::VerifyFailed {
-            provider: "gemini".to_string(),
-            written_paths: vec![PathBuf::from("/tmp/session.json")],
-            detail: "message count mismatch: expected 10, got 8".to_string(),
-        };
+        let err = CasrError::VerifyFailed { provider: "gemini".to_string(), written_paths: vec![PathBuf::from("/tmp/session.json")], detail: "message count mismatch: expected 10, got 8".to_string() };
         let msg = err.to_string();
         assert!(msg.contains("gemini"));
         assert!(msg.contains("bug in casr"));

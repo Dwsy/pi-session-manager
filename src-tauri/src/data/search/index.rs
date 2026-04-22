@@ -69,34 +69,21 @@ pub fn extract_search_segments(entry: &Value, options: SearchIndexOptions) -> Ve
 
     let mut segments = Vec::new();
     if !visible_parts.is_empty() {
-        segments.push(SearchSegment {
-            source,
-            text: visible_parts.join("\n"),
-        });
+        segments.push(SearchSegment { source, text: visible_parts.join("\n") });
     }
     if options.include_thinking && !thinking_parts.is_empty() {
-        segments.push(SearchSegment {
-            source: SearchSegmentSource::Thinking,
-            text: thinking_parts.join("\n"),
-        });
+        segments.push(SearchSegment { source: SearchSegmentSource::Thinking, text: thinking_parts.join("\n") });
     }
 
     segments
 }
 
 pub fn extract_message_contents(entry: &Value, include_thinking: bool) -> Vec<(String, String)> {
-    extract_search_segments(entry, SearchIndexOptions { include_thinking })
-        .into_iter()
-        .map(|segment| (segment.source.as_str().to_string(), segment.text))
-        .collect()
+    extract_search_segments(entry, SearchIndexOptions { include_thinking }).into_iter().map(|segment| (segment.source.as_str().to_string(), segment.text)).collect()
 }
 
 pub fn extract_primary_message_text(entry: &Value) -> String {
-    extract_search_segments(entry, SearchIndexOptions::default())
-        .into_iter()
-        .find(|segment| segment.source != SearchSegmentSource::Thinking)
-        .map(|segment| segment.text)
-        .unwrap_or_default()
+    extract_search_segments(entry, SearchIndexOptions::default()).into_iter().find(|segment| segment.source != SearchSegmentSource::Thinking).map(|segment| segment.text).unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -117,22 +104,12 @@ mod tests {
             }
         });
 
-        let without_thinking = extract_search_segments(
-            &entry,
-            SearchIndexOptions {
-                include_thinking: false,
-            },
-        );
+        let without_thinking = extract_search_segments(&entry, SearchIndexOptions { include_thinking: false });
         assert_eq!(without_thinking.len(), 1);
         assert_eq!(without_thinking[0].source, SearchSegmentSource::Assistant);
         assert_eq!(without_thinking[0].text, "visible\nsecond");
 
-        let with_thinking = extract_search_segments(
-            &entry,
-            SearchIndexOptions {
-                include_thinking: true,
-            },
-        );
+        let with_thinking = extract_search_segments(&entry, SearchIndexOptions { include_thinking: true });
         assert_eq!(with_thinking.len(), 2);
         assert_eq!(with_thinking[1].source, SearchSegmentSource::Thinking);
         assert_eq!(with_thinking[1].text, "hidden");

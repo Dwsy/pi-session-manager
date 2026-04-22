@@ -39,15 +39,7 @@ pub fn resolve_launch_cwd(cwd: &str, session_path: &str) -> String {
         }
     }
 
-    std::env::current_dir()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| {
-            if cfg!(target_os = "windows") {
-                "C:\\".to_string()
-            } else {
-                "/".to_string()
-            }
-        })
+    std::env::current_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| if cfg!(target_os = "windows") { "C:\\".to_string() } else { "/".to_string() })
 }
 
 /// Check if a command exists in PATH
@@ -73,8 +65,7 @@ pub fn command_exists(executable: &str) -> bool {
         if has_ext {
             candidates.push(executable.to_string());
         } else {
-            let path_ext =
-                std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_string());
+            let path_ext = std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_string());
             for ext in path_ext.split(';').filter(|ext| !ext.trim().is_empty()) {
                 candidates.push(format!("{executable}{ext}"));
             }

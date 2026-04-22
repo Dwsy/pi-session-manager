@@ -38,16 +38,10 @@ impl SourceHint {
     /// Heuristic: if the value contains a path separator or starts with `.`/`~`/`/`,
     /// treat it as a path. Otherwise, treat it as a provider alias.
     pub fn parse(value: &str) -> Self {
-        if value.contains(std::path::MAIN_SEPARATOR)
-            || value.starts_with('.')
-            || value.starts_with('~')
-            || value.starts_with('/')
-        {
+        if value.contains(std::path::MAIN_SEPARATOR) || value.starts_with('.') || value.starts_with('~') || value.starts_with('/') {
             // Expand leading `~/` to the user's home directory.
             let expanded = if let Some(rest) = value.strip_prefix("~/") {
-                dirs::home_dir()
-                    .map(|h| h.join(rest))
-                    .unwrap_or_else(|| PathBuf::from(value))
+                dirs::home_dir().map(|h| h.join(rest)).unwrap_or_else(|| PathBuf::from(value))
             } else if value == "~" {
                 dirs::home_dir().unwrap_or_else(|| PathBuf::from(value))
             } else {
@@ -74,10 +68,7 @@ pub struct ResolvedSession<'a> {
 
 impl std::fmt::Debug for ResolvedSession<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ResolvedSession")
-            .field("provider", &self.provider.slug())
-            .field("path", &self.path)
-            .finish()
+        f.debug_struct("ResolvedSession").field("provider", &self.provider.slug()).field("path", &self.path).finish()
     }
 }
 
@@ -122,11 +113,7 @@ impl ProviderRegistry {
             .iter()
             .map(|p| {
                 let result = p.detect();
-                debug!(
-                    provider = p.name(),
-                    installed = result.installed,
-                    "provider detection"
-                );
+                debug!(provider = p.name(), installed = result.installed, "provider detection");
                 (p.as_ref(), result)
             })
             .collect()
@@ -134,11 +121,7 @@ impl ProviderRegistry {
 
     /// Return only providers that are currently installed.
     pub fn installed_providers(&self) -> Vec<&dyn Provider> {
-        self.providers
-            .iter()
-            .filter(|p| p.detect().installed)
-            .map(|p| p.as_ref())
-            .collect()
+        self.providers.iter().filter(|p| p.detect().installed).map(|p| p.as_ref()).collect()
     }
 
     /// Return all registered providers regardless of installation status.
@@ -148,10 +131,7 @@ impl ProviderRegistry {
 
     /// Find a provider by its slug (e.g. `"claude-code"`).
     pub fn find_by_slug(&self, slug: &str) -> Option<&dyn Provider> {
-        self.providers
-            .iter()
-            .find(|p| p.slug() == slug)
-            .map(|p| p.as_ref())
+        self.providers.iter().find(|p| p.slug() == slug).map(|p| p.as_ref())
     }
 
     /// Find a provider by its CLI alias (e.g. `"cc"`) or slug.
@@ -163,10 +143,7 @@ impl ProviderRegistry {
             .find(|p| {
                 let alias_token = normalize_provider_token(p.cli_alias());
                 let slug_token = normalize_provider_token(p.slug());
-                alias_token == canonical
-                    || slug_token == canonical
-                    || alias_token == normalized
-                    || slug_token == normalized
+                alias_token == canonical || slug_token == canonical || alias_token == normalized || slug_token == normalized
             })
             .map(|p| p.as_ref())
     }
@@ -186,11 +163,7 @@ impl ProviderRegistry {
     /// 4. Exactly one match → return it.
     /// 5. Multiple matches → [`CasrError::AmbiguousSessionId`].
     /// 6. No matches → [`CasrError::SessionNotFound`] with diagnostics.
-    pub fn resolve_session(
-        &self,
-        session_id: &str,
-        source_hint: Option<&SourceHint>,
-    ) -> Result<ResolvedSession<'_>, CasrError> {
+    pub fn resolve_session(&self, session_id: &str, source_hint: Option<&SourceHint>) -> Result<ResolvedSession<'_>, CasrError> {
         match source_hint {
             Some(SourceHint::Path(path)) => self.resolve_from_path(session_id, path),
             Some(SourceHint::Alias(alias)) => self.resolve_with_alias(session_id, alias),
@@ -202,11 +175,7 @@ impl ProviderRegistry {
     ///
     /// Identifies the owning provider by checking which provider's session roots
     /// contain the path. Falls back to file extension heuristics.
-    fn resolve_from_path(
-        &self,
-        session_id: &str,
-        path: &Path,
-    ) -> Result<ResolvedSession<'_>, CasrError> {
+    fn resolve_from_path(&self, session_id: &str, path: &Path) -> Result<ResolvedSession<'_>, CasrError> {
         debug!(path = %path.display(), "resolving session from explicit path");
 
         // Some providers use "virtual" session paths that are not real files, e.g.
@@ -214,11 +183,7 @@ impl ProviderRegistry {
         let parent_is_file = path.parent().is_some_and(|p| p.is_file());
 
         if !path.is_file() && !parent_is_file {
-            return Err(CasrError::SessionNotFound {
-                session_id: session_id.to_string(),
-                providers_checked: vec!["(direct path)".to_string()],
-                sessions_scanned: 0,
-            });
+            return Err(CasrError::SessionNotFound { session_id: session_id.to_string(), providers_checked: vec!["(direct path)".to_string()], sessions_scanned: 0 });
         }
 
         // Try to identify the owning provider by checking session roots.
@@ -230,10 +195,7 @@ impl ProviderRegistry {
                         path = %path.display(),
                         "resolved session from explicit path"
                     );
-                    return Ok(ResolvedSession {
-                        provider: provider.as_ref(),
-                        path: path.to_path_buf(),
-                    });
+                    return Ok(ResolvedSession { provider: provider.as_ref(), path: path.to_path_buf() });
                 }
             }
         }
@@ -249,10 +211,7 @@ impl ProviderRegistry {
                 path = %path.display(),
                 "resolved session from explicit path via file signature"
             );
-            return Ok(ResolvedSession {
-                provider,
-                path: path.to_path_buf(),
-            });
+            return Ok(ResolvedSession { provider, path: path.to_path_buf() });
         }
 
         let mut best: Option<(&dyn Provider, usize, bool)> = None;
@@ -271,10 +230,7 @@ impl ProviderRegistry {
 
             let plausible = is_plausible_session(&session);
 
-            let is_better = best.is_none_or(|(best_provider, best_len, best_plausible)| {
-                (plausible, session.messages.len(), provider.slug())
-                    > (best_plausible, best_len, best_provider.slug())
-            });
+            let is_better = best.is_none_or(|(best_provider, best_len, best_plausible)| (plausible, session.messages.len(), provider.slug()) > (best_plausible, best_len, best_provider.slug()));
 
             if is_better {
                 best = Some((provider.as_ref(), session.messages.len(), plausible));
@@ -295,38 +251,17 @@ impl ProviderRegistry {
                     "resolved session from explicit path via provider probing"
                 );
             }
-            return Ok(ResolvedSession {
-                provider,
-                path: path.to_path_buf(),
-            });
+            return Ok(ResolvedSession { provider, path: path.to_path_buf() });
         }
 
-        Err(CasrError::SessionReadError {
-            path: path.to_path_buf(),
-            provider: "(unknown)".to_string(),
-            detail: format!(
-                "Path is not under any provider root and could not be parsed as a session by any provider. Tried: {providers_tried:?}"
-            ),
-        })
+        Err(CasrError::SessionReadError { path: path.to_path_buf(), provider: "(unknown)".to_string(), detail: format!("Path is not under any provider root and could not be parsed as a session by any provider. Tried: {providers_tried:?}") })
     }
 
     /// Resolve by alias hint — only search the specified provider.
-    fn resolve_with_alias(
-        &self,
-        session_id: &str,
-        alias: &str,
-    ) -> Result<ResolvedSession<'_>, CasrError> {
-        debug!(
-            alias,
-            session_id, "resolving session with source alias hint"
-        );
+    fn resolve_with_alias(&self, session_id: &str, alias: &str) -> Result<ResolvedSession<'_>, CasrError> {
+        debug!(alias, session_id, "resolving session with source alias hint");
 
-        let provider =
-            self.find_by_alias(alias)
-                .ok_or_else(|| CasrError::UnknownProviderAlias {
-                    alias: alias.to_string(),
-                    known_aliases: self.known_aliases(),
-                })?;
+        let provider = self.find_by_alias(alias).ok_or_else(|| CasrError::UnknownProviderAlias { alias: alias.to_string(), known_aliases: self.known_aliases() })?;
 
         match provider.owns_session(session_id) {
             Some(path) => {
@@ -339,21 +274,9 @@ impl ProviderRegistry {
                 Ok(ResolvedSession { provider, path })
             }
             None => {
-                let roots: Vec<String> = provider
-                    .session_roots()
-                    .iter()
-                    .map(|r| r.display().to_string())
-                    .collect();
-                debug!(
-                    provider = provider.name(),
-                    ?roots,
-                    "session not found in hinted provider"
-                );
-                Err(CasrError::SessionNotFound {
-                    session_id: session_id.to_string(),
-                    providers_checked: vec![provider.name().to_string()],
-                    sessions_scanned: 0,
-                })
+                let roots: Vec<String> = provider.session_roots().iter().map(|r| r.display().to_string()).collect();
+                debug!(provider = provider.name(), ?roots, "session not found in hinted provider");
+                Err(CasrError::SessionNotFound { session_id: session_id.to_string(), providers_checked: vec![provider.name().to_string()], sessions_scanned: 0 })
             }
         }
     }
@@ -390,16 +313,8 @@ impl ProviderRegistry {
 
         match matches.len() {
             0 => {
-                debug!(
-                    session_id,
-                    ?providers_checked,
-                    "session not found in any provider"
-                );
-                Err(CasrError::SessionNotFound {
-                    session_id: session_id.to_string(),
-                    providers_checked,
-                    sessions_scanned: 0,
-                })
+                debug!(session_id, ?providers_checked, "session not found in any provider");
+                Err(CasrError::SessionNotFound { session_id: session_id.to_string(), providers_checked, sessions_scanned: 0 })
             }
             1 => {
                 let (provider, path) = matches.into_iter().next().expect("checked len==1");
@@ -412,32 +327,16 @@ impl ProviderRegistry {
                 Ok(ResolvedSession { provider, path })
             }
             _ => {
-                let candidates: Vec<Candidate> = matches
-                    .iter()
-                    .map(|(p, path)| Candidate {
-                        provider: p.slug().to_string(),
-                        path: path.to_path_buf(),
-                    })
-                    .collect();
-                warn!(
-                    session_id,
-                    candidate_count = candidates.len(),
-                    "ambiguous session ID — multiple providers match"
-                );
-                Err(CasrError::AmbiguousSessionId {
-                    session_id: session_id.to_string(),
-                    candidates,
-                })
+                let candidates: Vec<Candidate> = matches.iter().map(|(p, path)| Candidate { provider: p.slug().to_string(), path: path.to_path_buf() }).collect();
+                warn!(session_id, candidate_count = candidates.len(), "ambiguous session ID — multiple providers match");
+                Err(CasrError::AmbiguousSessionId { session_id: session_id.to_string(), candidates })
             }
         }
     }
 
     /// Collect the CLI aliases of all registered providers (for error messages).
     pub fn known_aliases(&self) -> Vec<String> {
-        self.providers
-            .iter()
-            .map(|p| format!("{} ({})", p.cli_alias(), p.name()))
-            .collect()
+        self.providers.iter().map(|p| format!("{} ({})", p.cli_alias(), p.name())).collect()
     }
 }
 
@@ -460,10 +359,7 @@ fn is_plausible_session(session: &CanonicalSession) -> bool {
         return false;
     }
     let has_user = session.messages.iter().any(|m| m.role == MessageRole::User);
-    let has_assistant = session
-        .messages
-        .iter()
-        .any(|m| m.role == MessageRole::Assistant);
+    let has_assistant = session.messages.iter().any(|m| m.role == MessageRole::Assistant);
     has_user && has_assistant
 }
 
@@ -481,8 +377,7 @@ impl ProviderRegistry {
                     if trimmed.is_empty() {
                         continue;
                     }
-                    let Ok(value): Result<serde_json::Value, _> = serde_json::from_str(trimmed)
-                    else {
+                    let Ok(value): Result<serde_json::Value, _> = serde_json::from_str(trimmed) else {
                         continue;
                     };
                     lines_checked += 1;
@@ -495,21 +390,15 @@ impl ProviderRegistry {
                         return self.find_by_slug("factory");
                     }
                     // OpenClaw: type:"session" with version field.
-                    if value.get("type").and_then(|v| v.as_str()) == Some("session")
-                        && value.get("version").is_some()
-                    {
+                    if value.get("type").and_then(|v| v.as_str()) == Some("session") && value.get("version").is_some() {
                         return self.find_by_slug("openclaw");
                     }
                     // Pi-Agent: type:"session" with provider/modelId fields.
-                    if value.get("type").and_then(|v| v.as_str()) == Some("session")
-                        && (value.get("provider").is_some() || value.get("modelId").is_some())
-                    {
+                    if value.get("type").and_then(|v| v.as_str()) == Some("session") && (value.get("provider").is_some() || value.get("modelId").is_some()) {
                         return self.find_by_slug("pi-agent");
                     }
                     // OpenClaw/Pi-Agent: type:"message" with nested "message" object.
-                    if value.get("type").and_then(|v| v.as_str()) == Some("message")
-                        && value.get("message").is_some()
-                    {
+                    if value.get("type").and_then(|v| v.as_str()) == Some("message") && value.get("message").is_some() {
                         // Disambiguate by filename pattern: Pi-Agent uses underscore.
                         let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
                         if stem.contains('_') {
@@ -517,17 +406,11 @@ impl ProviderRegistry {
                         }
                         return self.find_by_slug("openclaw");
                     }
-                    if value.get("sessionId").is_some()
-                        && value.get("uuid").is_some()
-                        && value.get("cwd").is_some()
-                    {
+                    if value.get("sessionId").is_some() && value.get("uuid").is_some() && value.get("cwd").is_some() {
                         return self.find_by_slug("claude-code");
                     }
                     // ClawdBot: bare JSONL messages with role+content, no type field.
-                    if value.get("role").is_some()
-                        && value.get("content").is_some()
-                        && value.get("type").is_none()
-                    {
+                    if value.get("role").is_some() && value.get("content").is_some() && value.get("type").is_none() {
                         return self.find_by_slug("clawdbot");
                     }
 
@@ -546,9 +429,7 @@ impl ProviderRegistry {
                 }
 
                 // ChatGPT mapping-based conversation format.
-                if value.get("mapping").is_some()
-                    && (value.get("id").is_some() || value.get("conversation_id").is_some())
-                {
+                if value.get("mapping").is_some() && (value.get("id").is_some() || value.get("conversation_id").is_some()) {
                     return self.find_by_slug("chatgpt");
                 }
 
@@ -638,9 +519,7 @@ pub fn parse_git_marker(path: &Path) -> Option<GitMarker> {
         let gitdir_path = PathBuf::from(gitdir_str);
         let resolved = if gitdir_path.is_relative() {
             // Resolve relative to the directory containing the `.git` file.
-            path.parent()
-                .map(|parent| parent.join(&gitdir_path))
-                .unwrap_or(gitdir_path)
+            path.parent().map(|parent| parent.join(&gitdir_path)).unwrap_or(gitdir_path)
         } else {
             gitdir_path
         };
@@ -657,11 +536,7 @@ pub fn parse_git_marker(path: &Path) -> Option<GitMarker> {
 /// Looks for a `.git` entry (directory or file) in each ancestor directory.
 /// Returns `None` if no `.git` marker is found before reaching the filesystem root.
 pub fn find_git_root(start: &Path) -> Option<PathBuf> {
-    let mut current = if start.is_file() {
-        start.parent()?.to_path_buf()
-    } else {
-        start.to_path_buf()
-    };
+    let mut current = if start.is_file() { start.parent()?.to_path_buf() } else { start.to_path_buf() };
 
     loop {
         let candidate = current.join(".git");
@@ -680,9 +555,7 @@ pub fn find_git_root(start: &Path) -> Option<PathBuf> {
 /// basename of the workspace path itself.
 pub fn repo_name_from_path(workspace: &Path) -> Option<String> {
     let root = find_git_root(workspace).unwrap_or_else(|| workspace.to_path_buf());
-    root.file_name()
-        .and_then(|n| n.to_str())
-        .map(|s| s.to_string())
+    root.file_name().and_then(|n| n.to_str()).map(|s| s.to_string())
 }
 
 #[cfg(test)]
@@ -693,31 +566,11 @@ mod tests {
     use std::path::PathBuf;
 
     fn msg(idx: usize, role: MessageRole) -> CanonicalMessage {
-        CanonicalMessage {
-            idx,
-            role,
-            content: "x".to_string(),
-            timestamp: None,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: serde_json::Value::Null,
-        }
+        CanonicalMessage { idx, role, content: "x".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null }
     }
 
     fn session_with_messages(messages: Vec<CanonicalMessage>) -> CanonicalSession {
-        CanonicalSession {
-            session_id: "sid".to_string(),
-            provider_slug: "test".to_string(),
-            workspace: None,
-            title: None,
-            started_at: None,
-            ended_at: None,
-            messages,
-            metadata: serde_json::Value::Null,
-            source_path: PathBuf::from("/tmp/source"),
-            model_name: None,
-        }
+        CanonicalSession { session_id: "sid".to_string(), provider_slug: "test".to_string(), workspace: None, title: None, started_at: None, ended_at: None, messages, metadata: serde_json::Value::Null, source_path: PathBuf::from("/tmp/source"), model_name: None }
     }
 
     #[test]
@@ -741,9 +594,7 @@ mod tests {
         let hint = SourceHint::parse("~/x.jsonl");
         match hint {
             SourceHint::Path(p) => {
-                let expected = dirs::home_dir()
-                    .map(|h| h.join("x.jsonl"))
-                    .unwrap_or_else(|| PathBuf::from("~/x.jsonl"));
+                let expected = dirs::home_dir().map(|h| h.join("x.jsonl")).unwrap_or_else(|| PathBuf::from("~/x.jsonl"));
                 assert_eq!(p, expected);
             }
             other => panic!("expected Path, got {other:?}"),
@@ -753,25 +604,14 @@ mod tests {
     #[test]
     fn plausible_session_requires_user_and_assistant() {
         assert!(!is_plausible_session(&session_with_messages(vec![])));
-        assert!(!is_plausible_session(&session_with_messages(vec![msg(
-            0,
-            MessageRole::User,
-        )])));
-        assert!(!is_plausible_session(&session_with_messages(vec![msg(
-            0,
-            MessageRole::Assistant,
-        )])));
-        assert!(is_plausible_session(&session_with_messages(vec![
-            msg(0, MessageRole::User),
-            msg(1, MessageRole::Assistant),
-        ])));
+        assert!(!is_plausible_session(&session_with_messages(vec![msg(0, MessageRole::User,)])));
+        assert!(!is_plausible_session(&session_with_messages(vec![msg(0, MessageRole::Assistant,)])));
+        assert!(is_plausible_session(&session_with_messages(vec![msg(0, MessageRole::User), msg(1, MessageRole::Assistant),])));
     }
 
     fn infer_slug_for_file(path: &std::path::Path) -> Option<String> {
         let registry = ProviderRegistry::default_registry();
-        registry
-            .infer_provider_for_path(path)
-            .map(|p| p.slug().to_string())
+        registry.infer_provider_for_path(path).map(|p| p.slug().to_string())
     }
 
     #[test]
@@ -783,8 +623,7 @@ mod tests {
     #[test]
     fn infer_provider_for_path_json_gemini() {
         let mut tmp = tempfile::NamedTempFile::with_suffix(".json").expect("tmp");
-        tmp.write_all(br#"{"sessionId":"s1","messages":[]}"#)
-            .expect("write");
+        tmp.write_all(br#"{"sessionId":"s1","messages":[]}"#).expect("write");
         tmp.flush().expect("flush");
         assert_eq!(infer_slug_for_file(tmp.path()).as_deref(), Some("gemini"));
     }
@@ -792,8 +631,7 @@ mod tests {
     #[test]
     fn infer_provider_for_path_json_chatgpt_mapping() {
         let mut tmp = tempfile::NamedTempFile::with_suffix(".json").expect("tmp");
-        tmp.write_all(br#"{"id":"c1","mapping":{}}"#)
-            .expect("write");
+        tmp.write_all(br#"{"id":"c1","mapping":{}}"#).expect("write");
         tmp.flush().expect("flush");
         assert_eq!(infer_slug_for_file(tmp.path()).as_deref(), Some("chatgpt"));
     }
@@ -809,8 +647,7 @@ mod tests {
     #[test]
     fn infer_provider_for_path_jsonl_codex_session_meta() {
         let mut tmp = tempfile::NamedTempFile::with_suffix(".jsonl").expect("tmp");
-        tmp.write_all(b"\n{\"type\":\"session_meta\"}\n")
-            .expect("write");
+        tmp.write_all(b"\n{\"type\":\"session_meta\"}\n").expect("write");
         tmp.flush().expect("flush");
         assert_eq!(infer_slug_for_file(tmp.path()).as_deref(), Some("codex"));
     }
@@ -818,22 +655,15 @@ mod tests {
     #[test]
     fn infer_provider_for_path_jsonl_claude_code() {
         let mut tmp = tempfile::NamedTempFile::with_suffix(".jsonl").expect("tmp");
-        tmp.write_all(
-            br#"{"sessionId":"s1","uuid":"u1","cwd":"/tmp","type":"user","message":{"role":"user","content":"hi"}}"#,
-        )
-        .expect("write");
+        tmp.write_all(br#"{"sessionId":"s1","uuid":"u1","cwd":"/tmp","type":"user","message":{"role":"user","content":"hi"}}"#).expect("write");
         tmp.flush().expect("flush");
-        assert_eq!(
-            infer_slug_for_file(tmp.path()).as_deref(),
-            Some("claude-code")
-        );
+        assert_eq!(infer_slug_for_file(tmp.path()).as_deref(), Some("claude-code"));
     }
 
     #[test]
     fn infer_provider_for_path_jsonl_clawdbot_bare_role_content() {
         let mut tmp = tempfile::NamedTempFile::with_suffix(".jsonl").expect("tmp");
-        tmp.write_all(br#"{"role":"user","content":"hi"}"#)
-            .expect("write");
+        tmp.write_all(br#"{"role":"user","content":"hi"}"#).expect("write");
         tmp.flush().expect("flush");
         assert_eq!(infer_slug_for_file(tmp.path()).as_deref(), Some("clawdbot"));
     }
@@ -845,17 +675,11 @@ mod tests {
 
         let openclaw_path = dir.path().join("openclaw.jsonl");
         std::fs::write(&openclaw_path, content).expect("write openclaw");
-        assert_eq!(
-            infer_slug_for_file(&openclaw_path).as_deref(),
-            Some("openclaw")
-        );
+        assert_eq!(infer_slug_for_file(&openclaw_path).as_deref(), Some("openclaw"));
 
         let pi_agent_path = dir.path().join("pi_agent.jsonl");
         std::fs::write(&pi_agent_path, content).expect("write pi_agent");
-        assert_eq!(
-            infer_slug_for_file(&pi_agent_path).as_deref(),
-            Some("pi-agent")
-        );
+        assert_eq!(infer_slug_for_file(&pi_agent_path).as_deref(), Some("pi-agent"));
     }
 
     #[test]
@@ -868,12 +692,7 @@ mod tests {
     fn known_aliases_includes_provider_names() {
         let registry = ProviderRegistry::default_registry();
         let aliases = registry.known_aliases();
-        assert!(
-            aliases
-                .iter()
-                .any(|a| a.contains("cc") && a.contains("Claude Code")),
-            "expected cc alias in known_aliases: {aliases:?}"
-        );
+        assert!(aliases.iter().any(|a| a.contains("cc") && a.contains("Claude Code")), "expected cc alias in known_aliases: {aliases:?}");
     }
 
     // -----------------------------------------------------------------------
@@ -902,11 +721,7 @@ mod tests {
         match result {
             Some(GitMarker::File { gitdir }) => {
                 // Should be resolved relative to the .git file's parent.
-                assert!(
-                    gitdir.ends_with(".git/worktrees/my-branch"),
-                    "gitdir should end with expected path, got: {}",
-                    gitdir.display()
-                );
+                assert!(gitdir.ends_with(".git/worktrees/my-branch"), "gitdir should end with expected path, got: {}", gitdir.display());
             }
             other => panic!("expected GitMarker::File, got {other:?}"),
         }
@@ -969,10 +784,7 @@ mod tests {
         std::fs::write(&git_file, "\n# comment\n# another comment\n\n").expect("write");
 
         let result = parse_git_marker(&git_file);
-        assert_eq!(
-            result, None,
-            "should return None when file has only comments/blanks"
-        );
+        assert_eq!(result, None, "should return None when file has only comments/blanks");
     }
 
     #[test]

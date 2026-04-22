@@ -8,15 +8,7 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Create a test meta.json file
-fn create_meta_json(
-    dir: &PathBuf,
-    run_id: &str,
-    agent: &str,
-    model: &str,
-    cost: f64,
-    input: u64,
-    output: u64,
-) -> PathBuf {
+fn create_meta_json(dir: &PathBuf, run_id: &str, agent: &str, model: &str, cost: f64, input: u64, output: u64) -> PathBuf {
     let file_path = dir.join(format!("{run_id}_{agent}_meta.json"));
     let content = format!(
         r#"{{
@@ -88,51 +80,9 @@ fn test_parse_single_meta_json() {
 #[test]
 fn test_aggregate_multiple_runs() {
     let runs = vec![
-        SubagentRunInfo {
-            run_id: "run1".to_string(),
-            agent: "scout".to_string(),
-            model: "haiku".to_string(),
-            exit_code: 0,
-            cost: 0.01,
-            input_tokens: 1000,
-            output_tokens: 500,
-            cache_read_tokens: 0,
-            cache_write_tokens: 0,
-            duration_ms: 2000,
-            tool_count: 2,
-            timestamp: 1000,
-            turns: 2,
-        },
-        SubagentRunInfo {
-            run_id: "run2".to_string(),
-            agent: "worker".to_string(),
-            model: "sonnet".to_string(),
-            exit_code: 0,
-            cost: 0.05,
-            input_tokens: 5000,
-            output_tokens: 2000,
-            cache_read_tokens: 1000,
-            cache_write_tokens: 500,
-            duration_ms: 10000,
-            tool_count: 8,
-            timestamp: 2000,
-            turns: 3,
-        },
-        SubagentRunInfo {
-            run_id: "run3".to_string(),
-            agent: "worker".to_string(),
-            model: "opus".to_string(),
-            exit_code: 0,
-            cost: 0.15,
-            input_tokens: 10000,
-            output_tokens: 5000,
-            cache_read_tokens: 2000,
-            cache_write_tokens: 1000,
-            duration_ms: 20000,
-            tool_count: 15,
-            timestamp: 3000,
-            turns: 5,
-        },
+        SubagentRunInfo { run_id: "run1".to_string(), agent: "scout".to_string(), model: "haiku".to_string(), exit_code: 0, cost: 0.01, input_tokens: 1000, output_tokens: 500, cache_read_tokens: 0, cache_write_tokens: 0, duration_ms: 2000, tool_count: 2, timestamp: 1000, turns: 2 },
+        SubagentRunInfo { run_id: "run2".to_string(), agent: "worker".to_string(), model: "sonnet".to_string(), exit_code: 0, cost: 0.05, input_tokens: 5000, output_tokens: 2000, cache_read_tokens: 1000, cache_write_tokens: 500, duration_ms: 10000, tool_count: 8, timestamp: 2000, turns: 3 },
+        SubagentRunInfo { run_id: "run3".to_string(), agent: "worker".to_string(), model: "opus".to_string(), exit_code: 0, cost: 0.15, input_tokens: 10000, output_tokens: 5000, cache_read_tokens: 2000, cache_write_tokens: 1000, duration_ms: 20000, tool_count: 15, timestamp: 3000, turns: 5 },
     ];
 
     let summary = aggregate_runs(&runs);
@@ -167,24 +117,8 @@ fn test_scan_subagent_artifacts() {
 
     // Create 3 meta.json files
     create_meta_json(&artifacts_dir, "abc123", "scout", "haiku", 0.02, 2000, 1000);
-    create_meta_json(
-        &artifacts_dir,
-        "def456",
-        "worker",
-        "sonnet",
-        0.08,
-        8000,
-        4000,
-    );
-    create_meta_json(
-        &artifacts_dir,
-        "ghi789",
-        "reviewer",
-        "opus",
-        0.25,
-        15000,
-        8000,
-    );
+    create_meta_json(&artifacts_dir, "def456", "worker", "sonnet", 0.08, 8000, 4000);
+    create_meta_json(&artifacts_dir, "ghi789", "reviewer", "opus", 0.25, 15000, 8000);
 
     // Scan artifacts (without DB cache)
     let session_dirs = vec![session_dir.clone()];
@@ -198,10 +132,7 @@ fn test_scan_subagent_artifacts() {
     assert!(summary.runs_by_agent.contains_key("worker"));
     assert!(summary.runs_by_agent.contains_key("reviewer"));
 
-    println!(
-        "✅ Scan test passed: {} runs, ${:.4} total cost",
-        summary.total_runs, summary.total_cost
-    );
+    println!("✅ Scan test passed: {} runs, ${:.4} total cost", summary.total_runs, summary.total_cost);
 }
 
 /// Test 4: Rescan after file modification
@@ -213,15 +144,7 @@ fn test_subagent_file_modification() {
     fs::create_dir_all(&artifacts_dir).expect("Failed to create artifacts dir");
 
     // Create meta.json
-    let meta_path = create_meta_json(
-        &artifacts_dir,
-        "cache_test",
-        "worker",
-        "sonnet",
-        0.10,
-        5000,
-        2500,
-    );
+    let meta_path = create_meta_json(&artifacts_dir, "cache_test", "worker", "sonnet", 0.10, 5000, 2500);
 
     // First scan
     let summary1 = scan_subagent_artifacts(&[session_dir.clone()], None);
@@ -312,42 +235,10 @@ fn test_multiple_session_directories() {
     }
 
     // Each session has different subagent runs
-    create_meta_json(
-        &session1.join("subagent-artifacts"),
-        "a1",
-        "scout",
-        "haiku",
-        0.01,
-        1000,
-        500,
-    );
-    create_meta_json(
-        &session2.join("subagent-artifacts"),
-        "b1",
-        "worker",
-        "sonnet",
-        0.05,
-        5000,
-        2500,
-    );
-    create_meta_json(
-        &session3.join("subagent-artifacts"),
-        "c1",
-        "reviewer",
-        "opus",
-        0.20,
-        10000,
-        5000,
-    );
-    create_meta_json(
-        &session3.join("subagent-artifacts"),
-        "c2",
-        "worker",
-        "sonnet",
-        0.08,
-        8000,
-        4000,
-    );
+    create_meta_json(&session1.join("subagent-artifacts"), "a1", "scout", "haiku", 0.01, 1000, 500);
+    create_meta_json(&session2.join("subagent-artifacts"), "b1", "worker", "sonnet", 0.05, 5000, 2500);
+    create_meta_json(&session3.join("subagent-artifacts"), "c1", "reviewer", "opus", 0.20, 10000, 5000);
+    create_meta_json(&session3.join("subagent-artifacts"), "c2", "worker", "sonnet", 0.08, 8000, 4000);
 
     let summary = scan_subagent_artifacts(&[session1, session2, session3], None);
 
@@ -361,10 +252,7 @@ fn test_multiple_session_directories() {
     assert_eq!(summary.runs_by_agent["worker"].runs, 2);
     assert_eq!(summary.runs_by_agent["reviewer"].runs, 1);
 
-    println!(
-        "✅ Multiple directories test passed: correctly aggregates across {} sessions",
-        summary.total_runs
-    );
+    println!("✅ Multiple directories test passed: correctly aggregates across {} sessions", summary.total_runs);
 }
 
 /// Test 8: Fault tolerance for corrupted meta.json files
@@ -379,11 +267,7 @@ fn test_malformed_meta_json_graceful_handling() {
     create_meta_json(&artifacts_dir, "good", "worker", "sonnet", 0.10, 5000, 2500);
 
     // Create a corrupted file
-    fs::write(
-        artifacts_dir.join("bad_meta.json"),
-        "this is not valid json {{{",
-    )
-    .expect("Failed to write bad file");
+    fs::write(artifacts_dir.join("bad_meta.json"), "this is not valid json {{{").expect("Failed to write bad file");
 
     fs::write(artifacts_dir.join("empty_meta.json"), "").expect("Failed to write empty file");
 

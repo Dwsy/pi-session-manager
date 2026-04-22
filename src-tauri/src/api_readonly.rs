@@ -1,8 +1,5 @@
 use crate::core::intel::{ExperienceItem, RecallEvidence};
-use crate::data::search::embedding::{
-    EmbeddingBatchRequest, EmbeddingData, EmbeddingRequest, EmbeddingResponse, EmbeddingService,
-    EmbeddingStatusResponse,
-};
+use crate::data::search::embedding::{EmbeddingBatchRequest, EmbeddingData, EmbeddingRequest, EmbeddingResponse, EmbeddingService, EmbeddingStatusResponse};
 use crate::types::{FullTextSearchHit, FullTextSearchResponse, SessionInfo};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -25,24 +22,15 @@ pub struct ApiReadonlyError {
 
 impl ApiReadonlyError {
     pub fn bad_request(message: impl Into<String>) -> Self {
-        Self {
-            kind: ApiReadonlyErrorKind::BadRequest,
-            message: message.into(),
-        }
+        Self { kind: ApiReadonlyErrorKind::BadRequest, message: message.into() }
     }
 
     pub fn internal(message: impl Into<String>) -> Self {
-        Self {
-            kind: ApiReadonlyErrorKind::Internal,
-            message: message.into(),
-        }
+        Self { kind: ApiReadonlyErrorKind::Internal, message: message.into() }
     }
 
     pub fn service_unavailable(message: impl Into<String>) -> Self {
-        Self {
-            kind: ApiReadonlyErrorKind::ServiceUnavailable,
-            message: message.into(),
-        }
+        Self { kind: ApiReadonlyErrorKind::ServiceUnavailable, message: message.into() }
     }
 
     pub fn kind(&self) -> ApiReadonlyErrorKind {
@@ -206,28 +194,15 @@ pub fn require_query(query: Option<String>) -> Result<String, ApiReadonlyError> 
 
 pub fn parse_time_opt(input: &Option<String>) -> Result<Option<DateTime<Utc>>, ApiReadonlyError> {
     match input {
-        Some(s) if !s.trim().is_empty() => DateTime::parse_from_rfc3339(s)
-            .map(|dt| Some(dt.with_timezone(&Utc)))
-            .map_err(|e| ApiReadonlyError::bad_request(format!("Invalid time format '{s}': {e}"))),
+        Some(s) if !s.trim().is_empty() => DateTime::parse_from_rfc3339(s).map(|dt| Some(dt.with_timezone(&Utc))).map_err(|e| ApiReadonlyError::bad_request(format!("Invalid time format '{s}': {e}"))),
         _ => Ok(None),
     }
 }
 
-pub fn session_matches_scope(
-    session: &SessionInfo,
-    project: Option<&str>,
-    from: Option<DateTime<Utc>>,
-    to: Option<DateTime<Utc>>,
-) -> bool {
+pub fn session_matches_scope(session: &SessionInfo, project: Option<&str>, from: Option<DateTime<Utc>>, to: Option<DateTime<Utc>>) -> bool {
     if let Some(project) = project {
         let project = project.to_lowercase();
-        let hit = session.cwd.to_lowercase().contains(&project)
-            || session.path.to_lowercase().contains(&project)
-            || session
-                .name
-                .as_ref()
-                .map(|name| name.to_lowercase().contains(&project))
-                .unwrap_or(false);
+        let hit = session.cwd.to_lowercase().contains(&project) || session.path.to_lowercase().contains(&project) || session.name.as_ref().map(|name| name.to_lowercase().contains(&project)).unwrap_or(false);
         if !hit {
             return false;
         }
@@ -246,18 +221,9 @@ pub fn session_matches_scope(
     true
 }
 
-pub fn hit_matches_scope(
-    hit: &FullTextSearchHit,
-    project: Option<&str>,
-    from: Option<DateTime<Utc>>,
-    to: Option<DateTime<Utc>>,
-) -> bool {
+pub fn hit_matches_scope(hit: &FullTextSearchHit, project: Option<&str>, from: Option<DateTime<Utc>>, to: Option<DateTime<Utc>>) -> bool {
     if let Some(project) = project {
-        if !hit
-            .session_path
-            .to_lowercase()
-            .contains(&project.to_lowercase())
-        {
+        if !hit.session_path.to_lowercase().contains(&project.to_lowercase()) {
             return false;
         }
     }
@@ -283,33 +249,20 @@ where
     D: Fn(&'static str, Value) -> Fut,
     Fut: Future<Output = Result<Value, String>>,
 {
-    let value = dispatch("scan_sessions", serde_json::json!({}))
-        .await
-        .map_err(ApiReadonlyError::internal)?;
-    serde_json::from_value(value)
-        .map_err(|e| ApiReadonlyError::internal(format!("Invalid sessions response: {e}")))
+    let value = dispatch("scan_sessions", serde_json::json!({})).await.map_err(ApiReadonlyError::internal)?;
+    serde_json::from_value(value).map_err(|e| ApiReadonlyError::internal(format!("Invalid sessions response: {e}")))
 }
 
-async fn load_session_entries<D, Fut>(
-    dispatch: &D,
-    path: String,
-) -> Result<Vec<crate::types::SessionEntry>, ApiReadonlyError>
+async fn load_session_entries<D, Fut>(dispatch: &D, path: String) -> Result<Vec<crate::types::SessionEntry>, ApiReadonlyError>
 where
     D: Fn(&'static str, Value) -> Fut,
     Fut: Future<Output = Result<Value, String>>,
 {
-    let value = dispatch("get_session_entries", serde_json::json!({ "path": path }))
-        .await
-        .map_err(ApiReadonlyError::internal)?;
-    serde_json::from_value(value)
-        .map_err(|e| ApiReadonlyError::internal(format!("Invalid session entries response: {e}")))
+    let value = dispatch("get_session_entries", serde_json::json!({ "path": path })).await.map_err(ApiReadonlyError::internal)?;
+    serde_json::from_value(value).map_err(|e| ApiReadonlyError::internal(format!("Invalid session entries response: {e}")))
 }
 
-pub async fn full_text_search<D, Fut>(
-    dispatch: &D,
-    req: FullTextSearchRequest,
-    _normalize_filtered: bool,
-) -> Result<FullTextSearchResponse, ApiReadonlyError>
+pub async fn full_text_search<D, Fut>(dispatch: &D, req: FullTextSearchRequest, _normalize_filtered: bool) -> Result<FullTextSearchResponse, ApiReadonlyError>
 where
     D: Fn(&'static str, Value) -> Fut,
     Fut: Future<Output = Result<Value, String>>,
@@ -330,9 +283,7 @@ where
 
     if let (Some(from), Some(to)) = (from, to) {
         if from > to {
-            return Err(ApiReadonlyError::bad_request(
-                "from must be earlier than or equal to to",
-            ));
+            return Err(ApiReadonlyError::bad_request("from must be earlier than or equal to to"));
         }
     }
 
@@ -354,16 +305,12 @@ where
     )
     .await
     .map_err(ApiReadonlyError::bad_request)?;
-    let response: FullTextSearchResponse = serde_json::from_value(data)
-        .map_err(|e| ApiReadonlyError::internal(format!("Invalid search response: {e}")))?;
+    let response: FullTextSearchResponse = serde_json::from_value(data).map_err(|e| ApiReadonlyError::internal(format!("Invalid search response: {e}")))?;
 
     Ok(response)
 }
 
-pub async fn memory_recall<D, Fut>(
-    dispatch: &D,
-    req: MemoryRecallRequest,
-) -> Result<MemoryRecallResult, ApiReadonlyError>
+pub async fn memory_recall<D, Fut>(dispatch: &D, req: MemoryRecallRequest) -> Result<MemoryRecallResult, ApiReadonlyError>
 where
     D: Fn(&'static str, Value) -> Fut,
     Fut: Future<Output = Result<Value, String>>,
@@ -371,43 +318,19 @@ where
     let top_k = req.top_k.unwrap_or(8).clamp(1, 50);
     let response = full_text_search(
         dispatch,
-        FullTextSearchRequest {
-            query: req.query.clone(),
-            role_filter: req.role_filter,
-            glob_pattern: req.glob_pattern,
-            project: req.project,
-            from: req.from,
-            to: req.to,
-            page: Some(0),
-            page_size: Some(top_k),
-            match_mode: Some("any".to_string()),
-            sort_order: None,
-            source_filter: None,
-        },
+        FullTextSearchRequest { query: req.query.clone(), role_filter: req.role_filter, glob_pattern: req.glob_pattern, project: req.project, from: req.from, to: req.to, page: Some(0), page_size: Some(top_k), match_mode: Some("any".to_string()), sort_order: None, source_filter: None },
         true,
     )
     .await?;
 
     let total_hits = response.hits.len();
     let structured = crate::core::intel::build_structured_recall(&req.query, response.hits);
-    let suggested_actions =
-        crate::core::intel::suggest_workflow(&structured.intent, structured.confidence);
+    let suggested_actions = crate::core::intel::suggest_workflow(&structured.intent, structured.confidence);
 
-    Ok(MemoryRecallResult {
-        query: req.query,
-        intent: structured.intent,
-        confidence: structured.confidence,
-        total_hits,
-        evidence: structured.evidence,
-        suggested_actions,
-    })
+    Ok(MemoryRecallResult { query: req.query, intent: structured.intent, confidence: structured.confidence, total_hits, evidence: structured.evidence, suggested_actions })
 }
 
-pub async fn experience_extract<D, Fut>(
-    dispatch: &D,
-    req: ExperienceExtractRequest,
-    session_limit: usize,
-) -> Result<ExperienceExtractResult, ApiReadonlyError>
+pub async fn experience_extract<D, Fut>(dispatch: &D, req: ExperienceExtractRequest, session_limit: usize) -> Result<ExperienceExtractResult, ApiReadonlyError>
 where
     D: Fn(&'static str, Value) -> Fut,
     Fut: Future<Output = Result<Value, String>>,
@@ -439,79 +362,27 @@ where
         }
     }
 
-    Ok(ExperienceExtractResult {
-        count: items.len(),
-        items,
-    })
+    Ok(ExperienceExtractResult { count: items.len(), items })
 }
 
-pub async fn workflow_route_suggest<D, Fut>(
-    dispatch: &D,
-    req: WorkflowRouteSuggestRequest,
-) -> Result<MemoryRecallResult, ApiReadonlyError>
+pub async fn workflow_route_suggest<D, Fut>(dispatch: &D, req: WorkflowRouteSuggestRequest) -> Result<MemoryRecallResult, ApiReadonlyError>
 where
     D: Fn(&'static str, Value) -> Fut,
     Fut: Future<Output = Result<Value, String>>,
 {
-    memory_recall(
-        dispatch,
-        MemoryRecallRequest {
-            query: req.query,
-            top_k: req.top_k,
-            role_filter: req.role_filter,
-            glob_pattern: req.glob_pattern,
-            project: req.project,
-            from: req.from,
-            to: req.to,
-        },
-    )
-    .await
+    memory_recall(dispatch, MemoryRecallRequest { query: req.query, top_k: req.top_k, role_filter: req.role_filter, glob_pattern: req.glob_pattern, project: req.project, from: req.from, to: req.to }).await
 }
 
-pub async fn memory_unified<D, Fut>(
-    dispatch: &D,
-    req: MemoryUnifiedRequest,
-    preview_session_limit: usize,
-) -> Result<MemoryUnifiedResult, ApiReadonlyError>
+pub async fn memory_unified<D, Fut>(dispatch: &D, req: MemoryUnifiedRequest, preview_session_limit: usize) -> Result<MemoryUnifiedResult, ApiReadonlyError>
 where
     D: Fn(&'static str, Value) -> Fut,
     Fut: Future<Output = Result<Value, String>>,
 {
     let experience_limit = req.experience_limit.unwrap_or(8).clamp(1, 50);
-    let recall = memory_recall(
-        dispatch,
-        MemoryRecallRequest {
-            query: req.query.clone(),
-            top_k: req.top_k,
-            role_filter: req.role_filter,
-            glob_pattern: req.glob_pattern,
-            project: req.project.clone(),
-            from: req.from.clone(),
-            to: req.to.clone(),
-        },
-    )
-    .await?;
-    let experience = experience_extract(
-        dispatch,
-        ExperienceExtractRequest {
-            session_id: None,
-            limit: Some(experience_limit),
-            project: req.project,
-            from: req.from,
-            to: req.to,
-        },
-        preview_session_limit,
-    )
-    .await?;
+    let recall = memory_recall(dispatch, MemoryRecallRequest { query: req.query.clone(), top_k: req.top_k, role_filter: req.role_filter, glob_pattern: req.glob_pattern, project: req.project.clone(), from: req.from.clone(), to: req.to.clone() }).await?;
+    let experience = experience_extract(dispatch, ExperienceExtractRequest { session_id: None, limit: Some(experience_limit), project: req.project, from: req.from, to: req.to }, preview_session_limit).await?;
 
-    Ok(MemoryUnifiedResult {
-        query: req.query,
-        intent: recall.intent,
-        confidence: recall.confidence,
-        evidence: recall.evidence,
-        suggested_actions: recall.suggested_actions,
-        experience: experience.items,
-    })
+    Ok(MemoryUnifiedResult { query: req.query, intent: recall.intent, confidence: recall.confidence, evidence: recall.evidence, suggested_actions: recall.suggested_actions, experience: experience.items })
 }
 
 pub fn analytics_overview() -> Result<Value, ApiReadonlyError> {
@@ -531,14 +402,8 @@ pub fn readonly_capabilities(checkout_apply: bool, milestone_create: bool) -> Va
 }
 
 #[cfg(feature = "gui")]
-pub async fn embedding(
-    service: Arc<EmbeddingService>,
-    req: EmbeddingRequest,
-) -> Result<EmbeddingResponse, ApiReadonlyError> {
-    let endpoint = service
-        .ensure_running()
-        .await
-        .map_err(ApiReadonlyError::service_unavailable)?;
+pub async fn embedding(service: Arc<EmbeddingService>, req: EmbeddingRequest) -> Result<EmbeddingResponse, ApiReadonlyError> {
+    let endpoint = service.ensure_running().await.map_err(ApiReadonlyError::service_unavailable)?;
     let client = reqwest::Client::new();
     let url = format!("{endpoint}/embed");
     let payload = serde_json::json!({
@@ -546,48 +411,16 @@ pub async fn embedding(
         "normalize": req.normalize,
     });
 
-    let data = client
-        .post(&url)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| ApiReadonlyError::internal(format!("Request failed: {e}")))?
-        .json::<Value>()
-        .await
-        .map_err(|e| ApiReadonlyError::internal(format!("Failed to parse response: {e}")))?;
+    let data = client.post(&url).json(&payload).send().await.map_err(|e| ApiReadonlyError::internal(format!("Request failed: {e}")))?.json::<Value>().await.map_err(|e| ApiReadonlyError::internal(format!("Failed to parse response: {e}")))?;
 
-    let embedding = data
-        .get("embedding")
-        .and_then(|value| value.as_array())
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|value| value.as_f64().map(|number| number as f32))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
+    let embedding = data.get("embedding").and_then(|value| value.as_array()).map(|items| items.iter().filter_map(|value| value.as_f64().map(|number| number as f32)).collect::<Vec<_>>()).unwrap_or_default();
 
-    Ok(EmbeddingResponse {
-        success: true,
-        data: Some(EmbeddingData {
-            dimensions: embedding.len(),
-            embedding,
-            model: "embeddinggemma-300m-qat-q8_0".to_string(),
-            normalized: req.normalize,
-        }),
-        error: None,
-    })
+    Ok(EmbeddingResponse { success: true, data: Some(EmbeddingData { dimensions: embedding.len(), embedding, model: "embeddinggemma-300m-qat-q8_0".to_string(), normalized: req.normalize }), error: None })
 }
 
 #[cfg(feature = "gui")]
-pub async fn embedding_batch(
-    service: Arc<EmbeddingService>,
-    req: EmbeddingBatchRequest,
-) -> Result<Value, ApiReadonlyError> {
-    let endpoint = service
-        .ensure_running()
-        .await
-        .map_err(ApiReadonlyError::service_unavailable)?;
+pub async fn embedding_batch(service: Arc<EmbeddingService>, req: EmbeddingBatchRequest) -> Result<Value, ApiReadonlyError> {
+    let endpoint = service.ensure_running().await.map_err(ApiReadonlyError::service_unavailable)?;
     let client = reqwest::Client::new();
     let url = format!("{endpoint}/embed/batch");
     let payload = serde_json::json!({
@@ -595,15 +428,7 @@ pub async fn embedding_batch(
         "normalize": req.normalize,
     });
 
-    client
-        .post(&url)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| ApiReadonlyError::internal(format!("Request failed: {e}")))?
-        .json::<Value>()
-        .await
-        .map_err(|e| ApiReadonlyError::internal(format!("Parse error: {e}")))
+    client.post(&url).json(&payload).send().await.map_err(|e| ApiReadonlyError::internal(format!("Request failed: {e}")))?.json::<Value>().await.map_err(|e| ApiReadonlyError::internal(format!("Parse error: {e}")))
 }
 
 #[cfg(feature = "gui")]
@@ -614,11 +439,5 @@ pub async fn embedding_status(service: Arc<EmbeddingService>) -> EmbeddingStatus
         _ => (false, false),
     };
 
-    EmbeddingStatusResponse {
-        ready,
-        model_loaded,
-        model: Some("embeddinggemma-300m-qat-q8_0".to_string()),
-        dimensions: 768,
-        memory_mb: None,
-    }
+    EmbeddingStatusResponse { ready, model_loaded, model: Some("embeddinggemma-300m-qat-q8_0".to_string()), dimensions: 768, memory_mb: None }
 }

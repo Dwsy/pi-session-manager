@@ -138,7 +138,6 @@ pub fn run() {
             remove_tag_from_session,
             move_session_tag,
             reorder_tags,
-
             list_api_keys,
             create_api_key,
             revoke_api_key,
@@ -193,24 +192,12 @@ pub fn run() {
                         let details_count = details.len();
                         if let Ok(mut conn) = sqlite_cache::init_db() {
                             for entry in sessions {
-                                let _ = sqlite_cache::upsert_session(
-                                    &mut conn,
-                                    &entry.session,
-                                    entry.file_modified,
-                                    None,
-                                );
+                                let _ = sqlite_cache::upsert_session(&mut conn, &entry.session, entry.file_modified, None);
                             }
                             for entry in details {
-                                let _ = sqlite_cache::upsert_session_details_cache(
-                                    &conn,
-                                    &entry.path,
-                                    entry.file_modified,
-                                    &entry.details,
-                                );
+                                let _ = sqlite_cache::upsert_session_details_cache(&conn, &entry.path, entry.file_modified, &entry.details);
                             }
-                            log::trace!(
-                                "Flushed {sessions_count} sessions and {details_count} details to database"
-                            );
+                            log::trace!("Flushed {sessions_count} sessions and {details_count} details to database");
                         }
                     }
                 }
@@ -221,20 +208,10 @@ pub fn run() {
                 if let Some((sessions, details)) = write_buffer::force_flush_all() {
                     if let Ok(mut conn) = sqlite_cache::init_db() {
                         for entry in sessions {
-                            let _ = sqlite_cache::upsert_session(
-                                &mut conn,
-                                &entry.session,
-                                entry.file_modified,
-                                None,
-                            );
+                            let _ = sqlite_cache::upsert_session(&mut conn, &entry.session, entry.file_modified, None);
                         }
                         for entry in details {
-                            let _ = sqlite_cache::upsert_session_details_cache(
-                                &conn,
-                                &entry.path,
-                                entry.file_modified,
-                                &entry.details,
-                            );
+                            let _ = sqlite_cache::upsert_session_details_cache(&conn, &entry.path, entry.file_modified, &entry.details);
                         }
                     }
                 }

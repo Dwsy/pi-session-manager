@@ -1,8 +1,6 @@
 use chrono::Utc;
 use pi_session_manager::session_parser::SessionDetails;
-use pi_session_manager::write_buffer::{
-    buffer_details_write, buffer_session_write, get_buffered_details, get_buffered_session,
-};
+use pi_session_manager::write_buffer::{buffer_details_write, buffer_session_write, get_buffered_details, get_buffered_session};
 use pi_session_manager::SessionInfo;
 
 #[test]

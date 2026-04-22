@@ -70,10 +70,7 @@ fn test_tintinweb_meta_json_with_high_turns() {
     assert_eq!(info.tool_count, 75);
     assert!((info.cost - 2.50).abs() < 1e-9);
 
-    println!(
-        "✅ High turn count test passed (turns={}, tools={})",
-        info.turns, info.tool_count
-    );
+    println!("✅ High turn count test passed (turns={}, tools={})", info.turns, info.tool_count);
 }
 
 #[test]
@@ -127,8 +124,5 @@ fn test_tintinweb_meta_json_aborted_session() {
     assert_eq!(info.exit_code, 1);
     assert_eq!(info.turns, 3);
 
-    println!(
-        "✅ Aborted session test passed (exitCode={}, turns={})",
-        info.exit_code, info.turns
-    );
+    println!("✅ Aborted session test passed (exitCode={}, turns={})", info.exit_code, info.turns);
 }

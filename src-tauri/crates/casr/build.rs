@@ -7,11 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cargo = CargoBuilder::default().target_triple(true).build()?;
     let gix = GixBuilder::default().sha(true).build()?;
 
-    Emitter::default()
-        .add_instructions(&build)?
-        .add_instructions(&cargo)?
-        .add_instructions(&gix)?
-        .emit()?;
+    Emitter::default().add_instructions(&build)?.add_instructions(&cargo)?.add_instructions(&gix)?.emit()?;
 
     Ok(())
 }

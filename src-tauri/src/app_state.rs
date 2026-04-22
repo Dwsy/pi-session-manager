@@ -22,12 +22,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(app_handle: AppHandle) -> Self {
         let (event_tx, _) = broadcast::channel(100);
-        Self {
-            app_handle,
-            event_tx,
-            terminal_manager: Mutex::new(TerminalManager::new()),
-            pi_agent_registry: Arc::new(PiAgentRegistry::new()),
-        }
+        Self { app_handle, event_tx, terminal_manager: Mutex::new(TerminalManager::new()), pi_agent_registry: Arc::new(PiAgentRegistry::new()) }
     }
 
     pub fn subscribe_events(&self) -> broadcast::Receiver<WsEvent> {

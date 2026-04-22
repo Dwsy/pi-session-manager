@@ -19,71 +19,35 @@ mod realtime;
 mod sessions;
 mod static_assets;
 
-async fn handle_command(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-    Json(req): Json<common::HttpRequest>,
-) -> impl IntoResponse {
+async fn handle_command(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri, Json(req): Json<common::HttpRequest>) -> impl IntoResponse {
     if !common::is_authorized(&addr.ip(), &headers, &uri) {
-        return (
-            StatusCode::UNAUTHORIZED,
-            common::cors_headers(),
-            Json(common::HttpResponse {
-                success: false,
-                data: None,
-                error: Some("Unauthorized".to_string()),
-            }),
-        )
-            .into_response();
+        return (StatusCode::UNAUTHORIZED, common::cors_headers(), Json(common::HttpResponse { success: false, data: None, error: Some("Unauthorized".to_string()) })).into_response();
     }
 
     let gzip_requested = common::accepts_gzip(&headers);
     let force_gzip = std::env::var("PSM_FORCE_GZIP").unwrap_or_default() == "1";
     let gzip_enabled = gzip_requested || force_gzip;
 
-    log::debug!(
-        "HTTP request: gzip_requested={}, force_gzip={}, accept_encoding={:?}",
-        gzip_requested,
-        force_gzip,
-        headers.get("accept-encoding")
-    );
+    log::debug!("HTTP request: gzip_requested={}, force_gzip={}, accept_encoding={:?}", gzip_requested, force_gzip, headers.get("accept-encoding"));
 
     let result = dispatch_with_state(&Some(app_state.clone()), &req.command, &req.payload).await;
     let resp = match result {
-        Ok(data) => common::HttpResponse {
-            success: true,
-            data: Some(data),
-            error: None,
-        },
-        Err(error) => common::HttpResponse {
-            success: false,
-            data: None,
-            error: Some(error),
-        },
+        Ok(data) => common::HttpResponse { success: true, data: Some(data), error: None },
+        Err(error) => common::HttpResponse { success: false, data: None, error: Some(error) },
     };
 
-    let compression_disabled = common::query_param(&uri, "no_gzip").is_some()
-        || common::query_param(&uri, "disable_compression").is_some();
+    let compression_disabled = common::query_param(&uri, "no_gzip").is_some() || common::query_param(&uri, "disable_compression").is_some();
 
     if gzip_enabled && !compression_disabled {
         if let Ok(json_bytes) = serde_json::to_vec(&resp) {
             match crate::compression::gzip_compress(&json_bytes) {
                 Ok(compressed) => {
-                    log::debug!(
-                        "Gzip compressed: {} bytes -> {} bytes",
-                        json_bytes.len(),
-                        compressed.len()
-                    );
+                    log::debug!("Gzip compressed: {} bytes -> {} bytes", json_bytes.len(), compressed.len());
                     return Response::builder()
                         .status(StatusCode::OK)
                         .header("access-control-allow-origin", "*")
                         .header("access-control-allow-methods", "GET, POST, OPTIONS")
-                        .header(
-                            "access-control-allow-headers",
-                            "content-type, authorization",
-                        )
+                        .header("access-control-allow-headers", "content-type, authorization")
                         .header("content-type", "application/json")
                         .header("content-encoding", "gzip")
                         .body(Body::from(compressed))
@@ -102,36 +66,18 @@ async fn handle_command(
 
 async fn handle_metrics() -> impl IntoResponse {
     let metrics_text = crate::metrics::render();
-    (
-        [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
-        metrics_text,
-    )
+    ([(header::CONTENT_TYPE, "text/plain; version=0.0.4")], metrics_text)
 }
 
-pub async fn init_http_adapter(
-    app_state: SharedAppState,
-    bind_addr: &str,
-    port: u16,
-) -> Result<(), String> {
+pub async fn init_http_adapter(app_state: SharedAppState, bind_addr: &str, port: u16) -> Result<(), String> {
     init_http_adapter_with_options(app_state, bind_addr, port, true).await
 }
 
-pub async fn init_http_adapter_with_options(
-    app_state: SharedAppState,
-    bind_addr: &str,
-    port: u16,
-    serve_frontend: bool,
-) -> Result<(), String> {
+pub async fn init_http_adapter_with_options(app_state: SharedAppState, bind_addr: &str, port: u16, serve_frontend: bool) -> Result<(), String> {
     init_http_adapter_with_embedding(app_state, bind_addr, port, serve_frontend, None).await
 }
 
-pub async fn init_http_adapter_with_embedding(
-    app_state: SharedAppState,
-    bind_addr: &str,
-    port: u16,
-    serve_frontend: bool,
-    embedding_service: Option<std::sync::Arc<crate::data::search::embedding::EmbeddingService>>,
-) -> Result<(), String> {
+pub async fn init_http_adapter_with_embedding(app_state: SharedAppState, bind_addr: &str, port: u16, serve_frontend: bool, embedding_service: Option<std::sync::Arc<crate::data::search::embedding::EmbeddingService>>) -> Result<(), String> {
     let has_frontend = static_assets::has_frontend_assets();
 
     if serve_frontend {
@@ -145,70 +91,27 @@ pub async fn init_http_adapter_with_embedding(
     }
 
     let mut app = Router::new()
-        .route(
-            "/api",
-            post(handle_command).options(realtime::handle_preflight),
-        )
+        .route("/api", post(handle_command).options(realtime::handle_preflight))
         .route("/api/events", get(realtime::handle_sse))
         .route("/v1/events", get(realtime::handle_sse))
         .route("/v1/sessions", get(sessions::v1_list_sessions))
-        .route(
-            "/v1/sessions/{id}/entries",
-            get(sessions::v1_get_session_entries),
-        )
-        .route(
-            "/v1/sessions/{id}/snapshot",
-            get(sessions::v1_session_snapshot),
-        )
-        .route(
-            "/v1/sessions/{id}/checkout",
-            post(sessions::v1_checkout_session),
-        )
-        .route(
-            "/v1/sessions/{id}/milestones",
-            post(sessions::v1_create_milestone).get(sessions::v1_list_milestones),
-        )
-        .route(
-            "/v1/search/fulltext",
-            post(readonly_routes::v1_full_text_search),
-        )
+        .route("/v1/sessions/{id}/entries", get(sessions::v1_get_session_entries))
+        .route("/v1/sessions/{id}/snapshot", get(sessions::v1_session_snapshot))
+        .route("/v1/sessions/{id}/checkout", post(sessions::v1_checkout_session))
+        .route("/v1/sessions/{id}/milestones", post(sessions::v1_create_milestone).get(sessions::v1_list_milestones))
+        .route("/v1/search/fulltext", post(readonly_routes::v1_full_text_search))
         .route("/v1/memory/recall", post(readonly_routes::v1_memory_recall))
-        .route(
-            "/v1/memory/unified",
-            post(readonly_routes::v1_memory_unified),
-        )
-        .route(
-            "/v1/experience/extract",
-            post(readonly_routes::v1_experience_extract),
-        )
-        .route(
-            "/v1/workflow/route-suggest",
-            post(readonly_routes::v1_workflow_route_suggest),
-        )
-        .route(
-            "/v1/analytics/overview",
-            get(readonly_routes::v1_analytics_overview),
-        )
-        .route(
-            "/v1/observability/summary",
-            get(readonly_routes::v1_observability_summary),
-        )
+        .route("/v1/memory/unified", post(readonly_routes::v1_memory_unified))
+        .route("/v1/experience/extract", post(readonly_routes::v1_experience_extract))
+        .route("/v1/workflow/route-suggest", post(readonly_routes::v1_workflow_route_suggest))
+        .route("/v1/analytics/overview", get(readonly_routes::v1_analytics_overview))
+        .route("/v1/observability/summary", get(readonly_routes::v1_observability_summary))
         .route("/ws", get(realtime::handle_ws_upgrade))
         .route("/metrics", get(handle_metrics));
 
     if let Some(svc) = embedding_service {
         log::info!("Embedding service enabled");
-        app = app
-            .route("/v1/embedding", post(embedding::v1_embedding_handler))
-            .route(
-                "/v1/embedding/batch",
-                post(embedding::v1_embedding_batch_handler),
-            )
-            .route(
-                "/v1/embedding/status",
-                get(embedding::v1_embedding_status_handler),
-            )
-            .layer(axum::Extension(svc));
+        app = app.route("/v1/embedding", post(embedding::v1_embedding_handler)).route("/v1/embedding/batch", post(embedding::v1_embedding_batch_handler)).route("/v1/embedding/status", get(embedding::v1_embedding_status_handler)).layer(axum::Extension(svc));
     }
 
     let mut app = app.with_state(app_state);
@@ -217,16 +120,9 @@ pub async fn init_http_adapter_with_embedding(
     }
 
     let addr = format!("{bind_addr}:{port}");
-    let listener = tokio::net::TcpListener::bind(&addr)
-        .await
-        .map_err(|error| format!("Failed to bind HTTP: {error}"))?;
+    let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|error| format!("Failed to bind HTTP: {error}"))?;
 
     log::info!("HTTP+WS server listening on http://{addr}");
 
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await
-    .map_err(|error| format!("HTTP server error: {error}"))
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await.map_err(|error| format!("HTTP server error: {error}"))
 }

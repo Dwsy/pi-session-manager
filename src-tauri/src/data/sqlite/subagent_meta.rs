@@ -3,10 +3,7 @@ use super::util::parse_timestamp;
 
 /// Look up a cached `SubagentRunInfo` by file path.
 /// Returns `(file_modified, run_info)` when a cache entry exists, or `None` otherwise.
-pub fn get_cached_subagent_meta(
-    conn: &Connection,
-    path: &str,
-) -> Result<Option<(DateTime<Utc>, SubagentRunInfo)>, String> {
+pub fn get_cached_subagent_meta(conn: &Connection, path: &str) -> Result<Option<(DateTime<Utc>, SubagentRunInfo)>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT file_modified, run_id, agent, model, exit_code, cost,
@@ -44,12 +41,7 @@ pub fn get_cached_subagent_meta(
 }
 
 /// Insert or replace a `SubagentRunInfo` cache entry keyed by file path.
-pub fn upsert_subagent_meta(
-    conn: &Connection,
-    path: &str,
-    file_modified: DateTime<Utc>,
-    run: &SubagentRunInfo,
-) -> Result<(), String> {
+pub fn upsert_subagent_meta(conn: &Connection, path: &str, file_modified: DateTime<Utc>, run: &SubagentRunInfo) -> Result<(), String> {
     conn.execute(
         "INSERT INTO subagent_meta_cache (
             path, file_modified, run_id, agent, model, exit_code, cost,

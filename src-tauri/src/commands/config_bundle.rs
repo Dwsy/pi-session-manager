@@ -50,19 +50,10 @@ pub struct BundleMetadata {
 /// Known config files to include in the bundle.
 const CONFIG_FILES: &[(&str, &str)] = &[
     ("config.json", "~/.pi/pi-session-manager/config.json"),
-    (
-        "tags_config.json",
-        "~/.pi/pi-session-manager/tags_config.json",
-    ),
-    (
-        "session_mark.json",
-        "~/.pi/pi-session-manager/session_mark.json",
-    ),
+    ("tags_config.json", "~/.pi/pi-session-manager/tags_config.json"),
+    ("session_mark.json", "~/.pi/pi-session-manager/session_mark.json"),
     ("favorites.json", "~/.pi/pi-session-manager/favorites.json"),
-    (
-        "auth_tokens.json",
-        "~/.pi/pi-session-manager/auth_tokens.json",
-    ),
+    ("auth_tokens.json", "~/.pi/pi-session-manager/auth_tokens.json"),
 ];
 
 /// Resolve a path that may start with ~ to the home directory.
@@ -77,15 +68,12 @@ fn resolve_home_path(path: &str) -> PathBuf {
 
 /// Get the backup directory for config bundles.
 fn backup_dir() -> PathBuf {
-    crate::unified_config::backup_root_dir("config-bundles")
-        .unwrap_or_else(|_| PathBuf::from("/tmp/pi-config-backups"))
+    crate::unified_config::backup_root_dir("config-bundles").unwrap_or_else(|_| PathBuf::from("/tmp/pi-config-backups"))
 }
 
 /// Generate a timestamp-based backup ID.
 fn generate_backup_id() -> String {
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default();
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default();
     let secs = now.as_secs();
     format!(
         "import-{}-{:06}",
@@ -114,17 +102,14 @@ fn format_filename_timestamp() -> String {
 pub async fn export_config_bundle_internal(target_path: &str) -> Result<String, String> {
     let zip_path = PathBuf::from(target_path);
     if let Some(parent) = zip_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create export directory: {e}"))?;
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create export directory: {e}"))?;
     }
 
     // Create ZIP in memory first
     let cursor = Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(cursor);
 
-    let options = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated)
-        .unix_permissions(0o644);
+    let options = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated).unix_permissions(0o644);
 
     // Add metadata
     let metadata = BundleMetadata {
@@ -136,13 +121,10 @@ pub async fn export_config_bundle_internal(target_path: &str) -> Result<String, 
         notes: None,
     };
 
-    let metadata_json = serde_json::to_string_pretty(&metadata)
-        .map_err(|e| format!("Failed to serialize metadata: {e}"))?;
+    let metadata_json = serde_json::to_string_pretty(&metadata).map_err(|e| format!("Failed to serialize metadata: {e}"))?;
 
-    zip.start_file("metadata.json", options)
-        .map_err(|e| format!("Failed to write metadata: {e}"))?;
-    zip.write_all(metadata_json.as_bytes())
-        .map_err(|e| format!("Failed to write metadata: {e}"))?;
+    zip.start_file("metadata.json", options).map_err(|e| format!("Failed to write metadata: {e}"))?;
+    zip.write_all(metadata_json.as_bytes()).map_err(|e| format!("Failed to write metadata: {e}"))?;
 
     let mut file_count = 0;
     let mut warnings = Vec::new();
@@ -153,10 +135,8 @@ pub async fn export_config_bundle_internal(target_path: &str) -> Result<String, 
         if path.exists() {
             match fs::read(&path) {
                 Ok(contents) => {
-                    zip.start_file(zip_name, options)
-                        .map_err(|e| format!("Failed to add {zip_name}: {e}"))?;
-                    zip.write_all(&contents)
-                        .map_err(|e| format!("Failed to write {zip_name}: {e}"))?;
+                    zip.start_file(zip_name, options).map_err(|e| format!("Failed to add {zip_name}: {e}"))?;
+                    zip.write_all(&contents).map_err(|e| format!("Failed to write {zip_name}: {e}"))?;
                     file_count += 1;
                 }
                 Err(e) => {
@@ -173,9 +153,7 @@ pub async fn export_config_bundle_internal(target_path: &str) -> Result<String, 
     }
 
     // Write ZIP to disk
-    let mut zip = zip
-        .finish()
-        .map_err(|e| format!("Failed to finalize ZIP: {e}"))?;
+    let mut zip = zip.finish().map_err(|e| format!("Failed to finalize ZIP: {e}"))?;
     let zip_data = zip.into_inner();
     fs::write(&zip_path, zip_data).map_err(|e| format!("Failed to write ZIP file: {e}"))?;
 
@@ -194,8 +172,7 @@ pub async fn preview_config_bundle_internal(bundle_path: &str) -> Result<BundleP
     }
 
     let zip_file = fs::File::open(&path).map_err(|e| format!("Failed to open bundle: {e}"))?;
-    let mut archive =
-        zip::ZipArchive::new(zip_file).map_err(|e| format!("Invalid ZIP file: {e}"))?;
+    let mut archive = zip::ZipArchive::new(zip_file).map_err(|e| format!("Invalid ZIP file: {e}"))?;
 
     let mut files = Vec::new();
     let mut total_size = 0;
@@ -223,50 +200,27 @@ pub async fn preview_config_bundle_internal(bundle_path: &str) -> Result<BundleP
             total_size += size;
 
             // Check if file exists locally
-            let local_path = CONFIG_FILES
-                .iter()
-                .find(|(zip_name, _)| *zip_name == name)
-                .map(|(_, path)| resolve_home_path(path));
+            let local_path = CONFIG_FILES.iter().find(|(zip_name, _)| *zip_name == name).map(|(_, path)| resolve_home_path(path));
 
             let exists_locally = local_path.as_ref().is_some_and(|p| p.exists());
-            let local_size = local_path.and_then(|p| {
-                if p.exists() {
-                    fs::metadata(&p).ok().map(|m| m.len())
-                } else {
-                    None
-                }
-            });
+            let local_size = local_path.and_then(|p| if p.exists() { fs::metadata(&p).ok().map(|m| m.len()) } else { None });
 
-            files.push(BundleFileInfo {
-                name,
-                size,
-                exists_locally,
-                local_size,
-            });
+            files.push(BundleFileInfo { name, size, exists_locally, local_size });
         }
     }
 
-    Ok(BundlePreview {
-        file_count: files.len(),
-        total_size,
-        files,
-        created_at,
-    })
+    Ok(BundlePreview { file_count: files.len(), total_size, files, created_at })
 }
 
 /// Internal: Import config files from a ZIP bundle.
-pub async fn import_config_bundle_internal(
-    bundle_path: &str,
-    create_backup: bool,
-) -> Result<ImportResult, String> {
+pub async fn import_config_bundle_internal(bundle_path: &str, create_backup: bool) -> Result<ImportResult, String> {
     let path = PathBuf::from(bundle_path);
     if !path.exists() {
         return Err(format!("Bundle file not found: {bundle_path}"));
     }
 
     let zip_file = fs::File::open(&path).map_err(|e| format!("Failed to open bundle: {e}"))?;
-    let mut archive =
-        zip::ZipArchive::new(zip_file).map_err(|e| format!("Invalid ZIP file: {e}"))?;
+    let mut archive = zip::ZipArchive::new(zip_file).map_err(|e| format!("Invalid ZIP file: {e}"))?;
 
     let timestamp = format_timestamp(SystemTime::now());
     let mut imported_files = Vec::new();
@@ -278,8 +232,7 @@ pub async fn import_config_bundle_internal(
     if create_backup {
         let backup_subdir = generate_backup_id();
         let backup_dir = backup_dir().join(&backup_subdir);
-        fs::create_dir_all(&backup_dir)
-            .map_err(|e| format!("Failed to create backup directory: {e}"))?;
+        fs::create_dir_all(&backup_dir).map_err(|e| format!("Failed to create backup directory: {e}"))?;
 
         // Backup existing config files
         for (zip_name, config_path) in CONFIG_FILES {
@@ -316,12 +269,10 @@ pub async fn import_config_bundle_internal(
 
                 // Ensure parent directory exists
                 if let Some(parent) = dest.parent() {
-                    fs::create_dir_all(parent)
-                        .map_err(|e| format!("Failed to create directory: {e}"))?;
+                    fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {e}"))?;
                 }
 
-                fs::write(&dest, &contents)
-                    .map_err(|e| format!("Failed to write {zip_name}: {e}"))?;
+                fs::write(&dest, &contents).map_err(|e| format!("Failed to write {zip_name}: {e}"))?;
 
                 imported_files.push(zip_name.to_string());
             } else {
@@ -336,13 +287,7 @@ pub async fn import_config_bundle_internal(
         return Err("No configuration files found in bundle".to_string());
     }
 
-    Ok(ImportResult {
-        imported_files,
-        backup_id,
-        backup_path,
-        warnings,
-        timestamp,
-    })
+    Ok(ImportResult { imported_files, backup_id, backup_path, warnings, timestamp })
 }
 
 /// Internal: Restore the most recent import backup.
@@ -354,10 +299,7 @@ pub async fn restore_import_backup_internal() -> Result<String, String> {
 
     // Find the most recent backup directory
     let mut backups = Vec::new();
-    for entry in fs::read_dir(&backup_base)
-        .map_err(|e| format!("Failed to read backup directory: {e}"))?
-        .flatten()
-    {
+    for entry in fs::read_dir(&backup_base).map_err(|e| format!("Failed to read backup directory: {e}"))?.flatten() {
         let path = entry.path();
         if path.is_dir() {
             if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
@@ -373,10 +315,7 @@ pub async fn restore_import_backup_internal() -> Result<String, String> {
     }
 
     // Sort by name (timestamp-based) to get most recent
-    backups.sort_by(|a, b| {
-        b.file_name()
-            .cmp(&a.file_name().or(Some(std::ffi::OsStr::new(""))))
-    });
+    backups.sort_by(|a, b| b.file_name().cmp(&a.file_name().or(Some(std::ffi::OsStr::new("")))));
 
     let latest_backup = &backups[0];
     let mut restored = Vec::new();
@@ -402,11 +341,7 @@ pub async fn restore_import_backup_internal() -> Result<String, String> {
         return Err("No files found in backup to restore".to_string());
     }
 
-    Ok(format!(
-        "Restored {} files: {}",
-        restored.len(),
-        restored.join(", ")
-    ))
+    Ok(format!("Restored {} files: {}", restored.len(), restored.join(", ")))
 }
 
 /// Tauri command: Export all config files to a ZIP bundle.
@@ -423,10 +358,7 @@ pub async fn preview_config_bundle(bundle_path: String) -> Result<BundlePreview,
 
 /// Tauri command: Import config files from a ZIP bundle.
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn import_config_bundle(
-    bundle_path: String,
-    create_backup: Option<bool>,
-) -> Result<ImportResult, String> {
+pub async fn import_config_bundle(bundle_path: String, create_backup: Option<bool>) -> Result<ImportResult, String> {
     let do_backup = create_backup.unwrap_or(true);
     import_config_bundle_internal(&bundle_path, do_backup).await
 }

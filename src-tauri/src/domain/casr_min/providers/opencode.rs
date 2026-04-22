@@ -5,10 +5,7 @@ use std::sync::{OnceLock, RwLock};
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{json, Value};
 
-use crate::domain::casr_min::model::{
-    flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title,
-    CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult,
-};
+use crate::domain::casr_min::model::{flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult};
 
 pub const DB_FILENAME: &str = "opencode.db";
 const DATA_DIRNAME: &str = ".opencode";
@@ -19,30 +16,18 @@ struct OpenCodePathListCacheEntry {
     session_paths: Vec<PathBuf>,
 }
 
-fn session_path_cache(
-) -> &'static RwLock<std::collections::HashMap<String, OpenCodePathListCacheEntry>> {
-    static CACHE: OnceLock<RwLock<std::collections::HashMap<String, OpenCodePathListCacheEntry>>> =
-        OnceLock::new();
+fn session_path_cache() -> &'static RwLock<std::collections::HashMap<String, OpenCodePathListCacheEntry>> {
+    static CACHE: OnceLock<RwLock<std::collections::HashMap<String, OpenCodePathListCacheEntry>>> = OnceLock::new();
     CACHE.get_or_init(|| RwLock::new(std::collections::HashMap::new()))
 }
 
 fn db_modified_ms(path: &Path) -> Result<u128, String> {
     std::fs::metadata(path)
         .and_then(|metadata| metadata.modified())
-        .map_err(|e| {
-            format!(
-                "OpenCode: failed to read DB metadata {}: {e}",
-                path.display()
-            )
-        })?
+        .map_err(|e| format!("OpenCode: failed to read DB metadata {}: {e}", path.display()))?
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_millis())
-        .map_err(|e| {
-            format!(
-                "OpenCode: failed to normalize DB mtime {}: {e}",
-                path.display()
-            )
-        })
+        .map_err(|e| format!("OpenCode: failed to normalize DB mtime {}: {e}", path.display()))
 }
 
 pub fn session_roots() -> Vec<PathBuf> {
@@ -54,20 +39,11 @@ pub fn matches_path(path: &Path) -> bool {
         return true;
     }
 
-    path.parent()
-        .and_then(|parent| parent.file_name())
-        .and_then(|value| value.to_str())
-        == Some(DB_FILENAME)
-        || path
-            .to_string_lossy()
-            .replace('\\', "/")
-            .contains("/.opencode/")
+    path.parent().and_then(|parent| parent.file_name()).and_then(|value| value.to_str()) == Some(DB_FILENAME) || path.to_string_lossy().replace('\\', "/").contains("/.opencode/")
 }
 
 pub fn backing_store_path(path: &Path) -> PathBuf {
-    parse_virtual_path(path)
-        .map(|(db_path, _)| db_path)
-        .unwrap_or_else(|| path.to_path_buf())
+    parse_virtual_path(path).map(|(db_path, _)| db_path).unwrap_or_else(|| path.to_path_buf())
 }
 
 pub fn list_session_paths_in_db(db_path: &Path) -> Result<Vec<PathBuf>, String> {
@@ -87,35 +63,19 @@ pub fn list_session_paths_in_db(db_path: &Path) -> Result<Vec<PathBuf>, String> 
         return Ok(Vec::new());
     }
 
-    let mut stmt = conn
-        .prepare("SELECT id FROM sessions ORDER BY created_at DESC")
-        .map_err(|e| format!("OpenCode: failed to prepare session list query: {e}"))?;
-    let rows = stmt
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|e| format!("OpenCode: failed to query sessions: {e}"))?;
+    let mut stmt = conn.prepare("SELECT id FROM sessions ORDER BY created_at DESC").map_err(|e| format!("OpenCode: failed to prepare session list query: {e}"))?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0)).map_err(|e| format!("OpenCode: failed to query sessions: {e}"))?;
 
-    let session_paths = rows
-        .flatten()
-        .map(|session_id| virtual_session_path(db_path, &session_id))
-        .collect::<Vec<_>>();
+    let session_paths = rows.flatten().map(|session_id| virtual_session_path(db_path, &session_id)).collect::<Vec<_>>();
 
     if let Ok(mut guard) = session_path_cache().write() {
-        guard.insert(
-            cache_key,
-            OpenCodePathListCacheEntry {
-                modified_at_ms,
-                session_paths: session_paths.clone(),
-            },
-        );
+        guard.insert(cache_key, OpenCodePathListCacheEntry { modified_at_ms, session_paths: session_paths.clone() });
     }
 
     Ok(session_paths)
 }
 
-pub fn build_target_path(
-    session: &CanonicalSession,
-    target_session_id: &str,
-) -> Result<PathBuf, String> {
+pub fn build_target_path(session: &CanonicalSession, target_session_id: &str) -> Result<PathBuf, String> {
     let db_path = choose_target_db_path(session)?;
     Ok(virtual_session_path(&db_path, target_session_id))
 }
@@ -131,8 +91,7 @@ pub fn read_session(path: &Path) -> Result<CanonicalSession, String> {
     }
 
     let conn = open_db_ro(path)?;
-    let session_id = newest_root_session_id(&conn)
-        .ok_or_else(|| format!("OpenCode: no sessions found in {}", path.display()))?;
+    let session_id = newest_root_session_id(&conn).ok_or_else(|| format!("OpenCode: no sessions found in {}", path.display()))?;
     read_session_by_id(&conn, path, &session_id)
 }
 
@@ -140,17 +99,11 @@ pub fn read_session_from_str(_path: &Path, _content: &str) -> Result<CanonicalSe
     Err("OpenCode sessions are SQLite-backed; reading from string is unsupported".to_string())
 }
 
-pub fn render_session(
-    _session: &CanonicalSession,
-    _target_session_id: &str,
-) -> Result<String, String> {
+pub fn render_session(_session: &CanonicalSession, _target_session_id: &str) -> Result<String, String> {
     Err("OpenCode does not support text preview rendering".to_string())
 }
 
-pub fn write_session(
-    session: &CanonicalSession,
-    target_session_id: &str,
-) -> Result<PathBuf, String> {
+pub fn write_session(session: &CanonicalSession, target_session_id: &str) -> Result<PathBuf, String> {
     let target_path = build_target_path(session, target_session_id)?;
     let db_path = backing_store_path(&target_path);
     let mut conn = open_db_rw(&db_path)?;
@@ -159,43 +112,23 @@ pub fn write_session(
     let now = chrono::Utc::now().timestamp_millis();
     let created_at = session.started_at.unwrap_or(now);
     let updated_at = session.ended_at.unwrap_or(now);
-    let title = session
-        .title
-        .clone()
-        .or_else(|| {
-            session
-                .messages
-                .iter()
-                .find(|message| message.role == MessageRole::User)
-                .map(|message| truncate_title(&message.content, 80))
-                .filter(|value| !value.is_empty())
-        })
-        .unwrap_or_else(|| "Converted session".to_string());
+    let title = session.title.clone().or_else(|| session.messages.iter().find(|message| message.role == MessageRole::User).map(|message| truncate_title(&message.content, 80)).filter(|value| !value.is_empty())).unwrap_or_else(|| "Converted session".to_string());
 
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|e| format!("OpenCode: failed to begin transaction: {e}"))?;
+    let tx = conn.unchecked_transaction().map_err(|e| format!("OpenCode: failed to begin transaction: {e}"))?;
 
     tx.execute(
         "INSERT INTO sessions (
             id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost,
             summary_message_id, updated_at, created_at
          ) VALUES (?1, NULL, ?2, ?3, 0, 0, 0.0, NULL, ?4, ?5)",
-        rusqlite::params![
-            target_session_id,
-            title,
-            i64::try_from(session.messages.len()).unwrap_or(i64::MAX),
-            updated_at,
-            created_at,
-        ],
+        rusqlite::params![target_session_id, title, i64::try_from(session.messages.len()).unwrap_or(i64::MAX), updated_at, created_at,],
     )
     .map_err(|e| format!("OpenCode: failed to insert session: {e}"))?;
 
     let default_model = session.model_name.clone();
     for msg in &session.messages {
         let message_id = format!("{target_session_id}-{:04}", msg.idx);
-        let parts_json = serde_json::to_string(&build_parts(msg))
-            .map_err(|e| format!("OpenCode: failed to serialize message parts: {e}"))?;
+        let parts_json = serde_json::to_string(&build_parts(msg)).map_err(|e| format!("OpenCode: failed to serialize message parts: {e}"))?;
         let timestamp = msg.timestamp.unwrap_or(created_at);
         let model = msg.author.clone().or_else(|| default_model.clone());
 
@@ -203,21 +136,12 @@ pub fn write_session(
             "INSERT INTO messages (
                 id, session_id, role, parts, model, created_at, updated_at, finished_at
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)",
-            rusqlite::params![
-                message_id,
-                target_session_id,
-                role_to_opencode(&msg.role),
-                parts_json,
-                model,
-                timestamp,
-                timestamp,
-            ],
+            rusqlite::params![message_id, target_session_id, role_to_opencode(&msg.role), parts_json, model, timestamp, timestamp,],
         )
         .map_err(|e| format!("OpenCode: failed to insert message {}: {e}", msg.idx))?;
     }
 
-    tx.commit()
-        .map_err(|e| format!("OpenCode: failed to commit transaction: {e}"))?;
+    tx.commit().map_err(|e| format!("OpenCode: failed to commit transaction: {e}"))?;
 
     Ok(target_path)
 }
@@ -303,9 +227,7 @@ fn cwd_ancestor_data_dirs() -> Vec<PathBuf> {
         return Vec::new();
     };
 
-    cwd.ancestors()
-        .map(|ancestor| ancestor.join(DATA_DIRNAME))
-        .collect()
+    cwd.ancestors().map(|ancestor| ancestor.join(DATA_DIRNAME)).collect()
 }
 
 fn dedup_existing_dirs(paths: Vec<PathBuf>) -> Vec<PathBuf> {
@@ -352,40 +274,18 @@ fn parse_virtual_path(path: &Path) -> Option<(PathBuf, String)> {
 }
 
 fn open_db_ro(path: &Path) -> Result<Connection, String> {
-    let conn = Connection::open_with_flags(
-        path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    )
-    .map_err(|e| format!("OpenCode: failed to open DB {}: {e}", path.display()))?;
-    conn.busy_timeout(std::time::Duration::from_secs(5))
-        .map_err(|e| format!("OpenCode: failed to set busy timeout: {e}"))?;
+    let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|e| format!("OpenCode: failed to open DB {}: {e}", path.display()))?;
+    conn.busy_timeout(std::time::Duration::from_secs(5)).map_err(|e| format!("OpenCode: failed to set busy timeout: {e}"))?;
     Ok(conn)
 }
 
 fn open_db_rw(path: &Path) -> Result<Connection, String> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| {
-            format!(
-                "OpenCode: failed to create directory {}: {e}",
-                parent.display()
-            )
-        })?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("OpenCode: failed to create directory {}: {e}", parent.display()))?;
     }
 
-    let conn = Connection::open_with_flags(
-        path,
-        OpenFlags::SQLITE_OPEN_READ_WRITE
-            | OpenFlags::SQLITE_OPEN_CREATE
-            | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    )
-    .map_err(|e| {
-        format!(
-            "OpenCode: failed to open DB {} for writing: {e}",
-            path.display()
-        )
-    })?;
-    conn.busy_timeout(std::time::Duration::from_secs(5))
-        .map_err(|e| format!("OpenCode: failed to set busy timeout: {e}"))?;
+    let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|e| format!("OpenCode: failed to open DB {} for writing: {e}", path.display()))?;
+    conn.busy_timeout(std::time::Duration::from_secs(5)).map_err(|e| format!("OpenCode: failed to set busy timeout: {e}"))?;
     Ok(conn)
 }
 
@@ -439,9 +339,7 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
 }
 
 fn table_exists(conn: &Connection, table: &str) -> bool {
-    conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1")
-        .and_then(|mut stmt| stmt.exists(rusqlite::params![table]))
-        .unwrap_or(false)
+    conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1").and_then(|mut stmt| stmt.exists(rusqlite::params![table])).unwrap_or(false)
 }
 
 fn newest_root_session_id(conn: &Connection) -> Option<String> {
@@ -449,12 +347,7 @@ fn newest_root_session_id(conn: &Connection) -> Option<String> {
         return None;
     }
 
-    conn.query_row(
-        "SELECT id FROM sessions WHERE parent_session_id IS NULL ORDER BY created_at DESC LIMIT 1",
-        [],
-        |row| row.get(0),
-    )
-    .ok()
+    conn.query_row("SELECT id FROM sessions WHERE parent_session_id IS NULL ORDER BY created_at DESC LIMIT 1", [], |row| row.get(0)).ok()
 }
 
 fn workspace_from_db_path(db_path: &Path) -> Option<PathBuf> {
@@ -465,50 +358,22 @@ fn workspace_from_db_path(db_path: &Path) -> Option<PathBuf> {
     None
 }
 
-fn read_session_by_id(
-    conn: &Connection,
-    db_path: &Path,
-    session_id: &str,
-) -> Result<CanonicalSession, String> {
+fn read_session_by_id(conn: &Connection, db_path: &Path, session_id: &str) -> Result<CanonicalSession, String> {
     if !table_exists(conn, "sessions") {
-        return Err(format!(
-            "OpenCode DB has no sessions table: {}",
-            db_path.display()
-        ));
+        return Err(format!("OpenCode DB has no sessions table: {}", db_path.display()));
     }
     if !table_exists(conn, "messages") {
-        return Err(format!(
-            "OpenCode DB has no messages table: {}",
-            db_path.display()
-        ));
+        return Err(format!("OpenCode DB has no messages table: {}", db_path.display()));
     }
 
-    let (title_raw, created_raw, updated_raw, parent_session_id, prompt_tokens, completion_tokens, cost): (
-        String,
-        i64,
-        i64,
-        Option<String>,
-        i64,
-        i64,
-        f64,
-    ) = conn
+    let (title_raw, created_raw, updated_raw, parent_session_id, prompt_tokens, completion_tokens, cost): (String, i64, i64, Option<String>, i64, i64, f64) = conn
         .query_row(
             "SELECT title, created_at, updated_at, parent_session_id, prompt_tokens, completion_tokens, cost
              FROM sessions
              WHERE id = ?1
              LIMIT 1",
             rusqlite::params![session_id],
-            |row| {
-                Ok((
-                    row.get(0)?,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get(4)?,
-                    row.get(5)?,
-                    row.get(6)?,
-                ))
-            },
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?)),
         )
         .map_err(|e| format!("OpenCode: failed to load session {session_id}: {e}"))?;
 
@@ -527,29 +392,11 @@ fn read_session_by_id(
         .map_err(|e| format!("OpenCode: failed to prepare message query: {e}"))?;
 
     let rows = stmt
-        .query_map(rusqlite::params![session_id], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Option<String>>(3)?,
-                row.get::<_, i64>(4)?,
-                row.get::<_, i64>(5)?,
-                row.get::<_, Option<i64>>(6)?,
-            ))
-        })
+        .query_map(rusqlite::params![session_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, Option<String>>(3)?, row.get::<_, i64>(4)?, row.get::<_, i64>(5)?, row.get::<_, Option<i64>>(6)?)))
         .map_err(|e| format!("OpenCode: failed to query messages: {e}"))?;
 
     for row in rows {
-        let (
-            message_id,
-            role_raw,
-            parts_json,
-            model,
-            created_at_raw,
-            _updated_at_raw,
-            finished_at_raw,
-        ) = row.map_err(|e| format!("OpenCode: failed to decode message row: {e}"))?;
+        let (message_id, role_raw, parts_json, model, created_at_raw, _updated_at_raw, finished_at_raw) = row.map_err(|e| format!("OpenCode: failed to decode message row: {e}"))?;
 
         let timestamp = parse_timestamp(&Value::from(created_at_raw)).or(Some(created_at_raw));
         if let Some(ts) = timestamp {
@@ -587,20 +434,9 @@ fn read_session_by_id(
 
     reindex_messages(&mut messages);
 
-    let title = (!title_raw.trim().is_empty())
-        .then_some(title_raw)
-        .or_else(|| {
-            messages
-                .iter()
-                .find(|message| message.role == MessageRole::User)
-                .map(|message| truncate_title(&message.content, 80))
-                .filter(|value| !value.is_empty())
-        });
+    let title = (!title_raw.trim().is_empty()).then_some(title_raw).or_else(|| messages.iter().find(|message| message.role == MessageRole::User).map(|message| truncate_title(&message.content, 80)).filter(|value| !value.is_empty()));
 
-    let model_name = model_counts
-        .into_iter()
-        .max_by_key(|(_, count)| *count)
-        .map(|(name, _)| name);
+    let model_name = model_counts.into_iter().max_by_key(|(_, count)| *count).map(|(name, _)| name);
 
     Ok(CanonicalSession {
         session_id: session_id.to_string(),
@@ -652,44 +488,17 @@ fn parse_parts(parts: &Value) -> (String, Vec<ToolCall>, Vec<ToolResult>) {
                 }
             }
             "tool_call" => {
-                let name = data
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .filter(|value| !value.is_empty())
-                    .unwrap_or("tool_call")
-                    .to_string();
-                let id = data
-                    .get("id")
-                    .and_then(Value::as_str)
-                    .filter(|value| !value.is_empty())
-                    .map(ToString::to_string);
-                let input = data
-                    .get("input")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default();
+                let name = data.get("name").and_then(Value::as_str).filter(|value| !value.is_empty()).unwrap_or("tool_call").to_string();
+                let id = data.get("id").and_then(Value::as_str).filter(|value| !value.is_empty()).map(ToString::to_string);
+                let input = data.get("input").and_then(Value::as_str).unwrap_or_default();
 
-                tool_calls.push(ToolCall {
-                    id,
-                    name,
-                    arguments: parse_tool_call_arguments(input),
-                });
+                tool_calls.push(ToolCall { id, name, arguments: parse_tool_call_arguments(input) });
             }
             "tool_result" => {
                 tool_results.push(ToolResult {
-                    call_id: data
-                        .get("tool_call_id")
-                        .and_then(Value::as_str)
-                        .filter(|value| !value.is_empty())
-                        .map(ToString::to_string),
-                    content: data
-                        .get("content")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_string(),
-                    is_error: data
-                        .get("is_error")
-                        .and_then(Value::as_bool)
-                        .unwrap_or(false),
+                    call_id: data.get("tool_call_id").and_then(Value::as_str).filter(|value| !value.is_empty()).map(ToString::to_string),
+                    content: data.get("content").and_then(Value::as_str).unwrap_or_default().to_string(),
+                    is_error: data.get("is_error").and_then(Value::as_bool).unwrap_or(false),
                 });
             }
             _ => {
@@ -706,12 +515,7 @@ fn parse_parts(parts: &Value) -> (String, Vec<ToolCall>, Vec<ToolResult>) {
         content = reasoning_chunks.join("\n");
     }
     if content.trim().is_empty() {
-        content = tool_results
-            .iter()
-            .map(|result| result.content.as_str())
-            .filter(|value| !value.trim().is_empty())
-            .collect::<Vec<_>>()
-            .join("\n");
+        content = tool_results.iter().map(|result| result.content.as_str()).filter(|value| !value.trim().is_empty()).collect::<Vec<_>>().join("\n");
     }
 
     (content, tool_calls, tool_results)
@@ -729,16 +533,8 @@ fn build_parts(message: &CanonicalMessage) -> Value {
     let mut parts = Vec::new();
 
     if !message.content.trim().is_empty() {
-        let part_type = if message.author.as_deref() == Some("reasoning") {
-            "reasoning"
-        } else {
-            "text"
-        };
-        let data = if part_type == "reasoning" {
-            json!({ "thinking": message.content.clone() })
-        } else {
-            json!({ "text": message.content.clone() })
-        };
+        let part_type = if message.author.as_deref() == Some("reasoning") { "reasoning" } else { "text" };
+        let data = if part_type == "reasoning" { json!({ "thinking": message.content.clone() }) } else { json!({ "text": message.content.clone() }) };
         parts.push(json!({
             "type": part_type,
             "data": data,
@@ -746,11 +542,7 @@ fn build_parts(message: &CanonicalMessage) -> Value {
     }
 
     for call in &message.tool_calls {
-        let input = if let Some(text) = call.arguments.as_str() {
-            text.to_string()
-        } else {
-            serde_json::to_string(&call.arguments).unwrap_or_else(|_| "{}".to_string())
-        };
+        let input = if let Some(text) = call.arguments.as_str() { text.to_string() } else { serde_json::to_string(&call.arguments).unwrap_or_else(|_| "{}".to_string()) };
 
         parts.push(json!({
             "type": "tool_call",
@@ -803,16 +595,7 @@ mod tests {
             title: Some(text.to_string()),
             started_at: Some(1_701_388_800_000),
             ended_at: Some(1_701_388_801_000),
-            messages: vec![CanonicalMessage {
-                idx: 0,
-                role: MessageRole::User,
-                content: text.to_string(),
-                timestamp: Some(1_701_388_800_000),
-                author: None,
-                tool_calls: vec![],
-                tool_results: vec![],
-                extra: Value::Null,
-            }],
+            messages: vec![CanonicalMessage { idx: 0, role: MessageRole::User, content: text.to_string(), timestamp: Some(1_701_388_800_000), author: None, tool_calls: vec![], tool_results: vec![], extra: Value::Null }],
             metadata: Value::Null,
             source_path: workspace.join(format!("{session_id}.jsonl")),
             model_name: None,

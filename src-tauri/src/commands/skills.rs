@@ -22,16 +22,11 @@ fn pi_agent_dir() -> Result<PathBuf, String> {
 }
 
 fn skill_markdown_path(skill_name: &str) -> Result<PathBuf, String> {
-    Ok(pi_agent_dir()?
-        .join("skills")
-        .join(skill_name)
-        .join("SKILL.md"))
+    Ok(pi_agent_dir()?.join("skills").join(skill_name).join("SKILL.md"))
 }
 
 fn prompt_markdown_path(prompt_name: &str) -> Result<PathBuf, String> {
-    Ok(pi_agent_dir()?
-        .join("prompts")
-        .join(format!("{prompt_name}.md")))
+    Ok(pi_agent_dir()?.join("prompts").join(format!("{prompt_name}.md")))
 }
 
 fn read_first_line(path: &Path, trim_prefix: Option<&str>) -> String {
@@ -56,24 +51,11 @@ pub async fn scan_skills_internal() -> Result<Vec<SkillInfo>, String> {
                 continue;
             }
 
-            let name = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string();
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_string();
             let skill_md = path.join("SKILL.md");
-            let description = if skill_md.exists() {
-                read_first_line(&skill_md, None)
-            } else {
-                String::new()
-            };
+            let description = if skill_md.exists() { read_first_line(&skill_md, None) } else { String::new() };
 
-            skills.push(SkillInfo {
-                name: name.clone(),
-                path: format!("skills/{name}/SKILL.md"),
-                description,
-                enabled: true,
-            });
+            skills.push(SkillInfo { name: name.clone(), path: format!("skills/{name}/SKILL.md"), description, enabled: true });
         }
     }
 
@@ -105,14 +87,12 @@ pub async fn get_system_prompt() -> Result<String, String> {
     if !system_prompt_path.exists() {
         let default_prompt = prompt_markdown_path("default")?;
         if default_prompt.exists() {
-            return fs::read_to_string(&default_prompt)
-                .map_err(|e| format!("Failed to read default prompt: {e}"));
+            return fs::read_to_string(&default_prompt).map_err(|e| format!("Failed to read default prompt: {e}"));
         }
         return Ok(String::new());
     }
 
-    fs::read_to_string(&system_prompt_path)
-        .map_err(|e| format!("Failed to read system prompt: {e}"))
+    fs::read_to_string(&system_prompt_path).map_err(|e| format!("Failed to read system prompt: {e}"))
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -135,18 +115,9 @@ pub async fn scan_prompts_internal() -> Result<Vec<PromptInfo>, String> {
                 continue;
             }
 
-            let name = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string();
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_string();
 
-            prompts.push(PromptInfo {
-                name: name.trim_end_matches(".md").to_string(),
-                path: format!("prompts/{name}"),
-                description: read_first_line(&path, Some("# ")),
-                enabled: true,
-            });
+            prompts.push(PromptInfo { name: name.trim_end_matches(".md").to_string(), path: format!("prompts/{name}"), description: read_first_line(&path, Some("# ")), enabled: true });
         }
     }
 
@@ -178,9 +149,7 @@ pub struct ResourceInfo {
     pub metadata: ResourceMetadata,
 }
 
-fn read_settings_arrays(
-    settings_path: &Path,
-) -> (Vec<String>, Vec<String>, Vec<String>, Vec<String>) {
+fn read_settings_arrays(settings_path: &Path) -> (Vec<String>, Vec<String>, Vec<String>, Vec<String>) {
     let empty = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let content = match fs::read_to_string(settings_path) {
         Ok(c) => c,
@@ -190,23 +159,11 @@ fn read_settings_arrays(
         Ok(v) => v,
         Err(_) => return empty,
     };
-    (
-        extract_settings_array(&json, "skills"),
-        extract_settings_array(&json, "extensions"),
-        extract_settings_array(&json, "prompts"),
-        extract_settings_array(&json, "themes"),
-    )
+    (extract_settings_array(&json, "skills"), extract_settings_array(&json, "extensions"), extract_settings_array(&json, "prompts"), extract_settings_array(&json, "themes"))
 }
 
 fn extract_settings_array(json: &serde_json::Value, key: &str) -> Vec<String> {
-    json.get(key)
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default()
+    json.get(key).and_then(|v| v.as_array()).map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default()
 }
 
 fn is_resource_enabled(settings_list: &[String], relative_path: &str) -> bool {
@@ -273,37 +230,15 @@ fn scan_skills_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<Res
         if !path.is_dir() {
             continue;
         }
-        let name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("")
-            .to_string();
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
         if name.starts_with('.') {
             continue;
         }
         let skill_md = path.join("SKILL.md");
-        let description = if skill_md.exists() {
-            fs::read_to_string(&skill_md)
-                .ok()
-                .and_then(|c| extract_frontmatter_field(&c, "description"))
-                .unwrap_or_default()
-        } else {
-            String::new()
-        };
+        let description = if skill_md.exists() { fs::read_to_string(&skill_md).ok().and_then(|c| extract_frontmatter_field(&c, "description")).unwrap_or_default() } else { String::new() };
         let relative = format!("skills/{name}/SKILL.md");
         let enabled = is_resource_enabled(settings_list, &relative);
-        results.push(ResourceInfo {
-            name,
-            path: relative,
-            description,
-            enabled,
-            resource_type: "skills".to_string(),
-            metadata: ResourceMetadata {
-                source: "auto".to_string(),
-                scope: scope.to_string(),
-                origin: "top-level".to_string(),
-            },
-        });
+        results.push(ResourceInfo { name, path: relative, description, enabled, resource_type: "skills".to_string(), metadata: ResourceMetadata { source: "auto".to_string(), scope: scope.to_string(), origin: "top-level".to_string() } });
     }
     results.sort_by(|a, b| a.name.cmp(&b.name));
     results
@@ -317,35 +252,18 @@ fn scan_extensions_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        let file_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("")
-            .to_string();
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
         if file_name.starts_with('.') || file_name == "README.md" || file_name == "CHANGELOG.md" {
             continue;
         }
-        let is_ext_file =
-            path.is_file() && (file_name.ends_with(".ts") || file_name.ends_with(".js"));
-        let is_ext_dir =
-            path.is_dir() && (path.join("index.ts").exists() || path.join("index.js").exists());
+        let is_ext_file = path.is_file() && (file_name.ends_with(".ts") || file_name.ends_with(".js"));
+        let is_ext_dir = path.is_dir() && (path.join("index.ts").exists() || path.join("index.js").exists());
         if !is_ext_file && !is_ext_dir {
             continue;
         }
         let relative = format!("extensions/{file_name}");
         let enabled = is_resource_enabled(settings_list, &relative);
-        results.push(ResourceInfo {
-            name: file_name,
-            path: relative,
-            description: String::new(),
-            enabled,
-            resource_type: "extensions".to_string(),
-            metadata: ResourceMetadata {
-                source: "auto".to_string(),
-                scope: scope.to_string(),
-                origin: "top-level".to_string(),
-            },
-        });
+        results.push(ResourceInfo { name: file_name, path: relative, description: String::new(), enabled, resource_type: "extensions".to_string(), metadata: ResourceMetadata { source: "auto".to_string(), scope: scope.to_string(), origin: "top-level".to_string() } });
     }
     results.sort_by(|a, b| a.name.cmp(&b.name));
     results
@@ -362,37 +280,15 @@ fn scan_prompts_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<Re
         if !path.is_file() {
             continue;
         }
-        let file_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("")
-            .to_string();
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
         if !file_name.ends_with(".md") || file_name.starts_with('.') {
             continue;
         }
         let name = file_name.trim_end_matches(".md").to_string();
-        let description = fs::read_to_string(&path)
-            .ok()
-            .and_then(|c| {
-                c.lines()
-                    .next()
-                    .map(|s| s.trim().trim_start_matches("# ").to_string())
-            })
-            .unwrap_or_default();
+        let description = fs::read_to_string(&path).ok().and_then(|c| c.lines().next().map(|s| s.trim().trim_start_matches("# ").to_string())).unwrap_or_default();
         let relative = format!("prompts/{file_name}");
         let enabled = is_resource_enabled(settings_list, &relative);
-        results.push(ResourceInfo {
-            name,
-            path: relative,
-            description,
-            enabled,
-            resource_type: "prompts".to_string(),
-            metadata: ResourceMetadata {
-                source: "auto".to_string(),
-                scope: scope.to_string(),
-                origin: "top-level".to_string(),
-            },
-        });
+        results.push(ResourceInfo { name, path: relative, description, enabled, resource_type: "prompts".to_string(), metadata: ResourceMetadata { source: "auto".to_string(), scope: scope.to_string(), origin: "top-level".to_string() } });
     }
     results.sort_by(|a, b| a.name.cmp(&b.name));
     results
@@ -406,11 +302,7 @@ fn scan_themes_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<Res
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        let file_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("")
-            .to_string();
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
         if file_name.starts_with('.') {
             continue;
         }
@@ -420,81 +312,35 @@ fn scan_themes_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<Res
         }
         let relative = format!("themes/{file_name}");
         let enabled = is_resource_enabled(settings_list, &relative);
-        results.push(ResourceInfo {
-            name: file_name,
-            path: relative,
-            description: String::new(),
-            enabled,
-            resource_type: "themes".to_string(),
-            metadata: ResourceMetadata {
-                source: "auto".to_string(),
-                scope: scope.to_string(),
-                origin: "top-level".to_string(),
-            },
-        });
+        results.push(ResourceInfo { name: file_name, path: relative, description: String::new(), enabled, resource_type: "themes".to_string(), metadata: ResourceMetadata { source: "auto".to_string(), scope: scope.to_string(), origin: "top-level".to_string() } });
     }
     results.sort_by(|a, b| a.name.cmp(&b.name));
     results
 }
 
 pub async fn scan_all_resources_internal(cwd: Option<String>) -> Result<Vec<ResourceInfo>, String> {
-    let user_base = crate::paths::pi_agent_root_dir()
-        .map_err(|e| format!("Failed to get home directory: {e}"))?;
+    let user_base = crate::paths::pi_agent_root_dir().map_err(|e| format!("Failed to get home directory: {e}"))?;
     let user_settings_path = user_base.join("settings.json");
 
-    let (user_skills_cfg, user_ext_cfg, user_prompts_cfg, user_themes_cfg) =
-        read_settings_arrays(&user_settings_path);
+    let (user_skills_cfg, user_ext_cfg, user_prompts_cfg, user_themes_cfg) = read_settings_arrays(&user_settings_path);
 
     let mut all: Vec<ResourceInfo> = Vec::new();
 
-    all.extend(scan_skills_dir(
-        &user_base.join("skills"),
-        "user",
-        &user_skills_cfg,
-    ));
-    all.extend(scan_extensions_dir(
-        &user_base.join("extensions"),
-        "user",
-        &user_ext_cfg,
-    ));
-    all.extend(scan_prompts_dir(
-        &user_base.join("prompts"),
-        "user",
-        &user_prompts_cfg,
-    ));
-    all.extend(scan_themes_dir(
-        &user_base.join("themes"),
-        "user",
-        &user_themes_cfg,
-    ));
+    all.extend(scan_skills_dir(&user_base.join("skills"), "user", &user_skills_cfg));
+    all.extend(scan_extensions_dir(&user_base.join("extensions"), "user", &user_ext_cfg));
+    all.extend(scan_prompts_dir(&user_base.join("prompts"), "user", &user_prompts_cfg));
+    all.extend(scan_themes_dir(&user_base.join("themes"), "user", &user_themes_cfg));
 
     if let Some(cwd_str) = cwd {
         let project_base = crate::paths::project_pi_dir(&PathBuf::from(&cwd_str));
         if project_base.exists() {
             let project_settings_path = project_base.join("settings.json");
-            let (proj_skills_cfg, proj_ext_cfg, proj_prompts_cfg, proj_themes_cfg) =
-                read_settings_arrays(&project_settings_path);
+            let (proj_skills_cfg, proj_ext_cfg, proj_prompts_cfg, proj_themes_cfg) = read_settings_arrays(&project_settings_path);
 
-            all.extend(scan_skills_dir(
-                &project_base.join("skills"),
-                "project",
-                &proj_skills_cfg,
-            ));
-            all.extend(scan_extensions_dir(
-                &project_base.join("extensions"),
-                "project",
-                &proj_ext_cfg,
-            ));
-            all.extend(scan_prompts_dir(
-                &project_base.join("prompts"),
-                "project",
-                &proj_prompts_cfg,
-            ));
-            all.extend(scan_themes_dir(
-                &project_base.join("themes"),
-                "project",
-                &proj_themes_cfg,
-            ));
+            all.extend(scan_skills_dir(&project_base.join("skills"), "project", &proj_skills_cfg));
+            all.extend(scan_extensions_dir(&project_base.join("extensions"), "project", &proj_ext_cfg));
+            all.extend(scan_prompts_dir(&project_base.join("prompts"), "project", &proj_prompts_cfg));
+            all.extend(scan_themes_dir(&project_base.join("themes"), "project", &proj_themes_cfg));
         }
     }
 
@@ -519,9 +365,7 @@ fn resource_base_dir(scope: &str) -> Result<PathBuf, String> {
 pub async fn read_resource_file_internal(path: String, scope: String) -> Result<String, String> {
     let base = resource_base_dir(&scope)?;
     let full = base.join(&path);
-    let canonical = full
-        .canonicalize()
-        .map_err(|e| format!("Resolve path: {e}"))?;
+    let canonical = full.canonicalize().map_err(|e| format!("Resolve path: {e}"))?;
     let base_canonical = base.canonicalize().unwrap_or(base);
     if !canonical.starts_with(&base_canonical) {
         return Err("Path traversal denied".into());

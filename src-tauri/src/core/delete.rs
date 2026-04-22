@@ -22,9 +22,7 @@ pub fn delete_session_file_and_cache(path: &str) -> Result<DeleteSessionOutcome,
     }
 
     let session_path = Path::new(path);
-    let canonical_session_path = fs::canonicalize(session_path)
-        .ok()
-        .and_then(|canonical| canonical.to_str().map(str::to_string));
+    let canonical_session_path = fs::canonicalize(session_path).ok().and_then(|canonical| canonical.to_str().map(str::to_string));
 
     let deletion_method = if !session_path.exists() {
         DeletionMethod::AlreadyMissing
@@ -46,9 +44,7 @@ pub fn delete_session_file_and_cache(path: &str) -> Result<DeleteSessionOutcome,
     }
     scanner::remove_cached_sessions(&removed_paths);
 
-    Ok(DeleteSessionOutcome {
-        method: deletion_method,
-    })
+    Ok(DeleteSessionOutcome { method: deletion_method })
 }
 
 fn cleanup_session_cache(path: &str, canonical_path: Option<&str>) -> Result<(), String> {
@@ -73,18 +69,14 @@ fn delete_session_file(path: &Path) -> Result<DeletionMethod, String> {
     {
         match trash::delete(path) {
             Ok(_) => Ok(DeletionMethod::Trash),
-            Err(error) if is_recoverable_delete_unavailable(&error) => {
-                delete_file_permanently(path)
-                    .map_err(|io_error| format!("Failed to delete session: {io_error}"))
-            }
+            Err(error) if is_recoverable_delete_unavailable(&error) => delete_file_permanently(path).map_err(|io_error| format!("Failed to delete session: {io_error}")),
             Err(error) => Err(format!("Failed to move session to trash: {error}")),
         }
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
-        delete_file_permanently(path)
-            .map_err(|io_error| format!("Failed to delete session: {io_error}"))
+        delete_file_permanently(path).map_err(|io_error| format!("Failed to delete session: {io_error}"))
     }
 }
 
@@ -100,16 +92,5 @@ fn delete_file_permanently(path: &Path) -> Result<DeletionMethod, std::io::Error
 fn is_recoverable_delete_unavailable(error: &trash::Error) -> bool {
     let error_text = error.to_string().to_lowercase();
 
-    [
-        "not supported",
-        "unsupported",
-        "trash is disabled",
-        "recycle bin is disabled",
-        "recycle bin unavailable",
-        "trash directory is not available",
-        "can't get application",
-        "can’t get application",
-    ]
-    .iter()
-    .any(|indicator| error_text.contains(indicator))
+    ["not supported", "unsupported", "trash is disabled", "recycle bin is disabled", "recycle bin unavailable", "trash directory is not available", "can't get application", "can’t get application"].iter().any(|indicator| error_text.contains(indicator))
 }

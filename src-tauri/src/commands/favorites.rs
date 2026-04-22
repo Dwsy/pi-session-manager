@@ -31,8 +31,7 @@ fn get_conn() -> Result<rusqlite::Connection, String> {
 
 fn write_favorites_file(file: &FavoritesFile) -> Result<(), String> {
     let path = favorites_path()?;
-    let content =
-        serde_json::to_string_pretty(file).map_err(|e| format!("Serialize favorites: {e}"))?;
+    let content = serde_json::to_string_pretty(file).map_err(|e| format!("Serialize favorites: {e}"))?;
     fs::write(&path, content).map_err(|e| format!("Write favorites: {e}"))
 }
 
@@ -44,51 +43,17 @@ fn load_favorites_file() -> Result<FavoritesFile, String> {
     }
 
     let conn = get_conn()?;
-    let db_favorites = conn
-        .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='favorites'",
-            [],
-            |row| row.get::<_, i64>(0),
-        )
-        .map(|count| count > 0)
-        .unwrap_or(false)
-        .then(|| crate::data::sqlite::get_all_favorites(&conn))
-        .transpose()?
-        .unwrap_or_default();
-    let file = FavoritesFile {
-        version: 1,
-        migrated_at: Some(Utc::now().to_rfc3339()),
-        favorites: db_favorites
-            .into_iter()
-            .map(|f| FavoriteItem {
-                id: f.id,
-                favorite_type: f.favorite_type,
-                name: f.name,
-                path: f.path,
-                added_at: f.added_at,
-            })
-            .collect(),
-    };
+    let db_favorites = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='favorites'", [], |row| row.get::<_, i64>(0)).map(|count| count > 0).unwrap_or(false).then(|| crate::data::sqlite::get_all_favorites(&conn)).transpose()?.unwrap_or_default();
+    let file = FavoritesFile { version: 1, migrated_at: Some(Utc::now().to_rfc3339()), favorites: db_favorites.into_iter().map(|f| FavoriteItem { id: f.id, favorite_type: f.favorite_type, name: f.name, path: f.path, added_at: f.added_at }).collect() };
     write_favorites_file(&file)?;
     Ok(file)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn add_favorite(
-    id: String,
-    favorite_type: String,
-    name: String,
-    path: String,
-) -> Result<(), String> {
+pub async fn add_favorite(id: String, favorite_type: String, name: String, path: String) -> Result<(), String> {
     let mut file = load_favorites_file()?;
     file.favorites.retain(|item| item.id != id);
-    file.favorites.push(FavoriteItem {
-        id,
-        favorite_type,
-        name,
-        path,
-        added_at: Utc::now().to_rfc3339(),
-    });
+    file.favorites.push(FavoriteItem { id, favorite_type, name, path, added_at: Utc::now().to_rfc3339() });
     write_favorites_file(&file)
 }
 
@@ -112,25 +77,14 @@ pub async fn is_favorite(id: String) -> Result<bool, String> {
     Ok(file.favorites.iter().any(|item| item.id == id))
 }
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn toggle_favorite(
-    id: String,
-    favorite_type: String,
-    name: String,
-    path: String,
-) -> Result<bool, String> {
+pub async fn toggle_favorite(id: String, favorite_type: String, name: String, path: String) -> Result<bool, String> {
     let mut file = load_favorites_file()?;
     if file.favorites.iter().any(|item| item.id == id) {
         file.favorites.retain(|item| item.id != id);
         write_favorites_file(&file)?;
         Ok(false)
     } else {
-        file.favorites.push(FavoriteItem {
-            id,
-            favorite_type,
-            name,
-            path,
-            added_at: Utc::now().to_rfc3339(),
-        });
+        file.favorites.push(FavoriteItem { id, favorite_type, name, path, added_at: Utc::now().to_rfc3339() });
         write_favorites_file(&file)?;
         Ok(true)
     }

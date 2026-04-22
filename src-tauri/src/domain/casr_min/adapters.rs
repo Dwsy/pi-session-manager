@@ -8,11 +8,7 @@ use crate::types::{Content, Message, SessionEntry, SessionInfo};
 
 use super::model::{CanonicalMessage, CanonicalSession, MessageRole};
 
-pub fn canonical_to_session_info(
-    canonical: &CanonicalSession,
-    path: &Path,
-    modified: DateTime<Utc>,
-) -> SessionInfo {
+pub fn canonical_to_session_info(canonical: &CanonicalSession, path: &Path, modified: DateTime<Utc>) -> SessionInfo {
     let entries = canonical_to_session_entries(canonical);
     let mut message_count = 0usize;
     let mut first_message = String::new();
@@ -30,14 +26,7 @@ pub fn canonical_to_session_info(
             continue;
         }
         message_count += 1;
-        let text = message
-            .content
-            .iter()
-            .filter_map(|item| item.text.as_ref())
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect::<Vec<_>>()
-            .join("\n");
+        let text = message.content.iter().filter_map(|item| item.text.as_ref()).map(|v| v.trim()).filter(|v| !v.is_empty()).collect::<Vec<_>>().join("\n");
         if text.is_empty() {
             continue;
         }
@@ -57,16 +46,9 @@ pub fn canonical_to_session_info(
     SessionInfo {
         path: path.to_string_lossy().to_string(),
         id: canonical_session_cache_id(canonical, path),
-        cwd: canonical
-            .workspace
-            .as_ref()
-            .map(|value| value.to_string_lossy().to_string())
-            .unwrap_or_default(),
+        cwd: canonical.workspace.as_ref().map(|value| value.to_string_lossy().to_string()).unwrap_or_default(),
         name: canonical.title.clone(),
-        created: canonical
-            .started_at
-            .and_then(DateTime::<Utc>::from_timestamp_millis)
-            .unwrap_or(modified),
+        created: canonical.started_at.and_then(DateTime::<Utc>::from_timestamp_millis).unwrap_or(modified),
         modified,
         message_count,
         first_message,
@@ -87,29 +69,16 @@ pub fn canonical_to_session_entries(canonical: &CanonicalSession) -> Vec<Session
         let mut content = Vec::new();
 
         if !message.content.trim().is_empty() {
-            let content_type = if message.author.as_deref() == Some("reasoning") {
-                "thinking".to_string()
-            } else {
-                "text".to_string()
-            };
-            content.push(Content {
-                content_type,
-                text: Some(message.content.trim().to_string()),
-            });
+            let content_type = if message.author.as_deref() == Some("reasoning") { "thinking".to_string() } else { "text".to_string() };
+            content.push(Content { content_type, text: Some(message.content.trim().to_string()) });
         }
         for tool_call in &message.tool_calls {
-            content.push(Content {
-                content_type: "toolCall".to_string(),
-                text: Some(tool_call.name.clone()),
-            });
+            content.push(Content { content_type: "toolCall".to_string(), text: Some(tool_call.name.clone()) });
         }
         if matches!(message.role, MessageRole::Tool) {
             for tool_result in &message.tool_results {
                 if !tool_result.content.trim().is_empty() {
-                    content.push(Content {
-                        content_type: "text".to_string(),
-                        text: Some(tool_result.content.trim().to_string()),
-                    });
+                    content.push(Content { content_type: "text".to_string(), text: Some(tool_result.content.trim().to_string()) });
                 }
             }
         }
@@ -124,20 +93,9 @@ pub fn canonical_to_session_entries(canonical: &CanonicalSession) -> Vec<Session
             MessageRole::System => "system".to_string(),
             MessageRole::Other(ref other) => other.clone(),
         };
-        let timestamp = message
-            .timestamp
-            .and_then(DateTime::<Utc>::from_timestamp_millis)
-            .unwrap_or_else(Utc::now);
+        let timestamp = message.timestamp.and_then(DateTime::<Utc>::from_timestamp_millis).unwrap_or_else(Utc::now);
 
-        entries.push(SessionEntry {
-            entry_type: "message".to_string(),
-            id: id.clone(),
-            parent_id: previous_id.clone(),
-            timestamp,
-            message: Some(Message { role, content }),
-            target_id: None,
-            label: None,
-        });
+        entries.push(SessionEntry { entry_type: "message".to_string(), id: id.clone(), parent_id: previous_id.clone(), timestamp, message: Some(Message { role, content }), target_id: None, label: None });
         previous_id = Some(id);
     }
 
@@ -154,12 +112,7 @@ fn canonical_session_cache_id(canonical: &CanonicalSession, path: &Path) -> Stri
     let digest = format!("{:x}", hasher.finalize());
     let short = &digest[..12];
 
-    format!(
-        "{}:{}:{}",
-        canonical.provider_slug.replace('_', "-"),
-        canonical.session_id,
-        short
-    )
+    format!("{}:{}:{}", canonical.provider_slug.replace('_', "-"), canonical.session_id, short)
 }
 
 fn canonical_message_id(canonical: &CanonicalSession, message: &CanonicalMessage) -> String {
@@ -168,27 +121,9 @@ fn canonical_message_id(canonical: &CanonicalSession, message: &CanonicalMessage
         .get("uuid")
         .and_then(Value::as_str)
         .map(str::to_string)
-        .or_else(|| {
-            message
-                .extra
-                .pointer("/payload/id")
-                .and_then(Value::as_str)
-                .map(str::to_string)
-        })
-        .or_else(|| {
-            message
-                .extra
-                .pointer("/payload/call_id")
-                .and_then(Value::as_str)
-                .map(str::to_string)
-        })
-        .or_else(|| {
-            message
-                .extra
-                .get("id")
-                .and_then(Value::as_str)
-                .map(str::to_string)
-        })
+        .or_else(|| message.extra.pointer("/payload/id").and_then(Value::as_str).map(str::to_string))
+        .or_else(|| message.extra.pointer("/payload/call_id").and_then(Value::as_str).map(str::to_string))
+        .or_else(|| message.extra.get("id").and_then(Value::as_str).map(str::to_string))
         .unwrap_or_else(|| format!("{}-{:04}", canonical.session_id, message.idx))
 }
 

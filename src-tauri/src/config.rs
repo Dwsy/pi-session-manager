@@ -155,20 +155,10 @@ impl Config {
     }
 
     pub fn effective_active_dataset_ids(&self) -> Vec<String> {
-        let mut values = self
-            .active_dataset_ids
-            .iter()
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty())
-            .collect::<Vec<_>>();
+        let mut values = self.active_dataset_ids.iter().map(|value| value.trim().to_string()).filter(|value| !value.is_empty()).collect::<Vec<_>>();
 
         if values.is_empty() {
-            if let Some(value) = self
-                .active_dataset_id
-                .as_ref()
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty())
-            {
+            if let Some(value) = self.active_dataset_id.as_ref().map(|value| value.trim().to_string()).filter(|value| !value.is_empty()) {
                 values.push(value);
             }
         }
@@ -179,12 +169,7 @@ impl Config {
     }
 
     pub fn effective_external_session_provider_slugs(&self) -> Vec<String> {
-        let mut values = self
-            .external_session_provider_slugs
-            .iter()
-            .map(|value| value.trim().to_ascii_lowercase())
-            .filter(|value| !value.is_empty())
-            .collect::<Vec<_>>();
+        let mut values = self.external_session_provider_slugs.iter().map(|value| value.trim().to_ascii_lowercase()).filter(|value| !value.is_empty()).collect::<Vec<_>>();
 
         if values.is_empty() && self.scan_other_agent_jsonl {
             values = crate::domain::session_bridge::default_external_session_provider_slugs();
@@ -202,13 +187,11 @@ pub fn get_config_path() -> Result<PathBuf, String> {
 
 pub fn load_config() -> Result<Config, String> {
     let value = crate::unified_config::read_section("session")?;
-    serde_json::from_value::<Config>(value)
-        .map_err(|e| format!("Failed to parse session config: {e}"))
+    serde_json::from_value::<Config>(value).map_err(|e| format!("Failed to parse session config: {e}"))
 }
 
 pub fn save_config(config: &Config) -> Result<(), String> {
-    let value = serde_json::to_value(config)
-        .map_err(|e| format!("Failed to serialize session config: {e}"))?;
+    let value = serde_json::to_value(config).map_err(|e| format!("Failed to serialize session config: {e}"))?;
     crate::unified_config::write_section("session", value)
 }
 

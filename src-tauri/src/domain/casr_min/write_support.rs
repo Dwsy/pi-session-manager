@@ -23,71 +23,36 @@ pub struct AtomicWriteOutcome {
 
 static SESSION_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-pub fn build_write_plan(
-    canonical: &CanonicalSession,
-    target: ProviderKind,
-    now: DateTime<Utc>,
-) -> Result<WritePlan, String> {
+pub fn build_write_plan(canonical: &CanonicalSession, target: ProviderKind, now: DateTime<Utc>) -> Result<WritePlan, String> {
     let target_session_id = generate_session_id();
     let target_path = target.build_target_path(canonical, &target_session_id, now)?;
     let resume_command = target.resume_command(&target_session_id, &target_path);
-    Ok(WritePlan {
-        target_session_id,
-        target_path,
-        resume_command,
-    })
+    Ok(WritePlan { target_session_id, target_path, resume_command })
 }
 
-pub fn atomic_write(
-    target_path: &Path,
-    content: &[u8],
-    force: bool,
-    provider_name: &str,
-) -> Result<AtomicWriteOutcome, String> {
-    let parent = target_path
-        .parent()
-        .ok_or_else(|| format!("{provider_name}: target path has no parent directory"))?;
-    fs::create_dir_all(parent)
-        .map_err(|e| format!("{provider_name}: failed to create target directory: {e}"))?;
+pub fn atomic_write(target_path: &Path, content: &[u8], force: bool, provider_name: &str) -> Result<AtomicWriteOutcome, String> {
+    let parent = target_path.parent().ok_or_else(|| format!("{provider_name}: target path has no parent directory"))?;
+    fs::create_dir_all(parent).map_err(|e| format!("{provider_name}: failed to create target directory: {e}"))?;
 
     let backup_path = if target_path.exists() {
         if !force {
-            return Err(format!(
-                "{provider_name}: target already exists at {} (pass force to overwrite)",
-                target_path.display()
-            ));
+            return Err(format!("{provider_name}: target already exists at {} (pass force to overwrite)", target_path.display()));
         }
         let backup_path = next_backup_path(target_path);
-        fs::rename(target_path, &backup_path).map_err(|e| {
-            format!(
-                "{provider_name}: failed to create backup {}: {e}",
-                backup_path.display()
-            )
-        })?;
+        fs::rename(target_path, &backup_path).map_err(|e| format!("{provider_name}: failed to create backup {}: {e}", backup_path.display()))?;
         Some(backup_path)
     } else {
         None
     };
 
-    let temp_path = parent.join(format!(
-        ".{}.{}.tmp",
-        target_path
-            .file_name()
-            .and_then(|v| v.to_str())
-            .unwrap_or("session"),
-        SESSION_ID_COUNTER.fetch_add(1, Ordering::Relaxed)
-    ));
+    let temp_path = parent.join(format!(".{}.{}.tmp", target_path.file_name().and_then(|v| v.to_str()).unwrap_or("session"), SESSION_ID_COUNTER.fetch_add(1, Ordering::Relaxed)));
 
     let write_result = (|| -> Result<(), String> {
-        let mut file = fs::File::create(&temp_path)
-            .map_err(|e| format!("{provider_name}: failed to create temp file: {e}"))?;
-        file.write_all(content)
-            .map_err(|e| format!("{provider_name}: failed to write temp file: {e}"))?;
-        file.flush()
-            .map_err(|e| format!("{provider_name}: failed to flush temp file: {e}"))?;
+        let mut file = fs::File::create(&temp_path).map_err(|e| format!("{provider_name}: failed to create temp file: {e}"))?;
+        file.write_all(content).map_err(|e| format!("{provider_name}: failed to write temp file: {e}"))?;
+        file.flush().map_err(|e| format!("{provider_name}: failed to flush temp file: {e}"))?;
         drop(file);
-        fs::rename(&temp_path, target_path)
-            .map_err(|e| format!("{provider_name}: failed to move temp file into place: {e}"))?;
+        fs::rename(&temp_path, target_path).map_err(|e| format!("{provider_name}: failed to move temp file into place: {e}"))?;
         Ok(())
     })();
 
@@ -99,86 +64,48 @@ pub fn atomic_write(
         return Err(error);
     }
 
-    Ok(AtomicWriteOutcome {
-        target_path: target_path.to_path_buf(),
-        backup_path,
-    })
+    Ok(AtomicWriteOutcome { target_path: target_path.to_path_buf(), backup_path })
 }
 
 pub fn restore_backup(outcome: &AtomicWriteOutcome) -> Result<(), String> {
     if let Some(backup) = &outcome.backup_path {
         let _ = fs::remove_file(&outcome.target_path);
-        fs::rename(backup, &outcome.target_path)
-            .map_err(|e| format!("Failed to restore backup {}: {e}", backup.display()))
+        fs::rename(backup, &outcome.target_path).map_err(|e| format!("Failed to restore backup {}: {e}", backup.display()))
     } else {
-        fs::remove_file(&outcome.target_path)
-            .map_err(|e| format!("Failed to remove invalid target file: {e}"))
+        fs::remove_file(&outcome.target_path).map_err(|e| format!("Failed to remove invalid target file: {e}"))
     }
 }
 
-pub fn verify_written_session(
-    original: &CanonicalSession,
-    target: ProviderKind,
-    target_path: &Path,
-) -> Result<(), String> {
+pub fn verify_written_session(original: &CanonicalSession, target: ProviderKind, target_path: &Path) -> Result<(), String> {
     let readback = target.read_session(target_path)?;
     let original_messages = verification_messages(original);
     let readback_messages = verification_messages(&readback);
 
     if original_messages.len() != readback_messages.len() {
-        return Err(format!(
-            "Read-back verification failed for {}: wrote {} messages, read back {}",
-            target.display_name(),
-            original_messages.len(),
-            readback_messages.len()
-        ));
+        return Err(format!("Read-back verification failed for {}: wrote {} messages, read back {}", target.display_name(), original_messages.len(), readback_messages.len()));
     }
 
-    for (index, (expected, actual)) in original_messages
-        .iter()
-        .zip(readback_messages.iter())
-        .enumerate()
-    {
+    for (index, (expected, actual)) in original_messages.iter().zip(readback_messages.iter()).enumerate() {
         if verification_role_bucket(&expected.role) != verification_role_bucket(&actual.role) {
-            return Err(format!(
-                "Read-back verification failed for {} at message {}: role mismatch",
-                target.display_name(),
-                index
-            ));
+            return Err(format!("Read-back verification failed for {} at message {}: role mismatch", target.display_name(), index));
         }
         let expected_text = verification_text(expected);
         let actual_text = verification_text(actual);
         if expected_text != actual_text {
-            return Err(format!(
-                "Read-back verification failed for {} at message {}: content mismatch (expected={:?}, actual={:?})",
-                target.display_name(),
-                index,
-                truncate_verify_debug(&expected_text),
-                truncate_verify_debug(&actual_text),
-            ));
+            return Err(format!("Read-back verification failed for {} at message {}: content mismatch (expected={:?}, actual={:?})", target.display_name(), index, truncate_verify_debug(&expected_text), truncate_verify_debug(&actual_text),));
         }
     }
     Ok(())
 }
 
 fn verification_messages(session: &CanonicalSession) -> Vec<&CanonicalMessage> {
-    session
-        .messages
-        .iter()
-        .filter(|message| {
-            !message.content.trim().is_empty()
-                || !message.tool_calls.is_empty()
-                || !message.tool_results.is_empty()
-        })
-        .collect()
+    session.messages.iter().filter(|message| !message.content.trim().is_empty() || !message.tool_calls.is_empty() || !message.tool_results.is_empty()).collect()
 }
 
 fn verification_role_bucket(role: &MessageRole) -> &'static str {
     match role {
         MessageRole::Assistant => "assistant",
-        MessageRole::User | MessageRole::Tool | MessageRole::System | MessageRole::Other(_) => {
-            "user_like"
-        }
+        MessageRole::User | MessageRole::Tool | MessageRole::System | MessageRole::Other(_) => "user_like",
     }
 }
 
@@ -191,14 +118,7 @@ fn verification_text(message: &CanonicalMessage) -> String {
         return normalize_verify_text(&message.content);
     }
     if !message.tool_results.is_empty() {
-        return normalize_verify_text(
-            &message
-                .tool_results
-                .iter()
-                .map(|result| result.content.as_str())
-                .collect::<Vec<_>>()
-                .join("\n"),
-        );
+        return normalize_verify_text(&message.tool_results.iter().map(|result| result.content.as_str()).collect::<Vec<_>>().join("\n"));
     }
     String::new()
 }
@@ -209,19 +129,13 @@ fn truncate_verify_debug(text: &str) -> String {
     if chars.len() <= MAX {
         return text.to_string();
     }
-    let mut out = chars
-        .into_iter()
-        .take(MAX.saturating_sub(3))
-        .collect::<String>();
+    let mut out = chars.into_iter().take(MAX.saturating_sub(3)).collect::<String>();
     out.push_str("...");
     out
 }
 
 fn next_backup_path(target_path: &Path) -> PathBuf {
-    let name = target_path
-        .file_name()
-        .and_then(|v| v.to_str())
-        .unwrap_or("session");
+    let name = target_path.file_name().and_then(|v| v.to_str()).unwrap_or("session");
     let mut candidate = target_path.with_file_name(format!("{name}.bak"));
     if !candidate.exists() {
         return candidate;
@@ -237,21 +151,11 @@ fn next_backup_path(target_path: &Path) -> PathBuf {
 }
 
 fn generate_session_id() -> String {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
+    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|duration| duration.as_nanos()).unwrap_or_default();
     let counter = SESSION_ID_COUNTER.fetch_add(1, Ordering::Relaxed) as u128;
     let mut hex = format!("{:032x}", nanos ^ counter);
     if hex.len() < 32 {
         hex = format!("{hex:0>32}");
     }
-    format!(
-        "{}-{}-{}-{}-{}",
-        &hex[0..8],
-        &hex[8..12],
-        &hex[12..16],
-        &hex[16..20],
-        &hex[20..32]
-    )
+    format!("{}-{}-{}-{}-{}", &hex[0..8], &hex[8..12], &hex[12..16], &hex[16..20], &hex[20..32])
 }

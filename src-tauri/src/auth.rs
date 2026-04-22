@@ -38,11 +38,7 @@ struct AuthTokensFile {
 
 impl Default for AuthTokensFile {
     fn default() -> Self {
-        Self {
-            version: 1,
-            migrated_at: None,
-            tokens: Vec::new(),
-        }
+        Self { version: 1, migrated_at: None, tokens: Vec::new() }
     }
 }
 
@@ -62,66 +58,39 @@ fn open_legacy_db() -> Result<rusqlite::Connection, String> {
 }
 
 fn table_exists(conn: &rusqlite::Connection, table: &str) -> bool {
-    conn.query_row(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?1",
-        rusqlite::params![table],
-        |row| row.get::<_, i64>(0),
-    )
-    .map(|count| count > 0)
-    .unwrap_or(false)
+    conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?1", rusqlite::params![table], |row| row.get::<_, i64>(0)).map(|count| count > 0).unwrap_or(false)
 }
 
 fn write_tokens_file(file: &AuthTokensFile) -> Result<(), String> {
     let path = auth_tokens_path()?;
-    let content =
-        serde_json::to_string_pretty(file).map_err(|e| format!("Serialize auth tokens: {e}"))?;
+    let content = serde_json::to_string_pretty(file).map_err(|e| format!("Serialize auth tokens: {e}"))?;
     std::fs::write(&path, content).map_err(|e| format!("Write auth tokens: {e}"))
 }
 
 fn load_tokens_file() -> Result<AuthTokensFile, String> {
     let path = auth_tokens_path()?;
     if path.exists() {
-        let content =
-            std::fs::read_to_string(&path).map_err(|e| format!("Read auth tokens: {e}"))?;
+        let content = std::fs::read_to_string(&path).map_err(|e| format!("Read auth tokens: {e}"))?;
         return serde_json::from_str(&content).map_err(|e| format!("Parse auth tokens: {e}"));
     }
 
     let conn = open_legacy_db()?;
     let tokens = if table_exists(&conn, "auth_tokens") {
-        let mut stmt = conn
-            .prepare("SELECT token, name, created_at, last_used FROM auth_tokens ORDER BY created_at DESC")
-            .map_err(|e| format!("Prepare auth token migration: {e}"))?;
-        let rows = stmt
-            .query_map([], |row| {
-                Ok(StoredToken {
-                    token: row.get(0)?,
-                    name: row.get(1)?,
-                    created_at: row.get(2)?,
-                    last_used: row.get(3)?,
-                })
-            })
-            .map_err(|e| format!("Query auth token migration: {e}"))?;
+        let mut stmt = conn.prepare("SELECT token, name, created_at, last_used FROM auth_tokens ORDER BY created_at DESC").map_err(|e| format!("Prepare auth token migration: {e}"))?;
+        let rows = stmt.query_map([], |row| Ok(StoredToken { token: row.get(0)?, name: row.get(1)?, created_at: row.get(2)?, last_used: row.get(3)? })).map_err(|e| format!("Query auth token migration: {e}"))?;
         rows.filter_map(Result::ok).collect::<Vec<_>>()
     } else {
         Vec::new()
     };
 
-    let file = AuthTokensFile {
-        version: 1,
-        migrated_at: Some(chrono::Utc::now().to_rfc3339()),
-        tokens,
-    };
+    let file = AuthTokensFile { version: 1, migrated_at: Some(chrono::Utc::now().to_rfc3339()), tokens };
     write_tokens_file(&file)?;
     Ok(file)
 }
 
 fn reload_tokens() -> Result<(), String> {
     let file = load_tokens_file()?;
-    let tokens = file
-        .tokens
-        .into_iter()
-        .map(|item| item.token)
-        .collect::<HashSet<_>>();
+    let tokens = file.tokens.into_iter().map(|item| item.token).collect::<HashSet<_>>();
     *TOKENS.lock().expect("mutex poisoned") = tokens;
     Ok(())
 }
@@ -132,12 +101,7 @@ pub fn init() -> Result<String, String> {
     let token = if let Some(existing) = file.tokens.first() {
         existing.token.clone()
     } else {
-        let default = StoredToken {
-            token: "pi-session-manager".to_string(),
-            name: "default".to_string(),
-            created_at: chrono::Utc::now().to_rfc3339(),
-            last_used: None,
-        };
+        let default = StoredToken { token: "pi-session-manager".to_string(), name: "default".to_string(), created_at: chrono::Utc::now().to_rfc3339(), last_used: None };
         let token = default.token.clone();
         file.tokens.push(default);
         write_tokens_file(&file)?;
@@ -151,20 +115,7 @@ pub fn init() -> Result<String, String> {
 
 pub fn list_tokens() -> Result<Vec<TokenInfo>, String> {
     let file = load_tokens_file()?;
-    Ok(file
-        .tokens
-        .into_iter()
-        .map(|token| TokenInfo {
-            name: token.name,
-            key_preview: if token.token.len() >= 8 {
-                format!("{}…", &token.token[..8])
-            } else {
-                token.token.clone()
-            },
-            created_at: token.created_at,
-            last_used: token.last_used,
-        })
-        .collect())
+    Ok(file.tokens.into_iter().map(|token| TokenInfo { name: token.name, key_preview: if token.token.len() >= 8 { format!("{}…", &token.token[..8]) } else { token.token.clone() }, created_at: token.created_at, last_used: token.last_used }).collect())
 }
 
 pub fn create_token(name: &str, token_value: Option<&str>) -> Result<String, String> {
@@ -184,12 +135,7 @@ pub fn create_token(name: &str, token_value: Option<&str>) -> Result<String, Str
         return Err("Token already exists".to_string());
     }
 
-    file.tokens.push(StoredToken {
-        token: token.clone(),
-        name: name.to_string(),
-        created_at: chrono::Utc::now().to_rfc3339(),
-        last_used: None,
-    });
+    file.tokens.push(StoredToken { token: token.clone(), name: name.to_string(), created_at: chrono::Utc::now().to_rfc3339(), last_used: None });
     write_tokens_file(&file)?;
     reload_tokens()?;
     Ok(token)
@@ -264,9 +210,6 @@ fn generate_token() -> String {
             return buf.iter().map(|b| format!("{b:02x}")).collect();
         }
     }
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
+    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     format!("psm-{nanos:x}")
 }

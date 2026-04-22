@@ -3,10 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{json, Map, Value};
 
-use crate::domain::casr_min::model::{
-    flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title,
-    CanonicalMessage, CanonicalSession, MessageRole,
-};
+use crate::domain::casr_min::model::{flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole};
 
 pub fn session_roots() -> Vec<PathBuf> {
     let root = home_dir();
@@ -19,8 +16,7 @@ pub fn session_roots() -> Vec<PathBuf> {
 
 pub fn matches_path(path: &Path) -> bool {
     let normalized = path.to_string_lossy().replace('\\', "/");
-    normalized.contains("/.clawdbot/sessions/")
-        && path.extension().and_then(|ext| ext.to_str()) == Some("jsonl")
+    normalized.contains("/.clawdbot/sessions/") && path.extension().and_then(|ext| ext.to_str()) == Some("jsonl")
 }
 
 pub fn build_target_path(target_session_id: &str) -> Result<PathBuf, String> {
@@ -32,8 +28,7 @@ pub fn resume_command(session_id: &str) -> String {
 }
 
 pub fn read_session(path: &Path) -> Result<CanonicalSession, String> {
-    let file =
-        std::fs::File::open(path).map_err(|e| format!("failed to open {}: {e}", path.display()))?;
+    let file = std::fs::File::open(path).map_err(|e| format!("failed to open {}: {e}", path.display()))?;
     read_session_from_reader(path, BufReader::new(file))
 }
 
@@ -41,10 +36,7 @@ pub fn read_session_from_str(path: &Path, content: &str) -> Result<CanonicalSess
     read_session_from_reader(path, BufReader::new(content.as_bytes()))
 }
 
-pub fn render_session(
-    session: &CanonicalSession,
-    _target_session_id: &str,
-) -> Result<String, String> {
+pub fn render_session(session: &CanonicalSession, _target_session_id: &str) -> Result<String, String> {
     let mut lines = Vec::with_capacity(session.messages.len());
 
     for msg in &session.messages {
@@ -58,10 +50,7 @@ pub fn render_session(
         let mut obj = Map::new();
         obj.insert("role".into(), Value::String(role_str.to_string()));
         obj.insert("content".into(), Value::String(msg.content.clone()));
-        if let Some(ts) = msg
-            .timestamp
-            .and_then(chrono::DateTime::from_timestamp_millis)
-        {
+        if let Some(ts) = msg.timestamp.and_then(chrono::DateTime::from_timestamp_millis) {
             obj.insert("timestamp".into(), Value::String(ts.to_rfc3339()));
         }
         lines.push(serde_json::to_string(&Value::Object(obj)).map_err(|e| e.to_string())?);
@@ -74,16 +63,10 @@ fn home_dir() -> PathBuf {
     if let Ok(home) = std::env::var("CLAWDBOT_HOME") {
         return PathBuf::from(home);
     }
-    dirs::home_dir()
-        .unwrap_or_default()
-        .join(".clawdbot")
-        .join("sessions")
+    dirs::home_dir().unwrap_or_default().join(".clawdbot").join("sessions")
 }
 
-fn read_session_from_reader<R: BufRead>(
-    path: &Path,
-    reader: R,
-) -> Result<CanonicalSession, String> {
+fn read_session_from_reader<R: BufRead>(path: &Path, reader: R) -> Result<CanonicalSession, String> {
     let mut messages = Vec::new();
     let mut started_at = None;
     let mut ended_at = None;
@@ -102,10 +85,7 @@ fn read_session_from_reader<R: BufRead>(
             Err(_) => continue,
         };
 
-        let role_str = val
-            .get("role")
-            .and_then(Value::as_str)
-            .unwrap_or("assistant");
+        let role_str = val.get("role").and_then(Value::as_str).unwrap_or("assistant");
         let role = normalize_role(role_str);
         let content = val.get("content").map(flatten_content).unwrap_or_default();
         if content.trim().is_empty() {
@@ -120,32 +100,16 @@ fn read_session_from_reader<R: BufRead>(
             ended_at = ts;
         }
 
-        messages.push(CanonicalMessage {
-            idx: 0,
-            role,
-            content,
-            timestamp: ts,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: val,
-        });
+        messages.push(CanonicalMessage { idx: 0, role, content, timestamp: ts, author: None, tool_calls: vec![], tool_results: vec![], extra: val });
     }
 
     reindex_messages(&mut messages);
 
     Ok(CanonicalSession {
-        session_id: path
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .unwrap_or("unknown")
-            .to_string(),
+        session_id: path.file_stem().and_then(|stem| stem.to_str()).unwrap_or("unknown").to_string(),
         provider_slug: "clawdbot".to_string(),
         workspace: None,
-        title: messages
-            .iter()
-            .find(|message| message.role == MessageRole::User)
-            .map(|message| truncate_title(&message.content, 100)),
+        title: messages.iter().find(|message| message.role == MessageRole::User).map(|message| truncate_title(&message.content, 100)),
         started_at,
         ended_at,
         messages,

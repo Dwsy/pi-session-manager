@@ -46,47 +46,25 @@ struct SessionMarkFile {
 
 impl Default for TagsConfigFile {
     fn default() -> Self {
-        Self {
-            version: 1,
-            migrated_at: None,
-            tags: Vec::new(),
-        }
+        Self { version: 1, migrated_at: None, tags: Vec::new() }
     }
 }
 
 impl Default for SessionMarkFile {
     fn default() -> Self {
-        Self {
-            version: 1,
-            migrated_at: None,
-            session_tags: Vec::new(),
-        }
+        Self { version: 1, migrated_at: None, session_tags: Vec::new() }
     }
 }
 
 impl From<crate::data::sqlite::DbTag> for TagItem {
     fn from(t: crate::data::sqlite::DbTag) -> Self {
-        Self {
-            id: t.id,
-            name: t.name,
-            color: t.color,
-            icon: t.icon,
-            sort_order: t.sort_order,
-            is_builtin: t.is_builtin,
-            created_at: t.created_at,
-            parent_id: t.parent_id,
-        }
+        Self { id: t.id, name: t.name, color: t.color, icon: t.icon, sort_order: t.sort_order, is_builtin: t.is_builtin, created_at: t.created_at, parent_id: t.parent_id }
     }
 }
 
 impl From<crate::data::sqlite::DbSessionTag> for SessionTagItem {
     fn from(t: crate::data::sqlite::DbSessionTag) -> Self {
-        Self {
-            session_id: t.session_id,
-            tag_id: t.tag_id,
-            position: t.position,
-            assigned_at: t.assigned_at,
-        }
+        Self { session_id: t.session_id, tag_id: t.tag_id, position: t.position, assigned_at: t.assigned_at }
     }
 }
 
@@ -115,19 +93,12 @@ fn write_json_file<T: serde::Serialize>(path: &PathBuf, value: &T) -> Result<(),
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Create {}: {e}", parent.display()))?;
     }
-    let content = serde_json::to_string_pretty(value)
-        .map_err(|e| format!("Serialize {}: {e}", path.display()))?;
+    let content = serde_json::to_string_pretty(value).map_err(|e| format!("Serialize {}: {e}", path.display()))?;
     fs::write(path, content).map_err(|e| format!("Write {}: {e}", path.display()))
 }
 
 fn table_exists(conn: &rusqlite::Connection, table: &str) -> bool {
-    conn.query_row(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?1",
-        rusqlite::params![table],
-        |row| row.get::<_, i64>(0),
-    )
-    .map(|count| count > 0)
-    .unwrap_or(false)
+    conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?1", rusqlite::params![table], |row| row.get::<_, i64>(0)).map(|count| count > 0).unwrap_or(false)
 }
 
 fn migrate_tags_if_needed() -> Result<(), String> {
@@ -142,41 +113,13 @@ fn migrate_tags_if_needed() -> Result<(), String> {
     let migrated_at = Some(Utc::now().to_rfc3339());
 
     if !tags_path.exists() {
-        let tags = if table_exists(&conn, "tags") {
-            crate::data::sqlite::get_all_tags(&conn)?
-                .into_iter()
-                .map(TagItem::from)
-                .collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
-        write_json_file(
-            &tags_path,
-            &TagsConfigFile {
-                version: 1,
-                migrated_at: migrated_at.clone(),
-                tags,
-            },
-        )?;
+        let tags = if table_exists(&conn, "tags") { crate::data::sqlite::get_all_tags(&conn)?.into_iter().map(TagItem::from).collect::<Vec<_>>() } else { Vec::new() };
+        write_json_file(&tags_path, &TagsConfigFile { version: 1, migrated_at: migrated_at.clone(), tags })?;
     }
 
     if !marks_path.exists() {
-        let session_tags = if table_exists(&conn, "session_tags") {
-            crate::data::sqlite::get_all_session_tags(&conn)?
-                .into_iter()
-                .map(SessionTagItem::from)
-                .collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
-        write_json_file(
-            &marks_path,
-            &SessionMarkFile {
-                version: 1,
-                migrated_at,
-                session_tags,
-            },
-        )?;
+        let session_tags = if table_exists(&conn, "session_tags") { crate::data::sqlite::get_all_session_tags(&conn)?.into_iter().map(SessionTagItem::from).collect::<Vec<_>>() } else { Vec::new() };
+        write_json_file(&marks_path, &SessionMarkFile { version: 1, migrated_at, session_tags })?;
     }
 
     Ok(())
@@ -205,30 +148,16 @@ fn next_sort_order(tags: &[TagItem]) -> i64 {
 }
 
 fn next_position(session_tags: &[SessionTagItem], tag_id: &str) -> i64 {
-    session_tags
-        .iter()
-        .filter(|item| item.tag_id == tag_id)
-        .map(|item| item.position)
-        .max()
-        .unwrap_or(-1)
-        + 1
+    session_tags.iter().filter(|item| item.tag_id == tag_id).map(|item| item.position).max().unwrap_or(-1) + 1
 }
 
 fn assign_tag_in_memory(session_tags: &mut Vec<SessionTagItem>, session_id: &str, tag_id: &str) {
-    if session_tags
-        .iter()
-        .any(|item| item.session_id == session_id && item.tag_id == tag_id)
-    {
+    if session_tags.iter().any(|item| item.session_id == session_id && item.tag_id == tag_id) {
         return;
     }
 
     let position = next_position(session_tags, tag_id);
-    session_tags.push(SessionTagItem {
-        session_id: session_id.to_string(),
-        tag_id: tag_id.to_string(),
-        position,
-        assigned_at: Utc::now().to_rfc3339(),
-    });
+    session_tags.push(SessionTagItem { session_id: session_id.to_string(), tag_id: tag_id.to_string(), position, assigned_at: Utc::now().to_rfc3339() });
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -247,37 +176,16 @@ fn next_tag_id(tags: &[TagItem]) -> String {
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn create_tag(
-    name: String,
-    color: String,
-    icon: Option<String>,
-    parent_id: Option<String>,
-) -> Result<TagItem, String> {
+pub async fn create_tag(name: String, color: String, icon: Option<String>, parent_id: Option<String>) -> Result<TagItem, String> {
     let mut file = load_tags_file()?;
-    let tag = TagItem {
-        id: next_tag_id(&file.tags),
-        name,
-        color,
-        icon,
-        sort_order: next_sort_order(&file.tags),
-        is_builtin: false,
-        created_at: Utc::now().to_rfc3339(),
-        parent_id,
-    };
+    let tag = TagItem { id: next_tag_id(&file.tags), name, color, icon, sort_order: next_sort_order(&file.tags), is_builtin: false, created_at: Utc::now().to_rfc3339(), parent_id };
     file.tags.push(tag.clone());
     save_tags_file(&file)?;
     Ok(tag)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn update_tag(
-    id: String,
-    name: Option<String>,
-    color: Option<String>,
-    icon: Option<String>,
-    sort_order: Option<i64>,
-    parent_id: Option<Option<String>>,
-) -> Result<(), String> {
+pub async fn update_tag(id: String, name: Option<String>, color: Option<String>, icon: Option<String>, sort_order: Option<i64>, parent_id: Option<Option<String>>) -> Result<(), String> {
     let mut file = load_tags_file()?;
     let Some(tag) = file.tags.iter_mut().find(|tag| tag.id == id) else {
         return Err(format!("Tag not found: {id}"));
@@ -325,31 +233,18 @@ pub async fn assign_tag(session_id: String, tag_id: String) -> Result<(), String
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn remove_tag_from_session(session_id: String, tag_id: String) -> Result<(), String> {
     let mut file = load_session_marks_file()?;
-    file.session_tags
-        .retain(|item| !(item.session_id == session_id && item.tag_id == tag_id));
+    file.session_tags.retain(|item| !(item.session_id == session_id && item.tag_id == tag_id));
     save_session_marks_file(&file)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn move_session_tag(
-    session_id: String,
-    from_tag_id: Option<String>,
-    to_tag_id: String,
-    position: i64,
-) -> Result<(), String> {
+pub async fn move_session_tag(session_id: String, from_tag_id: Option<String>, to_tag_id: String, position: i64) -> Result<(), String> {
     let mut file = load_session_marks_file()?;
     if let Some(from) = from_tag_id {
-        file.session_tags
-            .retain(|item| !(item.session_id == session_id && item.tag_id == from));
+        file.session_tags.retain(|item| !(item.session_id == session_id && item.tag_id == from));
     }
-    file.session_tags
-        .retain(|item| !(item.session_id == session_id && item.tag_id == to_tag_id));
-    file.session_tags.push(SessionTagItem {
-        session_id,
-        tag_id: to_tag_id,
-        position,
-        assigned_at: Utc::now().to_rfc3339(),
-    });
+    file.session_tags.retain(|item| !(item.session_id == session_id && item.tag_id == to_tag_id));
+    file.session_tags.push(SessionTagItem { session_id, tag_id: to_tag_id, position, assigned_at: Utc::now().to_rfc3339() });
     save_session_marks_file(&file)
 }
 

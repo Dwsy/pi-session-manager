@@ -1,7 +1,5 @@
 //! Cross-platform terminal launching implementations
-use crate::domain::terminal::utils::{
-    build_resume_command, escape_double_quoted, shell_single_quote, spawn_command,
-};
+use crate::domain::terminal::utils::{build_resume_command, escape_double_quoted, shell_single_quote, spawn_command};
 use crate::utils::string::command_exists;
 use std::process::Command;
 
@@ -9,18 +7,10 @@ use std::process::Command;
 use crate::domain::terminal::utils::{macos_app_exists, run_osascript};
 
 #[cfg(target_os = "windows")]
-use crate::domain::terminal::utils::{
-    build_windows_cmd_resume_command, build_windows_powershell_resume_command,
-};
+use crate::domain::terminal::utils::{build_windows_cmd_resume_command, build_windows_powershell_resume_command};
 
 #[cfg(target_os = "macos")]
-pub fn try_launch_known_terminal_macos(
-    terminal_id: &str,
-    cwd: &str,
-    path: &str,
-    pi_cmd: &str,
-    resume_command: Option<&str>,
-) -> Result<bool, String> {
+pub fn try_launch_known_terminal_macos(terminal_id: &str, cwd: &str, path: &str, pi_cmd: &str, resume_command: Option<&str>) -> Result<bool, String> {
     let resume_cmd = build_resume_command(cwd, path, pi_cmd, resume_command);
     log::info!("[Terminal macOS] terminal_id: {terminal_id}");
     log::info!("[Terminal macOS] resume_command input: {resume_command:?}");
@@ -69,14 +59,7 @@ end tell"#,
             }
 
             let mut command = Command::new("wezterm");
-            command
-                .arg("--new-tab")
-                .arg("--cwd")
-                .arg(cwd)
-                .arg("-e")
-                .arg("sh")
-                .arg("-lc")
-                .arg(&resume_cmd);
+            command.arg("--new-tab").arg("--cwd").arg(cwd).arg("-e").arg("sh").arg("-lc").arg(&resume_cmd);
             spawn_command(&mut command, "wezterm")?;
             Ok(true)
         }
@@ -86,13 +69,7 @@ end tell"#,
             }
 
             let mut command = Command::new("ghostty");
-            command
-                .arg("--cwd")
-                .arg(cwd)
-                .arg("-e")
-                .arg("sh")
-                .arg("-lc")
-                .arg(&resume_cmd);
+            command.arg("--cwd").arg(cwd).arg("-e").arg("sh").arg("-lc").arg(&resume_cmd);
             spawn_command(&mut command, "ghostty")?;
             Ok(true)
         }
@@ -102,12 +79,7 @@ end tell"#,
             }
 
             let mut command = Command::new("kitty");
-            command
-                .arg("--directory")
-                .arg(cwd)
-                .arg("sh")
-                .arg("-lc")
-                .arg(&resume_cmd);
+            command.arg("--directory").arg(cwd).arg("sh").arg("-lc").arg(&resume_cmd);
             spawn_command(&mut command, "kitty")?;
             Ok(true)
         }
@@ -117,13 +89,7 @@ end tell"#,
             }
 
             let mut command = Command::new("alacritty");
-            command
-                .arg("--working-directory")
-                .arg(cwd)
-                .arg("-e")
-                .arg("sh")
-                .arg("-lc")
-                .arg(&resume_cmd);
+            command.arg("--working-directory").arg(cwd).arg("-e").arg("sh").arg("-lc").arg(&resume_cmd);
             spawn_command(&mut command, "alacritty")?;
             Ok(true)
         }
@@ -162,10 +128,7 @@ end tell"#,
             log::info!("[Terminal macOS tmux] session: {tmux_session}");
             log::info!("[Terminal macOS tmux] inner_cmd: {inner_cmd}");
 
-            let tmux_cmd = format!(
-                "/opt/homebrew/bin/tmux new-session -A -s {tmux_session} {}",
-                shell_single_quote(&inner_cmd)
-            );
+            let tmux_cmd = format!("/opt/homebrew/bin/tmux new-session -A -s {tmux_session} {}", shell_single_quote(&inner_cmd));
 
             log::info!("[Terminal macOS tmux] full_cmd: {tmux_cmd}");
 
@@ -199,25 +162,13 @@ end tell"#,
 }
 
 #[cfg(target_os = "windows")]
-pub fn try_launch_known_terminal_windows(
-    terminal_id: &str,
-    cwd: &str,
-    path: &str,
-    pi_cmd: &str,
-    resume_command: Option<&str>,
-) -> Result<bool, String> {
+pub fn try_launch_known_terminal_windows(terminal_id: &str, cwd: &str, path: &str, pi_cmd: &str, resume_command: Option<&str>) -> Result<bool, String> {
     let cmd_resume = match resume_command {
-        Some(template) if !template.trim().is_empty() => template
-            .replace("{cwd}", cwd)
-            .replace("{path}", path)
-            .replace("{pi}", pi_cmd),
+        Some(template) if !template.trim().is_empty() => template.replace("{cwd}", cwd).replace("{path}", path).replace("{pi}", pi_cmd),
         _ => build_windows_cmd_resume_command(cwd, path, pi_cmd),
     };
     let ps_resume = match resume_command {
-        Some(template) if !template.trim().is_empty() => template
-            .replace("{cwd}", cwd)
-            .replace("{path}", path)
-            .replace("{pi}", pi_cmd),
+        Some(template) if !template.trim().is_empty() => template.replace("{cwd}", cwd).replace("{path}", path).replace("{pi}", pi_cmd),
         _ => build_windows_powershell_resume_command(cwd, path, pi_cmd),
     };
     match terminal_id {
@@ -226,14 +177,7 @@ pub fn try_launch_known_terminal_windows(
                 return Ok(false);
             }
 
-            Command::new("wt")
-                .arg("-d")
-                .arg(cwd)
-                .arg("cmd")
-                .arg("/K")
-                .arg(&cmd_resume)
-                .spawn()
-                .map_err(|e| format!("Failed to launch Windows Terminal: {e}"))?;
+            Command::new("wt").arg("-d").arg(cwd).arg("cmd").arg("/K").arg(&cmd_resume).spawn().map_err(|e| format!("Failed to launch Windows Terminal: {e}"))?;
             Ok(true)
         }
         "powershell" => {
@@ -245,16 +189,7 @@ pub fn try_launch_known_terminal_windows(
                 return Ok(false);
             };
 
-            Command::new("cmd")
-                .arg("/C")
-                .arg("start")
-                .arg("")
-                .arg(shell_executable)
-                .arg("-NoExit")
-                .arg("-Command")
-                .arg(&ps_resume)
-                .spawn()
-                .map_err(|e| format!("Failed to launch PowerShell: {e}"))?;
+            Command::new("cmd").arg("/C").arg("start").arg("").arg(shell_executable).arg("-NoExit").arg("-Command").arg(&ps_resume).spawn().map_err(|e| format!("Failed to launch PowerShell: {e}"))?;
             Ok(true)
         }
         "cmd" => {
@@ -262,15 +197,7 @@ pub fn try_launch_known_terminal_windows(
                 return Ok(false);
             }
 
-            Command::new("cmd")
-                .arg("/C")
-                .arg("start")
-                .arg("")
-                .arg("cmd")
-                .arg("/K")
-                .arg(&cmd_resume)
-                .spawn()
-                .map_err(|e| format!("Failed to launch cmd: {e}"))?;
+            Command::new("cmd").arg("/C").arg("start").arg("").arg("cmd").arg("/K").arg(&cmd_resume).spawn().map_err(|e| format!("Failed to launch cmd: {e}"))?;
             Ok(true)
         }
         "vscode" => {
@@ -288,71 +215,35 @@ pub fn try_launch_known_terminal_windows(
 }
 
 #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
-pub fn try_launch_known_terminal_linux(
-    terminal_id: &str,
-    cwd: &str,
-    path: &str,
-    pi_cmd: &str,
-    resume_command: Option<&str>,
-) -> Result<bool, String> {
+pub fn try_launch_known_terminal_linux(terminal_id: &str, cwd: &str, path: &str, pi_cmd: &str, resume_command: Option<&str>) -> Result<bool, String> {
     let resume_cmd = build_resume_command(cwd, path, pi_cmd, resume_command);
     match terminal_id {
         "gnome-terminal" => {
             if !command_exists("gnome-terminal") {
                 return Ok(false);
             }
-            Command::new("gnome-terminal")
-                .arg("--")
-                .arg("bash")
-                .arg("-lc")
-                .arg(&resume_cmd)
-                .spawn()
-                .map_err(|e| format!("Failed to launch gnome-terminal: {e}"))?;
+            Command::new("gnome-terminal").arg("--").arg("bash").arg("-lc").arg(&resume_cmd).spawn().map_err(|e| format!("Failed to launch gnome-terminal: {e}"))?;
             Ok(true)
         }
         "konsole" => {
             if !command_exists("konsole") {
                 return Ok(false);
             }
-            Command::new("konsole")
-                .arg("--workdir")
-                .arg(cwd)
-                .arg("-e")
-                .arg("bash")
-                .arg("-lc")
-                .arg(&resume_cmd)
-                .spawn()
-                .map_err(|e| format!("Failed to launch konsole: {e}"))?;
+            Command::new("konsole").arg("--workdir").arg(cwd).arg("-e").arg("bash").arg("-lc").arg(&resume_cmd).spawn().map_err(|e| format!("Failed to launch konsole: {e}"))?;
             Ok(true)
         }
         "xfce4-terminal" => {
             if !command_exists("xfce4-terminal") {
                 return Ok(false);
             }
-            Command::new("xfce4-terminal")
-                .arg("--working-directory")
-                .arg(cwd)
-                .arg("-x")
-                .arg("bash")
-                .arg("-lc")
-                .arg(&resume_cmd)
-                .spawn()
-                .map_err(|e| format!("Failed to launch xfce4-terminal: {e}"))?;
+            Command::new("xfce4-terminal").arg("--working-directory").arg(cwd).arg("-x").arg("bash").arg("-lc").arg(&resume_cmd).spawn().map_err(|e| format!("Failed to launch xfce4-terminal: {e}"))?;
             Ok(true)
         }
         "tilix" => {
             if !command_exists("tilix") {
                 return Ok(false);
             }
-            Command::new("tilix")
-                .arg("--working-directory")
-                .arg(cwd)
-                .arg("-e")
-                .arg("bash")
-                .arg("-lc")
-                .arg(&resume_cmd)
-                .spawn()
-                .map_err(|e| format!("Failed to launch tilix: {e}"))?;
+            Command::new("tilix").arg("--working-directory").arg(cwd).arg("-e").arg("bash").arg("-lc").arg(&resume_cmd).spawn().map_err(|e| format!("Failed to launch tilix: {e}"))?;
             Ok(true)
         }
         "kitty" => {
@@ -360,12 +251,7 @@ pub fn try_launch_known_terminal_linux(
                 return Ok(false);
             }
             let mut command = Command::new("kitty");
-            command
-                .arg("--directory")
-                .arg(cwd)
-                .arg("sh")
-                .arg("-lc")
-                .arg(&resume_cmd);
+            command.arg("--directory").arg(cwd).arg("sh").arg("-lc").arg(&resume_cmd);
             spawn_command(&mut command, "kitty")?;
             Ok(true)
         }
@@ -374,13 +260,7 @@ pub fn try_launch_known_terminal_linux(
                 return Ok(false);
             }
             let mut command = Command::new("alacritty");
-            command
-                .arg("--working-directory")
-                .arg(cwd)
-                .arg("-e")
-                .arg("sh")
-                .arg("-lc")
-                .arg(&resume_cmd);
+            command.arg("--working-directory").arg(cwd).arg("-e").arg("sh").arg("-lc").arg(&resume_cmd);
             spawn_command(&mut command, "alacritty")?;
             Ok(true)
         }
@@ -389,14 +269,7 @@ pub fn try_launch_known_terminal_linux(
                 return Ok(false);
             }
             let mut command = Command::new("wezterm");
-            command
-                .arg("start")
-                .arg("--cwd")
-                .arg(cwd)
-                .arg("--")
-                .arg("sh")
-                .arg("-lc")
-                .arg(&resume_cmd);
+            command.arg("start").arg("--cwd").arg(cwd).arg("--").arg("sh").arg("-lc").arg(&resume_cmd);
             spawn_command(&mut command, "wezterm")?;
             Ok(true)
         }
@@ -404,15 +277,7 @@ pub fn try_launch_known_terminal_linux(
             if !command_exists("mate-terminal") {
                 return Ok(false);
             }
-            Command::new("mate-terminal")
-                .arg("--working-directory")
-                .arg(cwd)
-                .arg("--")
-                .arg("bash")
-                .arg("-lc")
-                .arg(&resume_cmd)
-                .spawn()
-                .map_err(|e| format!("Failed to launch mate-terminal: {e}"))?;
+            Command::new("mate-terminal").arg("--working-directory").arg(cwd).arg("--").arg("bash").arg("-lc").arg(&resume_cmd).spawn().map_err(|e| format!("Failed to launch mate-terminal: {e}"))?;
             Ok(true)
         }
         "lxterminal" => {
@@ -420,38 +285,21 @@ pub fn try_launch_known_terminal_linux(
                 return Ok(false);
             }
             let command = format!("bash -lc {}", shell_single_quote(&resume_cmd));
-            Command::new("lxterminal")
-                .arg(format!("--working-directory={cwd}"))
-                .arg("-e")
-                .arg(&command)
-                .spawn()
-                .map_err(|e| format!("Failed to launch lxterminal: {e}"))?;
+            Command::new("lxterminal").arg(format!("--working-directory={cwd}")).arg("-e").arg(&command).spawn().map_err(|e| format!("Failed to launch lxterminal: {e}"))?;
             Ok(true)
         }
         "xterm" => {
             if !command_exists("xterm") {
                 return Ok(false);
             }
-            Command::new("xterm")
-                .arg("-e")
-                .arg("bash")
-                .arg("-lc")
-                .arg(&resume_cmd)
-                .spawn()
-                .map_err(|e| format!("Failed to launch xterm: {e}"))?;
+            Command::new("xterm").arg("-e").arg("bash").arg("-lc").arg(&resume_cmd).spawn().map_err(|e| format!("Failed to launch xterm: {e}"))?;
             Ok(true)
         }
         "x-terminal-emulator" => {
             if !command_exists("x-terminal-emulator") {
                 return Ok(false);
             }
-            Command::new("x-terminal-emulator")
-                .arg("-e")
-                .arg("bash")
-                .arg("-lc")
-                .arg(&resume_cmd)
-                .spawn()
-                .map_err(|e| format!("Failed to launch x-terminal-emulator: {e}"))?;
+            Command::new("x-terminal-emulator").arg("-e").arg("bash").arg("-lc").arg(&resume_cmd).spawn().map_err(|e| format!("Failed to launch x-terminal-emulator: {e}"))?;
             Ok(true)
         }
         "vscode" => {
@@ -468,13 +316,7 @@ pub fn try_launch_known_terminal_linux(
 }
 
 /// Try to launch a known terminal (cross-platform dispatcher)
-pub fn try_launch_known_terminal(
-    terminal_id: &str,
-    cwd: &str,
-    path: &str,
-    pi_cmd: &str,
-    resume_command: Option<&str>,
-) -> Result<bool, String> {
+pub fn try_launch_known_terminal(terminal_id: &str, cwd: &str, path: &str, pi_cmd: &str, resume_command: Option<&str>) -> Result<bool, String> {
     #[cfg(target_os = "macos")]
     {
         try_launch_known_terminal_macos(terminal_id, cwd, path, pi_cmd, resume_command)

@@ -12,39 +12,19 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::net::SocketAddr;
 
-use super::common::{
-    is_authorized, json_error_response, json_success_response, parse_time_opt,
-    session_matches_scope, unauthorized_response, CheckoutRequest, MilestoneCreateRequest,
-    SessionsQuery,
-};
+use super::common::{is_authorized, json_error_response, json_success_response, parse_time_opt, session_matches_scope, unauthorized_response, CheckoutRequest, MilestoneCreateRequest, SessionsQuery};
 
-async fn dispatch_json(
-    app_state: &SharedAppState,
-    command: &str,
-    payload: Value,
-) -> Result<Value, String> {
+async fn dispatch_json(app_state: &SharedAppState, command: &str, payload: Value) -> Result<Value, String> {
     dispatch(&Some(app_state.clone()), command, &payload).await
 }
 
-async fn find_session_path_by_id(
-    app_state: &SharedAppState,
-    id: &str,
-) -> Result<Option<String>, String> {
+async fn find_session_path_by_id(app_state: &SharedAppState, id: &str) -> Result<Option<String>, String> {
     let sessions_value = dispatch_json(app_state, "scan_sessions", json!({})).await?;
     let sessions: Vec<SessionInfo> = serde_json::from_value(sessions_value).unwrap_or_default();
-    Ok(sessions
-        .into_iter()
-        .find(|session| session.id == id)
-        .map(|session| session.path))
+    Ok(sessions.into_iter().find(|session| session.id == id).map(|session| session.path))
 }
 
-pub(crate) async fn v1_list_sessions(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    Query(query): Query<SessionsQuery>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
+pub(crate) async fn v1_list_sessions(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, Query(query): Query<SessionsQuery>, headers: HeaderMap, uri: Uri) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
@@ -67,21 +47,11 @@ pub(crate) async fn v1_list_sessions(
             }
             if let Some(query_text) = query.q {
                 let query_text = query_text.to_lowercase();
-                sessions.retain(|session| {
-                    session.id.to_lowercase().contains(&query_text)
-                        || session.path.to_lowercase().contains(&query_text)
-                        || session
-                            .name
-                            .as_ref()
-                            .map(|name| name.to_lowercase().contains(&query_text))
-                            .unwrap_or(false)
-                        || session.first_message.to_lowercase().contains(&query_text)
-                });
+                sessions
+                    .retain(|session| session.id.to_lowercase().contains(&query_text) || session.path.to_lowercase().contains(&query_text) || session.name.as_ref().map(|name| name.to_lowercase().contains(&query_text)).unwrap_or(false) || session.first_message.to_lowercase().contains(&query_text));
             }
 
-            sessions.retain(|session| {
-                session_matches_scope(session, query.project.as_deref(), from, to)
-            });
+            sessions.retain(|session| session_matches_scope(session, query.project.as_deref(), from, to));
             if let Some(limit) = query.limit {
                 sessions.truncate(limit);
             }
@@ -92,13 +62,7 @@ pub(crate) async fn v1_list_sessions(
     }
 }
 
-pub(crate) async fn v1_get_session_entries(
-    Path(id): Path<String>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
+pub(crate) async fn v1_get_session_entries(Path(id): Path<String>, ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
@@ -110,85 +74,46 @@ pub(crate) async fn v1_get_session_entries(
         return json_error_response(StatusCode::NOT_FOUND, "Session not found");
     };
 
-    match dispatch_json(
-        &app_state,
-        "get_session_entries",
-        json!({ "path": session_path }),
-    )
-    .await
-    {
+    match dispatch_json(&app_state, "get_session_entries", json!({ "path": session_path })).await {
         Ok(data) => json_success_response(data),
         Err(error) => json_error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
     }
 }
 
-pub(crate) async fn v1_create_milestone(
-    Path(id): Path<String>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-    Json(req): Json<MilestoneCreateRequest>,
-) -> Response {
+pub(crate) async fn v1_create_milestone(Path(id): Path<String>, ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri, Json(req): Json<MilestoneCreateRequest>) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
 
     let _ = (&id, &app_state, &req.name, &req.color, &req.icon);
-    json_error_response(
-        StatusCode::FORBIDDEN,
-        "Read-only mode: creating milestones is disabled",
-    )
+    json_error_response(StatusCode::FORBIDDEN, "Read-only mode: creating milestones is disabled")
 }
 
-pub(crate) async fn v1_list_milestones(
-    Path(id): Path<String>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
+pub(crate) async fn v1_list_milestones(Path(id): Path<String>, ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
 
-    let session_tags_value =
-        match dispatch_json(&app_state, "get_all_session_tags", json!({})).await {
-            Ok(value) => value,
-            Err(error) => return json_error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
-        };
+    let session_tags_value = match dispatch_json(&app_state, "get_all_session_tags", json!({})).await {
+        Ok(value) => value,
+        Err(error) => return json_error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
+    };
     let tags_value = match dispatch_json(&app_state, "get_all_tags", json!({})).await {
         Ok(value) => value,
         Err(error) => return json_error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
     };
 
-    let session_tags: Vec<crate::commands::SessionTagItem> =
-        serde_json::from_value(session_tags_value).unwrap_or_default();
-    let tags: Vec<crate::commands::TagItem> =
-        serde_json::from_value(tags_value).unwrap_or_default();
+    let session_tags: Vec<crate::commands::SessionTagItem> = serde_json::from_value(session_tags_value).unwrap_or_default();
+    let tags: Vec<crate::commands::TagItem> = serde_json::from_value(tags_value).unwrap_or_default();
 
-    let milestone_tag_ids: HashSet<String> = session_tags
-        .into_iter()
-        .filter(|session_tag| session_tag.session_id == id)
-        .map(|session_tag| session_tag.tag_id)
-        .collect();
+    let milestone_tag_ids: HashSet<String> = session_tags.into_iter().filter(|session_tag| session_tag.session_id == id).map(|session_tag| session_tag.tag_id).collect();
 
-    let milestones: Vec<crate::commands::TagItem> = tags
-        .into_iter()
-        .filter(|tag| milestone_tag_ids.contains(&tag.id))
-        .filter(|tag| tag.name.starts_with("milestone/"))
-        .collect();
+    let milestones: Vec<crate::commands::TagItem> = tags.into_iter().filter(|tag| milestone_tag_ids.contains(&tag.id)).filter(|tag| tag.name.starts_with("milestone/")).collect();
 
     json_success_response(milestones)
 }
 
-pub(crate) async fn v1_session_snapshot(
-    Path(id): Path<String>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
+pub(crate) async fn v1_session_snapshot(Path(id): Path<String>, ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
@@ -200,11 +125,10 @@ pub(crate) async fn v1_session_snapshot(
         return json_error_response(StatusCode::NOT_FOUND, "Session not found");
     };
 
-    let entries_value =
-        match dispatch_json(&app_state, "get_session_entries", json!({ "path": path })).await {
-            Ok(value) => value,
-            Err(error) => return json_error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
-        };
+    let entries_value = match dispatch_json(&app_state, "get_session_entries", json!({ "path": path })).await {
+        Ok(value) => value,
+        Err(error) => return json_error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
+    };
     let entries: Vec<SessionEntry> = serde_json::from_value(entries_value).unwrap_or_default();
 
     let mut user_count = 0usize;
@@ -227,17 +151,8 @@ pub(crate) async fn v1_session_snapshot(
     }
 
     for entry in entries.iter().rev().take(5).rev() {
-        let text = entry
-            .message
-            .as_ref()
-            .and_then(|message| message.content.first())
-            .and_then(|content| content.text.clone())
-            .unwrap_or_default();
-        let role = entry
-            .message
-            .as_ref()
-            .map(|message| message.role.clone())
-            .unwrap_or_default();
+        let text = entry.message.as_ref().and_then(|message| message.content.first()).and_then(|content| content.text.clone()).unwrap_or_default();
+        let role = entry.message.as_ref().map(|message| message.role.clone()).unwrap_or_default();
         recent.push(json!({
             "entry_id": entry.id,
             "type": entry.entry_type,
@@ -259,14 +174,7 @@ pub(crate) async fn v1_session_snapshot(
     }))
 }
 
-pub(crate) async fn v1_checkout_session(
-    Path(id): Path<String>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-    Json(req): Json<CheckoutRequest>,
-) -> Response {
+pub(crate) async fn v1_checkout_session(Path(id): Path<String>, ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri, Json(req): Json<CheckoutRequest>) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
@@ -281,11 +189,10 @@ pub(crate) async fn v1_checkout_session(
         return json_error_response(StatusCode::NOT_FOUND, "Session not found");
     };
 
-    let entries_value =
-        match dispatch_json(&app_state, "get_session_entries", json!({ "path": path })).await {
-            Ok(value) => value,
-            Err(error) => return json_error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
-        };
+    let entries_value = match dispatch_json(&app_state, "get_session_entries", json!({ "path": path })).await {
+        Ok(value) => value,
+        Err(error) => return json_error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
+    };
     let entries: Vec<SessionEntry> = serde_json::from_value(entries_value).unwrap_or_default();
     if entries.is_empty() {
         return json_error_response(StatusCode::BAD_REQUEST, "Session has no entries");
@@ -295,22 +202,13 @@ pub(crate) async fn v1_checkout_session(
         "position" => match req.target_value.parse::<usize>() {
             Ok(value) if value < entries.len() => value,
             _ => {
-                return json_error_response(
-                    StatusCode::BAD_REQUEST,
-                    format!("Invalid position: {}", req.target_value),
-                );
+                return json_error_response(StatusCode::BAD_REQUEST, format!("Invalid position: {}", req.target_value));
             }
         },
-        _ => match entries
-            .iter()
-            .position(|entry| entry.id == req.target_value)
-        {
+        _ => match entries.iter().position(|entry| entry.id == req.target_value) {
             Some(value) => value,
             None => {
-                return json_error_response(
-                    StatusCode::BAD_REQUEST,
-                    format!("Target entry not found: {}", req.target_value),
-                );
+                return json_error_response(StatusCode::BAD_REQUEST, format!("Target entry not found: {}", req.target_value));
             }
         },
     };
@@ -322,21 +220,8 @@ pub(crate) async fn v1_checkout_session(
         .take(6)
         .rev()
         .map(|entry| {
-            let role = entry
-                .message
-                .as_ref()
-                .map(|message| message.role.clone())
-                .unwrap_or_else(|| "system".to_string());
-            let text = entry
-                .message
-                .as_ref()
-                .and_then(|message| {
-                    message
-                        .content
-                        .iter()
-                        .find_map(|content| content.text.clone())
-                })
-                .unwrap_or_default();
+            let role = entry.message.as_ref().map(|message| message.role.clone()).unwrap_or_else(|| "system".to_string());
+            let text = entry.message.as_ref().and_then(|message| message.content.iter().find_map(|content| content.text.clone())).unwrap_or_default();
             json!({
                 "entry_id": entry.id,
                 "role": role,
@@ -348,10 +233,7 @@ pub(crate) async fn v1_checkout_session(
 
     let strategy = req.strategy.unwrap_or_else(|| "preview".to_string());
     if strategy == "reset" || strategy == "squash" {
-        return json_error_response(
-            StatusCode::FORBIDDEN,
-            "Read-only mode: checkout apply is disabled, use strategy=preview",
-        );
+        return json_error_response(StatusCode::FORBIDDEN, "Read-only mode: checkout apply is disabled, use strategy=preview");
     }
 
     let checkout_id = format!("chk-{}", chrono::Utc::now().timestamp_millis());

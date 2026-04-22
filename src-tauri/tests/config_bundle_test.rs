@@ -33,10 +33,7 @@ fn test_export_creates_zip() {
     fs::create_dir_all(&temp_dir).unwrap();
 
     let zip_path = temp_dir.join("test-bundle.zip");
-    let test_files = vec![
-        ("metadata.json", br#"{"version":"1.0"}"#.as_slice()),
-        ("test.json", br#"{"key":"value"}"#.as_slice()),
-    ];
+    let test_files = vec![("metadata.json", br#"{"version":"1.0"}"#.as_slice()), ("test.json", br#"{"key":"value"}"#.as_slice())];
 
     create_test_bundle(&zip_path, &test_files);
 
@@ -54,14 +51,7 @@ fn test_preview_bundle_valid_file() {
     fs::create_dir_all(&temp_dir).unwrap();
 
     let zip_path = temp_dir.join("preview-test.zip");
-    let test_files = vec![
-        (
-            "metadata.json",
-            br#"{"version":"1.0","created_at":"2026-04-03 12:00:00"}"#.as_slice(),
-        ),
-        ("models.json", br#"{"providers":{}}"#.as_slice()),
-        ("settings.json", br#"{}"#.as_slice()),
-    ];
+    let test_files = vec![("metadata.json", br#"{"version":"1.0","created_at":"2026-04-03 12:00:00"}"#.as_slice()), ("models.json", br#"{"providers":{}}"#.as_slice()), ("settings.json", br#"{}"#.as_slice())];
 
     create_test_bundle(&zip_path, &test_files);
 
@@ -69,15 +59,9 @@ fn test_preview_bundle_valid_file() {
     let zip_file = fs::File::open(&zip_path).unwrap();
     let mut archive = zip::ZipArchive::new(zip_file).unwrap();
 
-    assert!(
-        archive.by_name("metadata.json").is_ok(),
-        "Should have metadata"
-    );
+    assert!(archive.by_name("metadata.json").is_ok(), "Should have metadata");
     assert!(archive.by_name("models.json").is_ok(), "Should have models");
-    assert!(
-        archive.by_name("settings.json").is_ok(),
-        "Should have settings"
-    );
+    assert!(archive.by_name("settings.json").is_ok(), "Should have settings");
 }
 
 #[test]
@@ -108,13 +92,7 @@ fn test_bundle_metadata_format() {
         file_count: usize,
     }
 
-    let metadata = Metadata {
-        version: "1.0".to_string(),
-        created_at: "2026-04-03 12:00:00".to_string(),
-        app_version: "0.5.1".to_string(),
-        source_platform: "darwin".to_string(),
-        file_count: 3,
-    };
+    let metadata = Metadata { version: "1.0".to_string(), created_at: "2026-04-03 12:00:00".to_string(), app_version: "0.5.1".to_string(), source_platform: "darwin".to_string(), file_count: 3 };
 
     let json = serde_json::to_string(&metadata).unwrap();
     let parsed: Metadata = serde_json::from_str(&json).unwrap();
@@ -126,9 +104,7 @@ fn test_bundle_metadata_format() {
 #[test]
 fn test_backup_directory_creation() {
     let temp_dir = tempdir().unwrap();
-    let backup_dir = temp_dir
-        .path()
-        .join(".pi/agent/backups/config-bundles/test-backup");
+    let backup_dir = temp_dir.path().join(".pi/agent/backups/config-bundles/test-backup");
 
     fs::create_dir_all(&backup_dir).unwrap();
     assert!(backup_dir.exists(), "Backup directory should be created");

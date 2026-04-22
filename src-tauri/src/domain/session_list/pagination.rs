@@ -20,11 +20,7 @@ pub fn strip_session_list_payload(session: &SessionInfo) -> SessionInfo {
     }
 }
 
-pub fn build_paginated_result(
-    sessions: &[SessionInfo],
-    offset: Option<usize>,
-    limit: Option<usize>,
-) -> PaginatedSessionsResult {
+pub fn build_paginated_result(sessions: &[SessionInfo], offset: Option<usize>, limit: Option<usize>) -> PaginatedSessionsResult {
     const DEFAULT_LIMIT: usize = 100;
     const MAX_LIMIT: usize = 500;
 
@@ -32,16 +28,7 @@ pub fn build_paginated_result(
     let total = sessions.len();
     let start = offset.unwrap_or(0).min(total);
     let end = start.saturating_add(normalized_limit).min(total);
-    let page_sessions = sessions[start..end]
-        .iter()
-        .map(strip_session_list_payload)
-        .collect();
+    let page_sessions = sessions[start..end].iter().map(strip_session_list_payload).collect();
 
-    PaginatedSessionsResult {
-        sessions: page_sessions,
-        total,
-        offset: start,
-        limit: normalized_limit,
-        has_more: end < total,
-    }
+    PaginatedSessionsResult { sessions: page_sessions, total, offset: start, limit: normalized_limit, has_more: end < total }
 }

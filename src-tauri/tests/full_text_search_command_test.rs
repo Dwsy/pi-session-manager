@@ -16,10 +16,7 @@ fn setup_in_memory_db_with_sessions(sessions: &[(&str, &str, &[(&str, &str)])]) 
     let conn = Connection::open_in_memory().unwrap();
 
     // Enable WAL, foreign keys
-    conn.prepare("PRAGMA journal_mode=WAL;")
-        .unwrap()
-        .query_row([], |_| Ok(()))
-        .unwrap();
+    conn.prepare("PRAGMA journal_mode=WAL;").unwrap().query_row([], |_| Ok(())).unwrap();
     conn.execute("PRAGMA synchronous=NORMAL;", []).unwrap();
     conn.execute("PRAGMA foreign_keys=ON;", []).unwrap();
 
@@ -53,6 +50,7 @@ fn setup_in_memory_db_with_sessions(sessions: &[(&str, &str, &[(&str, &str)])]) 
             session_path TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
             content TEXT NOT NULL,
+            search_text TEXT NOT NULL DEFAULT '',
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
         )",
@@ -60,11 +58,7 @@ fn setup_in_memory_db_with_sessions(sessions: &[(&str, &str, &[(&str, &str)])]) 
     )
     .unwrap();
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)",
-        [],
-    )
-    .unwrap();
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)", []).unwrap();
 
     // Create FTS schema
     sqlite_cache::ensure_message_fts_schema(&conn).unwrap();
@@ -75,60 +69,23 @@ fn setup_in_memory_db_with_sessions(sessions: &[(&str, &str, &[(&str, &str)])]) 
         // Build session row
         let now = chrono::Utc::now().to_rfc3339();
         let first_msg = messages.first().map(|(_, t)| *t).unwrap_or("").to_string();
-        let all_text = messages
-            .iter()
-            .map(|(_, t)| *t)
-            .collect::<Vec<_>>()
-            .join("\n");
-        let user_text = messages
-            .iter()
-            .filter(|(r, _)| *r == "user")
-            .map(|(_, t)| *t)
-            .collect::<Vec<_>>()
-            .join("\n");
-        let asst_text = messages
-            .iter()
-            .filter(|(r, _)| *r == "assistant")
-            .map(|(_, t)| *t)
-            .collect::<Vec<_>>()
-            .join("\n");
+        let all_text = messages.iter().map(|(_, t)| *t).collect::<Vec<_>>().join("\n");
+        let user_text = messages.iter().filter(|(r, _)| *r == "user").map(|(_, t)| *t).collect::<Vec<_>>().join("\n");
+        let asst_text = messages.iter().filter(|(r, _)| *r == "assistant").map(|(_, t)| *t).collect::<Vec<_>>().join("\n");
         let last_msg = messages.last().map(|(_, t)| *t).unwrap_or("").to_string();
         let last_role = messages.last().map(|(r, _)| *r).unwrap_or("").to_string();
 
         conn.execute(
             "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
-            params![
-                id,
-                path,
-                cwd,
-                format!("Session {}", id),
-                now,
-                now,
-                now,
-                messages.len() as i64,
-                first_msg,
-                user_text,
-                asst_text,
-                last_msg,
-                last_role,
-                now,
-            ],
-        ).unwrap();
+            params![id, path, cwd, format!("Session {}", id), now, now, now, messages.len() as i64, first_msg, user_text, asst_text, last_msg, last_role, now,],
+        )
+        .unwrap();
 
         // Insert message entries
         for (i, (role, text)) in messages.iter().enumerate() {
             let entry_id = format!("{id}-msg{i}");
             let timestamp = chrono::Utc::now(); // not important
-            conn.execute(
-                "INSERT INTO message_entries (id, session_path, role, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![
-                    entry_id,
-                    path,
-                    role,
-                    text,
-                    timestamp.to_rfc3339(),
-                ],
-            ).unwrap();
+            conn.execute("INSERT INTO message_entries (id, session_path, role, content, search_text, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6)", params![entry_id, path, role, text, pi_session_manager::utils::normalize_search_text(text), timestamp.to_rfc3339(),]).unwrap();
         }
     }
 
@@ -136,14 +93,7 @@ fn setup_in_memory_db_with_sessions(sessions: &[(&str, &str, &[(&str, &str)])]) 
 }
 
 /// Execute the same query logic as in `full_text_search` command directly on the connection
-fn search_message_entries_with_params(
-    conn: &Connection,
-    query: &str,
-    role_filter: Option<&str>,
-    glob_pattern: Option<&str>,
-    page: usize,
-    page_size: usize,
-) -> Result<(Vec<(String, String, String, String, String, f32)>, usize), String> {
+fn search_message_entries_with_params(conn: &Connection, query: &str, role_filter: Option<&str>, glob_pattern: Option<&str>, page: usize, page_size: usize) -> Result<(Vec<(String, String, String, String, String, f32)>, usize), String> {
     use chrono::DateTime;
 
     let trimmed = query.trim();
@@ -168,10 +118,7 @@ fn search_message_entries_with_params(
 
     let mut where_clause = format!("WHERE message_fts MATCH ? AND {role_condition}");
     let pattern_owned: Option<String> = glob_pattern.map(|s| s.to_string());
-    let has_glob = pattern_owned
-        .as_ref()
-        .map(|s| !s.is_empty())
-        .unwrap_or(false);
+    let has_glob = pattern_owned.as_ref().map(|s| !s.is_empty()).unwrap_or(false);
     if has_glob {
         where_clause = format!("{where_clause} AND m.session_path GLOB ?");
     }
@@ -194,12 +141,8 @@ fn search_message_entries_with_params(
         if has_glob {
             count_params.push(pattern_owned.as_ref().unwrap());
         }
-        let mut stmt = conn
-            .prepare(&count_sql)
-            .map_err(|e| format!("Failed to prepare count: {e}"))?;
-        let total_hits_i64: i64 = stmt
-            .query_row(count_params.as_slice(), |row| row.get(0))
-            .map_err(|e| format!("Count query failed: {e}"))?;
+        let mut stmt = conn.prepare(&count_sql).map_err(|e| format!("Failed to prepare count: {e}"))?;
+        let total_hits_i64: i64 = stmt.query_row(count_params.as_slice(), |row| row.get(0)).map_err(|e| format!("Count query failed: {e}"))?;
         total_hits_i64 as usize
     };
 
@@ -244,21 +187,10 @@ fn search_message_entries_with_params(
     data_params.push(&offset_i64);
     data_params.push(&limit_i64);
 
-    let mut stmt = conn
-        .prepare(&data_sql)
-        .map_err(|e| format!("Failed to prepare data query: {e}"))?;
+    let mut stmt = conn.prepare(&data_sql).map_err(|e| format!("Failed to prepare data query: {e}"))?;
 
     let rows = stmt
-        .query_map(data_params.as_slice(), |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, f32>(5)?,
-            ))
-        })
+        .query_map(data_params.as_slice(), |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?, row.get::<_, String>(4)?, row.get::<_, f32>(5)?)))
         .map_err(|e| format!("Query failed: {e}"))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Collect failed: {e}"))?;
@@ -270,68 +202,29 @@ fn search_message_entries_with_params(
 fn test_full_text_search_command_role_filter_and_glob() {
     // Create in-memory DB with sessions from different directories
     let conn = setup_in_memory_db_with_sessions(&[
-        (
-            "s1",
-            "/cwd1",
-            &[
-                ("user", "banana smoothie"),
-                ("assistant", "Here is banana recipe"),
-            ],
-        ),
-        (
-            "s2",
-            "/cwd2",
-            &[
-                ("user", "I like apples"),
-                ("assistant", "Apple pie is delicious"),
-            ],
-        ),
-        (
-            "s3",
-            "/cwd3",
-            &[
-                ("user", "Rust programming"),
-                ("assistant", "Tokio async runtime"),
-            ],
-        ),
+        ("s1", "/cwd1", &[("user", "banana smoothie"), ("assistant", "Here is banana recipe")]),
+        ("s2", "/cwd2", &[("user", "I like apples"), ("assistant", "Apple pie is delicious")]),
+        ("s3", "/cwd3", &[("user", "Rust programming"), ("assistant", "Tokio async runtime")]),
     ]);
 
     // Test 1: Role filter 'user' for 'banana' should only get user messages
-    let (hits, total) =
-        search_message_entries_with_params(&conn, "banana", Some("user"), None, 0, 10).unwrap();
+    let (hits, total) = search_message_entries_with_params(&conn, "banana", Some("user"), None, 0, 10).unwrap();
     assert!(total >= 1);
     assert!(hits.iter().all(|(_, _, role, _, _, _)| role == "user"));
     // Should not include assistant message containing banana
-    assert!(!hits
-        .iter()
-        .any(|(_, _, role, content, _, _)| role == "assistant" && content.contains("banana")));
+    assert!(!hits.iter().any(|(_, _, role, content, _, _)| role == "assistant" && content.contains("banana")));
 
     // Test 2: Role filter 'assistant' for 'banana' should only get assistant messages
-    let (hits, total) =
-        search_message_entries_with_params(&conn, "banana", Some("assistant"), None, 0, 10)
-            .unwrap();
+    let (hits, total) = search_message_entries_with_params(&conn, "banana", Some("assistant"), None, 0, 10).unwrap();
     assert!(hits.iter().all(|(_, _, role, _, _, _)| role == "assistant"));
 
     // Test 3: Glob filter - only sessions under /cwd1
-    let (hits, total) =
-        search_message_entries_with_params(&conn, "banana", None, Some("/cwd1*"), 0, 10).unwrap();
-    assert!(hits
-        .iter()
-        .all(|(_, session_path, _, _, _, _)| session_path.contains("/cwd1")));
+    let (hits, total) = search_message_entries_with_params(&conn, "banana", None, Some("/cwd1*"), 0, 10).unwrap();
+    assert!(hits.iter().all(|(_, session_path, _, _, _, _)| session_path.contains("/cwd1")));
 
     // Test 4: Combined role and glob
-    let (hits, total) = search_message_entries_with_params(
-        &conn,
-        "apple",
-        Some("assistant"),
-        Some("/cwd2*"),
-        0,
-        10,
-    )
-    .unwrap();
-    assert!(hits.iter().all(|(_, session_path, role, _, _, _)| {
-        session_path.contains("/cwd2") && role == "assistant"
-    }));
+    let (hits, total) = search_message_entries_with_params(&conn, "apple", Some("assistant"), Some("/cwd2*"), 0, 10).unwrap();
+    assert!(hits.iter().all(|(_, session_path, role, _, _, _)| { session_path.contains("/cwd2") && role == "assistant" }));
 
     // Test 5: Empty query
     let (hits, total) = search_message_entries_with_params(&conn, "", None, None, 0, 10).unwrap();
@@ -352,24 +245,13 @@ fn test_full_text_search_command_role_filter_and_glob() {
 fn test_full_text_search_relevance_ranking() {
     // Verify that search results are ordered by FTS5 BM25 rank, not insertion order.
     // Insert two messages with different frequencies of the same term.
-    let conn = setup_in_memory_db_with_sessions(&[(
-        "s1",
-        "/cwd",
-        &[
-            ("user", "rust rust rust rust rust rust rust rust rust rust"),
-            ("user", "rust"),
-        ],
-    )]);
+    let conn = setup_in_memory_db_with_sessions(&[("s1", "/cwd", &[("user", "rust rust rust rust rust rust rust rust rust rust"), ("user", "rust")])]);
 
-    let (hits, total) =
-        search_message_entries_with_params(&conn, "rust", None, None, 0, 10).unwrap();
+    let (hits, total) = search_message_entries_with_params(&conn, "rust", None, None, 0, 10).unwrap();
     assert_eq!(total, 2);
     assert_eq!(hits.len(), 2);
     // The first hit should have a lower (better) rank than the second.
     let rank_first = hits[0].5;
     let rank_second = hits[1].5;
-    assert!(
-        rank_first < rank_second,
-        "Expected message with more occurrences to rank higher (lower score), got {rank_first} vs {rank_second}"
-    );
+    assert!(rank_first < rank_second, "Expected message with more occurrences to rank higher (lower score), got {rank_first} vs {rank_second}");
 }

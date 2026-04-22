@@ -30,9 +30,7 @@ use tracing::{debug, info, trace};
 use walkdir::WalkDir;
 
 use crate::discovery::DetectionResult;
-use crate::model::{
-    CanonicalMessage, CanonicalSession, MessageRole, reindex_messages, truncate_title,
-};
+use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, reindex_messages, truncate_title};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// Aider provider implementation.
@@ -91,15 +89,8 @@ impl Aider {
         if !dir.is_dir() {
             return;
         }
-        for entry in WalkDir::new(dir)
-            .max_depth(max_depth)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
-            if entry.file_name().to_str() == Some(".aider.chat.history.md")
-                && entry.path().is_file()
-                && !files.contains(&entry.path().to_path_buf())
-            {
+        for entry in WalkDir::new(dir).max_depth(max_depth).into_iter().filter_map(Result::ok) {
+            if entry.file_name().to_str() == Some(".aider.chat.history.md") && entry.path().is_file() && !files.contains(&entry.path().to_path_buf()) {
                 files.push(entry.path().to_path_buf());
             }
         }
@@ -121,11 +112,7 @@ impl Aider {
         let filename = path.file_name()?.to_str()?;
 
         // If the parent path ends with `.aider.chat.history.md`, it's a virtual path.
-        if parent
-            .file_name()
-            .and_then(|n| n.to_str())
-            .is_some_and(|n| n.ends_with(".aider.chat.history.md"))
-        {
+        if parent.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(".aider.chat.history.md")) {
             let decoded = urlencoding::decode(filename).ok()?;
             return Some((parent.to_path_buf(), decoded.into_owned()));
         }
@@ -144,11 +131,7 @@ impl Aider {
             if let Some(ts) = parse_session_header(line) {
                 // Flush previous session.
                 if !current_id.is_empty() && !current_text.trim().is_empty() {
-                    sessions.push(ParsedSession {
-                        session_id: current_id.clone(),
-                        start_timestamp: current_timestamp.clone(),
-                        text: std::mem::take(&mut current_text),
-                    });
+                    sessions.push(ParsedSession { session_id: current_id.clone(), start_timestamp: current_timestamp.clone(), text: std::mem::take(&mut current_text) });
                 }
                 current_timestamp = ts.clone();
                 current_id = timestamp_to_session_id(&ts);
@@ -161,21 +144,14 @@ impl Aider {
 
         // Flush last session.
         if !current_id.is_empty() && !current_text.trim().is_empty() {
-            sessions.push(ParsedSession {
-                session_id: current_id,
-                start_timestamp: current_timestamp,
-                text: current_text,
-            });
+            sessions.push(ParsedSession { session_id: current_id, start_timestamp: current_timestamp, text: current_text });
         }
 
         sessions
     }
 
     /// Parse a single session text block into a `CanonicalSession`.
-    fn parse_session_text(
-        path: &Path,
-        session: &ParsedSession,
-    ) -> anyhow::Result<CanonicalSession> {
+    fn parse_session_text(path: &Path, session: &ParsedSession) -> anyhow::Result<CanonicalSession> {
         let mut messages: Vec<CanonicalMessage> = Vec::new();
         let mut user_lines: Vec<String> = Vec::new();
         let mut assistant_lines: Vec<String> = Vec::new();
@@ -193,16 +169,7 @@ impl Aider {
             if content.is_empty() || content == "<blank>" {
                 return;
             }
-            msgs.push(CanonicalMessage {
-                idx: 0,
-                role: MessageRole::User,
-                content,
-                timestamp: None,
-                author: None,
-                tool_calls: vec![],
-                tool_results: vec![],
-                extra: serde_json::Value::Null,
-            });
+            msgs.push(CanonicalMessage { idx: 0, role: MessageRole::User, content, timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null });
         };
 
         let flush_assistant = |lines: &mut Vec<String>, msgs: &mut Vec<CanonicalMessage>| {
@@ -214,16 +181,7 @@ impl Aider {
             if content.is_empty() {
                 return;
             }
-            msgs.push(CanonicalMessage {
-                idx: 0,
-                role: MessageRole::Assistant,
-                content,
-                timestamp: None,
-                author: None,
-                tool_calls: vec![],
-                tool_results: vec![],
-                extra: serde_json::Value::Null,
-            });
+            msgs.push(CanonicalMessage { idx: 0, role: MessageRole::Assistant, content, timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null });
         };
 
         let flush_tool = |lines: &mut Vec<String>, msgs: &mut Vec<CanonicalMessage>| {
@@ -235,16 +193,7 @@ impl Aider {
             if content.is_empty() {
                 return;
             }
-            msgs.push(CanonicalMessage {
-                idx: 0,
-                role: MessageRole::Tool,
-                content,
-                timestamp: None,
-                author: None,
-                tool_calls: vec![],
-                tool_results: vec![],
-                extra: serde_json::Value::Null,
-            });
+            msgs.push(CanonicalMessage { idx: 0, role: MessageRole::Tool, content, timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null });
         };
 
         for line in session.text.lines() {
@@ -311,10 +260,7 @@ impl Aider {
         let ended_at = started_at; // Aider doesn't have per-message timestamps.
 
         // Title from first user message.
-        let title = messages
-            .iter()
-            .find(|m| m.role == MessageRole::User)
-            .map(|m| truncate_title(&m.content, 100));
+        let title = messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100));
 
         // If workspace not found in tool output, try to derive from file path.
         if workspace.is_none() {
@@ -322,35 +268,14 @@ impl Aider {
         }
 
         let mut metadata = serde_json::Map::new();
-        metadata.insert(
-            "source".into(),
-            serde_json::Value::String("aider".to_string()),
-        );
-        metadata.insert(
-            "start_timestamp_raw".into(),
-            serde_json::Value::String(session.start_timestamp.clone()),
-        );
+        metadata.insert("source".into(), serde_json::Value::String("aider".to_string()));
+        metadata.insert("start_timestamp_raw".into(), serde_json::Value::String(session.start_timestamp.clone()));
 
         let source_path = Self::virtual_session_path(path, &session.session_id);
 
-        debug!(
-            session_id = session.session_id,
-            messages = messages.len(),
-            "Aider session parsed"
-        );
+        debug!(session_id = session.session_id, messages = messages.len(), "Aider session parsed");
 
-        Ok(CanonicalSession {
-            session_id: session.session_id.clone(),
-            provider_slug: "aider".to_string(),
-            workspace,
-            title,
-            started_at,
-            ended_at,
-            messages,
-            metadata: serde_json::Value::Object(metadata),
-            source_path,
-            model_name,
-        })
+        Ok(CanonicalSession { session_id: session.session_id.clone(), provider_slug: "aider".to_string(), workspace, title, started_at, ended_at, messages, metadata: serde_json::Value::Object(metadata), source_path, model_name })
     }
 }
 
@@ -378,19 +303,12 @@ impl Provider for Aider {
 
         let history_files = Self::find_history_files();
         if !history_files.is_empty() {
-            evidence.push(format!(
-                "{} .aider.chat.history.md file(s) found",
-                history_files.len()
-            ));
+            evidence.push(format!("{} .aider.chat.history.md file(s) found", history_files.len()));
             installed = true;
         }
 
         trace!(provider = "aider", ?evidence, installed, "detection");
-        DetectionResult {
-            installed,
-            version: None,
-            evidence,
-        }
+        DetectionResult { installed, version: None, evidence }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -438,38 +356,19 @@ impl Provider for Aider {
 
         // Check if this is a virtual path (history_file/session_id).
         if let Some((history_path, session_id)) = Self::parse_virtual_path(path) {
-            let content = std::fs::read_to_string(&history_path)
-                .with_context(|| format!("failed to read {}", history_path.display()))?;
+            let content = std::fs::read_to_string(&history_path).with_context(|| format!("failed to read {}", history_path.display()))?;
             let sessions = Self::split_sessions(&content);
-            let session = sessions
-                .iter()
-                .find(|s| s.session_id == session_id)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "session {} not found in {}",
-                        session_id,
-                        history_path.display()
-                    )
-                })?;
+            let session = sessions.iter().find(|s| s.session_id == session_id).ok_or_else(|| anyhow::anyhow!("session {} not found in {}", session_id, history_path.display()))?;
             return Self::parse_session_text(&history_path, session);
         }
 
         // Direct file path — read the whole file and return the last session.
-        let content = std::fs::read_to_string(path)
-            .with_context(|| format!("failed to read {}", path.display()))?;
+        let content = std::fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
         let sessions = Self::split_sessions(&content);
 
         if sessions.is_empty() {
             // Treat the entire file as a single session.
-            let session = ParsedSession {
-                session_id: path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("unknown")
-                    .to_string(),
-                start_timestamp: String::new(),
-                text: content,
-            };
+            let session = ParsedSession { session_id: path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string(), start_timestamp: String::new(), text: content };
             return Self::parse_session_text(path, &session);
         }
 
@@ -478,11 +377,7 @@ impl Provider for Aider {
         Self::parse_session_text(path, last)
     }
 
-    fn write_session(
-        &self,
-        session: &CanonicalSession,
-        _opts: &WriteOptions,
-    ) -> anyhow::Result<WrittenSession> {
+    fn write_session(&self, session: &CanonicalSession, _opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
         let target_session_id = chrono::Utc::now().format("%Y-%m-%dT%H-%M-%S").to_string();
         let now = chrono::Utc::now();
         let now_str = now.format("%Y-%m-%d %H:%M:%S").to_string();
@@ -551,8 +446,7 @@ impl Provider for Aider {
 
         // Always force the write because Aider appends to a shared history file.
         // A pre-existing file is the expected state, not a conflict.
-        let outcome =
-            crate::pipeline::atomic_write(&target_path, &content_bytes, true, self.slug())?;
+        let outcome = crate::pipeline::atomic_write(&target_path, &content_bytes, true, self.slug())?;
 
         info!(
             target_session_id,
@@ -563,12 +457,7 @@ impl Provider for Aider {
 
         let virtual_path = Self::virtual_session_path(&outcome.target_path, &target_session_id);
 
-        Ok(WrittenSession {
-            paths: vec![virtual_path],
-            session_id: target_session_id.clone(),
-            resume_command: self.resume_command(&target_session_id),
-            backup_path: outcome.backup_path,
-        })
+        Ok(WrittenSession { paths: vec![virtual_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: outcome.backup_path })
     }
 
     fn resume_command(&self, _session_id: &str) -> String {
@@ -610,9 +499,7 @@ impl Provider for Aider {
 /// Returns the timestamp portion (e.g. `"2024-08-05 19:33:02"`).
 fn parse_session_header(line: &str) -> Option<String> {
     let trimmed = line.trim();
-    trimmed
-        .strip_prefix("# aider chat started at ")
-        .map(|ts| ts.trim().to_string())
+    trimmed.strip_prefix("# aider chat started at ").map(|ts| ts.trim().to_string())
 }
 
 /// Convert a timestamp string to a deterministic session ID.
@@ -630,9 +517,7 @@ fn parse_aider_timestamp(ts: &str) -> Option<i64> {
     if ts.is_empty() {
         return None;
     }
-    chrono::NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S")
-        .ok()
-        .map(|dt| dt.and_utc().timestamp_millis())
+    chrono::NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S").ok().map(|dt| dt.and_utc().timestamp_millis())
 }
 
 /// Extract model name from an Aider tool output line.
@@ -665,10 +550,7 @@ fn extract_workspace_from_tool_line(line: &str) -> Option<PathBuf> {
     for prefix in ["/data/projects/", "/home/", "/Users/", "/root/"] {
         if let Some(idx) = line.find(prefix) {
             let rest = &line[idx..];
-            let path: String = rest
-                .chars()
-                .take_while(|c| !c.is_whitespace() && *c != '"' && *c != '\'')
-                .collect();
+            let path: String = rest.chars().take_while(|c| !c.is_whitespace() && *c != '"' && *c != '\'').collect();
             if path.len() > prefix.len() {
                 return Some(PathBuf::from(path));
             }
@@ -688,18 +570,12 @@ mod tests {
 
     #[test]
     fn parse_session_header_standard() {
-        assert_eq!(
-            parse_session_header("# aider chat started at 2024-08-05 19:33:02"),
-            Some("2024-08-05 19:33:02".to_string())
-        );
+        assert_eq!(parse_session_header("# aider chat started at 2024-08-05 19:33:02"), Some("2024-08-05 19:33:02".to_string()));
     }
 
     #[test]
     fn parse_session_header_with_whitespace() {
-        assert_eq!(
-            parse_session_header("  # aider chat started at 2024-08-05 19:33:02  "),
-            Some("2024-08-05 19:33:02".to_string())
-        );
+        assert_eq!(parse_session_header("  # aider chat started at 2024-08-05 19:33:02  "), Some("2024-08-05 19:33:02".to_string()));
     }
 
     #[test]
@@ -715,10 +591,7 @@ mod tests {
 
     #[test]
     fn timestamp_to_session_id_standard() {
-        assert_eq!(
-            timestamp_to_session_id("2024-08-05 19:33:02"),
-            "2024-08-05T19-33-02"
-        );
+        assert_eq!(timestamp_to_session_id("2024-08-05 19:33:02"), "2024-08-05T19-33-02");
     }
 
     // -----------------------------------------------------------------------
@@ -748,28 +621,17 @@ mod tests {
 
     #[test]
     fn extract_model_standard() {
-        assert_eq!(
-            extract_model_from_tool_line(
-                "Models: claude-3-5-sonnet-20240620 with diff edit format, weak model claude-3-haiku"
-            ),
-            Some("claude-3-5-sonnet-20240620".to_string())
-        );
+        assert_eq!(extract_model_from_tool_line("Models: claude-3-5-sonnet-20240620 with diff edit format, weak model claude-3-haiku"), Some("claude-3-5-sonnet-20240620".to_string()));
     }
 
     #[test]
     fn extract_model_single_model() {
-        assert_eq!(
-            extract_model_from_tool_line("Model: gpt-4o-mini with whole edit format"),
-            Some("gpt-4o-mini".to_string())
-        );
+        assert_eq!(extract_model_from_tool_line("Model: gpt-4o-mini with whole edit format"), Some("gpt-4o-mini".to_string()));
     }
 
     #[test]
     fn extract_model_no_model() {
-        assert_eq!(
-            extract_model_from_tool_line("Git repo: .git with 300 files"),
-            None
-        );
+        assert_eq!(extract_model_from_tool_line("Git repo: .git with 300 files"), None);
     }
 
     // -----------------------------------------------------------------------
@@ -832,9 +694,7 @@ Response two
         tmp.write_all(content.as_bytes()).unwrap();
         tmp.flush().unwrap();
         let aider = Aider;
-        aider
-            .read_session(tmp.path())
-            .unwrap_or_else(|e| panic!("read_session failed: {e}"))
+        aider.read_session(tmp.path()).unwrap_or_else(|e| panic!("read_session failed: {e}"))
     }
 
     #[test]
@@ -863,16 +723,8 @@ print('fixed')
         assert!(session.messages.len() >= 2);
 
         // Check we have user and assistant messages.
-        let user_msgs: Vec<_> = session
-            .messages
-            .iter()
-            .filter(|m| m.role == MessageRole::User)
-            .collect();
-        let asst_msgs: Vec<_> = session
-            .messages
-            .iter()
-            .filter(|m| m.role == MessageRole::Assistant)
-            .collect();
+        let user_msgs: Vec<_> = session.messages.iter().filter(|m| m.role == MessageRole::User).collect();
+        let asst_msgs: Vec<_> = session.messages.iter().filter(|m| m.role == MessageRole::Assistant).collect();
         assert_eq!(user_msgs.len(), 1);
         assert_eq!(user_msgs[0].content, "Fix the bug in main.rs");
         assert!(!asst_msgs.is_empty());
@@ -896,11 +748,7 @@ Response here.
 
 ",
         );
-        let user_msgs: Vec<_> = session
-            .messages
-            .iter()
-            .filter(|m| m.role == MessageRole::User)
-            .collect();
+        let user_msgs: Vec<_> = session.messages.iter().filter(|m| m.role == MessageRole::User).collect();
         assert_eq!(user_msgs.len(), 1);
         assert!(user_msgs[0].content.contains("First line of input"));
         assert!(user_msgs[0].content.contains("Second line of input"));
@@ -923,11 +771,7 @@ Another response
 
 ",
         );
-        let user_msgs: Vec<_> = session
-            .messages
-            .iter()
-            .filter(|m| m.role == MessageRole::User)
-            .collect();
+        let user_msgs: Vec<_> = session.messages.iter().filter(|m| m.role == MessageRole::User).collect();
         assert_eq!(user_msgs.len(), 1);
         assert_eq!(user_msgs[0].content, "Real message");
     }
@@ -949,11 +793,7 @@ Response
 
 ",
         );
-        let tool_msgs: Vec<_> = session
-            .messages
-            .iter()
-            .filter(|m| m.role == MessageRole::Tool)
-            .collect();
+        let tool_msgs: Vec<_> = session.messages.iter().filter(|m| m.role == MessageRole::Tool).collect();
         assert!(!tool_msgs.is_empty());
     }
 
@@ -976,11 +816,7 @@ Second response
 ",
         );
         assert_eq!(session.session_id, "2024-08-05T20-45-10");
-        let user_msgs: Vec<_> = session
-            .messages
-            .iter()
-            .filter(|m| m.role == MessageRole::User)
-            .collect();
+        let user_msgs: Vec<_> = session.messages.iter().filter(|m| m.role == MessageRole::User).collect();
         assert_eq!(user_msgs.len(), 1);
         assert_eq!(user_msgs[0].content, "Second session");
     }
@@ -1003,10 +839,7 @@ Done.
 
 ",
         );
-        assert_eq!(
-            session.title.as_deref(),
-            Some("Refactor the authentication module")
-        );
+        assert_eq!(session.title.as_deref(), Some("Refactor the authentication module"));
     }
 
     #[test]
@@ -1027,11 +860,7 @@ fn main() {
 
 ",
         );
-        let asst_msgs: Vec<_> = session
-            .messages
-            .iter()
-            .filter(|m| m.role == MessageRole::Assistant)
-            .collect();
+        let asst_msgs: Vec<_> = session.messages.iter().filter(|m| m.role == MessageRole::Assistant).collect();
         assert!(asst_msgs[0].content.contains("```rust"));
         assert!(asst_msgs[0].content.contains("fn main()"));
     }
@@ -1050,11 +879,7 @@ fn main() {
 
 ",
         );
-        let user_msgs: Vec<_> = session
-            .messages
-            .iter()
-            .filter(|m| m.role == MessageRole::User)
-            .collect();
+        let user_msgs: Vec<_> = session.messages.iter().filter(|m| m.role == MessageRole::User).collect();
         assert!(!user_msgs.is_empty());
         assert_eq!(user_msgs[0].content, "/diff");
     }
@@ -1084,8 +909,7 @@ Hi!
         let session_id = "2024-08-05T19-33-02";
         let virtual_path = Aider::virtual_session_path(history, session_id);
 
-        let (parsed_path, parsed_id) =
-            Aider::parse_virtual_path(&virtual_path).expect("should parse virtual path");
+        let (parsed_path, parsed_id) = Aider::parse_virtual_path(&virtual_path).expect("should parse virtual path");
         assert_eq!(parsed_path, history);
         assert_eq!(parsed_id, session_id);
     }
@@ -1097,10 +921,7 @@ Hi!
     #[test]
     fn resume_command_uses_restore_flag() {
         let provider = Aider;
-        assert_eq!(
-            <Aider as Provider>::resume_command(&provider, "any-id"),
-            "aider --restore-chat-history"
-        );
+        assert_eq!(<Aider as Provider>::resume_command(&provider, "any-id"), "aider --restore-chat-history");
     }
 
     #[test]
@@ -1169,26 +990,8 @@ Response three
             started_at: Some(1_700_000_000_000),
             ended_at: Some(1_700_001_000_000),
             messages: vec![
-                CanonicalMessage {
-                    idx: 0,
-                    role: MessageRole::User,
-                    content: "Fix the bug".to_string(),
-                    timestamp: None,
-                    author: None,
-                    tool_calls: vec![],
-                    tool_results: vec![],
-                    extra: json!({}),
-                },
-                CanonicalMessage {
-                    idx: 1,
-                    role: MessageRole::Assistant,
-                    content: "I'll fix it now.".to_string(),
-                    timestamp: None,
-                    author: None,
-                    tool_calls: vec![],
-                    tool_results: vec![],
-                    extra: json!({}),
-                },
+                CanonicalMessage { idx: 0, role: MessageRole::User, content: "Fix the bug".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: json!({}) },
+                CanonicalMessage { idx: 1, role: MessageRole::Assistant, content: "I'll fix it now.".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: json!({}) },
             ],
             metadata: json!({"source": "claude-code"}),
             source_path: PathBuf::from("/tmp/test.jsonl"),
@@ -1197,9 +1000,7 @@ Response three
 
         let provider = Aider;
         let opts = WriteOptions { force: false };
-        let result = provider
-            .write_session(&session, &opts)
-            .expect("write should succeed");
+        let result = provider.write_session(&session, &opts).expect("write should succeed");
 
         assert!(!result.session_id.is_empty());
         assert_eq!(result.resume_command, "aider --restore-chat-history");

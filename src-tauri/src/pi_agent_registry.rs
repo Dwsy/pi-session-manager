@@ -48,51 +48,19 @@ pub struct PiAgentRegistry {
 
 impl PiAgentRegistry {
     pub fn new() -> Self {
-        Self {
-            sessions: Mutex::new(HashMap::new()),
-            connections: Mutex::new(HashMap::new()),
-        }
+        Self { sessions: Mutex::new(HashMap::new()), connections: Mutex::new(HashMap::new()) }
     }
 
     /// Register a new session
-    pub fn register(
-        &self,
-        session_id: String,
-        session_path: Option<String>,
-        pid: Option<u32>,
-        cwd: Option<String>,
-        entries: Vec<serde_json::Value>,
-    ) {
+    pub fn register(&self, session_id: String, session_path: Option<String>, pid: Option<u32>, cwd: Option<String>, entries: Vec<serde_json::Value>) {
         let now = chrono::Utc::now().to_rfc3339();
-        self.sessions.lock().expect("mutex poisoned").insert(
-            session_id.clone(),
-            PiLiveSession {
-                session_id,
-                session_path,
-                pid,
-                cwd,
-                is_streaming: false,
-                entry_count: entries.len() as u64,
-                last_seen: now,
-                model: None,
-                available_models: None,
-                thinking_level: None,
-                context_usage: None,
-                entries,
-            },
-        );
+        self.sessions.lock().expect("mutex poisoned").insert(session_id.clone(), PiLiveSession { session_id, session_path, pid, cwd, is_streaming: false, entry_count: entries.len() as u64, last_seen: now, model: None, available_models: None, thinking_level: None, context_usage: None, entries });
     }
 
     /// Remove a session
     pub fn remove(&self, session_id: &str) {
-        self.sessions
-            .lock()
-            .expect("mutex poisoned")
-            .remove(session_id);
-        self.connections
-            .lock()
-            .expect("mutex poisoned")
-            .remove(session_id);
+        self.sessions.lock().expect("mutex poisoned").remove(session_id);
+        self.connections.lock().expect("mutex poisoned").remove(session_id);
     }
 
     /// Record a new entry for a session
@@ -109,81 +77,33 @@ impl PiAgentRegistry {
 
     /// List all sessions
     pub fn list(&self) -> Vec<PiLiveSession> {
-        self.sessions
-            .lock()
-            .expect("mutex poisoned")
-            .values()
-            .cloned()
-            .collect()
+        self.sessions.lock().expect("mutex poisoned").values().cloned().collect()
     }
 
     /// Get a session by id (exact or partial match)
     pub fn get_live_session(&self, session_id: &str) -> Option<PiLiveSession> {
         let guard = self.sessions.lock().expect("mutex poisoned");
-        guard.get(session_id).cloned().or_else(|| {
-            guard
-                .values()
-                .find(|s| s.session_id.contains(session_id))
-                .cloned()
-        })
+        guard.get(session_id).cloned().or_else(|| guard.values().find(|s| s.session_id.contains(session_id)).cloned())
     }
 
     // ── Connection management for RPC ───────────────────────
 
     /// Register a bidirectional RPC connection
-    pub fn register_connection(
-        &self,
-        session_id: String,
-        sender: mpsc::UnboundedSender<String>,
-        response_tx: broadcast::Sender<serde_json::Value>,
-    ) {
-        self.connections.lock().expect("mutex poisoned").insert(
-            session_id.clone(),
-            PiAgentConnection {
-                session_id,
-                sender: Some(sender),
-                response_tx: Some(response_tx),
-            },
-        );
+    pub fn register_connection(&self, session_id: String, sender: mpsc::UnboundedSender<String>, response_tx: broadcast::Sender<serde_json::Value>) {
+        self.connections.lock().expect("mutex poisoned").insert(session_id.clone(), PiAgentConnection { session_id, sender: Some(sender), response_tx: Some(response_tx) });
     }
 
     /// Send an RPC command and wait for response
-    pub async fn send_rpc(
-        &self,
-        session_id: &str,
-        command: serde_json::Value,
-    ) -> Result<serde_json::Value, String> {
+    pub async fn send_rpc(&self, session_id: &str, command: serde_json::Value) -> Result<serde_json::Value, String> {
         let (full_id, conn) = {
             let guard = self.connections.lock().expect("mutex poisoned");
-            let conn = guard
-                .get(session_id)
-                .cloned()
-                .or_else(|| {
-                    guard
-                        .iter()
-                        .find(|(k, _)| k.contains(session_id))
-                        .map(|(_, v)| v.clone())
-                })
-                .ok_or_else(|| format!("Session not connected: {session_id}"))?;
-            let key = guard
-                .get(session_id)
-                .map(|_| session_id.to_string())
-                .or_else(|| {
-                    guard
-                        .iter()
-                        .find(|(k, _)| k.contains(session_id))
-                        .map(|(k, _)| k.clone())
-                })
-                .unwrap_or_else(|| session_id.to_string());
+            let conn = guard.get(session_id).cloned().or_else(|| guard.iter().find(|(k, _)| k.contains(session_id)).map(|(_, v)| v.clone())).ok_or_else(|| format!("Session not connected: {session_id}"))?;
+            let key = guard.get(session_id).map(|_| session_id.to_string()).or_else(|| guard.iter().find(|(k, _)| k.contains(session_id)).map(|(k, _)| k.clone())).unwrap_or_else(|| session_id.to_string());
             (key, conn)
         };
 
-        let sender = conn
-            .sender
-            .ok_or_else(|| "No sender for session".to_string())?;
-        let response_tx = conn
-            .response_tx
-            .ok_or_else(|| "No response channel for session".to_string())?;
+        let sender = conn.sender.ok_or_else(|| "No sender for session".to_string())?;
+        let response_tx = conn.response_tx.ok_or_else(|| "No response channel for session".to_string())?;
 
         let mut response_rx = response_tx.subscribe();
         let call_id = session_id.to_string();
@@ -192,10 +112,7 @@ impl PiAgentRegistry {
 
         let command_str = serde_json::to_string(&command_val).map_err(|e| e.to_string())?;
 
-        log::info!(
-            "[RPC] -> [{full_id}] command={:?} id={call_id}",
-            command_val["type"]
-        );
+        log::info!("[RPC] -> [{full_id}] command={:?} id={call_id}", command_val["type"]);
         sender.send(command_str).map_err(|e| e.to_string())?;
 
         // Wait for response with timeout
@@ -223,12 +140,7 @@ impl PiAgentRegistry {
 
     /// Forward a response to waiting RPC callers
     pub fn forward_response(&self, session_id: &str, response: serde_json::Value) {
-        if let Some(conn) = self
-            .connections
-            .lock()
-            .expect("mutex poisoned")
-            .get(session_id)
-        {
+        if let Some(conn) = self.connections.lock().expect("mutex poisoned").get(session_id) {
             if let Some(tx) = &conn.response_tx {
                 let _ = tx.send(response);
             }
@@ -236,20 +148,8 @@ impl PiAgentRegistry {
     }
 
     /// Update session state (model, thinking level, context usage)
-    pub fn update_session_state(
-        &self,
-        session_id: &str,
-        model: Option<serde_json::Value>,
-        available_models: Option<Vec<serde_json::Value>>,
-        thinking_level: Option<String>,
-        context_usage: Option<serde_json::Value>,
-    ) {
-        if let Some(s) = self
-            .sessions
-            .lock()
-            .expect("mutex poisoned")
-            .get_mut(session_id)
-        {
+    pub fn update_session_state(&self, session_id: &str, model: Option<serde_json::Value>, available_models: Option<Vec<serde_json::Value>>, thinking_level: Option<String>, context_usage: Option<serde_json::Value>) {
+        if let Some(s) = self.sessions.lock().expect("mutex poisoned").get_mut(session_id) {
             if model.is_some() {
                 s.model = model;
             }
@@ -267,12 +167,7 @@ impl PiAgentRegistry {
 
     /// Update session entries
     pub fn update_session_entries(&self, session_id: &str, entries: Vec<serde_json::Value>) {
-        if let Some(s) = self
-            .sessions
-            .lock()
-            .expect("mutex poisoned")
-            .get_mut(session_id)
-        {
+        if let Some(s) = self.sessions.lock().expect("mutex poisoned").get_mut(session_id) {
             s.entries = entries;
             s.entry_count = s.entries.len() as u64;
         }
@@ -280,46 +175,28 @@ impl PiAgentRegistry {
 
     /// Update streaming state
     pub fn update_streaming_state(&self, session_id: &str, is_streaming: bool) {
-        if let Some(s) = self
-            .sessions
-            .lock()
-            .expect("mutex poisoned")
-            .get_mut(session_id)
-        {
+        if let Some(s) = self.sessions.lock().expect("mutex poisoned").get_mut(session_id) {
             s.is_streaming = is_streaming;
         }
     }
 
     /// Increment entry count
     pub fn increment_entry_count(&self, session_id: &str) {
-        if let Some(s) = self
-            .sessions
-            .lock()
-            .expect("mutex poisoned")
-            .get_mut(session_id)
-        {
+        if let Some(s) = self.sessions.lock().expect("mutex poisoned").get_mut(session_id) {
             s.entry_count += 1;
         }
     }
 
     /// Update last_seen timestamp
     pub fn touch(&self, session_id: &str) {
-        if let Some(s) = self
-            .sessions
-            .lock()
-            .expect("mutex poisoned")
-            .get_mut(session_id)
-        {
+        if let Some(s) = self.sessions.lock().expect("mutex poisoned").get_mut(session_id) {
             s.last_seen = chrono::Utc::now().to_rfc3339();
         }
     }
 
     /// Remove RPC connection only (session data preserved)
     pub fn remove_connection(&self, session_id: &str) {
-        self.connections
-            .lock()
-            .expect("mutex poisoned")
-            .remove(session_id);
+        self.connections.lock().expect("mutex poisoned").remove(session_id);
     }
 }
 

@@ -3,11 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub async fn export_session(
-    session_path: &str,
-    format: &str,
-    output_path: &str,
-) -> Result<(), String> {
+pub async fn export_session(session_path: &str, format: &str, output_path: &str) -> Result<(), String> {
     match format {
         "html" => export_using_pi_command(session_path, output_path),
         "json" => export_as_json(session_path, output_path),
@@ -25,44 +21,26 @@ fn export_using_pi_command(session_path: &str, output_path: &str) -> Result<(), 
             continue;
         }
 
-        match Command::new(&command)
-            .arg("--export")
-            .arg(session_path)
-            .arg(output_path)
-            .output()
-        {
+        match Command::new(&command).arg("--export").arg(session_path).arg(output_path).output() {
             Ok(output) if output.status.success() => return Ok(()),
             Ok(output) => {
                 let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                let detail = if stderr.is_empty() {
-                    "unknown error".to_string()
-                } else {
-                    stderr
-                };
+                let detail = if stderr.is_empty() { "unknown error".to_string() } else { stderr };
                 attempts.push(format!("{command}: {detail}"));
             }
             Err(e) => attempts.push(format!("{command}: {e}")),
         }
     }
 
-    Err(format!(
-        "Pi export command failed. attempts: {}",
-        attempts.join(" | ")
-    ))
+    Err(format!("Pi export command failed. attempts: {}", attempts.join(" | ")))
 }
 
 /// Build the system prompt for a session by calling pi's buildSystemPrompt via node.
 /// Falls back to reading APPEND_SYSTEM.md if the node call fails.
 pub fn extract_system_prompt(session_path: &str) -> Result<String, String> {
     // Read session header to get cwd
-    let content =
-        fs::read_to_string(session_path).map_err(|e| format!("Failed to read session: {e}"))?;
-    let cwd = content
-        .lines()
-        .next()
-        .and_then(|line| serde_json::from_str::<Value>(line).ok())
-        .and_then(|v| v.get("cwd").and_then(|c| c.as_str()).map(String::from))
-        .unwrap_or_default();
+    let content = fs::read_to_string(session_path).map_err(|e| format!("Failed to read session: {e}"))?;
+    let cwd = content.lines().next().and_then(|line| serde_json::from_str::<Value>(line).ok()).and_then(|v| v.get("cwd").and_then(|c| c.as_str()).map(String::from)).unwrap_or_default();
 
     // Try calling pi's buildSystemPrompt via node
     let pi_pkg = which_pi_module();
@@ -103,11 +81,7 @@ process.stdout.write(prompt);
             cwd_json = serde_json::to_string(&cwd).unwrap_or_else(|_| "\"\"".to_string()),
         );
 
-        let output = Command::new("node")
-            .arg("--input-type=module")
-            .arg("-e")
-            .arg(&script)
-            .output();
+        let output = Command::new("node").arg("--input-type=module").arg("-e").arg(&script).output();
 
         if let Ok(out) = output {
             if out.status.success() {
@@ -122,8 +96,7 @@ process.stdout.write(prompt);
     // Fallback: read APPEND_SYSTEM.md
     let append_path = crate::paths::pi_agent_root_dir()?.join("APPEND_SYSTEM.md");
     if append_path.exists() {
-        return fs::read_to_string(&append_path)
-            .map_err(|e| format!("Failed to read APPEND_SYSTEM.md: {e}"));
+        return fs::read_to_string(&append_path).map_err(|e| format!("Failed to read APPEND_SYSTEM.md: {e}"));
     }
     Ok(String::new())
 }
@@ -133,9 +106,7 @@ fn which_pi_module() -> Option<String> {
     let pi_bin = find_pi_executable()?;
     let resolved = fs::canonicalize(&pi_bin).unwrap_or(pi_bin.clone());
 
-    find_pi_package_root(&resolved)
-        .or_else(|| find_pi_package_root(&pi_bin))
-        .map(|dir| dir.to_string_lossy().to_string())
+    find_pi_package_root(&resolved).or_else(|| find_pi_package_root(&pi_bin)).map(|dir| dir.to_string_lossy().to_string())
 }
 
 fn pi_command_candidates() -> Vec<String> {
@@ -157,16 +128,12 @@ fn pi_command_candidates() -> Vec<String> {
 }
 
 fn find_pi_executable() -> Option<PathBuf> {
-    find_executable_in_path("pi")
-        .or_else(|| find_executable_in_path("pi.cmd"))
-        .or_else(|| find_executable_in_path("pi.exe"))
+    find_executable_in_path("pi").or_else(|| find_executable_in_path("pi.cmd")).or_else(|| find_executable_in_path("pi.exe"))
 }
 
 fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     let direct = Path::new(executable);
-    if (direct.is_absolute() || executable.contains('/') || executable.contains('\\'))
-        && direct.is_file()
-    {
+    if (direct.is_absolute() || executable.contains('/') || executable.contains('\\')) && direct.is_file() {
         return Some(direct.to_path_buf());
     }
 
@@ -193,8 +160,7 @@ fn command_name_candidates(executable: &str) -> Vec<String> {
         }
 
         let mut out = Vec::new();
-        let path_ext =
-            std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_string());
+        let path_ext = std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_string());
         for ext in path_ext.split(';').filter(|ext| !ext.trim().is_empty()) {
             out.push(format!("{executable}{ext}"));
         }
@@ -211,11 +177,7 @@ fn command_name_candidates(executable: &str) -> Vec<String> {
 fn find_pi_package_root(binary_path: &Path) -> Option<PathBuf> {
     // npm/pnpm global installs may place wrappers in bin directories.
     let wrapper_dir = binary_path.parent()?;
-    let package_candidates = [
-        wrapper_dir.join("node_modules/@mariozechner/pi-coding-agent"),
-        wrapper_dir.join("../node_modules/@mariozechner/pi-coding-agent"),
-        wrapper_dir.join("../lib/node_modules/@mariozechner/pi-coding-agent"),
-    ];
+    let package_candidates = [wrapper_dir.join("node_modules/@mariozechner/pi-coding-agent"), wrapper_dir.join("../node_modules/@mariozechner/pi-coding-agent"), wrapper_dir.join("../lib/node_modules/@mariozechner/pi-coding-agent")];
 
     for candidate in package_candidates {
         if is_pi_package_root(&candidate) {
@@ -239,27 +201,19 @@ fn is_pi_package_root(path: &Path) -> bool {
 }
 
 fn export_as_json(session_path: &str, output_path: &str) -> Result<(), String> {
-    let content = fs::read_to_string(session_path)
-        .map_err(|e| format!("Failed to read session file: {e}"))?;
+    let content = fs::read_to_string(session_path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
-    let entries: Vec<Value> = content
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect();
+    let entries: Vec<Value> = content.lines().filter(|line| !line.trim().is_empty()).filter_map(|line| serde_json::from_str(line).ok()).collect();
 
-    let json_content = serde_json::to_string_pretty(&entries)
-        .map_err(|e| format!("Failed to serialize JSON: {e}"))?;
+    let json_content = serde_json::to_string_pretty(&entries).map_err(|e| format!("Failed to serialize JSON: {e}"))?;
 
-    fs::write(output_path, json_content)
-        .map_err(|e| format!("Failed to write export file: {e}"))?;
+    fs::write(output_path, json_content).map_err(|e| format!("Failed to write export file: {e}"))?;
 
     Ok(())
 }
 
 fn export_as_markdown(session_path: &str, output_path: &str) -> Result<(), String> {
-    let content = fs::read_to_string(session_path)
-        .map_err(|e| format!("Failed to read session file: {e}"))?;
+    let content = fs::read_to_string(session_path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
     let mut md = String::new();
     let mut session_name = String::from("Session Export");

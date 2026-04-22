@@ -16,12 +16,7 @@ pub enum SessionSortBy {
 
 impl SessionSortBy {
     pub fn from_raw(value: Option<&str>) -> Self {
-        match value
-            .map(str::trim)
-            .filter(|raw| !raw.is_empty())
-            .map(str::to_lowercase)
-            .as_deref()
-        {
+        match value.map(str::trim).filter(|raw| !raw.is_empty()).map(str::to_lowercase).as_deref() {
             Some("name") | Some("name_asc") => Self::NameAsc,
             Some("name_desc") => Self::NameDesc,
             Some("created") | Some("created_desc") | Some("last_created") => Self::CreatedDesc,

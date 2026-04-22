@@ -14,13 +14,7 @@ fn test_registry_empty_list() {
 fn test_registry_register_session() {
     let registry = Arc::new(PiAgentRegistry::new());
 
-    registry.register(
-        "test-session-1".to_string(),
-        Some("/path/to/session.jsonl".to_string()),
-        Some(12345),
-        Some("/home/user/project".to_string()),
-        vec![],
-    );
+    registry.register("test-session-1".to_string(), Some("/path/to/session.jsonl".to_string()), Some(12345), Some("/home/user/project".to_string()), vec![]);
 
     let sessions = registry.list();
     assert_eq!(sessions.len(), 1);
@@ -34,13 +28,7 @@ fn test_registry_register_session() {
 fn test_registry_remove_session() {
     let registry = Arc::new(PiAgentRegistry::new());
 
-    registry.register(
-        "test-session-2".to_string(),
-        None,
-        Some(54321),
-        None,
-        vec![],
-    );
+    registry.register("test-session-2".to_string(), None, Some(54321), None, vec![]);
 
     assert_eq!(registry.list().len(), 1);
 
@@ -75,28 +63,13 @@ fn test_registry_update_streaming_state() {
 
     registry.register("streaming-session".to_string(), None, None, None, vec![]);
 
-    assert!(
-        !registry
-            .get_live_session("streaming-session")
-            .unwrap()
-            .is_streaming
-    );
+    assert!(!registry.get_live_session("streaming-session").unwrap().is_streaming);
 
     registry.update_streaming_state("streaming-session", true);
-    assert!(
-        registry
-            .get_live_session("streaming-session")
-            .unwrap()
-            .is_streaming
-    );
+    assert!(registry.get_live_session("streaming-session").unwrap().is_streaming);
 
     registry.update_streaming_state("streaming-session", false);
-    assert!(
-        !registry
-            .get_live_session("streaming-session")
-            .unwrap()
-            .is_streaming
-    );
+    assert!(!registry.get_live_session("streaming-session").unwrap().is_streaming);
 }
 
 #[test]
@@ -105,31 +78,13 @@ fn test_registry_increment_entry_count() {
 
     registry.register("entries-session".to_string(), None, None, None, vec![]);
 
-    assert_eq!(
-        registry
-            .get_live_session("entries-session")
-            .unwrap()
-            .entry_count,
-        0
-    );
+    assert_eq!(registry.get_live_session("entries-session").unwrap().entry_count, 0);
 
     registry.increment_entry_count("entries-session");
-    assert_eq!(
-        registry
-            .get_live_session("entries-session")
-            .unwrap()
-            .entry_count,
-        1
-    );
+    assert_eq!(registry.get_live_session("entries-session").unwrap().entry_count, 1);
 
     registry.increment_entry_count("entries-session");
-    assert_eq!(
-        registry
-            .get_live_session("entries-session")
-            .unwrap()
-            .entry_count,
-        2
-    );
+    assert_eq!(registry.get_live_session("entries-session").unwrap().entry_count, 2);
 }
 
 #[test]

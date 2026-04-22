@@ -26,10 +26,7 @@ use tracing::{debug, info, trace};
 use walkdir::WalkDir;
 
 use crate::discovery::DetectionResult;
-use crate::model::{
-    CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, flatten_content,
-    normalize_role, parse_timestamp, reindex_messages, truncate_title,
-};
+use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// Gemini CLI provider implementation.
@@ -103,11 +100,7 @@ impl Provider for Gemini {
         }
 
         trace!(provider = "gemini", ?evidence, installed, "detection");
-        DetectionResult {
-            installed,
-            version: None,
-            evidence,
-        }
+        DetectionResult { installed, version: None, evidence }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -136,11 +129,7 @@ impl Provider for Gemini {
         }
 
         let mut sessions: Vec<(String, PathBuf)> = Vec::new();
-        for entry in WalkDir::new(&tmp)
-            .max_depth(3)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
+        for entry in WalkDir::new(&tmp).max_depth(3).into_iter().filter_map(Result::ok) {
             let path = entry.path();
             if !path.is_file() {
                 continue;
@@ -160,12 +149,7 @@ impl Provider for Gemini {
                 continue;
             }
 
-            let session_id = session_id_from_file(path).unwrap_or_else(|| {
-                name.strip_prefix("session-")
-                    .and_then(|n| n.strip_suffix(".json"))
-                    .unwrap_or(name)
-                    .to_string()
-            });
+            let session_id = session_id_from_file(path).unwrap_or_else(|| name.strip_prefix("session-").and_then(|n| n.strip_suffix(".json")).unwrap_or(name).to_string());
             sessions.push((session_id, path.to_path_buf()));
         }
 
@@ -183,17 +167,9 @@ impl Provider for Gemini {
         // Real filename convention: session-YYYY-MM-DDThh-mm-<uuid_prefix8>.json
         // so we cannot rely on exact filename == session_id.
         let exact_name = format!("session-{session_id}.json");
-        let id_prefix = session_id
-            .chars()
-            .take(8)
-            .collect::<String>()
-            .to_ascii_lowercase();
+        let id_prefix = session_id.chars().take(8).collect::<String>().to_ascii_lowercase();
 
-        for entry in WalkDir::new(&tmp)
-            .max_depth(3)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
+        for entry in WalkDir::new(&tmp).max_depth(3).into_iter().filter_map(Result::ok) {
             let path = entry.path();
             // Files must be in a chats/ directory.
             if let Some(parent) = path.parent()
@@ -209,9 +185,7 @@ impl Provider for Gemini {
                 // Prefix-based lookup for modern filenames.
                 if !id_prefix.is_empty() {
                     let name_lc = name.to_ascii_lowercase();
-                    if name_lc.ends_with(&format!("-{id_prefix}.json"))
-                        && session_id_from_file(path).as_deref() == Some(session_id)
-                    {
+                    if name_lc.ends_with(&format!("-{id_prefix}.json")) && session_id_from_file(path).as_deref() == Some(session_id) {
                         debug!(path = %path.display(), "found Gemini session by UUID prefix + sessionId body match");
                         return Some(path.to_path_buf());
                     }
@@ -224,50 +198,29 @@ impl Provider for Gemini {
     fn read_session(&self, path: &Path) -> anyhow::Result<CanonicalSession> {
         debug!(path = %path.display(), "reading Gemini session");
 
-        let file = std::fs::File::open(path)
-            .with_context(|| format!("failed to open {}", path.display()))?;
+        let file = std::fs::File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
         let reader = std::io::BufReader::new(file);
-        let root: serde_json::Value = serde_json::from_reader(reader)
-            .with_context(|| format!("failed to parse JSON {}", path.display()))?;
+        let root: serde_json::Value = serde_json::from_reader(reader).with_context(|| format!("failed to parse JSON {}", path.display()))?;
 
         // Session-level fields.
-        let session_id = root
-            .get("sessionId")
-            .and_then(|v| v.as_str())
-            .map(String::from)
-            .unwrap_or_else(|| {
-                // Derive from filename: session-<uuid>.json → <uuid>
-                path.file_stem()
-                    .and_then(|s| s.to_str())
-                    .and_then(|s| s.strip_prefix("session-"))
-                    .unwrap_or("unknown")
-                    .to_string()
-            });
+        let session_id = root.get("sessionId").and_then(|v| v.as_str()).map(String::from).unwrap_or_else(|| {
+            // Derive from filename: session-<uuid>.json → <uuid>
+            path.file_stem().and_then(|s| s.to_str()).and_then(|s| s.strip_prefix("session-")).unwrap_or("unknown").to_string()
+        });
 
-        let project_hash = root
-            .get("projectHash")
-            .and_then(|v| v.as_str())
-            .map(String::from);
+        let project_hash = root.get("projectHash").and_then(|v| v.as_str()).map(String::from);
 
         let started_at = root.get("startTime").and_then(parse_timestamp);
         let mut ended_at = root.get("lastUpdated").and_then(parse_timestamp);
 
         // Parse messages array.
-        let msg_array = root
-            .get("messages")
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
+        let msg_array = root.get("messages").and_then(|v| v.as_array()).cloned().unwrap_or_default();
 
         let mut messages: Vec<CanonicalMessage> = Vec::new();
 
         for (i, msg) in msg_array.iter().enumerate() {
             // Role: Gemini uses "type" field with "user" or "model".
-            let role_str = msg
-                .get("type")
-                .or_else(|| msg.get("role"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("user");
+            let role_str = msg.get("type").or_else(|| msg.get("role")).and_then(|v| v.as_str()).unwrap_or("user");
             let role = normalize_role(role_str);
 
             // Content: string or array of content parts.
@@ -287,83 +240,39 @@ impl Provider for Gemini {
                 ended_at = Some(ended_at.map_or(t, |e: i64| e.max(t)));
             }
 
-            messages.push(CanonicalMessage {
-                idx: 0,
-                role,
-                content: text,
-                timestamp: ts,
-                author: None,
-                tool_calls,
-                tool_results,
-                extra: msg.clone(),
-            });
+            messages.push(CanonicalMessage { idx: 0, role, content: text, timestamp: ts, author: None, tool_calls, tool_results, extra: msg.clone() });
         }
 
         reindex_messages(&mut messages);
 
         // Title from first user message.
-        let title = messages
-            .iter()
-            .find(|m| m.role == MessageRole::User)
-            .map(|m| truncate_title(&m.content, 100));
+        let title = messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100));
 
         // Workspace: try to extract from message content (project paths).
         let workspace = extract_workspace_from_messages(&messages);
 
         // Metadata.
         let mut metadata = serde_json::Map::new();
-        metadata.insert(
-            "source".into(),
-            serde_json::Value::String("gemini".to_string()),
-        );
+        metadata.insert("source".into(), serde_json::Value::String("gemini".to_string()));
         if let Some(ref ph) = project_hash {
             metadata.insert("project_hash".into(), serde_json::Value::String(ph.clone()));
         }
 
-        debug!(
-            session_id,
-            messages = messages.len(),
-            "Gemini session parsed"
-        );
+        debug!(session_id, messages = messages.len(), "Gemini session parsed");
 
-        Ok(CanonicalSession {
-            session_id,
-            provider_slug: "gemini".to_string(),
-            workspace,
-            title,
-            started_at,
-            ended_at,
-            messages,
-            metadata: serde_json::Value::Object(metadata),
-            source_path: path.to_path_buf(),
-            model_name: None,
-        })
+        Ok(CanonicalSession { session_id, provider_slug: "gemini".to_string(), workspace, title, started_at, ended_at, messages, metadata: serde_json::Value::Object(metadata), source_path: path.to_path_buf(), model_name: None })
     }
 
-    fn write_session(
-        &self,
-        session: &CanonicalSession,
-        opts: &WriteOptions,
-    ) -> anyhow::Result<WrittenSession> {
+    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
         let target_session_id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now();
 
         // Determine target path.
-        let tmp_dir = Self::tmp_dir()
-            .ok_or_else(|| anyhow::anyhow!("cannot determine Gemini tmp directory"))?;
+        let tmp_dir = Self::tmp_dir().ok_or_else(|| anyhow::anyhow!("cannot determine Gemini tmp directory"))?;
 
         // Use workspace hash for project directory, or a fallback hash.
-        let workspace_path = session
-            .workspace
-            .as_deref()
-            .unwrap_or(std::path::Path::new("/tmp"));
-        let hash = session
-            .metadata
-            .get("project_hash")
-            .or_else(|| session.metadata.get("projectHash"))
-            .and_then(serde_json::Value::as_str)
-            .map(ToString::to_string)
-            .unwrap_or_else(|| project_hash(workspace_path));
+        let workspace_path = session.workspace.as_deref().unwrap_or(std::path::Path::new("/tmp"));
+        let hash = session.metadata.get("project_hash").or_else(|| session.metadata.get("projectHash")).and_then(serde_json::Value::as_str).map(ToString::to_string).unwrap_or_else(|| project_hash(workspace_path));
         let chats_dir = tmp_dir.join(&hash).join("chats");
         let filename = session_filename(&target_session_id, &now);
         let target_path = chats_dir.join(&filename);
@@ -375,27 +284,16 @@ impl Provider for Gemini {
         );
 
         // Build the Gemini JSON structure.
-        let start_time = session
-            .started_at
-            .and_then(chrono::DateTime::from_timestamp_millis)
-            .unwrap_or(now)
-            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let start_time = session.started_at.and_then(chrono::DateTime::from_timestamp_millis).unwrap_or(now).to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
 
-        let last_updated = session
-            .ended_at
-            .and_then(chrono::DateTime::from_timestamp_millis)
-            .unwrap_or(now)
-            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let last_updated = session.ended_at.and_then(chrono::DateTime::from_timestamp_millis).unwrap_or(now).to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
 
         let mut json_messages: Vec<serde_json::Value> = Vec::with_capacity(session.messages.len());
 
         for msg in &session.messages {
             let msg_type = gemini_message_type(msg);
 
-            let ts = msg
-                .timestamp
-                .and_then(chrono::DateTime::from_timestamp_millis)
-                .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+            let ts = msg.timestamp.and_then(chrono::DateTime::from_timestamp_millis).map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
 
             let mut entry = serde_json::json!({
                 "type": msg_type,
@@ -419,8 +317,7 @@ impl Provider for Gemini {
 
         let content_bytes = serde_json::to_string_pretty(&root)?.into_bytes();
 
-        let outcome =
-            crate::pipeline::atomic_write(&target_path, &content_bytes, opts.force, self.slug())?;
+        let outcome = crate::pipeline::atomic_write(&target_path, &content_bytes, opts.force, self.slug())?;
 
         info!(
             target_session_id,
@@ -429,12 +326,7 @@ impl Provider for Gemini {
             "Gemini session written"
         );
 
-        Ok(WrittenSession {
-            paths: vec![outcome.target_path],
-            session_id: target_session_id.clone(),
-            resume_command: self.resume_command(&target_session_id),
-            backup_path: outcome.backup_path,
-        })
+        Ok(WrittenSession { paths: vec![outcome.target_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: outcome.backup_path })
     }
 
     fn resume_command(&self, session_id: &str) -> String {
@@ -456,10 +348,7 @@ fn gemini_message_type(msg: &CanonicalMessage) -> String {
     }
 }
 
-fn gemini_extract_text_content(
-    message: &serde_json::Value,
-    content: Option<&serde_json::Value>,
-) -> String {
+fn gemini_extract_text_content(message: &serde_json::Value, content: Option<&serde_json::Value>) -> String {
     let extracted = match content {
         Some(value) => match value {
             serde_json::Value::String(s) => s.clone(),
@@ -470,10 +359,7 @@ fn gemini_extract_text_content(
                         serde_json::Value::String(s) => text_parts.push(s.clone()),
                         serde_json::Value::Object(obj) => {
                             let block_type = obj.get("type").and_then(|v| v.as_str());
-                            if (matches!(
-                                block_type,
-                                Some("text") | Some("input_text") | Some("output_text")
-                            ) || block_type.is_none())
+                            if (matches!(block_type, Some("text") | Some("input_text") | Some("output_text")) || block_type.is_none())
                                 && let Some(text) = obj.get("text").and_then(|v| v.as_str())
                             {
                                 text_parts.push(text.to_string());
@@ -484,11 +370,7 @@ fn gemini_extract_text_content(
                 }
                 text_parts.join("\n")
             }
-            serde_json::Value::Object(obj) => obj
-                .get("text")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
+            serde_json::Value::Object(obj) => obj.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string(),
             _ => String::new(),
         },
         None => String::new(),
@@ -502,10 +384,7 @@ fn gemini_extract_text_content(
     // `content` empty when messages are tool-heavy. Preserve this fallback so
     // list/info metrics and cross-provider transforms don't look artificially
     // sparse.
-    message
-        .get("thoughts")
-        .map(gemini_extract_thoughts_text)
-        .unwrap_or_default()
+    message.get("thoughts").map(gemini_extract_thoughts_text).unwrap_or_default()
 }
 
 fn gemini_extract_thoughts_text(value: &serde_json::Value) -> String {
@@ -521,18 +400,8 @@ fn gemini_extract_thoughts_text(value: &serde_json::Value) -> String {
                         }
                     }
                     serde_json::Value::Object(obj) => {
-                        let subject = obj
-                            .get("subject")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .trim();
-                        let description = obj
-                            .get("description")
-                            .or_else(|| obj.get("text"))
-                            .or_else(|| obj.get("summary"))
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .trim();
+                        let subject = obj.get("subject").and_then(|v| v.as_str()).unwrap_or("").trim();
+                        let description = obj.get("description").or_else(|| obj.get("text")).or_else(|| obj.get("summary")).and_then(|v| v.as_str()).unwrap_or("").trim();
 
                         if !subject.is_empty() && !description.is_empty() {
                             parts.push(format!("{subject}: {description}"));
@@ -552,22 +421,12 @@ fn gemini_extract_thoughts_text(value: &serde_json::Value) -> String {
             }
             parts.join("\n\n")
         }
-        serde_json::Value::Object(obj) => obj
-            .get("description")
-            .or_else(|| obj.get("text"))
-            .or_else(|| obj.get("summary"))
-            .or_else(|| obj.get("subject"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
+        serde_json::Value::Object(obj) => obj.get("description").or_else(|| obj.get("text")).or_else(|| obj.get("summary")).or_else(|| obj.get("subject")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
         _ => String::new(),
     }
 }
 
-fn gemini_extract_tool_calls(
-    message: &serde_json::Value,
-    content: Option<&serde_json::Value>,
-) -> Vec<ToolCall> {
+fn gemini_extract_tool_calls(message: &serde_json::Value, content: Option<&serde_json::Value>) -> Vec<ToolCall> {
     let mut calls: Vec<ToolCall> = Vec::new();
 
     if let Some(serde_json::Value::Array(parts)) = content {
@@ -579,18 +438,7 @@ fn gemini_extract_tool_calls(
                 continue;
             }
 
-            calls.push(ToolCall {
-                id: obj
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .map(ToString::to_string),
-                name: obj
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown")
-                    .to_string(),
-                arguments: obj.get("input").cloned().unwrap_or(serde_json::Value::Null),
-            });
+            calls.push(ToolCall { id: obj.get("id").and_then(|v| v.as_str()).map(ToString::to_string), name: obj.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(), arguments: obj.get("input").cloned().unwrap_or(serde_json::Value::Null) });
         }
     }
 
@@ -599,28 +447,14 @@ fn gemini_extract_tool_calls(
             let Some(obj) = call.as_object() else {
                 continue;
             };
-            calls.push(ToolCall {
-                id: obj
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .map(ToString::to_string),
-                name: obj
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown")
-                    .to_string(),
-                arguments: obj.get("args").cloned().unwrap_or(serde_json::Value::Null),
-            });
+            calls.push(ToolCall { id: obj.get("id").and_then(|v| v.as_str()).map(ToString::to_string), name: obj.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(), arguments: obj.get("args").cloned().unwrap_or(serde_json::Value::Null) });
         }
     }
 
     calls
 }
 
-fn gemini_extract_tool_results(
-    message: &serde_json::Value,
-    content: Option<&serde_json::Value>,
-) -> Vec<ToolResult> {
+fn gemini_extract_tool_results(message: &serde_json::Value, content: Option<&serde_json::Value>) -> Vec<ToolResult> {
     let mut results: Vec<ToolResult> = Vec::new();
 
     if let Some(serde_json::Value::Array(parts)) = content {
@@ -632,23 +466,9 @@ fn gemini_extract_tool_results(
                 continue;
             }
 
-            let content_text = obj
-                .get("content")
-                .map(flatten_content)
-                .or_else(|| obj.get("output").map(flatten_content))
-                .unwrap_or_default();
+            let content_text = obj.get("content").map(flatten_content).or_else(|| obj.get("output").map(flatten_content)).unwrap_or_default();
 
-            results.push(ToolResult {
-                call_id: obj
-                    .get("tool_use_id")
-                    .and_then(|v| v.as_str())
-                    .map(ToString::to_string),
-                content: content_text,
-                is_error: obj
-                    .get("is_error")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false),
-            });
+            results.push(ToolResult { call_id: obj.get("tool_use_id").and_then(|v| v.as_str()).map(ToString::to_string), content: content_text, is_error: obj.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false) });
         }
     }
 
@@ -664,14 +484,7 @@ fn gemini_extract_tool_results(
             }
 
             let content_text = gemini_tool_call_result_text(call);
-            results.push(ToolResult {
-                call_id: obj
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .map(ToString::to_string),
-                content: content_text,
-                is_error: obj.get("status").and_then(|v| v.as_str()) == Some("error"),
-            });
+            results.push(ToolResult { call_id: obj.get("id").and_then(|v| v.as_str()).map(ToString::to_string), content: content_text, is_error: obj.get("status").and_then(|v| v.as_str()) == Some("error") });
         }
     }
 
@@ -685,17 +498,13 @@ fn gemini_tool_call_result_text(call: &serde_json::Value) -> String {
         return s.to_string();
     }
 
-    if let Some(s) = call
-        .pointer("/result/0/functionResponse/response/output")
-        .and_then(|v| v.as_str())
+    if let Some(s) = call.pointer("/result/0/functionResponse/response/output").and_then(|v| v.as_str())
         && !s.trim().is_empty()
     {
         return s.to_string();
     }
 
-    if let Some(s) = call
-        .pointer("/result/0/functionResponse/response/error")
-        .and_then(|v| v.as_str())
+    if let Some(s) = call.pointer("/result/0/functionResponse/response/error").and_then(|v| v.as_str())
         && !s.trim().is_empty()
     {
         return s.to_string();
@@ -749,11 +558,7 @@ fn gemini_message_content(msg: &CanonicalMessage) -> serde_json::Value {
         }));
     }
 
-    if blocks.is_empty() {
-        serde_json::Value::String(msg.content.clone())
-    } else {
-        serde_json::Value::Array(blocks)
-    }
+    if blocks.is_empty() { serde_json::Value::String(msg.content.clone()) } else { serde_json::Value::Array(blocks) }
 }
 
 fn merge_gemini_extra_fields(entry: &mut serde_json::Value, extra: &serde_json::Value) {
@@ -785,10 +590,7 @@ fn extract_workspace_from_messages(messages: &[CanonicalMessage]) -> Option<Path
         if let Some(idx) = msg.content.find("/data/projects/") {
             let rest = &msg.content[idx..];
             // Extract project name (next path segment after /data/projects/).
-            let project_path: String = rest
-                .chars()
-                .take_while(|c| !c.is_whitespace() && *c != '"' && *c != '\'' && *c != ')')
-                .collect();
+            let project_path: String = rest.chars().take_while(|c| !c.is_whitespace() && *c != '"' && *c != '\'' && *c != ')').collect();
             // Normalize to just /data/projects/<name>
             let parts: Vec<&str> = project_path.split('/').collect();
             if parts.len() >= 4 {
@@ -800,10 +602,7 @@ fn extract_workspace_from_messages(messages: &[CanonicalMessage]) -> Option<Path
         for prefix in ["/home/", "/Users/", "/root/"] {
             if let Some(idx) = msg.content.find(prefix) {
                 let rest = &msg.content[idx..];
-                let path: String = rest
-                    .chars()
-                    .take_while(|c| !c.is_whitespace() && *c != '"' && *c != '\'')
-                    .collect();
+                let path: String = rest.chars().take_while(|c| !c.is_whitespace() && *c != '"' && *c != '\'').collect();
                 if path.len() > prefix.len() + 3 {
                     return normalize_workspace_candidate(&path);
                 }
@@ -820,16 +619,10 @@ fn normalize_workspace_candidate(raw: &str) -> Option<PathBuf> {
     }
 
     if candidate.exists() && candidate.is_file() {
-        return candidate
-            .parent()
-            .map(Path::to_path_buf)
-            .or(Some(candidate));
+        return candidate.parent().map(Path::to_path_buf).or(Some(candidate));
     }
 
-    let looks_like_file = candidate
-        .file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|name| name.contains('.') && !name.starts_with('.'));
+    let looks_like_file = candidate.file_name().and_then(|n| n.to_str()).is_some_and(|name| name.contains('.') && !name.starts_with('.'));
     if looks_like_file
         && let Some(parent) = candidate.parent()
         && !parent.as_os_str().is_empty()
@@ -854,10 +647,7 @@ fn session_id_from_file(path: &Path) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        Gemini, gemini_message_content, gemini_message_type, merge_gemini_extra_fields,
-        normalize_workspace_candidate, project_hash, session_filename,
-    };
+    use super::{Gemini, gemini_message_content, gemini_message_type, merge_gemini_extra_fields, normalize_workspace_candidate, project_hash, session_filename};
     use chrono::{TimeZone, Utc};
     use serde_json::json;
     use std::path::Path;
@@ -869,32 +659,24 @@ mod tests {
     fn project_hash_matches_observed_sha256_mapping() {
         let workspace = Path::new("/data/projects/flywheel_gateway");
         let hash = project_hash(workspace);
-        assert_eq!(
-            hash,
-            "b7da685261f0fff76430fd68dd709a693a8abac1c72c19c49f2fd1c7424c6d4e"
-        );
+        assert_eq!(hash, "b7da685261f0fff76430fd68dd709a693a8abac1c72c19c49f2fd1c7424c6d4e");
     }
 
     #[test]
     fn workspace_candidate_file_path_normalizes_to_parent_dir() {
-        let got = normalize_workspace_candidate("/data/projects/foo/README.md")
-            .expect("workspace should normalize");
+        let got = normalize_workspace_candidate("/data/projects/foo/README.md").expect("workspace should normalize");
         assert_eq!(got, Path::new("/data/projects/foo"));
     }
 
     #[test]
     fn workspace_candidate_hidden_directory_is_preserved() {
-        let got = normalize_workspace_candidate("/home/ubuntu/.config")
-            .expect("workspace should normalize");
+        let got = normalize_workspace_candidate("/home/ubuntu/.config").expect("workspace should normalize");
         assert_eq!(got, Path::new("/home/ubuntu/.config"));
     }
 
     #[test]
     fn session_filename_uses_timestamp_and_uuid_prefix() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 1, 10, 2, 6, 44)
-            .single()
-            .expect("valid timestamp");
+        let now = Utc.with_ymd_and_hms(2026, 1, 10, 2, 6, 44).single().expect("valid timestamp");
         let filename = session_filename("8c1890a5-eb39-4c5c-acff-93790d35dd3f", &now);
         assert_eq!(filename, "session-2026-01-10T02-06-8c1890a5.json");
     }
@@ -935,23 +717,13 @@ mod tests {
             content: "".to_string(),
             timestamp: None,
             author: None,
-            tool_calls: vec![ToolCall {
-                id: Some("call-7".to_string()),
-                name: "read_file".to_string(),
-                arguments: json!({"path":"README.md"}),
-            }],
-            tool_results: vec![ToolResult {
-                call_id: Some("call-7".to_string()),
-                content: "ok".to_string(),
-                is_error: false,
-            }],
+            tool_calls: vec![ToolCall { id: Some("call-7".to_string()), name: "read_file".to_string(), arguments: json!({"path":"README.md"}) }],
+            tool_results: vec![ToolResult { call_id: Some("call-7".to_string()), content: "ok".to_string(), is_error: false }],
             extra: serde_json::Value::Null,
         };
 
         let content = gemini_message_content(&msg);
-        let blocks = content
-            .as_array()
-            .expect("tool-rich Gemini content should serialize as array");
+        let blocks = content.as_array().expect("tool-rich Gemini content should serialize as array");
         assert!(blocks.iter().any(|b| b["type"] == "tool_use"));
         assert!(blocks.iter().any(|b| b["type"] == "tool_result"));
     }
@@ -979,28 +751,10 @@ mod tests {
 
     #[test]
     fn message_type_preserves_non_user_roles() {
-        let assistant = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::Assistant,
-            content: String::new(),
-            timestamp: None,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: serde_json::Value::Null,
-        };
-        let tool = CanonicalMessage {
-            role: MessageRole::Tool,
-            ..assistant.clone()
-        };
-        let system = CanonicalMessage {
-            role: MessageRole::System,
-            ..assistant.clone()
-        };
-        let other = CanonicalMessage {
-            role: MessageRole::Other("reviewer".to_string()),
-            ..assistant
-        };
+        let assistant = CanonicalMessage { idx: 0, role: MessageRole::Assistant, content: String::new(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null };
+        let tool = CanonicalMessage { role: MessageRole::Tool, ..assistant.clone() };
+        let system = CanonicalMessage { role: MessageRole::System, ..assistant.clone() };
+        let other = CanonicalMessage { role: MessageRole::Other("reviewer".to_string()), ..assistant };
 
         assert_eq!(gemini_message_type(&tool), "tool");
         assert_eq!(gemini_message_type(&system), "system");
@@ -1010,10 +764,7 @@ mod tests {
     #[test]
     fn resume_command_uses_resume_flag() {
         let provider = Gemini;
-        assert_eq!(
-            <Gemini as Provider>::resume_command(&provider, "abc123"),
-            "gemini --resume abc123"
-        );
+        assert_eq!(<Gemini as Provider>::resume_command(&provider, "abc123"), "gemini --resume abc123");
     }
 
     // -----------------------------------------------------------------------
@@ -1027,9 +778,7 @@ mod tests {
         let mut tmp = tempfile::NamedTempFile::with_suffix(".json").unwrap();
         tmp.write_all(content.as_bytes()).unwrap();
         tmp.flush().unwrap();
-        Gemini
-            .read_session(tmp.path())
-            .unwrap_or_else(|e| panic!("read_session failed: {e}"))
+        Gemini.read_session(tmp.path()).unwrap_or_else(|e| panic!("read_session failed: {e}"))
     }
 
     #[test]
@@ -1096,10 +845,7 @@ mod tests {
             }"#,
         );
         assert_eq!(session.messages.len(), 2);
-        assert_eq!(
-            session.messages[1].content,
-            "Reasoned answer hidden in thoughts"
-        );
+        assert_eq!(session.messages[1].content, "Reasoned answer hidden in thoughts");
     }
 
     #[test]
@@ -1241,16 +987,8 @@ mod tests {
             }"#,
         );
         assert_eq!(session.messages.len(), 2);
-        assert!(
-            session.messages[1]
-                .content
-                .contains("Plan: Investigate parser edge cases")
-        );
-        assert!(
-            session.messages[1]
-                .content
-                .contains("Result: Patched fallback extraction")
-        );
+        assert!(session.messages[1].content.contains("Plan: Investigate parser edge cases"));
+        assert!(session.messages[1].content.contains("Result: Patched fallback extraction"));
     }
 
     #[test]
@@ -1305,10 +1043,7 @@ mod tests {
                 ]
             }"#,
         );
-        assert_eq!(
-            session.title.as_deref(),
-            Some("Explain the architecture of this system")
-        );
+        assert_eq!(session.title.as_deref(), Some("Explain the architecture of this system"));
     }
 
     #[test]
@@ -1336,51 +1071,21 @@ mod tests {
 
     #[test]
     fn writer_content_plain_string_without_extra() {
-        let msg = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::User,
-            content: "Simple text".to_string(),
-            timestamp: None,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: serde_json::Value::Null,
-        };
+        let msg = CanonicalMessage { idx: 0, role: MessageRole::User, content: "Simple text".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null };
         let content = gemini_message_content(&msg);
-        assert!(
-            content.is_string(),
-            "Gemini content without extra should be plain string"
-        );
+        assert!(content.is_string(), "Gemini content without extra should be plain string");
         assert_eq!(content.as_str().unwrap(), "Simple text");
     }
 
     #[test]
     fn writer_user_type_is_user() {
-        let msg = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::User,
-            content: String::new(),
-            timestamp: None,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: serde_json::Value::Null,
-        };
+        let msg = CanonicalMessage { idx: 0, role: MessageRole::User, content: String::new(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null };
         assert_eq!(gemini_message_type(&msg), "user");
     }
 
     #[test]
     fn writer_assistant_type_is_model() {
-        let msg = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::Assistant,
-            content: String::new(),
-            timestamp: None,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: serde_json::Value::Null,
-        };
+        let msg = CanonicalMessage { idx: 0, role: MessageRole::Assistant, content: String::new(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null };
         assert_eq!(gemini_message_type(&msg), "model");
     }
 }

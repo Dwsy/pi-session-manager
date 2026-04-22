@@ -135,13 +135,7 @@ pub struct SubagentSummary {
 
 impl Default for SubagentSummary {
     fn default() -> Self {
-        Self {
-            total_cost: 0.0,
-            total_runs: 0,
-            total_tokens: 0,
-            runs_by_agent: HashMap::new(),
-            runs_by_model: HashMap::new(),
-        }
+        Self { total_cost: 0.0, total_runs: 0, total_tokens: 0, runs_by_agent: HashMap::new(), runs_by_model: HashMap::new() }
     }
 }
 
@@ -172,12 +166,8 @@ mod tests {
 
     #[test]
     fn session_info_serialization_skips_large_text_fields() {
-        let created = chrono::DateTime::parse_from_rfc3339("2026-01-18T00:00:00Z")
-            .expect("valid created timestamp")
-            .with_timezone(&chrono::Utc);
-        let modified = chrono::DateTime::parse_from_rfc3339("2026-01-18T01:00:00Z")
-            .expect("valid modified timestamp")
-            .with_timezone(&chrono::Utc);
+        let created = chrono::DateTime::parse_from_rfc3339("2026-01-18T00:00:00Z").expect("valid created timestamp").with_timezone(&chrono::Utc);
+        let modified = chrono::DateTime::parse_from_rfc3339("2026-01-18T01:00:00Z").expect("valid modified timestamp").with_timezone(&chrono::Utc);
 
         let session = SessionInfo {
             path: "/tmp/session.jsonl".to_string(),

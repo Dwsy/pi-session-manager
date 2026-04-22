@@ -13,8 +13,7 @@ pub fn read_models_config_internal() -> Result<serde_json::Value, String> {
         return Ok(serde_json::json!({ "providers": {} }));
     }
     let content = fs::read_to_string(&path).map_err(|e| format!("Read models.json: {e}"))?;
-    let json: serde_json::Value =
-        serde_json::from_str(&content).map_err(|e| format!("Parse models.json: {e}"))?;
+    let json: serde_json::Value = serde_json::from_str(&content).map_err(|e| format!("Parse models.json: {e}"))?;
     Ok(ensure_model_config_shape(json))
 }
 

@@ -49,10 +49,7 @@ pub fn ensure_model_config_shape(mut json: Value) -> Value {
     if !json.is_object() {
         json = Value::Object(Map::new());
     }
-    if !json
-        .get("providers")
-        .is_some_and(|providers| providers.is_object())
-    {
+    if !json.get("providers").is_some_and(|providers| providers.is_object()) {
         json["providers"] = Value::Object(Map::new());
     }
     json
@@ -63,10 +60,7 @@ pub fn validate_model_config_shape(json: &Value) -> Result<(), String> {
     if !json.is_object() {
         return Err("models.json root must be an object".to_string());
     }
-    if !json
-        .get("providers")
-        .is_some_and(|providers| providers.is_object())
-    {
+    if !json.get("providers").is_some_and(|providers| providers.is_object()) {
         return Err("models.json.providers must be an object".to_string());
     }
     Ok(())

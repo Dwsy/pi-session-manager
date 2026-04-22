@@ -7,10 +7,7 @@ const DEFAULT_WINDOW_HEIGHT: f64 = 900.0;
 const DEFAULT_MIN_WINDOW_WIDTH: f64 = 1000.0;
 const DEFAULT_MIN_WINDOW_HEIGHT: f64 = 600.0;
 
-fn clamp_window_dimensions(
-    available_width: f64,
-    available_height: f64,
-) -> ((f64, f64), (f64, f64)) {
+fn clamp_window_dimensions(available_width: f64, available_height: f64) -> ((f64, f64), (f64, f64)) {
     let initial_width = DEFAULT_WINDOW_WIDTH.min(available_width).max(1.0);
     let initial_height = DEFAULT_WINDOW_HEIGHT.min(available_height).max(1.0);
     let min_width = DEFAULT_MIN_WINDOW_WIDTH.min(initial_width);
@@ -20,21 +17,12 @@ fn clamp_window_dimensions(
 }
 
 fn resolve_window_dimensions(monitor: Option<&tauri::Monitor>) -> ((f64, f64), (f64, f64)) {
-    monitor.map_or(
-        (
-            (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT),
-            (DEFAULT_MIN_WINDOW_WIDTH, DEFAULT_MIN_WINDOW_HEIGHT),
-        ),
-        |monitor| {
-            let work_area = monitor.work_area();
-            let scale_factor = monitor.scale_factor();
+    monitor.map_or(((DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT), (DEFAULT_MIN_WINDOW_WIDTH, DEFAULT_MIN_WINDOW_HEIGHT)), |monitor| {
+        let work_area = monitor.work_area();
+        let scale_factor = monitor.scale_factor();
 
-            clamp_window_dimensions(
-                f64::from(work_area.size.width) / scale_factor,
-                f64::from(work_area.size.height) / scale_factor,
-            )
-        },
-    )
+        clamp_window_dimensions(f64::from(work_area.size.width) / scale_factor, f64::from(work_area.size.height) / scale_factor)
+    })
 }
 
 #[cfg(test)]
@@ -43,8 +31,7 @@ mod tests {
 
     #[test]
     fn test_clamp_window_dimensions_preserves_default_size_on_large_screens() {
-        let ((initial_width, initial_height), (min_width, min_height)) =
-            clamp_window_dimensions(1728.0, 1117.0);
+        let ((initial_width, initial_height), (min_width, min_height)) = clamp_window_dimensions(1728.0, 1117.0);
 
         assert_eq!(initial_width, 1400.0);
         assert_eq!(initial_height, 900.0);
@@ -54,8 +41,7 @@ mod tests {
 
     #[test]
     fn test_clamp_window_dimensions_shrinks_to_fit_smaller_work_areas() {
-        let ((initial_width, initial_height), (min_width, min_height)) =
-            clamp_window_dimensions(1352.0, 820.0);
+        let ((initial_width, initial_height), (min_width, min_height)) = clamp_window_dimensions(1352.0, 820.0);
 
         assert_eq!(initial_width, 1352.0);
         assert_eq!(initial_height, 820.0);
@@ -65,8 +51,7 @@ mod tests {
 
     #[test]
     fn test_clamp_window_dimensions_caps_minimum_size_to_available_space() {
-        let ((initial_width, initial_height), (min_width, min_height)) =
-            clamp_window_dimensions(920.0, 560.0);
+        let ((initial_width, initial_height), (min_width, min_height)) = clamp_window_dimensions(920.0, 560.0);
 
         assert_eq!(initial_width, 920.0);
         assert_eq!(initial_height, 560.0);
@@ -86,49 +71,32 @@ struct MainCliArgs {
 }
 
 fn parse_port_arg(value: &str, flag: &str) -> Result<u16, String> {
-    value
-        .parse::<u16>()
-        .map_err(|_| format!("Invalid value for {flag}: `{value}`"))
+    value.parse::<u16>().map_err(|_| format!("Invalid value for {flag}: `{value}`"))
 }
 
 fn parse_main_cli_args() -> Result<MainCliArgs, String> {
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
     if raw_args.iter().any(|arg| arg == "-h" || arg == "--help") {
-        return Ok(MainCliArgs {
-            show_help: true,
-            ..MainCliArgs::default()
-        });
+        return Ok(MainCliArgs { show_help: true, ..MainCliArgs::default() });
     }
 
-    let cli_mode = raw_args
-        .iter()
-        .any(|arg| arg == "--cli" || arg == "--headless");
+    let cli_mode = raw_args.iter().any(|arg| arg == "--cli" || arg == "--headless");
     if !cli_mode {
-        return Ok(MainCliArgs {
-            cli_mode: false,
-            ..MainCliArgs::default()
-        });
+        return Ok(MainCliArgs { cli_mode: false, ..MainCliArgs::default() });
     }
 
-    let mut parsed = MainCliArgs {
-        cli_mode: true,
-        ..MainCliArgs::default()
-    };
+    let mut parsed = MainCliArgs { cli_mode: true, ..MainCliArgs::default() };
 
     let mut iter = raw_args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
             "--cli" | "--headless" => {}
             "-p" | "--port" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
+                let value = iter.next().ok_or_else(|| format!("Missing value for `{arg}`"))?;
                 parsed.http_port = Some(parse_port_arg(value, arg)?);
             }
             "-b" | "--bind" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
+                let value = iter.next().ok_or_else(|| format!("Missing value for `{arg}`"))?;
                 if value.trim().is_empty() {
                     return Err(format!("Invalid value for `{arg}`: empty address"));
                 }
@@ -147,9 +115,7 @@ fn parse_main_cli_args() -> Result<MainCliArgs, String> {
                 parsed.auth_enabled = Some(false);
             }
             "--token" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for `--token`".to_string())?;
+                let value = iter.next().ok_or_else(|| "Missing value for `--token`".to_string())?;
                 let token = value.trim();
                 if token.is_empty() {
                     return Err("Invalid value for `--token`: empty token".to_string());
@@ -189,10 +155,7 @@ fn print_help() {
     );
 }
 
-fn apply_cli_overrides(
-    server_cfg: &mut pi_session_manager::ServerSettings,
-    cli_args: &MainCliArgs,
-) {
+fn apply_cli_overrides(server_cfg: &mut pi_session_manager::ServerSettings, cli_args: &MainCliArgs) {
     if let Some(port) = cli_args.http_port {
         server_cfg.http_port = port;
     }
@@ -249,9 +212,7 @@ fn main() {
                 match pi_session_manager::auth::init() {
                     Ok(token) => {
                         if let Some(cli_token) = runtime_token.as_ref() {
-                            if let Err(e) =
-                                pi_session_manager::auth::set_runtime_tokens(vec![cli_token.clone()])
-                            {
+                            if let Err(e) = pi_session_manager::auth::set_runtime_tokens(vec![cli_token.clone()]) {
                                 eprintln!("Failed to set runtime token: {e}");
                                 std::process::exit(2);
                             }
@@ -279,17 +240,9 @@ fn main() {
             // Single-port architecture: both GUI and CLI modes use HTTP /ws path
             if server_cfg.ws_enabled {
                 if cli_mode {
-                    log::info!(
-                        "CLI mode uses HTTP /ws on {}:{} (unified single-port)",
-                        server_cfg.bind_addr,
-                        server_cfg.http_port
-                    );
+                    log::info!("CLI mode uses HTTP /ws on {}:{} (unified single-port)", server_cfg.bind_addr, server_cfg.http_port);
                 } else {
-                    log::info!(
-                        "GUI mode uses HTTP /ws on {}:{} (unified single-port)",
-                        server_cfg.bind_addr,
-                        server_cfg.http_port
-                    );
+                    log::info!("GUI mode uses HTTP /ws on {}:{} (unified single-port)", server_cfg.bind_addr, server_cfg.http_port);
                 }
             }
 
@@ -302,12 +255,7 @@ fn main() {
                 tauri::async_runtime::spawn(async move {
                     // In GUI mode, don't serve static files (use Vite dev server)
                     // In CLI mode, serve embedded static files
-                    if let Err(e) =
-                        pi_session_manager::server::http::init_http_adapter_with_options(
-                            http_state, &http_bind, http_port, is_cli,
-                        )
-                        .await
-                    {
+                    if let Err(e) = pi_session_manager::server::http::init_http_adapter_with_options(http_state, &http_bind, http_port, is_cli).await {
                         eprintln!("Failed to init HTTP adapter: {e}");
                     }
                 });
@@ -321,9 +269,7 @@ fn main() {
 
                 loop {
                     interval.tick().await;
-                    if let Some((sessions, details)) =
-                        pi_session_manager::core::write_buffer::check_and_take_flush_data()
-                    {
+                    if let Some((sessions, details)) = pi_session_manager::core::write_buffer::check_and_take_flush_data() {
                         let sessions_count = sessions.len();
                         let details_count = details.len();
 
@@ -336,40 +282,26 @@ fn main() {
                                     log::error!("Failed to init DB for flush: {e}");
                                     continue;
                                 }
-                            }
+                            },
                         };
 
                         let mut flush_error = false;
                         let mut conn = conn; // make mutable
                         for entry in &sessions {
-                            if let Err(e) = pi_session_manager::data::sqlite::upsert_session(
-                                &mut conn,
-                                &entry.session,
-                                entry.file_modified,
-                                None,
-                            ) {
+                            if let Err(e) = pi_session_manager::data::sqlite::upsert_session(&mut conn, &entry.session, entry.file_modified, None) {
                                 log::error!("Failed to upsert session during flush: {e}");
                                 flush_error = true;
                             }
                         }
                         for entry in &details {
-                            if let Err(e) =
-                                pi_session_manager::data::sqlite::upsert_session_details_cache(
-                                    &conn,
-                                    &entry.path,
-                                    entry.file_modified,
-                                    &entry.details,
-                                )
-                            {
+                            if let Err(e) = pi_session_manager::data::sqlite::upsert_session_details_cache(&conn, &entry.path, entry.file_modified, &entry.details) {
                                 log::error!("Failed to upsert session details during flush: {e}");
                                 flush_error = true;
                             }
                         }
 
                         if !flush_error {
-                            log::trace!(
-                                "Flushed {sessions_count} sessions and {details_count} details to database"
-                            );
+                            log::trace!("Flushed {sessions_count} sessions and {details_count} details to database");
                         }
 
                         // Keep connection for next iteration
@@ -380,42 +312,24 @@ fn main() {
 
             // Flush write buffer on app exit
             app.handle().clone().listen("tauri://exit", |_| {
-                if let Some((sessions, details)) =
-                    pi_session_manager::core::write_buffer::force_flush_all()
-                {
+                if let Some((sessions, details)) = pi_session_manager::core::write_buffer::force_flush_all() {
                     match pi_session_manager::data::sqlite::init_db() {
                         Ok(mut conn) => {
                             let mut flush_error = false;
                             for entry in &sessions {
-                                if let Err(e) = pi_session_manager::data::sqlite::upsert_session(
-                                    &mut conn,
-                                    &entry.session,
-                                    entry.file_modified,
-                                    None,
-                                ) {
+                                if let Err(e) = pi_session_manager::data::sqlite::upsert_session(&mut conn, &entry.session, entry.file_modified, None) {
                                     log::error!("Failed to upsert session on exit: {e}");
                                     flush_error = true;
                                 }
                             }
                             for entry in &details {
-                                if let Err(e) =
-                                    pi_session_manager::data::sqlite::upsert_session_details_cache(
-                                        &conn,
-                                        &entry.path,
-                                        entry.file_modified,
-                                        &entry.details,
-                                    )
-                                {
+                                if let Err(e) = pi_session_manager::data::sqlite::upsert_session_details_cache(&conn, &entry.path, entry.file_modified, &entry.details) {
                                     log::error!("Failed to upsert session details on exit: {e}");
                                     flush_error = true;
                                 }
                             }
                             if !flush_error {
-                                log::info!(
-                                    "Flushed {} sessions and {} details to database on exit",
-                                    sessions.len(),
-                                    details.len()
-                                );
+                                log::info!("Flushed {} sessions and {} details to database on exit", sessions.len(), details.len());
                             }
                         }
                         Err(e) => {
@@ -428,13 +342,7 @@ fn main() {
             if cli_mode {
                 let mut info = String::from("CLI mode:");
                 if server_cfg.http_enabled {
-                    info.push_str(&format!(
-                        " HTTP+WS http://{}:{}/api | ws://{}:{}/ws",
-                        server_cfg.bind_addr,
-                        server_cfg.http_port,
-                        server_cfg.bind_addr,
-                        server_cfg.http_port
-                    ));
+                    info.push_str(&format!(" HTTP+WS http://{}:{}/api | ws://{}:{}/ws", server_cfg.bind_addr, server_cfg.http_port, server_cfg.bind_addr, server_cfg.http_port));
                 } else {
                     info.push_str(" HTTP disabled");
                 }
@@ -443,35 +351,20 @@ fn main() {
                 let monitor = match app.primary_monitor() {
                     Ok(monitor) => monitor,
                     Err(error) => {
-                        log::warn!(
-                            "Failed to read primary monitor for initial window sizing: {error}"
-                        );
+                        log::warn!("Failed to read primary monitor for initial window sizing: {error}");
                         None
                     }
                 };
-                let ((initial_width, initial_height), (min_width, min_height)) =
-                    resolve_window_dimensions(monitor.as_ref());
+                let ((initial_width, initial_height), (min_width, min_height)) = resolve_window_dimensions(monitor.as_ref());
 
-                let builder = tauri::WebviewWindowBuilder::new(
-                    app,
-                    "main",
-                    tauri::WebviewUrl::App("index.html".into()),
-                )
-                .title("Pi Session Manager")
-                .inner_size(initial_width, initial_height)
-                .min_inner_size(min_width, min_height)
-                .center()
-                .resizable(true)
-                .fullscreen(false);
+                let builder = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into())).title("Pi Session Manager").inner_size(initial_width, initial_height).min_inner_size(min_width, min_height).center().resizable(true).fullscreen(false);
 
                 // Default to false to avoid accidental pinch zoom on macOS
                 // Enable zoom hotkeys for Cmd+/- support
                 let builder = builder.zoom_hotkeys_enabled(true);
 
                 #[cfg(target_os = "macos")]
-                let builder = builder
-                    .title_bar_style(tauri::TitleBarStyle::Overlay)
-                    .hidden_title(true);
+                let builder = builder.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
 
                 #[cfg(not(target_os = "macos"))]
                 let builder = builder.decorations(true);
@@ -484,11 +377,7 @@ fn main() {
                     match pi_session_manager::settings_store::get::<f64>("window_zoom_level") {
                         Ok(Some(level)) => {
                             // Ensure zoom level is within valid range (0.75 - 2.0), default to 1.0
-                            let safe_level = if (0.75..=2.0).contains(&level) {
-                                level
-                            } else {
-                                1.0
-                            };
+                            let safe_level = if (0.75..=2.0).contains(&level) { level } else { 1.0 };
                             if let Err(e) = window.set_zoom(safe_level).map_err(|e| e.to_string()) {
                                 log::warn!("Failed to restore zoom level: {e}");
                             } else {
@@ -582,7 +471,6 @@ fn main() {
             pi_session_manager::remove_tag_from_session,
             pi_session_manager::move_session_tag,
             pi_session_manager::reorder_tags,
-
             pi_session_manager::list_api_keys,
             pi_session_manager::create_api_key,
             pi_session_manager::revoke_api_key,

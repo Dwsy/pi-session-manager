@@ -14,7 +14,6 @@ const SESSION_ID_PREFIX_SCORE: f32 = 999_000.0;
 // session-id rediscovery, intentional label rediscovery, ordinary content similarity
 const LABEL_MATCH_BASE_SCORE: f32 = 500_000.0;
 const SMART_PHRASE_MATCH_BOOST: f32 = 100_000.0;
-const CONTENT_LIKE_SCORE: f32 = 1.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SourceFilter {
@@ -74,9 +73,7 @@ impl SortMode {
         match self {
             Self::Newest => "julianday(timestamp) DESC, score DESC, session_path ASC, entry_id ASC",
             Self::Oldest => "julianday(timestamp) ASC, score DESC, session_path ASC, entry_id ASC",
-            Self::Relevance => {
-                "score DESC, julianday(timestamp) DESC, session_path ASC, entry_id ASC"
-            }
+            Self::Relevance => "score DESC, julianday(timestamp) DESC, session_path ASC, entry_id ASC",
         }
     }
 
@@ -127,22 +124,12 @@ struct TimeScope {
 
 impl TimeScope {
     fn parse(from: Option<&str>, to: Option<&str>) -> Result<Self, String> {
-        let from = from
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(parse_time_bound)
-            .transpose()?;
-        let to = to
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(parse_time_bound)
-            .transpose()?;
+        let from = from.map(str::trim).filter(|value| !value.is_empty()).map(parse_time_bound).transpose()?;
+        let to = to.map(str::trim).filter(|value| !value.is_empty()).map(parse_time_bound).transpose()?;
 
         if let (Some(from), Some(to)) = (from, to) {
             if from > to {
-                return Err(
-                    "Invalid time range: 'from' must be earlier than or equal to 'to'".to_string(),
-                );
+                return Err("Invalid time range: 'from' must be earlier than or equal to 'to'".to_string());
             }
         }
 
@@ -173,16 +160,8 @@ impl TimeScope {
     }
 
     fn to_sql_params(&self) -> (Option<String>, Option<String>) {
-        (
-            self.from.map(|value| value.to_rfc3339()),
-            self.to.map(|value| value.to_rfc3339()),
-        )
+        (self.from.map(|value| value.to_rfc3339()), self.to.map(|value| value.to_rfc3339()))
     }
-}
-
-struct ContentLikeQuery {
-    predicate: String,
-    patterns: Vec<String>,
 }
 
 fn session_allowed_in_search(path: &str, config: &crate::config::Config) -> bool {
@@ -190,13 +169,7 @@ fn session_allowed_in_search(path: &str, config: &crate::config::Config) -> bool
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn search_sessions(
-    sessions: Vec<SessionInfo>,
-    query: String,
-    search_mode: String,
-    role_filter: String,
-    include_tools: bool,
-) -> Result<Vec<crate::types::SearchResult>, String> {
+pub async fn search_sessions(sessions: Vec<SessionInfo>, query: String, search_mode: String, role_filter: String, include_tools: bool) -> Result<Vec<crate::types::SearchResult>, String> {
     let mode = match search_mode.as_str() {
         "name" => search::SearchMode::Name,
         _ => search::SearchMode::Content,
@@ -208,18 +181,9 @@ pub async fn search_sessions(
         _ => search::RoleFilter::All,
     };
     let config = config::load_config()?;
-    let sessions = sessions
-        .into_iter()
-        .filter(|session| session_allowed_in_search(&session.path, &config))
-        .collect::<Vec<_>>();
+    let sessions = sessions.into_iter().filter(|session| session_allowed_in_search(&session.path, &config)).collect::<Vec<_>>();
 
-    Ok(search::search_sessions(
-        &sessions,
-        &query,
-        mode,
-        role,
-        include_tools,
-    ))
+    Ok(search::search_sessions(&sessions, &query, mode, role, include_tools))
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -257,25 +221,7 @@ pub async fn full_text_search(
     from: Option<String>,
     to: Option<String>,
 ) -> Result<FullTextSearchResponse, String> {
-    let result = tokio::time::timeout(
-        Duration::from_secs(5),
-        tokio::task::spawn_blocking(move || {
-            full_text_search_blocking(
-                query,
-                role_filter,
-                glob_pattern,
-                project_path,
-                page,
-                page_size,
-                match_mode,
-                sort_order,
-                source_filter,
-                from,
-                to,
-            )
-        }),
-    )
-    .await;
+    let result = tokio::time::timeout(Duration::from_secs(5), tokio::task::spawn_blocking(move || full_text_search_blocking(query, role_filter, glob_pattern, project_path, page, page_size, match_mode, sort_order, source_filter, from, to))).await;
 
     match result {
         Ok(Ok(inner)) => inner,
@@ -307,18 +253,12 @@ fn full_text_search_blocking(
     let time_scope = TimeScope::parse(from.as_deref(), to.as_deref())?;
 
     if trimmed.is_empty() && !is_labels_browse_mode {
-        return Ok(FullTextSearchResponse {
-            hits: vec![],
-            total_hits: 0,
-            has_more: false,
-        });
+        return Ok(FullTextSearchResponse { hits: vec![], total_hits: 0, has_more: false });
     }
 
     let config = config::load_config().map_err(|e| format!("Failed to load config: {e}"))?;
-    let conn = crate::data::sqlite::init_db_with_config(&config)
-        .map_err(|e| format!("Failed to init database: {e}"))?;
-    conn.execute("PRAGMA query_timeout = 5000", [])
-        .map_err(|e| format!("Failed to set query_timeout: {e}"))?;
+    let conn = crate::data::sqlite::init_db_with_config(&config).map_err(|e| format!("Failed to init database: {e}"))?;
+    conn.execute("PRAGMA query_timeout = 5000", []).map_err(|e| format!("Failed to set query_timeout: {e}"))?;
 
     let normalized_role_filter = role_filter.to_lowercase();
     let role_opt = match normalized_role_filter.as_str() {
@@ -327,68 +267,19 @@ fn full_text_search_blocking(
         _ => None,
     };
 
-    let like_pattern = glob_pattern
-        .as_ref()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .map(|value| glob_to_like(&value));
-    let project_path_owned = project_path
-        .as_ref()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty());
+    let like_pattern = glob_pattern.as_ref().map(|value| value.trim().to_string()).filter(|value| !value.is_empty()).map(|value| glob_to_like(&value));
+    let project_path_owned = project_path.as_ref().map(|value| value.trim().to_string()).filter(|value| !value.is_empty());
 
     let response = if is_labels_browse_mode {
-        let hits = browse_all_labels_hits(
-            &conn,
-            role_opt,
-            like_pattern.as_ref(),
-            project_path_owned.as_ref(),
-            sort_mode,
-            &time_scope,
-            &config,
-        )?;
+        let hits = browse_all_labels_hits(&conn, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), sort_mode, &time_scope, &config)?;
         paginate_hits(hits, page, page_size)
     } else {
-        let session_id_matches = if source_filter.includes_session_id() {
-            search_session_id_matches(
-                &conn,
-                &trimmed,
-                role_opt,
-                like_pattern.as_ref(),
-                project_path_owned.as_ref(),
-                &time_scope,
-                &config,
-            )?
-        } else {
-            Vec::new()
-        };
+        let session_id_matches = if source_filter.includes_session_id() { search_session_id_matches(&conn, &trimmed, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), &time_scope, &config)? } else { Vec::new() };
 
         let message_hits = if sort_mode.uses_recent_priority() {
-            search_message_hits_recent_first(
-                &conn,
-                &trimmed,
-                role_opt,
-                like_pattern.as_ref(),
-                project_path_owned.as_ref(),
-                match_mode,
-                sort_mode,
-                source_filter,
-                &time_scope,
-                &config,
-            )?
+            search_message_hits_recent_first(&conn, &trimmed, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), match_mode, sort_mode, source_filter, &time_scope, &config)?
         } else {
-            search_message_hits(
-                &conn,
-                &trimmed,
-                role_opt,
-                like_pattern.as_ref(),
-                project_path_owned.as_ref(),
-                match_mode,
-                sort_mode,
-                source_filter,
-                &time_scope,
-                &config,
-            )?
+            search_message_hits(&conn, &trimmed, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), match_mode, sort_mode, source_filter, &time_scope, &config)?
         };
 
         let combined_hits = append_unique_hits(session_id_matches, message_hits);
@@ -403,34 +294,16 @@ fn full_text_search_blocking(
     Ok(response)
 }
 
-fn paginate_hits(
-    hits: Vec<FullTextSearchHit>,
-    page: usize,
-    page_size: usize,
-) -> FullTextSearchResponse {
+fn paginate_hits(hits: Vec<FullTextSearchHit>, page: usize, page_size: usize) -> FullTextSearchResponse {
     let total_hits = hits.len();
     let offset = page.saturating_mul(page_size);
-    let paged_hits = if page_size == 0 || offset >= total_hits {
-        Vec::new()
-    } else {
-        hits.into_iter().skip(offset).take(page_size).collect()
-    };
+    let paged_hits = if page_size == 0 || offset >= total_hits { Vec::new() } else { hits.into_iter().skip(offset).take(page_size).collect() };
 
-    FullTextSearchResponse {
-        has_more: offset.saturating_add(paged_hits.len()) < total_hits,
-        total_hits,
-        hits: paged_hits,
-    }
+    FullTextSearchResponse { has_more: offset.saturating_add(paged_hits.len()) < total_hits, total_hits, hits: paged_hits }
 }
 
-fn append_unique_hits(
-    mut primary: Vec<FullTextSearchHit>,
-    secondary: Vec<FullTextSearchHit>,
-) -> Vec<FullTextSearchHit> {
-    let mut seen = primary
-        .iter()
-        .map(hit_identity_key)
-        .collect::<HashSet<String>>();
+fn append_unique_hits(mut primary: Vec<FullTextSearchHit>, secondary: Vec<FullTextSearchHit>) -> Vec<FullTextSearchHit> {
+    let mut seen = primary.iter().map(hit_identity_key).collect::<HashSet<String>>();
 
     for hit in secondary {
         let key = hit_identity_key(&hit);
@@ -443,22 +316,11 @@ fn append_unique_hits(
 }
 
 fn hit_identity_key(hit: &FullTextSearchHit) -> String {
-    format!(
-        "{}\u{1f}{}\u{1f}{}",
-        hit.session_path, hit.entry_id, hit.source_type
-    )
+    format!("{}\u{1f}{}\u{1f}{}", hit.session_path, hit.entry_id, hit.source_type)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn browse_all_labels_hits(
-    conn: &rusqlite::Connection,
-    role_opt: Option<&str>,
-    like_pattern: Option<&String>,
-    project_path: Option<&String>,
-    sort_mode: SortMode,
-    time_scope: &TimeScope,
-    config: &crate::config::Config,
-) -> Result<Vec<FullTextSearchHit>, String> {
+fn browse_all_labels_hits(conn: &rusqlite::Connection, role_opt: Option<&str>, like_pattern: Option<&String>, project_path: Option<&String>, sort_mode: SortMode, time_scope: &TimeScope, config: &crate::config::Config) -> Result<Vec<FullTextSearchHit>, String> {
     let role_condition = match role_opt {
         Some("user") => "m.role = 'user'",
         Some("assistant") => "m.role = 'assistant'",
@@ -475,19 +337,11 @@ fn browse_all_labels_hits(
     }
 
     if let Some(project_path) = project_path {
-        where_clause = format!(
-            "{where_clause} AND EXISTS (SELECT 1 FROM sessions s2 WHERE s2.path = m.session_path AND s2.cwd = ?)"
-        );
+        where_clause = format!("{where_clause} AND EXISTS (SELECT 1 FROM sessions s2 WHERE s2.path = m.session_path AND s2.cwd = ?)");
         params.push(project_path);
     }
 
-    append_time_scope_sql(
-        &mut where_clause,
-        &mut params,
-        "m.timestamp",
-        from_param.as_ref(),
-        to_param.as_ref(),
-    );
+    append_time_scope_sql(&mut where_clause, &mut params, "m.timestamp", from_param.as_ref(), to_param.as_ref());
 
     let order_sql = sort_mode.label_browse_order_sql();
     let data_sql = format!(
@@ -506,94 +360,34 @@ fn browse_all_labels_hits(
          ORDER BY {order_sql}"
     );
 
-    let mut stmt = conn
-        .prepare(&data_sql)
-        .map_err(|e| format!("Failed to prepare label browse query: {e}"))?;
+    let mut stmt = conn.prepare(&data_sql).map_err(|e| format!("Failed to prepare label browse query: {e}"))?;
 
     let rows = stmt
-        .query_map(params.as_slice(), |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<String>>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
-                row.get::<_, String>(6)?,
-                row.get::<_, String>(7)?,
-            ))
-        })
+        .query_map(params.as_slice(), |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?, row.get::<_, String>(3)?, row.get::<_, String>(4)?, row.get::<_, String>(5)?, row.get::<_, String>(6)?, row.get::<_, String>(7)?)))
         .map_err(|e| format!("Failed to execute label browse query: {e}"))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect label browse hits: {e}"))?;
 
     rows.into_iter()
         .filter(|(_, session_path, _, _, _, _, _, _)| session_allowed_in_search(session_path, config))
-        .map(
-            |(
-                session_id,
-                session_path,
-                session_name,
-                entry_id,
-                role,
-                source_type,
-                content,
-                timestamp_str,
-            )| {
-                let timestamp = try_parse_timestamp(&timestamp_str).ok_or_else(|| {
-                    format!(
-                        "Invalid label browse timestamp for session {session_path} entry {entry_id}: {timestamp_str}"
-                    )
-                })?;
-                Ok(FullTextSearchHit {
-                    session_id,
-                    session_path,
-                    session_name,
-                    entry_id,
-                    role,
-                    source_type,
-                    content,
-                    timestamp,
-                    score: LABEL_MATCH_BASE_SCORE,
-                    match_reason: Some("label".to_string()),
-                })
-            },
-        )
+        .map(|(session_id, session_path, session_name, entry_id, role, source_type, content, timestamp_str)| {
+            let timestamp = try_parse_timestamp(&timestamp_str).ok_or_else(|| format!("Invalid label browse timestamp for session {session_path} entry {entry_id}: {timestamp_str}"))?;
+            Ok(FullTextSearchHit { session_id, session_path, session_name, entry_id, role, source_type, content, timestamp, score: LABEL_MATCH_BASE_SCORE, match_reason: Some("label".to_string()) })
+        })
         .collect()
 }
 
-fn search_session_id_matches(
-    conn: &rusqlite::Connection,
-    trimmed: &str,
-    role_opt: Option<&str>,
-    like_pattern: Option<&String>,
-    project_path: Option<&String>,
-    time_scope: &TimeScope,
-    config: &crate::config::Config,
-) -> Result<Vec<FullTextSearchHit>, String> {
+fn search_session_id_matches(conn: &rusqlite::Connection, trimmed: &str, role_opt: Option<&str>, like_pattern: Option<&String>, project_path: Option<&String>, time_scope: &TimeScope, config: &crate::config::Config) -> Result<Vec<FullTextSearchHit>, String> {
     let exact_session_id_query = search::normalize_session_id_query(trimmed);
     let session_id_exact_only = search::session_id_query_is_exact(trimmed);
     let session_id_supports_prefix = !session_id_exact_only && exact_session_id_query.len() >= 3;
 
-    let mut session_id_where_clause = if session_id_supports_prefix {
-        "WHERE (lower(s.id) = ? OR substr(lower(s.id), 1, length(?)) = ?)".to_string()
-    } else {
-        "WHERE lower(s.id) = ?".to_string()
-    };
-    let mut session_id_params: Vec<&dyn ToSql> = if session_id_supports_prefix {
-        vec![
-            &exact_session_id_query,
-            &exact_session_id_query,
-            &exact_session_id_query,
-        ]
-    } else {
-        vec![&exact_session_id_query]
-    };
+    let mut session_id_where_clause = if session_id_supports_prefix { "WHERE (lower(s.id) = ? OR substr(lower(s.id), 1, length(?)) = ?)".to_string() } else { "WHERE lower(s.id) = ?".to_string() };
+    let mut session_id_params: Vec<&dyn ToSql> = if session_id_supports_prefix { vec![&exact_session_id_query, &exact_session_id_query, &exact_session_id_query] } else { vec![&exact_session_id_query] };
     let (from_param, to_param) = time_scope.to_sql_params();
 
     if let Some(pattern) = like_pattern {
-        session_id_where_clause =
-            format!("{session_id_where_clause} AND s.path LIKE ? ESCAPE '\\'");
+        session_id_where_clause = format!("{session_id_where_clause} AND s.path LIKE ? ESCAPE '\\'");
         session_id_params.push(pattern);
     }
 
@@ -602,13 +396,7 @@ fn search_session_id_matches(
         session_id_params.push(project_path);
     }
 
-    append_time_scope_sql(
-        &mut session_id_where_clause,
-        &mut session_id_params,
-        "s.modified",
-        from_param.as_ref(),
-        to_param.as_ref(),
-    );
+    append_time_scope_sql(&mut session_id_where_clause, &mut session_id_params, "s.modified", from_param.as_ref(), to_param.as_ref());
 
     let session_id_order_query = exact_session_id_query.clone();
     let session_id_sql = format!(
@@ -626,85 +414,63 @@ fn search_session_id_matches(
     );
     session_id_params.push(&session_id_order_query);
 
-    let mut stmt = conn
-        .prepare(&session_id_sql)
-        .map_err(|e| format!("Failed to prepare session id query: {e}"))?;
+    let mut stmt = conn.prepare(&session_id_sql).map_err(|e| format!("Failed to prepare session id query: {e}"))?;
     let rows = stmt
-        .query_map(session_id_params.as_slice(), |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<String>>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
-                row.get::<_, String>(6)?,
-            ))
-        })
+        .query_map(session_id_params.as_slice(), |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?, row.get::<_, String>(3)?, row.get::<_, String>(4)?, row.get::<_, String>(5)?, row.get::<_, String>(6)?)))
         .map_err(|e| format!("Failed to query sessions by id: {e}"))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect session id results: {e}"))?;
 
     Ok(rows
         .into_iter()
-        .filter_map(
-            |(
+        .filter_map(|(session_id, session_path, session_name, first_message, last_message, last_message_role, modified_str)| {
+            if !session_allowed_in_search(&session_path, config) {
+                return None;
+            }
+
+            let timestamp = match try_parse_timestamp(&modified_str) {
+                Some(timestamp) => timestamp,
+                None => return None,
+            };
+
+            let match_kind = search::session_id_match_kind(&session_id, trimmed)?;
+            let preview = if !last_message.trim().is_empty() {
+                last_message.clone()
+            } else if !first_message.trim().is_empty() {
+                first_message.clone()
+            } else {
+                session_name.clone().unwrap_or_else(|| session_path.clone())
+            };
+            let role = match last_message_role.as_str() {
+                "user" | "assistant" => last_message_role,
+                _ => "assistant".to_string(),
+            };
+
+            if let Some(expected_role) = role_opt {
+                if role != expected_role {
+                    return None;
+                }
+            }
+
+            Some(FullTextSearchHit {
                 session_id,
                 session_path,
                 session_name,
-                first_message,
-                last_message,
-                last_message_role,
-                modified_str,
-            )| {
-                if !session_allowed_in_search(&session_path, config) {
-                    return None;
-                }
-
-                let timestamp = match try_parse_timestamp(&modified_str) {
-                    Some(timestamp) => timestamp,
-                    None => return None,
-                };
-
-                let match_kind = search::session_id_match_kind(&session_id, trimmed)?;
-                let preview = if !last_message.trim().is_empty() {
-                    last_message.clone()
-                } else if !first_message.trim().is_empty() {
-                    first_message.clone()
-                } else {
-                    session_name.clone().unwrap_or_else(|| session_path.clone())
-                };
-                let role = match last_message_role.as_str() {
-                    "user" | "assistant" => last_message_role,
-                    _ => "assistant".to_string(),
-                };
-
-                if let Some(expected_role) = role_opt {
-                    if role != expected_role {
-                        return None;
-                    }
-                }
-
-                Some(FullTextSearchHit {
-                    session_id,
-                    session_path,
-                    session_name,
-                    entry_id: String::new(),
-                    role: role.clone(),
-                    source_type: role,
-                    content: preview,
-                    timestamp,
-                    score: match match_kind {
-                        search::SessionIdMatchKind::Exact => SESSION_ID_EXACT_SCORE,
-                        search::SessionIdMatchKind::Prefix => SESSION_ID_PREFIX_SCORE,
-                    },
-                    match_reason: Some(match match_kind {
-                        search::SessionIdMatchKind::Exact => "session_id_exact".to_string(),
-                        search::SessionIdMatchKind::Prefix => "session_id_prefix".to_string(),
-                    }),
-                })
-            },
-        )
+                entry_id: String::new(),
+                role: role.clone(),
+                source_type: role,
+                content: preview,
+                timestamp,
+                score: match match_kind {
+                    search::SessionIdMatchKind::Exact => SESSION_ID_EXACT_SCORE,
+                    search::SessionIdMatchKind::Prefix => SESSION_ID_PREFIX_SCORE,
+                },
+                match_reason: Some(match match_kind {
+                    search::SessionIdMatchKind::Exact => "session_id_exact".to_string(),
+                    search::SessionIdMatchKind::Prefix => "session_id_prefix".to_string(),
+                }),
+            })
+        })
         .collect())
 }
 
@@ -723,18 +489,7 @@ fn search_message_hits_recent_first(
 ) -> Result<Vec<FullTextSearchHit>, String> {
     let mut hits = Vec::new();
     for window_scope in build_recent_priority_scopes(time_scope) {
-        let window_hits = search_message_hits(
-            conn,
-            trimmed,
-            role_opt,
-            like_pattern,
-            project_path,
-            match_mode,
-            sort_mode,
-            source_filter,
-            &window_scope,
-            config,
-        )?;
+        let window_hits = search_message_hits(conn, trimmed, role_opt, like_pattern, project_path, match_mode, sort_mode, source_filter, &window_scope, config)?;
         hits = append_unique_hits(hits, window_hits);
     }
     Ok(hits)
@@ -757,58 +512,43 @@ fn search_message_hits(
         return Ok(Vec::new());
     }
 
-    if match_mode == MatchMode::Smart && should_prioritize_phrase(trimmed) {
-        let mut phrase_hits = search_message_hits_for_mode(
-            conn,
-            trimmed,
-            role_opt,
-            like_pattern,
-            project_path,
-            MatchMode::Phrase,
-            sort_mode,
-            source_filter,
-            time_scope,
-            config,
-        )?;
+    let contains_cjk_query = crate::utils::contains_cjk(trimmed);
+
+    if match_mode == MatchMode::Smart && contains_cjk_query {
+        let mut phrase_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::Phrase, sort_mode, source_filter, time_scope, config)?;
         for hit in &mut phrase_hits {
             if hit.match_reason.as_deref() == Some("content") {
                 hit.score += SMART_PHRASE_MATCH_BOOST;
             }
         }
 
-        let any_hits = search_message_hits_for_mode(
-            conn,
-            trimmed,
-            role_opt,
-            like_pattern,
-            project_path,
-            MatchMode::Any,
-            sort_mode,
-            source_filter,
-            time_scope,
-            config,
-        )?;
+        let all_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::All, sort_mode, source_filter, time_scope, config)?;
+        return Ok(append_unique_hits(phrase_hits, all_hits));
+    }
+
+    if match_mode == MatchMode::Smart && should_prioritize_phrase(trimmed) {
+        let mut phrase_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::Phrase, sort_mode, source_filter, time_scope, config)?;
+        for hit in &mut phrase_hits {
+            if hit.match_reason.as_deref() == Some("content") {
+                hit.score += SMART_PHRASE_MATCH_BOOST;
+            }
+        }
+
+        let any_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::Any, sort_mode, source_filter, time_scope, config)?;
         return Ok(append_unique_hits(phrase_hits, any_hits));
     }
 
     let concrete_mode = if match_mode == MatchMode::Smart {
-        MatchMode::Any
+        if contains_cjk_query {
+            MatchMode::All
+        } else {
+            MatchMode::Any
+        }
     } else {
         match_mode
     };
 
-    search_message_hits_for_mode(
-        conn,
-        trimmed,
-        role_opt,
-        like_pattern,
-        project_path,
-        concrete_mode,
-        sort_mode,
-        source_filter,
-        time_scope,
-        config,
-    )
+    search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, concrete_mode, sort_mode, source_filter, time_scope, config)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -824,33 +564,15 @@ fn search_message_hits_for_mode(
     time_scope: &TimeScope,
     config: &crate::config::Config,
 ) -> Result<Vec<FullTextSearchHit>, String> {
-    let use_content_like = contains_cjk(trimmed);
     let role_condition = match role_opt {
         Some("user") => "m.role = 'user'",
         Some("assistant") => "m.role = 'assistant'",
         _ => "1=1",
     };
     let source_condition = source_filter.message_source_condition();
-    let from_clause = if use_content_like {
-        "FROM message_entries m"
-    } else {
-        "FROM message_entries m JOIN message_fts ON m.rowid = message_fts.rowid"
-    };
-    let like_query = use_content_like.then(|| build_content_like_query(trimmed, match_mode));
-    let fts_query = (!use_content_like).then(|| build_fts_query(trimmed, match_mode));
-    let mut params: Vec<&dyn ToSql> = Vec::new();
-    let mut where_clause = if let Some(like_query) = like_query.as_ref() {
-        for pattern in &like_query.patterns {
-            params.push(pattern);
-        }
-        format!(
-            "WHERE {} AND {role_condition} AND {source_condition}",
-            like_query.predicate
-        )
-    } else {
-        params.push(fts_query.as_ref().expect("fts query must exist"));
-        format!("WHERE message_fts MATCH ? AND {role_condition} AND {source_condition}")
-    };
+    let fts_query = build_fts_query(trimmed, match_mode);
+    let mut params: Vec<&dyn ToSql> = vec![&fts_query];
+    let mut where_clause = format!("WHERE message_fts MATCH ? AND {role_condition} AND {source_condition}");
     let (from_param, to_param) = time_scope.to_sql_params();
 
     if let Some(pattern) = like_pattern {
@@ -859,30 +581,15 @@ fn search_message_hits_for_mode(
     }
 
     if let Some(project_path) = project_path {
-        where_clause = format!(
-            "{where_clause} AND EXISTS (SELECT 1 FROM sessions s WHERE s.path = m.session_path AND s.cwd = ?)"
-        );
+        where_clause = format!("{where_clause} AND EXISTS (SELECT 1 FROM sessions s WHERE s.path = m.session_path AND s.cwd = ?)");
         params.push(project_path);
     }
 
-    append_time_scope_sql(
-        &mut where_clause,
-        &mut params,
-        "m.timestamp",
-        from_param.as_ref(),
-        to_param.as_ref(),
-    );
+    append_time_scope_sql(&mut where_clause, &mut params, "m.timestamp", from_param.as_ref(), to_param.as_ref());
 
-    let source_precedence =
-        "CASE m.source_type WHEN 'label' THEN 0 WHEN 'user' THEN 1 WHEN 'assistant' THEN 2 ELSE 3 END";
-    let text_score_expr = if use_content_like {
-        CONTENT_LIKE_SCORE.to_string()
-    } else {
-        "-message_fts.rank".to_string()
-    };
-    let score_expr = format!(
-        "CASE WHEN m.source_type = 'label' THEN {LABEL_MATCH_BASE_SCORE} + ({text_score_expr}) ELSE ({text_score_expr}) END"
-    );
+    let source_precedence = "CASE m.source_type WHEN 'label' THEN 0 WHEN 'user' THEN 1 WHEN 'assistant' THEN 2 ELSE 3 END";
+    let text_score_expr = "-message_fts.rank".to_string();
+    let score_expr = format!("CASE WHEN m.source_type = 'label' THEN {LABEL_MATCH_BASE_SCORE} + ({text_score_expr}) ELSE ({text_score_expr}) END");
 
     let global_order = sort_mode.global_order_sql();
     let per_session_order = sort_mode.per_session_order_sql();
@@ -900,7 +607,7 @@ fn search_message_hits_for_mode(
                     PARTITION BY m.session_path, m.entry_id
                     ORDER BY {source_precedence}, julianday(m.timestamp) DESC
                 ) AS rn_in_entry
-            {from_clause}
+            FROM message_entries m JOIN message_fts ON m.rowid = message_fts.rowid
             {where_clause}
         ),
         deduped AS (
@@ -935,64 +642,19 @@ fn search_message_hits_for_mode(
         ORDER BY {global_order}"
     );
 
-    let mut stmt = conn
-        .prepare(&data_sql)
-        .map_err(|e| format!("Failed to prepare message search query: {e}"))?;
+    let mut stmt = conn.prepare(&data_sql).map_err(|e| format!("Failed to prepare message search query: {e}"))?;
     let rows = stmt
-        .query_map(params.as_slice(), |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Option<String>>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
-                row.get::<_, String>(6)?,
-                row.get::<_, String>(7)?,
-                row.get::<_, f32>(8)?,
-            ))
-        })
+        .query_map(params.as_slice(), |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, Option<String>>(3)?, row.get::<_, String>(4)?, row.get::<_, String>(5)?, row.get::<_, String>(6)?, row.get::<_, String>(7)?, row.get::<_, f32>(8)?)))
         .map_err(|e| format!("Failed to execute message search query: {e}"))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect message search hits: {e}"))?;
 
     rows.into_iter()
         .filter(|(_, session_path, _, _, _, _, _, _, _)| session_allowed_in_search(session_path, config))
-        .map(
-            |(
-                entry_id,
-                session_path,
-                session_id,
-                session_name,
-                role,
-                source_type,
-                content,
-                timestamp_str,
-                score,
-            )| {
-                let timestamp = try_parse_timestamp(&timestamp_str).ok_or_else(|| {
-                    format!(
-                        "Invalid search hit timestamp for session {session_path} entry {entry_id}: {timestamp_str}"
-                    )
-                })?;
-                Ok(FullTextSearchHit {
-                    entry_id,
-                    session_path,
-                    session_id,
-                    session_name,
-                    role,
-                    source_type: source_type.clone(),
-                    content,
-                    timestamp,
-                    score,
-                    match_reason: Some(if source_type == "label" {
-                        "label".to_string()
-                    } else {
-                        "content".to_string()
-                    }),
-                })
-            },
-        )
+        .map(|(entry_id, session_path, session_id, session_name, role, source_type, content, timestamp_str, score)| {
+            let timestamp = try_parse_timestamp(&timestamp_str).ok_or_else(|| format!("Invalid search hit timestamp for session {session_path} entry {entry_id}: {timestamp_str}"))?;
+            Ok(FullTextSearchHit { entry_id, session_path, session_id, session_name, role, source_type: source_type.clone(), content, timestamp, score, match_reason: Some(if source_type == "label" { "label".to_string() } else { "content".to_string() }) })
+        })
         .collect()
 }
 
@@ -1003,36 +665,13 @@ fn build_recent_priority_scopes(base_scope: &TimeScope) -> Vec<TimeScope> {
     let thirty_days_ago = now - ChronoDuration::days(30);
     let one_eighty_days_ago = now - ChronoDuration::days(180);
 
-    [
-        TimeScope {
-            from: Some(seven_days_ago),
-            to: None,
-        },
-        TimeScope {
-            from: Some(thirty_days_ago),
-            to: Some(seven_days_ago - epsilon),
-        },
-        TimeScope {
-            from: Some(one_eighty_days_ago),
-            to: Some(thirty_days_ago - epsilon),
-        },
-        TimeScope {
-            from: None,
-            to: Some(one_eighty_days_ago - epsilon),
-        },
-    ]
-    .into_iter()
-    .filter_map(|window| base_scope.intersect(&window))
-    .collect()
+    [TimeScope { from: Some(seven_days_ago), to: None }, TimeScope { from: Some(thirty_days_ago), to: Some(seven_days_ago - epsilon) }, TimeScope { from: Some(one_eighty_days_ago), to: Some(thirty_days_ago - epsilon) }, TimeScope { from: None, to: Some(one_eighty_days_ago - epsilon) }]
+        .into_iter()
+        .filter_map(|window| base_scope.intersect(&window))
+        .collect()
 }
 
-fn append_time_scope_sql<'a>(
-    where_clause: &mut String,
-    params: &mut Vec<&'a dyn ToSql>,
-    column: &str,
-    from_param: Option<&'a String>,
-    to_param: Option<&'a String>,
-) {
+fn append_time_scope_sql<'a>(where_clause: &mut String, params: &mut Vec<&'a dyn ToSql>, column: &str, from_param: Option<&'a String>, to_param: Option<&'a String>) {
     if let Some(from) = from_param {
         *where_clause = format!("{where_clause} AND julianday({column}) >= julianday(?)");
         params.push(from);
@@ -1045,15 +684,11 @@ fn append_time_scope_sql<'a>(
 }
 
 fn try_parse_timestamp(value: &str) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(value)
-        .ok()
-        .map(|timestamp| timestamp.with_timezone(&Utc))
+    DateTime::parse_from_rfc3339(value).ok().map(|timestamp| timestamp.with_timezone(&Utc))
 }
 
 fn parse_time_bound(value: &str) -> Result<DateTime<Utc>, String> {
-    DateTime::parse_from_rfc3339(value)
-        .map(|timestamp| timestamp.with_timezone(&Utc))
-        .map_err(|error| format!("Invalid RFC3339 timestamp '{value}': {error}"))
+    DateTime::parse_from_rfc3339(value).map(|timestamp| timestamp.with_timezone(&Utc)).map_err(|error| format!("Invalid RFC3339 timestamp '{value}': {error}"))
 }
 
 fn escape_fts_term(term: &str) -> String {
@@ -1072,10 +707,7 @@ fn parse_quoted_terms(query: &str) -> (Vec<String>, Vec<String>, bool) {
     let normalized_query = query.replace(['“', '”'], "\"");
     let quote_count = normalized_query.chars().filter(|ch| *ch == '"').count();
     if quote_count == 0 || quote_count % 2 != 0 {
-        let words = normalized_query
-            .split_whitespace()
-            .map(|word| word.to_string())
-            .collect::<Vec<String>>();
+        let words = normalized_query.split_whitespace().map(|word| word.to_string()).collect::<Vec<String>>();
         return (vec![], words, false);
     }
 
@@ -1103,16 +735,10 @@ fn parse_quoted_terms(query: &str) -> (Vec<String>, Vec<String>, bool) {
         }
     }
 
-    let words = remainder
-        .split_whitespace()
-        .map(|word| word.to_string())
-        .collect::<Vec<String>>();
+    let words = remainder.split_whitespace().map(|word| word.to_string()).collect::<Vec<String>>();
 
     if phrases.is_empty() {
-        let fallback_words = normalized_query
-            .split_whitespace()
-            .map(|word| word.to_string())
-            .collect::<Vec<String>>();
+        let fallback_words = normalized_query.split_whitespace().map(|word| word.to_string()).collect::<Vec<String>>();
         return (vec![], fallback_words, false);
     }
 
@@ -1124,12 +750,7 @@ fn should_prioritize_phrase(trimmed_query: &str) -> bool {
     !has_phrases && phrases.is_empty() && words.len() > 1
 }
 
-fn build_phrase_text(
-    trimmed_query: &str,
-    phrases: &[String],
-    words: &[String],
-    has_phrases: bool,
-) -> String {
+fn build_phrase_text(trimmed_query: &str, phrases: &[String], words: &[String], has_phrases: bool) -> String {
     if has_phrases && words.is_empty() && phrases.len() == 1 {
         return phrases[0].clone();
     }
@@ -1146,102 +767,61 @@ fn build_fts_query(trimmed_query: &str, mode: MatchMode) -> String {
 
     if mode == MatchMode::Phrase {
         let phrase_text = build_phrase_text(trimmed_query, &phrases, &words, has_phrases);
-        return format!("\"{}\"", escape_fts_term(&phrase_text));
+        return build_exact_phrase_query(&phrase_text);
     }
 
     if !has_phrases {
-        let escaped_words: Vec<String> = words
-            .iter()
-            .map(|word| {
-                let escaped = escape_fts_term(word);
-                if word.chars().any(|ch| !ch.is_alphanumeric() && ch != '_') {
-                    format!("\"{escaped}\"")
-                } else {
-                    escaped
-                }
-            })
-            .collect();
-
-        if escaped_words.is_empty() {
-            let escaped = escape_fts_term(trimmed_query);
-            return format!("\"{escaped}\"");
-        }
-
-        if mode == MatchMode::All {
-            return escaped_words.join(" ");
-        }
-
-        return escaped_words.join(" OR ");
+        return join_fts_terms(build_fts_terms_for_words(&words), mode, trimmed_query);
     }
 
-    let mut terms: Vec<String> = words.iter().map(|word| escape_fts_term(word)).collect();
-    terms.extend(
-        phrases
-            .iter()
-            .map(|phrase| format!("\"{}\"", escape_fts_term(phrase))),
-    );
-
-    if terms.is_empty() {
-        let escaped = escape_fts_term(trimmed_query);
-        return format!("\"{escaped}\"");
-    }
-
-    if mode == MatchMode::All {
-        terms.join(" ")
-    } else {
-        terms.join(" OR ")
-    }
+    let mut terms = build_fts_terms_for_words(&words);
+    terms.extend(phrases.iter().map(|phrase| build_exact_phrase_query(phrase)));
+    join_fts_terms(terms, mode, trimmed_query)
 }
 
-fn build_content_like_query(trimmed_query: &str, mode: MatchMode) -> ContentLikeQuery {
-    let (phrases, words, has_phrases) = parse_quoted_terms(trimmed_query);
-
-    if mode == MatchMode::Phrase {
-        let phrase_text = build_phrase_text(trimmed_query, &phrases, &words, has_phrases);
-        return ContentLikeQuery {
-            predicate: "lower(m.content) LIKE ?".to_string(),
-            patterns: vec![format!("%{}%", phrase_text.to_lowercase())],
-        };
+fn build_exact_phrase_query(value: &str) -> String {
+    let normalized = crate::utils::normalize_search_text(value);
+    if normalized.is_empty() {
+        return format!("\"{}\"", escape_fts_term(value.trim()));
     }
 
-    let terms = if has_phrases {
-        phrases.into_iter().chain(words).collect::<Vec<_>>()
-    } else {
-        words
-    };
-    let normalized_terms = if terms.is_empty() {
-        vec![trimmed_query.to_string()]
+    format!("\"{}\"", normalized.split_whitespace().map(escape_fts_term).collect::<Vec<_>>().join(" "))
+}
+
+fn build_fts_terms_for_words(words: &[String]) -> Vec<String> {
+    words.iter().flat_map(|word| build_fts_terms_for_word(word)).collect()
+}
+
+fn build_fts_terms_for_word(word: &str) -> Vec<String> {
+    let tokens = crate::utils::normalize_search_tokens(word);
+    if tokens.is_empty() {
+        return vec![];
+    }
+
+    if tokens.len() > 1 && !crate::utils::contains_cjk(word) {
+        return vec![format!("\"{}\"", tokens.iter().map(|token| escape_fts_term(token)).collect::<Vec<_>>().join(" "))];
+    }
+
+    tokens.into_iter().map(|token| escape_fts_term(&token)).collect()
+}
+
+fn join_fts_terms(terms: Vec<String>, mode: MatchMode, fallback: &str) -> String {
+    let final_terms = if terms.is_empty() {
+        let normalized = crate::utils::normalize_search_text(fallback);
+        if normalized.is_empty() {
+            vec![format!("\"{}\"", escape_fts_term(fallback.trim()))]
+        } else {
+            normalized.split_whitespace().map(escape_fts_term).collect::<Vec<_>>()
+        }
     } else {
         terms
     };
-    let connector = if mode == MatchMode::All {
-        " AND "
+
+    if mode == MatchMode::All {
+        final_terms.join(" ")
     } else {
-        " OR "
-    };
-    let predicate = normalized_terms
-        .iter()
-        .map(|_| "lower(m.content) LIKE ?")
-        .collect::<Vec<_>>()
-        .join(connector);
-    let patterns = normalized_terms
-        .into_iter()
-        .map(|term| format!("%{}%", term.to_lowercase()))
-        .collect();
-
-    ContentLikeQuery {
-        predicate,
-        patterns,
+        final_terms.join(" OR ")
     }
-}
-
-fn contains_cjk(value: &str) -> bool {
-    value.chars().any(|ch| {
-        matches!(
-            ch as u32,
-            0x4E00..=0x9FFF | 0x3400..=0x4DBF | 0xF900..=0xFAFF
-        )
-    })
 }
 
 fn glob_to_like(pattern_str: &str) -> String {
@@ -1262,4 +842,39 @@ fn glob_to_like(pattern_str: &str) -> String {
         }
     }
     like_pattern
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_fts_query, build_fts_terms_for_word, MatchMode};
+
+    #[test]
+    fn cjk_word_builds_character_terms() {
+        let terms = build_fts_terms_for_word("默认系统中文");
+        assert_eq!(terms, vec!["默", "认", "系", "统", "中", "文"]);
+    }
+
+    #[test]
+    fn exact_phrase_query_uses_normalized_tokens() {
+        let query = build_fts_query("\"默认识别系统\"", MatchMode::Phrase);
+        assert_eq!(query, "\"默 认 识 别 系 统\"");
+    }
+
+    #[test]
+    fn cjk_all_query_uses_character_terms() {
+        let query = build_fts_query("默认系统中文", MatchMode::All);
+        assert_eq!(query, "默 认 系 统 中 文");
+    }
+
+    #[test]
+    fn latin_query_is_lowercased_and_tokenized() {
+        let query = build_fts_query("Hello WORLD", MatchMode::All);
+        assert_eq!(query, "hello world");
+    }
+
+    #[test]
+    fn punctuation_split_word_uses_phrase_query() {
+        let query = build_fts_query("codex-alpha", MatchMode::Any);
+        assert_eq!(query, "\"codex alpha\"");
+    }
 }

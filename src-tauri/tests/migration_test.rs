@@ -54,10 +54,7 @@ fn test_database_migration_from_old_schema() {
     }
 
     // 2. Run the current initialization logic
-    let config = Config {
-        enable_fts5: true,
-        ..Default::default()
-    };
+    let config = Config { enable_fts5: true, ..Default::default() };
 
     // We need to point sqlite_cache to our test DB.
     // Since get_db_path is hardcoded, we'll manually call the logic using our connection.
@@ -89,42 +86,23 @@ fn test_database_migration_from_old_schema() {
         .unwrap();
 
         // Run migrations
-        conn.execute("ALTER TABLE sessions ADD COLUMN last_message TEXT", [])
-            .ok();
-        conn.execute("ALTER TABLE sessions ADD COLUMN last_message_role TEXT", [])
-            .ok();
-        conn.execute(
-            "ALTER TABLE sessions ADD COLUMN user_messages_text TEXT",
-            [],
-        )
-        .ok();
-        conn.execute(
-            "ALTER TABLE sessions ADD COLUMN assistant_messages_text TEXT",
-            [],
-        )
-        .ok();
+        conn.execute("ALTER TABLE sessions ADD COLUMN last_message TEXT", []).ok();
+        conn.execute("ALTER TABLE sessions ADD COLUMN last_message_role TEXT", []).ok();
+        conn.execute("ALTER TABLE sessions ADD COLUMN user_messages_text TEXT", []).ok();
+        conn.execute("ALTER TABLE sessions ADD COLUMN assistant_messages_text TEXT", []).ok();
 
         // Check columns
         let mut stmt = conn.prepare("PRAGMA table_info(sessions)").unwrap();
-        let cols: Vec<String> = stmt
-            .query_map([], |row| row.get(1))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
+        let cols: Vec<String> = stmt.query_map([], |row| row.get(1)).unwrap().map(|r| r.unwrap()).collect();
         assert!(cols.contains(&"user_messages_text".to_string()));
         assert!(cols.contains(&"assistant_messages_text".to_string()));
 
         // FTS upgrade logic (copied from init_fts5)
         let mut stmt = conn.prepare("PRAGMA table_info(sessions_fts)").unwrap();
-        let fts_cols: Vec<String> = stmt
-            .query_map([], |row| row.get(1))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
+        let fts_cols: Vec<String> = stmt.query_map([], |row| row.get(1)).unwrap().map(|r| r.unwrap()).collect();
 
         if !fts_cols.is_empty() && !fts_cols.contains(&"user_messages_text".to_string()) {
-            conn.execute("DROP TABLE IF EXISTS sessions_fts", [])
-                .unwrap();
+            conn.execute("DROP TABLE IF EXISTS sessions_fts", []).unwrap();
         }
 
         conn.execute(
@@ -144,11 +122,7 @@ fn test_database_migration_from_old_schema() {
         .unwrap();
 
         let mut stmt = conn.prepare("PRAGMA table_info(sessions_fts)").unwrap();
-        let new_fts_cols: Vec<String> = stmt
-            .query_map([], |row| row.get(1))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
+        let new_fts_cols: Vec<String> = stmt.query_map([], |row| row.get(1)).unwrap().map(|r| r.unwrap()).collect();
         assert!(new_fts_cols.contains(&"user_messages_text".to_string()));
     }
 
@@ -177,9 +151,7 @@ fn test_database_corruption_recovery() {
             let conn = Connection::open(path).map_err(|e| e.to_string())?;
             // Simulate a failure that would happen on a malformed DB
             // Use query_row because PRAGMA schema_version returns a value
-            let _: i64 = conn
-                .query_row("PRAGMA schema_version", [], |row| row.get(0))
-                .map_err(|e| e.to_string())?;
+            let _: i64 = conn.query_row("PRAGMA schema_version", [], |row| row.get(0)).map_err(|e| e.to_string())?;
             Ok(conn)
         };
 
@@ -189,10 +161,7 @@ fn test_database_corruption_recovery() {
         };
 
         println!("Got error: '{initial_err}'");
-        if initial_err.contains("malformed")
-            || initial_err.contains("disk image")
-            || initial_err.contains("not a database")
-        {
+        if initial_err.contains("malformed") || initial_err.contains("disk image") || initial_err.contains("not a database") {
             fs::remove_file(&test_db_path).map_err(|err| err.to_string())?;
             println!("Deleted corrupted file, reopening...");
             let result = open_init(&test_db_path);
@@ -203,10 +172,7 @@ fn test_database_corruption_recovery() {
         }
     })();
 
-    assert!(
-        result.is_ok(),
-        "Should recover from corrupted file by deleting and recreating it"
-    );
+    assert!(result.is_ok(), "Should recover from corrupted file by deleting and recreating it");
     assert!(test_db_path.exists());
 
     fs::remove_file(&test_db_path).ok();
@@ -235,39 +201,25 @@ fn test_fts_vtable_corruption_triggers_database_recreation() {
 
     // First initialization: create DB with FTS and insert test data
     {
-        let conn = pi_session_manager::sqlite_cache::init_db_with_config(&config)
-            .expect("first init should succeed");
+        let conn = pi_session_manager::sqlite_cache::init_db_with_config(&config).expect("first init should succeed");
 
         // Insert a session and message to populate FTS
         let session_path = "/test/session1.jsonl".to_string();
         conn.execute(
             "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-            params![
-                "s1",
-                &session_path,
-                "/cwd",
-                "2025-01-01T00:00:00Z",
-                "2025-01-01T00:00:00Z",
-                "2025-01-01T00:00:00Z",
-                1i64,
-                "hello",
-                "",
-                "",
-                "",
-                "",
-                Utc::now().to_rfc3339(),
-            ],
-        ).unwrap();
+            params!["s1", &session_path, "/cwd", "2025-01-01T00:00:00Z", "2025-01-01T00:00:00Z", "2025-01-01T00:00:00Z", 1i64, "hello", "", "", "", "", Utc::now().to_rfc3339(),],
+        )
+        .unwrap();
 
         // Insert message entry to populate message_entries and message_fts via auto-sync
         conn.execute(
-            "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params!["m1:user", "m1", &session_path, "user", "user", "hello world", "2025-01-01T00:00:00Z"]
-        ).unwrap();
+            "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, search_text, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["m1:user", "m1", &session_path, "user", "user", "hello world", pi_session_manager::utils::normalize_search_text("hello world"), "2025-01-01T00:00:00Z"],
+        )
+        .unwrap();
 
         // Verify FTS works before corruption
-        let results_before =
-            pi_session_manager::sqlite_cache::search_message_fts(&conn, "hello", None, 10).unwrap();
+        let results_before = pi_session_manager::sqlite_cache::search_message_fts(&conn, "hello", None, 10).unwrap();
         assert_eq!(results_before.len(), 1);
         assert_eq!(results_before[0].1, session_path);
     }
@@ -284,17 +236,13 @@ fn test_fts_vtable_corruption_triggers_database_recreation() {
     }
 
     // Second initialization: should detect corruption, delete the entire DB, and recreate fresh
-    let conn2 = pi_session_manager::sqlite_cache::init_db_with_config(&config)
-        .expect("init after corruption should succeed");
+    let conn2 = pi_session_manager::sqlite_cache::init_db_with_config(&config).expect("init after corruption should succeed");
 
     // Look for backup file in the same directory (should exist from recovery)
     let parent_dir = db_path.parent().unwrap();
     use std::fs;
     // List all entries for debugging
-    let all_entries: Vec<_> = fs::read_dir(parent_dir)
-        .expect("read dir")
-        .map(|e| e.unwrap().file_name())
-        .collect();
+    let all_entries: Vec<_> = fs::read_dir(parent_dir).expect("read dir").map(|e| e.unwrap().file_name()).collect();
     println!("DEBUG: all entries in parent: {all_entries:?}");
     let mut backup_files = Vec::new();
     for entry_name in all_entries {
@@ -304,52 +252,32 @@ fn test_fts_vtable_corruption_triggers_database_recreation() {
             }
         }
     }
-    assert_eq!(
-        backup_files.len(),
-        1,
-        "Expected exactly one backup file, got {backup_files:?}"
-    );
+    assert_eq!(backup_files.len(), 1, "Expected exactly one backup file, got {backup_files:?}");
     let backup_path = &backup_files[0];
     assert!(backup_path.exists(), "Backup file should exist");
 
     // Verify that the sessions table is empty (fresh DB)
-    let session_count: i64 = conn2
-        .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
-        .unwrap();
-    assert_eq!(
-        session_count, 0,
-        "Sessions table should be empty after DB recreation"
-    );
+    let session_count: i64 = conn2.query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0)).unwrap();
+    assert_eq!(session_count, 0, "Sessions table should be empty after DB recreation");
 
     // Verify that FTS can be used normally on the fresh DB by inserting new data
     let new_session_path = "/test/session2.jsonl".to_string();
-    conn2.execute(
-        "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-        params![
-            "s2",
-            &new_session_path,
-            "/cwd2",
-            "2025-01-01T00:00:00Z",
-            "2025-01-01T00:00:00Z",
-            "2025-01-01T00:00:00Z",
-            1i64,
-            "new hello",
-            "",
-            "",
-            "",
-            "",
-            Utc::now().to_rfc3339(),
-        ],
-    ).unwrap();
+    conn2
+        .execute(
+            "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            params!["s2", &new_session_path, "/cwd2", "2025-01-01T00:00:00Z", "2025-01-01T00:00:00Z", "2025-01-01T00:00:00Z", 1i64, "new hello", "", "", "", "", Utc::now().to_rfc3339(),],
+        )
+        .unwrap();
 
-    conn2.execute(
-        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params!["m2:user", "m2", &new_session_path, "user", "user", "new hello world", "2025-01-01T00:00:00Z"]
-    ).unwrap();
+    conn2
+        .execute(
+            "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, search_text, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["m2:user", "m2", &new_session_path, "user", "user", "new hello world", pi_session_manager::utils::normalize_search_text("new hello world"), "2025-01-01T00:00:00Z"],
+        )
+        .unwrap();
 
     // Verify FTS works on the new data
-    let results_after =
-        pi_session_manager::sqlite_cache::search_message_fts(&conn2, "new", None, 10).unwrap();
+    let results_after = pi_session_manager::sqlite_cache::search_message_fts(&conn2, "new", None, 10).unwrap();
     assert_eq!(results_after.len(), 1);
     assert_eq!(results_after[0].1, new_session_path);
 
@@ -376,8 +304,7 @@ fn test_fts_rebuild_after_recreate() {
     let config = Config::default();
 
     // Initialize DB and create tables
-    let conn = pi_session_manager::sqlite_cache::init_db_with_config(&config)
-        .expect("init should succeed");
+    let conn = pi_session_manager::sqlite_cache::init_db_with_config(&config).expect("init should succeed");
 
     // Immediately unset the override to prevent leaking to other tests
     env::remove_var("PPM_TEST_DB");
@@ -386,31 +313,18 @@ fn test_fts_rebuild_after_recreate() {
     let session_path = "/test/session_rebuild.jsonl".to_string();
     conn.execute(
         "INSERT INTO sessions (id, path, cwd, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-        params![
-            "sess_rebuild",
-            &session_path,
-            "/cwd",
-            "2025-01-01T00:00:00Z",
-            "2025-01-01T00:00:00Z",
-            "2025-01-01T00:00:00Z",
-            1i64,
-            "Rebuild test",
-            "",
-            "",
-            "",
-            "",
-            Utc::now().to_rfc3339(),
-        ],
-    ).unwrap();
+        params!["sess_rebuild", &session_path, "/cwd", "2025-01-01T00:00:00Z", "2025-01-01T00:00:00Z", "2025-01-01T00:00:00Z", 1i64, "Rebuild test", "", "", "", "", Utc::now().to_rfc3339(),],
+    )
+    .unwrap();
 
     conn.execute(
-        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params!["m_rebuild1:user", "m_rebuild1", &session_path, "user", "user", "rebuild test message", "2025-01-01T00:00:00Z"]
-    ).unwrap();
+        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, search_text, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params!["m_rebuild1:user", "m_rebuild1", &session_path, "user", "user", "rebuild test message", pi_session_manager::utils::normalize_search_text("rebuild test message"), "2025-01-01T00:00:00Z"],
+    )
+    .unwrap();
 
     // Verify FTS works before dropping
-    let results_before =
-        pi_session_manager::sqlite_cache::search_message_fts(&conn, "rebuild", None, 10).unwrap();
+    let results_before = pi_session_manager::sqlite_cache::search_message_fts(&conn, "rebuild", None, 10).unwrap();
     assert_eq!(results_before.len(), 1);
     assert_eq!(results_before[0].1, session_path);
 
@@ -418,21 +332,14 @@ fn test_fts_rebuild_after_recreate() {
     conn.execute("DROP TABLE message_fts", []).unwrap();
 
     // Ensure FTS is gone
-    let fts_exists: bool = conn
-        .query_row(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='message_fts'",
-            [],
-            |row| Ok(true),
-        )
-        .unwrap_or(false);
+    let fts_exists: bool = conn.query_row("SELECT name FROM sqlite_master WHERE type='table' AND name='message_fts'", [], |row| Ok(true)).unwrap_or(false);
     assert!(!fts_exists);
 
     // Re-run ensure_message_fts_schema to recreate and rebuild index
     pi_session_manager::sqlite_cache::ensure_message_fts_schema(&conn).unwrap();
 
     // Verify FTS is back and populated without reinserting data
-    let results_after =
-        pi_session_manager::sqlite_cache::search_message_fts(&conn, "rebuild", None, 10).unwrap();
+    let results_after = pi_session_manager::sqlite_cache::search_message_fts(&conn, "rebuild", None, 10).unwrap();
     assert_eq!(results_after.len(), 1, "Expected one hit after rebuild");
     assert_eq!(results_after[0].1, session_path);
 
@@ -453,10 +360,8 @@ fn test_init_db_upgrades_legacy_message_entries_before_new_indexes() {
 
     let db_path = sqlite_cache::get_db_path().unwrap();
     let conn = Connection::open(&db_path).unwrap();
-    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)", [])
-        .unwrap();
-    conn.execute("INSERT INTO schema_version (version) VALUES (3)", [])
-        .unwrap();
+    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)", []).unwrap();
+    conn.execute("INSERT INTO schema_version (version) VALUES (3)", []).unwrap();
     conn.execute(
         "CREATE TABLE sessions (
             id TEXT PRIMARY KEY,
@@ -485,6 +390,7 @@ fn test_init_db_upgrades_legacy_message_entries_before_new_indexes() {
             session_path TEXT NOT NULL,
             role TEXT NOT NULL,
             content TEXT NOT NULL,
+            search_text TEXT NOT NULL DEFAULT '',
             timestamp TEXT NOT NULL
         )",
         [],
@@ -496,21 +402,12 @@ fn test_init_db_upgrades_legacy_message_entries_before_new_indexes() {
     let conn = sqlite_cache::init_db_with_config(&config).unwrap();
 
     let mut stmt = conn.prepare("PRAGMA table_info(message_entries)").unwrap();
-    let columns: Vec<String> = stmt
-        .query_map([], |row| row.get(1))
-        .unwrap()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+    let columns: Vec<String> = stmt.query_map([], |row| row.get(1)).unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     assert!(columns.contains(&"entry_id".to_string()));
     assert!(columns.contains(&"source_type".to_string()));
+    assert!(columns.contains(&"search_text".to_string()));
 
-    let index_count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_message_entries_entry_id'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
+    let index_count: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_message_entries_entry_id'", [], |row| row.get(0)).unwrap();
     assert_eq!(index_count, 1);
 
     if let Some(home) = original_home {

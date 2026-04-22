@@ -7,19 +7,11 @@ use tempfile::tempdir;
 
 /// Helper: create a minimal session file content as JSONL
 fn make_session_file(id: &str, cwd: &str, messages: &[(&str, &str)]) -> String {
-    let header = format!(
-        r#"{{"type":"session","version":3,"id":"{id}","timestamp":"2026-02-10T22:00:00Z","cwd":"{cwd}"}}"#
-    );
+    let header = format!(r#"{{"type":"session","version":3,"id":"{id}","timestamp":"2026-02-10T22:00:00Z","cwd":"{cwd}"}}"#);
     let mut lines = vec![header];
     for (i, (role, text)) in messages.iter().enumerate() {
         let entry_id = format!("{id}-msg{i}");
-        let msg = format!(
-            r#"{{"type":"message","id":"{}","parentId":null,"timestamp":"2026-02-10T22:00:{:02}Z","message":{{"role":"{}","content":[{{"type":"text","text":"{}"}}]}}}}"#,
-            entry_id,
-            i,
-            role,
-            text.replace('"', "\\\"")
-        );
+        let msg = format!(r#"{{"type":"message","id":"{}","parentId":null,"timestamp":"2026-02-10T22:00:{:02}Z","message":{{"role":"{}","content":[{{"type":"text","text":"{}"}}]}}}}"#, entry_id, i, role, text.replace('"', "\\\""));
         lines.push(msg);
     }
     lines.join("\n")
@@ -33,17 +25,7 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
     fs::create_dir_all(&sessions_dir).unwrap();
 
     let sess_path = sessions_dir.join("multi.jsonl");
-    let content = make_session_file(
-        "multi",
-        "/test",
-        &[
-            ("user", "I like banana"),
-            ("user", "banana is yellow"),
-            ("user", "bananas are tasty"),
-            ("user", "eat more banana"),
-            ("user", "banana smoothie"),
-        ],
-    );
+    let content = make_session_file("multi", "/test", &[("user", "I like banana"), ("user", "banana is yellow"), ("user", "bananas are tasty"), ("user", "eat more banana"), ("user", "banana smoothie")]);
     fs::write(&sess_path, content).unwrap();
 
     // Set up temporary database
@@ -52,9 +34,7 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
     let conn = Connection::open(&db_file).unwrap();
 
     // Initialize schema
-    let _: String = conn
-        .query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0))
-        .unwrap();
+    let _: String = conn.query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0)).unwrap();
     conn.execute("PRAGMA synchronous=NORMAL;", []).unwrap();
     conn.execute("PRAGMA foreign_keys=ON;", []).unwrap();
 
@@ -87,6 +67,7 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
             session_path TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
             content TEXT NOT NULL,
+            search_text TEXT NOT NULL DEFAULT '',
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
         )",
@@ -94,11 +75,7 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
     )
     .unwrap();
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)",
-        [],
-    )
-    .unwrap();
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)", []).unwrap();
 
     sqlite_cache::ensure_message_fts_schema(&conn).unwrap();
 
@@ -123,7 +100,8 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
             &session.last_message_role,
             &Utc::now().to_rfc3339(),
         ],
-    ).unwrap();
+    )
+    .unwrap();
     sqlite_cache::insert_message_entries(&conn, &session).unwrap();
 
     // Build the pagination query as in full_text_search (page=0, page_size=3)
@@ -144,16 +122,11 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
     );
     let total_hits: usize = {
         let mut stmt = conn.prepare(&count_sql).unwrap();
-        let count: i64 = stmt
-            .query_row(params![fts_query], |row| row.get(0))
-            .unwrap();
+        let count: i64 = stmt.query_row(params![fts_query], |row| row.get(0)).unwrap();
         count as usize
     };
     // Only one session, 5 matching messages, but per-session limit is 3, so total = 3
-    assert_eq!(
-        total_hits, 3,
-        "Total hits after per-session limit should be 3"
-    );
+    assert_eq!(total_hits, 3, "Total hits after per-session limit should be 3");
 
     // Fetch first page (global offset=0, limit=3)
     let data_sql = format!(
@@ -198,11 +171,7 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
         .unwrap();
 
     assert_eq!(rows.len(), 3, "First page should contain exactly 3 hits");
-    assert!(rows
-        .iter()
-        .all(|(_, sp, _, _, _, _)| sp == &sess_path.to_string_lossy()));
+    assert!(rows.iter().all(|(_, sp, _, _, _, _)| sp == &sess_path.to_string_lossy()));
     // Also verify that content is non-empty for each hit (basic sanity)
-    assert!(rows
-        .iter()
-        .all(|(_, _, _, content, _, _)| !content.is_empty()));
+    assert!(rows.iter().all(|(_, _, _, content, _, _)| !content.is_empty()));
 }

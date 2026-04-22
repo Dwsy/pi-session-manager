@@ -38,23 +38,13 @@ pub fn get_db_path_for_config(config: &Config) -> Result<PathBuf, String> {
     if config.session_source_mode == crate::config::SessionSourceMode::Dataset {
         let active_dataset_ids = config.effective_active_dataset_ids();
         if active_dataset_ids.len() == 1 {
-            if let Some(dataset) = config
-                .datasets
-                .iter()
-                .find(|item| item.id == active_dataset_ids[0])
-            {
+            if let Some(dataset) = config.datasets.iter().find(|item| item.id == active_dataset_ids[0]) {
                 let home = match std::env::var("HOME") {
                     Ok(h) => PathBuf::from(h),
                     Err(_) => dirs::home_dir().ok_or("Cannot find home directory")?,
                 };
-                let dataset_dir = home
-                    .join(".pi")
-                    .join("agent")
-                    .join("sessions")
-                    .join("datasets")
-                    .join(&dataset.slug);
-                fs::create_dir_all(&dataset_dir)
-                    .map_err(|e| format!("Failed to create dataset dir: {e}"))?;
+                let dataset_dir = home.join(".pi").join("agent").join("sessions").join("datasets").join(&dataset.slug);
+                fs::create_dir_all(&dataset_dir).map_err(|e| format!("Failed to create dataset dir: {e}"))?;
                 return Ok(dataset_dir.join("sessions.db"));
             }
         } else if active_dataset_ids.len() > 1 {
@@ -65,14 +55,8 @@ pub fn get_db_path_for_config(config: &Config) -> Result<PathBuf, String> {
             let mut hasher = DefaultHasher::new();
             active_dataset_ids.hash(&mut hasher);
             let selection_hash = format!("{:016x}", hasher.finish());
-            let selection_dir = home
-                .join(".pi")
-                .join("agent")
-                .join("sessions")
-                .join("datasets")
-                .join("__selection__");
-            fs::create_dir_all(&selection_dir)
-                .map_err(|e| format!("Failed to create selection dir: {e}"))?;
+            let selection_dir = home.join(".pi").join("agent").join("sessions").join("datasets").join("__selection__");
+            fs::create_dir_all(&selection_dir).map_err(|e| format!("Failed to create selection dir: {e}"))?;
             return Ok(selection_dir.join(format!("{selection_hash}.db")));
         }
     }
@@ -98,36 +82,21 @@ pub fn init_db_with_config(config: &Config) -> Result<Connection, String> {
 pub fn init_db_with_path(db_path: &Path, config: &Config) -> Result<Connection, String> {
     match open_and_init_db(db_path, config) {
         Ok(conn) => Ok(conn),
-        Err(e)
-            if e.contains("malformed")
-                || e.contains("disk image")
-                || e.contains("not a database")
-                || e.contains("vtable constructor failed") =>
-        {
+        Err(e) if e.contains("malformed") || e.contains("disk image") || e.contains("not a database") || e.contains("vtable constructor failed") => {
             // Attempt recovery: delete corrupted DB and recreate
-            warn!(
-                "[Recovery] Database corrupted ({}). Deleting and recreating...",
-                e
-            );
+            warn!("[Recovery] Database corrupted ({}). Deleting and recreating...", e);
             if db_path.exists() {
                 // Backup corrupted DB before deletion
                 let backup_path = {
                     let file_name = db_path.file_name().and_then(|s| s.to_str()).unwrap_or("db");
                     let parent = db_path.parent().unwrap_or_else(|| Path::new("."));
-                    parent.join(format!(
-                        "{}.corrupted.{}",
-                        file_name,
-                        Utc::now().timestamp()
-                    ))
+                    parent.join(format!("{}.corrupted.{}", file_name, Utc::now().timestamp()))
                 };
-                fs::copy(db_path, &backup_path).map_err(|e| {
-                    format!("Failed to backup corrupted DB to {backup_path:?}: {e}")
-                })?;
+                fs::copy(db_path, &backup_path).map_err(|e| format!("Failed to backup corrupted DB to {backup_path:?}: {e}"))?;
                 info!("Backed up corrupted DB to {:?}", backup_path);
                 // Increment recovery counter
                 crate::metrics::inc_corruption_recovery();
-                fs::remove_file(db_path)
-                    .map_err(|err| format!("Failed to delete corrupted DB: {err}"))?;
+                fs::remove_file(db_path).map_err(|err| format!("Failed to delete corrupted DB: {err}"))?;
             }
             open_and_init_db(db_path, config)
         }
@@ -137,29 +106,22 @@ pub fn init_db_with_path(db_path: &Path, config: &Config) -> Result<Connection, 
 
 fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, String> {
     if let Some(parent) = db_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create database parent dir: {e}"))?;
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create database parent dir: {e}"))?;
     }
     let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
 
     let init_result = (|| -> Result<(), String> {
         // Enable WAL mode for better concurrency and reliability
-        conn.prepare("PRAGMA journal_mode=WAL;")
-            .map_err(|e| format!("Failed to set WAL mode: {e}"))?
-            .query_row([], |_| Ok(()))
-            .map_err(|e| format!("Failed to set WAL mode: {e}"))?;
+        conn.prepare("PRAGMA journal_mode=WAL;").map_err(|e| format!("Failed to set WAL mode: {e}"))?.query_row([], |_| Ok(())).map_err(|e| format!("Failed to set WAL mode: {e}"))?;
 
         // Set synchronous mode (does not return a result row)
-        conn.execute("PRAGMA synchronous=NORMAL;", [])
-            .map_err(|e| format!("Failed to set synchronous mode: {e}"))?;
+        conn.execute("PRAGMA synchronous=NORMAL;", []).map_err(|e| format!("Failed to set synchronous mode: {e}"))?;
 
         // Enable busy timeout to handle concurrent write locks gracefully
-        conn.busy_timeout(std::time::Duration::from_secs(5))
-            .map_err(|e| format!("Failed to set busy_timeout: {e}"))?;
+        conn.busy_timeout(std::time::Duration::from_secs(5)).map_err(|e| format!("Failed to set busy_timeout: {e}"))?;
 
         // Enable foreign key constraints
-        conn.execute("PRAGMA foreign_keys=ON;", [])
-            .map_err(|e| format!("Failed to enable foreign keys: {e}"))?;
+        conn.execute("PRAGMA foreign_keys=ON;", []).map_err(|e| format!("Failed to enable foreign keys: {e}"))?;
 
         // Ensure schema_version table exists for migrations
         ensure_schema_version_table(&conn)?;
@@ -246,32 +208,15 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         )
         .map_err(|e| format!("Failed to create table scan_state: {e}"))?;
 
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_modified ON sessions(modified DESC)",
-            [],
-        )
-        .map_err(|e| format!("Failed to create index idx_modified: {e}"))?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_modified ON sessions(modified DESC)", []).map_err(|e| format!("Failed to create index idx_modified: {e}"))?;
 
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_cwd ON sessions(cwd)", [])
-            .map_err(|e| format!("Failed to create index idx_cwd: {e}"))?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_cwd ON sessions(cwd)", []).map_err(|e| format!("Failed to create index idx_cwd: {e}"))?;
 
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_file_modified ON sessions(file_modified)",
-            [],
-        )
-        .map_err(|e| format!("Failed to create index idx_file_modified: {e}"))?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_file_modified ON sessions(file_modified)", []).map_err(|e| format!("Failed to create index idx_file_modified: {e}"))?;
 
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_scan_state_backing_path ON scan_state(backing_path)",
-            [],
-        )
-        .map_err(|e| format!("Failed to create index idx_scan_state_backing_path: {e}"))?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_scan_state_backing_path ON scan_state(backing_path)", []).map_err(|e| format!("Failed to create index idx_scan_state_backing_path: {e}"))?;
 
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_scan_state_provider_slug ON scan_state(provider_slug)",
-            [],
-        )
-        .map_err(|e| format!("Failed to create index idx_scan_state_provider_slug: {e}"))?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_scan_state_provider_slug ON scan_state(provider_slug)", []).map_err(|e| format!("Failed to create index idx_scan_state_provider_slug: {e}"))?;
 
         // Create favorites table
         conn.execute(
@@ -317,37 +262,18 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         let now = Utc::now().to_rfc3339();
 
         // Detect system language
-        let is_chinese = std::env::var("LANG")
-            .or_else(|_| std::env::var("LC_ALL"))
-            .or_else(|_| std::env::var("LC_MESSAGES"))
-            .map(|lang| lang.to_lowercase().contains("zh") || lang.to_lowercase().contains("cn"))
-            .unwrap_or(false);
+        let is_chinese = crate::utils::is_system_chinese_locale();
 
         let builtins = if is_chinese {
             // Chinese labels
-            [
-                ("builtin-todo", "待处理", "warning", 0),
-                ("builtin-wip", "进行中", "info", 1),
-                ("builtin-done", "已完成", "success", 2),
-                ("builtin-important", "重要", "destructive", 3),
-                ("builtin-archive", "归档", "slate", 4),
-            ]
+            [("builtin-todo", "待处理", "warning", 0), ("builtin-wip", "进行中", "info", 1), ("builtin-done", "已完成", "success", 2), ("builtin-important", "重要", "destructive", 3), ("builtin-archive", "归档", "slate", 4)]
         } else {
             // English labels
-            [
-                ("builtin-todo", "To Do", "warning", 0),
-                ("builtin-wip", "In Progress", "info", 1),
-                ("builtin-done", "Done", "success", 2),
-                ("builtin-important", "Important", "destructive", 3),
-                ("builtin-archive", "Archive", "slate", 4),
-            ]
+            [("builtin-todo", "To Do", "warning", 0), ("builtin-wip", "In Progress", "info", 1), ("builtin-done", "Done", "success", 2), ("builtin-important", "Important", "destructive", 3), ("builtin-archive", "Archive", "slate", 4)]
         };
 
         for (id, name, color, order) in &builtins {
-            conn.execute(
-            "INSERT OR IGNORE INTO tags (id, name, color, sort_order, is_builtin, created_at) VALUES (?1, ?2, ?3, ?4, 1, ?5)",
-            params![id, name, color, order, now],
-        ).ok();
+            conn.execute("INSERT OR IGNORE INTO tags (id, name, color, sort_order, is_builtin, created_at) VALUES (?1, ?2, ?3, ?4, 1, ?5)", params![id, name, color, order, now]).ok();
         }
 
         // Create message_entries table for fresh installs.
@@ -361,6 +287,7 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
             source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking', 'label')),
             content TEXT NOT NULL,
+            search_text TEXT NOT NULL DEFAULT '',
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
         )",
@@ -374,45 +301,21 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             apply_migrations(&conn, current_version)?;
         }
 
-        conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)",
-        [],
-    )
-    .map_err(|e| format!("Failed to create index on message_entries: {e}"))?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)", []).map_err(|e| format!("Failed to create index on message_entries: {e}"))?;
 
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id)",
-            [],
-        )
-        .map_err(|e| format!("Failed to create entry_id index on message_entries: {e}"))?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id)", []).map_err(|e| format!("Failed to create entry_id index on message_entries: {e}"))?;
 
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_message_entries_session_time ON message_entries(session_path, timestamp)",
-            [],
-        )
-        .map_err(|e| format!("Failed to create session/timestamp index on message_entries: {e}"))?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_session_time ON message_entries(session_path, timestamp)", []).map_err(|e| format!("Failed to create session/timestamp index on message_entries: {e}"))?;
 
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_message_entries_timestamp ON message_entries(timestamp DESC)",
-            [],
-        )
-        .map_err(|e| format!("Failed to create timestamp index on message_entries: {e}"))?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_timestamp ON message_entries(timestamp DESC)", []).map_err(|e| format!("Failed to create timestamp index on message_entries: {e}"))?;
 
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_message_entries_timestamp_julianday ON message_entries(julianday(timestamp) DESC)",
-            [],
-        )
-        .map_err(|e| format!("Failed to create julianday timestamp index on message_entries: {e}"))?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_timestamp_julianday ON message_entries(julianday(timestamp) DESC)", []).map_err(|e| format!("Failed to create julianday timestamp index on message_entries: {e}"))?;
 
-        if config.enable_fts5 {
-            // init_fts5(&conn)?; // DISABLED: sessions_fts incompatible with sessions schema (TEXT PRIMARY KEY)
-            // Comprehensive schema check for message-level FTS only
-            ensure_message_fts_schema(&conn)?;
-        } else {
-            // FTS disabled: ensure no leftover triggers for both message-level and session-level
-            let _ = drop_message_entries_triggers(&conn);
-            let _ = drop_sessions_fts_triggers(&conn);
-        }
+        // Message-level FTS is the primary search path. Always reconcile it here so
+        // legacy config flags cannot leave search_text / message_fts stale.
+        ensure_message_fts_schema(&conn)?;
+        // Legacy session-level FTS remains disabled regardless of config.
+        let _ = drop_sessions_fts_triggers(&conn);
 
         Ok(())
     })();
@@ -421,10 +324,7 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         Ok(()) => Ok(conn),
         Err(error) => {
             if let Err((_, close_error)) = conn.close() {
-                warn!(
-                    "Failed to close SQLite connection after initialization error: {}",
-                    close_error
-                );
+                warn!("Failed to close SQLite connection after initialization error: {}", close_error);
             }
             Err(error)
         }
@@ -470,14 +370,7 @@ mod tests {
         let db_path = get_db_path_for_config(&config).expect("dataset db path");
         let path_str = db_path.to_string_lossy();
         // Use Path instead of string contains for cross-platform compatibility
-        assert!(
-            db_path.components().any(|c| c.as_os_str() == "datasets")
-                && db_path
-                    .components()
-                    .any(|c| c.as_os_str() == "badlogicgames__pi-mono"),
-            "Path should contain datasets/badlogicgames__pi-mono: {}",
-            path_str
-        );
+        assert!(db_path.components().any(|c| c.as_os_str() == "datasets") && db_path.components().any(|c| c.as_os_str() == "badlogicgames__pi-mono"), "Path should contain datasets/badlogicgames__pi-mono: {}", path_str);
         assert!(db_path.ends_with("sessions.db"));
     }
 }

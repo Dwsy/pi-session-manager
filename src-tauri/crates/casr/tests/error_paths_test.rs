@@ -84,26 +84,8 @@ mod unix_error_paths {
             started_at: Some(1_700_000_000_000),
             ended_at: Some(1_700_000_010_000),
             messages: vec![
-                CanonicalMessage {
-                    idx: 0,
-                    role: MessageRole::User,
-                    content: "test question".to_string(),
-                    timestamp: Some(1_700_000_000_000),
-                    author: None,
-                    tool_calls: vec![],
-                    tool_results: vec![],
-                    extra: serde_json::Value::Null,
-                },
-                CanonicalMessage {
-                    idx: 1,
-                    role: MessageRole::Assistant,
-                    content: "test answer".to_string(),
-                    timestamp: Some(1_700_000_010_000),
-                    author: None,
-                    tool_calls: vec![],
-                    tool_results: vec![],
-                    extra: serde_json::Value::Null,
-                },
+                CanonicalMessage { idx: 0, role: MessageRole::User, content: "test question".to_string(), timestamp: Some(1_700_000_000_000), author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null },
+                CanonicalMessage { idx: 1, role: MessageRole::Assistant, content: "test answer".to_string(), timestamp: Some(1_700_000_010_000), author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null },
             ],
             metadata: serde_json::Value::Null,
             source_path: PathBuf::from("/tmp/source.jsonl"),
@@ -136,10 +118,7 @@ mod unix_error_paths {
     #[test]
     fn read_nonexistent_clawdbot() {
         let err = ClawdBot.read_session(Path::new("/tmp/nonexistent-casr-test-file.jsonl"));
-        assert!(
-            err.is_err(),
-            "ClawdBot: reading nonexistent file should fail"
-        );
+        assert!(err.is_err(), "ClawdBot: reading nonexistent file should fail");
     }
 
     #[test]
@@ -151,28 +130,19 @@ mod unix_error_paths {
     #[test]
     fn read_nonexistent_factory() {
         let err = Factory.read_session(Path::new("/tmp/nonexistent-casr-test-file.jsonl"));
-        assert!(
-            err.is_err(),
-            "Factory: reading nonexistent file should fail"
-        );
+        assert!(err.is_err(), "Factory: reading nonexistent file should fail");
     }
 
     #[test]
     fn read_nonexistent_openclaw() {
         let err = OpenClaw.read_session(Path::new("/tmp/nonexistent-casr-test-file.jsonl"));
-        assert!(
-            err.is_err(),
-            "OpenClaw: reading nonexistent file should fail"
-        );
+        assert!(err.is_err(), "OpenClaw: reading nonexistent file should fail");
     }
 
     #[test]
     fn read_nonexistent_pi_agent() {
         let err = PiAgent.read_session(Path::new("/tmp/nonexistent-casr-test-file.json"));
-        assert!(
-            err.is_err(),
-            "PiAgent: reading nonexistent file should fail"
-        );
+        assert!(err.is_err(), "PiAgent: reading nonexistent file should fail");
     }
 
     // =========================================================================
@@ -199,22 +169,12 @@ mod unix_error_paths {
         fs::copy(&src, &target_file).unwrap();
 
         fs::set_permissions(&target_file, fs::Permissions::from_mode(0o000)).unwrap();
-        let _guard = PermGuard {
-            path: target_file.clone(),
-            mode: 0o644,
-        };
+        let _guard = PermGuard { path: target_file.clone(), mode: 0o644 };
 
         let err = ClaudeCode.read_session(&target_file);
-        assert!(
-            err.is_err(),
-            "reading unreadable file should fail; got {:?}",
-            err
-        );
+        assert!(err.is_err(), "reading unreadable file should fail; got {:?}", err);
         let msg = err.unwrap_err().to_string();
-        assert!(
-            msg.contains("ermission denied") || msg.contains("access") || msg.contains("open"),
-            "error should mention permission; got: {msg}"
-        );
+        assert!(msg.contains("ermission denied") || msg.contains("access") || msg.contains("open"), "error should mention permission; got: {msg}");
     }
 
     #[test]
@@ -233,17 +193,10 @@ mod unix_error_paths {
         fs::copy(&src, &target_file).unwrap();
 
         fs::set_permissions(&target_file, fs::Permissions::from_mode(0o000)).unwrap();
-        let _guard = PermGuard {
-            path: target_file.clone(),
-            mode: 0o644,
-        };
+        let _guard = PermGuard { path: target_file.clone(), mode: 0o644 };
 
         let err = Codex.read_session(&target_file);
-        assert!(
-            err.is_err(),
-            "Codex: reading unreadable file should fail; got {:?}",
-            err
-        );
+        assert!(err.is_err(), "Codex: reading unreadable file should fail; got {:?}", err);
     }
 
     #[test]
@@ -256,24 +209,13 @@ mod unix_error_paths {
         let chat_dir = tmp.path().join("tmp/abc123/chats");
         fs::create_dir_all(&chat_dir).unwrap();
         let session_file = chat_dir.join("session-test.json");
-        fs::write(
-            &session_file,
-            r#"{"sessionId":"test","messages":[{"type":"user","content":"hi"}]}"#,
-        )
-        .unwrap();
+        fs::write(&session_file, r#"{"sessionId":"test","messages":[{"type":"user","content":"hi"}]}"#).unwrap();
 
         fs::set_permissions(&session_file, fs::Permissions::from_mode(0o000)).unwrap();
-        let _guard = PermGuard {
-            path: session_file.clone(),
-            mode: 0o644,
-        };
+        let _guard = PermGuard { path: session_file.clone(), mode: 0o644 };
 
         let err = Gemini.read_session(&session_file);
-        assert!(
-            err.is_err(),
-            "Gemini: reading unreadable file should fail; got {:?}",
-            err
-        );
+        assert!(err.is_err(), "Gemini: reading unreadable file should fail; got {:?}", err);
     }
 
     // =========================================================================
@@ -288,11 +230,7 @@ mod unix_error_paths {
         match &result {
             Err(_) => {} // Fine — empty file is an error.
             Ok(session) => {
-                assert!(
-                    session.messages.is_empty(),
-                    "CC: empty file should produce 0 messages, got {}",
-                    session.messages.len()
-                );
+                assert!(session.messages.is_empty(), "CC: empty file should produce 0 messages, got {}", session.messages.len());
             }
         }
     }
@@ -305,11 +243,7 @@ mod unix_error_paths {
         match &result {
             Err(_) => {}
             Ok(session) => {
-                assert!(
-                    session.messages.is_empty(),
-                    "Codex: empty file should produce 0 messages, got {}",
-                    session.messages.len()
-                );
+                assert!(session.messages.is_empty(), "Codex: empty file should produce 0 messages, got {}", session.messages.len());
             }
         }
     }
@@ -336,11 +270,7 @@ mod unix_error_paths {
             Err(_) => {}
             Ok(session) => {
                 // If it tolerates garbage, at most 0 messages.
-                assert!(
-                    session.messages.is_empty(),
-                    "CC: garbage should not produce messages, got {}",
-                    session.messages.len()
-                );
+                assert!(session.messages.is_empty(), "CC: garbage should not produce messages, got {}", session.messages.len());
             }
         }
     }
@@ -353,11 +283,7 @@ mod unix_error_paths {
         match &result {
             Err(_) => {}
             Ok(session) => {
-                assert!(
-                    session.messages.is_empty(),
-                    "Codex: garbage should not produce messages, got {}",
-                    session.messages.len()
-                );
+                assert!(session.messages.is_empty(), "Codex: garbage should not produce messages, got {}", session.messages.len());
             }
         }
     }
@@ -383,18 +309,11 @@ mod unix_error_paths {
         let sessions_dir = tmp.path().join("sessions");
         fs::create_dir_all(&sessions_dir).unwrap();
         fs::set_permissions(&sessions_dir, fs::Permissions::from_mode(0o555)).unwrap();
-        let _guard = PermGuard {
-            path: sessions_dir,
-            mode: 0o755,
-        };
+        let _guard = PermGuard { path: sessions_dir, mode: 0o755 };
 
         let session = make_session("/tmp");
         let err = Codex.write_session(&session, &WriteOptions { force: false });
-        assert!(
-            err.is_err(),
-            "Codex: writing to read-only dir should fail; got {:?}",
-            err
-        );
+        assert!(err.is_err(), "Codex: writing to read-only dir should fail; got {:?}", err);
     }
 
     #[test]
@@ -405,18 +324,11 @@ mod unix_error_paths {
 
         // ClawdBot writes directly under HOME — make the home dir read-only.
         fs::set_permissions(tmp.path(), fs::Permissions::from_mode(0o555)).unwrap();
-        let _guard = PermGuard {
-            path: tmp.path().to_path_buf(),
-            mode: 0o755,
-        };
+        let _guard = PermGuard { path: tmp.path().to_path_buf(), mode: 0o755 };
 
         let session = make_session("/tmp");
         let err = ClawdBot.write_session(&session, &WriteOptions { force: false });
-        assert!(
-            err.is_err(),
-            "ClawdBot: writing to read-only dir should fail; got {:?}",
-            err
-        );
+        assert!(err.is_err(), "ClawdBot: writing to read-only dir should fail; got {:?}", err);
     }
 
     #[test]
@@ -427,18 +339,11 @@ mod unix_error_paths {
 
         // Vibe writes to <HOME>/<session-id>/messages.jsonl — make home read-only.
         fs::set_permissions(tmp.path(), fs::Permissions::from_mode(0o555)).unwrap();
-        let _guard = PermGuard {
-            path: tmp.path().to_path_buf(),
-            mode: 0o755,
-        };
+        let _guard = PermGuard { path: tmp.path().to_path_buf(), mode: 0o755 };
 
         let session = make_session("/tmp");
         let err = Vibe.write_session(&session, &WriteOptions { force: false });
-        assert!(
-            err.is_err(),
-            "Vibe: writing to read-only dir should fail; got {:?}",
-            err
-        );
+        assert!(err.is_err(), "Vibe: writing to read-only dir should fail; got {:?}", err);
     }
 
     #[test]
@@ -449,18 +354,11 @@ mod unix_error_paths {
 
         // Factory writes to <HOME>/<workspace-hash>/ — make home read-only.
         fs::set_permissions(tmp.path(), fs::Permissions::from_mode(0o555)).unwrap();
-        let _guard = PermGuard {
-            path: tmp.path().to_path_buf(),
-            mode: 0o755,
-        };
+        let _guard = PermGuard { path: tmp.path().to_path_buf(), mode: 0o755 };
 
         let session = make_session("/tmp");
         let err = Factory.write_session(&session, &WriteOptions { force: false });
-        assert!(
-            err.is_err(),
-            "Factory: writing to read-only dir should fail; got {:?}",
-            err
-        );
+        assert!(err.is_err(), "Factory: writing to read-only dir should fail; got {:?}", err);
     }
 
     #[test]
@@ -471,18 +369,11 @@ mod unix_error_paths {
 
         // OpenClaw writes directly under HOME — make home read-only.
         fs::set_permissions(tmp.path(), fs::Permissions::from_mode(0o555)).unwrap();
-        let _guard = PermGuard {
-            path: tmp.path().to_path_buf(),
-            mode: 0o755,
-        };
+        let _guard = PermGuard { path: tmp.path().to_path_buf(), mode: 0o755 };
 
         let session = make_session("/tmp");
         let err = OpenClaw.write_session(&session, &WriteOptions { force: false });
-        assert!(
-            err.is_err(),
-            "OpenClaw: writing to read-only dir should fail; got {:?}",
-            err
-        );
+        assert!(err.is_err(), "OpenClaw: writing to read-only dir should fail; got {:?}", err);
     }
 
     #[test]
@@ -494,18 +385,11 @@ mod unix_error_paths {
         let sessions_dir = tmp.path().join("sessions");
         fs::create_dir_all(&sessions_dir).unwrap();
         fs::set_permissions(&sessions_dir, fs::Permissions::from_mode(0o555)).unwrap();
-        let _guard = PermGuard {
-            path: sessions_dir,
-            mode: 0o755,
-        };
+        let _guard = PermGuard { path: sessions_dir, mode: 0o755 };
 
         let session = make_session("/tmp");
         let err = PiAgent.write_session(&session, &WriteOptions { force: false });
-        assert!(
-            err.is_err(),
-            "PiAgent: writing to read-only dir should fail; got {:?}",
-            err
-        );
+        assert!(err.is_err(), "PiAgent: writing to read-only dir should fail; got {:?}", err);
     }
 
     // =========================================================================
@@ -524,12 +408,7 @@ mod unix_error_paths {
         let session_roots = ClaudeCode.session_roots();
         // Roots may be empty or non-existent — either way owns_session should return None.
         let owns = ClaudeCode.owns_session("some-session-id");
-        assert!(
-            owns.is_none(),
-            "CC: home-is-file should not own any session; roots: {:?}, detection: {:?}",
-            session_roots,
-            detection
-        );
+        assert!(owns.is_none(), "CC: home-is-file should not own any session; roots: {:?}, detection: {:?}", session_roots, detection);
     }
 
     #[test]
@@ -539,10 +418,7 @@ mod unix_error_paths {
         let _env = EnvGuard::set("CODEX_HOME", tmp.path());
 
         let owns = Codex.owns_session("some-session-id");
-        assert!(
-            owns.is_none(),
-            "Codex: home-is-file should not own any session"
-        );
+        assert!(owns.is_none(), "Codex: home-is-file should not own any session");
     }
 
     #[test]
@@ -552,10 +428,7 @@ mod unix_error_paths {
         let _env = EnvGuard::set("GEMINI_HOME", tmp.path());
 
         let owns = Gemini.owns_session("some-session-id");
-        assert!(
-            owns.is_none(),
-            "Gemini: home-is-file should not own any session"
-        );
+        assert!(owns.is_none(), "Gemini: home-is-file should not own any session");
     }
 
     // =========================================================================
@@ -579,10 +452,7 @@ mod unix_error_paths {
         let _env = EnvGuard::set("CODEX_HOME", tmp.path());
 
         let owns = Codex.owns_session("any-session-id");
-        assert!(
-            owns.is_none(),
-            "Codex: empty home should not own any session"
-        );
+        assert!(owns.is_none(), "Codex: empty home should not own any session");
     }
 
     #[test]
@@ -592,10 +462,7 @@ mod unix_error_paths {
         let _env = EnvGuard::set("GEMINI_HOME", tmp.path());
 
         let owns = Gemini.owns_session("any-session-id");
-        assert!(
-            owns.is_none(),
-            "Gemini: empty home should not own any session"
-        );
+        assert!(owns.is_none(), "Gemini: empty home should not own any session");
     }
 
     // =========================================================================
@@ -616,10 +483,7 @@ mod unix_error_paths {
         // Either succeeds with a fallback workspace or errors — but should not panic.
         match result {
             Ok(written) => {
-                assert!(
-                    !written.paths.is_empty(),
-                    "should produce at least one file"
-                );
+                assert!(!written.paths.is_empty(), "should produce at least one file");
             }
             Err(e) => {
                 // Acceptable if the provider requires a workspace.
@@ -710,10 +574,7 @@ mod unix_error_paths {
             Err(_) => {} // Acceptable.
             Ok(session) => {
                 // Should have at least the first valid message.
-                assert!(
-                    !session.messages.is_empty(),
-                    "CC: truncated JSONL should recover at least one message"
-                );
+                assert!(!session.messages.is_empty(), "CC: truncated JSONL should recover at least one message");
             }
         }
     }
@@ -751,10 +612,7 @@ mod unix_error_paths {
         match result {
             Err(_) => {}
             Ok(session) => {
-                assert!(
-                    session.messages.is_empty(),
-                    "CC: whitespace-only file should produce 0 messages"
-                );
+                assert!(session.messages.is_empty(), "CC: whitespace-only file should produce 0 messages");
             }
         }
     }
@@ -767,10 +625,7 @@ mod unix_error_paths {
         match result {
             Err(_) => {}
             Ok(session) => {
-                assert!(
-                    session.messages.is_empty(),
-                    "Codex: whitespace-only file should produce 0 messages"
-                );
+                assert!(session.messages.is_empty(), "Codex: whitespace-only file should produce 0 messages");
             }
         }
     }
@@ -787,10 +642,7 @@ mod unix_error_paths {
         match result {
             Err(_) => {} // Expected — wrong structure.
             Ok(session) => {
-                assert!(
-                    session.messages.is_empty(),
-                    "Gemini: wrong-structure JSON should produce 0 messages"
-                );
+                assert!(session.messages.is_empty(), "Gemini: wrong-structure JSON should produce 0 messages");
             }
         }
     }
@@ -804,11 +656,7 @@ mod unix_error_paths {
         match result {
             Err(_) => {} // Expected.
             Ok(session) => {
-                assert!(
-                    session.messages.is_empty(),
-                    "Gemini: JSON array should produce 0 messages, got {}",
-                    session.messages.len()
-                );
+                assert!(session.messages.is_empty(), "Gemini: JSON array should produce 0 messages, got {}", session.messages.len());
             }
         }
     }
@@ -835,10 +683,7 @@ ALSO NOT VALID
             Err(_) => {} // Acceptable if it can't handle mixed.
             Ok(session) => {
                 // Should have recovered at least the valid lines.
-                assert!(
-                    !session.messages.is_empty(),
-                    "CC: mixed lines should recover some messages"
-                );
+                assert!(!session.messages.is_empty(), "CC: mixed lines should recover some messages");
             }
         }
     }

@@ -6,18 +6,8 @@ pub async fn list_api_keys() -> Result<Vec<auth::TokenInfo>, String> {
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn create_api_key(
-    name: Option<String>,
-    key: Option<String>,
-    value: Option<String>,
-) -> Result<String, String> {
-    let final_name = key
-        .as_deref()
-        .or(name.as_deref())
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .unwrap_or("unnamed")
-        .to_string();
+pub async fn create_api_key(name: Option<String>, key: Option<String>, value: Option<String>) -> Result<String, String> {
+    let final_name = key.as_deref().or(name.as_deref()).map(str::trim).filter(|s| !s.is_empty()).unwrap_or("unnamed").to_string();
 
     match (key, value) {
         (Some(_), Some(v)) => auth::create_token(&final_name, Some(v.as_str())),

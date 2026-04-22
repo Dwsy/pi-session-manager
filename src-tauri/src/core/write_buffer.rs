@@ -34,17 +34,11 @@ struct WriteBuffer {
 
 impl WriteBuffer {
     fn new() -> Self {
-        Self {
-            sessions: HashMap::new(),
-            details: HashMap::new(),
-            last_flush: Instant::now(),
-        }
+        Self { sessions: HashMap::new(), details: HashMap::new(), last_flush: Instant::now() }
     }
 
     fn should_flush(&self) -> bool {
-        self.last_flush.elapsed() >= BUFFER_FLUSH_INTERVAL
-            || self.sessions.len() >= BUFFER_SIZE_THRESHOLD
-            || self.details.len() >= BUFFER_SIZE_THRESHOLD
+        self.last_flush.elapsed() >= BUFFER_FLUSH_INTERVAL || self.sessions.len() >= BUFFER_SIZE_THRESHOLD || self.details.len() >= BUFFER_SIZE_THRESHOLD
     }
 }
 
@@ -58,22 +52,11 @@ fn get_buffer() -> &'static Mutex<WriteBuffer> {
 pub fn buffer_session_write(session: &SessionInfo, file_modified: DateTime<Utc>) {
     if let Ok(mut buffer) = get_buffer().lock() {
         let path = session.path.clone();
-        buffer.sessions.insert(
-            path.clone(),
-            SessionCacheEntry {
-                session: session.clone(),
-                file_modified,
-                cached_at: Instant::now(),
-            },
-        );
+        buffer.sessions.insert(path.clone(), SessionCacheEntry { session: session.clone(), file_modified, cached_at: Instant::now() });
         // Evict oldest entries if buffer exceeds max capacity
         while buffer.sessions.len() > MAX_SESSION_BUFFER {
             // Find key of oldest entry
-            let key_opt = buffer
-                .sessions
-                .iter()
-                .min_by_key(|(_, entry)| entry.cached_at)
-                .map(|(k, _)| k.clone());
+            let key_opt = buffer.sessions.iter().min_by_key(|(_, entry)| entry.cached_at).map(|(k, _)| k.clone());
             if let Some(key) = key_opt {
                 buffer.sessions.remove(&key);
             } else {
@@ -89,22 +72,10 @@ pub fn buffer_session_write(session: &SessionInfo, file_modified: DateTime<Utc>)
 pub fn buffer_details_write(path: &str, file_modified: DateTime<Utc>, details: &SessionDetails) {
     if let Ok(mut buffer) = get_buffer().lock() {
         let path_string = path.to_string();
-        buffer.details.insert(
-            path_string.clone(),
-            DetailsCacheEntry {
-                path: path_string,
-                details: details.clone(),
-                file_modified,
-                cached_at: Instant::now(),
-            },
-        );
+        buffer.details.insert(path_string.clone(), DetailsCacheEntry { path: path_string, details: details.clone(), file_modified, cached_at: Instant::now() });
         // Evict oldest entries if buffer exceeds max capacity
         while buffer.details.len() > MAX_DETAILS_BUFFER {
-            let key_opt = buffer
-                .details
-                .iter()
-                .min_by_key(|(_, entry)| entry.cached_at)
-                .map(|(k, _)| k.clone());
+            let key_opt = buffer.details.iter().min_by_key(|(_, entry)| entry.cached_at).map(|(k, _)| k.clone());
             if let Some(key) = key_opt {
                 buffer.details.remove(&key);
             } else {
@@ -140,8 +111,7 @@ pub fn get_buffered_details(path: &str) -> Option<(SessionDetails, DateTime<Utc>
 pub fn check_and_take_flush_data() -> Option<(Vec<SessionCacheEntry>, Vec<DetailsCacheEntry>)> {
     if let Ok(mut buffer) = get_buffer().lock() {
         if buffer.should_flush() && (!buffer.sessions.is_empty() || !buffer.details.is_empty()) {
-            let sessions: Vec<SessionCacheEntry> =
-                buffer.sessions.drain().map(|(_, v)| v).collect();
+            let sessions: Vec<SessionCacheEntry> = buffer.sessions.drain().map(|(_, v)| v).collect();
             let details: Vec<DetailsCacheEntry> = buffer.details.drain().map(|(_, v)| v).collect();
             buffer.last_flush = Instant::now();
             return Some((sessions, details));
@@ -154,8 +124,7 @@ pub fn check_and_take_flush_data() -> Option<(Vec<SessionCacheEntry>, Vec<Detail
 pub fn force_flush_all() -> Option<(Vec<SessionCacheEntry>, Vec<DetailsCacheEntry>)> {
     if let Ok(mut buffer) = get_buffer().lock() {
         if !buffer.sessions.is_empty() || !buffer.details.is_empty() {
-            let sessions: Vec<SessionCacheEntry> =
-                buffer.sessions.drain().map(|(_, v)| v).collect();
+            let sessions: Vec<SessionCacheEntry> = buffer.sessions.drain().map(|(_, v)| v).collect();
             let details: Vec<DetailsCacheEntry> = buffer.details.drain().map(|(_, v)| v).collect();
             buffer.last_flush = Instant::now();
             return Some((sessions, details));
@@ -167,11 +136,7 @@ pub fn force_flush_all() -> Option<(Vec<SessionCacheEntry>, Vec<DetailsCacheEntr
 /// Get current buffer statistics (for debugging)
 pub fn get_buffer_stats() -> (usize, usize, u64) {
     if let Ok(buffer) = get_buffer().lock() {
-        (
-            buffer.sessions.len(),
-            buffer.details.len(),
-            buffer.last_flush.elapsed().as_secs(),
-        )
+        (buffer.sessions.len(), buffer.details.len(), buffer.last_flush.elapsed().as_secs())
     } else {
         (0, 0, 0)
     }

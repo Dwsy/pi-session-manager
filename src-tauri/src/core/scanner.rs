@@ -16,15 +16,11 @@ use tokio::time::{interval, Duration as TokioDuration};
 use tracing::{debug, error, info, trace, warn};
 
 fn is_corruption_error(err: &str) -> bool {
-    err.contains("malformed")
-        || err.contains("disk image")
-        || err.contains("not a database")
-        || err.contains("vtable constructor failed")
+    err.contains("malformed") || err.contains("disk image") || err.contains("not a database") || err.contains("vtable constructor failed")
 }
 
 static SCAN_CACHE: RwLock<Option<Vec<SessionInfo>>> = RwLock::new(None);
-static SCAN_ENTRIES_CACHE: RwLock<Option<std::collections::HashMap<String, Vec<SessionEntry>>>> =
-    RwLock::new(None);
+static SCAN_ENTRIES_CACHE: RwLock<Option<std::collections::HashMap<String, Vec<SessionEntry>>>> = RwLock::new(None);
 static CACHE_VERSION: AtomicU64 = AtomicU64::new(0);
 
 /// Invalidate the scan cache so the next scan re-reads all directories
@@ -41,10 +37,7 @@ pub fn invalidate_cache() {
 pub fn upsert_cached_session(session: SessionInfo) {
     if let Ok(mut guard) = SCAN_CACHE.write() {
         let sessions = guard.get_or_insert_with(Vec::new);
-        if let Some(existing) = sessions
-            .iter_mut()
-            .find(|existing| existing.path == session.path)
-        {
+        if let Some(existing) = sessions.iter_mut().find(|existing| existing.path == session.path) {
             *existing = session;
         } else {
             sessions.push(session);
@@ -56,17 +49,12 @@ pub fn upsert_cached_session(session: SessionInfo) {
 
 fn set_cached_entries(path: &str, entries: Vec<SessionEntry>) {
     if let Ok(mut guard) = SCAN_ENTRIES_CACHE.write() {
-        guard
-            .get_or_insert_with(std::collections::HashMap::new)
-            .insert(path.to_string(), entries);
+        guard.get_or_insert_with(std::collections::HashMap::new).insert(path.to_string(), entries);
     }
 }
 
 fn get_cached_entries(path: &str) -> Option<Vec<SessionEntry>> {
-    SCAN_ENTRIES_CACHE
-        .read()
-        .ok()
-        .and_then(|g| g.as_ref().and_then(|m| m.get(path).cloned()))
+    SCAN_ENTRIES_CACHE.read().ok().and_then(|g| g.as_ref().and_then(|m| m.get(path).cloned()))
 }
 
 pub fn remove_cached_sessions(paths: &[String]) {
@@ -94,11 +82,7 @@ pub fn remove_cached_sessions(paths: &[String]) {
 /// Lightweight digest for HTTP polling — just version + count, no session data
 pub fn get_session_digest() -> (u64, usize) {
     let version = CACHE_VERSION.load(Ordering::Relaxed);
-    let count = SCAN_CACHE
-        .read()
-        .ok()
-        .and_then(|g| g.as_ref().map(|v| v.len()))
-        .unwrap_or(0);
+    let count = SCAN_CACHE.read().ok().and_then(|g| g.as_ref().map(|v| v.len())).unwrap_or(0);
     (version, count)
 }
 
@@ -129,11 +113,7 @@ fn clone_session_for_list(session: &SessionInfo) -> SessionInfo {
 /// Snapshot cached sessions optimized for list/pagination APIs.
 /// Drops heavy conversation blobs to reduce clone cost and memory pressure.
 pub fn get_cached_sessions_for_list() -> Option<Vec<SessionInfo>> {
-    SCAN_CACHE.read().ok().and_then(|guard| {
-        guard
-            .as_ref()
-            .map(|sessions| sessions.iter().map(clone_session_for_list).collect())
-    })
+    SCAN_CACHE.read().ok().and_then(|guard| guard.as_ref().map(|sessions| sessions.iter().map(clone_session_for_list).collect()))
 }
 
 pub fn get_sessions_dir() -> Result<PathBuf, String> {
@@ -146,19 +126,8 @@ pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
         let mut dataset_dirs = Vec::new();
         if let Ok(home) = crate::paths::home_dir() {
             for active_dataset_id in config.effective_active_dataset_ids() {
-                if let Some(dataset) = config
-                    .datasets
-                    .iter()
-                    .find(|item| item.id == active_dataset_id)
-                {
-                    dataset_dirs.push(
-                        home.join(".pi")
-                            .join("agent")
-                            .join("sessions")
-                            .join("datasets")
-                            .join(&dataset.slug)
-                            .join("sessions"),
-                    );
+                if let Some(dataset) = config.datasets.iter().find(|item| item.id == active_dataset_id) {
+                    dataset_dirs.push(home.join(".pi").join("agent").join("sessions").join("datasets").join(&dataset.slug).join("sessions"));
                 }
             }
         }
@@ -179,10 +148,7 @@ pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
             continue;
         }
 
-        let enabled = config
-            .effective_external_session_provider_slugs()
-            .iter()
-            .any(|slug| slug == &source.slug().replace('_', "-"));
+        let enabled = config.effective_external_session_provider_slugs().iter().any(|slug| slug == &source.slug().replace('_', "-"));
         if !enabled {
             continue;
         }
@@ -218,10 +184,7 @@ fn expand_tilde(path: &str) -> String {
 
     if let Some(rest) = path.strip_prefix("~/").or_else(|| path.strip_prefix("~\\")) {
         let mut expanded = home;
-        for part in rest
-            .split(['/', '\\'])
-            .filter(|segment| !segment.is_empty())
-        {
+        for part in rest.split(['/', '\\']).filter(|segment| !segment.is_empty()) {
             expanded = expanded.join(part);
         }
         return expanded.to_string_lossy().to_string();
@@ -257,10 +220,7 @@ pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
             return false;
         };
 
-        if matches!(
-            name,
-            "transcripts" | "subagent-artifacts" | "subagents" | ".timelines" | "checkpoints"
-        ) {
+        if matches!(name, "transcripts" | "subagent-artifacts" | "subagents" | ".timelines" | "checkpoints") {
             return true;
         }
 
@@ -320,12 +280,7 @@ pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
         if !sessions_dir.exists() {
             continue;
         }
-        walk_dir(
-            sessions_dir,
-            sessions_dir,
-            default_root.as_deref(),
-            &mut files,
-        );
+        walk_dir(sessions_dir, sessions_dir, default_root.as_deref(), &mut files);
     }
     files.sort();
     files.dedup();
@@ -333,10 +288,7 @@ pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
 }
 
 pub(crate) fn collect_jsonl_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
-    collect_session_files(all_dirs)
-        .into_iter()
-        .filter(|path| path.extension().map(|ext| ext == "jsonl").unwrap_or(false))
-        .collect()
+    collect_session_files(all_dirs).into_iter().filter(|path| path.extension().map(|ext| ext == "jsonl").unwrap_or(false)).collect()
 }
 
 /// Parsed result from a single file
@@ -359,8 +311,7 @@ pub(crate) async fn parallel_parse_files(files: Vec<PathBuf>) -> Vec<ParsedFileR
     for file_path in files {
         set.spawn(async move {
             let path_str = file_path.to_string_lossy().to_string();
-            let metadata =
-                fs::metadata(crate::domain::session_bridge::backing_file_path(&file_path));
+            let metadata = fs::metadata(crate::domain::session_bridge::backing_file_path(&file_path));
             let file_modified: DateTime<Utc> = match metadata {
                 Ok(m) => DateTime::from(m.modified().unwrap_or(std::time::SystemTime::now())),
                 Err(e) => {
@@ -371,12 +322,7 @@ pub(crate) async fn parallel_parse_files(files: Vec<PathBuf>) -> Vec<ParsedFileR
 
             // Parse the file
             match parse_session_info(&file_path) {
-                Ok((info, entries)) => Some(ParsedFileResult {
-                    info,
-                    entries,
-                    file_modified,
-                    path_str,
-                }),
+                Ok((info, entries)) => Some(ParsedFileResult { info, entries, file_modified, path_str }),
                 Err(e) => {
                     warn!("Failed to parse {}: {}", path_str, e);
                     None
@@ -437,29 +383,13 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
         let files = collect_session_files(&all_dirs);
         let collect_elapsed_ms = collect_started_at.elapsed().as_millis();
         let total_files = files.len();
-        info!(
-            "Collected {} session files for scanning from {} roots in {}ms (dirs={}ms, db_init={}ms)",
-            total_files,
-            all_dirs.len(),
-            collect_elapsed_ms,
-            dirs_elapsed_ms,
-            db_init_elapsed_ms
-        );
+        info!("Collected {} session files for scanning from {} roots in {}ms (dirs={}ms, db_init={}ms)", total_files, all_dirs.len(), collect_elapsed_ms, dirs_elapsed_ms, db_init_elapsed_ms);
 
         // Load all sessions from DB first (O(1) lookup by path)
         let db_load_started_at = Instant::now();
-        let db_sessions = sqlite::get_all_sessions(&conn)?
-            .into_iter()
-            .filter(|session| {
-                crate::domain::session_bridge::is_session_visible_under_config(
-                    Path::new(&session.path),
-                    config,
-                )
-            })
-            .collect::<Vec<_>>();
+        let db_sessions = sqlite::get_all_sessions(&conn)?.into_iter().filter(|session| crate::domain::session_bridge::is_session_visible_under_config(Path::new(&session.path), config)).collect::<Vec<_>>();
         let db_load_elapsed_ms = db_load_started_at.elapsed().as_millis();
-        let db_paths: std::collections::HashSet<&str> =
-            db_sessions.iter().map(|s| s.path.as_str()).collect();
+        let db_paths: std::collections::HashSet<&str> = db_sessions.iter().map(|s| s.path.as_str()).collect();
         let scan_state_by_path = sqlite::get_all_scan_state(&conn)?;
 
         // Identify files that need parsing: new files or files whose scan_state metadata is stale
@@ -480,37 +410,19 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
                 let Ok(metadata) = std::fs::metadata(&backing_path) else {
                     return true;
                 };
-                let file_modified: chrono::DateTime<chrono::Utc> = DateTime::from(
-                    metadata
-                        .modified()
-                        .unwrap_or(std::time::SystemTime::UNIX_EPOCH),
-                );
+                let file_modified: chrono::DateTime<chrono::Utc> = DateTime::from(metadata.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH));
                 let file_size = metadata.len();
 
-                scan_state.backing_path != backing_path.to_string_lossy()
-                    || scan_state.file_modified != file_modified
-                    || scan_state.file_size != file_size
-                    || scan_state.last_parse_status != "ok"
+                scan_state.backing_path != backing_path.to_string_lossy() || scan_state.file_modified != file_modified || scan_state.file_size != file_size || scan_state.last_parse_status != "ok"
             })
             .collect();
         let classify_elapsed_ms = classify_started_at.elapsed().as_millis();
 
-        info!(
-            "Need to parse {} files ({} cached, {} to parse) [db_load={}ms classify={}ms]",
-            total_files,
-            total_files - files_to_parse.len(),
-            files_to_parse.len(),
-            db_load_elapsed_ms,
-            classify_elapsed_ms
-        );
+        info!("Need to parse {} files ({} cached, {} to parse) [db_load={}ms classify={}ms]", total_files, total_files - files_to_parse.len(), files_to_parse.len(), db_load_elapsed_ms, classify_elapsed_ms);
 
         // Parse only files that need updates
         let parse_started_at = Instant::now();
-        let parsed_results = if files_to_parse.is_empty() {
-            Vec::new()
-        } else {
-            parallel_parse_files(files_to_parse).await
-        };
+        let parsed_results = if files_to_parse.is_empty() { Vec::new() } else { parallel_parse_files(files_to_parse).await };
         let parse_elapsed_ms = parse_started_at.elapsed().as_millis();
 
         // Process results: separate realtime vs historical, upsert to DB
@@ -526,29 +438,15 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             if result.file_modified > realtime_cutoff {
                 // Realtime file: add to results, buffer for DB
                 write_buffer::buffer_session_write(&info, result.file_modified);
-                let _ =
-                    sqlite::upsert_scan_state_for_session(&conn, &info, result.file_modified, "ok");
+                let _ = sqlite::upsert_scan_state_for_session(&conn, &info, result.file_modified, "ok");
                 realtime_buffered += 1;
             } else {
                 // Historical file: upsert to DB
-                if let Err(e) = sqlite::upsert_session(
-                    &mut conn,
-                    &info,
-                    result.file_modified,
-                    Some(&result.entries),
-                ) {
-                    error!(
-                        "Failed to upsert historical session {}: {}",
-                        result.path_str, e
-                    );
+                if let Err(e) = sqlite::upsert_session(&mut conn, &info, result.file_modified, Some(&result.entries)) {
+                    error!("Failed to upsert historical session {}: {}", result.path_str, e);
                     continue;
                 } else {
-                    let _ = sqlite::upsert_scan_state_for_session(
-                        &conn,
-                        &info,
-                        result.file_modified,
-                        "ok",
-                    );
+                    let _ = sqlite::upsert_scan_state_for_session(&conn, &info, result.file_modified, "ok");
                     historical_upserts += 1;
                 }
             }
@@ -575,10 +473,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
         all_sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
 
         let merge_elapsed_ms = merge_started_at.elapsed().as_millis();
-        let realtime_count = all_sessions
-            .iter()
-            .filter(|s| s.modified > realtime_cutoff)
-            .count();
+        let realtime_count = all_sessions.iter().filter(|s| s.modified > realtime_cutoff).count();
         let historical_count = all_sessions.len() - realtime_count;
 
         info!(
@@ -616,28 +511,17 @@ pub fn extract_index_segments(entry: &Value, include_thinking: bool) -> Vec<(Str
 }
 
 fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, String> {
-    DateTime::parse_from_rfc3339(s)
-        .map(|dt| dt.with_timezone(&Utc))
-        .map_err(|e| format!("Failed to parse timestamp: {e}"))
+    DateTime::parse_from_rfc3339(s).map(|dt| dt.with_timezone(&Utc)).map_err(|e| format!("Failed to parse timestamp: {e}"))
 }
 
 /// Safely read only the tail of an append-only JSONL file.
 /// Returns (new_offset, new_entries) on success, or Err("fallback") if the file
 /// appears to have been rewritten in-place (size shrank, mtime changed without size change,
 /// or JSON parse fails at the expected offset).
-fn safe_append_only_read_jsonl(
-    path: &Path,
-    last_offset: u64,
-) -> Result<(u64, Vec<SessionEntry>), String> {
-    let metadata =
-        fs::metadata(path).map_err(|e| format!("stat failed for {}: {}", path.display(), e))?;
+fn safe_append_only_read_jsonl(path: &Path, last_offset: u64) -> Result<(u64, Vec<SessionEntry>), String> {
+    let metadata = fs::metadata(path).map_err(|e| format!("stat failed for {}: {}", path.display(), e))?;
     let current_size = metadata.len();
-    let current_mtime = metadata
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
+    let current_mtime = metadata.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs() as i64).unwrap_or(0);
 
     // Layer 1: size/mtime guards
     if current_size < last_offset {
@@ -650,18 +534,13 @@ fn safe_append_only_read_jsonl(
         return Ok((last_offset, vec![]));
     }
 
-    let file = std::fs::File::open(path)
-        .map_err(|e| format!("open failed for {}: {}", path.display(), e))?;
+    let file = std::fs::File::open(path).map_err(|e| format!("open failed for {}: {}", path.display(), e))?;
     let mut reader = std::io::BufReader::new(file);
-    reader
-        .seek(std::io::SeekFrom::Start(last_offset))
-        .map_err(|_| "fallback".to_string())?;
+    reader.seek(std::io::SeekFrom::Start(last_offset)).map_err(|_| "fallback".to_string())?;
 
     let mut new_content = String::new();
     use std::io::Read;
-    reader
-        .read_to_string(&mut new_content)
-        .map_err(|_| "fallback".to_string())?;
+    reader.read_to_string(&mut new_content).map_err(|_| "fallback".to_string())?;
 
     // Layer 2: trailing-newline guard against half-written lines
     let effective_bytes = if !new_content.ends_with('\n') {
@@ -694,11 +573,7 @@ fn safe_append_only_read_jsonl(
 }
 
 /// Incrementally update SessionInfo by appending new entries.
-fn incremental_update_session_info(
-    old: &SessionInfo,
-    new_entries: &[SessionEntry],
-    file_modified: DateTime<Utc>,
-) -> SessionInfo {
+fn incremental_update_session_info(old: &SessionInfo, new_entries: &[SessionEntry], file_modified: DateTime<Utc>) -> SessionInfo {
     let mut info = old.clone();
     let mut modified = info.modified;
 
@@ -707,14 +582,7 @@ fn incremental_update_session_info(
             if let Some(ref message) = entry.message {
                 info.message_count += 1;
 
-                let text = message
-                    .content
-                    .iter()
-                    .filter(|c| c.content_type == "text")
-                    .filter_map(|c| c.text.as_ref())
-                    .cloned()
-                    .collect::<Vec<String>>()
-                    .join("");
+                let text = message.content.iter().filter(|c| c.content_type == "text").filter_map(|c| c.text.as_ref()).cloned().collect::<Vec<String>>().join("");
 
                 if message.role == "user" || message.role == "assistant" {
                     if info.first_message.is_empty() && message.role == "user" {
@@ -756,20 +624,13 @@ fn incremental_update_session_info(
 
 /// Incremental update: re-parse changed files, update cache, return diff for frontend merge.
 pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<SessionsDiff, String> {
-    let mut sessions = if let Ok(guard) = SCAN_CACHE.read() {
-        guard.clone().unwrap_or_default()
-    } else {
-        vec![]
-    };
+    let mut sessions = if let Ok(guard) = SCAN_CACHE.read() { guard.clone().unwrap_or_default() } else { vec![] };
 
     if sessions.is_empty() {
         sessions = scan_sessions().await?;
     }
 
-    let mut diff = SessionsDiff {
-        updated: vec![],
-        removed: vec![],
-    };
+    let mut diff = SessionsDiff { updated: vec![], removed: vec![] };
 
     let config = Config::load().unwrap_or_default();
     let mut conn = crate::data::sqlite::init_db_with_config(&config)?;
@@ -779,21 +640,10 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
         let is_opencode_db = crate::domain::session_bridge::is_opencode_db_path(&path);
 
         if !path.exists() {
-            let removed_paths = sessions
-                .iter()
-                .filter(|session| {
-                    session.path == *path_str
-                        || crate::domain::session_bridge::backing_file_path(Path::new(
-                            &session.path,
-                        )) == path
-                })
-                .map(|session| session.path.clone())
-                .collect::<Vec<_>>();
+            let removed_paths = sessions.iter().filter(|session| session.path == *path_str || crate::domain::session_bridge::backing_file_path(Path::new(&session.path)) == path).map(|session| session.path.clone()).collect::<Vec<_>>();
 
             if !removed_paths.is_empty() {
-                sessions.retain(|session| {
-                    !removed_paths.iter().any(|removed| removed == &session.path)
-                });
+                sessions.retain(|session| !removed_paths.iter().any(|removed| removed == &session.path));
                 for removed in removed_paths {
                     let _ = crate::data::sqlite::delete_session(&conn, &removed);
                     let _ = crate::data::sqlite::delete_scan_state(&conn, &removed);
@@ -804,11 +654,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             continue;
         }
 
-        let expanded_paths = if is_opencode_db {
-            crate::domain::session_bridge::expand_opencode_session_paths(&path)
-        } else {
-            vec![path.clone()]
-        };
+        let expanded_paths = if is_opencode_db { crate::domain::session_bridge::expand_opencode_session_paths(&path) } else { vec![path.clone()] };
         let mut seen_paths = std::collections::HashSet::new();
 
         for expanded_path in expanded_paths {
@@ -817,22 +663,13 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             let file_modified = match fs::metadata(&backing).and_then(|m| m.modified()) {
                 Ok(mt) => DateTime::from(mt),
                 Err(e) => {
-                    warn!(
-                        "Failed to get metadata for {}: {}",
-                        expanded_path.display(),
-                        e
-                    );
+                    warn!("Failed to get metadata for {}: {}", expanded_path.display(), e);
                     continue;
                 }
             };
 
-            let scan_state = sqlite::get_scan_state(&conn, &session_path_str)
-                .ok()
-                .flatten();
-            let trust = scan_state
-                .as_ref()
-                .map(|s| s.append_trust_count)
-                .unwrap_or(0);
+            let scan_state = sqlite::get_scan_state(&conn, &session_path_str).ok().flatten();
+            let trust = scan_state.as_ref().map(|s| s.append_trust_count).unwrap_or(0);
             let last_offset = scan_state.as_ref().map(|s| s.read_offset).unwrap_or(0);
 
             // Try incremental tail-read if trust level is high enough
@@ -840,22 +677,12 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                 match safe_append_only_read_jsonl(&backing, last_offset) {
                     Ok((new_offset, new_entries)) if !new_entries.is_empty() => {
                         if let Some(old_entries) = get_cached_entries(&session_path_str) {
-                            if let Some(old_info) =
-                                sessions.iter().find(|s| s.path == session_path_str)
-                            {
+                            if let Some(old_info) = sessions.iter().find(|s| s.path == session_path_str) {
                                 let mut all_entries = old_entries;
                                 all_entries.extend(new_entries.clone());
-                                let info = incremental_update_session_info(
-                                    old_info,
-                                    &new_entries,
-                                    file_modified,
-                                );
+                                let info = incremental_update_session_info(old_info, &new_entries, file_modified);
                                 set_cached_entries(&session_path_str, all_entries.clone());
-                                let _ = sqlite::append_message_entries(
-                                    &conn,
-                                    &session_path_str,
-                                    &new_entries,
-                                );
+                                let _ = sqlite::append_message_entries(&conn, &session_path_str, &new_entries);
                                 Some((info, all_entries, new_offset, trust.saturating_add(1)))
                             } else {
                                 None
@@ -866,12 +693,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                     }
                     Ok((new_offset, _)) => {
                         // No new complete lines; just refresh offset
-                        let _ = sqlite::update_scan_state_offset_and_trust(
-                            &conn,
-                            &session_path_str,
-                            new_offset,
-                            trust,
-                        );
+                        let _ = sqlite::update_scan_state_offset_and_trust(&conn, &session_path_str, new_offset, trust);
                         continue;
                     }
                     Err(_) => None,
@@ -900,17 +722,11 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
 
             seen_paths.insert(info.path.clone());
 
-            if let Err(e) = sqlite::upsert_session(&mut conn, &info, file_modified, Some(&entries))
-            {
+            if let Err(e) = sqlite::upsert_session(&mut conn, &info, file_modified, Some(&entries)) {
                 warn!("Failed to upsert session for {}: {}", info.path, e);
             } else {
                 let _ = sqlite::upsert_scan_state_for_session(&conn, &info, file_modified, "ok");
-                let _ = sqlite::update_scan_state_offset_and_trust(
-                    &conn,
-                    &session_path_str,
-                    new_offset,
-                    new_trust,
-                );
+                let _ = sqlite::update_scan_state_offset_and_trust(&conn, &session_path_str, new_offset, new_trust);
             }
 
             crate::core::write_buffer::buffer_session_write(&info, file_modified);
@@ -924,15 +740,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
         }
 
         if is_opencode_db {
-            let removed_paths = sessions
-                .iter()
-                .filter(|session| {
-                    crate::domain::session_bridge::backing_file_path(Path::new(&session.path))
-                        == path
-                        && !seen_paths.contains(&session.path)
-                })
-                .map(|session| session.path.clone())
-                .collect::<Vec<_>>();
+            let removed_paths = sessions.iter().filter(|session| crate::domain::session_bridge::backing_file_path(Path::new(&session.path)) == path && !seen_paths.contains(&session.path)).map(|session| session.path.clone()).collect::<Vec<_>>();
 
             for removed in removed_paths {
                 sessions.retain(|session| session.path != removed);
@@ -951,11 +759,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
         }
     }
 
-    debug!(
-        "Incremental rescan: {} updated, {} removed",
-        diff.updated.len(),
-        diff.removed.len()
-    );
+    debug!("Incremental rescan: {} updated, {} removed", diff.updated.len(), diff.removed.len());
 
     Ok(diff)
 }
@@ -967,17 +771,11 @@ pub struct ScannerScheduler {
 
 impl ScannerScheduler {
     pub fn new(_sessions_dir: PathBuf, scan_interval_secs: u64, config: Config) -> Self {
-        Self {
-            config,
-            scan_interval: TokioDuration::from_secs(scan_interval_secs),
-        }
+        Self { config, scan_interval: TokioDuration::from_secs(scan_interval_secs) }
     }
 
     pub async fn start(&self) {
-        info!(
-            "Starting scanner scheduler with {}s interval",
-            self.scan_interval.as_secs()
-        );
+        info!("Starting scanner scheduler with {}s interval", self.scan_interval.as_secs());
         let mut ticker = interval(self.scan_interval);
         ticker.tick().await;
 
@@ -1026,21 +824,11 @@ impl ScannerScheduler {
                     skipped += 1;
                 }
                 Some(_) => {
-                    sqlite::upsert_session(
-                        &mut conn,
-                        &result.info,
-                        file_modified,
-                        Some(&result.entries),
-                    )?;
+                    sqlite::upsert_session(&mut conn, &result.info, file_modified, Some(&result.entries))?;
                     updated += 1;
                 }
                 None => {
-                    sqlite::upsert_session(
-                        &mut conn,
-                        &result.info,
-                        file_modified,
-                        Some(&result.entries),
-                    )?;
+                    sqlite::upsert_session(&mut conn, &result.info, file_modified, Some(&result.entries))?;
                     added += 1;
                 }
             }
@@ -1049,22 +837,14 @@ impl ScannerScheduler {
 
             // Buffer realtime files for stats
             if file_modified > realtime_cutoff {
-                write_buffer::buffer_session_write(
-                    sessions.last().expect("session just pushed"),
-                    file_modified,
-                );
+                write_buffer::buffer_session_write(sessions.last().expect("session just pushed"), file_modified);
             }
         }
 
         let elapsed = start.elapsed();
-        info!(
-            "Scanner complete: +{} added, ~{} updated, {} skipped in {:?}",
-            added, updated, skipped, elapsed
-        );
+        info!("Scanner complete: +{} added, ~{} updated, {} skipped in {:?}", added, updated, skipped, elapsed);
 
-        Ok(format!(
-            "Scanned: +{added} added, ~{updated} updated, {skipped} skipped"
-        ))
+        Ok(format!("Scanned: +{added} added, ~{updated} updated, {skipped} skipped"))
     }
 
     async fn auto_cleanup(&self) -> Result<String, String> {

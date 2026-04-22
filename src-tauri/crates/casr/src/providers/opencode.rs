@@ -18,10 +18,7 @@ use rusqlite::{Connection, OpenFlags};
 use tracing::{debug, info, trace};
 
 use crate::discovery::DetectionResult;
-use crate::model::{
-    CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, flatten_content,
-    normalize_role, parse_timestamp, reindex_messages, truncate_title,
-};
+use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// OpenCode provider implementation.
@@ -82,10 +79,7 @@ impl OpenCode {
             let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
                 continue;
             };
-            let Some(dir) = json
-                .pointer("/data/directory")
-                .and_then(serde_json::Value::as_str)
-            else {
+            let Some(dir) = json.pointer("/data/directory").and_then(serde_json::Value::as_str) else {
                 continue;
             };
 
@@ -117,11 +111,7 @@ impl OpenCode {
     /// If env override is set, discovery is constrained to that location.
     fn find_db_files() -> Vec<PathBuf> {
         if let Some(env_db) = Self::env_db_path() {
-            return if env_db.is_file() {
-                vec![env_db]
-            } else {
-                Vec::new()
-            };
+            return if env_db.is_file() { vec![env_db] } else { Vec::new() };
         }
 
         let mut candidates = Vec::new();
@@ -177,11 +167,7 @@ impl OpenCode {
 
     /// Open DB in read-only mode.
     fn open_db(path: &Path) -> anyhow::Result<Connection> {
-        let conn = Connection::open_with_flags(
-            path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
-        .with_context(|| format!("failed to open OpenCode DB: {}", path.display()))?;
+        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).with_context(|| format!("failed to open OpenCode DB: {}", path.display()))?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         Ok(conn)
     }
@@ -189,31 +175,20 @@ impl OpenCode {
     /// Open DB in read-write/create mode.
     fn open_db_rw(path: &Path) -> anyhow::Result<Connection> {
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create directory: {}", parent.display()))?;
+            std::fs::create_dir_all(parent).with_context(|| format!("failed to create directory: {}", parent.display()))?;
         }
 
-        let conn = Connection::open_with_flags(
-            path,
-            OpenFlags::SQLITE_OPEN_READ_WRITE
-                | OpenFlags::SQLITE_OPEN_CREATE
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
-        .with_context(|| format!("failed to open OpenCode DB for writing: {}", path.display()))?;
+        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_NO_MUTEX).with_context(|| format!("failed to open OpenCode DB for writing: {}", path.display()))?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         Ok(conn)
     }
 
     fn table_exists(conn: &Connection, table: &str) -> bool {
-        conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1")
-            .and_then(|mut stmt| stmt.exists(rusqlite::params![table]))
-            .unwrap_or(false)
+        conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1").and_then(|mut stmt| stmt.exists(rusqlite::params![table])).unwrap_or(false)
     }
 
     fn trigger_exists(conn: &Connection, trigger: &str) -> bool {
-        conn.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=?1")
-            .and_then(|mut stmt| stmt.exists(rusqlite::params![trigger]))
-            .unwrap_or(false)
+        conn.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=?1").and_then(|mut stmt| stmt.exists(rusqlite::params![trigger])).unwrap_or(false)
     }
 
     /// Ensure core OpenCode tables exist.
@@ -271,9 +246,7 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
         if !Self::table_exists(conn, "sessions") {
             return false;
         }
-        conn.prepare("SELECT 1 FROM sessions WHERE id = ?1 LIMIT 1")
-            .and_then(|mut stmt| stmt.exists(rusqlite::params![session_id]))
-            .unwrap_or(false)
+        conn.prepare("SELECT 1 FROM sessions WHERE id = ?1 LIMIT 1").and_then(|mut stmt| stmt.exists(rusqlite::params![session_id])).unwrap_or(false)
     }
 
     fn newest_root_session_id(conn: &Connection) -> Option<String> {
@@ -281,12 +254,7 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
             return None;
         }
 
-        conn.query_row(
-            "SELECT id FROM sessions WHERE parent_session_id IS NULL ORDER BY created_at DESC LIMIT 1",
-            [],
-            |row| row.get(0),
-        )
-        .ok()
+        conn.query_row("SELECT id FROM sessions WHERE parent_session_id IS NULL ORDER BY created_at DESC LIMIT 1", [], |row| row.get(0)).ok()
     }
 
     fn workspace_from_db_path(db_path: &Path) -> Option<PathBuf> {
@@ -297,11 +265,7 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
         None
     }
 
-    fn read_session_by_id(
-        conn: &Connection,
-        db_path: &Path,
-        session_id: &str,
-    ) -> anyhow::Result<CanonicalSession> {
+    fn read_session_by_id(conn: &Connection, db_path: &Path, session_id: &str) -> anyhow::Result<CanonicalSession> {
         if !Self::table_exists(conn, "sessions") {
             anyhow::bail!("OpenCode DB has no sessions table: {}", db_path.display());
         }
@@ -309,32 +273,14 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
             anyhow::bail!("OpenCode DB has no messages table: {}", db_path.display());
         }
 
-        let (title_raw, created_raw, updated_raw, parent_session_id, prompt_tokens, completion_tokens, cost): (
-            String,
-            i64,
-            i64,
-            Option<String>,
-            i64,
-            i64,
-            f64,
-        ) = conn
+        let (title_raw, created_raw, updated_raw, parent_session_id, prompt_tokens, completion_tokens, cost): (String, i64, i64, Option<String>, i64, i64, f64) = conn
             .query_row(
                 "SELECT title, created_at, updated_at, parent_session_id, prompt_tokens, completion_tokens, cost
                  FROM sessions
                  WHERE id = ?1
                  LIMIT 1",
                 rusqlite::params![session_id],
-                |row| {
-                    Ok((
-                        row.get(0)?,
-                        row.get(1)?,
-                        row.get(2)?,
-                        row.get(3)?,
-                        row.get(4)?,
-                        row.get(5)?,
-                        row.get(6)?,
-                    ))
-                },
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?)),
             )
             .with_context(|| format!("session '{session_id}' not found in {}", db_path.display()))?;
 
@@ -352,31 +298,12 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
             )
             .context("failed to prepare message query")?;
 
-        let rows = stmt.query_map(rusqlite::params![session_id], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Option<String>>(3)?,
-                row.get::<_, i64>(4)?,
-                row.get::<_, i64>(5)?,
-                row.get::<_, Option<i64>>(6)?,
-            ))
-        })?;
+        let rows = stmt.query_map(rusqlite::params![session_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, Option<String>>(3)?, row.get::<_, i64>(4)?, row.get::<_, i64>(5)?, row.get::<_, Option<i64>>(6)?)))?;
 
         for row in rows {
-            let (
-                message_id,
-                role_raw,
-                parts_json,
-                model,
-                created_at_raw,
-                _updated_at_raw,
-                finished_at_raw,
-            ) = row?;
+            let (message_id, role_raw, parts_json, model, created_at_raw, _updated_at_raw, finished_at_raw) = row?;
 
-            let timestamp =
-                parse_timestamp(&serde_json::Value::from(created_at_raw)).or(Some(created_at_raw));
+            let timestamp = parse_timestamp(&serde_json::Value::from(created_at_raw)).or(Some(created_at_raw));
             if let Some(ts) = timestamp {
                 started_at = Some(started_at.map_or(ts, |current| current.min(ts)));
                 ended_at = Some(ended_at.map_or(ts, |current| current.max(ts)));
@@ -388,8 +315,7 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
                 ended_at = Some(ended_at.map_or(finished_ts, |current| current.max(finished_ts)));
             }
 
-            let raw_parts = serde_json::from_str::<serde_json::Value>(&parts_json)
-                .unwrap_or_else(|_| serde_json::json!([]));
+            let raw_parts = serde_json::from_str::<serde_json::Value>(&parts_json).unwrap_or_else(|_| serde_json::json!([]));
             let (content, tool_calls, tool_results) = parse_parts(&raw_parts);
 
             if let Some(model_name) = model.as_deref().filter(|m| !m.is_empty()) {
@@ -413,20 +339,9 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
 
         reindex_messages(&mut messages);
 
-        let title = (!title_raw.trim().is_empty())
-            .then_some(title_raw)
-            .or_else(|| {
-                messages
-                    .iter()
-                    .find(|m| m.role == MessageRole::User)
-                    .map(|m| truncate_title(&m.content, 80))
-                    .filter(|t| !t.is_empty())
-            });
+        let title = (!title_raw.trim().is_empty()).then_some(title_raw).or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 80)).filter(|t| !t.is_empty()));
 
-        let model_name = model_counts
-            .into_iter()
-            .max_by_key(|(_, count)| *count)
-            .map(|(name, _)| name);
+        let model_name = model_counts.into_iter().max_by_key(|(_, count)| *count).map(|(name, _)| name);
 
         let source = Self::virtual_session_path(db_path, session_id);
 
@@ -484,11 +399,7 @@ impl Provider for OpenCode {
         }
 
         trace!(provider = "opencode", installed, ?evidence, "detection");
-        DetectionResult {
-            installed,
-            version: None,
-            evidence,
-        }
+        DetectionResult { installed, version: None, evidence }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -532,30 +443,18 @@ impl Provider for OpenCode {
         Self::read_session_by_id(&conn, path, &session_id)
     }
 
-    fn write_session(
-        &self,
-        session: &CanonicalSession,
-        _opts: &WriteOptions,
-    ) -> anyhow::Result<WrittenSession> {
+    fn write_session(&self, session: &CanonicalSession, _opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
         let db_path = Self::choose_target_db_path(session)?;
         let mut conn = Self::open_db_rw(&db_path)?;
         Self::ensure_schema(&conn)?;
 
-        let has_count_trigger =
-            Self::trigger_exists(&conn, "update_session_message_count_on_insert");
+        let has_count_trigger = Self::trigger_exists(&conn, "update_session_message_count_on_insert");
         let target_session_id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().timestamp_millis();
         let created_at = session.started_at.unwrap_or(now);
         let updated_at = session.ended_at.unwrap_or(now);
 
-        let title = session.title.clone().or_else(|| {
-            session
-                .messages
-                .iter()
-                .find(|m| m.role == MessageRole::User)
-                .map(|m| truncate_title(&m.content, 80))
-                .filter(|t| !t.is_empty())
-        });
+        let title = session.title.clone().or_else(|| session.messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 80)).filter(|t| !t.is_empty()));
         let title = title.unwrap_or_else(|| "Converted session".to_string());
 
         let tx = conn.transaction().context("failed to begin transaction")?;
@@ -565,17 +464,7 @@ impl Provider for OpenCode {
                 id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost,
                 summary_message_id, updated_at, created_at
              ) VALUES (?1, NULL, ?2, ?3, 0, 0, 0.0, NULL, ?4, ?5)",
-            rusqlite::params![
-                target_session_id,
-                title,
-                if has_count_trigger {
-                    0_i64
-                } else {
-                    i64::try_from(session.messages.len()).unwrap_or(i64::MAX)
-                },
-                updated_at,
-                created_at,
-            ],
+            rusqlite::params![target_session_id, title, if has_count_trigger { 0_i64 } else { i64::try_from(session.messages.len()).unwrap_or(i64::MAX) }, updated_at, created_at,],
         )
         .context("failed to insert OpenCode session")?;
 
@@ -583,8 +472,7 @@ impl Provider for OpenCode {
         for msg in &session.messages {
             let message_id = uuid::Uuid::new_v4().to_string();
             let parts = build_parts(msg);
-            let parts_json =
-                serde_json::to_string(&parts).context("failed to serialize OpenCode parts")?;
+            let parts_json = serde_json::to_string(&parts).context("failed to serialize OpenCode parts")?;
             let timestamp = msg.timestamp.unwrap_or(created_at);
             let model = msg.author.clone().or_else(|| default_model.clone());
 
@@ -592,29 +480,14 @@ impl Provider for OpenCode {
                 "INSERT INTO messages (
                     id, session_id, role, parts, model, created_at, updated_at, finished_at
                  ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)",
-                rusqlite::params![
-                    message_id,
-                    target_session_id,
-                    role_to_opencode(&msg.role),
-                    parts_json,
-                    model,
-                    timestamp,
-                    timestamp,
-                ],
+                rusqlite::params![message_id, target_session_id, role_to_opencode(&msg.role), parts_json, model, timestamp, timestamp,],
             )
             .with_context(|| format!("failed to insert OpenCode message {}", msg.idx))?;
         }
 
         // If the DB has no count trigger, set message_count explicitly.
         if !has_count_trigger {
-            tx.execute(
-                "UPDATE sessions SET message_count = ?1 WHERE id = ?2",
-                rusqlite::params![
-                    i64::try_from(session.messages.len()).unwrap_or(i64::MAX),
-                    target_session_id
-                ],
-            )
-            .context("failed to update OpenCode session message_count")?;
+            tx.execute("UPDATE sessions SET message_count = ?1 WHERE id = ?2", rusqlite::params![i64::try_from(session.messages.len()).unwrap_or(i64::MAX), target_session_id]).context("failed to update OpenCode session message_count")?;
         }
 
         tx.commit().context("failed to commit transaction")?;
@@ -627,12 +500,7 @@ impl Provider for OpenCode {
             "OpenCode session written"
         );
 
-        Ok(WrittenSession {
-            paths: vec![virtual_path],
-            session_id: target_session_id.clone(),
-            resume_command: self.resume_command(&target_session_id),
-            backup_path: None,
-        })
+        Ok(WrittenSession { paths: vec![virtual_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: None })
     }
 
     fn resume_command(&self, _session_id: &str) -> String {
@@ -655,8 +523,7 @@ impl Provider for OpenCode {
                 continue;
             }
 
-            let Ok(mut stmt) = conn.prepare("SELECT id FROM sessions ORDER BY created_at DESC")
-            else {
+            let Ok(mut stmt) = conn.prepare("SELECT id FROM sessions ORDER BY created_at DESC") else {
                 continue;
             };
 
@@ -703,10 +570,7 @@ fn parse_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<ToolRes
     };
 
     for item in items {
-        let part_type = item
-            .get("type")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or_default();
+        let part_type = item.get("type").and_then(serde_json::Value::as_str).unwrap_or_default();
         let data = item.get("data").unwrap_or(&serde_json::Value::Null);
 
         match part_type {
@@ -725,49 +589,18 @@ fn parse_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<ToolRes
                 }
             }
             "tool_call" => {
-                let name = data
-                    .get("name")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|name| !name.is_empty())
-                    .unwrap_or("tool_call")
-                    .to_string();
-                let id = data
-                    .get("id")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|id| !id.is_empty())
-                    .map(ToString::to_string);
-                let input = data
-                    .get("input")
-                    .and_then(serde_json::Value::as_str)
-                    .unwrap_or_default();
+                let name = data.get("name").and_then(serde_json::Value::as_str).filter(|name| !name.is_empty()).unwrap_or("tool_call").to_string();
+                let id = data.get("id").and_then(serde_json::Value::as_str).filter(|id| !id.is_empty()).map(ToString::to_string);
+                let input = data.get("input").and_then(serde_json::Value::as_str).unwrap_or_default();
 
-                tool_calls.push(ToolCall {
-                    id,
-                    name,
-                    arguments: parse_tool_call_arguments(input),
-                });
+                tool_calls.push(ToolCall { id, name, arguments: parse_tool_call_arguments(input) });
             }
             "tool_result" => {
-                let content = data
-                    .get("content")
-                    .and_then(serde_json::Value::as_str)
-                    .unwrap_or_default()
-                    .to_string();
-                let call_id = data
-                    .get("tool_call_id")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|id| !id.is_empty())
-                    .map(ToString::to_string);
-                let is_error = data
-                    .get("is_error")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false);
+                let content = data.get("content").and_then(serde_json::Value::as_str).unwrap_or_default().to_string();
+                let call_id = data.get("tool_call_id").and_then(serde_json::Value::as_str).filter(|id| !id.is_empty()).map(ToString::to_string);
+                let is_error = data.get("is_error").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
-                tool_results.push(ToolResult {
-                    call_id,
-                    content,
-                    is_error,
-                });
+                tool_results.push(ToolResult { call_id, content, is_error });
             }
             _ => {
                 let fallback = flatten_content(data);
@@ -783,11 +616,7 @@ fn parse_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<ToolRes
         content = reasoning_chunks.join("\n");
     }
     if content.trim().is_empty() {
-        let result_texts: Vec<&str> = tool_results
-            .iter()
-            .map(|result| result.content.as_str())
-            .filter(|text| !text.trim().is_empty())
-            .collect();
+        let result_texts: Vec<&str> = tool_results.iter().map(|result| result.content.as_str()).filter(|text| !text.trim().is_empty()).collect();
         content = result_texts.join("\n");
     }
 
@@ -805,11 +634,7 @@ fn build_parts(message: &CanonicalMessage) -> serde_json::Value {
     }
 
     for call in &message.tool_calls {
-        let input = if let Some(s) = call.arguments.as_str() {
-            s.to_string()
-        } else {
-            serde_json::to_string(&call.arguments).unwrap_or_else(|_| "{}".to_string())
-        };
+        let input = if let Some(s) = call.arguments.as_str() { s.to_string() } else { serde_json::to_string(&call.arguments).unwrap_or_else(|_| "{}".to_string()) };
 
         parts.push(serde_json::json!({
             "type": "tool_call",
@@ -884,32 +709,15 @@ mod tests {
             started_at: Some(1_700_000_000_000),
             ended_at: Some(1_700_000_010_000),
             messages: vec![
-                CanonicalMessage {
-                    idx: 0,
-                    role: MessageRole::User,
-                    content: "Please inspect src/main.rs".to_string(),
-                    timestamp: Some(1_700_000_000_000),
-                    author: None,
-                    tool_calls: vec![],
-                    tool_results: vec![],
-                    extra: serde_json::json!({}),
-                },
+                CanonicalMessage { idx: 0, role: MessageRole::User, content: "Please inspect src/main.rs".to_string(), timestamp: Some(1_700_000_000_000), author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::json!({}) },
                 CanonicalMessage {
                     idx: 1,
                     role: MessageRole::Assistant,
                     content: "Inspecting now.".to_string(),
                     timestamp: Some(1_700_000_005_000),
                     author: Some("gpt-5".to_string()),
-                    tool_calls: vec![ToolCall {
-                        id: Some("call-1".to_string()),
-                        name: "Read".to_string(),
-                        arguments: serde_json::json!({"path":"src/main.rs"}),
-                    }],
-                    tool_results: vec![ToolResult {
-                        call_id: Some("call-1".to_string()),
-                        content: "Read complete".to_string(),
-                        is_error: false,
-                    }],
+                    tool_calls: vec![ToolCall { id: Some("call-1".to_string()), name: "Read".to_string(), arguments: serde_json::json!({"path":"src/main.rs"}) }],
+                    tool_results: vec![ToolResult { call_id: Some("call-1".to_string()), content: "Read complete".to_string(), is_error: false }],
                     extra: serde_json::json!({}),
                 },
             ],
@@ -925,10 +733,7 @@ mod tests {
         assert_eq!(provider.name(), "OpenCode");
         assert_eq!(provider.slug(), "opencode");
         assert_eq!(provider.cli_alias(), "opc");
-        assert_eq!(
-            <OpenCode as Provider>::resume_command(&provider, "sid"),
-            "opencode"
-        );
+        assert_eq!(<OpenCode as Provider>::resume_command(&provider, "sid"), "opencode");
     }
 
     #[test]
@@ -955,22 +760,14 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let source = sample_session(&workspace);
-        let written = OpenCode
-            .write_session(&source, &WriteOptions { force: false })
-            .expect("write should succeed");
+        let written = OpenCode.write_session(&source, &WriteOptions { force: false }).expect("write should succeed");
 
         assert_eq!(written.resume_command, "opencode");
         assert_eq!(written.paths.len(), 1);
-        let db_path = written
-            .paths
-            .first()
-            .and_then(|p| p.parent())
-            .expect("virtual path parent");
+        let db_path = written.paths.first().and_then(|p| p.parent()).expect("virtual path parent");
         assert!(db_path.is_file(), "db file should exist");
 
-        let readback = OpenCode
-            .read_session(&written.paths[0])
-            .expect("readback should succeed");
+        let readback = OpenCode.read_session(&written.paths[0]).expect("readback should succeed");
 
         assert_eq!(readback.provider_slug, "opencode");
         assert_eq!(readback.messages.len(), source.messages.len());
@@ -991,9 +788,7 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let source = sample_session(&workspace);
-        let written = OpenCode
-            .write_session(&source, &WriteOptions { force: false })
-            .expect("write should succeed");
+        let written = OpenCode.write_session(&source, &WriteOptions { force: false }).expect("write should succeed");
         let found = OpenCode.owns_session(&written.session_id);
 
         assert_eq!(found.as_deref(), Some(written.paths[0].as_path()));
@@ -1010,27 +805,16 @@ mod tests {
         let mut first = sample_session(&workspace);
         first.title = Some("Older Session".to_string());
         first.started_at = Some(1_700_000_000_000);
-        let _first_written = OpenCode
-            .write_session(&first, &WriteOptions { force: false })
-            .expect("first write");
+        let _first_written = OpenCode.write_session(&first, &WriteOptions { force: false }).expect("first write");
 
         let mut second = sample_session(&workspace);
         second.title = Some("Newer Session".to_string());
         second.started_at = Some(1_800_000_000_000);
-        let second_written = OpenCode
-            .write_session(&second, &WriteOptions { force: false })
-            .expect("second write");
+        let second_written = OpenCode.write_session(&second, &WriteOptions { force: false }).expect("second write");
 
-        let db_path = second_written
-            .paths
-            .first()
-            .and_then(|p| p.parent())
-            .expect("db path parent")
-            .to_path_buf();
+        let db_path = second_written.paths.first().and_then(|p| p.parent()).expect("db path parent").to_path_buf();
 
-        let read_latest = OpenCode
-            .read_session(&db_path)
-            .expect("read from db should pick latest");
+        let read_latest = OpenCode.read_session(&db_path).expect("read from db should pick latest");
         assert_eq!(read_latest.title.as_deref(), Some("Newer Session"));
     }
 
@@ -1043,22 +827,11 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let source = sample_session(&workspace);
-        OpenCode
-            .write_session(&source, &WriteOptions { force: false })
-            .expect("write should succeed");
+        OpenCode.write_session(&source, &WriteOptions { force: false }).expect("write should succeed");
 
         let detection = OpenCode.detect();
-        assert!(
-            detection.installed,
-            "db presence should mark provider installed"
-        );
-        assert!(
-            detection
-                .evidence
-                .iter()
-                .any(|ev| ev.contains("opencode.db")),
-            "evidence should include db detection"
-        );
+        assert!(detection.installed, "db presence should mark provider installed");
+        assert!(detection.evidence.iter().any(|ev| ev.contains("opencode.db")), "evidence should include db detection");
     }
 
     #[test]
@@ -1216,26 +989,14 @@ mod tests {
         assert_eq!(role_to_opencode(&MessageRole::Assistant), "assistant");
         assert_eq!(role_to_opencode(&MessageRole::Tool), "tool");
         assert_eq!(role_to_opencode(&MessageRole::System), "system");
-        assert_eq!(
-            role_to_opencode(&MessageRole::Other("custom".to_string())),
-            "custom"
-        );
+        assert_eq!(role_to_opencode(&MessageRole::Other("custom".to_string())), "custom");
     }
 
     // ── build_parts ─────────────────────────────────────────────────────
 
     #[test]
     fn build_parts_text_only() {
-        let msg = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::User,
-            content: "Hello world".to_string(),
-            timestamp: None,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: serde_json::json!({}),
-        };
+        let msg = CanonicalMessage { idx: 0, role: MessageRole::User, content: "Hello world".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::json!({}) };
         let parts = build_parts(&msg);
         let arr = parts.as_array().expect("should be array");
         assert_eq!(arr.len(), 1);
@@ -1251,16 +1012,8 @@ mod tests {
             content: "Let me check.".to_string(),
             timestamp: None,
             author: None,
-            tool_calls: vec![ToolCall {
-                id: Some("tc-1".to_string()),
-                name: "Bash".to_string(),
-                arguments: serde_json::json!({"cmd": "ls"}),
-            }],
-            tool_results: vec![ToolResult {
-                call_id: Some("tc-1".to_string()),
-                content: "file1.rs\nfile2.rs".to_string(),
-                is_error: false,
-            }],
+            tool_calls: vec![ToolCall { id: Some("tc-1".to_string()), name: "Bash".to_string(), arguments: serde_json::json!({"cmd": "ls"}) }],
+            tool_results: vec![ToolResult { call_id: Some("tc-1".to_string()), content: "file1.rs\nfile2.rs".to_string(), is_error: false }],
             extra: serde_json::json!({}),
         };
         let parts = build_parts(&msg);
@@ -1275,20 +1028,7 @@ mod tests {
 
     #[test]
     fn build_parts_empty_content_skips_text() {
-        let msg = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::Tool,
-            content: "  ".to_string(),
-            timestamp: None,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![ToolResult {
-                call_id: Some("c1".to_string()),
-                content: "result".to_string(),
-                is_error: false,
-            }],
-            extra: serde_json::json!({}),
-        };
+        let msg = CanonicalMessage { idx: 0, role: MessageRole::Tool, content: "  ".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![ToolResult { call_id: Some("c1".to_string()), content: "result".to_string(), is_error: false }], extra: serde_json::json!({}) };
         let parts = build_parts(&msg);
         let arr = parts.as_array().expect("array");
         assert_eq!(arr.len(), 1);
@@ -1346,9 +1086,7 @@ mod tests {
         let mut session = sample_session(&workspace);
         session.title = None;
 
-        let written = OpenCode
-            .write_session(&session, &WriteOptions { force: false })
-            .expect("write");
+        let written = OpenCode.write_session(&session, &WriteOptions { force: false }).expect("write");
         let readback = OpenCode.read_session(&written.paths[0]).expect("readback");
 
         // Title should be derived from first user message
@@ -1372,9 +1110,7 @@ mod tests {
             msg.timestamp = None;
         }
 
-        let written = OpenCode
-            .write_session(&session, &WriteOptions { force: false })
-            .expect("write");
+        let written = OpenCode.write_session(&session, &WriteOptions { force: false }).expect("write");
         let readback = OpenCode.read_session(&written.paths[0]).expect("readback");
 
         assert!(readback.started_at.is_some());
@@ -1390,9 +1126,7 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let session = sample_session(&workspace);
-        let written = OpenCode
-            .write_session(&session, &WriteOptions { force: false })
-            .expect("write");
+        let written = OpenCode.write_session(&session, &WriteOptions { force: false }).expect("write");
         let readback = OpenCode.read_session(&written.paths[0]).expect("readback");
 
         // The model_name should be detected from message authors
@@ -1410,9 +1144,7 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let session = sample_session(&workspace);
-        let written = OpenCode
-            .write_session(&session, &WriteOptions { force: false })
-            .expect("write");
+        let written = OpenCode.write_session(&session, &WriteOptions { force: false }).expect("write");
         let readback = OpenCode.read_session(&written.paths[0]).expect("readback");
 
         // Metadata should include OpenCode-specific fields
@@ -1431,20 +1163,12 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let session = sample_session(&workspace);
-        let written = OpenCode
-            .write_session(&session, &WriteOptions { force: false })
-            .expect("write");
+        let written = OpenCode.write_session(&session, &WriteOptions { force: false }).expect("write");
         let readback = OpenCode.read_session(&written.paths[0]).expect("readback");
 
         for msg in &readback.messages {
-            assert!(
-                msg.extra.get("opencode_message_id").is_some(),
-                "each message should have opencode_message_id in extra"
-            );
-            assert!(
-                msg.extra.get("opencode_parts").is_some(),
-                "each message should have opencode_parts in extra"
-            );
+            assert!(msg.extra.get("opencode_message_id").is_some(), "each message should have opencode_message_id in extra");
+            assert!(msg.extra.get("opencode_parts").is_some(), "each message should have opencode_parts in extra");
         }
     }
 
@@ -1490,33 +1214,19 @@ mod tests {
         let mut first = sample_session(&workspace);
         first.title = Some("First Session".to_string());
         first.started_at = Some(1_700_000_000_000);
-        let first_written = OpenCode
-            .write_session(&first, &WriteOptions { force: false })
-            .expect("first write");
+        let first_written = OpenCode.write_session(&first, &WriteOptions { force: false }).expect("first write");
 
         let mut second = sample_session(&workspace);
         second.title = Some("Second Session".to_string());
         second.started_at = Some(1_800_000_000_000);
-        let second_written = OpenCode
-            .write_session(&second, &WriteOptions { force: false })
-            .expect("second write");
+        let second_written = OpenCode.write_session(&second, &WriteOptions { force: false }).expect("second write");
 
         let listed = OpenCode.list_sessions().expect("should return Some");
-        assert!(
-            listed.len() >= 2,
-            "expected at least 2 sessions, got {}",
-            listed.len()
-        );
+        assert!(listed.len() >= 2, "expected at least 2 sessions, got {}", listed.len());
 
         let ids: Vec<&str> = listed.iter().map(|(id, _)| id.as_str()).collect();
-        assert!(
-            ids.contains(&first_written.session_id.as_str()),
-            "first session should be listed"
-        );
-        assert!(
-            ids.contains(&second_written.session_id.as_str()),
-            "second session should be listed"
-        );
+        assert!(ids.contains(&first_written.session_id.as_str()), "first session should be listed");
+        assert!(ids.contains(&second_written.session_id.as_str()), "second session should be listed");
     }
 
     #[test]

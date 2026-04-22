@@ -12,27 +12,13 @@ use axum::Json;
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 
-use super::common::{
-    is_authorized, json_success_response, readonly_error_response, unauthorized_response,
-    ExperienceExtractRequest, FullTextSearchRequest, MemoryRecallRequest, MemoryUnifiedRequest,
-    WorkflowRouteSuggestRequest,
-};
+use super::common::{is_authorized, json_success_response, readonly_error_response, unauthorized_response, ExperienceExtractRequest, FullTextSearchRequest, MemoryRecallRequest, MemoryUnifiedRequest, WorkflowRouteSuggestRequest};
 
-async fn dispatch_json(
-    app_state: &SharedAppState,
-    command: &str,
-    payload: Value,
-) -> Result<Value, String> {
+async fn dispatch_json(app_state: &SharedAppState, command: &str, payload: Value) -> Result<Value, String> {
     dispatch(&Some(app_state.clone()), command, &payload).await
 }
 
-pub(crate) async fn v1_full_text_search(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-    Json(req): Json<FullTextSearchRequest>,
-) -> Response {
+pub(crate) async fn v1_full_text_search(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri, Json(req): Json<FullTextSearchRequest>) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
@@ -48,13 +34,7 @@ pub(crate) async fn v1_full_text_search(
     }
 }
 
-pub(crate) async fn v1_memory_recall(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-    Json(req): Json<MemoryRecallRequest>,
-) -> Response {
+pub(crate) async fn v1_memory_recall(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri, Json(req): Json<MemoryRecallRequest>) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
@@ -81,13 +61,7 @@ pub(crate) async fn v1_memory_recall(
     }
 }
 
-pub(crate) async fn v1_experience_extract(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-    Json(req): Json<ExperienceExtractRequest>,
-) -> Response {
+pub(crate) async fn v1_experience_extract(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri, Json(req): Json<ExperienceExtractRequest>) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
@@ -106,13 +80,7 @@ pub(crate) async fn v1_experience_extract(
     }
 }
 
-pub(crate) async fn v1_workflow_route_suggest(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-    Json(req): Json<WorkflowRouteSuggestRequest>,
-) -> Response {
+pub(crate) async fn v1_workflow_route_suggest(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri, Json(req): Json<WorkflowRouteSuggestRequest>) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
@@ -134,13 +102,7 @@ pub(crate) async fn v1_workflow_route_suggest(
     }
 }
 
-pub(crate) async fn v1_memory_unified(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-    Json(req): Json<MemoryUnifiedRequest>,
-) -> Response {
+pub(crate) async fn v1_memory_unified(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri, Json(req): Json<MemoryUnifiedRequest>) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
@@ -163,11 +125,7 @@ pub(crate) async fn v1_memory_unified(
     }
 }
 
-pub(crate) async fn v1_analytics_overview(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
+pub(crate) async fn v1_analytics_overview(ConnectInfo(addr): ConnectInfo<SocketAddr>, headers: HeaderMap, uri: Uri) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }
@@ -178,11 +136,7 @@ pub(crate) async fn v1_analytics_overview(
     }
 }
 
-pub(crate) async fn v1_observability_summary(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
+pub(crate) async fn v1_observability_summary(ConnectInfo(addr): ConnectInfo<SocketAddr>, headers: HeaderMap, uri: Uri) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
     }

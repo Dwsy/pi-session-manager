@@ -41,12 +41,8 @@ fn test_search_integration() {
             id: "session1".to_string(),
             cwd: "/projects/rust-search".to_string(),
             name: Some("Rust Search Implementation".to_string()),
-            created: DateTime::parse_from_rfc3339("2025-01-30T00:00:00Z")
-                .unwrap()
-                .with_timezone(&Utc),
-            modified: DateTime::parse_from_rfc3339("2025-01-30T00:00:00Z")
-                .unwrap()
-                .with_timezone(&Utc),
+            created: DateTime::parse_from_rfc3339("2025-01-30T00:00:00Z").unwrap().with_timezone(&Utc),
+            modified: DateTime::parse_from_rfc3339("2025-01-30T00:00:00Z").unwrap().with_timezone(&Utc),
             message_count: 1,
             first_message: "How to implement search in Rust?".to_string(),
             user_messages_text: String::new(),
@@ -60,12 +56,8 @@ fn test_search_integration() {
             id: "session2".to_string(),
             cwd: "/projects/react-tutorial".to_string(),
             name: Some("React Tutorial".to_string()),
-            created: DateTime::parse_from_rfc3339("2025-01-30T01:00:00Z")
-                .unwrap()
-                .with_timezone(&Utc),
-            modified: DateTime::parse_from_rfc3339("2025-01-30T01:00:00Z")
-                .unwrap()
-                .with_timezone(&Utc),
+            created: DateTime::parse_from_rfc3339("2025-01-30T01:00:00Z").unwrap().with_timezone(&Utc),
+            modified: DateTime::parse_from_rfc3339("2025-01-30T01:00:00Z").unwrap().with_timezone(&Utc),
             message_count: 1,
             first_message: "I want to learn React".to_string(),
             user_messages_text: String::new(),
@@ -79,12 +71,8 @@ fn test_search_integration() {
             id: "session3".to_string(),
             cwd: "/projects/rust-search".to_string(),
             name: Some("Rust Search Answer".to_string()),
-            created: DateTime::parse_from_rfc3339("2025-01-30T02:00:00Z")
-                .unwrap()
-                .with_timezone(&Utc),
-            modified: DateTime::parse_from_rfc3339("2025-01-30T02:00:00Z")
-                .unwrap()
-                .with_timezone(&Utc),
+            created: DateTime::parse_from_rfc3339("2025-01-30T02:00:00Z").unwrap().with_timezone(&Utc),
+            modified: DateTime::parse_from_rfc3339("2025-01-30T02:00:00Z").unwrap().with_timezone(&Utc),
             message_count: 1,
             first_message: "Here is how you implement search in Rust...".to_string(),
             user_messages_text: String::new(),
@@ -96,80 +84,38 @@ fn test_search_integration() {
     ];
 
     // Test 1: Search for "Rust" - should find 2 sessions
-    let results = search_sessions(
-        &sessions,
-        "Rust",
-        SearchMode::Content,
-        RoleFilter::All,
-        true,
-    );
+    let results = search_sessions(&sessions, "Rust", SearchMode::Content, RoleFilter::All, true);
     println!("\n=== Test 1: Search for 'Rust' ===");
     println!("Found {} results", results.len());
     for result in &results {
-        println!(
-            "  - Session: {} ({})",
-            result.session_name.as_deref().unwrap_or("Untitled"),
-            result.session_id
-        );
+        println!("  - Session: {} ({})", result.session_name.as_deref().unwrap_or("Untitled"), result.session_id);
         println!("    Matches: {}", result.matches.len());
     }
     assert_eq!(results.len(), 2, "Should find 2 sessions with 'Rust'");
 
     // Test 2: Search for "React" - should find 1 session
-    let results = search_sessions(
-        &sessions,
-        "React",
-        SearchMode::Content,
-        RoleFilter::All,
-        true,
-    );
+    let results = search_sessions(&sessions, "React", SearchMode::Content, RoleFilter::All, true);
     println!("\n=== Test 2: Search for 'React' ===");
     println!("Found {} results", results.len());
     assert_eq!(results.len(), 1, "Should find 1 session with 'React'");
 
     // Test 3: Search by name - "Rust Search Implementation" (AND logic - all words must match)
-    let results = search_sessions(
-        &sessions,
-        "Rust Search Implementation",
-        SearchMode::Name,
-        RoleFilter::All,
-        true,
-    );
+    let results = search_sessions(&sessions, "Rust Search Implementation", SearchMode::Name, RoleFilter::All, true);
     println!("\n=== Test 3: Search by name 'Rust Search Implementation' ===");
     println!("Found {} results", results.len());
-    assert_eq!(
-        results.len(),
-        1,
-        "Should find 1 session by name (AND logic)"
-    );
+    assert_eq!(results.len(), 1, "Should find 1 session by name (AND logic)");
 
     // Test 4: Search with role filter - assistant only
-    let results = search_sessions(
-        &sessions,
-        "implement",
-        SearchMode::Content,
-        RoleFilter::Assistant,
-        true,
-    );
+    let results = search_sessions(&sessions, "implement", SearchMode::Content, RoleFilter::Assistant, true);
     println!("\n=== Test 4: Search with role filter 'assistant' ===");
     println!("Found {} results", results.len());
     assert_eq!(results.len(), 1, "Should find 1 assistant message");
 
     // Test 5: Multi-word search (OR logic)
-    let results = search_sessions(
-        &sessions,
-        "Rust React",
-        SearchMode::Content,
-        RoleFilter::All,
-        true,
-    );
+    let results = search_sessions(&sessions, "Rust React", SearchMode::Content, RoleFilter::All, true);
     println!("\n=== Test 5: Multi-word search 'Rust React' ===");
     println!("Found {} results", results.len());
-    assert_eq!(
-        results.len(),
-        3,
-        "Should find all 3 sessions (Rust OR React)"
-    );
+    assert_eq!(results.len(), 3, "Should find all 3 sessions (Rust OR React)");
 
     // Test 6: Empty query
     let results = search_sessions(&sessions, "", SearchMode::Content, RoleFilter::All, true);
@@ -178,13 +124,7 @@ fn test_search_integration() {
     assert_eq!(results.len(), 0, "Should find 0 sessions with empty query");
 
     // Test 7: Verify search results contain session metadata
-    let results = search_sessions(
-        &sessions,
-        "Rust",
-        SearchMode::Content,
-        RoleFilter::All,
-        true,
-    );
+    let results = search_sessions(&sessions, "Rust", SearchMode::Content, RoleFilter::All, true);
     println!("\n=== Test 7: Verify search results metadata ===");
     for result in &results {
         println!("  Session ID: {}", result.session_id);
@@ -195,23 +135,10 @@ fn test_search_integration() {
         println!("  Matches: {}", result.matches.len());
         if !result.matches.is_empty() {
             println!("    First match role: {}", result.matches[0].role);
-            println!(
-                "    First match snippet: {}",
-                result.matches[0]
-                    .snippet
-                    .chars()
-                    .take(50)
-                    .collect::<String>()
-            );
+            println!("    First match snippet: {}", result.matches[0].snippet.chars().take(50).collect::<String>());
         }
-        assert!(
-            !result.session_id.is_empty(),
-            "Session ID should not be empty"
-        );
-        assert!(
-            !result.session_path.is_empty(),
-            "Session path should not be empty"
-        );
+        assert!(!result.session_id.is_empty(), "Session ID should not be empty");
+        assert!(!result.session_path.is_empty(), "Session path should not be empty");
         assert!(result.score > 0.0, "Score should be positive");
     }
 
@@ -233,12 +160,8 @@ fn test_search_results_mapping() {
         id: "session1".to_string(),
         cwd: "/projects/my-project".to_string(),
         name: Some("My Test Session".to_string()),
-        created: DateTime::parse_from_rfc3339("2025-01-30T00:00:00Z")
-            .unwrap()
-            .with_timezone(&Utc),
-        modified: DateTime::parse_from_rfc3339("2025-01-30T00:00:00Z")
-            .unwrap()
-            .with_timezone(&Utc),
+        created: DateTime::parse_from_rfc3339("2025-01-30T00:00:00Z").unwrap().with_timezone(&Utc),
+        modified: DateTime::parse_from_rfc3339("2025-01-30T00:00:00Z").unwrap().with_timezone(&Utc),
         message_count: 1,
         first_message: "Test search functionality".to_string(),
         user_messages_text: String::new(),
@@ -248,13 +171,7 @@ fn test_search_results_mapping() {
         parent_session_path: None,
     }];
 
-    let results = search_sessions(
-        &sessions,
-        "test",
-        SearchMode::Content,
-        RoleFilter::All,
-        true,
-    );
+    let results = search_sessions(&sessions, "test", SearchMode::Content, RoleFilter::All, true);
 
     println!("\n=== Test: Search Results Mapping ===");
     println!("Original session cwd: {}", sessions[0].cwd);
@@ -263,19 +180,13 @@ fn test_search_results_mapping() {
     // Simulate frontend mapping
     for result in &results {
         let original_session = sessions.iter().find(|s| s.id == result.session_id);
-        assert!(
-            original_session.is_some(),
-            "Should find original session by ID"
-        );
+        assert!(original_session.is_some(), "Should find original session by ID");
 
         let mapped = SessionInfo {
             path: result.session_path.clone(),
             id: result.session_id.clone(),
             cwd: original_session.unwrap().cwd.clone(),
-            name: result
-                .session_name
-                .clone()
-                .or_else(|| original_session.unwrap().name.clone()),
+            name: result.session_name.clone().or_else(|| original_session.unwrap().name.clone()),
             created: original_session.unwrap().created,
             modified: original_session.unwrap().modified,
             message_count: result.matches.len(),
@@ -289,15 +200,8 @@ fn test_search_results_mapping() {
 
         println!("Mapped session cwd: {}", mapped.cwd);
         println!("Mapped session name: {:?}", mapped.name);
-        assert_eq!(
-            mapped.cwd, "/projects/my-project",
-            "cwd should be preserved"
-        );
-        assert_eq!(
-            mapped.name,
-            Some("My Test Session".to_string()),
-            "name should be preserved"
-        );
+        assert_eq!(mapped.cwd, "/projects/my-project", "cwd should be preserved");
+        assert_eq!(mapped.name, Some("My Test Session".to_string()), "name should be preserved");
     }
 
     cleanup_test_dir(test_dir);

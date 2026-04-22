@@ -27,13 +27,7 @@ fn assert_empty_file_handled(provider: &dyn Provider, ext: &str) {
     match &result {
         Err(_) => {} // Fine — explicit error for empty file.
         Ok(session) => {
-            assert!(
-                session.messages.is_empty(),
-                "{}: empty {} file returned Ok with {} messages (expected 0 or Err)",
-                provider.slug(),
-                ext,
-                session.messages.len()
-            );
+            assert!(session.messages.is_empty(), "{}: empty {} file returned Ok with {} messages (expected 0 or Err)", provider.slug(), ext, session.messages.len());
         }
     }
 }
@@ -42,22 +36,12 @@ fn assert_empty_file_handled(provider: &dyn Provider, ext: &str) {
 /// Acceptable: Err or Ok(0 messages).
 fn assert_garbage_handled(provider: &dyn Provider, ext: &str) {
     let tmp = tempfile::NamedTempFile::with_suffix(ext).expect("create temp file");
-    std::fs::write(
-        tmp.path(),
-        b"\x00\x01\x02\xff\xfe\xfd\x80\x81\x82garbage\n\x00",
-    )
-    .expect("write garbage");
+    std::fs::write(tmp.path(), b"\x00\x01\x02\xff\xfe\xfd\x80\x81\x82garbage\n\x00").expect("write garbage");
     let result = provider.read_session(tmp.path());
     match &result {
         Err(_) => {} // Fine — explicit error for garbage.
         Ok(session) => {
-            assert!(
-                session.messages.is_empty(),
-                "{}: garbage {} file returned Ok with {} messages (expected 0 or Err)",
-                provider.slug(),
-                ext,
-                session.messages.len()
-            );
+            assert!(session.messages.is_empty(), "{}: garbage {} file returned Ok with {} messages (expected 0 or Err)", provider.slug(), ext, session.messages.len());
         }
     }
 }
@@ -65,19 +49,12 @@ fn assert_garbage_handled(provider: &dyn Provider, ext: &str) {
 /// Test that a provider handles truncated JSON without panicking.
 fn assert_truncated_json_handled(provider: &dyn Provider, ext: &str) {
     let tmp = tempfile::NamedTempFile::with_suffix(ext).expect("create temp file");
-    std::fs::write(tmp.path(), r#"{"type": "message", "content": "hello"#)
-        .expect("write truncated json");
+    std::fs::write(tmp.path(), r#"{"type": "message", "content": "hello"#).expect("write truncated json");
     let result = provider.read_session(tmp.path());
     match &result {
         Err(_) => {} // Fine.
         Ok(session) => {
-            assert!(
-                session.messages.is_empty(),
-                "{}: truncated {} file returned Ok with {} messages (expected 0 or Err)",
-                provider.slug(),
-                ext,
-                session.messages.len()
-            );
+            assert!(session.messages.is_empty(), "{}: truncated {} file returned Ok with {} messages (expected 0 or Err)", provider.slug(), ext, session.messages.len());
         }
     }
 }
@@ -214,10 +191,7 @@ fn malformed_cline_empty() {
     let history = task_dir.join("api_conversation_history.json");
     std::fs::write(&history, "").expect("write empty file");
     let result = Cline.read_session(&history);
-    assert!(
-        result.is_err(),
-        "cline: reading empty api_conversation_history.json should return Err"
-    );
+    assert!(result.is_err(), "cline: reading empty api_conversation_history.json should return Err");
 }
 
 #[test]
@@ -228,10 +202,7 @@ fn malformed_cline_garbage() {
     let history = task_dir.join("api_conversation_history.json");
     std::fs::write(&history, b"\x00\x01\x02garbage").expect("write garbage");
     let result = Cline.read_session(&history);
-    assert!(
-        result.is_err(),
-        "cline: reading garbage api_conversation_history.json should return Err"
-    );
+    assert!(result.is_err(), "cline: reading garbage api_conversation_history.json should return Err");
 }
 
 // ===========================================================================
@@ -254,11 +225,7 @@ fn malformed_aider_garbage() {
     // Aider may tolerantly return a session with 0 messages — that's fine.
     // It should NOT panic.
     if let Ok(session) = &result {
-        assert!(
-            session.messages.is_empty(),
-            "aider: garbage should produce 0 messages, got {}",
-            session.messages.len()
-        );
+        assert!(session.messages.is_empty(), "aider: garbage should produce 0 messages, got {}", session.messages.len());
     }
 }
 
@@ -284,10 +251,7 @@ fn malformed_opencode_empty() {
     let db_path = db_dir.join("opencode.db");
     std::fs::write(&db_path, "").expect("write empty file");
     let result = casr::providers::opencode::OpenCode.read_session(&db_path);
-    assert!(
-        result.is_err(),
-        "opencode: reading empty db should return Err"
-    );
+    assert!(result.is_err(), "opencode: reading empty db should return Err");
 }
 
 #[test]
@@ -298,10 +262,7 @@ fn malformed_opencode_garbage() {
     let db_path = db_dir.join("opencode.db");
     std::fs::write(&db_path, b"\x00\x01garbage\xff\xfe").expect("write garbage");
     let result = casr::providers::opencode::OpenCode.read_session(&db_path);
-    assert!(
-        result.is_err(),
-        "opencode: reading garbage db should return Err"
-    );
+    assert!(result.is_err(), "opencode: reading garbage db should return Err");
 }
 
 // ===========================================================================
@@ -322,10 +283,7 @@ GARBAGE LINE
     // CC should recover at least 1 valid message and skip the garbage.
     match result {
         Ok(session) => {
-            assert!(
-                !session.messages.is_empty(),
-                "CC recovery: expected >= 1 messages from mixed input, got 0",
-            );
+            assert!(!session.messages.is_empty(), "CC recovery: expected >= 1 messages from mixed input, got 0",);
         }
         Err(e) => {
             // Also acceptable if it errors — the key is no panic.

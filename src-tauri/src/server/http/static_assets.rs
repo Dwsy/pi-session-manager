@@ -14,26 +14,12 @@ pub(crate) fn has_frontend_assets() -> bool {
 
 fn serve_embedded(path: &str) -> Option<Response> {
     let mime = mime_guess::from_path(path).first_or_octet_stream();
-    FrontendAssets::get(path).map(|file| {
-        (
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, mime.as_ref())],
-            file.data.to_vec(),
-        )
-            .into_response()
-    })
+    FrontendAssets::get(path).map(|file| (StatusCode::OK, [(header::CONTENT_TYPE, mime.as_ref())], file.data.to_vec()).into_response())
 }
 
 fn is_api_like_path(path: &str) -> bool {
     let normalized = path.trim_start_matches('/');
-    normalized == "api"
-        || normalized.starts_with("api/")
-        || normalized == "v1"
-        || normalized.starts_with("v1/")
-        || normalized == "ws"
-        || normalized.starts_with("ws/")
-        || normalized == "metrics"
-        || normalized.starts_with("metrics/")
+    normalized == "api" || normalized.starts_with("api/") || normalized == "v1" || normalized.starts_with("v1/") || normalized == "ws" || normalized.starts_with("ws/") || normalized == "metrics" || normalized.starts_with("metrics/")
 }
 
 fn should_spa_fallback(path: &str) -> bool {
@@ -63,16 +49,8 @@ pub(crate) async fn serve_static(uri: Uri) -> Response {
         };
     }
     if is_api_like_path(path) {
-        return json_error_response(
-            StatusCode::NOT_FOUND,
-            format!("API endpoint not found: /{path}"),
-        );
+        return json_error_response(StatusCode::NOT_FOUND, format!("API endpoint not found: /{path}"));
     }
 
-    (
-        StatusCode::NOT_FOUND,
-        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-        format!("Not Found: /{path}"),
-    )
-        .into_response()
+    (StatusCode::NOT_FOUND, [(header::CONTENT_TYPE, "text/plain; charset=utf-8")], format!("Not Found: /{path}")).into_response()
 }

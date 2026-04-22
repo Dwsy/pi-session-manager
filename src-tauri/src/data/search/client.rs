@@ -34,10 +34,7 @@ fn normalize_search_quotes(raw_query: &str) -> String {
 pub fn session_id_query_is_exact(raw_query: &str) -> bool {
     let normalized_query = normalize_search_quotes(raw_query);
     let trimmed = normalized_query.trim();
-    trimmed.len() >= 2
-        && trimmed.starts_with('"')
-        && trimmed.ends_with('"')
-        && !trimmed[1..trimmed.len() - 1].contains('"')
+    trimmed.len() >= 2 && trimmed.starts_with('"') && trimmed.ends_with('"') && !trimmed[1..trimmed.len() - 1].contains('"')
 }
 
 pub fn normalize_session_id_query(raw_query: &str) -> String {
@@ -62,10 +59,7 @@ pub fn session_id_match_kind(session_id: &str, raw_query: &str) -> Option<Sessio
         return Some(SessionIdMatchKind::Exact);
     }
 
-    if !exact_only
-        && normalized_query.len() >= MIN_SESSION_ID_PREFIX_LENGTH
-        && lower_session_id.starts_with(&normalized_query)
-    {
+    if !exact_only && normalized_query.len() >= MIN_SESSION_ID_PREFIX_LENGTH && lower_session_id.starts_with(&normalized_query) {
         return Some(SessionIdMatchKind::Prefix);
     }
 
@@ -76,15 +70,8 @@ fn parse_quoted_query_lower(query: &str) -> ParsedQuotedQuery {
     let normalized_query = normalize_search_quotes(query);
     let quote_count = normalized_query.chars().filter(|ch| *ch == '"').count();
     if quote_count == 0 || quote_count % 2 != 0 {
-        let words = normalized_query
-            .to_lowercase()
-            .split_whitespace()
-            .map(|word| word.to_string())
-            .collect();
-        return ParsedQuotedQuery {
-            phrases: vec![],
-            words,
-        };
+        let words = crate::utils::normalize_search_tokens(&normalized_query);
+        return ParsedQuotedQuery { phrases: vec![], words };
     }
 
     let mut phrases = Vec::new();
@@ -96,7 +83,7 @@ fn parse_quoted_query_lower(query: &str) -> ParsedQuotedQuery {
         if ch == '"' {
             if in_phrase {
                 if !current_phrase.trim().is_empty() {
-                    phrases.push(current_phrase.to_lowercase());
+                    phrases.push(crate::utils::normalize_search_text(&current_phrase));
                 }
                 current_phrase.clear();
             }
@@ -111,11 +98,7 @@ fn parse_quoted_query_lower(query: &str) -> ParsedQuotedQuery {
         }
     }
 
-    let words = remainder
-        .to_lowercase()
-        .split_whitespace()
-        .map(|word| word.to_string())
-        .collect();
+    let words = crate::utils::normalize_search_tokens(&remainder);
 
     ParsedQuotedQuery { phrases, words }
 }
@@ -124,110 +107,73 @@ fn parse_quoted_query_lower(query: &str) -> ParsedQuotedQuery {
 /// Optimizations:
 /// 1. Use lowercase query cache to avoid repeated conversions
 /// 2. Reduce unnecessary string allocations
-pub fn search_sessions(
-    sessions: &[SessionInfo],
-    query: &str,
-    search_mode: SearchMode,
-    role_filter: RoleFilter,
-    include_tools: bool,
-) -> Vec<SearchResult> {
+pub fn search_sessions(sessions: &[SessionInfo], query: &str, search_mode: SearchMode, role_filter: RoleFilter, include_tools: bool) -> Vec<SearchResult> {
     let query_trimmed = query.trim();
     if query_trimmed.is_empty() {
         return vec![];
     }
 
     let parsed_query = parse_quoted_query_lower(query_trimmed);
-    let query_terms: Vec<&str> = parsed_query
-        .words
-        .iter()
-        .chain(parsed_query.phrases.iter())
-        .map(String::as_str)
-        .collect();
-
-    if query_terms.is_empty() {
+    if parsed_query.words.is_empty() && parsed_query.phrases.is_empty() {
         return vec![];
     }
+
+    let query_has_cjk = crate::utils::contains_cjk(query_trimmed);
 
     let mut results = Vec::new();
 
     for session in sessions {
         if session_id_match_kind(&session.id, query_trimmed).is_some() {
-            results.push(SearchResult {
-                session_id: session.id.clone(),
-                session_path: session.path.clone(),
-                session_name: session.name.clone(),
-                first_message: session.first_message.clone(),
-                matches: vec![],
-                score: 1_000.0,
-            });
+            results.push(SearchResult { session_id: session.id.clone(), session_path: session.path.clone(), session_name: session.name.clone(), first_message: session.first_message.clone(), matches: vec![], score: 1_000.0 });
             continue;
         }
 
         if search_mode == SearchMode::Name {
             // Search session name and first message
-            if matches_session_name(session, &query_terms) {
-                results.push(SearchResult {
-                    session_id: session.id.clone(),
-                    session_path: session.path.clone(),
-                    session_name: session.name.clone(),
-                    first_message: session.first_message.clone(),
-                    matches: vec![],
-                    score: 1.0,
-                });
+            if matches_session_name(session, &parsed_query, query_has_cjk) {
+                results.push(SearchResult { session_id: session.id.clone(), session_path: session.path.clone(), session_name: session.name.clone(), first_message: session.first_message.clone(), matches: vec![], score: 1.0 });
             }
         } else {
             // Search message content
-            let matches = find_matches(session, &query_terms, role_filter, include_tools);
+            let matches = find_matches(session, &parsed_query, query_has_cjk, role_filter, include_tools);
             if !matches.is_empty() {
+                let query_terms: Vec<&str> = parsed_query.words.iter().chain(parsed_query.phrases.iter()).map(String::as_str).collect();
                 let score = calculate_score(&matches, &query_terms);
-                results.push(SearchResult {
-                    session_id: session.id.clone(),
-                    session_path: session.path.clone(),
-                    session_name: session.name.clone(),
-                    first_message: session.first_message.clone(),
-                    matches,
-                    score,
-                });
+                results.push(SearchResult { session_id: session.id.clone(), session_path: session.path.clone(), session_name: session.name.clone(), first_message: session.first_message.clone(), matches, score });
             }
         }
     }
 
-    results.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
     results
 }
 
 /// Match session name
 /// Optimization: reduce string allocations, avoid creating intermediate strings
-fn matches_session_name(session: &SessionInfo, query_words: &[&str]) -> bool {
-    if query_words.is_empty() {
+fn matches_session_name(session: &SessionInfo, parsed_query: &ParsedQuotedQuery, query_has_cjk: bool) -> bool {
+    if parsed_query.words.is_empty() && parsed_query.phrases.is_empty() {
         return false;
     }
 
     let name = session.name.as_deref().unwrap_or("");
     let first_msg = &session.first_message;
-
-    // Check if each query word matches name or first message
-    // Avoid creating merged strings, reduce memory allocations
-    query_words
-        .iter()
-        .all(|word| name.to_lowercase().contains(word) || first_msg.to_lowercase().contains(word))
+    let normalized_name = crate::utils::normalize_search_text(name);
+    let normalized_first_msg = crate::utils::normalize_search_text(first_msg);
+    local_search_matches(
+        &normalized_name,
+        &normalized_first_msg,
+        parsed_query,
+        query_has_cjk,
+        true, // Name search uses AND logic
+    )
 }
 
 /// Find matches
 /// Optimizations:
 /// 1. Use BufReader to read large files line by line, avoid loading entire file at once
 /// 2. Reduce string allocations
-fn find_matches(
-    session: &SessionInfo,
-    query_words: &[&str],
-    role_filter: RoleFilter,
-    include_tools: bool,
-) -> Vec<Match> {
-    if query_words.is_empty() {
+fn find_matches(session: &SessionInfo, parsed_query: &ParsedQuotedQuery, query_has_cjk: bool, role_filter: RoleFilter, include_tools: bool) -> Vec<Match> {
+    if parsed_query.words.is_empty() && parsed_query.phrases.is_empty() {
         return vec![];
     }
 
@@ -244,34 +190,45 @@ fn find_matches(
     let entries = parse_session_entries_from_reader(reader, role_filter, include_tools);
 
     for entry in &entries {
-        let content_lower = entry.content.to_lowercase();
-
-        // Check if any query word matches (OR logic)
-        let any_word_match = query_words.iter().any(|word| content_lower.contains(word));
-
-        if any_word_match {
-            // Find position of first matching word, generate snippet
-            for word in query_words {
-                if let Some(word_pos) = content_lower.find(word) {
-                    let snippet_start = word_pos.saturating_sub(30);
-                    let snippet_end = (word_pos + word.len() + 100).min(entry.content.len());
-                    let snippet = entry.content[snippet_start..snippet_end].to_string();
-
-                    matches.push(Match {
-                        entry_id: entry.id.clone(),
-                        role: entry.role.clone(),
-                        snippet,
-                        timestamp: entry.timestamp,
-                    });
-                    break; // Add only one snippet per entry
-                }
-            }
+        let normalized_content = crate::utils::normalize_search_text(&entry.content);
+        if local_search_matches(
+            &normalized_content,
+            "",
+            parsed_query,
+            query_has_cjk,
+            false, // Content search uses OR logic
+        ) {
+            // TODO: Snippet takes first 130 chars; if the match is in the middle or later,
+            // it won't be visible. Should center around the match position instead,
+            // e.g. substr(content, instr(content, ?) - 40, 120).
+            let snippet = entry.content.chars().take(130).collect::<String>();
+            matches.push(Match { entry_id: entry.id.clone(), role: entry.role.clone(), snippet, timestamp: entry.timestamp });
         }
     }
 
     matches.dedup_by(|a, b| a.entry_id == b.entry_id);
     matches.truncate(5);
     matches
+}
+
+fn local_search_matches(normalized_primary: &str, normalized_secondary: &str, parsed_query: &ParsedQuotedQuery, query_has_cjk: bool, and_logic: bool) -> bool {
+    let phrases_match = parsed_query.phrases.iter().all(|phrase| (!phrase.is_empty() && normalized_primary.contains(phrase)) || (!phrase.is_empty() && normalized_secondary.contains(phrase)));
+
+    if !phrases_match {
+        return false;
+    }
+
+    if parsed_query.words.is_empty() {
+        return !parsed_query.phrases.is_empty();
+    }
+
+    if query_has_cjk {
+        parsed_query.words.iter().all(|word| normalized_primary.contains(word) || normalized_secondary.contains(word))
+    } else if and_logic {
+        parsed_query.words.iter().all(|word| normalized_primary.contains(word) || normalized_secondary.contains(word))
+    } else {
+        parsed_query.words.iter().any(|word| normalized_primary.contains(word) || normalized_secondary.contains(word))
+    }
 }
 
 struct MessageEntry {
@@ -283,11 +240,7 @@ struct MessageEntry {
 
 /// Parse session entries from BufReader
 /// Optimization: support streaming read, avoid large file memory issues
-fn parse_session_entries_from_reader<R: std::io::BufRead>(
-    reader: R,
-    role_filter: RoleFilter,
-    include_tools: bool,
-) -> Vec<MessageEntry> {
+fn parse_session_entries_from_reader<R: std::io::BufRead>(reader: R, role_filter: RoleFilter, include_tools: bool) -> Vec<MessageEntry> {
     let mut entries = Vec::new();
 
     for line_result in reader.lines() {
@@ -309,9 +262,7 @@ fn parse_session_entries_from_reader<R: std::io::BufRead>(
             if let Some(message) = entry.get("message") {
                 let role = message["role"].as_str().unwrap_or("unknown");
                 let timestamp_str = entry["timestamp"].as_str().unwrap_or("");
-                let timestamp = chrono::DateTime::parse_from_rfc3339(timestamp_str)
-                    .map(|dt| dt.with_timezone(&chrono::Utc))
-                    .unwrap_or_else(|_| chrono::Utc::now());
+                let timestamp = chrono::DateTime::parse_from_rfc3339(timestamp_str).map(|dt| dt.with_timezone(&chrono::Utc)).unwrap_or_else(|_| chrono::Utc::now());
 
                 // Filter by role
                 let include = match role_filter {
@@ -343,12 +294,7 @@ fn parse_session_entries_from_reader<R: std::io::BufRead>(
                     }
 
                     if !text.is_empty() {
-                        entries.push(MessageEntry {
-                            id: entry["id"].as_str().unwrap_or("").to_string(),
-                            role: role.to_string(),
-                            content: text,
-                            timestamp,
-                        });
+                        entries.push(MessageEntry { id: entry["id"].as_str().unwrap_or("").to_string(), role: role.to_string(), content: text, timestamp });
                     }
                 }
             }
@@ -359,8 +305,7 @@ fn parse_session_entries_from_reader<R: std::io::BufRead>(
 }
 
 fn get_filtered_session_content(path: &str, role_filter: RoleFilter) -> Result<String, String> {
-    let content =
-        std::fs::read_to_string(path).map_err(|e| format!("Failed to read session file: {e}"))?;
+    let content = std::fs::read_to_string(path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
     let mut full_text = String::new();
 
@@ -411,8 +356,7 @@ fn role_to_string(role_filter: RoleFilter) -> String {
 }
 
 fn get_full_session_content(path: &str) -> Result<String, String> {
-    let content =
-        std::fs::read_to_string(path).map_err(|e| format!("Failed to read session file: {e}"))?;
+    let content = std::fs::read_to_string(path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
     let mut full_text = String::new();
 
@@ -475,10 +419,8 @@ fn calculate_score(matches: &[Match], query_words: &[&str]) -> f32 {
                 let snippet_bytes = snippet_lower.as_bytes();
 
                 // Check if it is a word boundary
-                let is_word_boundary_start =
-                    pos == 0 || !snippet_bytes[pos - 1].is_ascii_alphanumeric();
-                let is_word_boundary_end = pos + word_len >= snippet_bytes.len()
-                    || !snippet_bytes[pos + word_len].is_ascii_alphanumeric();
+                let is_word_boundary_start = pos == 0 || !snippet_bytes[pos - 1].is_ascii_alphanumeric();
+                let is_word_boundary_end = pos + word_len >= snippet_bytes.len() || !snippet_bytes[pos + word_len].is_ascii_alphanumeric();
 
                 if is_word_boundary_start && is_word_boundary_end {
                     score += 0.5;

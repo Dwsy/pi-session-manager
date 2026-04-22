@@ -71,11 +71,7 @@ pub trait Provider: Send + Sync {
     fn read_session(&self, path: &Path) -> anyhow::Result<CanonicalSession>;
 
     /// Write a canonical session into this provider's native format.
-    fn write_session(
-        &self,
-        session: &CanonicalSession,
-        opts: &WriteOptions,
-    ) -> anyhow::Result<WrittenSession>;
+    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession>;
 
     /// Build the shell command to resume a session with this provider.
     fn resume_command(&self, session_id: &str) -> String;

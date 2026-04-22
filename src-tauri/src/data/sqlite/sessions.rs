@@ -1,15 +1,8 @@
 use super::deps::*;
-use super::message_index::{
-    delete_message_entries_for_session, insert_message_entries, upsert_message_entries,
-};
+use super::message_index::{delete_message_entries_for_session, insert_message_entries, upsert_message_entries};
 use super::util::parse_timestamp;
 
-pub fn upsert_session(
-    conn: &mut Connection,
-    session: &SessionInfo,
-    file_modified: DateTime<Utc>,
-    entries: Option<&[SessionEntry]>,
-) -> Result<(), String> {
+pub fn upsert_session(conn: &mut Connection, session: &SessionInfo, file_modified: DateTime<Utc>, entries: Option<&[SessionEntry]>) -> Result<(), String> {
     const MAX_RETRIES: usize = 3;
     let mut last_error = None;
 
@@ -19,9 +12,7 @@ pub fn upsert_session(
             std::thread::sleep(delay);
         }
 
-        let tx = conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(|e| format!("Failed to begin transaction: {e}"))?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|e| format!("Failed to begin transaction: {e}"))?;
 
         let result = upsert_session_in_tx(&tx, session, file_modified, entries);
 
@@ -29,8 +20,7 @@ pub fn upsert_session(
             Ok(()) => {
                 if let Err(e) = tx.commit() {
                     let err_msg = format!("Failed to commit transaction: {e}");
-                    let is_locked =
-                        err_msg.contains("database is locked") || err_msg.contains("busy");
+                    let is_locked = err_msg.contains("database is locked") || err_msg.contains("busy");
                     if is_locked && attempt < MAX_RETRIES - 1 {
                         last_error = Some(err_msg);
                         continue;
@@ -54,12 +44,7 @@ pub fn upsert_session(
     Err(last_error.unwrap_or_else(|| "Unknown upsert error".to_string()))
 }
 
-fn upsert_session_in_tx(
-    tx: &rusqlite::Transaction<'_>,
-    session: &SessionInfo,
-    file_modified: DateTime<Utc>,
-    entries: Option<&[SessionEntry]>,
-) -> Result<(), String> {
+fn upsert_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInfo, file_modified: DateTime<Utc>, entries: Option<&[SessionEntry]>) -> Result<(), String> {
     tx.execute(
         "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 0, NULL)
@@ -92,22 +77,12 @@ fn upsert_session_in_tx(
             &session.parent_session_path,
             &Utc::now().to_rfc3339(),
         ],
-    ).map_err(|e| format!("Failed to upsert session: {e}"))?;
+    )
+    .map_err(|e| format!("Failed to upsert session: {e}"))?;
 
     // Populate message_entries table if it exists (for per-message FTS)
-    if tx
-        .query_row(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'",
-            [],
-            |row| row.get::<_, String>(0),
-        )
-        .map(|_| true)
-        .unwrap_or(false)
-    {
-        debug!(
-            "[Upsert] Updating message entries for session: {}",
-            session.path
-        );
+    if tx.query_row("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, String>(0)).map(|_| true).unwrap_or(false) {
+        debug!("[Upsert] Updating message entries for session: {}", session.path);
         // Clear existing entries for this session to avoid duplicates
         delete_message_entries_for_session(tx, &session.path)?;
         // Insert fresh entries (use pre-parsed if available to avoid re-reading file)
@@ -116,10 +91,7 @@ fn upsert_session_in_tx(
         } else {
             insert_message_entries(tx, session)?;
         }
-        debug!(
-            "[Upsert] Completed message entries for session: {}",
-            session.path
-        );
+        debug!("[Upsert] Completed message entries for session: {}", session.path);
     } else {
         debug!("[Upsert] message_entries table does not exist, skipping");
     }
@@ -128,10 +100,12 @@ fn upsert_session_in_tx(
 }
 
 pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>, String> {
-    let mut stmt = conn.prepare(
-        "SELECT id, path, cwd, name, created, modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
-         FROM sessions WHERE path = ?"
-    ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, path, cwd, name, created, modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
+         FROM sessions WHERE path = ?",
+        )
+        .map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let session = stmt
         .query_row(params![path], |row| {
@@ -154,21 +128,19 @@ pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>,
         .ok();
 
     if session.is_some() {
-        conn.execute(
-            "UPDATE sessions SET access_count = access_count + 1, last_accessed = ? WHERE path = ?",
-            params![Utc::now().to_rfc3339(), path],
-        )
-        .ok();
+        conn.execute("UPDATE sessions SET access_count = access_count + 1, last_accessed = ? WHERE path = ?", params![Utc::now().to_rfc3339(), path]).ok();
     }
 
     Ok(session)
 }
 
 pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
-    let mut stmt = conn.prepare(
-        "SELECT id, path, cwd, name, created, modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
-         FROM sessions ORDER BY modified DESC, path ASC"
-    ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, path, cwd, name, created, modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
+         FROM sessions ORDER BY modified DESC, path ASC",
+        )
+        .map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let sessions = stmt
         .query_map([], |row| {
@@ -196,10 +168,12 @@ pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
 }
 
 pub fn get_all_sessions_for_list(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
-    let mut stmt = conn.prepare(
-        "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path
-         FROM sessions ORDER BY modified DESC, path ASC"
-    ).map_err(|e| format!("Failed to prepare list statement: {e}"))?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path
+         FROM sessions ORDER BY modified DESC, path ASC",
+        )
+        .map_err(|e| format!("Failed to prepare list statement: {e}"))?;
 
     let sessions = stmt
         .query_map([], |row| {
@@ -226,12 +200,8 @@ pub fn get_all_sessions_for_list(conn: &Connection) -> Result<Vec<SessionInfo>, 
     Ok(sessions)
 }
 
-pub fn get_all_cached_file_modified(
-    conn: &Connection,
-) -> Result<HashMap<String, DateTime<Utc>>, String> {
-    let mut stmt = conn
-        .prepare("SELECT path, file_modified FROM sessions")
-        .map_err(|e| format!("Failed to prepare cached modified statement: {e}"))?;
+pub fn get_all_cached_file_modified(conn: &Connection) -> Result<HashMap<String, DateTime<Utc>>, String> {
+    let mut stmt = conn.prepare("SELECT path, file_modified FROM sessions").map_err(|e| format!("Failed to prepare cached modified statement: {e}"))?;
 
     let rows = stmt
         .query_map([], |row| {
@@ -246,14 +216,13 @@ pub fn get_all_cached_file_modified(
     Ok(rows.into_iter().collect())
 }
 
-pub fn get_sessions_modified_after(
-    conn: &Connection,
-    cutoff: DateTime<Utc>,
-) -> Result<Vec<SessionInfo>, String> {
-    let mut stmt = conn.prepare(
-        "SELECT id, path, cwd, name, created, modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
-         FROM sessions WHERE modified > ? ORDER BY modified DESC, path ASC"
-    ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
+pub fn get_sessions_modified_after(conn: &Connection, cutoff: DateTime<Utc>) -> Result<Vec<SessionInfo>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, path, cwd, name, created, modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
+         FROM sessions WHERE modified > ? ORDER BY modified DESC, path ASC",
+        )
+        .map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let sessions = stmt
         .query_map(params![cutoff.to_rfc3339()], |row| {
@@ -280,14 +249,13 @@ pub fn get_sessions_modified_after(
     Ok(sessions)
 }
 
-pub fn get_sessions_modified_before(
-    conn: &Connection,
-    cutoff: DateTime<Utc>,
-) -> Result<Vec<SessionInfo>, String> {
-    let mut stmt = conn.prepare(
-        "SELECT id, path, cwd, name, created, modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
-         FROM sessions WHERE modified <= ? ORDER BY modified DESC, path ASC"
-    ).map_err(|e| format!("Failed to prepare statement: {e}"))?;
+pub fn get_sessions_modified_before(conn: &Connection, cutoff: DateTime<Utc>) -> Result<Vec<SessionInfo>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, path, cwd, name, created, modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
+         FROM sessions WHERE modified <= ? ORDER BY modified DESC, path ASC",
+        )
+        .map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let sessions = stmt
         .query_map(params![cutoff.to_rfc3339()], |row| {

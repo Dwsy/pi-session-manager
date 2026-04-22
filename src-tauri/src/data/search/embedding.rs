@@ -26,13 +26,7 @@ pub struct EmbeddingConfig {
 impl Default for EmbeddingConfig {
     fn default() -> Self {
         let home = crate::paths::pi_root_dir().unwrap_or_default();
-        Self {
-            enabled: true,
-            model_path: home.join("models/embedding-models/embeddinggemma-300M-Q8_0.gguf"),
-            port: 11435,
-            auto_release_minutes: 5,
-            node_path: None,
-        }
+        Self { enabled: true, model_path: home.join("models/embedding-models/embeddinggemma-300M-Q8_0.gguf"), port: 11435, auto_release_minutes: 5, node_path: None }
     }
 }
 
@@ -49,11 +43,7 @@ impl EmbeddingService {
         &self.config
     }
     pub fn new(config: EmbeddingConfig) -> Self {
-        Self {
-            config,
-            child_process: Arc::new(Mutex::new(None)),
-            last_used: Arc::new(Mutex::new(std::time::Instant::now())),
-        }
+        Self { config, child_process: Arc::new(Mutex::new(None)), last_used: Arc::new(Mutex::new(std::time::Instant::now())) }
     }
 
     /// Ensure the embedding server is running
@@ -73,30 +63,15 @@ impl EmbeddingService {
     /// Start the embedding server process
     async fn start(&self, child: &mut Option<Child>) -> Result<(), String> {
         if !self.config.model_path.exists() {
-            return Err(format!(
-                "Model file not found: {}",
-                self.config.model_path.display()
-            ));
+            return Err(format!("Model file not found: {}", self.config.model_path.display()));
         }
 
         let node = self.config.node_path.as_deref().unwrap_or("node");
         let script_path = Self::get_server_script_path()?;
 
-        info!(
-            "Starting embedding server with model: {}",
-            self.config.model_path.display()
-        );
+        info!("Starting embedding server with model: {}", self.config.model_path.display());
 
-        let new_child = Command::new(node)
-            .arg(&script_path)
-            .arg("--model")
-            .arg(&self.config.model_path)
-            .arg("--port")
-            .arg(self.config.port.to_string())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("Failed to start embedding server: {e}"))?;
+        let new_child = Command::new(node).arg(&script_path).arg("--model").arg(&self.config.model_path).arg("--port").arg(self.config.port.to_string()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().map_err(|e| format!("Failed to start embedding server: {e}"))?;
 
         *child = Some(new_child);
 
@@ -142,11 +117,7 @@ impl EmbeddingService {
     /// Get the path to the embedding server script
     fn get_server_script_path() -> Result<PathBuf, String> {
         // Try to find the script relative to the executable
-        let exe_dir = std::env::current_exe()
-            .map_err(|e| format!("Failed to get exe dir: {e}"))?
-            .parent()
-            .ok_or("No parent dir")?
-            .to_path_buf();
+        let exe_dir = std::env::current_exe().map_err(|e| format!("Failed to get exe dir: {e}"))?.parent().ok_or("No parent dir")?.to_path_buf();
 
         let script_path = exe_dir.join("embedding-server.mjs");
         if script_path.exists() {
@@ -154,9 +125,7 @@ impl EmbeddingService {
         }
 
         // Fallback to project directory
-        let project_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("scripts")
-            .join("embedding-server.mjs");
+        let project_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("scripts").join("embedding-server.mjs");
 
         if project_path.exists() {
             return Ok(project_path);
@@ -182,10 +151,7 @@ impl EmbeddingService {
                 if idle_duration > Duration::from_secs(minutes * 60) {
                     let child_exists = self.child_process.lock().await.is_some();
                     if child_exists {
-                        info!(
-                            "Auto-releasing embedding server after {} minutes idle",
-                            minutes
-                        );
+                        info!("Auto-releasing embedding server after {} minutes idle", minutes);
                         self.stop().await;
                     }
                 }
@@ -239,34 +205,15 @@ pub struct EmbeddingStatusResponse {
 }
 
 fn cors_headers() -> [(&'static str, &'static str); 3] {
-    [
-        ("access-control-allow-origin", "*"),
-        ("access-control-allow-methods", "GET, POST, OPTIONS"),
-        (
-            "access-control-allow-headers",
-            "content-type, authorization",
-        ),
-    ]
+    [("access-control-allow-origin", "*"), ("access-control-allow-methods", "GET, POST, OPTIONS"), ("access-control-allow-headers", "content-type, authorization")]
 }
 
 /// POST /v1/embedding - Generate embedding for single text
-pub async fn v1_embedding(
-    State(service): State<Arc<EmbeddingService>>,
-    Json(req): Json<EmbeddingRequest>,
-) -> impl IntoResponse {
+pub async fn v1_embedding(State(service): State<Arc<EmbeddingService>>, Json(req): Json<EmbeddingRequest>) -> impl IntoResponse {
     let endpoint = match service.ensure_running().await {
         Ok(url) => url,
         Err(e) => {
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                cors_headers(),
-                Json(EmbeddingResponse {
-                    success: false,
-                    data: None,
-                    error: Some(e),
-                }),
-            )
-                .into_response();
+            return (StatusCode::SERVICE_UNAVAILABLE, cors_headers(), Json(EmbeddingResponse { success: false, data: None, error: Some(e) })).into_response();
         }
     };
 
@@ -281,61 +228,18 @@ pub async fn v1_embedding(
     match client.post(&url).json(&payload).send().await {
         Ok(resp) => match resp.json::<Value>().await {
             Ok(data) => {
-                let embedding = data
-                    .get("embedding")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_f64().map(|f| f as f32))
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default();
+                let embedding = data.get("embedding").and_then(|v| v.as_array()).map(|arr| arr.iter().filter_map(|v| v.as_f64().map(|f| f as f32)).collect::<Vec<_>>()).unwrap_or_default();
 
-                (
-                    StatusCode::OK,
-                    cors_headers(),
-                    Json(EmbeddingResponse {
-                        success: true,
-                        data: Some(EmbeddingData {
-                            dimensions: embedding.len(),
-                            embedding,
-                            model: "embeddinggemma-300m-qat-q8_0".to_string(),
-                            normalized: req.normalize,
-                        }),
-                        error: None,
-                    }),
-                )
-                    .into_response()
+                (StatusCode::OK, cors_headers(), Json(EmbeddingResponse { success: true, data: Some(EmbeddingData { dimensions: embedding.len(), embedding, model: "embeddinggemma-300m-qat-q8_0".to_string(), normalized: req.normalize }), error: None })).into_response()
             }
-            Err(e) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                cors_headers(),
-                Json(EmbeddingResponse {
-                    success: false,
-                    data: None,
-                    error: Some(format!("Failed to parse response: {e}")),
-                }),
-            )
-                .into_response(),
+            Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, cors_headers(), Json(EmbeddingResponse { success: false, data: None, error: Some(format!("Failed to parse response: {e}")) })).into_response(),
         },
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            cors_headers(),
-            Json(EmbeddingResponse {
-                success: false,
-                data: None,
-                error: Some(format!("Request failed: {e}")),
-            }),
-        )
-            .into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, cors_headers(), Json(EmbeddingResponse { success: false, data: None, error: Some(format!("Request failed: {e}")) })).into_response(),
     }
 }
 
 /// POST /v1/embedding/batch - Generate embeddings for multiple texts
-pub async fn v1_embedding_batch(
-    State(service): State<Arc<EmbeddingService>>,
-    Json(req): Json<EmbeddingBatchRequest>,
-) -> impl IntoResponse {
+pub async fn v1_embedding_batch(State(service): State<Arc<EmbeddingService>>, Json(req): Json<EmbeddingBatchRequest>) -> impl IntoResponse {
     let endpoint = match service.ensure_running().await {
         Ok(url) => url,
         Err(e) => {
@@ -393,9 +297,7 @@ pub async fn v1_embedding_batch(
 }
 
 /// GET /v1/embedding/status - Get embedding service status
-pub async fn v1_embedding_status(
-    State(service): State<Arc<EmbeddingService>>,
-) -> impl IntoResponse {
+pub async fn v1_embedding_status(State(service): State<Arc<EmbeddingService>>) -> impl IntoResponse {
     let endpoint = format!("http://127.0.0.1:{}/health", service.config.port);
 
     let (ready, model_loaded) = match reqwest::get(&endpoint).await {
@@ -403,16 +305,5 @@ pub async fn v1_embedding_status(
         _ => (false, false),
     };
 
-    (
-        StatusCode::OK,
-        cors_headers(),
-        Json(EmbeddingStatusResponse {
-            ready,
-            model_loaded,
-            model: Some("embeddinggemma-300m-qat-q8_0".to_string()),
-            dimensions: 768,
-            memory_mb: None,
-        }),
-    )
-        .into_response()
+    (StatusCode::OK, cors_headers(), Json(EmbeddingStatusResponse { ready, model_loaded, model: Some("embeddinggemma-300m-qat-q8_0".to_string()), dimensions: 768, memory_mb: None })).into_response()
 }

@@ -5,30 +5,12 @@ use crate::{export, scanner, stats};
 
 fn filter_sessions_for_stats(sessions: Vec<SessionInfo>) -> Vec<SessionInfo> {
     let config = crate::config::Config::load().unwrap_or_default();
-    sessions
-        .into_iter()
-        .filter(|session| {
-            crate::domain::session_bridge::is_session_allowed_in_stats(
-                std::path::Path::new(&session.path),
-                &config,
-            )
-        })
-        .collect()
+    sessions.into_iter().filter(|session| crate::domain::session_bridge::is_session_allowed_in_stats(std::path::Path::new(&session.path), &config)).collect()
 }
 
-fn filter_session_stat_inputs_for_stats(
-    sessions: Vec<stats::SessionStatsInput>,
-) -> Vec<stats::SessionStatsInput> {
+fn filter_session_stat_inputs_for_stats(sessions: Vec<stats::SessionStatsInput>) -> Vec<stats::SessionStatsInput> {
     let config = crate::config::Config::load().unwrap_or_default();
-    sessions
-        .into_iter()
-        .filter(|session| {
-            crate::domain::session_bridge::is_session_allowed_in_stats(
-                std::path::Path::new(&session.path),
-                &config,
-            )
-        })
-        .collect()
+    sessions.into_iter().filter(|session| crate::domain::session_bridge::is_session_allowed_in_stats(std::path::Path::new(&session.path), &config)).collect()
 }
 
 // Re-export from domain
@@ -83,33 +65,12 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn scan_sessions_paginated(
-    offset: Option<usize>,
-    limit: Option<usize>,
-    search_query: Option<String>,
-    project_filter: Option<String>,
-    filter_tag_ids: Option<Vec<String>>,
-    source_filter_slugs: Option<Vec<String>>,
-    sort_by: Option<String>,
-) -> Result<PaginatedSessionsResult, String> {
-    super::session_list::scan_sessions_paginated_impl(
-        offset,
-        limit,
-        search_query,
-        project_filter,
-        filter_tag_ids,
-        source_filter_slugs,
-        sort_by,
-    )
-    .await
+pub async fn scan_sessions_paginated(offset: Option<usize>, limit: Option<usize>, search_query: Option<String>, project_filter: Option<String>, filter_tag_ids: Option<Vec<String>>, source_filter_slugs: Option<Vec<String>>, sort_by: Option<String>) -> Result<PaginatedSessionsResult, String> {
+    super::session_list::scan_sessions_paginated_impl(offset, limit, search_query, project_filter, filter_tag_ids, source_filter_slugs, sort_by).await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn read_session_file_chunk(
-    path: String,
-    offset: Option<u64>,
-    max_bytes: Option<usize>,
-) -> Result<SessionChunk, String> {
+pub async fn read_session_file_chunk(path: String, offset: Option<u64>, max_bytes: Option<usize>) -> Result<SessionChunk, String> {
     super::session_file::read_session_file_chunk_impl(path, offset, max_bytes).await
 }
 
@@ -119,18 +80,12 @@ pub async fn read_session_file(path: String) -> Result<String, String> {
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn read_session_file_incremental(
-    path: String,
-    from_line: usize,
-) -> Result<(usize, String), String> {
+pub async fn read_session_file_incremental(path: String, from_line: usize) -> Result<(usize, String), String> {
     super::session_file::read_session_file_incremental_impl(path, from_line).await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn read_session_file_incremental_offset(
-    path: String,
-    from_offset: u64,
-) -> Result<(u64, String), String> {
+pub async fn read_session_file_incremental_offset(path: String, from_offset: u64) -> Result<(u64, String), String> {
     super::session_file::read_session_file_incremental_offset_impl(path, from_offset).await
 }
 
@@ -161,11 +116,7 @@ pub async fn delete_sessions(paths: Vec<String>) -> Result<DeleteSessionsResult,
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn export_session(
-    path: String,
-    format: String,
-    output_path: String,
-) -> Result<(), String> {
+pub async fn export_session(path: String, format: String, output_path: String) -> Result<(), String> {
     export::export_session(&path, &format, &output_path).await
 }
 
@@ -175,10 +126,7 @@ pub async fn rename_session(path: String, new_name: String) -> Result<(), String
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn fork_session(
-    source_path: String,
-    target_name: Option<String>,
-) -> Result<SessionInfo, String> {
+pub async fn fork_session(source_path: String, target_name: Option<String>) -> Result<SessionInfo, String> {
     super::session_file::fork_session_impl(source_path, target_name).await
 }
 
@@ -188,33 +136,19 @@ pub async fn get_session_stats(sessions: Vec<SessionInfo>) -> Result<stats::Sess
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn get_session_stats_light(
-    sessions: Vec<stats::SessionStatsInput>,
-) -> Result<stats::SessionStats, String> {
-    Ok(stats::calculate_stats_from_inputs(
-        &filter_session_stat_inputs_for_stats(sessions),
-    ))
+pub async fn get_session_stats_light(sessions: Vec<stats::SessionStatsInput>) -> Result<stats::SessionStats, String> {
+    Ok(stats::calculate_stats_from_inputs(&filter_session_stat_inputs_for_stats(sessions)))
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn get_day_stats(
-    date: String,
-    sessions: Vec<SessionInfo>,
-) -> Result<stats::DayStats, String> {
+pub async fn get_day_stats(date: String, sessions: Vec<SessionInfo>) -> Result<stats::DayStats, String> {
     let sessions = filter_sessions_for_stats(sessions);
     stats::get_day_stats(&date, &sessions)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn open_session_in_terminal(
-    path: String,
-    cwd: String,
-    terminal: Option<String>,
-    pi_path: Option<String>,
-    resume_command: Option<String>,
-) -> Result<(), String> {
-    super::session_open::open_session_in_terminal_impl(path, cwd, terminal, pi_path, resume_command)
-        .await
+pub async fn open_session_in_terminal(path: String, cwd: String, terminal: Option<String>, pi_path: Option<String>, resume_command: Option<String>) -> Result<(), String> {
+    super::session_open::open_session_in_terminal_impl(path, cwd, terminal, pi_path, resume_command).await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -229,9 +163,7 @@ pub async fn open_path_in_system(path: String) -> Result<(), String> {
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn detect_session_format(path: String) -> Result<String, String> {
-    let (provider, _) = crate::domain::session_bridge::read_canonical_session_from_path(
-        std::path::Path::new(&path),
-    )?;
+    let (provider, _) = crate::domain::session_bridge::read_canonical_session_from_path(std::path::Path::new(&path))?;
     Ok(provider.display_name().to_string())
 }
 
@@ -239,33 +171,14 @@ pub async fn detect_session_format(path: String) -> Result<String, String> {
 pub async fn list_supported_session_providers() -> Result<Vec<SessionProviderInfo>, String> {
     Ok(crate::domain::session_bridge::SessionBridgeSource::ALL
         .into_iter()
-        .map(|source| SessionProviderInfo {
-            slug: source.slug().replace('_', "-"),
-            display_name: source.display_name().to_string(),
-            capabilities: SessionProviderCapabilities {
-                can_scan: source.can_scan(),
-                can_convert_target: source.can_convert_target(),
-            },
-        })
+        .map(|source| SessionProviderInfo { slug: source.slug().replace('_', "-"), display_name: source.display_name().to_string(), capabilities: SessionProviderCapabilities { can_scan: source.can_scan(), can_convert_target: source.can_convert_target() } })
         .collect())
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn convert_session_format(
-    path: String,
-    target_format: String,
-    dry_run: Option<bool>,
-    force: Option<bool>,
-) -> Result<SessionBridgeConvertResult, String> {
+pub async fn convert_session_format(path: String, target_format: String, dry_run: Option<bool>, force: Option<bool>) -> Result<SessionBridgeConvertResult, String> {
     let target = crate::domain::session_bridge::SessionBridgeSource::parse_alias(&target_format)?;
-    crate::domain::session_bridge::convert_session_format(
-        std::path::Path::new(&path),
-        target,
-        crate::domain::session_bridge::SessionBridgeConvertOptions {
-            dry_run: dry_run.unwrap_or(false),
-            force: force.unwrap_or(false),
-        },
-    )
+    crate::domain::session_bridge::convert_session_format(std::path::Path::new(&path), target, crate::domain::session_bridge::SessionBridgeConvertOptions { dry_run: dry_run.unwrap_or(false), force: force.unwrap_or(false) })
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -282,11 +195,7 @@ mod tests {
     async fn get_session_stats_excludes_external_sessions_by_default() {
         let pi_root = crate::paths::pi_agent_sessions_dir().expect("pi sessions dir");
         let pi_session = SessionInfo {
-            path: pi_root
-                .join("foo")
-                .join("pi.jsonl")
-                .to_string_lossy()
-                .to_string(),
+            path: pi_root.join("foo").join("pi.jsonl").to_string_lossy().to_string(),
             id: "pi-1".to_string(),
             cwd: "/repo/pi".to_string(),
             name: Some("Pi".to_string()),
@@ -316,9 +225,7 @@ mod tests {
             parent_session_path: None,
         };
 
-        let stats = get_session_stats(vec![pi_session, codex_session])
-            .await
-            .expect("stats");
+        let stats = get_session_stats(vec![pi_session, codex_session]).await.expect("stats");
         assert_eq!(stats.total_sessions, 1);
         assert_eq!(stats.total_messages, 10);
     }

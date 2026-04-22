@@ -54,13 +54,7 @@ struct State {
 
 impl ReentrantMutex {
     fn new() -> Self {
-        Self {
-            state: Mutex::new(State {
-                owner: None,
-                depth: 0,
-            }),
-            cvar: Condvar::new(),
-        }
+        Self { state: Mutex::new(State { owner: None, depth: 0 }), cvar: Condvar::new() }
     }
 
     fn lock(&'static self) -> EnvLockGuard<'static> {
@@ -84,10 +78,7 @@ impl ReentrantMutex {
             }
         }
 
-        EnvLockGuard {
-            lock: self,
-            _nosend: PhantomData,
-        }
+        EnvLockGuard { lock: self, _nosend: PhantomData }
     }
 
     fn unlock(&self) {

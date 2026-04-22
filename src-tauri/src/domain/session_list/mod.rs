@@ -17,15 +17,7 @@ pub use sorting::*;
 pub use types::*;
 
 /// Main entry point: scan sessions with pagination, filtering, and sorting
-pub async fn scan_sessions_paginated_impl(
-    offset: Option<usize>,
-    limit: Option<usize>,
-    search_query: Option<String>,
-    project_filter: Option<String>,
-    filter_tag_ids: Option<Vec<String>>,
-    source_filter_slugs: Option<Vec<String>>,
-    sort_by: Option<String>,
-) -> Result<PaginatedSessionsResult, String> {
+pub async fn scan_sessions_paginated_impl(offset: Option<usize>, limit: Option<usize>, search_query: Option<String>, project_filter: Option<String>, filter_tag_ids: Option<Vec<String>>, source_filter_slugs: Option<Vec<String>>, sort_by: Option<String>) -> Result<PaginatedSessionsResult, String> {
     use crate::{config, scanner};
 
     let mut sessions = if let Some(cached) = scanner::get_cached_sessions_for_list() {
@@ -35,29 +27,21 @@ pub async fn scan_sessions_paginated_impl(
         let conn = crate::data::sqlite::init_db_with_config(&config)?;
         let db_sessions = crate::data::sqlite::get_all_sessions_for_list(&conn)?;
         if db_sessions.is_empty() {
-            scanner::scan_sessions()
-                .await?
-                .into_iter()
-                .map(|session| strip_session_list_payload(&session))
-                .collect()
-        } else {
-            db_sessions
+            // Keep the paginated endpoint non-blocking on cold start, but warm the
+            // in-memory cache/database in the background so follow-up refreshes do
+            // not stay empty until the user manually rescans.
+            tauri::async_runtime::spawn(async {
+                let _ = scanner::scan_sessions().await;
+            });
         }
+        db_sessions
     };
 
-    if let Some(project) = project_filter
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
+    if let Some(project) = project_filter.as_deref().map(str::trim).filter(|value| !value.is_empty()) {
         sessions.retain(|session| session_matches_project_filter(session, project));
     }
 
-    if let Some(query) = search_query
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
+    if let Some(query) = search_query.as_deref().map(str::trim).filter(|value| !value.is_empty()) {
         sessions.retain(|session| session_matches_search_query(session, query));
     }
 

@@ -23,9 +23,7 @@ pub struct ConfigVersionMeta {
 }
 
 fn history_dir() -> Result<PathBuf, String> {
-    let dir = crate::unified_config::config_root_dir()?
-        .join("history")
-        .join("config-versions");
+    let dir = crate::unified_config::config_root_dir()?.join("history").join("config-versions");
     fs::create_dir_all(&dir).map_err(|e| format!("Create history dir: {e}"))?;
     Ok(dir)
 }
@@ -69,10 +67,7 @@ fn next_snapshot_id() -> Result<i64, String> {
 fn prune_versions(file_path: &str) -> Result<(), String> {
     let versions = load_all_versions()?;
     let mut kept = 0usize;
-    for version in versions
-        .into_iter()
-        .filter(|version| version.file_path == file_path)
-    {
+    for version in versions.into_iter().filter(|version| version.file_path == file_path) {
         kept += 1;
         if kept <= MAX_CONFIG_VERSIONS {
             continue;
@@ -87,22 +82,13 @@ fn prune_versions(file_path: &str) -> Result<(), String> {
 
 pub fn save_config_snapshot(file_path: &str, content: &str) -> Result<(), String> {
     let id = next_snapshot_id()?;
-    let version = ConfigVersion {
-        id,
-        file_path: file_path.to_string(),
-        content: content.to_string(),
-        created_at: crate::unified_config::snapshot_timestamp(),
-        size_bytes: content.len(),
-    };
-    let serialized =
-        serde_json::to_string_pretty(&version).map_err(|e| format!("Serialize snapshot: {e}"))?;
+    let version = ConfigVersion { id, file_path: file_path.to_string(), content: content.to_string(), created_at: crate::unified_config::snapshot_timestamp(), size_bytes: content.len() };
+    let serialized = serde_json::to_string_pretty(&version).map_err(|e| format!("Serialize snapshot: {e}"))?;
     fs::write(snapshot_path(id)?, serialized).map_err(|e| format!("Write snapshot: {e}"))?;
     prune_versions(file_path)
 }
 
-pub async fn list_config_versions_internal(
-    file_path: Option<String>,
-) -> Result<Vec<ConfigVersionMeta>, String> {
+pub async fn list_config_versions_internal(file_path: Option<String>) -> Result<Vec<ConfigVersionMeta>, String> {
     let versions = load_all_versions()?;
     Ok(versions
         .into_iter()
@@ -111,19 +97,12 @@ pub async fn list_config_versions_internal(
             None => true,
         })
         .take(MAX_CONFIG_VERSIONS)
-        .map(|version| ConfigVersionMeta {
-            id: version.id,
-            file_path: version.file_path,
-            created_at: version.created_at,
-            size_bytes: version.size_bytes,
-        })
+        .map(|version| ConfigVersionMeta { id: version.id, file_path: version.file_path, created_at: version.created_at, size_bytes: version.size_bytes })
         .collect())
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn list_config_versions(
-    file_path: Option<String>,
-) -> Result<Vec<ConfigVersionMeta>, String> {
+pub async fn list_config_versions(file_path: Option<String>) -> Result<Vec<ConfigVersionMeta>, String> {
     list_config_versions_internal(file_path).await
 }
 

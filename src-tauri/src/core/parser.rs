@@ -3,27 +3,17 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
 fn get_u64_field(value: &Value, keys: &[&str]) -> u64 {
-    keys.iter()
-        .find_map(|key| value.get(*key).and_then(|item| item.as_u64()))
-        .unwrap_or(0)
+    keys.iter().find_map(|key| value.get(*key).and_then(|item| item.as_u64())).unwrap_or(0)
 }
 
 fn get_f64_field(value: &Value, keys: &[&str]) -> f64 {
-    keys.iter()
-        .find_map(|key| value.get(*key).and_then(|item| item.as_f64()))
-        .unwrap_or(0.0)
+    keys.iter().find_map(|key| value.get(*key).and_then(|item| item.as_f64())).unwrap_or(0.0)
 }
 
 fn find_usage_object(value: &Value) -> Option<&Value> {
     match value {
         Value::Object(map) => {
-            if map.contains_key("input")
-                || map.contains_key("output")
-                || map.contains_key("cacheRead")
-                || map.contains_key("cacheWrite")
-                || map.contains_key("cache_read")
-                || map.contains_key("cache_write")
-            {
+            if map.contains_key("input") || map.contains_key("output") || map.contains_key("cacheRead") || map.contains_key("cacheWrite") || map.contains_key("cache_read") || map.contains_key("cache_write") {
                 return Some(value);
             }
 
@@ -56,22 +46,10 @@ fn apply_usage_to_details(details: &mut SessionDetails, model_name: Option<&str>
     details.cache_read_tokens += cache_read;
     details.cache_write_tokens += cache_write;
 
-    let input_cost = usage
-        .get("cost")
-        .map(|cost| get_f64_field(cost, &["input", "input_cost"]))
-        .unwrap_or(0.0);
-    let output_cost = usage
-        .get("cost")
-        .map(|cost| get_f64_field(cost, &["output", "output_cost"]))
-        .unwrap_or(0.0);
-    let cache_read_cost = usage
-        .get("cost")
-        .map(|cost| get_f64_field(cost, &["cacheRead", "cache_read", "cache_read_cost"]))
-        .unwrap_or(0.0);
-    let cache_write_cost = usage
-        .get("cost")
-        .map(|cost| get_f64_field(cost, &["cacheWrite", "cache_write", "cache_write_cost"]))
-        .unwrap_or(0.0);
+    let input_cost = usage.get("cost").map(|cost| get_f64_field(cost, &["input", "input_cost"])).unwrap_or(0.0);
+    let output_cost = usage.get("cost").map(|cost| get_f64_field(cost, &["output", "output_cost"])).unwrap_or(0.0);
+    let cache_read_cost = usage.get("cost").map(|cost| get_f64_field(cost, &["cacheRead", "cache_read", "cache_read_cost"])).unwrap_or(0.0);
+    let cache_write_cost = usage.get("cost").map(|cost| get_f64_field(cost, &["cacheWrite", "cache_write", "cache_write_cost"])).unwrap_or(0.0);
 
     details.input_cost += input_cost;
     details.output_cost += output_cost;
@@ -101,9 +79,7 @@ pub struct SessionModelUsage {
 
 /// Parse session file to extract detailed statistics
 pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
-    if let Ok((_, session)) =
-        crate::domain::session_bridge::read_canonical_session_from_str(jsonl_content, None)
-    {
+    if let Ok((_, session)) = crate::domain::session_bridge::read_canonical_session_from_str(jsonl_content, None) {
         let mut details = SessionDetails::default();
         let mut model_set: HashSet<String> = HashSet::new();
         let mut first_message_time: Option<chrono::DateTime<chrono::Utc>> = None;
@@ -121,8 +97,7 @@ pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
                     }
                 }
                 crate::domain::session_bridge::MessageRole::Tool => details.tool_results += 1,
-                crate::domain::session_bridge::MessageRole::System
-                | crate::domain::session_bridge::MessageRole::Other(_) => {}
+                crate::domain::session_bridge::MessageRole::System | crate::domain::session_bridge::MessageRole::Other(_) => {}
             }
 
             if let Some(usage) = find_usage_object(&message.extra) {
@@ -190,8 +165,7 @@ pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
                                 details.cache_read_tokens += cache_read;
                                 details.cache_write_tokens += cache_write;
 
-                                let model_usage =
-                                    details.model_usage.entry(model_name).or_default();
+                                let model_usage = details.model_usage.entry(model_name).or_default();
                                 model_usage.messages += 1;
                                 model_usage.input_tokens += input;
                                 model_usage.output_tokens += output;
@@ -202,17 +176,13 @@ pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
                                     let input_cost = cost["input"].as_f64().unwrap_or(0.0);
                                     let output_cost = cost["output"].as_f64().unwrap_or(0.0);
                                     let cache_read_cost = cost["cacheRead"].as_f64().unwrap_or(0.0);
-                                    let cache_write_cost =
-                                        cost["cacheWrite"].as_f64().unwrap_or(0.0);
+                                    let cache_write_cost = cost["cacheWrite"].as_f64().unwrap_or(0.0);
 
                                     details.input_cost += input_cost;
                                     details.output_cost += output_cost;
                                     details.cache_read_cost += cache_read_cost;
                                     details.cache_write_cost += cache_write_cost;
-                                    model_usage.cost += input_cost
-                                        + output_cost
-                                        + cache_read_cost
-                                        + cache_write_cost;
+                                    model_usage.cost += input_cost + output_cost + cache_read_cost + cache_write_cost;
                                 }
                             }
                         }
@@ -225,10 +195,8 @@ pub fn parse_session_details(jsonl_content: &str) -> SessionDetails {
                 if let Some(timestamp_str) = value["timestamp"].as_str() {
                     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(timestamp_str) {
                         let utc_time = dt.with_timezone(&chrono::Utc);
-                        first_message_time =
-                            Some(first_message_time.unwrap_or(utc_time).min(utc_time));
-                        last_message_time =
-                            Some(last_message_time.unwrap_or(utc_time).max(utc_time));
+                        first_message_time = Some(first_message_time.unwrap_or(utc_time).min(utc_time));
+                        last_message_time = Some(last_message_time.unwrap_or(utc_time).max(utc_time));
                     }
                 }
             } else if entry_type == "compaction" {

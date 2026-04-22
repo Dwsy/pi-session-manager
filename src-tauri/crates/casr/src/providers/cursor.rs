@@ -34,10 +34,7 @@ use rusqlite::{Connection, OpenFlags};
 use tracing::{debug, info, trace, warn};
 
 use crate::discovery::DetectionResult;
-use crate::model::{
-    CanonicalMessage, CanonicalSession, MessageRole, flatten_content, normalize_role,
-    parse_timestamp, reindex_messages, truncate_title,
-};
+use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// Cursor AI provider implementation.
@@ -114,33 +111,21 @@ impl Cursor {
 
     /// Open a SQLite database read-only with a busy timeout.
     fn open_db(path: &Path) -> anyhow::Result<Connection> {
-        let conn = Connection::open_with_flags(
-            path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
-        .with_context(|| format!("failed to open Cursor DB: {}", path.display()))?;
+        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).with_context(|| format!("failed to open Cursor DB: {}", path.display()))?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         Ok(conn)
     }
 
     /// Open a SQLite database read-write (for writer).
     fn open_db_rw(path: &Path) -> anyhow::Result<Connection> {
-        let conn = Connection::open_with_flags(
-            path,
-            OpenFlags::SQLITE_OPEN_READ_WRITE
-                | OpenFlags::SQLITE_OPEN_CREATE
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
-        .with_context(|| format!("failed to open Cursor DB for writing: {}", path.display()))?;
+        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_NO_MUTEX).with_context(|| format!("failed to open Cursor DB for writing: {}", path.display()))?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         Ok(conn)
     }
 
     /// Check if a table exists in the database.
     fn table_exists(conn: &Connection, table: &str) -> bool {
-        conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1")
-            .and_then(|mut stmt| stmt.exists(rusqlite::params![table]))
-            .unwrap_or(false)
+        conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1").and_then(|mut stmt| stmt.exists(rusqlite::params![table])).unwrap_or(false)
     }
 
     /// List all composer IDs from the cursorDiskKV table.
@@ -149,22 +134,18 @@ impl Cursor {
             return vec![];
         }
 
-        let mut stmt =
-            match conn.prepare("SELECT key FROM cursorDiskKV WHERE key LIKE 'composerData:%'") {
-                Ok(s) => s,
-                Err(e) => {
-                    warn!(error = %e, "failed to query composerData keys");
-                    return vec![];
-                }
-            };
+        let mut stmt = match conn.prepare("SELECT key FROM cursorDiskKV WHERE key LIKE 'composerData:%'") {
+            Ok(s) => s,
+            Err(e) => {
+                warn!(error = %e, "failed to query composerData keys");
+                return vec![];
+            }
+        };
 
         let ids: Vec<String> = stmt
             .query_map([], |row| {
                 let key: String = row.get(0)?;
-                Ok(key
-                    .strip_prefix("composerData:")
-                    .unwrap_or(&key)
-                    .to_string())
+                Ok(key.strip_prefix("composerData:").unwrap_or(&key).to_string())
             })
             .ok()
             .into_iter()
@@ -179,19 +160,14 @@ impl Cursor {
     ///
     /// Key format: `bubbleId:{composerId}:{bubbleId}`
     /// Uses range query `key >= prefix AND key < prefix_upper` for index leverage.
-    fn fetch_bubbles(
-        conn: &Connection,
-        composer_id: &str,
-    ) -> std::collections::HashMap<String, serde_json::Value> {
+    fn fetch_bubbles(conn: &Connection, composer_id: &str) -> std::collections::HashMap<String, serde_json::Value> {
         let prefix = format!("bubbleId:{composer_id}:");
         // Increment last char for upper bound.
         let prefix_upper = format!("bubbleId:{composer_id};");
 
         let mut bubbles = std::collections::HashMap::new();
 
-        let mut stmt = match conn
-            .prepare("SELECT key, value FROM cursorDiskKV WHERE key >= ?1 AND key < ?2")
-        {
+        let mut stmt = match conn.prepare("SELECT key, value FROM cursorDiskKV WHERE key >= ?1 AND key < ?2") {
             Ok(s) => s,
             Err(e) => {
                 warn!(error = %e, "failed to query bubble data");
@@ -224,22 +200,11 @@ impl Cursor {
     }
 
     /// Read a single session from a composerData entry.
-    fn read_composer_session(
-        conn: &Connection,
-        composer_id: &str,
-        db_path: &Path,
-    ) -> anyhow::Result<CanonicalSession> {
+    fn read_composer_session(conn: &Connection, composer_id: &str, db_path: &Path) -> anyhow::Result<CanonicalSession> {
         // Fetch the composerData entry.
-        let composer_json: String = conn
-            .query_row(
-                "SELECT value FROM cursorDiskKV WHERE key = ?1",
-                rusqlite::params![format!("composerData:{composer_id}")],
-                |row| row.get(0),
-            )
-            .with_context(|| format!("composerData not found for {composer_id}"))?;
+        let composer_json: String = conn.query_row("SELECT value FROM cursorDiskKV WHERE key = ?1", rusqlite::params![format!("composerData:{composer_id}")], |row| row.get(0)).with_context(|| format!("composerData not found for {composer_id}"))?;
 
-        let composer: serde_json::Value =
-            serde_json::from_str(&composer_json).context("invalid composerData JSON")?;
+        let composer: serde_json::Value = serde_json::from_str(&composer_json).context("invalid composerData JSON")?;
 
         // Fetch all bubbles for this composer.
         let bubbles = Self::fetch_bubbles(conn, composer_id);
@@ -248,15 +213,9 @@ impl Cursor {
     }
 
     /// Parse a composerData entry + bubbles into a CanonicalSession.
-    fn parse_composer(
-        composer_id: &str,
-        composer: &serde_json::Value,
-        bubbles: &std::collections::HashMap<String, serde_json::Value>,
-        source_path: &Path,
-    ) -> anyhow::Result<CanonicalSession> {
+    fn parse_composer(composer_id: &str, composer: &serde_json::Value, bubbles: &std::collections::HashMap<String, serde_json::Value>, source_path: &Path) -> anyhow::Result<CanonicalSession> {
         let mut messages: Vec<CanonicalMessage> = Vec::new();
-        let mut model_counts: std::collections::HashMap<String, usize> =
-            std::collections::HashMap::new();
+        let mut model_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         let mut started_at: Option<i64> = None;
         let mut ended_at: Option<i64> = None;
 
@@ -269,19 +228,12 @@ impl Cursor {
         }
 
         // Extract workspace from bubbles.
-        let workspace = extract_workspace_from_bubbles(bubbles)
-            .or_else(|| extract_workspace_from_composer(composer));
+        let workspace = extract_workspace_from_bubbles(bubbles).or_else(|| extract_workspace_from_composer(composer));
 
         // Try modern v0.40+ format: fullConversationHeadersOnly.
-        if let Some(headers) = composer
-            .get("fullConversationHeadersOnly")
-            .and_then(|v| v.as_array())
-        {
+        if let Some(headers) = composer.get("fullConversationHeadersOnly").and_then(|v| v.as_array()) {
             for header in headers {
-                let bubble_id = header
-                    .get("bubbleId")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let bubble_id = header.get("bubbleId").and_then(|v| v.as_str()).unwrap_or("");
                 if bubble_id.is_empty() {
                     continue;
                 }
@@ -294,9 +246,7 @@ impl Cursor {
                     }
                 };
 
-                if let Some(msg) =
-                    parse_bubble(bubble, &mut model_counts, &mut started_at, &mut ended_at)
-                {
+                if let Some(msg) = parse_bubble(bubble, &mut model_counts, &mut started_at, &mut ended_at) {
                     messages.push(msg);
                 }
             }
@@ -306,9 +256,7 @@ impl Cursor {
             for tab in tabs {
                 if let Some(tab_bubbles) = tab.get("bubbles").and_then(|v| v.as_array()) {
                     for bubble in tab_bubbles {
-                        if let Some(msg) =
-                            parse_bubble(bubble, &mut model_counts, &mut started_at, &mut ended_at)
-                        {
+                        if let Some(msg) = parse_bubble(bubble, &mut model_counts, &mut started_at, &mut ended_at) {
                             messages.push(msg);
                         }
                     }
@@ -320,9 +268,7 @@ impl Cursor {
             for (_conv_id, conv) in conv_map {
                 if let Some(conv_bubbles) = conv.get("bubbles").and_then(|v| v.as_array()) {
                     for bubble in conv_bubbles {
-                        if let Some(msg) =
-                            parse_bubble(bubble, &mut model_counts, &mut started_at, &mut ended_at)
-                        {
+                        if let Some(msg) = parse_bubble(bubble, &mut model_counts, &mut started_at, &mut ended_at) {
                             messages.push(msg);
                         }
                     }
@@ -333,76 +279,33 @@ impl Cursor {
         else if let Some(content) = extract_bubble_content(composer)
             && !content.trim().is_empty()
         {
-            messages.push(CanonicalMessage {
-                idx: 0,
-                role: MessageRole::User,
-                content,
-                timestamp: started_at,
-                author: None,
-                tool_calls: Vec::new(),
-                tool_results: Vec::new(),
-                extra: composer.clone(),
-            });
+            messages.push(CanonicalMessage { idx: 0, role: MessageRole::User, content, timestamp: started_at, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: composer.clone() });
         }
 
         reindex_messages(&mut messages);
 
         // Derive title.
-        let session_title = composer
-            .get("name")
-            .and_then(|v| v.as_str())
-            .filter(|s| !s.is_empty())
-            .map(String::from)
-            .or_else(|| {
-                messages
-                    .iter()
-                    .find(|m| m.role == MessageRole::User)
-                    .map(|m| truncate_title(&m.content, 100))
-            });
+        let session_title = composer.get("name").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(String::from).or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100)));
 
         // Most common model name.
-        let model_name = model_counts
-            .into_iter()
-            .max_by_key(|(_, count)| *count)
-            .map(|(name, _)| name);
+        let model_name = model_counts.into_iter().max_by_key(|(_, count)| *count).map(|(name, _)| name);
 
         // Build metadata.
         let mut metadata = serde_json::Map::new();
-        metadata.insert(
-            "source".into(),
-            serde_json::Value::String("cursor".to_string()),
-        );
+        metadata.insert("source".into(), serde_json::Value::String("cursor".to_string()));
         if let Some(model_config) = composer.get("modelConfig") {
             metadata.insert("modelConfig".into(), model_config.clone());
         }
         if let Some(mode) = composer.get("unifiedMode").and_then(|v| v.as_str()) {
-            metadata.insert(
-                "unifiedMode".into(),
-                serde_json::Value::String(mode.to_string()),
-            );
+            metadata.insert("unifiedMode".into(), serde_json::Value::String(mode.to_string()));
         }
 
         // Unique source path: db_path/composer_id for dedup.
         let source = Self::virtual_session_path(source_path, composer_id);
 
-        debug!(
-            composer_id,
-            messages = messages.len(),
-            "Cursor session parsed"
-        );
+        debug!(composer_id, messages = messages.len(), "Cursor session parsed");
 
-        Ok(CanonicalSession {
-            session_id: composer_id.to_string(),
-            provider_slug: "cursor".to_string(),
-            workspace,
-            title: session_title,
-            started_at,
-            ended_at,
-            messages,
-            metadata: serde_json::Value::Object(metadata),
-            source_path: source,
-            model_name,
-        })
+        Ok(CanonicalSession { session_id: composer_id.to_string(), provider_slug: "cursor".to_string(), workspace, title: session_title, started_at, ended_at, messages, metadata: serde_json::Value::Object(metadata), source_path: source, model_name })
     }
 }
 
@@ -444,11 +347,7 @@ impl Provider for Cursor {
         }
 
         trace!(provider = "cursor", ?evidence, installed, "detection");
-        DetectionResult {
-            installed,
-            version: None,
-            evidence,
-        }
+        DetectionResult { installed, version: None, evidence }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -498,9 +397,7 @@ impl Provider for Cursor {
         if let Some(parent_path) = parent
             && parent_path.is_file()
         {
-            let composer_id = urlencoding::decode(filename)
-                .map(|s| s.into_owned())
-                .unwrap_or_else(|_| filename.to_string());
+            let composer_id = urlencoding::decode(filename).map(|s| s.into_owned()).unwrap_or_else(|_| filename.to_string());
             let conn = Self::open_db(parent_path)?;
             return Self::read_composer_session(&conn, &composer_id, parent_path);
         }
@@ -515,26 +412,17 @@ impl Provider for Cursor {
         anyhow::bail!("no Cursor sessions found in {}", path.display())
     }
 
-    fn write_session(
-        &self,
-        session: &CanonicalSession,
-        opts: &WriteOptions,
-    ) -> anyhow::Result<WrittenSession> {
+    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
         let target_composer_id = uuid::Uuid::new_v4().to_string();
         let now_millis = chrono::Utc::now().timestamp_millis();
 
         // Determine target DB path.
-        let global_db = Self::config_dir()
-            .map(|c| c.join("User/globalStorage/state.vscdb"))
-            .ok_or_else(|| anyhow::anyhow!("cannot determine Cursor config directory"))?;
+        let global_db = Self::config_dir().map(|c| c.join("User/globalStorage/state.vscdb")).ok_or_else(|| anyhow::anyhow!("cannot determine Cursor config directory"))?;
 
         // If the DB doesn't exist, create it with the proper schema.
-        let db_dir = global_db
-            .parent()
-            .ok_or_else(|| anyhow::anyhow!("invalid Cursor DB path"))?;
+        let db_dir = global_db.parent().ok_or_else(|| anyhow::anyhow!("invalid Cursor DB path"))?;
 
-        std::fs::create_dir_all(db_dir)
-            .with_context(|| format!("failed to create directory: {}", db_dir.display()))?;
+        std::fs::create_dir_all(db_dir).with_context(|| format!("failed to create directory: {}", db_dir.display()))?;
 
         // Check for conflict.
         if global_db.exists() && !opts.force {
@@ -543,11 +431,7 @@ impl Provider for Cursor {
             if let Ok(conn) = Self::open_db(&global_db) {
                 let ids = Self::list_composer_ids(&conn);
                 if ids.contains(&target_composer_id) {
-                    return Err(crate::error::CasrError::SessionConflict {
-                        session_id: target_composer_id,
-                        existing_path: global_db,
-                    }
-                    .into());
+                    return Err(crate::error::CasrError::SessionConflict { session_id: target_composer_id, existing_path: global_db }.into());
                 }
             }
         }
@@ -555,10 +439,7 @@ impl Provider for Cursor {
         let mut conn = Self::open_db_rw(&global_db)?;
 
         // Create table if needed.
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS cursorDiskKV (key TEXT PRIMARY KEY, value TEXT);",
-        )
-        .context("failed to create cursorDiskKV table")?;
+        conn.execute_batch("CREATE TABLE IF NOT EXISTS cursorDiskKV (key TEXT PRIMARY KEY, value TEXT);").context("failed to create cursorDiskKV table")?;
 
         let tx = conn.transaction().context("failed to begin transaction")?;
 
@@ -582,11 +463,7 @@ impl Provider for Cursor {
             let bubble_key = format!("bubbleId:{target_composer_id}:{bubble_id}");
             let bubble_json = serde_json::to_string(&bubble)?;
 
-            tx.execute(
-                "INSERT OR REPLACE INTO cursorDiskKV (key, value) VALUES (?1, ?2)",
-                rusqlite::params![bubble_key, bubble_json],
-            )
-            .with_context(|| format!("failed to insert bubble {bubble_id}"))?;
+            tx.execute("INSERT OR REPLACE INTO cursorDiskKV (key, value) VALUES (?1, ?2)", rusqlite::params![bubble_key, bubble_json]).with_context(|| format!("failed to insert bubble {bubble_id}"))?;
 
             headers.push(serde_json::json!({ "bubbleId": bubble_id }));
         }
@@ -608,11 +485,7 @@ impl Provider for Cursor {
         let composer_key = format!("composerData:{target_composer_id}");
         let composer_json = serde_json::to_string(&composer_data)?;
 
-        tx.execute(
-            "INSERT OR REPLACE INTO cursorDiskKV (key, value) VALUES (?1, ?2)",
-            rusqlite::params![composer_key, composer_json],
-        )
-        .context("failed to insert composerData")?;
+        tx.execute("INSERT OR REPLACE INTO cursorDiskKV (key, value) VALUES (?1, ?2)", rusqlite::params![composer_key, composer_json]).context("failed to insert composerData")?;
 
         tx.commit().context("failed to commit transaction")?;
 
@@ -624,12 +497,7 @@ impl Provider for Cursor {
         );
         let virtual_path = Self::virtual_session_path(&global_db, &target_composer_id);
 
-        Ok(WrittenSession {
-            paths: vec![virtual_path],
-            session_id: target_composer_id.clone(),
-            resume_command: self.resume_command(&target_composer_id),
-            backup_path: None,
-        })
+        Ok(WrittenSession { paths: vec![virtual_path], session_id: target_composer_id.clone(), resume_command: self.resume_command(&target_composer_id), backup_path: None })
     }
 
     fn resume_command(&self, _session_id: &str) -> String {
@@ -680,39 +548,21 @@ fn extract_bubble_content(bubble: &serde_json::Value) -> Option<String> {
 }
 
 /// Parse a single bubble into a CanonicalMessage.
-fn parse_bubble(
-    bubble: &serde_json::Value,
-    model_counts: &mut std::collections::HashMap<String, usize>,
-    started_at: &mut Option<i64>,
-    ended_at: &mut Option<i64>,
-) -> Option<CanonicalMessage> {
+fn parse_bubble(bubble: &serde_json::Value, model_counts: &mut std::collections::HashMap<String, usize>, started_at: &mut Option<i64>, ended_at: &mut Option<i64>) -> Option<CanonicalMessage> {
     let content = extract_bubble_content(bubble)?;
 
     // Determine role.
     let role = determine_bubble_role(bubble);
 
     // Extract author (model name).
-    let author = bubble
-        .get("modelType")
-        .and_then(|v| v.as_str())
-        .or_else(|| bubble.get("model").and_then(|v| v.as_str()))
-        .or_else(|| {
-            bubble
-                .pointer("/modelInfo/modelName")
-                .and_then(|v| v.as_str())
-        })
-        .filter(|s| !s.is_empty())
-        .map(String::from);
+    let author = bubble.get("modelType").and_then(|v| v.as_str()).or_else(|| bubble.get("model").and_then(|v| v.as_str())).or_else(|| bubble.pointer("/modelInfo/modelName").and_then(|v| v.as_str())).filter(|s| !s.is_empty()).map(String::from);
 
     if let Some(ref m) = author {
         *model_counts.entry(m.clone()).or_insert(0) += 1;
     }
 
     // Extract timestamp.
-    let timestamp = bubble
-        .get("timestamp")
-        .or_else(|| bubble.get("createdAt"))
-        .and_then(parse_timestamp);
+    let timestamp = bubble.get("timestamp").or_else(|| bubble.get("createdAt")).and_then(parse_timestamp);
 
     if let Some(ts) = timestamp {
         *started_at = Some(started_at.map_or(ts, |s: i64| s.min(ts)));
@@ -778,9 +628,7 @@ fn normalize_cursor_role(role_str: &str) -> MessageRole {
 /// Extract workspace path from bubble data.
 ///
 /// Searches all bubbles for `workspaceProjectDir` or `workspaceUris`.
-fn extract_workspace_from_bubbles(
-    bubbles: &std::collections::HashMap<String, serde_json::Value>,
-) -> Option<PathBuf> {
+fn extract_workspace_from_bubbles(bubbles: &std::collections::HashMap<String, serde_json::Value>) -> Option<PathBuf> {
     for bubble in bubbles.values() {
         // Direct workspace path.
         if let Some(dir) = bubble.get("workspaceProjectDir").and_then(|v| v.as_str())
@@ -805,12 +653,7 @@ fn extract_workspace_from_bubbles(
 
 /// Extract workspace from composerData itself (fallback).
 fn extract_workspace_from_composer(composer: &serde_json::Value) -> Option<PathBuf> {
-    composer
-        .get("workspacePath")
-        .or_else(|| composer.get("projectPath"))
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from)
+    composer.get("workspacePath").or_else(|| composer.get("projectPath")).and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(PathBuf::from)
 }
 
 /// Parse a workspace URI into a filesystem path.
@@ -825,10 +668,7 @@ fn parse_workspace_uri(uri: &str) -> Option<PathBuf> {
         // On Unix, path is absolute. On Windows, strip leading / for drive letters.
         #[cfg(target_os = "windows")]
         {
-            if path_str.len() > 2
-                && path_str.as_bytes()[0] == b'/'
-                && path_str.as_bytes()[2] == b':'
-            {
+            if path_str.len() > 2 && path_str.as_bytes()[0] == b'/' && path_str.as_bytes()[2] == b':' {
                 return Some(PathBuf::from(&path_str[1..]));
             }
         }
@@ -855,15 +695,10 @@ fn parse_workspace_uri(uri: &str) -> Option<PathBuf> {
 /// Read a session from the legacy ItemTable format.
 fn read_legacy_session(conn: &Connection, db_path: &Path) -> anyhow::Result<CanonicalSession> {
     if !Cursor::table_exists(conn, "ItemTable") {
-        anyhow::bail!(
-            "no cursorDiskKV or ItemTable found in {}",
-            db_path.display()
-        );
+        anyhow::bail!("no cursorDiskKV or ItemTable found in {}", db_path.display());
     }
 
-    let mut stmt = conn.prepare(
-        "SELECT key, value FROM ItemTable WHERE key LIKE '%aichat%chatdata%' OR key LIKE '%composer%' ORDER BY key LIMIT 1",
-    )?;
+    let mut stmt = conn.prepare("SELECT key, value FROM ItemTable WHERE key LIKE '%aichat%chatdata%' OR key LIKE '%composer%' ORDER BY key LIMIT 1")?;
 
     let result: Option<(String, String)> = stmt
         .query_row([], |row| {
@@ -873,11 +708,9 @@ fn read_legacy_session(conn: &Connection, db_path: &Path) -> anyhow::Result<Cano
         })
         .ok();
 
-    let (entry_key, entry_value) = result
-        .ok_or_else(|| anyhow::anyhow!("no legacy chat data found in {}", db_path.display()))?;
+    let (entry_key, entry_value) = result.ok_or_else(|| anyhow::anyhow!("no legacy chat data found in {}", db_path.display()))?;
 
-    let data: serde_json::Value = serde_json::from_str(&entry_value)
-        .with_context(|| format!("invalid JSON in legacy entry {entry_key}"))?;
+    let data: serde_json::Value = serde_json::from_str(&entry_value).with_context(|| format!("invalid JSON in legacy entry {entry_key}"))?;
 
     // Legacy format may have tabs/bubbles or direct messages.
     let empty_map = std::collections::HashMap::new();
@@ -914,19 +747,13 @@ mod tests {
     #[test]
     fn extract_bubble_content_content_field() {
         let bubble = json!({"content": "Content field"});
-        assert_eq!(
-            extract_bubble_content(&bubble),
-            Some("Content field".into())
-        );
+        assert_eq!(extract_bubble_content(&bubble), Some("Content field".into()));
     }
 
     #[test]
     fn extract_bubble_content_message_field() {
         let bubble = json!({"message": "Message content"});
-        assert_eq!(
-            extract_bubble_content(&bubble),
-            Some("Message content".into())
-        );
+        assert_eq!(extract_bubble_content(&bubble), Some("Message content".into()));
     }
 
     #[test]
@@ -1084,8 +911,7 @@ mod tests {
         let mut started = None;
         let mut ended = None;
 
-        let msg = parse_bubble(&bubble, &mut model_counts, &mut started, &mut ended)
-            .expect("should parse");
+        let msg = parse_bubble(&bubble, &mut model_counts, &mut started, &mut ended).expect("should parse");
         assert_eq!(msg.role, MessageRole::User);
         assert_eq!(msg.content, "Hello assistant");
         assert_eq!(msg.timestamp, Some(1_700_000_000_000));
@@ -1103,8 +929,7 @@ mod tests {
         let mut started = None;
         let mut ended = None;
 
-        let msg = parse_bubble(&bubble, &mut model_counts, &mut started, &mut ended)
-            .expect("should parse");
+        let msg = parse_bubble(&bubble, &mut model_counts, &mut started, &mut ended).expect("should parse");
         assert_eq!(msg.role, MessageRole::Assistant);
         assert_eq!(msg.author.as_deref(), Some("gpt-4"));
         assert_eq!(*model_counts.get("gpt-4").unwrap(), 1);
@@ -1141,19 +966,12 @@ mod tests {
 
     fn create_test_db(path: &Path) -> Connection {
         let conn = Connection::open(path).expect("create test DB");
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS cursorDiskKV (key TEXT PRIMARY KEY, value TEXT);",
-        )
-        .expect("create table");
+        conn.execute_batch("CREATE TABLE IF NOT EXISTS cursorDiskKV (key TEXT PRIMARY KEY, value TEXT);").expect("create table");
         conn
     }
 
     fn insert_kv(conn: &Connection, key: &str, value: &serde_json::Value) {
-        conn.execute(
-            "INSERT INTO cursorDiskKV (key, value) VALUES (?1, ?2)",
-            rusqlite::params![key, serde_json::to_string(value).unwrap()],
-        )
-        .unwrap();
+        conn.execute("INSERT INTO cursorDiskKV (key, value) VALUES (?1, ?2)", rusqlite::params![key, serde_json::to_string(value).unwrap()]).unwrap();
     }
 
     #[test]
@@ -1210,10 +1028,7 @@ mod tests {
         assert_eq!(session.messages[0].role, MessageRole::User);
         assert_eq!(session.messages[0].content, "What is Rust?");
         assert_eq!(session.messages[1].role, MessageRole::Assistant);
-        assert_eq!(
-            session.messages[1].content,
-            "Rust is a systems programming language."
-        );
+        assert_eq!(session.messages[1].content, "Rust is a systems programming language.");
         assert_eq!(session.messages[1].author.as_deref(), Some("gpt-4"));
         assert_eq!(session.title.as_deref(), Some("Rust question"));
         assert_eq!(session.model_name.as_deref(), Some("gpt-4"));
@@ -1247,9 +1062,7 @@ mod tests {
 
         drop(conn);
 
-        let session = Cursor
-            .read_session(&db_path)
-            .expect("should read tabs session");
+        let session = Cursor.read_session(&db_path).expect("should read tabs session");
 
         assert_eq!(session.messages.len(), 2);
         assert_eq!(session.messages[0].role, MessageRole::User);
@@ -1284,9 +1097,7 @@ mod tests {
 
         drop(conn);
 
-        let session = Cursor
-            .read_session(&db_path)
-            .expect("should read conversationMap session");
+        let session = Cursor.read_session(&db_path).expect("should read conversationMap session");
 
         assert_eq!(session.messages.len(), 2);
         assert_eq!(session.messages[0].role, MessageRole::User);
@@ -1299,16 +1110,8 @@ mod tests {
         let db_path = tmp.path().join("state.vscdb");
         let conn = create_test_db(&db_path);
 
-        insert_kv(
-            &conn,
-            "composerData:session-a",
-            &json!({"fullConversationHeadersOnly": []}),
-        );
-        insert_kv(
-            &conn,
-            "composerData:session-b",
-            &json!({"fullConversationHeadersOnly": []}),
-        );
+        insert_kv(&conn, "composerData:session-a", &json!({"fullConversationHeadersOnly": []}));
+        insert_kv(&conn, "composerData:session-b", &json!({"fullConversationHeadersOnly": []}));
 
         let ids = Cursor::list_composer_ids(&conn);
         assert_eq!(ids.len(), 2);
@@ -1328,10 +1131,7 @@ mod tests {
         // path directly using the internal methods.
         let db_path = cursor_home.join("User/globalStorage/state.vscdb");
         let conn = Cursor::open_db_rw(&db_path).expect("create DB");
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS cursorDiskKV (key TEXT PRIMARY KEY, value TEXT);",
-        )
-        .unwrap();
+        conn.execute_batch("CREATE TABLE IF NOT EXISTS cursorDiskKV (key TEXT PRIMARY KEY, value TEXT);").unwrap();
 
         // Create a sample session.
         let session = CanonicalSession {
@@ -1342,26 +1142,8 @@ mod tests {
             started_at: Some(1_700_000_000_000),
             ended_at: Some(1_700_000_010_000),
             messages: vec![
-                CanonicalMessage {
-                    idx: 0,
-                    role: MessageRole::User,
-                    content: "Hello".to_string(),
-                    timestamp: Some(1_700_000_000_000),
-                    author: None,
-                    tool_calls: Vec::new(),
-                    tool_results: Vec::new(),
-                    extra: json!({}),
-                },
-                CanonicalMessage {
-                    idx: 1,
-                    role: MessageRole::Assistant,
-                    content: "Hi there!".to_string(),
-                    timestamp: Some(1_700_000_005_000),
-                    author: Some("gpt-4".to_string()),
-                    tool_calls: Vec::new(),
-                    tool_results: Vec::new(),
-                    extra: json!({}),
-                },
+                CanonicalMessage { idx: 0, role: MessageRole::User, content: "Hello".to_string(), timestamp: Some(1_700_000_000_000), author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: json!({}) },
+                CanonicalMessage { idx: 1, role: MessageRole::Assistant, content: "Hi there!".to_string(), timestamp: Some(1_700_000_005_000), author: Some("gpt-4".to_string()), tool_calls: Vec::new(), tool_results: Vec::new(), extra: json!({}) },
             ],
             metadata: json!({}),
             source_path: PathBuf::from("/tmp/original.jsonl"),
@@ -1385,11 +1167,7 @@ mod tests {
                 "timestamp": msg.timestamp.unwrap_or(now_millis),
                 "modelType": msg.author.as_deref(),
             });
-            insert_kv(
-                &conn,
-                &format!("bubbleId:{composer_id}:{bubble_id}"),
-                &bubble,
-            );
+            insert_kv(&conn, &format!("bubbleId:{composer_id}:{bubble_id}"), &bubble);
             headers.push(json!({"bubbleId": bubble_id}));
         }
 
@@ -1399,11 +1177,7 @@ mod tests {
             "lastUpdatedAt": session.ended_at,
             "name": session.title,
         });
-        insert_kv(
-            &conn,
-            &format!("composerData:{composer_id}"),
-            &composer_data,
-        );
+        insert_kv(&conn, &format!("composerData:{composer_id}"), &composer_data);
         drop(conn);
 
         // Read back.
@@ -1424,10 +1198,7 @@ mod tests {
     #[test]
     fn workspace_extraction_from_bubbles() {
         let mut bubbles = std::collections::HashMap::new();
-        bubbles.insert(
-            "b1".to_string(),
-            json!({"workspaceProjectDir": "/home/user/project"}),
-        );
+        bubbles.insert("b1".to_string(), json!({"workspaceProjectDir": "/home/user/project"}));
         bubbles.insert("b2".to_string(), json!({"text": "no workspace"}));
 
         let ws = extract_workspace_from_bubbles(&bubbles);
@@ -1437,10 +1208,7 @@ mod tests {
     #[test]
     fn workspace_extraction_from_uris() {
         let mut bubbles = std::collections::HashMap::new();
-        bubbles.insert(
-            "b1".to_string(),
-            json!({"workspaceUris": ["file:///data/projects/test"]}),
-        );
+        bubbles.insert("b1".to_string(), json!({"workspaceUris": ["file:///data/projects/test"]}));
 
         let ws = extract_workspace_from_bubbles(&bubbles);
         assert_eq!(ws, Some(PathBuf::from("/data/projects/test")));

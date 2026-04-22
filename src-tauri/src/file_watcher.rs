@@ -20,9 +20,7 @@ pub struct FileWatcherState {
 
 impl FileWatcherState {
     pub fn new() -> Self {
-        Self {
-            watcher: Arc::new(Mutex::new(None)),
-        }
+        Self { watcher: Arc::new(Mutex::new(None)) }
     }
 
     /// Start or restart the file watcher with new paths
@@ -64,22 +62,14 @@ impl FileWatcher {
         }
 
         // Filter existing paths and deduplicate
-        let unique_paths: Vec<PathBuf> = paths
-            .into_iter()
-            .filter(|p| p.exists())
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect();
+        let unique_paths: Vec<PathBuf> = paths.into_iter().filter(|p| p.exists()).collect::<HashSet<_>>().into_iter().collect();
 
         if unique_paths.is_empty() {
             warn!("No existing session directories to watch");
             return Err("No existing paths to watch".to_string());
         }
 
-        debug!(
-            "Starting file watcher for {} directories:",
-            unique_paths.len()
-        );
+        debug!("Starting file watcher for {} directories:", unique_paths.len());
         for path in &unique_paths {
             debug!("  - {:?}", path);
         }
@@ -88,40 +78,25 @@ impl FileWatcher {
         let (tx, rx) = channel();
 
         // Create debounced watcher (3 second debounce)
-        let debouncer = new_debouncer(
-            Duration::from_secs(3),
-            None,
-            move |result: DebounceEventResult| {
-                if let Err(e) = tx.send(result) {
-                    error!("Failed to send file event: {:?}", e);
-                }
-            },
-        )
+        let debouncer = new_debouncer(Duration::from_secs(3), None, move |result: DebounceEventResult| {
+            if let Err(e) = tx.send(result) {
+                error!("Failed to send file event: {:?}", e);
+            }
+        })
         .map_err(|e| format!("Failed to create file watcher: {e}"))?;
 
         let mut debouncer_guard = debouncer;
 
         // Watch all paths
         for path in &unique_paths {
-            let watch_path = if path.is_file() {
-                path.parent().unwrap_or(path)
-            } else {
-                path.as_path()
-            };
-            let recursive_mode = if path.is_file() {
-                RecursiveMode::NonRecursive
-            } else {
-                RecursiveMode::Recursive
-            };
+            let watch_path = if path.is_file() { path.parent().unwrap_or(path) } else { path.as_path() };
+            let recursive_mode = if path.is_file() { RecursiveMode::NonRecursive } else { RecursiveMode::Recursive };
             if let Err(e) = debouncer_guard.watcher().watch(watch_path, recursive_mode) {
                 error!("Failed to watch path {:?}: {}", watch_path, e);
             }
         }
 
-        debug!(
-            "File watcher started successfully (3s debounce + batch merge) for {} dirs",
-            unique_paths.len()
-        );
+        debug!("File watcher started successfully (3s debounce + batch merge) for {} dirs", unique_paths.len());
 
         // Keep debouncer alive
         let debouncer_arc = Arc::new(Mutex::new(debouncer_guard));
@@ -134,9 +109,7 @@ impl FileWatcher {
             process_events_with_merge(rx, app_handle_for_thread);
         });
 
-        Ok(Self {
-            _debouncer: debouncer_arc,
-        })
+        Ok(Self { _debouncer: debouncer_arc })
     }
 }
 
@@ -163,10 +136,7 @@ pub fn start_watcher_for_all_dirs(app_handle: AppHandle) -> Result<FileWatcherSt
 }
 
 /// Restart watcher when config changes (call this after saving session_paths)
-pub fn restart_watcher_with_config(
-    watcher_state: &FileWatcherState,
-    app_handle: AppHandle,
-) -> Result<(), String> {
+pub fn restart_watcher_with_config(watcher_state: &FileWatcherState, app_handle: AppHandle) -> Result<(), String> {
     let config = crate::config::load_config().unwrap_or_default();
     if should_disable_watcher(&config) {
         debug!("Skipping file watcher restart in dataset mode");
@@ -175,10 +145,7 @@ pub fn restart_watcher_with_config(
     }
     let all_dirs = crate::core::scanner::get_all_session_dirs(&config);
 
-    debug!(
-        "Restarting file watcher with {} directories",
-        all_dirs.len()
-    );
+    debug!("Restarting file watcher with {} directories", all_dirs.len());
     watcher_state.restart(all_dirs, app_handle)?;
 
     Ok(())
@@ -191,10 +158,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
     let mut pending_paths: HashSet<PathBuf> = HashSet::new();
 
     // Create a tokio runtime for async calls
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("Failed to create tokio runtime for file watcher");
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Failed to create tokio runtime for file watcher");
 
     loop {
         let result = rx.recv_timeout(Duration::from_secs(1));
@@ -204,21 +168,16 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                 Ok(events) => {
                     for event in &events {
                         for path in &event.paths {
-                            let is_jsonl =
-                                path.extension().map(|ext| ext == "jsonl").unwrap_or(false);
-                            let is_gemini_json =
-                                crate::domain::session_bridge::is_gemini_session_file(path);
-                            let is_opencode_db =
-                                crate::domain::session_bridge::is_opencode_db_path(path);
+                            let is_jsonl = path.extension().map(|ext| ext == "jsonl").unwrap_or(false);
+                            let is_gemini_json = crate::domain::session_bridge::is_gemini_session_file(path);
+                            let is_opencode_db = crate::domain::session_bridge::is_opencode_db_path(path);
 
                             if is_jsonl || is_opencode_db || is_gemini_json {
                                 // Skip non-pi-session files: subagent artifacts and
                                 // gateway transcripts use different JSONL formats.
                                 let dominated_by_excluded = path.components().any(|c| {
                                     let s = c.as_os_str();
-                                    s == "subagent-artifacts"
-                                        || s == "transcripts"
-                                        || s == "datasets"
+                                    s == "subagent-artifacts" || s == "transcripts" || s == "datasets"
                                 });
                                 if !dominated_by_excluded {
                                     pending_paths.insert(path.clone());
@@ -228,10 +187,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                     }
 
                     if !pending_paths.is_empty() {
-                        debug!(
-                            "Detected session file changes: {} files (batching...)",
-                            pending_paths.len()
-                        );
+                        debug!("Detected session file changes: {} files (batching...)", pending_paths.len());
                     }
                 }
                 Err(errors) => {
@@ -246,10 +202,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
         }
 
         if !pending_paths.is_empty() && last_notification.elapsed() >= min_interval {
-            let changed: Vec<String> = pending_paths
-                .drain()
-                .map(|p| p.to_string_lossy().to_string())
-                .collect();
+            let changed: Vec<String> = pending_paths.drain().map(|p| p.to_string_lossy().to_string()).collect();
 
             let changed_count = changed.len();
             let rescan_started_at = Instant::now();
@@ -260,21 +213,11 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                 Ok(diff) => {
                     let rescan_elapsed_ms = rescan_started_at.elapsed().as_millis();
                     if diff.updated.is_empty() && diff.removed.is_empty() {
-                        info!(
-                            "Incremental rescan completed in {}ms with no effective session diff (changed_files={})",
-                            rescan_elapsed_ms,
-                            changed_count
-                        );
+                        info!("Incremental rescan completed in {}ms with no effective session diff (changed_files={})", rescan_elapsed_ms, changed_count);
                         // Nothing actually changed, skip notification
                         continue;
                     }
-                    info!(
-                        "Incremental rescan completed in {}ms (changed_files={} updated={} removed={})",
-                        rescan_elapsed_ms,
-                        changed_count,
-                        diff.updated.len(),
-                        diff.removed.len()
-                    );
+                    info!("Incremental rescan completed in {}ms (changed_files={} updated={} removed={})", rescan_elapsed_ms, changed_count, diff.updated.len(), diff.removed.len());
                     // Emit diff so frontend can merge locally without calling scan_sessions
                     let payload = serde_json::to_value(&diff).unwrap_or(Value::Null);
                     if let Err(e) = app_handle.emit("sessions-changed", payload) {
@@ -284,11 +227,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                     }
                 }
                 Err(e) => {
-                    error!(
-                        "Failed to rescan changed files after {}ms: {}",
-                        rescan_started_at.elapsed().as_millis(),
-                        e
-                    );
+                    error!("Failed to rescan changed files after {}ms: {}", rescan_started_at.elapsed().as_millis(), e);
                 }
             }
         }

@@ -22,17 +22,12 @@ pub async fn load_model_config() -> Result<serde_json::Value, String> {
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn save_model_config(
-    content: serde_json::Value,
-    create_backup: Option<bool>,
-) -> Result<(), String> {
+pub async fn save_model_config(content: serde_json::Value, create_backup: Option<bool>) -> Result<(), String> {
     domain::save_model_config_internal(content, create_backup).await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn create_model_config_backup(
-    note: Option<String>,
-) -> Result<ModelConfigBackupMeta, String> {
+pub async fn create_model_config_backup(note: Option<String>) -> Result<ModelConfigBackupMeta, String> {
     domain::create_model_config_backup_internal(note)
 }
 
@@ -62,18 +57,12 @@ pub async fn export_model_config_to_path(path: String) -> Result<String, String>
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn import_model_config_content(
-    content: String,
-    mode: Option<String>,
-) -> Result<serde_json::Value, String> {
+pub async fn import_model_config_content(content: String, mode: Option<String>) -> Result<serde_json::Value, String> {
     domain::import_model_config_content_internal(content, mode).await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn import_model_config_from_path(
-    path: String,
-    mode: Option<String>,
-) -> Result<serde_json::Value, String> {
+pub async fn import_model_config_from_path(path: String, mode: Option<String>) -> Result<serde_json::Value, String> {
     domain::import_model_config_from_path_internal(path, mode).await
 }
 
@@ -85,12 +74,7 @@ pub async fn list_model_config_versions() -> Result<Vec<ConfigVersionMeta>, Stri
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn test_model_http(
-    provider: String,
-    model: String,
-    prompt: Option<String>,
-    timeout_ms: Option<u64>,
-) -> Result<ModelHttpTestResult, String> {
+pub async fn test_model_http(provider: String, model: String, prompt: Option<String>, timeout_ms: Option<u64>) -> Result<ModelHttpTestResult, String> {
     domain::test_model_http_internal(provider, model, prompt, timeout_ms).await
 }
 

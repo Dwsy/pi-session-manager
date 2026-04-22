@@ -42,23 +42,7 @@ struct WsResponse {
 use crate::utils::payload::{extract_string, extract_usize};
 
 fn is_pi_live_forward_event(event_type: &str) -> bool {
-    matches!(
-        event_type,
-        "message_start"
-            | "message_update"
-            | "message_end"
-            | "tool_execution_start"
-            | "tool_execution_update"
-            | "tool_execution_end"
-            | "agent_start"
-            | "agent_end"
-            | "turn_start"
-            | "turn_end"
-            | "model_select"
-            | "auto_compaction_start"
-            | "auto_compaction_end"
-            | "queue_update"
-    )
+    matches!(event_type, "message_start" | "message_update" | "message_end" | "tool_execution_start" | "tool_execution_update" | "tool_execution_end" | "agent_start" | "agent_end" | "turn_start" | "turn_end" | "model_select" | "auto_compaction_start" | "auto_compaction_end" | "queue_update")
 }
 
 pub struct WsAdapter {
@@ -69,21 +53,13 @@ pub struct WsAdapter {
 
 impl WsAdapter {
     pub fn new(app_state: SharedAppState, bind_addr: &str, port: u16) -> Self {
-        Self {
-            app_state,
-            bind_addr: bind_addr.to_string(),
-            port,
-        }
+        Self { app_state, bind_addr: bind_addr.to_string(), port }
     }
 
     pub async fn start(self: Arc<Self>) -> Result<(), String> {
-        let addr: SocketAddr = format!("{}:{}", self.bind_addr, self.port)
-            .parse()
-            .map_err(|e| format!("Invalid address: {e}"))?;
+        let addr: SocketAddr = format!("{}:{}", self.bind_addr, self.port).parse().map_err(|e| format!("Invalid address: {e}"))?;
 
-        let listener = TcpListener::bind(&addr)
-            .await
-            .map_err(|e| format!("Failed to bind: {e}"))?;
+        let listener = TcpListener::bind(&addr).await.map_err(|e| format!("Failed to bind: {e}"))?;
 
         log::info!("WebSocket server listening on ws://{addr}");
 
@@ -95,10 +71,7 @@ impl WsAdapter {
             tokio::spawn(async move {
                 if let Err(e) = adapter.handle_connection(stream, peer_addr).await {
                     let msg = e.to_string();
-                    if msg.contains("Connection reset")
-                        || msg.contains("Broken pipe")
-                        || msg.contains("closing handshake")
-                    {
+                    if msg.contains("Connection reset") || msg.contains("Broken pipe") || msg.contains("closing handshake") {
                         log::debug!("WebSocket peer gone: {msg}");
                     } else {
                         log::warn!("WebSocket connection error: {msg}");
@@ -110,40 +83,23 @@ impl WsAdapter {
         Ok(())
     }
 
-    async fn handle_connection(
-        &self,
-        stream: TcpStream,
-        peer_addr: SocketAddr,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_connection(&self, stream: TcpStream, peer_addr: SocketAddr) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let ws_stream = accept_async(stream).await?;
         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
         // Non-local connections must authenticate (if auth enabled)
         if crate::auth::is_auth_required(&peer_addr.ip()) {
-            let authed =
-                match tokio::time::timeout(std::time::Duration::from_secs(10), ws_receiver.next())
-                    .await
-                {
-                    Ok(Some(Ok(Message::Text(text)))) => {
-                        serde_json::from_str::<serde_json::Value>(&text)
-                            .ok()
-                            .and_then(|v| v.get("auth")?.as_str().map(String::from))
-                            .map(|t| crate::auth::validate(&t))
-                            .unwrap_or(false)
-                    }
-                    _ => false,
-                };
+            let authed = match tokio::time::timeout(std::time::Duration::from_secs(10), ws_receiver.next()).await {
+                Ok(Some(Ok(Message::Text(text)))) => serde_json::from_str::<serde_json::Value>(&text).ok().and_then(|v| v.get("auth")?.as_str().map(String::from)).map(|t| crate::auth::validate(&t)).unwrap_or(false),
+                _ => false,
+            };
 
             if !authed {
-                let _ = ws_sender
-                    .send(Message::Text(r#"{"error":"Unauthorized"}"#.to_string()))
-                    .await;
+                let _ = ws_sender.send(Message::Text(r#"{"error":"Unauthorized"}"#.to_string())).await;
                 let _ = ws_sender.send(Message::Close(None)).await;
                 return Ok(());
             }
-            let _ = ws_sender
-                .send(Message::Text(r#"{"auth":"ok"}"#.to_string()))
-                .await;
+            let _ = ws_sender.send(Message::Text(r#"{"auth":"ok"}"#.to_string())).await;
         }
 
         let mut event_rx = self.app_state.subscribe_events();
@@ -376,16 +332,9 @@ impl WsAdapter {
             log::info!("[WS] Pi agent disconnected: session={sid}");
             self.app_state.pi_agent_registry.remove(sid);
 
-            let ws_event = WsEvent {
-                event_type: "event".to_string(),
-                event: "pi-live:session_disconnected".to_string(),
-                payload: serde_json::json!({ "sessionId": sid }),
-            };
+            let ws_event = WsEvent { event_type: "event".to_string(), event: "pi-live:session_disconnected".to_string(), payload: serde_json::json!({ "sessionId": sid }) };
             let _ = self.app_state.event_tx.send(ws_event.clone());
-            let _ = self
-                .app_state
-                .app_handle
-                .emit("pi-live:session_disconnected", &ws_event.payload);
+            let _ = self.app_state.app_handle.emit("pi-live:session_disconnected", &ws_event.payload);
         }
 
         Ok(())
@@ -394,59 +343,22 @@ impl WsAdapter {
     async fn handle_request(&self, request: WsRequest) -> WsResponse {
         log::debug!("Handling command: {} (id: {})", request.command, request.id);
 
-        let result = crate::dispatch::dispatch_with_state(
-            &Some(self.app_state.clone()),
-            &request.command,
-            &request.payload,
-        )
-        .await;
+        let result = crate::dispatch::dispatch_with_state(&Some(self.app_state.clone()), &request.command, &request.payload).await;
 
         match result {
-            Ok(data) => WsResponse {
-                id: request.id,
-                command: request.command,
-                success: true,
-                data: Some(data),
-                error: None,
-                compressed: None,
-            },
-            Err(error) => WsResponse {
-                id: request.id,
-                command: request.command,
-                success: false,
-                data: None,
-                error: Some(error),
-                compressed: None,
-            },
+            Ok(data) => WsResponse { id: request.id, command: request.command, success: true, data: Some(data), error: None, compressed: None },
+            Err(error) => WsResponse { id: request.id, command: request.command, success: false, data: None, error: Some(error), compressed: None },
         }
     }
 
     fn build_response(&self, request: &WsRequest, result: Result<Value, String>) -> WsResponse {
         match result {
-            Ok(data) => WsResponse {
-                id: request.id.clone(),
-                command: request.command.clone(),
-                success: true,
-                data: Some(data),
-                error: None,
-                compressed: None,
-            },
-            Err(error) => WsResponse {
-                id: request.id.clone(),
-                command: request.command.clone(),
-                success: false,
-                data: None,
-                error: Some(error),
-                compressed: None,
-            },
+            Ok(data) => WsResponse { id: request.id.clone(), command: request.command.clone(), success: true, data: Some(data), error: None, compressed: None },
+            Err(error) => WsResponse { id: request.id.clone(), command: request.command.clone(), success: false, data: None, error: Some(error), compressed: None },
         }
     }
 
-    fn compress_response_if_needed(
-        &self,
-        response: WsResponse,
-        accept_gzip: bool,
-    ) -> Result<Message, Box<dyn std::error::Error + Send + Sync>> {
+    fn compress_response_if_needed(&self, response: WsResponse, accept_gzip: bool) -> Result<Message, Box<dyn std::error::Error + Send + Sync>> {
         if !accept_gzip {
             return Ok(Message::Text(serde_json::to_string(&response)?));
         }
@@ -455,24 +367,13 @@ impl WsAdapter {
         match crate::compression::gzip_compress_to_base64(json_str.as_bytes()) {
             Ok(compressed_b64) => {
                 let mut compressed_response = serde_json::Map::new();
-                compressed_response
-                    .insert("id".to_string(), serde_json::Value::String(response.id));
-                compressed_response.insert(
-                    "command".to_string(),
-                    serde_json::Value::String(response.command),
-                );
-                compressed_response.insert(
-                    "success".to_string(),
-                    serde_json::Value::Bool(response.success),
-                );
-                compressed_response.insert(
-                    "data".to_string(),
-                    serde_json::Value::String(compressed_b64),
-                );
+                compressed_response.insert("id".to_string(), serde_json::Value::String(response.id));
+                compressed_response.insert("command".to_string(), serde_json::Value::String(response.command));
+                compressed_response.insert("success".to_string(), serde_json::Value::Bool(response.success));
+                compressed_response.insert("data".to_string(), serde_json::Value::String(compressed_b64));
                 compressed_response.insert("compressed".to_string(), serde_json::Value::Bool(true));
                 if let Some(error) = response.error {
-                    compressed_response
-                        .insert("error".to_string(), serde_json::Value::String(error));
+                    compressed_response.insert("error".to_string(), serde_json::Value::String(error));
                 }
                 Ok(Message::Text(serde_json::to_string(&compressed_response)?))
             }
@@ -489,31 +390,17 @@ impl WsAdapter {
 
         app_handle.listen("sessions-changed", move |event| {
             let payload = serde_json::from_str::<Value>(event.payload()).unwrap_or(Value::Null);
-            let ws_event = WsEvent {
-                event_type: "event".to_string(),
-                event: "sessions-changed".to_string(),
-                payload,
-            };
+            let ws_event = WsEvent { event_type: "event".to_string(), event: "sessions-changed".to_string(), payload };
             let _ = event_tx.send(ws_event);
         });
     }
 }
 
-pub async fn ws_dispatch(
-    app_state: &SharedAppState,
-    command: &str,
-    payload: &Value,
-) -> Result<Value, String> {
+pub async fn ws_dispatch(app_state: &SharedAppState, command: &str, payload: &Value) -> Result<Value, String> {
     // GUI-only overrides that need AppState (terminal, save_session_paths with watcher)
     match command {
         "save_session_paths" => {
-            let paths: Vec<String> = serde_json::from_value(
-                payload
-                    .get("paths")
-                    .cloned()
-                    .unwrap_or(Value::Array(vec![])),
-            )
-            .map_err(|e| format!("Invalid paths: {e}"))?;
+            let paths: Vec<String> = serde_json::from_value(payload.get("paths").cloned().unwrap_or(Value::Array(vec![]))).map_err(|e| format!("Invalid paths: {e}"))?;
             let app_handle = app_state.app_handle.clone();
             crate::save_session_paths(paths, app_handle).await?;
             return Ok(Value::Null);
@@ -526,20 +413,14 @@ pub async fn ws_dispatch(
             let cols = payload.get("cols").and_then(|v| v.as_u64()).unwrap_or(80) as u16;
             let app_handle = app_state.app_handle.clone();
             let event_tx = app_state.event_tx.clone();
-            let manager = app_state
-                .terminal_manager
-                .lock()
-                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            let manager = app_state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
             manager.create_session(id, app_handle, event_tx, cwd, shell, rows, cols)?;
             return Ok(serde_json::json!("Terminal created"));
         }
         "terminal_write" => {
             let id = extract_string(payload, "id")?;
             let data = extract_string(payload, "data")?;
-            let manager = app_state
-                .terminal_manager
-                .lock()
-                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            let manager = app_state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
             manager.write_to_session(&id, data)?;
             return Ok(Value::Null);
         }
@@ -547,29 +428,20 @@ pub async fn ws_dispatch(
             let id = extract_string(payload, "id")?;
             let rows = payload.get("rows").and_then(|v| v.as_u64()).unwrap_or(24) as u16;
             let cols = payload.get("cols").and_then(|v| v.as_u64()).unwrap_or(80) as u16;
-            let manager = app_state
-                .terminal_manager
-                .lock()
-                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            let manager = app_state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
             manager.resize_session(&id, rows, cols)?;
             return Ok(Value::Null);
         }
         "terminal_close" => {
             let id = extract_string(payload, "id")?;
-            let manager = app_state
-                .terminal_manager
-                .lock()
-                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            let manager = app_state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
             manager.close_session(&id)?;
             return Ok(Value::Null);
         }
         "get_default_shell" => {
             let shells = crate::commands::terminal::scan_shells();
             let fallback = if cfg!(windows) { "cmd.exe" } else { "/bin/sh" };
-            return Ok(serde_json::json!(shells
-                .first()
-                .map(|(_, p)| p.as_str())
-                .unwrap_or(fallback)));
+            return Ok(serde_json::json!(shells.first().map(|(_, p)| p.as_str()).unwrap_or(fallback)));
         }
         "get_available_shells" => {
             return Ok(serde_json::json!(crate::commands::terminal::scan_shells()));
@@ -585,11 +457,7 @@ pub async fn ws_dispatch(
     crate::dispatch::dispatch(command, payload).await
 }
 
-pub async fn init_ws_adapter(
-    app_state: SharedAppState,
-    bind_addr: &str,
-    port: u16,
-) -> Result<Arc<WsAdapter>, String> {
+pub async fn init_ws_adapter(app_state: SharedAppState, bind_addr: &str, port: u16) -> Result<Arc<WsAdapter>, String> {
     let adapter = Arc::new(WsAdapter::new(app_state, bind_addr, port));
     let adapter_clone = adapter.clone();
 

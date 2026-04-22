@@ -2,10 +2,7 @@ use super::deps::*;
 use super::types::SessionDetailsCache;
 use super::util::parse_timestamp;
 
-pub fn get_session_details_cache(
-    conn: &Connection,
-    path: &str,
-) -> Result<Option<SessionDetailsCache>, String> {
+pub fn get_session_details_cache(conn: &Connection, path: &str) -> Result<Option<SessionDetailsCache>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT file_modified, user_messages, assistant_messages, input_tokens, output_tokens,
@@ -39,16 +36,9 @@ pub fn get_session_details_cache(
     Ok(row)
 }
 
-pub fn upsert_session_details_cache(
-    conn: &Connection,
-    path: &str,
-    file_modified: DateTime<Utc>,
-    details: &SessionDetails,
-) -> Result<(), String> {
-    let models_json = serde_json::to_string(&details.models)
-        .map_err(|e| format!("Failed to serialize models: {e}"))?;
-    let model_usage_json = serde_json::to_string(&details.model_usage)
-        .map_err(|e| format!("Failed to serialize model usage: {e}"))?;
+pub fn upsert_session_details_cache(conn: &Connection, path: &str, file_modified: DateTime<Utc>, details: &SessionDetails) -> Result<(), String> {
+    let models_json = serde_json::to_string(&details.models).map_err(|e| format!("Failed to serialize models: {e}"))?;
+    let model_usage_json = serde_json::to_string(&details.model_usage).map_err(|e| format!("Failed to serialize model usage: {e}"))?;
 
     conn.execute(
         "INSERT INTO session_details_cache (

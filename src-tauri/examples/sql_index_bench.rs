@@ -20,12 +20,7 @@ struct BenchArgs {
 
 impl Default for BenchArgs {
     fn default() -> Self {
-        Self {
-            runs: 5,
-            sessions: 180,
-            messages_per_session: 18,
-            page_size: 20,
-        }
+        Self { runs: 5, sessions: 180, messages_per_session: 18, page_size: 20 }
     }
 }
 
@@ -82,27 +77,19 @@ fn parse_args() -> Result<BenchArgs, Box<dyn std::error::Error>> {
     while let Some(flag) = iter.next() {
         match flag.as_str() {
             "--runs" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| boxed_error("missing value for --runs"))?;
+                let value = iter.next().ok_or_else(|| boxed_error("missing value for --runs"))?;
                 args.runs = value.parse()?;
             }
             "--sessions" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| boxed_error("missing value for --sessions"))?;
+                let value = iter.next().ok_or_else(|| boxed_error("missing value for --sessions"))?;
                 args.sessions = value.parse()?;
             }
             "--messages" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| boxed_error("missing value for --messages"))?;
+                let value = iter.next().ok_or_else(|| boxed_error("missing value for --messages"))?;
                 args.messages_per_session = value.parse()?;
             }
             "--page-size" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| boxed_error("missing value for --page-size"))?;
+                let value = iter.next().ok_or_else(|| boxed_error("missing value for --page-size"))?;
                 args.page_size = value.parse()?;
             }
             other => {
@@ -111,8 +98,7 @@ fn parse_args() -> Result<BenchArgs, Box<dyn std::error::Error>> {
         }
     }
 
-    if args.runs == 0 || args.sessions == 0 || args.messages_per_session == 0 || args.page_size == 0
-    {
+    if args.runs == 0 || args.sessions == 0 || args.messages_per_session == 0 || args.page_size == 0 {
         return Err(boxed_error("all numeric benchmark arguments must be > 0"));
     }
 
@@ -120,153 +106,63 @@ fn parse_args() -> Result<BenchArgs, Box<dyn std::error::Error>> {
 }
 
 fn now_millis() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis()
 }
 
 fn unique_root(run_index: usize) -> PathBuf {
-    env::temp_dir().join(format!(
-        "pi-session-manager-sql-index-bench-{}-{}-{}",
-        process::id(),
-        now_millis(),
-        run_index
-    ))
+    env::temp_dir().join(format!("pi-session-manager-sql-index-bench-{}-{}-{}", process::id(), now_millis(), run_index))
 }
 
 fn build_queries() -> [QueryCase; 5] {
     [
-        QueryCase {
-            label: "common_fts",
-            query: "sqlite index",
-            role_filter: "all",
-            project_path: None,
-            match_mode: Some("all"),
-            page: 0,
-        },
-        QueryCase {
-            label: "phrase_fts",
-            query: "\"vector cache\"",
-            role_filter: "all",
-            project_path: None,
-            match_mode: Some("any"),
-            page: 0,
-        },
-        QueryCase {
-            label: "assistant_filter",
-            query: "latency budget",
-            role_filter: "assistant",
-            project_path: None,
-            match_mode: Some("all"),
-            page: 0,
-        },
-        QueryCase {
-            label: "project_filter",
-            query: "tokio async",
-            role_filter: "all",
-            project_path: Some("/workspace/project-b"),
-            match_mode: Some("all"),
-            page: 0,
-        },
-        QueryCase {
-            label: "paged_query",
-            query: "search performance",
-            role_filter: "user",
-            project_path: None,
-            match_mode: Some("all"),
-            page: 1,
-        },
+        QueryCase { label: "common_fts", query: "sqlite index", role_filter: "all", project_path: None, match_mode: Some("all"), page: 0 },
+        QueryCase { label: "phrase_fts", query: "\"vector cache\"", role_filter: "all", project_path: None, match_mode: Some("any"), page: 0 },
+        QueryCase { label: "assistant_filter", query: "latency budget", role_filter: "assistant", project_path: None, match_mode: Some("all"), page: 0 },
+        QueryCase { label: "project_filter", query: "tokio async", role_filter: "all", project_path: Some("/workspace/project-b"), match_mode: Some("all"), page: 0 },
+        QueryCase { label: "paged_query", query: "search performance", role_filter: "user", project_path: None, match_mode: Some("all"), page: 1 },
     ]
 }
 
-fn write_session_file(
-    path: &Path,
-    session_idx: usize,
-    messages_per_session: usize,
-    cwd: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn write_session_file(path: &Path, session_idx: usize, messages_per_session: usize, cwd: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = File::create(path)?;
     let session_id = format!("session-{session_idx:04}");
 
-    writeln!(
-        file,
-        "{{\"type\":\"session\",\"version\":3,\"id\":\"{session_id}\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"cwd\":\"{cwd}\"}}"
-    )?;
+    writeln!(file, "{{\"type\":\"session\",\"version\":3,\"id\":\"{session_id}\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"cwd\":\"{cwd}\"}}")?;
 
     if session_idx % 6 == 0 {
-        writeln!(
-            file,
-            "{{\"type\":\"session_info\",\"name\":\"SQL Bench Session {session_idx}\"}}"
-        )?;
+        writeln!(file, "{{\"type\":\"session_info\",\"name\":\"SQL Bench Session {session_idx}\"}}")?;
     }
 
-    let project_tag = cwd
-        .rsplit('/')
-        .next()
-        .ok_or_else(|| boxed_error("missing project tag in cwd"))?;
+    let project_tag = cwd.rsplit('/').next().ok_or_else(|| boxed_error("missing project tag in cwd"))?;
 
     for message_idx in 0..messages_per_session {
-        let role = if message_idx % 2 == 0 {
-            "user"
-        } else {
-            "assistant"
-        };
-        let role_phrase = if role == "user" {
-            "user prompt"
-        } else {
-            "assistant synthesis"
-        };
-        let phrase = if session_idx % 2 == 0 {
-            "vector cache"
-        } else {
-            "segment ranking"
-        };
-        let runtime = if cwd.ends_with("project-b") || session_idx % 3 == 0 {
-            "tokio async runtime"
-        } else {
-            "axum service pipeline"
-        };
-        let latency = if message_idx % 3 == 0 {
-            "latency budget"
-        } else {
-            "throughput steady"
-        };
+        let role = if message_idx % 2 == 0 { "user" } else { "assistant" };
+        let role_phrase = if role == "user" { "user prompt" } else { "assistant synthesis" };
+        let phrase = if session_idx % 2 == 0 { "vector cache" } else { "segment ranking" };
+        let runtime = if cwd.ends_with("project-b") || session_idx % 3 == 0 { "tokio async runtime" } else { "axum service pipeline" };
+        let latency = if message_idx % 3 == 0 { "latency budget" } else { "throughput steady" };
         let rarity = match session_idx % 4 {
             0 => "rare-orchid",
             1 => "rare-saffron",
             2 => "rare-cerulean",
             _ => "rare-vermilion",
         };
-        let text = format!(
-            "{role_phrase} session {session_idx} message {message_idx} sqlite index search performance {phrase} {runtime} {latency} {project_tag} {rarity} retrieval benchmark"
-        );
+        let text = format!("{role_phrase} session {session_idx} message {message_idx} sqlite index search performance {phrase} {runtime} {latency} {project_tag} {rarity} retrieval benchmark");
         let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
         let minute = (message_idx / 60) % 60;
         let second = message_idx % 60;
 
-        writeln!(
-            file,
-            "{{\"type\":\"message\",\"id\":\"{session_id}-msg-{message_idx:02}\",\"parentId\":null,\"timestamp\":\"2026-01-01T00:{minute:02}:{second:02}Z\",\"message\":{{\"role\":\"{role}\",\"content\":[{{\"type\":\"text\",\"text\":\"{escaped}\"}}]}}}}"
-        )?;
+        writeln!(file, "{{\"type\":\"message\",\"id\":\"{session_id}-msg-{message_idx:02}\",\"parentId\":null,\"timestamp\":\"2026-01-01T00:{minute:02}:{second:02}Z\",\"message\":{{\"role\":\"{role}\",\"content\":[{{\"type\":\"text\",\"text\":\"{escaped}\"}}]}}}}")?;
     }
 
     Ok(())
 }
 
-fn prepare_dataset(
-    root: &Path,
-    sessions: usize,
-    messages_per_session: usize,
-) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+fn prepare_dataset(root: &Path, sessions: usize, messages_per_session: usize) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let sessions_root = root.join("session-data");
     fs::create_dir_all(&sessions_root)?;
 
-    let projects = [
-        "/workspace/project-a",
-        "/workspace/project-b",
-        "/workspace/project-c",
-    ];
+    let projects = ["/workspace/project-a", "/workspace/project-b", "/workspace/project-c"];
 
     let mut paths = Vec::with_capacity(sessions);
     for session_idx in 0..sessions {
@@ -294,10 +190,7 @@ fn median(values: &[f64]) -> f64 {
     }
 }
 
-async fn run_once(
-    run_index: usize,
-    args: BenchArgs,
-) -> Result<RunMetrics, Box<dyn std::error::Error>> {
+async fn run_once(run_index: usize, args: BenchArgs) -> Result<RunMetrics, Box<dyn std::error::Error>> {
     let root = unique_root(run_index);
     fs::create_dir_all(&root)?;
 
@@ -315,8 +208,7 @@ async fn run_once(
     let ingest_started = Instant::now();
     for session_path in &session_paths {
         let (session, entries) = scanner::parse_session_info(session_path).map_err(boxed_error)?;
-        sqlite_cache::upsert_session(&mut conn, &session, session.modified, Some(&entries))
-            .map_err(boxed_error)?;
+        sqlite_cache::upsert_session(&mut conn, &session, session.modified, Some(&entries)).map_err(boxed_error)?;
     }
     let ingest_ms = ingest_started.elapsed().as_secs_f64() * 1000.0;
     drop(conn);
@@ -324,27 +216,10 @@ async fn run_once(
     let search_started = Instant::now();
     let mut total_hits = 0usize;
     for case in build_queries() {
-        let response = full_text_search(
-            case.query.to_string(),
-            case.role_filter.to_string(),
-            None,
-            case.project_path.map(str::to_string),
-            case.page,
-            args.page_size,
-            case.match_mode.map(str::to_string),
-            None,
-            None,
-            None,
-            None,
-        )
-        .await
-        .map_err(boxed_error)?;
+        let response = full_text_search(case.query.to_string(), case.role_filter.to_string(), None, case.project_path.map(str::to_string), case.page, args.page_size, case.match_mode.map(str::to_string), None, None, None, None).await.map_err(boxed_error)?;
 
         if response.total_hits == 0 {
-            return Err(boxed_error(format!(
-                "benchmark query '{}' returned zero hits",
-                case.label
-            )));
+            return Err(boxed_error(format!("benchmark query '{}' returned zero hits", case.label)));
         }
         total_hits += response.total_hits;
     }
@@ -354,35 +229,18 @@ async fn run_once(
 
     let _ = fs::remove_dir_all(&root);
 
-    Ok(RunMetrics {
-        init_ms,
-        ingest_ms,
-        search_ms,
-        total_ms,
-        total_hits,
-    })
+    Ok(RunMetrics { init_ms, ingest_ms, search_ms, total_ms, total_hits })
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = parse_args()?;
-    eprintln!(
-        "sql_index_bench: runs={} sessions={} messages_per_session={} page_size={}",
-        args.runs, args.sessions, args.messages_per_session, args.page_size
-    );
+    eprintln!("sql_index_bench: runs={} sessions={} messages_per_session={} page_size={}", args.runs, args.sessions, args.messages_per_session, args.page_size);
 
     let mut all_runs = Vec::with_capacity(args.runs);
     for run_index in 0..args.runs {
         let metrics = run_once(run_index, args).await?;
-        eprintln!(
-            "run {} => init={:.3}ms ingest={:.3}ms search={:.3}ms total={:.3}ms hits={}",
-            run_index + 1,
-            metrics.init_ms,
-            metrics.ingest_ms,
-            metrics.search_ms,
-            metrics.total_ms,
-            metrics.total_hits
-        );
+        eprintln!("run {} => init={:.3}ms ingest={:.3}ms search={:.3}ms total={:.3}ms hits={}", run_index + 1, metrics.init_ms, metrics.ingest_ms, metrics.search_ms, metrics.total_ms, metrics.total_hits);
         all_runs.push(metrics);
     }
 
@@ -390,10 +248,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ingest_values: Vec<f64> = all_runs.iter().map(|run| run.ingest_ms).collect();
     let search_values: Vec<f64> = all_runs.iter().map(|run| run.search_ms).collect();
     let total_values: Vec<f64> = all_runs.iter().map(|run| run.total_ms).collect();
-    let total_hits = all_runs
-        .first()
-        .map(|run| run.total_hits)
-        .ok_or_else(|| boxed_error("benchmark produced no runs"))?;
+    let total_hits = all_runs.first().map(|run| run.total_hits).ok_or_else(|| boxed_error("benchmark produced no runs"))?;
 
     println!("METRIC total_ms={:.3}", median(&total_values));
     println!("METRIC init_ms={:.3}", median(&init_values));

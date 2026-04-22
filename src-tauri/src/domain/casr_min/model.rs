@@ -69,18 +69,8 @@ pub fn flatten_content(value: &serde_json::Value) -> String {
                                 }
                             }
                             Some("tool_use") => {
-                                let name = obj
-                                    .get("name")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("unknown");
-                                let desc =
-                                    obj.get("input")
-                                        .and_then(|v| v.as_object())
-                                        .and_then(|inp| {
-                                            inp.get("description")
-                                                .or_else(|| inp.get("file_path"))
-                                                .and_then(|v| v.as_str())
-                                        });
+                                let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+                                let desc = obj.get("input").and_then(|v| v.as_object()).and_then(|inp| inp.get("description").or_else(|| inp.get("file_path")).and_then(|v| v.as_str()));
                                 match desc {
                                     Some(d) => parts.push(format!("[Tool: {name} - {d}]")),
                                     None => parts.push(format!("[Tool: {name}]")),
@@ -105,10 +95,7 @@ pub fn flatten_content(value: &serde_json::Value) -> String {
                     return texts.join("\n");
                 }
             }
-            obj.get("text")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string()
+            obj.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string()
         }
         _ => String::new(),
     }
@@ -122,13 +109,7 @@ pub fn parse_timestamp(value: &serde_json::Value) -> Option<i64> {
             if let Some(i) = n.as_i64() {
                 Some(if i < MILLIS_THRESHOLD { i * 1000 } else { i })
             } else {
-                n.as_f64().map(|f| {
-                    if f < (MILLIS_THRESHOLD as f64) {
-                        (f * 1000.0) as i64
-                    } else {
-                        f as i64
-                    }
-                })
+                n.as_f64().map(|f| if f < (MILLIS_THRESHOLD as f64) { (f * 1000.0) as i64 } else { f as i64 })
             }
         }
         serde_json::Value::String(s) => {
@@ -141,11 +122,7 @@ pub fn parse_timestamp(value: &serde_json::Value) -> Option<i64> {
             }
             if let Ok(f) = s.parse::<f64>() {
                 if f.is_finite() {
-                    return Some(if f < (MILLIS_THRESHOLD as f64) {
-                        (f * 1000.0) as i64
-                    } else {
-                        f as i64
-                    });
+                    return Some(if f < (MILLIS_THRESHOLD as f64) { (f * 1000.0) as i64 } else { f as i64 });
                 }
             }
             if let Ok(dt) = DateTime::parse_from_rfc3339(s) {

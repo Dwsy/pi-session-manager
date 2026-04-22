@@ -6,10 +6,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub use crate::api_readonly::{
-    parse_time_opt, session_matches_scope, ExperienceExtractRequest, FullTextSearchRequest,
-    MemoryRecallRequest, MemoryUnifiedRequest, WorkflowRouteSuggestRequest,
-};
+pub use crate::api_readonly::{parse_time_opt, session_matches_scope, ExperienceExtractRequest, FullTextSearchRequest, MemoryRecallRequest, MemoryUnifiedRequest, WorkflowRouteSuggestRequest};
 
 #[derive(Deserialize)]
 pub(crate) struct HttpRequest {
@@ -57,14 +54,7 @@ pub(crate) struct CheckoutRequest {
 }
 
 pub(crate) fn cors_headers() -> [(&'static str, &'static str); 3] {
-    [
-        ("access-control-allow-origin", "*"),
-        ("access-control-allow-methods", "GET, POST, OPTIONS"),
-        (
-            "access-control-allow-headers",
-            "content-type, authorization",
-        ),
-    ]
+    [("access-control-allow-origin", "*"), ("access-control-allow-methods", "GET, POST, OPTIONS"), ("access-control-allow-headers", "content-type, authorization")]
 }
 
 pub(crate) fn query_param(uri: &Uri, key: &str) -> Option<String> {
@@ -82,27 +72,15 @@ pub(crate) fn is_authorized(ip: &std::net::IpAddr, headers: &HeaderMap, uri: &Ur
     if !auth::is_auth_required(ip) {
         return true;
     }
-    let header_ok = headers
-        .get("authorization")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .map(auth::validate)
-        .unwrap_or(false);
+    let header_ok = headers.get("authorization").and_then(|value| value.to_str().ok()).and_then(|value| value.strip_prefix("Bearer ")).map(auth::validate).unwrap_or(false);
     if header_ok {
         return true;
     }
-    query_param(uri, "token")
-        .as_deref()
-        .map(auth::validate)
-        .unwrap_or(false)
+    query_param(uri, "token").as_deref().map(auth::validate).unwrap_or(false)
 }
 
 pub(crate) fn accepts_gzip(headers: &HeaderMap) -> bool {
-    headers
-        .get("accept-encoding")
-        .and_then(|value| value.to_str().ok())
-        .map(|value| value.to_lowercase().contains("gzip"))
-        .unwrap_or(false)
+    headers.get("accept-encoding").and_then(|value| value.to_str().ok()).map(|value| value.to_lowercase().contains("gzip")).unwrap_or(false)
 }
 
 pub(crate) fn unauthorized_response() -> Response {
@@ -113,21 +91,11 @@ pub(crate) fn json_success_response<T>(data: T) -> Response
 where
     T: Serialize,
 {
-    (
-        StatusCode::OK,
-        cors_headers(),
-        Json(serde_json::json!({ "success": true, "data": data })),
-    )
-        .into_response()
+    (StatusCode::OK, cors_headers(), Json(serde_json::json!({ "success": true, "data": data }))).into_response()
 }
 
 pub(crate) fn json_error_response(status: StatusCode, error: impl Into<String>) -> Response {
-    (
-        status,
-        cors_headers(),
-        Json(serde_json::json!({ "success": false, "error": error.into() })),
-    )
-        .into_response()
+    (status, cors_headers(), Json(serde_json::json!({ "success": false, "error": error.into() }))).into_response()
 }
 
 pub(crate) fn readonly_error_status(error: &ApiReadonlyError) -> StatusCode {

@@ -24,10 +24,7 @@ use tracing::{debug, info, trace, warn};
 use walkdir::WalkDir;
 
 use crate::discovery::DetectionResult;
-use crate::model::{
-    CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, flatten_content,
-    normalize_role, parse_timestamp, reindex_messages, truncate_title,
-};
+use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// Codex provider implementation.
@@ -38,11 +35,7 @@ pub struct Codex;
 /// Convention: `~/.codex/sessions/YYYY/MM/DD/rollout-YYYY-MM-DDThh-mm-ss-<session-id>.jsonl`
 ///
 /// The session ID is a ULID (timestamp-prefixed UUID).
-pub fn rollout_path(
-    sessions_dir: &Path,
-    session_id: &str,
-    now: &chrono::DateTime<chrono::Utc>,
-) -> PathBuf {
+pub fn rollout_path(sessions_dir: &Path, session_id: &str, now: &chrono::DateTime<chrono::Utc>) -> PathBuf {
     let date_dir = now.format("%Y/%m/%d").to_string();
     let ts_part = now.format("%Y-%m-%dT%H-%M-%S").to_string();
     let filename = format!("rollout-{ts_part}-{session_id}.jsonl");
@@ -95,11 +88,7 @@ impl Provider for Codex {
         }
 
         trace!(provider = "codex", ?evidence, installed, "detection");
-        DetectionResult {
-            installed,
-            version: None,
-            evidence,
-        }
+        DetectionResult { installed, version: None, evidence }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -116,11 +105,7 @@ impl Provider for Codex {
         }
 
         let mut sessions: Vec<(String, PathBuf)> = Vec::new();
-        for entry in WalkDir::new(&sessions_dir)
-            .max_depth(5)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
+        for entry in WalkDir::new(&sessions_dir).max_depth(5).into_iter().filter_map(Result::ok) {
             let path = entry.path();
             if !path.is_file() {
                 continue;
@@ -129,9 +114,7 @@ impl Provider for Codex {
             let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
                 continue;
             };
-            if !(name.starts_with("rollout-")
-                && (name.ends_with(".jsonl") || name.ends_with(".json")))
-            {
+            if !(name.starts_with("rollout-") && (name.ends_with(".jsonl") || name.ends_with(".json"))) {
                 continue;
             }
 
@@ -164,11 +147,7 @@ impl Provider for Codex {
         // Try as relative path (with or without extension).
         let as_path = sessions_dir.join(session_id);
         for ext in ["", ".jsonl", ".json"] {
-            let candidate = if ext.is_empty() {
-                as_path.clone()
-            } else {
-                as_path.with_extension(&ext[1..])
-            };
+            let candidate = if ext.is_empty() { as_path.clone() } else { as_path.with_extension(&ext[1..]) };
             if candidate.is_file() {
                 debug!(path = %candidate.display(), "found Codex session by path");
                 return Some(candidate);
@@ -176,15 +155,10 @@ impl Provider for Codex {
         }
 
         // Scan rollout files recursively.
-        for entry in WalkDir::new(&sessions_dir)
-            .max_depth(5)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
+        for entry in WalkDir::new(&sessions_dir).max_depth(5).into_iter().filter_map(Result::ok) {
             let path = entry.path();
             if let Some(name) = path.file_name().and_then(|n| n.to_str())
-                && (name.starts_with("rollout-")
-                    && (name.ends_with(".jsonl") || name.ends_with(".json")))
+                && (name.starts_with("rollout-") && (name.ends_with(".jsonl") || name.ends_with(".json")))
                 && path.is_file()
             {
                 // Check if the relative path (minus extension) matches session_id.
@@ -198,10 +172,7 @@ impl Provider for Codex {
 
                 // Match by UUID suffix embedded in rollout filename:
                 // rollout-YYYY-MM-DDThh-mm-ss-<session-id>.jsonl
-                let name_no_ext = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or_default();
+                let name_no_ext = path.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
                 if name_no_ext.ends_with(session_id) {
                     debug!(path = %path.display(), "found Codex session by filename suffix");
                     return Some(path.to_path_buf());
@@ -221,8 +192,7 @@ impl Provider for Codex {
         debug!(path = %path.display(), "reading Codex session");
 
         // Try JSONL first, fall back to legacy JSON.
-        let content = std::fs::read_to_string(path)
-            .with_context(|| format!("failed to read {}", path.display()))?;
+        let content = std::fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
 
         // Detect format: if first non-whitespace char is '{' and the file has
         // multiple JSON lines, it's JSONL. If the top-level parse yields a
@@ -238,17 +208,12 @@ impl Provider for Codex {
         self.read_jsonl(path, &content)
     }
 
-    fn write_session(
-        &self,
-        session: &CanonicalSession,
-        opts: &WriteOptions,
-    ) -> anyhow::Result<WrittenSession> {
+    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
         let target_session_id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now();
         let now_iso = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
 
-        let sessions_dir = Self::sessions_dir()
-            .ok_or_else(|| anyhow::anyhow!("cannot determine Codex sessions directory"))?;
+        let sessions_dir = Self::sessions_dir().ok_or_else(|| anyhow::anyhow!("cannot determine Codex sessions directory"))?;
         let target_path = rollout_path(&sessions_dir, &target_session_id, &now);
 
         debug!(
@@ -260,12 +225,7 @@ impl Provider for Codex {
         let mut lines: Vec<String> = Vec::with_capacity(session.messages.len() + 1);
 
         // 1. session_meta line.
-        let cwd = session
-            .workspace
-            .as_deref()
-            .unwrap_or(std::path::Path::new("/tmp"))
-            .to_string_lossy()
-            .to_string();
+        let cwd = session.workspace.as_deref().unwrap_or(std::path::Path::new("/tmp")).to_string_lossy().to_string();
 
         lines.push(serde_json::to_string(&serde_json::json!({
             "type": "session_meta",
@@ -283,11 +243,7 @@ impl Provider for Codex {
 
         // 2. Messages.
         for msg in &session.messages {
-            let msg_ts = msg
-                .timestamp
-                .and_then(chrono::DateTime::from_timestamp_millis)
-                .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
-                .unwrap_or_else(|| now_iso.clone());
+            let msg_ts = msg.timestamp.and_then(chrono::DateTime::from_timestamp_millis).map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)).unwrap_or_else(|| now_iso.clone());
 
             for event in codex_events_for_message(msg, &msg_ts) {
                 lines.push(serde_json::to_string(&event)?);
@@ -296,8 +252,7 @@ impl Provider for Codex {
 
         let content_bytes = lines.join("\n").into_bytes();
 
-        let outcome =
-            crate::pipeline::atomic_write(&target_path, &content_bytes, opts.force, self.slug())?;
+        let outcome = crate::pipeline::atomic_write(&target_path, &content_bytes, opts.force, self.slug())?;
 
         info!(
             target_session_id,
@@ -306,12 +261,7 @@ impl Provider for Codex {
             "Codex session written"
         );
 
-        Ok(WrittenSession {
-            paths: vec![outcome.target_path],
-            session_id: target_session_id.clone(),
-            resume_command: self.resume_command(&target_session_id),
-            backup_path: outcome.backup_path,
-        })
+        Ok(WrittenSession { paths: vec![outcome.target_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: outcome.backup_path })
     }
 
     fn resume_command(&self, session_id: &str) -> String {
@@ -322,8 +272,7 @@ impl Provider for Codex {
 fn codex_events_for_message(msg: &CanonicalMessage, msg_ts: &str) -> Vec<serde_json::Value> {
     // User messages that carry tool payloads must be serialized as response_item
     // envelopes; event_msg/user_message cannot represent tool_use/tool_result blocks.
-    let user_needs_response_item = msg.role == MessageRole::User
-        && (!msg.tool_calls.is_empty() || !msg.tool_results.is_empty());
+    let user_needs_response_item = msg.role == MessageRole::User && (!msg.tool_calls.is_empty() || !msg.tool_results.is_empty());
 
     match msg.role {
         MessageRole::User if !user_needs_response_item => vec![serde_json::json!({
@@ -353,10 +302,7 @@ fn codex_events_for_message(msg: &CanonicalMessage, msg_ts: &str) -> Vec<serde_j
                 }
             })]
         }
-        MessageRole::Assistant
-        | MessageRole::Tool
-        | MessageRole::System
-        | MessageRole::Other(_) => {
+        MessageRole::Assistant | MessageRole::Tool | MessageRole::System | MessageRole::Other(_) => {
             let mut events = vec![serde_json::json!({
                 "type": "response_item",
                 "timestamp": msg_ts,
@@ -398,11 +344,7 @@ fn codex_response_content(msg: &CanonicalMessage) -> serde_json::Value {
 
     // Codex expects "output_text" for assistant-generated content blocks,
     // "input_text" for user-supplied content blocks.
-    let text_type = if msg.role == MessageRole::Assistant {
-        "output_text"
-    } else {
-        "input_text"
-    };
+    let text_type = if msg.role == MessageRole::Assistant { "output_text" } else { "input_text" };
 
     if !msg.content.is_empty() {
         blocks.push(serde_json::json!({
@@ -481,12 +423,7 @@ fn codex_token_count_info(extra: &serde_json::Value) -> Option<serde_json::Value
     None
 }
 
-fn insert_token_count(
-    out: &mut serde_json::Map<String, serde_json::Value>,
-    obj: &serde_json::Map<String, serde_json::Value>,
-    snake: &str,
-    camel: &str,
-) {
+fn insert_token_count(out: &mut serde_json::Map<String, serde_json::Value>, obj: &serde_json::Map<String, serde_json::Value>, snake: &str, camel: &str) {
     if let Some(value) = obj.get(snake).or_else(|| obj.get(camel))
         && let Some(num) = token_count_number(value)
     {
@@ -567,10 +504,7 @@ impl Codex {
                 }
                 "response_item" => {
                     if let Some(p) = payload {
-                        let role_str = p
-                            .get("role")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("assistant");
+                        let role_str = p.get("role").and_then(|v| v.as_str()).unwrap_or("assistant");
                         let role = normalize_role(role_str);
 
                         let content_val = p.get("content");
@@ -580,34 +514,17 @@ impl Codex {
                         let mut tool_results = codex_extract_tool_results(content_val);
                         tool_results.extend(codex_extract_payload_tool_results(p));
 
-                        if text.trim().is_empty()
-                            && tool_calls.is_empty()
-                            && tool_results.is_empty()
-                        {
+                        if text.trim().is_empty() && tool_calls.is_empty() && tool_results.is_empty() {
                             trace!(line = line_num, "skipping empty response_item");
                             continue;
                         }
 
-                        let next_message = CanonicalMessage {
-                            idx: 0,
-                            role,
-                            content: text,
-                            timestamp: ts,
-                            author: None,
-                            tool_calls,
-                            tool_results,
-                            extra: envelope,
-                        };
+                        let next_message = CanonicalMessage { idx: 0, role, content: text, timestamp: ts, author: None, tool_calls, tool_results, extra: envelope };
 
                         // Some Codex files mirror user turns in both
                         // `response_item(message:user)` and `event_msg(user_message)`.
                         // Drop exact adjacent duplicates to preserve clean alternation.
-                        let is_adjacent_user_duplicate = messages.last().is_some_and(|prev| {
-                            prev.role == MessageRole::User
-                                && next_message.role == MessageRole::User
-                                && prev.content == next_message.content
-                                && prev.timestamp == next_message.timestamp
-                        });
+                        let is_adjacent_user_duplicate = messages.last().is_some_and(|prev| prev.role == MessageRole::User && next_message.role == MessageRole::User && prev.content == next_message.content && prev.timestamp == next_message.timestamp);
                         if is_adjacent_user_duplicate {
                             trace!(line = line_num, "skipping duplicate user response_item");
                             continue;
@@ -621,34 +538,13 @@ impl Codex {
                         let sub_type = p.get("type").and_then(|v| v.as_str()).unwrap_or("");
                         match sub_type {
                             "user_message" => {
-                                let text = p
-                                    .get("message")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string();
+                                let text = p.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string();
                                 if !text.trim().is_empty() {
-                                    let next_message = CanonicalMessage {
-                                        idx: 0,
-                                        role: MessageRole::User,
-                                        content: text,
-                                        timestamp: ts,
-                                        author: None,
-                                        tool_calls: vec![],
-                                        tool_results: vec![],
-                                        extra: envelope,
-                                    };
+                                    let next_message = CanonicalMessage { idx: 0, role: MessageRole::User, content: text, timestamp: ts, author: None, tool_calls: vec![], tool_results: vec![], extra: envelope };
 
-                                    let is_adjacent_user_duplicate =
-                                        messages.last().is_some_and(|prev| {
-                                            prev.role == MessageRole::User
-                                                && prev.content == next_message.content
-                                                && prev.timestamp == next_message.timestamp
-                                        });
+                                    let is_adjacent_user_duplicate = messages.last().is_some_and(|prev| prev.role == MessageRole::User && prev.content == next_message.content && prev.timestamp == next_message.timestamp);
                                     if is_adjacent_user_duplicate {
-                                        trace!(
-                                            line = line_num,
-                                            "skipping duplicate user event_msg"
-                                        );
+                                        trace!(line = line_num, "skipping duplicate user event_msg");
                                         continue;
                                     }
 
@@ -656,29 +552,13 @@ impl Codex {
                                 }
                             }
                             "agent_reasoning" => {
-                                let text = p
-                                    .get("text")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string();
+                                let text = p.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
                                 if !text.trim().is_empty() {
-                                    messages.push(CanonicalMessage {
-                                        idx: 0,
-                                        role: MessageRole::Assistant,
-                                        content: text,
-                                        timestamp: ts,
-                                        author: Some("reasoning".to_string()),
-                                        tool_calls: vec![],
-                                        tool_results: vec![],
-                                        extra: envelope,
-                                    });
+                                    messages.push(CanonicalMessage { idx: 0, role: MessageRole::Assistant, content: text, timestamp: ts, author: Some("reasoning".to_string()), tool_calls: vec![], tool_results: vec![], extra: envelope });
                                 }
                             }
                             _ => {
-                                trace!(
-                                    line = line_num,
-                                    sub_type, "skipping non-conversational event_msg"
-                                );
+                                trace!(line = line_num, sub_type, "skipping non-conversational event_msg");
                             }
                         }
                     }
@@ -690,41 +570,25 @@ impl Codex {
         }
 
         reindex_messages(&mut messages);
-        self.build_session(
-            path, session_id, workspace, started_at, ended_at, messages, skipped,
-        )
+        self.build_session(path, session_id, workspace, started_at, ended_at, messages, skipped)
     }
 
     /// Parse legacy single-JSON format: `{ "session": {…}, "items": […] }`.
     fn read_legacy_json(&self, path: &Path, content: &str) -> anyhow::Result<CanonicalSession> {
-        let root: serde_json::Value = serde_json::from_str(content)
-            .with_context(|| format!("failed to parse legacy JSON {}", path.display()))?;
+        let root: serde_json::Value = serde_json::from_str(content).with_context(|| format!("failed to parse legacy JSON {}", path.display()))?;
 
         let session_obj = root.get("session");
-        let session_id = session_obj
-            .and_then(|s| s.get("id"))
-            .and_then(|v| v.as_str())
-            .map(String::from);
-        let workspace = session_obj
-            .and_then(|s| s.get("cwd"))
-            .and_then(|v| v.as_str())
-            .map(PathBuf::from);
+        let session_id = session_obj.and_then(|s| s.get("id")).and_then(|v| v.as_str()).map(String::from);
+        let workspace = session_obj.and_then(|s| s.get("cwd")).and_then(|v| v.as_str()).map(PathBuf::from);
 
-        let items = root
-            .get("items")
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
+        let items = root.get("items").and_then(|v| v.as_array()).cloned().unwrap_or_default();
 
         let mut messages = Vec::new();
         let mut started_at: Option<i64> = None;
         let mut ended_at: Option<i64> = None;
 
         for item in &items {
-            let role_str = item
-                .get("role")
-                .and_then(|v| v.as_str())
-                .unwrap_or("assistant");
+            let role_str = item.get("role").and_then(|v| v.as_str()).unwrap_or("assistant");
             let role = normalize_role(role_str);
 
             let text = item.get("content").map(flatten_content).unwrap_or_default();
@@ -738,39 +602,16 @@ impl Codex {
                 ended_at = Some(ended_at.map_or(t, |e: i64| e.max(t)));
             }
 
-            messages.push(CanonicalMessage {
-                idx: 0,
-                role,
-                content: text,
-                timestamp: ts,
-                author: None,
-                tool_calls: vec![],
-                tool_results: vec![],
-                extra: item.clone(),
-            });
+            messages.push(CanonicalMessage { idx: 0, role, content: text, timestamp: ts, author: None, tool_calls: vec![], tool_results: vec![], extra: item.clone() });
         }
 
         reindex_messages(&mut messages);
-        self.build_session(
-            path, session_id, workspace, started_at, ended_at, messages, 0,
-        )
+        self.build_session(path, session_id, workspace, started_at, ended_at, messages, 0)
     }
 
     /// Assemble the final `CanonicalSession` from parsed data.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "internal builder; clarity > refactoring"
-    )]
-    fn build_session(
-        &self,
-        path: &Path,
-        session_id: Option<String>,
-        workspace: Option<PathBuf>,
-        started_at: Option<i64>,
-        ended_at: Option<i64>,
-        messages: Vec<CanonicalMessage>,
-        skipped: usize,
-    ) -> anyhow::Result<CanonicalSession> {
+    #[expect(clippy::too_many_arguments, reason = "internal builder; clarity > refactoring")]
+    fn build_session(&self, path: &Path, session_id: Option<String>, workspace: Option<PathBuf>, started_at: Option<i64>, ended_at: Option<i64>, messages: Vec<CanonicalMessage>, skipped: usize) -> anyhow::Result<CanonicalSession> {
         // Derive session ID from relative path if not in content.
         let session_id = session_id.unwrap_or_else(|| {
             if let Some(sessions_dir) = Self::sessions_dir()
@@ -778,42 +619,17 @@ impl Codex {
             {
                 return rel.with_extension("").to_string_lossy().to_string();
             }
-            path.file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unknown")
-                .to_string()
+            path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string()
         });
 
-        let title = messages
-            .iter()
-            .find(|m| m.role == MessageRole::User)
-            .map(|m| truncate_title(&m.content, 100));
+        let title = messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100));
 
         let mut metadata = serde_json::Map::new();
-        metadata.insert(
-            "source".into(),
-            serde_json::Value::String("codex".to_string()),
-        );
+        metadata.insert("source".into(), serde_json::Value::String("codex".to_string()));
 
-        debug!(
-            session_id,
-            messages = messages.len(),
-            skipped,
-            "Codex session parsed"
-        );
+        debug!(session_id, messages = messages.len(), skipped, "Codex session parsed");
 
-        Ok(CanonicalSession {
-            session_id,
-            provider_slug: "codex".to_string(),
-            workspace,
-            title,
-            started_at,
-            ended_at,
-            messages,
-            metadata: serde_json::Value::Object(metadata),
-            source_path: path.to_path_buf(),
-            model_name: None,
-        })
+        Ok(CanonicalSession { session_id, provider_slug: "codex".to_string(), workspace, title, started_at, ended_at, messages, metadata: serde_json::Value::Object(metadata), source_path: path.to_path_buf(), model_name: None })
     }
 }
 
@@ -841,10 +657,7 @@ fn codex_extract_text_content(content: Option<&serde_json::Value>) -> String {
                     serde_json::Value::String(s) => parts.push(s.clone()),
                     serde_json::Value::Object(obj) => {
                         let block_type = obj.get("type").and_then(|v| v.as_str());
-                        if (matches!(
-                            block_type,
-                            Some("text") | Some("input_text") | Some("output_text")
-                        ) || block_type.is_none())
+                        if (matches!(block_type, Some("text") | Some("input_text") | Some("output_text")) || block_type.is_none())
                             && let Some(text) = obj.get("text").and_then(|v| v.as_str())
                         {
                             parts.push(text.to_string());
@@ -855,11 +668,7 @@ fn codex_extract_text_content(content: Option<&serde_json::Value>) -> String {
             }
             parts.join("\n")
         }
-        serde_json::Value::Object(obj) => obj
-            .get("text")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
+        serde_json::Value::Object(obj) => obj.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string(),
         _ => String::new(),
     }
 }
@@ -876,15 +685,7 @@ fn codex_extract_tool_calls(content: Option<&serde_json::Value>) -> Vec<ToolCall
             if obj.get("type")?.as_str()? != "tool_use" {
                 return None;
             }
-            Some(ToolCall {
-                id: obj.get("id").and_then(|v| v.as_str()).map(String::from),
-                name: obj
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown")
-                    .to_string(),
-                arguments: obj.get("input").cloned().unwrap_or(serde_json::Value::Null),
-            })
+            Some(ToolCall { id: obj.get("id").and_then(|v| v.as_str()).map(String::from), name: obj.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(), arguments: obj.get("input").cloned().unwrap_or(serde_json::Value::Null) })
         })
         .collect()
 }
@@ -902,109 +703,43 @@ fn codex_extract_tool_results(content: Option<&serde_json::Value>) -> Vec<ToolRe
                 return None;
             }
             Some(ToolResult {
-                call_id: obj
-                    .get("tool_use_id")
-                    .and_then(|v| v.as_str())
-                    .map(String::from),
-                content: obj
-                    .get("content")
-                    .and_then(|v| v.as_str())
-                    .or_else(|| obj.get("output").and_then(|v| v.as_str()))
-                    .unwrap_or("")
-                    .to_string(),
-                is_error: obj
-                    .get("is_error")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false),
+                call_id: obj.get("tool_use_id").and_then(|v| v.as_str()).map(String::from),
+                content: obj.get("content").and_then(|v| v.as_str()).or_else(|| obj.get("output").and_then(|v| v.as_str())).unwrap_or("").to_string(),
+                is_error: obj.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false),
             })
         })
         .collect()
 }
 
 fn codex_extract_payload_tool_calls(payload: &serde_json::Value) -> Vec<ToolCall> {
-    let payload_type = payload
-        .get("type")
-        .and_then(|v| v.as_str())
-        .unwrap_or_default();
+    let payload_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or_default();
     if !matches!(payload_type, "function_call" | "custom_tool_call") {
         return vec![];
     }
 
-    let arguments = payload
-        .get("arguments")
-        .or_else(|| payload.get("input"))
-        .or_else(|| payload.get("args"))
-        .map(codex_parse_arguments_value)
-        .unwrap_or(serde_json::Value::Null);
+    let arguments = payload.get("arguments").or_else(|| payload.get("input")).or_else(|| payload.get("args")).map(codex_parse_arguments_value).unwrap_or(serde_json::Value::Null);
 
     vec![ToolCall {
-        id: payload
-            .get("call_id")
-            .or_else(|| payload.get("id"))
-            .or_else(|| payload.get("tool_use_id"))
-            .and_then(|v| v.as_str())
-            .map(String::from),
-        name: payload
-            .get("name")
-            .or_else(|| payload.pointer("/function/name"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
-            .to_string(),
+        id: payload.get("call_id").or_else(|| payload.get("id")).or_else(|| payload.get("tool_use_id")).and_then(|v| v.as_str()).map(String::from),
+        name: payload.get("name").or_else(|| payload.pointer("/function/name")).and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
         arguments,
     }]
 }
 
 fn codex_extract_payload_tool_results(payload: &serde_json::Value) -> Vec<ToolResult> {
-    let payload_type = payload
-        .get("type")
-        .and_then(|v| v.as_str())
-        .unwrap_or_default();
-    if !matches!(
-        payload_type,
-        "function_call_output" | "custom_tool_call_output"
-    ) {
+    let payload_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or_default();
+    if !matches!(payload_type, "function_call_output" | "custom_tool_call_output") {
         return vec![];
     }
 
-    let content = payload
-        .get("output")
-        .or_else(|| payload.get("content"))
-        .or_else(|| payload.get("result"))
-        .map(flatten_content)
-        .unwrap_or_default();
-    let is_error = payload
-        .get("is_error")
-        .and_then(|v| v.as_bool())
-        .or_else(|| {
-            payload
-                .get("status")
-                .and_then(|v| v.as_str())
-                .map(|status| status == "error")
-        })
-        .unwrap_or(false);
+    let content = payload.get("output").or_else(|| payload.get("content")).or_else(|| payload.get("result")).map(flatten_content).unwrap_or_default();
+    let is_error = payload.get("is_error").and_then(|v| v.as_bool()).or_else(|| payload.get("status").and_then(|v| v.as_str()).map(|status| status == "error")).unwrap_or(false);
 
-    vec![ToolResult {
-        call_id: payload
-            .get("call_id")
-            .or_else(|| payload.get("tool_use_id"))
-            .or_else(|| payload.get("id"))
-            .and_then(|v| v.as_str())
-            .map(String::from),
-        content,
-        is_error,
-    }]
+    vec![ToolResult { call_id: payload.get("call_id").or_else(|| payload.get("tool_use_id")).or_else(|| payload.get("id")).and_then(|v| v.as_str()).map(String::from), content, is_error }]
 }
 
 fn codex_parse_arguments_value(value: &serde_json::Value) -> serde_json::Value {
-    if let Some(text) = value.as_str() {
-        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
-            parsed
-        } else {
-            serde_json::Value::String(text.to_string())
-        }
-    } else {
-        value.clone()
-    }
+    if let Some(text) = value.as_str() { if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) { parsed } else { serde_json::Value::String(text.to_string()) } } else { value.clone() }
 }
 
 /// Extract `session_meta.payload.id` from a Codex rollout file.
@@ -1021,10 +756,7 @@ fn session_meta_id(path: &Path) -> Option<String> {
             Err(_) => continue,
         };
         if envelope.get("type").and_then(|v| v.as_str()) == Some("session_meta") {
-            return envelope
-                .pointer("/payload/id")
-                .and_then(|v| v.as_str())
-                .map(ToString::to_string);
+            return envelope.pointer("/payload/id").and_then(|v| v.as_str()).map(ToString::to_string);
         }
     }
     None
@@ -1042,22 +774,10 @@ mod tests {
 
     #[test]
     fn rollout_path_includes_date_hierarchy_and_uuid_suffix() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 2, 9, 6, 7, 8)
-            .single()
-            .expect("valid timestamp");
-        let path = rollout_path(
-            Path::new("/tmp/codex/sessions"),
-            "019c40fd-3c51-7621-a418-68203585f589",
-            &now,
-        );
+        let now = Utc.with_ymd_and_hms(2026, 2, 9, 6, 7, 8).single().expect("valid timestamp");
+        let path = rollout_path(Path::new("/tmp/codex/sessions"), "019c40fd-3c51-7621-a418-68203585f589", &now);
         let path_str = path.to_string_lossy();
-        assert!(
-            path_str.ends_with(
-                "2026/02/09/rollout-2026-02-09T06-07-08-019c40fd-3c51-7621-a418-68203585f589.jsonl"
-            ),
-            "{path_str}"
-        );
+        assert!(path_str.ends_with("2026/02/09/rollout-2026-02-09T06-07-08-019c40fd-3c51-7621-a418-68203585f589.jsonl"), "{path_str}");
     }
 
     #[test]
@@ -1068,16 +788,8 @@ mod tests {
             content: "Applied the patch".to_string(),
             timestamp: None,
             author: None,
-            tool_calls: vec![ToolCall {
-                id: Some("call-1".to_string()),
-                name: "apply_patch".to_string(),
-                arguments: json!({"path":"src/providers/codex.rs"}),
-            }],
-            tool_results: vec![ToolResult {
-                call_id: Some("call-1".to_string()),
-                content: "ok".to_string(),
-                is_error: false,
-            }],
+            tool_calls: vec![ToolCall { id: Some("call-1".to_string()), name: "apply_patch".to_string(), arguments: json!({"path":"src/providers/codex.rs"}) }],
+            tool_results: vec![ToolResult { call_id: Some("call-1".to_string()), content: "ok".to_string(), is_error: false }],
             extra: json!({
                 "usage": {
                     "input_tokens": 11,
@@ -1091,9 +803,7 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(events[0]["type"], "response_item");
         assert_eq!(events[0]["payload"]["type"], "message");
-        let content_blocks = events[0]["payload"]["content"]
-            .as_array()
-            .expect("response_item content should be array");
+        let content_blocks = events[0]["payload"]["content"].as_array().expect("response_item content should be array");
         assert!(content_blocks.iter().any(|b| b["type"] == "tool_use"));
         assert!(content_blocks.iter().any(|b| b["type"] == "tool_result"));
 
@@ -1112,16 +822,8 @@ mod tests {
             content: String::new(),
             timestamp: None,
             author: None,
-            tool_calls: vec![ToolCall {
-                id: Some("call-7".to_string()),
-                name: "Read".to_string(),
-                arguments: json!({"file_path":"src/main.rs"}),
-            }],
-            tool_results: vec![ToolResult {
-                call_id: Some("call-7".to_string()),
-                content: "fn main() {}".to_string(),
-                is_error: false,
-            }],
+            tool_calls: vec![ToolCall { id: Some("call-7".to_string()), name: "Read".to_string(), arguments: json!({"file_path":"src/main.rs"}) }],
+            tool_results: vec![ToolResult { call_id: Some("call-7".to_string()), content: "fn main() {}".to_string(), is_error: false }],
             extra: json!({}),
         };
 
@@ -1130,9 +832,7 @@ mod tests {
         assert_eq!(events[0]["type"], "response_item");
         assert_eq!(events[0]["payload"]["type"], "message");
         assert_eq!(events[0]["payload"]["role"], "user");
-        let blocks = events[0]["payload"]["content"]
-            .as_array()
-            .expect("response_item content should be array");
+        let blocks = events[0]["payload"]["content"].as_array().expect("response_item content should be array");
         assert!(blocks.iter().any(|b| b["type"] == "tool_use"));
         assert!(blocks.iter().any(|b| b["type"] == "tool_result"));
     }
@@ -1155,9 +855,7 @@ mod tests {
         .expect("serializable test envelope");
 
         let provider = Codex;
-        let session = provider
-            .read_jsonl(Path::new("/tmp/rollout-test.jsonl"), &file_text)
-            .expect("Codex JSONL reader should parse tool_result-only response_item");
+        let session = provider.read_jsonl(Path::new("/tmp/rollout-test.jsonl"), &file_text).expect("Codex JSONL reader should parse tool_result-only response_item");
 
         assert_eq!(session.messages.len(), 1);
         assert_eq!(session.messages[0].tool_results.len(), 1);
@@ -1180,21 +878,13 @@ mod tests {
         .expect("serializable test envelope");
 
         let provider = Codex;
-        let session = provider
-            .read_jsonl(Path::new("/tmp/rollout-fc.jsonl"), &file_text)
-            .expect("Codex JSONL reader should parse payload-level function_call");
+        let session = provider.read_jsonl(Path::new("/tmp/rollout-fc.jsonl"), &file_text).expect("Codex JSONL reader should parse payload-level function_call");
 
         assert_eq!(session.messages.len(), 1);
         assert_eq!(session.messages[0].tool_calls.len(), 1);
         assert_eq!(session.messages[0].tool_calls[0].name, "Read");
-        assert_eq!(
-            session.messages[0].tool_calls[0].id.as_deref(),
-            Some("call-42")
-        );
-        assert_eq!(
-            session.messages[0].tool_calls[0].arguments["file_path"],
-            "src/main.rs"
-        );
+        assert_eq!(session.messages[0].tool_calls[0].id.as_deref(), Some("call-42"));
+        assert_eq!(session.messages[0].tool_calls[0].arguments["file_path"], "src/main.rs");
     }
 
     #[test]
@@ -1212,26 +902,18 @@ mod tests {
         .expect("serializable test envelope");
 
         let provider = Codex;
-        let session = provider
-            .read_jsonl(Path::new("/tmp/rollout-fco.jsonl"), &file_text)
-            .expect("Codex JSONL reader should parse payload-level function_call_output");
+        let session = provider.read_jsonl(Path::new("/tmp/rollout-fco.jsonl"), &file_text).expect("Codex JSONL reader should parse payload-level function_call_output");
 
         assert_eq!(session.messages.len(), 1);
         assert_eq!(session.messages[0].tool_results.len(), 1);
-        assert_eq!(
-            session.messages[0].tool_results[0].call_id.as_deref(),
-            Some("call-42")
-        );
+        assert_eq!(session.messages[0].tool_results[0].call_id.as_deref(), Some("call-42"));
         assert_eq!(session.messages[0].tool_results[0].content, "done");
     }
 
     #[test]
     fn resume_command_uses_subcommand_form() {
         let provider = Codex;
-        assert_eq!(
-            <Codex as Provider>::resume_command(&provider, "abc123"),
-            "codex resume abc123"
-        );
+        assert_eq!(<Codex as Provider>::resume_command(&provider, "abc123"), "codex resume abc123");
     }
 
     // -----------------------------------------------------------------------
@@ -1241,17 +923,13 @@ mod tests {
     /// Read Codex JSONL from an inline string.
     fn read_codex_jsonl(content: &str) -> crate::model::CanonicalSession {
         let provider = Codex;
-        provider
-            .read_jsonl(Path::new("/tmp/test-rollout.jsonl"), content)
-            .unwrap_or_else(|e| panic!("read_jsonl failed: {e}"))
+        provider.read_jsonl(Path::new("/tmp/test-rollout.jsonl"), content).unwrap_or_else(|e| panic!("read_jsonl failed: {e}"))
     }
 
     /// Read Codex legacy JSON from an inline string.
     fn read_codex_legacy(content: &str) -> crate::model::CanonicalSession {
         let provider = Codex;
-        provider
-            .read_legacy_json(Path::new("/tmp/test-legacy.json"), content)
-            .unwrap_or_else(|e| panic!("read_legacy_json failed: {e}"))
+        provider.read_legacy_json(Path::new("/tmp/test-legacy.json"), content).unwrap_or_else(|e| panic!("read_legacy_json failed: {e}"))
     }
 
     #[test]
@@ -1267,10 +945,7 @@ mod tests {
         assert_eq!(session.messages[0].content, "Hello");
         assert_eq!(session.messages[1].role, MessageRole::Assistant);
         assert_eq!(session.messages[1].content, "Hi back");
-        assert_eq!(
-            session.workspace,
-            Some(std::path::PathBuf::from("/data/proj"))
-        );
+        assert_eq!(session.workspace, Some(std::path::PathBuf::from("/data/proj")));
     }
 
     #[test]
@@ -1386,10 +1061,7 @@ not json
         );
         assert_eq!(session.session_id, "legacy-1");
         assert_eq!(session.messages.len(), 2);
-        assert_eq!(
-            session.workspace,
-            Some(std::path::PathBuf::from("/home/user/proj"))
-        );
+        assert_eq!(session.workspace, Some(std::path::PathBuf::from("/home/user/proj")));
         assert!(session.started_at.is_some());
     }
 
@@ -1418,10 +1090,7 @@ not json
 {"type":"event_msg","timestamp":1700000001.0,"payload":{"type":"user_message","message":"Optimize the database query"}}
 {"type":"response_item","timestamp":1700000002.0,"payload":{"role":"assistant","content":[{"type":"input_text","text":"Done"}]}}"#,
         );
-        assert_eq!(
-            session.title.as_deref(),
-            Some("Optimize the database query")
-        );
+        assert_eq!(session.title.as_deref(), Some("Optimize the database query"));
     }
 
     // -----------------------------------------------------------------------
@@ -1432,16 +1101,7 @@ not json
 
     #[test]
     fn writer_user_event_format() {
-        let msg = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::User,
-            content: "Hello from user".to_string(),
-            timestamp: None,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: json!({}),
-        };
+        let msg = CanonicalMessage { idx: 0, role: MessageRole::User, content: "Hello from user".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: json!({}) };
         let events = codex_events_for_message(&msg, "2023-11-14T22:13:20.000Z");
         assert_eq!(events.len(), 1);
         assert_eq!(events[0]["type"], "event_msg");
@@ -1451,16 +1111,7 @@ not json
 
     #[test]
     fn writer_reasoning_event_format() {
-        let msg = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::Assistant,
-            content: "Deep thought".to_string(),
-            timestamp: None,
-            author: Some("reasoning".to_string()),
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: json!({}),
-        };
+        let msg = CanonicalMessage { idx: 0, role: MessageRole::Assistant, content: "Deep thought".to_string(), timestamp: None, author: Some("reasoning".to_string()), tool_calls: vec![], tool_results: vec![], extra: json!({}) };
         let events = codex_events_for_message(&msg, "2023-11-14T22:13:20.000Z");
         assert_eq!(events.len(), 1);
         assert_eq!(events[0]["type"], "event_msg");
@@ -1474,30 +1125,14 @@ not json
         assert_eq!(codex_role_string(&MessageRole::Assistant), "assistant");
         assert_eq!(codex_role_string(&MessageRole::Tool), "tool");
         assert_eq!(codex_role_string(&MessageRole::System), "developer");
-        assert_eq!(
-            codex_role_string(&MessageRole::Other("custom".to_string())),
-            "custom"
-        );
+        assert_eq!(codex_role_string(&MessageRole::Other("custom".to_string())), "custom");
     }
 
     #[test]
     fn writer_assistant_without_token_count_produces_one_event() {
-        let msg = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::Assistant,
-            content: "Simple reply".to_string(),
-            timestamp: None,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: json!(null),
-        };
+        let msg = CanonicalMessage { idx: 0, role: MessageRole::Assistant, content: "Simple reply".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: json!(null) };
         let events = codex_events_for_message(&msg, "2023-11-14T22:13:20.000Z");
-        assert_eq!(
-            events.len(),
-            1,
-            "Assistant without usage should produce one response_item"
-        );
+        assert_eq!(events.len(), 1, "Assistant without usage should produce one response_item");
         assert_eq!(events[0]["type"], "response_item");
     }
 }

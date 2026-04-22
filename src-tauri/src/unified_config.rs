@@ -100,21 +100,11 @@ fn normalize_meta_section(value: Value) -> Value {
 }
 
 fn normalize_root_value(value: Value) -> Value {
-    let mut input = if let Some(map) = value.as_object() {
-        map.clone()
-    } else {
-        Map::new()
-    };
+    let mut input = if let Some(map) = value.as_object() { map.clone() } else { Map::new() };
 
     let meta = normalize_meta_section(input.remove("meta").unwrap_or_else(default_meta_section));
-    let server = normalize_server_section(
-        input
-            .remove("server")
-            .unwrap_or_else(default_server_section),
-    );
-    let session = normalize_object(input.remove("session").unwrap_or_else(|| {
-        serde_json::to_value(crate::config::Config::default()).unwrap_or_else(|_| json!({}))
-    }));
+    let server = normalize_server_section(input.remove("server").unwrap_or_else(default_server_section));
+    let session = normalize_object(input.remove("session").unwrap_or_else(|| serde_json::to_value(crate::config::Config::default()).unwrap_or_else(|_| json!({}))));
     let app = normalize_object(input.remove("app").unwrap_or_else(|| json!({})));
     let ui = normalize_object(input.remove("ui").unwrap_or_else(|| json!({})));
 
@@ -158,13 +148,7 @@ fn open_legacy_settings_db() -> Option<Connection> {
         return None;
     }
     let conn = Connection::open(path).ok()?;
-    let table_exists = conn
-        .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='settings'",
-            [],
-            |row| row.get::<_, i64>(0),
-        )
-        .ok()?;
+    let table_exists = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='settings'", [], |row| row.get::<_, i64>(0)).ok()?;
     if table_exists <= 0 {
         return None;
     }
@@ -173,13 +157,7 @@ fn open_legacy_settings_db() -> Option<Connection> {
 
 fn legacy_db_setting(key: &str) -> Option<Value> {
     let conn = open_legacy_settings_db()?;
-    let raw: String = conn
-        .query_row(
-            "SELECT value FROM settings WHERE key = ?1",
-            params![key],
-            |row| row.get(0),
-        )
-        .ok()?;
+    let raw: String = conn.query_row("SELECT value FROM settings WHERE key = ?1", params![key], |row| row.get(0)).ok()?;
     serde_json::from_str(&raw).ok()
 }
 
@@ -206,15 +184,7 @@ fn migrate_server_section() -> Value {
             continue;
         };
         if let (Some(target), Some(source)) = (server.as_object_mut(), value.as_object()) {
-            for key in [
-                "ws_enabled",
-                "ws_port",
-                "http_enabled",
-                "http_port",
-                "auth_enabled",
-                "bind_addr",
-                "embedding_enabled",
-            ] {
+            for key in ["ws_enabled", "ws_port", "http_enabled", "http_port", "auth_enabled", "bind_addr", "embedding_enabled"] {
                 if let Some(value) = source.get(key) {
                     target.insert(key.to_string(), value.clone());
                 }
@@ -227,8 +197,7 @@ fn migrate_server_section() -> Value {
 }
 
 fn migrate_session_section() -> Value {
-    let mut session =
-        serde_json::to_value(crate::config::Config::default()).unwrap_or_else(|_| json!({}));
+    let mut session = serde_json::to_value(crate::config::Config::default()).unwrap_or_else(|_| json!({}));
 
     if let Ok(agent_dir) = legacy_agent_dir() {
         let legacy_path = agent_dir.join(LEGACY_SESSION_CONFIG_FILE);
@@ -244,10 +213,7 @@ fn migrate_session_section() -> Value {
     if let Some(session_paths) = legacy_db_setting("session_paths") {
         if let Some(paths) = session_paths.as_array() {
             if let Some(obj) = session.as_object_mut() {
-                let current_empty = obj
-                    .get("session_paths")
-                    .and_then(Value::as_array)
-                    .is_none_or(|items| items.is_empty());
+                let current_empty = obj.get("session_paths").and_then(Value::as_array).is_none_or(|items| items.is_empty());
                 if current_empty {
                     obj.insert("session_paths".to_string(), Value::Array(paths.clone()));
                 }
@@ -264,9 +230,7 @@ fn migrate_app_section() -> Value {
     }
 
     if let Some(config_dir) = legacy_config_dir() {
-        let legacy_path = config_dir
-            .join("pi-session-manager")
-            .join(LEGACY_SETTINGS_FILE);
+        let legacy_path = config_dir.join("pi-session-manager").join(LEGACY_SETTINGS_FILE);
         if legacy_path.exists() {
             if let Some(value) = read_json_file(&legacy_path) {
                 return normalize_object(value);
@@ -340,16 +304,12 @@ fn migrate_legacy_root() -> Value {
 pub fn load_root() -> Result<Value, String> {
     let path = config_file_path()?;
     if path.exists() {
-        let content =
-            fs::read_to_string(&path).map_err(|e| format!("Failed to read unified config: {e}"))?;
-        let value = serde_json::from_str::<Value>(&content)
-            .map_err(|e| format!("Failed to parse unified config: {e}"))?;
+        let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read unified config: {e}"))?;
+        let value = serde_json::from_str::<Value>(&content).map_err(|e| format!("Failed to parse unified config: {e}"))?;
         let normalized = normalize_root_value(value);
-        let normalized_content = serde_json::to_string_pretty(&normalized)
-            .map_err(|e| format!("Failed to serialize unified config: {e}"))?;
+        let normalized_content = serde_json::to_string_pretty(&normalized).map_err(|e| format!("Failed to serialize unified config: {e}"))?;
         if content != normalized_content {
-            fs::write(&path, normalized_content)
-                .map_err(|e| format!("Failed to normalize unified config: {e}"))?;
+            fs::write(&path, normalized_content).map_err(|e| format!("Failed to normalize unified config: {e}"))?;
         }
         return Ok(normalized);
     }
@@ -362,17 +322,13 @@ pub fn load_root() -> Result<Value, String> {
 pub fn save_root(root: &Value) -> Result<(), String> {
     let path = config_file_path()?;
     let normalized = normalize_root_value(root.clone());
-    let content = serde_json::to_string_pretty(&normalized)
-        .map_err(|e| format!("Failed to serialize unified config: {e}"))?;
+    let content = serde_json::to_string_pretty(&normalized).map_err(|e| format!("Failed to serialize unified config: {e}"))?;
     fs::write(&path, content).map_err(|e| format!("Failed to write unified config: {e}"))
 }
 
 pub fn read_section(section: &str) -> Result<Value, String> {
     let root = load_root()?;
-    Ok(root
-        .get(section)
-        .cloned()
-        .unwrap_or_else(|| default_root_value()[section].clone()))
+    Ok(root.get(section).cloned().unwrap_or_else(|| default_root_value()[section].clone()))
 }
 
 pub fn write_section(section: &str, value: Value) -> Result<(), String> {
@@ -386,20 +342,17 @@ pub fn write_section(section: &str, value: Value) -> Result<(), String> {
 
 pub fn read_section_string(section: &str) -> Result<String, String> {
     let section_value = read_section(section)?;
-    serde_json::to_string_pretty(&section_value)
-        .map_err(|e| format!("Failed to serialize config section: {e}"))
+    serde_json::to_string_pretty(&section_value).map_err(|e| format!("Failed to serialize config section: {e}"))
 }
 
 pub fn write_section_string(section: &str, content: &str) -> Result<(), String> {
-    let value = serde_json::from_str::<Value>(content)
-        .map_err(|e| format!("Failed to parse section JSON: {e}"))?;
+    let value = serde_json::from_str::<Value>(content).map_err(|e| format!("Failed to parse section JSON: {e}"))?;
     write_section(section, value)
 }
 
 pub fn current_config_content() -> Result<String, String> {
     let root = load_root()?;
-    serde_json::to_string_pretty(&root)
-        .map_err(|e| format!("Failed to serialize config content: {e}"))
+    serde_json::to_string_pretty(&root).map_err(|e| format!("Failed to serialize config content: {e}"))
 }
 
 pub fn backup_root_dir(name: &str) -> Result<PathBuf, String> {

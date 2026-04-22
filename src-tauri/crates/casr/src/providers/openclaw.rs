@@ -28,10 +28,7 @@ use std::path::{Path, PathBuf};
 use tracing::{debug, info, trace};
 
 use crate::discovery::DetectionResult;
-use crate::model::{
-    CanonicalMessage, CanonicalSession, MessageRole, ToolCall, normalize_role, parse_timestamp,
-    reindex_messages, truncate_title,
-};
+use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, ToolCall, normalize_role, parse_timestamp, reindex_messages, truncate_title};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// OpenClaw provider implementation.
@@ -44,12 +41,7 @@ impl OpenClaw {
         if let Ok(home) = std::env::var("OPENCLAW_HOME") {
             return PathBuf::from(home);
         }
-        dirs::home_dir()
-            .unwrap_or_default()
-            .join(".openclaw")
-            .join("agents")
-            .join("openclaw")
-            .join("sessions")
+        dirs::home_dir().unwrap_or_default().join(".openclaw").join("agents").join("openclaw").join("sessions")
     }
 
     /// Flatten OpenClaw content blocks into a single string.
@@ -67,15 +59,10 @@ impl OpenClaw {
                         match block_type {
                             "text" => block.get("text").and_then(|t| t.as_str()).map(String::from),
                             "toolCall" => {
-                                let name = block
-                                    .get("name")
-                                    .and_then(|n| n.as_str())
-                                    .unwrap_or("tool_call");
+                                let name = block.get("name").and_then(|n| n.as_str()).unwrap_or("tool_call");
                                 Some(format!("[tool: {name}]"))
                             }
-                            "thinking" => {
-                                block.get("text").and_then(|t| t.as_str()).map(String::from)
-                            }
+                            "thinking" => block.get("text").and_then(|t| t.as_str()).map(String::from),
                             _ => block.get("text").and_then(|t| t.as_str()).map(String::from),
                         }
                     })
@@ -96,18 +83,7 @@ impl OpenClaw {
                 if block.get("type").and_then(|t| t.as_str()) != Some("toolCall") {
                     return None;
                 }
-                Some(ToolCall {
-                    id: block.get("id").and_then(|v| v.as_str()).map(String::from),
-                    name: block
-                        .get("name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("unknown")
-                        .to_string(),
-                    arguments: block
-                        .get("arguments")
-                        .cloned()
-                        .unwrap_or(serde_json::Value::Null),
-                })
+                Some(ToolCall { id: block.get("id").and_then(|v| v.as_str()).map(String::from), name: block.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(), arguments: block.get("arguments").cloned().unwrap_or(serde_json::Value::Null) })
             })
             .collect()
     }
@@ -130,31 +106,17 @@ impl Provider for OpenClaw {
         let root = Self::home_dir();
         let installed = root.is_dir();
         // Also check parent dir in case sessions dir hasn't been created yet.
-        let parent_exists = if !installed {
-            root.parent()
-                .and_then(|p| p.parent())
-                .and_then(|p| p.parent())
-                .is_some_and(|p| p.is_dir())
-        } else {
-            false
-        };
+        let parent_exists = if !installed { root.parent().and_then(|p| p.parent()).and_then(|p| p.parent()).is_some_and(|p| p.is_dir()) } else { false };
         let installed = installed || parent_exists;
         let evidence = if root.is_dir() {
             vec![format!("sessions directory found: {}", root.display())]
         } else if parent_exists {
-            vec![format!(
-                "parent directory found (sessions dir not yet created): {}",
-                root.display()
-            )]
+            vec![format!("parent directory found (sessions dir not yet created): {}", root.display())]
         } else {
             vec![]
         };
         trace!(provider = "openclaw", ?evidence, installed, "detection");
-        DetectionResult {
-            installed,
-            version: None,
-            evidence,
-        }
+        DetectionResult { installed, version: None, evidence }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -178,24 +140,11 @@ impl Provider for OpenClaw {
             return Some(candidate);
         }
         // Walk subdirectories.
-        for entry in walkdir::WalkDir::new(&root)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
+        for entry in walkdir::WalkDir::new(&root).into_iter().filter_map(Result::ok) {
             if !entry.file_type().is_file() {
                 continue;
             }
-            if entry
-                .path()
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .is_some_and(|s| s == session_id)
-                && entry
-                    .path()
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .is_some_and(|e| e == "jsonl")
-            {
+            if entry.path().file_stem().and_then(|s| s.to_str()).is_some_and(|s| s == session_id) && entry.path().extension().and_then(|e| e.to_str()).is_some_and(|e| e == "jsonl") {
                 debug!(
                     provider = "openclaw",
                     path = %entry.path().display(),
@@ -211,8 +160,7 @@ impl Provider for OpenClaw {
     fn read_session(&self, path: &Path) -> anyhow::Result<CanonicalSession> {
         debug!(path = %path.display(), "reading OpenClaw session");
 
-        let file = std::fs::File::open(path)
-            .map_err(|e| anyhow::anyhow!("failed to open {}: {e}", path.display()))?;
+        let file = std::fs::File::open(path).map_err(|e| anyhow::anyhow!("failed to open {}: {e}", path.display()))?;
         let reader = std::io::BufReader::new(file);
 
         let mut messages: Vec<CanonicalMessage> = Vec::new();
@@ -250,10 +198,7 @@ impl Provider for OpenClaw {
                         None => continue,
                     };
 
-                    let role_str = msg
-                        .get("role")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("assistant");
+                    let role_str = msg.get("role").and_then(|v| v.as_str()).unwrap_or("assistant");
                     let role = normalize_role(role_str);
 
                     let content_val = msg.get("content");
@@ -263,15 +208,10 @@ impl Provider for OpenClaw {
                         continue;
                     }
 
-                    let tool_calls = content_val
-                        .map(Self::extract_tool_calls)
-                        .unwrap_or_default();
+                    let tool_calls = content_val.map(Self::extract_tool_calls).unwrap_or_default();
 
                     // Timestamps on wrapper or inner message.
-                    let ts = val
-                        .get("timestamp")
-                        .and_then(parse_timestamp)
-                        .or_else(|| msg.get("timestamp").and_then(parse_timestamp));
+                    let ts = val.get("timestamp").and_then(parse_timestamp).or_else(|| msg.get("timestamp").and_then(parse_timestamp));
 
                     if started_at.is_none() {
                         started_at = ts;
@@ -286,16 +226,7 @@ impl Provider for OpenClaw {
                         model_name = author.clone();
                     }
 
-                    messages.push(CanonicalMessage {
-                        idx: 0,
-                        role,
-                        content,
-                        timestamp: ts,
-                        author,
-                        tool_calls,
-                        tool_results: vec![],
-                        extra: val,
-                    });
+                    messages.push(CanonicalMessage { idx: 0, role, content, timestamp: ts, author, tool_calls, tool_results: vec![], extra: val });
                 }
                 "model_change" => {
                     if let Some(m) = val.get("modelId").and_then(|v| v.as_str()) {
@@ -309,16 +240,9 @@ impl Provider for OpenClaw {
 
         reindex_messages(&mut messages);
 
-        let session_id = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unknown")
-            .to_string();
+        let session_id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string();
 
-        let title = messages
-            .iter()
-            .find(|m| m.role == MessageRole::User)
-            .map(|m| truncate_title(&m.content, 100));
+        let title = messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100));
 
         let workspace = session_cwd.as_ref().map(PathBuf::from);
 
@@ -327,36 +251,13 @@ impl Provider for OpenClaw {
             "cwd": session_cwd,
         });
 
-        info!(
-            session_id,
-            messages = messages.len(),
-            "OpenClaw session parsed"
-        );
+        info!(session_id, messages = messages.len(), "OpenClaw session parsed");
 
-        Ok(CanonicalSession {
-            session_id,
-            provider_slug: "openclaw".to_string(),
-            workspace,
-            title,
-            started_at,
-            ended_at,
-            messages,
-            metadata,
-            source_path: path.to_path_buf(),
-            model_name,
-        })
+        Ok(CanonicalSession { session_id, provider_slug: "openclaw".to_string(), workspace, title, started_at, ended_at, messages, metadata, source_path: path.to_path_buf(), model_name })
     }
 
-    fn write_session(
-        &self,
-        session: &CanonicalSession,
-        opts: &WriteOptions,
-    ) -> anyhow::Result<WrittenSession> {
-        let session_id = if session.session_id.is_empty() {
-            format!("casr-{}", chrono::Utc::now().format("%Y%m%dT%H%M%S"))
-        } else {
-            session.session_id.clone()
-        };
+    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
+        let session_id = if session.session_id.is_empty() { format!("casr-{}", chrono::Utc::now().format("%Y%m%dT%H%M%S")) } else { session.session_id.clone() };
 
         let target_dir = Self::home_dir();
         let target_path = target_dir.join(format!("{session_id}.jsonl"));
@@ -371,11 +272,7 @@ impl Provider for OpenClaw {
         let mut lines: Vec<String> = Vec::new();
 
         // Session header.
-        let workspace = session
-            .workspace
-            .as_ref()
-            .and_then(|w| w.to_str())
-            .unwrap_or("/tmp");
+        let workspace = session.workspace.as_ref().and_then(|w| w.to_str()).unwrap_or("/tmp");
         let header = serde_json::json!({
             "type": "session",
             "id": session_id,
@@ -419,9 +316,7 @@ impl Provider for OpenClaw {
                 }));
             }
 
-            let content: serde_json::Value = if blocks.len() == 1
-                && blocks[0].get("type").and_then(|t| t.as_str()) == Some("text")
-            {
+            let content: serde_json::Value = if blocks.len() == 1 && blocks[0].get("type").and_then(|t| t.as_str()) == Some("text") {
                 // Single text block — use plain string for compactness.
                 serde_json::Value::String(msg.content.clone())
             } else {
@@ -436,11 +331,7 @@ impl Provider for OpenClaw {
                 inner["model"] = serde_json::Value::String(author.clone());
             }
 
-            let ts_str = msg
-                .timestamp
-                .and_then(chrono::DateTime::from_timestamp_millis)
-                .map(|dt| dt.to_rfc3339())
-                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
+            let ts_str = msg.timestamp.and_then(chrono::DateTime::from_timestamp_millis).map(|dt| dt.to_rfc3339()).unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
 
             let entry = serde_json::json!({
                 "type": "message",
@@ -452,12 +343,7 @@ impl Provider for OpenClaw {
         }
 
         let file_content = lines.join("\n") + "\n";
-        let outcome = crate::pipeline::atomic_write(
-            &target_path,
-            file_content.as_bytes(),
-            opts.force,
-            self.slug(),
-        )?;
+        let outcome = crate::pipeline::atomic_write(&target_path, file_content.as_bytes(), opts.force, self.slug())?;
 
         info!(
             session_id,
@@ -466,12 +352,7 @@ impl Provider for OpenClaw {
             "OpenClaw session written"
         );
 
-        Ok(WrittenSession {
-            paths: vec![outcome.target_path],
-            session_id: session_id.clone(),
-            resume_command: self.resume_command(&session_id),
-            backup_path: outcome.backup_path,
-        })
+        Ok(WrittenSession { paths: vec![outcome.target_path], session_id: session_id.clone(), resume_command: self.resume_command(&session_id), backup_path: outcome.backup_path })
     }
 
     fn resume_command(&self, session_id: &str) -> String {
@@ -520,27 +401,19 @@ mod tests {
         assert_eq!(session.messages[1].role, MessageRole::Assistant);
         assert!(session.messages[1].content.contains("Hi there!"));
         assert!(session.messages[1].content.contains("[tool: exec]"));
-        assert_eq!(
-            session.messages[1].author,
-            Some("claude-opus-4-5".to_string())
-        );
+        assert_eq!(session.messages[1].author, Some("claude-opus-4-5".to_string()));
         assert_eq!(session.workspace, Some(PathBuf::from("/home/user/project")));
         assert!(session.started_at.is_some());
     }
 
     #[test]
     fn reader_tool_calls_extracted() {
-        let session = read_openclaw(&[
-            r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"assistant","content":[{"type":"text","text":"Let me check."},{"type":"toolCall","id":"tc1","name":"read_file","arguments":{"path":"/test.rs"}}]}}"#,
-        ]);
+        let session = read_openclaw(&[r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"assistant","content":[{"type":"text","text":"Let me check."},{"type":"toolCall","id":"tc1","name":"read_file","arguments":{"path":"/test.rs"}}]}}"#]);
 
         assert_eq!(session.messages.len(), 1);
         assert_eq!(session.messages[0].tool_calls.len(), 1);
         assert_eq!(session.messages[0].tool_calls[0].name, "read_file");
-        assert_eq!(
-            session.messages[0].tool_calls[0].id,
-            Some("tc1".to_string())
-        );
+        assert_eq!(session.messages[0].tool_calls[0].id, Some("tc1".to_string()));
     }
 
     #[test]
@@ -559,12 +432,7 @@ mod tests {
 
     #[test]
     fn reader_handles_empty_and_invalid_lines() {
-        let session = read_openclaw(&[
-            "",
-            "not-json",
-            r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00.000Z","message":{"role":"user","content":"Valid"}}"#,
-            r#"{"type":"message","id":"m2","message":{"role":"assistant","content":""}}"#,
-        ]);
+        let session = read_openclaw(&["", "not-json", r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00.000Z","message":{"role":"user","content":"Valid"}}"#, r#"{"type":"message","id":"m2","message":{"role":"assistant","content":""}}"#]);
 
         assert_eq!(session.messages.len(), 1);
         assert_eq!(session.messages[0].content, "Valid");
@@ -572,9 +440,7 @@ mod tests {
 
     #[test]
     fn reader_thinking_content_blocks() {
-        let session = read_openclaw(&[
-            r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"assistant","content":[{"type":"thinking","text":"Let me reason..."},{"type":"text","text":"Here's my answer."}]}}"#,
-        ]);
+        let session = read_openclaw(&[r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"assistant","content":[{"type":"thinking","text":"Let me reason..."},{"type":"text","text":"Here's my answer."}]}}"#]);
 
         assert_eq!(session.messages.len(), 1);
         assert!(session.messages[0].content.contains("Let me reason..."));
@@ -583,9 +449,7 @@ mod tests {
 
     #[test]
     fn reader_plain_string_content() {
-        let session = read_openclaw(&[
-            r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"user","content":"Plain string, no blocks"}}"#,
-        ]);
+        let session = read_openclaw(&[r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"user","content":"Plain string, no blocks"}}"#]);
 
         assert_eq!(session.messages.len(), 1);
         assert_eq!(session.messages[0].content, "Plain string, no blocks");
@@ -594,13 +458,7 @@ mod tests {
     #[test]
     fn reader_session_id_from_filename() {
         let tmp = tempfile::tempdir().unwrap();
-        let path = write_jsonl(
-            tmp.path(),
-            "my-openclaw-session.jsonl",
-            &[
-                r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"user","content":"test"}}"#,
-            ],
-        );
+        let path = write_jsonl(tmp.path(), "my-openclaw-session.jsonl", &[r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"user","content":"test"}}"#]);
         let provider = OpenClaw;
         let session = provider.read_session(&path).unwrap();
         assert_eq!(session.session_id, "my-openclaw-session");
@@ -608,10 +466,7 @@ mod tests {
 
     #[test]
     fn reader_title_from_first_user_message() {
-        let session = read_openclaw(&[
-            r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"assistant","content":"Welcome"}}"#,
-            r#"{"type":"message","id":"m2","timestamp":"2026-02-01T16:00:01Z","message":{"role":"user","content":"Refactor the auth module"}}"#,
-        ]);
+        let session = read_openclaw(&[r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"assistant","content":"Welcome"}}"#, r#"{"type":"message","id":"m2","timestamp":"2026-02-01T16:00:01Z","message":{"role":"user","content":"Refactor the auth module"}}"#]);
         assert_eq!(session.title.as_deref(), Some("Refactor the auth module"));
     }
 
@@ -624,19 +479,13 @@ mod tests {
 
     #[test]
     fn reader_model_change_tracked() {
-        let session = read_openclaw(&[
-            r#"{"type":"model_change","modelId":"gpt-5"}"#,
-            r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"user","content":"test"}}"#,
-        ]);
+        let session = read_openclaw(&[r#"{"type":"model_change","modelId":"gpt-5"}"#, r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"user","content":"test"}}"#]);
         assert_eq!(session.model_name, Some("gpt-5".to_string()));
     }
 
     #[test]
     fn reader_timestamps_parsed() {
-        let session = read_openclaw(&[
-            r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00.000Z","message":{"role":"user","content":"First"}}"#,
-            r#"{"type":"message","id":"m2","timestamp":"2026-02-01T17:00:00.000Z","message":{"role":"assistant","content":"Second"}}"#,
-        ]);
+        let session = read_openclaw(&[r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00.000Z","message":{"role":"user","content":"First"}}"#, r#"{"type":"message","id":"m2","timestamp":"2026-02-01T17:00:00.000Z","message":{"role":"assistant","content":"Second"}}"#]);
         assert!(session.started_at.is_some());
         assert!(session.ended_at.is_some());
         assert!(session.started_at.unwrap() < session.ended_at.unwrap());
@@ -645,37 +494,27 @@ mod tests {
     #[test]
     fn reader_wrapper_timestamp_preferred() {
         // Wrapper timestamp is ISO string, inner is epoch millis.
-        let session = read_openclaw(&[
-            r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00.828Z","message":{"role":"user","content":"test","timestamp":1769961600827}}"#,
-        ]);
+        let session = read_openclaw(&[r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00.828Z","message":{"role":"user","content":"test","timestamp":1769961600827}}"#]);
         assert!(session.messages[0].timestamp.is_some());
     }
 
     #[test]
     fn reader_reindexes_messages() {
-        let session = read_openclaw(&[
-            r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"user","content":"A"}}"#,
-            r#"{"type":"message","id":"m2","timestamp":"2026-02-01T16:00:01Z","message":{"role":"assistant","content":"B"}}"#,
-        ]);
+        let session = read_openclaw(&[r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"user","content":"A"}}"#, r#"{"type":"message","id":"m2","timestamp":"2026-02-01T16:00:01Z","message":{"role":"assistant","content":"B"}}"#]);
         assert_eq!(session.messages[0].idx, 0);
         assert_eq!(session.messages[1].idx, 1);
     }
 
     #[test]
     fn reader_message_without_inner_message_skipped() {
-        let session = read_openclaw(&[
-            r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z"}"#,
-            r#"{"type":"message","id":"m2","timestamp":"2026-02-01T16:00:01Z","message":{"role":"user","content":"Valid"}}"#,
-        ]);
+        let session = read_openclaw(&[r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z"}"#, r#"{"type":"message","id":"m2","timestamp":"2026-02-01T16:00:01Z","message":{"role":"user","content":"Valid"}}"#]);
         assert_eq!(session.messages.len(), 1);
         assert_eq!(session.messages[0].content, "Valid");
     }
 
     #[test]
     fn reader_metadata_has_source() {
-        let session = read_openclaw(&[
-            r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"user","content":"test"}}"#,
-        ]);
+        let session = read_openclaw(&[r#"{"type":"message","id":"m1","timestamp":"2026-02-01T16:00:00Z","message":{"role":"user","content":"test"}}"#]);
         assert_eq!(session.metadata["source"], "openclaw");
     }
 
@@ -691,11 +530,7 @@ mod tests {
         // Build content and write manually to avoid env var issues.
         let mut lines: Vec<String> = Vec::new();
 
-        let workspace = session
-            .workspace
-            .as_ref()
-            .and_then(|w| w.to_str())
-            .unwrap_or("/tmp");
+        let workspace = session.workspace.as_ref().and_then(|w| w.to_str()).unwrap_or("/tmp");
         let header = json!({
             "type": "session",
             "id": session.session_id,
@@ -715,11 +550,7 @@ mod tests {
                 MessageRole::Tool => "tool",
                 MessageRole::Other(r) => r.as_str(),
             };
-            let ts_str = msg
-                .timestamp
-                .and_then(chrono::DateTime::from_timestamp_millis)
-                .map(|dt| dt.to_rfc3339())
-                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
+            let ts_str = msg.timestamp.and_then(chrono::DateTime::from_timestamp_millis).map(|dt| dt.to_rfc3339()).unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
 
             let content: serde_json::Value = if msg.tool_calls.is_empty() {
                 serde_json::Value::String(msg.content.clone())
@@ -764,26 +595,8 @@ mod tests {
             started_at: Some(1_700_000_000_000),
             ended_at: Some(1_700_001_000_000),
             messages: vec![
-                CanonicalMessage {
-                    idx: 0,
-                    role: MessageRole::User,
-                    content: "Fix the bug".to_string(),
-                    timestamp: Some(1_700_000_000_000),
-                    author: None,
-                    tool_calls: vec![],
-                    tool_results: vec![],
-                    extra: json!({}),
-                },
-                CanonicalMessage {
-                    idx: 1,
-                    role: MessageRole::Assistant,
-                    content: "I'll fix it now.".to_string(),
-                    timestamp: Some(1_700_000_500_000),
-                    author: Some("claude-3-opus".to_string()),
-                    tool_calls: vec![],
-                    tool_results: vec![],
-                    extra: json!({}),
-                },
+                CanonicalMessage { idx: 0, role: MessageRole::User, content: "Fix the bug".to_string(), timestamp: Some(1_700_000_000_000), author: None, tool_calls: vec![], tool_results: vec![], extra: json!({}) },
+                CanonicalMessage { idx: 1, role: MessageRole::Assistant, content: "I'll fix it now.".to_string(), timestamp: Some(1_700_000_500_000), author: Some("claude-3-opus".to_string()), tool_calls: vec![], tool_results: vec![], extra: json!({}) },
             ],
             metadata: json!({"source": "claude-code"}),
             source_path: PathBuf::from("/tmp/test.jsonl"),
@@ -796,14 +609,8 @@ mod tests {
         assert_eq!(readback.messages[0].content, "Fix the bug");
         assert_eq!(readback.messages[1].role, MessageRole::Assistant);
         assert_eq!(readback.messages[1].content, "I'll fix it now.");
-        assert_eq!(
-            readback.messages[1].author,
-            Some("claude-3-opus".to_string())
-        );
-        assert_eq!(
-            readback.workspace,
-            Some(PathBuf::from("/home/user/project"))
-        );
+        assert_eq!(readback.messages[1].author, Some("claude-3-opus".to_string()));
+        assert_eq!(readback.workspace, Some(PathBuf::from("/home/user/project")));
     }
 
     #[test]
@@ -821,11 +628,7 @@ mod tests {
                 content: "Let me check.".to_string(),
                 timestamp: Some(1_700_000_000_000),
                 author: None,
-                tool_calls: vec![ToolCall {
-                    id: Some("tc1".to_string()),
-                    name: "read_file".to_string(),
-                    arguments: json!({"path": "/test.rs"}),
-                }],
+                tool_calls: vec![ToolCall { id: Some("tc1".to_string()), name: "read_file".to_string(), arguments: json!({"path": "/test.rs"}) }],
                 tool_results: vec![],
                 extra: json!({}),
             }],
@@ -842,10 +645,7 @@ mod tests {
     #[test]
     fn writer_resume_command() {
         let provider = OpenClaw;
-        assert_eq!(
-            provider.resume_command("my-session"),
-            "openclaw --resume my-session"
-        );
+        assert_eq!(provider.resume_command("my-session"), "openclaw --resume my-session");
     }
 
     // -----------------------------------------------------------------------

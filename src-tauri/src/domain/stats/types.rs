@@ -11,6 +11,8 @@ pub struct SessionStats {
     pub total_tokens: usize,
     pub sessions_by_project: HashMap<String, usize>,
     pub sessions_by_model: HashMap<String, usize>,
+    #[serde(default)]
+    pub sessions_by_provider: HashMap<String, usize>,
     pub model_usage_by_project: HashMap<String, HashMap<String, usize>>,
     pub messages_by_date: HashMap<String, usize>,
     pub messages_by_hour: HashMap<String, usize>,
@@ -37,10 +39,15 @@ pub struct TokenDetails {
     pub total_cache_read: usize,
     pub total_cache_write: usize,
     pub total_cost: f64,
+    /// Provider -> (Model -> Stats)
+    #[serde(default)]
+    pub tokens_by_provider: HashMap<String, HashMap<String, ModelTokenStats>>,
+    /// Legacy: model name -> stats (for backward compatibility)
+    #[serde(default)]
     pub tokens_by_model: HashMap<String, ModelTokenStats>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ModelTokenStats {
     pub messages: usize,
     pub input: usize,

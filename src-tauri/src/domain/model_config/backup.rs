@@ -9,9 +9,7 @@ fn models_backup_dir() -> Result<PathBuf, String> {
     Ok(crate::paths::pi_agent_root_dir()?.join("backups/models"))
 }
 
-pub fn create_model_config_backup_internal(
-    note: Option<String>,
-) -> Result<ModelConfigBackupMeta, String> {
+pub fn create_model_config_backup_internal(note: Option<String>) -> Result<ModelConfigBackupMeta, String> {
     let models_path = get_models_json_path()?;
     if !models_path.exists() {
         return Err("models.json not found".to_string());
@@ -33,18 +31,11 @@ pub fn create_model_config_backup_internal(
             "note": note_text,
             "createdAt": now.to_rfc3339(),
         });
-        let note_content = serde_json::to_string_pretty(&note_json)
-            .map_err(|e| format!("Serialize backup note: {e}"))?;
+        let note_content = serde_json::to_string_pretty(&note_json).map_err(|e| format!("Serialize backup note: {e}"))?;
         fs::write(note_path, note_content).map_err(|e| format!("Write backup note: {e}"))?;
     }
 
-    Ok(ModelConfigBackupMeta {
-        id,
-        file_path: backup_path.to_string_lossy().to_string(),
-        created_at: now.to_rfc3339(),
-        size_bytes: content.len() as u64,
-        note,
-    })
+    Ok(ModelConfigBackupMeta { id, file_path: backup_path.to_string_lossy().to_string(), created_at: now.to_rfc3339(), size_bytes: content.len() as u64, note })
 }
 
 pub fn list_model_config_backups_internal() -> Result<Vec<ModelConfigBackupMeta>, String> {
@@ -61,11 +52,7 @@ pub fn list_model_config_backups_internal() -> Result<Vec<ModelConfigBackupMeta>
         if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
             continue;
         }
-        if path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name.ends_with(".meta.json"))
-        {
+        if path.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.ends_with(".meta.json")) {
             continue;
         }
 
@@ -73,32 +60,14 @@ pub fn list_model_config_backups_internal() -> Result<Vec<ModelConfigBackupMeta>
             continue;
         };
 
-        let metadata = entry
-            .metadata()
-            .map_err(|e| format!("Read backup metadata: {e}"))?;
+        let metadata = entry.metadata().map_err(|e| format!("Read backup metadata: {e}"))?;
         let modified = metadata.modified().ok();
-        let created_at = modified
-            .map(chrono::DateTime::<chrono::Utc>::from)
-            .map(|t| t.to_rfc3339())
-            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        let created_at = modified.map(chrono::DateTime::<chrono::Utc>::from).map(|t| t.to_rfc3339()).unwrap_or_else(|| Utc::now().to_rfc3339());
 
         let note_path = backup_dir.join(format!("{id}.meta.json"));
-        let note = if note_path.exists() {
-            fs::read_to_string(&note_path)
-                .ok()
-                .and_then(|content| serde_json::from_str::<serde_json::Value>(&content).ok())
-                .and_then(|v| v.get("note").and_then(|n| n.as_str()).map(str::to_string))
-        } else {
-            None
-        };
+        let note = if note_path.exists() { fs::read_to_string(&note_path).ok().and_then(|content| serde_json::from_str::<serde_json::Value>(&content).ok()).and_then(|v| v.get("note").and_then(|n| n.as_str()).map(str::to_string)) } else { None };
 
-        backups.push(ModelConfigBackupMeta {
-            id: id.to_string(),
-            file_path: path.to_string_lossy().to_string(),
-            created_at,
-            size_bytes: metadata.len(),
-            note,
-        });
+        backups.push(ModelConfigBackupMeta { id: id.to_string(), file_path: path.to_string_lossy().to_string(), created_at, size_bytes: metadata.len(), note });
     }
 
     backups.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -113,8 +82,7 @@ pub fn restore_model_config_backup_internal(id: String) -> Result<(), String> {
     }
 
     let content = fs::read_to_string(&backup_path).map_err(|e| format!("Read backup file: {e}"))?;
-    let imported: serde_json::Value =
-        serde_json::from_str(&content).map_err(|e| format!("Parse backup JSON: {e}"))?;
+    let imported: serde_json::Value = serde_json::from_str(&content).map_err(|e| format!("Parse backup JSON: {e}"))?;
     crate::domain::model_config::writer::write_models_config_internal(imported, true)
 }
 
@@ -138,10 +106,7 @@ fn sanitize_backup_id(id: &str) -> Result<String, String> {
     if id.is_empty() {
         return Err("Backup id is empty".to_string());
     }
-    if !id
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-    {
+    if !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
         return Err("Backup id contains invalid characters".to_string());
     }
     Ok(id.to_string())

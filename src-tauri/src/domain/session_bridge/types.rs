@@ -1,9 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub use crate::domain::casr_min::model::{
-    CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult,
-};
+pub use crate::domain::casr_min::model::{CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult};
 use crate::domain::casr_min::providers::ProviderKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -19,15 +17,7 @@ pub enum SessionBridgeSource {
 }
 
 impl SessionBridgeSource {
-    pub const ALL: [Self; 7] = [
-        Self::Pi,
-        Self::ClaudeCode,
-        Self::Codex,
-        Self::OpenCode,
-        Self::Gemini,
-        Self::Factory,
-        Self::ClawdBot,
-    ];
+    pub const ALL: [Self; 7] = [Self::Pi, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot];
 
     pub fn slug(self) -> &'static str {
         match self {
@@ -55,42 +45,16 @@ impl SessionBridgeSource {
 
     pub fn session_roots(self) -> Vec<PathBuf> {
         match self {
-            Self::Pi => crate::paths::pi_agent_sessions_dir()
-                .ok()
-                .filter(|path| path.is_dir())
-                .map(|path| vec![path])
-                .unwrap_or_default(),
-            Self::ClaudeCode => dirs::home_dir()
-                .map(|home| home.join(".claude").join("projects"))
-                .filter(|path| path.is_dir())
-                .map(|path| vec![path])
-                .unwrap_or_default(),
-            Self::Codex => dirs::home_dir()
-                .map(|home| home.join(".codex").join("sessions"))
-                .filter(|path| path.is_dir())
-                .map(|path| vec![path])
-                .unwrap_or_default(),
+            Self::Pi => crate::paths::pi_agent_sessions_dir().ok().filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
+            Self::ClaudeCode => dirs::home_dir().map(|home| home.join(".claude").join("projects")).filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
+            Self::Codex => dirs::home_dir().map(|home| home.join(".codex").join("sessions")).filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
             Self::Gemini => crate::domain::casr_min::providers::gemini::session_roots(),
             Self::Factory => {
-                let root = if let Ok(home) = std::env::var("FACTORY_HOME") {
-                    PathBuf::from(home)
-                } else {
-                    dirs::home_dir()
-                        .unwrap_or_default()
-                        .join(".factory")
-                        .join("sessions")
-                };
+                let root = if let Ok(home) = std::env::var("FACTORY_HOME") { PathBuf::from(home) } else { dirs::home_dir().unwrap_or_default().join(".factory").join("sessions") };
                 root.is_dir().then_some(vec![root]).unwrap_or_default()
             }
             Self::ClawdBot => {
-                let root = if let Ok(home) = std::env::var("CLAWDBOT_HOME") {
-                    PathBuf::from(home)
-                } else {
-                    dirs::home_dir()
-                        .unwrap_or_default()
-                        .join(".clawdbot")
-                        .join("sessions")
-                };
+                let root = if let Ok(home) = std::env::var("CLAWDBOT_HOME") { PathBuf::from(home) } else { dirs::home_dir().unwrap_or_default().join(".clawdbot").join("sessions") };
                 root.is_dir().then_some(vec![root]).unwrap_or_default()
             }
             Self::OpenCode => crate::domain::casr_min::providers::opencode::session_roots(),
@@ -100,26 +64,13 @@ impl SessionBridgeSource {
     pub fn matches_path(self, path: &Path) -> bool {
         let normalized = path.to_string_lossy().replace('\\', "/");
         match self {
-            Self::Pi => crate::paths::pi_agent_sessions_dir()
-                .ok()
-                .map(|path| path.to_string_lossy().replace('\\', "/"))
-                .is_some_and(|root| normalized.contains(&root)),
+            Self::Pi => crate::paths::pi_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
             Self::ClaudeCode => normalized.contains("/.claude/projects/"),
             Self::Codex => normalized.contains("/.codex/sessions/"),
             Self::Gemini => crate::domain::casr_min::providers::gemini::is_session_file(path),
-            Self::Factory => {
-                normalized.contains("/.factory/sessions/")
-                    && path.extension().and_then(|ext| ext.to_str()) == Some("jsonl")
-            }
-            Self::ClawdBot => {
-                normalized.contains("/.clawdbot/sessions/")
-                    && path.extension().and_then(|ext| ext.to_str()) == Some("jsonl")
-            }
-            Self::OpenCode => {
-                path.file_name().and_then(|value| value.to_str()) == Some("opencode.db")
-                    || normalized.contains("/.opencode/")
-                    || normalized.contains("/opencode.db/")
-            }
+            Self::Factory => normalized.contains("/.factory/sessions/") && path.extension().and_then(|ext| ext.to_str()) == Some("jsonl"),
+            Self::ClawdBot => normalized.contains("/.clawdbot/sessions/") && path.extension().and_then(|ext| ext.to_str()) == Some("jsonl"),
+            Self::OpenCode => path.file_name().and_then(|value| value.to_str()) == Some("opencode.db") || normalized.contains("/.opencode/") || normalized.contains("/opencode.db/"),
         }
     }
 
@@ -193,8 +144,6 @@ pub struct SessionBridgeConvertResult {
     pub warnings: Vec<String>,
 }
 
-pub(crate) fn map_read_result(
-    (provider, canonical): (ProviderKind, CanonicalSession),
-) -> (SessionBridgeSource, CanonicalSession) {
+pub(crate) fn map_read_result((provider, canonical): (ProviderKind, CanonicalSession)) -> (SessionBridgeSource, CanonicalSession) {
     (provider.into(), canonical)
 }

@@ -4,9 +4,7 @@ use casr::discovery::{ProviderRegistry, SourceHint};
 use casr::pipeline::{ConversionPipeline, ConvertOptions};
 
 use crate::domain::session_bridge::SessionBridgeConvertResult;
-use crate::domain::session_bridge::{
-    CanonicalMessage, CanonicalSession, MessageRole, SessionBridgeSource, ToolCall, ToolResult,
-};
+use crate::domain::session_bridge::{CanonicalMessage, CanonicalSession, MessageRole, SessionBridgeSource, ToolCall, ToolResult};
 
 fn registry() -> ProviderRegistry {
     ProviderRegistry::default_registry()
@@ -67,24 +65,8 @@ fn canonical_from_casr(session: casr::model::CanonicalSession) -> CanonicalSessi
                 content: message.content,
                 timestamp: message.timestamp,
                 author: message.author,
-                tool_calls: message
-                    .tool_calls
-                    .into_iter()
-                    .map(|call| ToolCall {
-                        id: call.id,
-                        name: call.name,
-                        arguments: call.arguments,
-                    })
-                    .collect(),
-                tool_results: message
-                    .tool_results
-                    .into_iter()
-                    .map(|result| ToolResult {
-                        call_id: result.call_id,
-                        content: result.content,
-                        is_error: result.is_error,
-                    })
-                    .collect(),
+                tool_calls: message.tool_calls.into_iter().map(|call| ToolCall { id: call.id, name: call.name, arguments: call.arguments }).collect(),
+                tool_results: message.tool_results.into_iter().map(|result| ToolResult { call_id: result.call_id, content: result.content, is_error: result.is_error }).collect(),
                 extra: message.extra,
             })
             .collect(),
@@ -95,65 +77,30 @@ fn canonical_from_casr(session: casr::model::CanonicalSession) -> CanonicalSessi
 }
 
 fn session_id_hint_from_path(path: &Path) -> String {
-    path.file_stem()
-        .and_then(|stem| stem.to_str())
-        .filter(|stem| !stem.trim().is_empty())
-        .unwrap_or("session")
-        .to_string()
+    path.file_stem().and_then(|stem| stem.to_str()).filter(|stem| !stem.trim().is_empty()).unwrap_or("session").to_string()
 }
 
-pub fn read_canonical_session_from_path(
-    path: &Path,
-) -> Result<(SessionBridgeSource, CanonicalSession), String> {
+pub fn read_canonical_session_from_path(path: &Path) -> Result<(SessionBridgeSource, CanonicalSession), String> {
     let registry = registry();
     let session_id = session_id_hint_from_path(path);
-    let resolved = registry
-        .resolve_session(&session_id, Some(&SourceHint::Path(path.to_path_buf())))
-        .map_err(|error| error.to_string())?;
+    let resolved = registry.resolve_session(&session_id, Some(&SourceHint::Path(path.to_path_buf()))).map_err(|error| error.to_string())?;
     let source = session_bridge_source_from_casr_slug(resolved.provider.slug())?;
-    let canonical = resolved
-        .provider
-        .read_session(&resolved.path)
-        .map_err(|error| error.to_string())?;
+    let canonical = resolved.provider.read_session(&resolved.path).map_err(|error| error.to_string())?;
     Ok((source, canonical_from_casr(canonical)))
 }
 
-pub fn convert_session_format(
-    path: &Path,
-    target: SessionBridgeSource,
-    force: bool,
-) -> Result<SessionBridgeConvertResult, String> {
+pub fn convert_session_format(path: &Path, target: SessionBridgeSource, force: bool) -> Result<SessionBridgeConvertResult, String> {
     let registry = registry();
     let pipeline = ConversionPipeline { registry };
-    let result = pipeline
-        .convert(
-            casr_slug_from_target(target),
-            &session_id_hint_from_path(path),
-            ConvertOptions {
-                dry_run: false,
-                force,
-                verbose: false,
-                enrich: false,
-                source_hint: Some(path.to_string_lossy().to_string()),
-            },
-        )
-        .map_err(|error| error.to_string())?;
+    let result = pipeline.convert(casr_slug_from_target(target), &session_id_hint_from_path(path), ConvertOptions { dry_run: false, force, verbose: false, enrich: false, source_hint: Some(path.to_string_lossy().to_string()) }).map_err(|error| error.to_string())?;
 
     let source = session_bridge_source_from_casr_slug(&result.source_provider)?;
     let written = result.written;
     let (written_paths, target_session_id, resume_command) = if let Some(written) = written {
-        let paths = if written.paths.is_empty() {
-            vec![path.to_path_buf()]
-        } else {
-            written.paths
-        };
+        let paths = if written.paths.is_empty() { vec![path.to_path_buf()] } else { written.paths };
         (paths, written.session_id, written.resume_command)
     } else {
-        (
-            vec![path.to_path_buf()],
-            result.canonical_session.session_id.clone(),
-            String::new(),
-        )
+        (vec![path.to_path_buf()], result.canonical_session.session_id.clone(), String::new())
     };
 
     Ok(SessionBridgeConvertResult {
@@ -161,10 +108,7 @@ pub fn convert_session_format(
         target_provider: target.display_name().to_string(),
         source_session_id: result.canonical_session.session_id.clone(),
         target_session_id,
-        written_paths: written_paths
-            .into_iter()
-            .map(|value| value.to_string_lossy().to_string())
-            .collect(),
+        written_paths: written_paths.into_iter().map(|value| value.to_string_lossy().to_string()).collect(),
         resume_command,
         dry_run: false,
         warnings: result.warnings,

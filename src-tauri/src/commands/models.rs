@@ -29,10 +29,7 @@ pub async fn list_models(search: Option<String>) -> Result<Vec<ModelInfo>, Strin
         args.push(query);
     }
 
-    let output = Command::new("pi")
-        .args(&args)
-        .output()
-        .map_err(|e| format!("Failed to execute pi --list-models: {e}"))?;
+    let output = Command::new("pi").args(&args).output().map_err(|e| format!("Failed to execute pi --list-models: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -57,15 +54,7 @@ pub async fn list_models(search: Option<String>) -> Result<Vec<ModelInfo>, Strin
             let provider = parts[0].to_string();
             let model = parts[1].to_string();
 
-            models.push(ModelInfo {
-                provider,
-                model,
-                available: true,
-                tested: false,
-                last_test_time: None,
-                response_time: None,
-                status: "ready".to_string(),
-            });
+            models.push(ModelInfo { provider, model, available: true, tested: false, last_test_time: None, response_time: None, status: "ready".to_string() });
         }
     }
 
@@ -73,73 +62,31 @@ pub async fn list_models(search: Option<String>) -> Result<Vec<ModelInfo>, Strin
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn test_model(
-    provider: String,
-    model: String,
-    _prompt: Option<String>,
-) -> Result<ModelTestResult, String> {
-    let args = vec![
-        "--provider",
-        &provider,
-        "--model",
-        &model,
-        "--no-tools",
-        "--no-skills",
-        "--no-extensions",
-        "--no-session",
-        "--print",
-    ];
+pub async fn test_model(provider: String, model: String, _prompt: Option<String>) -> Result<ModelTestResult, String> {
+    let args = vec!["--provider", &provider, "--model", &model, "--no-tools", "--no-skills", "--no-extensions", "--no-session", "--print"];
 
     let start_time = Instant::now();
 
-    let output = Command::new("pi")
-        .args(&args)
-        .stdin(Stdio::piped())
-        .output()
-        .map_err(|e| format!("Failed to execute pi: {e}"))?;
+    let output = Command::new("pi").args(&args).stdin(Stdio::piped()).output().map_err(|e| format!("Failed to execute pi: {e}"))?;
 
     let duration = start_time.elapsed().as_secs_f64();
 
     if output.status.success() {
-        Ok(ModelTestResult {
-            provider,
-            model,
-            time: duration,
-            output: "OK".to_string(),
-            status: "success".to_string(),
-            error_msg: None,
-        })
+        Ok(ModelTestResult { provider, model, time: duration, output: "OK".to_string(), status: "success".to_string(), error_msg: None })
     } else {
-        Ok(ModelTestResult {
-            provider,
-            model,
-            time: duration,
-            output: "Failed".to_string(),
-            status: "error".to_string(),
-            error_msg: Some(String::from_utf8_lossy(&output.stderr).to_string()),
-        })
+        Ok(ModelTestResult { provider, model, time: duration, output: "Failed".to_string(), status: "error".to_string(), error_msg: Some(String::from_utf8_lossy(&output.stderr).to_string()) })
     }
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn test_models_batch(
-    models: Vec<(String, String)>,
-    prompt: Option<String>,
-) -> Result<Vec<ModelTestResult>, String> {
+pub async fn test_models_batch(models: Vec<(String, String)>, prompt: Option<String>) -> Result<Vec<ModelTestResult>, String> {
     let mut results = Vec::new();
 
     for (provider, model) in models {
         match test_model(provider.clone(), model.clone(), prompt.clone()).await {
             Ok(result) => results.push(result),
             Err(e) => {
-                results.push(ModelTestResult {
-                    provider,
-                    model,
-                    time: 0.0,
-                    output: String::new(),
-                    status: "error".to_string(),
-                    error_msg: Some(e),
-                });
+                results.push(ModelTestResult { provider, model, time: 0.0, output: String::new(), status: "error".to_string(), error_msg: Some(e) });
             }
         }
     }

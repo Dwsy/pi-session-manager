@@ -14,20 +14,12 @@ lazy_static! {
 
 /// Helper: create a minimal session file content as JSONL
 fn make_session_file(id: &str, cwd: &str, messages: &[(&str, &str)]) -> String {
-    let header = format!(
-        r#"{{"type":"session","version":3,"id":"{id}","timestamp":"2026-02-10T22:00:00Z","cwd":"{cwd}"}}"#
-    );
+    let header = format!(r#"{{"type":"session","version":3,"id":"{id}","timestamp":"2026-02-10T22:00:00Z","cwd":"{cwd}"}}"#);
     let mut lines = vec![header];
     for (i, (role, text)) in messages.iter().enumerate() {
         // Use globally unique message IDs by combining session id and index
         let entry_id = format!("{id}-msg{i}");
-        let msg = format!(
-            r#"{{"type":"message","id":"{}","parentId":null,"timestamp":"2026-02-10T22:00:{:02}Z","message":{{"role":"{}","content":[{{"type":"text","text":"{}"}}]}}}}"#,
-            entry_id,
-            i,
-            role,
-            text.replace('"', "\\\"")
-        );
+        let msg = format!(r#"{{"type":"message","id":"{}","parentId":null,"timestamp":"2026-02-10T22:00:{:02}Z","message":{{"role":"{}","content":[{{"type":"text","text":"{}"}}]}}}}"#, entry_id, i, role, text.replace('"', "\\\""));
         lines.push(msg);
     }
     lines.join("\n")
@@ -79,9 +71,7 @@ fn test_fts_migration_and_integrity() {
 
     // 3. Initialize DB schema (same as open_and_init_db up to FTS)
     // Enable WAL, foreign keys, create tables
-    let _: String = conn
-        .query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0))
-        .unwrap();
+    let _: String = conn.query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0)).unwrap();
     conn.execute("PRAGMA synchronous=NORMAL;", []).unwrap();
     conn.execute("PRAGMA foreign_keys=ON;", []).unwrap();
 
@@ -114,6 +104,7 @@ fn test_fts_migration_and_integrity() {
             session_path TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
             content TEXT NOT NULL,
+            search_text TEXT NOT NULL DEFAULT '',
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
         )",
@@ -121,11 +112,7 @@ fn test_fts_migration_and_integrity() {
     )
     .unwrap();
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)",
-        [],
-    )
-    .unwrap();
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)", []).unwrap();
 
     // 4. Ensure FTS schema: this will create message_fts with auto-sync and drop any manual triggers
     sqlite_cache::ensure_message_fts_schema(&conn).unwrap();
@@ -163,16 +150,9 @@ fn test_fts_migration_and_integrity() {
 
     // Since message_fts is auto-sync, inserting into message_entries automatically updates the FTS index.
     // For test determinism, we can check that message_fts count equals message_entries count.
-    let me_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM message_entries", [], |row| row.get(0))
-        .unwrap();
-    let fts_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM message_fts", [], |row| row.get(0))
-        .unwrap();
-    assert_eq!(
-        me_count, fts_count,
-        "FTS index count should match message_entries count"
-    );
+    let me_count: i64 = conn.query_row("SELECT COUNT(*) FROM message_entries", [], |row| row.get(0)).unwrap();
+    let fts_count: i64 = conn.query_row("SELECT COUNT(*) FROM message_fts", [], |row| row.get(0)).unwrap();
+    assert_eq!(me_count, fts_count, "FTS index count should match message_entries count");
 
     // 6. Perform searches (use simple terms without special characters)
     let queries = vec![
@@ -184,75 +164,31 @@ fn test_fts_migration_and_integrity() {
 
     for (query, expected_session_substr) in queries {
         let results = sqlite_cache::search_message_fts(&conn, query, None, 10).unwrap();
-        assert!(
-            !results.is_empty(),
-            "Search for '{query}' should return results"
-        );
+        assert!(!results.is_empty(), "Search for '{query}' should return results");
         // At least one result should come from a session containing expected substring
-        let found = results
-            .iter()
-            .any(|(_, session_path, _, _, _, _)| session_path.contains(expected_session_substr));
-        assert!(
-            found,
-            "Search for '{}': expected session containing '{}' in path, got paths: {:?}",
-            query,
-            expected_session_substr,
-            results.iter().map(|r| &r.1).collect::<Vec<_>>()
-        );
+        let found = results.iter().any(|(_, session_path, _, _, _, _)| session_path.contains(expected_session_substr));
+        assert!(found, "Search for '{}': expected session containing '{}' in path, got paths: {:?}", query, expected_session_substr, results.iter().map(|r| &r.1).collect::<Vec<_>>());
     }
 
     // 7. Test deletion cascade: remove a session and verify its messages are gone from message_entries and message_fts
-    conn.execute(
-        "DELETE FROM sessions WHERE path = ?",
-        params![&sess1_path.to_string_lossy()],
-    )
-    .unwrap();
+    conn.execute("DELETE FROM sessions WHERE path = ?", params![&sess1_path.to_string_lossy()]).unwrap();
 
-    let count_after_delete: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM message_entries WHERE session_path = ?",
-            params![&sess1_path.to_string_lossy()],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert_eq!(
-        count_after_delete, 0,
-        "message_entries should be empty for deleted session after cascade"
-    );
+    let count_after_delete: i64 = conn.query_row("SELECT COUNT(*) FROM message_entries WHERE session_path = ?", params![&sess1_path.to_string_lossy()], |row| row.get(0)).unwrap();
+    assert_eq!(count_after_delete, 0, "message_entries should be empty for deleted session after cascade");
 
     // FTS auto-sync will have removed the corresponding rows from message_fts after the DELETE trigger fires.
-    let fts_count_after: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM message_fts WHERE session_path = ?",
-            params![&sess1_path.to_string_lossy()],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert_eq!(
-        fts_count_after, 0,
-        "message_fts should have no entries for deleted session"
-    );
+    let fts_count_after: i64 = conn.query_row("SELECT COUNT(*) FROM message_fts WHERE session_path = ?", params![&sess1_path.to_string_lossy()], |row| row.get(0)).unwrap();
+    assert_eq!(fts_count_after, 0, "message_fts should have no entries for deleted session");
 
     // Search for terms that only existed in session1 should no longer return session1
     let results = sqlite_cache::search_message_fts(&conn, "binary search", None, 10).unwrap();
-    let has_session1 = results
-        .iter()
-        .any(|(_, session_path, _, _, _, _)| session_path.contains("session1"));
-    assert!(
-        !has_session1,
-        "After deletion, session1 should not appear in search results"
-    );
+    let has_session1 = results.iter().any(|(_, session_path, _, _, _, _)| session_path.contains("session1"));
+    assert!(!has_session1, "After deletion, session1 should not appear in search results");
 
     // Ensure snippets contain highlight tags (<b>)
     if let Some((_, _, _, snippet, _, _)) = results.first() {
-        assert!(
-            snippet.contains("<b>"),
-            "Snippet missing opening <b> tag: {snippet}"
-        );
-        assert!(
-            snippet.contains("</b>"),
-            "Snippet missing closing </b> tag: {snippet}"
-        );
+        assert!(snippet.contains("<b>"), "Snippet missing opening <b> tag: {snippet}");
+        assert!(snippet.contains("</b>"), "Snippet missing closing </b> tag: {snippet}");
     }
 
     // Print success
@@ -268,21 +204,29 @@ fn test_backfill_when_message_entries_empty() {
 
     // Create session files with searchable content
     let sess1_path = sessions_dir.join("session1.jsonl");
-    let sess1_content = make_session_file("sess1", "/cwd1", &[
-        ("user", "How do I implement a binary search tree in Rust"),
-        ("assistant", "A binary search tree in Rust requires a Node struct with left and right child references."),
-        ("user", "Can you show example code"),
-        ("assistant", "Here is a simple implementation: struct Node { value: i32, left: Option<Box<Node>>, right: Option<Box<Node>> }"),
-    ]);
+    let sess1_content = make_session_file(
+        "sess1",
+        "/cwd1",
+        &[
+            ("user", "How do I implement a binary search tree in Rust"),
+            ("assistant", "A binary search tree in Rust requires a Node struct with left and right child references."),
+            ("user", "Can you show example code"),
+            ("assistant", "Here is a simple implementation: struct Node { value: i32, left: Option<Box<Node>>, right: Option<Box<Node>> }"),
+        ],
+    );
     fs::write(&sess1_path, sess1_content).unwrap();
 
     let sess2_path = sessions_dir.join("session2.jsonl");
-    let sess2_content = make_session_file("sess2", "/cwd2", &[
-        ("user", "Explain async/await in Tokio"),
-        ("assistant", "Async/await in Tokio allows you to write async code."),
-        ("user", "What is Send vs Sync"),
-        ("assistant", "Send indicates a type can be transferred across thread boundaries, while Sync indicates it can be referenced from multiple threads."),
-    ]);
+    let sess2_content = make_session_file(
+        "sess2",
+        "/cwd2",
+        &[
+            ("user", "Explain async/await in Tokio"),
+            ("assistant", "Async/await in Tokio allows you to write async code."),
+            ("user", "What is Send vs Sync"),
+            ("assistant", "Send indicates a type can be transferred across thread boundaries, while Sync indicates it can be referenced from multiple threads."),
+        ],
+    );
     fs::write(&sess2_path, sess2_content).unwrap();
 
     // Create temp DB
@@ -291,9 +235,7 @@ fn test_backfill_when_message_entries_empty() {
     let conn = Connection::open(&db_file).unwrap();
 
     // Init settings and create tables (sessions, message_entries)
-    let _: String = conn
-        .query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0))
-        .unwrap();
+    let _: String = conn.query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0)).unwrap();
     conn.execute("PRAGMA synchronous=NORMAL;", []).unwrap();
     conn.execute("PRAGMA foreign_keys=ON;", []).unwrap();
 
@@ -326,6 +268,7 @@ fn test_backfill_when_message_entries_empty() {
             session_path TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
             content TEXT NOT NULL,
+            search_text TEXT NOT NULL DEFAULT '',
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
         )",
@@ -333,33 +276,17 @@ fn test_backfill_when_message_entries_empty() {
     )
     .unwrap();
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)",
-        [],
-    )
-    .unwrap();
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)", []).unwrap();
 
     // Ensure FTS schema (creates message_fts)
     sqlite_cache::ensure_message_fts_schema(&conn).unwrap();
     eprintln!("[DEBUG] ensure_message_fts_schema completed");
 
     // Debug: check FTS table definition and triggers
-    let fts_sql: String = conn
-        .query_row(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='message_fts'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
+    let fts_sql: String = conn.query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='message_fts'", [], |row| row.get(0)).unwrap();
     eprintln!("[DEBUG] message_fts CREATE (test2): {fts_sql}");
-    let triggers: Vec<String> = match conn.prepare(
-        "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='message_entries'",
-    ) {
-        Ok(mut stmt) => stmt
-            .query_map([], |row| row.get(0))
-            .unwrap()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap(),
+    let triggers: Vec<String> = match conn.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='message_entries'") {
+        Ok(mut stmt) => stmt.query_map([], |row| row.get(0)).unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
         Err(e) => {
             eprintln!("[DEBUG] trigger query error: {e}");
             vec![]
@@ -368,23 +295,11 @@ fn test_backfill_when_message_entries_empty() {
     eprintln!("[DEBUG] triggers on message_entries after init (test2): {triggers:?}");
 
     // Debug: check FTS table definition
-    let fts_sql: String = conn
-        .query_row(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='message_fts'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
+    let fts_sql: String = conn.query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='message_fts'", [], |row| row.get(0)).unwrap();
     eprintln!("[DEBUG] message_fts CREATE: {fts_sql}");
     // Debug: list triggers on message_entries
-    let triggers: Vec<String> = match conn.prepare(
-        "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='message_entries'",
-    ) {
-        Ok(mut stmt) => stmt
-            .query_map([], |row| row.get(0))
-            .unwrap()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap(),
+    let triggers: Vec<String> = match conn.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='message_entries'") {
+        Ok(mut stmt) => stmt.query_map([], |row| row.get(0)).unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
         Err(e) => {
             eprintln!("[DEBUG] trigger query error: {e}");
             vec![]
@@ -412,58 +327,29 @@ fn test_backfill_when_message_entries_empty() {
     }
 
     // Verify message_entries is empty
-    let me_count_before: i64 = conn
-        .query_row("SELECT COUNT(*) FROM message_entries", [], |row| row.get(0))
-        .unwrap();
-    assert_eq!(
-        me_count_before, 0,
-        "Expected message_entries to be empty before backfill"
-    );
+    let me_count_before: i64 = conn.query_row("SELECT COUNT(*) FROM message_entries", [], |row| row.get(0)).unwrap();
+    assert_eq!(me_count_before, 0, "Expected message_entries to be empty before backfill");
 
     // Run ensure_message_fts_schema again - this should trigger backfill because message_entries is empty while sessions exist
     sqlite_cache::ensure_message_fts_schema(&conn).unwrap();
 
     // After backfill, message_entries should have rows
-    let me_count_after: i64 = conn
-        .query_row("SELECT COUNT(*) FROM message_entries", [], |row| row.get(0))
-        .unwrap();
-    assert!(
-        me_count_after > 0,
-        "Expected message_entries to be populated after backfill, got 0"
-    );
+    let me_count_after: i64 = conn.query_row("SELECT COUNT(*) FROM message_entries", [], |row| row.get(0)).unwrap();
+    assert!(me_count_after > 0, "Expected message_entries to be populated after backfill, got 0");
 
     // FTS index should be in sync
-    let fts_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM message_fts", [], |row| row.get(0))
-        .unwrap();
-    assert_eq!(
-        me_count_after, fts_count,
-        "FTS index should match message_entries count after backfill"
-    );
+    let fts_count: i64 = conn.query_row("SELECT COUNT(*) FROM message_fts", [], |row| row.get(0)).unwrap();
+    assert_eq!(me_count_after, fts_count, "FTS index should match message_entries count after backfill");
 
     // DEBUG: inspect stored content
-    let sample_content: String = conn
-        .query_row("SELECT content FROM message_entries LIMIT 1", [], |row| {
-            row.get(0)
-        })
-        .unwrap();
+    let sample_content: String = conn.query_row("SELECT content FROM message_entries LIMIT 1", [], |row| row.get(0)).unwrap();
     println!("[DEBUG] Sample message_entries.content: {sample_content}");
-    let fts_content_opt: Option<String> = conn
-        .query_row("SELECT content FROM message_fts LIMIT 1", [], |row| {
-            row.get(0)
-        })
-        .ok();
-    println!("[DEBUG] Sample message_fts.content (first row): {fts_content_opt:?}");
+    let fts_content_opt: Option<String> = conn.query_row("SELECT content FROM message_fts LIMIT 1", [], |row| row.get(0)).ok();
+    println!("[DEBUG] Sample message_fts.search_text (first row): {fts_content_opt:?}");
 
     // List triggers on message_entries to see if auto-sync triggers exist
-    let triggers: Vec<String> = match conn.prepare(
-        "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='message_entries'",
-    ) {
-        Ok(mut stmt) => stmt
-            .query_map([], |row| row.get(0))
-            .unwrap()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap(),
+    let triggers: Vec<String> = match conn.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='message_entries'") {
+        Ok(mut stmt) => stmt.query_map([], |row| row.get(0)).unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
         Err(e) => {
             println!("[DEBUG] Trigger query error: {e}");
             vec![]
@@ -472,125 +358,63 @@ fn test_backfill_when_message_entries_empty() {
     println!("[DEBUG] Triggers on message_entries: {triggers:?}");
 
     // Dump FTS rows to see indexed content
-    let fts_rows: Vec<(i64, String, String, String)> =
-        match conn.prepare("SELECT rowid, session_path, role, content FROM message_fts") {
-            Ok(mut stmt) => stmt
-                .query_map([], |row| {
-                    Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
-                })
-                .unwrap()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap(),
-            Err(e) => {
-                println!("[DEBUG] FTS dump error: {e}");
-                vec![]
-            }
-        };
-    println!(
-        "[DEBUG] FTS rows (count={}): {:?}",
-        fts_rows.len(),
-        fts_rows
-    );
+    let fts_rows: Vec<(i64, String, String, String)> = match conn.prepare("SELECT rowid, session_path, role, search_text FROM message_fts") {
+        Ok(mut stmt) => stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))).unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+        Err(e) => {
+            println!("[DEBUG] FTS dump error: {e}");
+            vec![]
+        }
+    };
+    println!("[DEBUG] FTS rows (count={}): {:?}", fts_rows.len(), fts_rows);
 
     // Direct MATCH tests
-    let direct_matches_bin: Vec<i64> =
-        match conn.prepare("SELECT rowid FROM message_fts WHERE message_fts MATCH 'binary*'") {
-            Ok(mut stmt) => stmt
-                .query_map([], |row| row.get(0))
-                .unwrap()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap(),
-            Err(e) => {
-                println!("[DEBUG] MATCH 'binary*' error: {e}");
-                vec![]
-            }
-        };
-    println!(
-        "[DEBUG] Direct 'binary*' matches count: {}",
-        direct_matches_bin.len()
-    );
+    let direct_matches_bin: Vec<i64> = match conn.prepare("SELECT rowid FROM message_fts WHERE message_fts MATCH 'binary*'") {
+        Ok(mut stmt) => stmt.query_map([], |row| row.get(0)).unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+        Err(e) => {
+            println!("[DEBUG] MATCH 'binary*' error: {e}");
+            vec![]
+        }
+    };
+    println!("[DEBUG] Direct 'binary*' matches count: {}", direct_matches_bin.len());
 
     // Test with a term we saw in sample content: tokio
-    let direct_matches_tok: Vec<i64> =
-        match conn.prepare("SELECT rowid FROM message_fts WHERE message_fts MATCH 'tokio*'") {
-            Ok(mut stmt) => stmt
-                .query_map([], |row| row.get(0))
-                .unwrap()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap(),
-            Err(e) => {
-                println!("[DEBUG] MATCH 'tokio*' error: {e}");
-                vec![]
-            }
-        };
-    println!(
-        "[DEBUG] Direct 'tokio*' matches count: {}",
-        direct_matches_tok.len()
-    );
+    let direct_matches_tok: Vec<i64> = match conn.prepare("SELECT rowid FROM message_fts WHERE message_fts MATCH 'tokio*'") {
+        Ok(mut stmt) => stmt.query_map([], |row| row.get(0)).unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+        Err(e) => {
+            println!("[DEBUG] MATCH 'tokio*' error: {e}");
+            vec![]
+        }
+    };
+    println!("[DEBUG] Direct 'tokio*' matches count: {}", direct_matches_tok.len());
 
     // Also test a non-prefix exact term (lowercase)
-    let direct_matches_exact: Vec<i64> =
-        match conn.prepare("SELECT rowid FROM message_fts WHERE message_fts MATCH 'tokio'") {
-            Ok(mut stmt) => stmt
-                .query_map([], |row| row.get(0))
-                .unwrap()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap(),
-            Err(e) => {
-                println!("[DEBUG] MATCH 'tokio' error: {e}");
-                vec![]
-            }
-        };
-    println!(
-        "[DEBUG] Direct 'tokio' matches count: {}",
-        direct_matches_exact.len()
-    );
+    let direct_matches_exact: Vec<i64> = match conn.prepare("SELECT rowid FROM message_fts WHERE message_fts MATCH 'tokio'") {
+        Ok(mut stmt) => stmt.query_map([], |row| row.get(0)).unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+        Err(e) => {
+            println!("[DEBUG] MATCH 'tokio' error: {e}");
+            vec![]
+        }
+    };
+    println!("[DEBUG] Direct 'tokio' matches count: {}", direct_matches_exact.len());
 
     // Test exact 'binary'
-    let direct_binary: Vec<i64> =
-        match conn.prepare("SELECT rowid FROM message_fts WHERE message_fts MATCH 'binary'") {
-            Ok(mut stmt) => stmt
-                .query_map([], |row| row.get(0))
-                .unwrap()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap(),
-            Err(e) => {
-                println!("[DEBUG] MATCH 'binary' error: {e}");
-                vec![]
-            }
-        };
-    println!(
-        "[DEBUG] Direct 'binary' matches count: {}",
-        direct_binary.len()
-    );
+    let direct_binary: Vec<i64> = match conn.prepare("SELECT rowid FROM message_fts WHERE message_fts MATCH 'binary'") {
+        Ok(mut stmt) => stmt.query_map([], |row| row.get(0)).unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+        Err(e) => {
+            println!("[DEBUG] MATCH 'binary' error: {e}");
+            vec![]
+        }
+    };
+    println!("[DEBUG] Direct 'binary' matches count: {}", direct_binary.len());
 
     // Search should work
     let results = sqlite_cache::search_message_fts(&conn, "binary search", None, 10).unwrap();
-    assert!(
-        !results.is_empty(),
-        "Expected search results after backfill"
-    );
-    assert!(
-        results
-            .iter()
-            .any(|(_, p, _, _, _, _)| p.contains("session1")),
-        "Expected results to include session1; got paths: {:?}",
-        results.iter().map(|r| &r.1).collect::<Vec<_>>()
-    );
+    assert!(!results.is_empty(), "Expected search results after backfill");
+    assert!(results.iter().any(|(_, p, _, _, _, _)| p.contains("session1")), "Expected results to include session1; got paths: {:?}", results.iter().map(|r| &r.1).collect::<Vec<_>>());
 
     // Deletion cascade should still work
-    conn.execute(
-        "DELETE FROM sessions WHERE path = ?",
-        params![&sess2_path.to_string_lossy()],
-    )
-    .unwrap();
-    let me_remaining: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM message_entries WHERE session_path = ?",
-            params![&sess2_path.to_string_lossy()],
-            |row| row.get(0),
-        )
-        .unwrap();
+    conn.execute("DELETE FROM sessions WHERE path = ?", params![&sess2_path.to_string_lossy()]).unwrap();
+    let me_remaining: i64 = conn.query_row("SELECT COUNT(*) FROM message_entries WHERE session_path = ?", params![&sess2_path.to_string_lossy()], |row| row.get(0)).unwrap();
     assert_eq!(me_remaining, 0);
 }
 
@@ -659,6 +483,7 @@ fn test_fts_escaping_and_snippet_tags() {
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
             source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking')),
             content TEXT NOT NULL,
+            search_text TEXT NOT NULL DEFAULT '',
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
         )",
@@ -671,22 +496,13 @@ fn test_fts_escaping_and_snippet_tags() {
 
     // Insert a message entry with special characters: quotes and backslash
     conn.execute(
-        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![
-            "m1:user",
-            "m1",
-            session_path.to_string_lossy().to_string(),
-            "user",
-            "user",
-            "This contains \"double quotes\" and \\ backslash in the text",
-            "2025-01-01T00:00:00Z"
-        ],
-    ).unwrap();
+        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, search_text, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params!["m1:user", "m1", session_path.to_string_lossy().to_string(), "user", "user", "This contains \"double quotes\" and \\ backslash in the text", pi_session_manager::utils::normalize_search_text("This contains \"double quotes\" and \\ backslash in the text"), "2025-01-01T00:00:00Z"],
+    )
+    .unwrap();
 
     // Verify FTS has the entry
-    let fts_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM message_fts", [], |row| row.get(0))
-        .unwrap();
+    let fts_count: i64 = conn.query_row("SELECT COUNT(*) FROM message_fts", [], |row| row.get(0)).unwrap();
     assert_eq!(fts_count, 1, "FTS should have one entry after auto-sync");
 
     // Search for a term that exists: "quotes" - should work
@@ -694,14 +510,8 @@ fn test_fts_escaping_and_snippet_tags() {
     assert!(!results.is_empty(), "Should find entry with 'quotes'");
     // The snippet should contain highlighting tags
     let snippet = &results[0].3;
-    assert!(
-        snippet.contains("<b>"),
-        "Snippet should contain <b> tag for query match"
-    );
-    assert!(
-        snippet.contains("quotes") || snippet.contains("QUOTES"),
-        "Snippet should contain the matched term 'quotes' (case-insensitive)"
-    );
+    assert!(snippet.contains("<b>"), "Snippet should contain <b> tag for query match");
+    assert!(snippet.contains("quotes") || snippet.contains("QUOTES"), "Snippet should contain the matched term 'quotes' (case-insensitive)");
 
     // Search with a query containing double quotes - should not error
     let _ = sqlite_cache::search_message_fts(&conn, "\"double quotes\"", None, 10).unwrap();
@@ -709,10 +519,7 @@ fn test_fts_escaping_and_snippet_tags() {
     let _ = sqlite_cache::search_message_fts(&conn, "backslash", None, 10).unwrap();
 
     // Additional check: snippet contains </b> as well
-    assert!(
-        snippet.contains("</b>"),
-        "Snippet should contain closing </b> tag"
-    );
+    assert!(snippet.contains("</b>"), "Snippet should contain closing </b> tag");
 }
 
 #[test]
@@ -735,8 +542,7 @@ fn test_database_recovery_from_message_fts_corruption() {
 
     // First initialization: should succeed and create DB with FTS
     {
-        let conn = sqlite_cache::init_db_with_path(&db_path, &config)
-            .expect("initial init should succeed");
+        let conn = sqlite_cache::init_db_with_path(&db_path, &config).expect("initial init should succeed");
         // Insert test session and message
         conn.execute(
             "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, cached_at, access_count, last_accessed) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
@@ -760,9 +566,10 @@ fn test_database_recovery_from_message_fts_corruption() {
             ],
         ).unwrap();
         conn.execute(
-            "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params!["m1:user", "m1", &session_path, "user", "user", "Hello world", "2025-01-01T00:00:00Z"]
-        ).unwrap();
+            "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, search_text, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["m1:user", "m1", &session_path, "user", "user", "Hello world", pi_session_manager::utils::normalize_search_text("Hello world"), "2025-01-01T00:00:00Z"],
+        )
+        .unwrap();
 
         // Verify FTS works
         let results = sqlite_cache::search_message_fts(&conn, "hello", None, 10).unwrap();
@@ -781,8 +588,7 @@ fn test_database_recovery_from_message_fts_corruption() {
     }
 
     // Second initialization: should recover by deleting corrupted DB and recreating fresh
-    let conn2 = sqlite_cache::init_db_with_path(&db_path, &config)
-        .expect("init after corruption should recover");
+    let conn2 = sqlite_cache::init_db_with_path(&db_path, &config).expect("init after corruption should recover");
 
     // After full DB recovery, the previous data is gone; we need to repopulate
     conn2.execute(
@@ -806,10 +612,12 @@ fn test_database_recovery_from_message_fts_corruption() {
                 rusqlite::types::Null,
         ],
     ).unwrap();
-    conn2.execute(
-        "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params!["m1:user", "m1", &session_path, "user", "user", "Hello world", "2025-01-01T00:00:00Z"]
-    ).unwrap();
+    conn2
+        .execute(
+            "INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, search_text, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["m1:user", "m1", &session_path, "user", "user", "Hello world", pi_session_manager::utils::normalize_search_text("Hello world"), "2025-01-01T00:00:00Z"],
+        )
+        .unwrap();
 
     // Verify FTS works after recovery
     let results_after = sqlite_cache::search_message_fts(&conn2, "hello", None, 10).unwrap();
@@ -834,9 +642,7 @@ fn test_backfill_when_message_entries_partially_missing() {
     let temp_db = tempdir().unwrap();
     let db_file = temp_db.path().join("test.db");
     let conn = Connection::open(&db_file).unwrap();
-    let _: String = conn
-        .query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0))
-        .unwrap();
+    let _: String = conn.query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0)).unwrap();
     conn.execute("PRAGMA synchronous=NORMAL;", []).unwrap();
     conn.execute("PRAGMA foreign_keys=ON;", []).unwrap();
 
@@ -871,6 +677,7 @@ fn test_backfill_when_message_entries_partially_missing() {
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
             source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking')),
             content TEXT NOT NULL,
+            search_text TEXT NOT NULL DEFAULT '',
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
         )",
@@ -909,17 +716,8 @@ fn test_backfill_when_message_entries_partially_missing() {
 
     sqlite_cache::ensure_message_fts_schema(&conn).unwrap();
 
-    let count_second: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM message_entries WHERE session_path = ?",
-            params![sess2_path.to_string_lossy().to_string()],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert!(
-        count_second > 0,
-        "second session should be backfilled into message_entries"
-    );
+    let count_second: i64 = conn.query_row("SELECT COUNT(*) FROM message_entries WHERE session_path = ?", params![sess2_path.to_string_lossy().to_string()], |row| row.get(0)).unwrap();
+    assert!(count_second > 0, "second session should be backfilled into message_entries");
 
     let results = sqlite_cache::search_message_fts(&conn, "弱智", None, 10).unwrap();
     assert_eq!(results.len(), 1);
@@ -931,9 +729,7 @@ fn test_backfill_removes_stale_missing_session() {
     let temp_db = tempdir().unwrap();
     let db_file = temp_db.path().join("test.db");
     let conn = Connection::open(&db_file).unwrap();
-    let _: String = conn
-        .query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0))
-        .unwrap();
+    let _: String = conn.query_row("PRAGMA journal_mode=WAL;", [], |row| row.get(0)).unwrap();
     conn.execute("PRAGMA synchronous=NORMAL;", []).unwrap();
     conn.execute("PRAGMA foreign_keys=ON;", []).unwrap();
 
@@ -968,6 +764,7 @@ fn test_backfill_removes_stale_missing_session() {
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
             source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking')),
             content TEXT NOT NULL,
+            search_text TEXT NOT NULL DEFAULT '',
             timestamp TEXT NOT NULL,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
         )",
@@ -1001,15 +798,6 @@ fn test_backfill_removes_stale_missing_session() {
 
     sqlite_cache::ensure_message_fts_schema(&conn).unwrap();
 
-    let count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM sessions WHERE path = ?",
-            params![stale_path],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert_eq!(
-        count, 0,
-        "stale session row should be removed during backfill cleanup"
-    );
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM sessions WHERE path = ?", params![stale_path], |row| row.get(0)).unwrap();
+    assert_eq!(count, 0, "stale session row should be removed during backfill cleanup");
 }

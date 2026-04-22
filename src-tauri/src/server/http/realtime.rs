@@ -21,35 +21,14 @@ use tokio::sync::broadcast;
 use super::common::{cors_headers, is_authorized};
 
 fn is_pi_live_forward_event(event_type: &str) -> bool {
-    matches!(
-        event_type,
-        "message_start"
-            | "message_update"
-            | "message_end"
-            | "tool_execution_start"
-            | "tool_execution_update"
-            | "tool_execution_end"
-            | "agent_start"
-            | "agent_end"
-            | "turn_start"
-            | "turn_end"
-            | "model_select"
-            | "auto_compaction_start"
-            | "auto_compaction_end"
-            | "queue_update"
-    )
+    matches!(event_type, "message_start" | "message_update" | "message_end" | "tool_execution_start" | "tool_execution_update" | "tool_execution_end" | "agent_start" | "agent_end" | "turn_start" | "turn_end" | "model_select" | "auto_compaction_start" | "auto_compaction_end" | "queue_update")
 }
 
 pub(crate) async fn handle_preflight() -> impl IntoResponse {
     (StatusCode::NO_CONTENT, cors_headers())
 }
 
-pub(crate) async fn handle_sse(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> impl IntoResponse {
+pub(crate) async fn handle_sse(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri) -> impl IntoResponse {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
@@ -74,51 +53,26 @@ pub(crate) async fn handle_sse(
         }
     };
 
-    (
-        [
-            ("access-control-allow-origin", "*"),
-            ("cache-control", "no-cache"),
-        ],
-        Sse::new(stream).keep_alive(KeepAlive::default()),
-    )
-        .into_response()
+    ([("access-control-allow-origin", "*"), ("cache-control", "no-cache")], Sse::new(stream).keep_alive(KeepAlive::default())).into_response()
 }
 
-pub(crate) async fn handle_ws_upgrade(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(app_state): State<SharedAppState>,
-    headers: HeaderMap,
-    uri: Uri,
-    ws: WebSocketUpgrade,
-) -> Response {
+pub(crate) async fn handle_ws_upgrade(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri, ws: WebSocketUpgrade) -> Response {
     let pre_authed = is_authorized(&addr.ip(), &headers, &uri);
     let needs_auth = auth::is_auth_required(&addr.ip());
     ws.on_upgrade(move |socket| handle_ws_connection(socket, app_state, pre_authed, needs_auth))
 }
 
-async fn handle_ws_connection(
-    socket: WebSocket,
-    app_state: SharedAppState,
-    pre_authed: bool,
-    needs_auth: bool,
-) {
+async fn handle_ws_connection(socket: WebSocket, app_state: SharedAppState, pre_authed: bool, needs_auth: bool) {
     let (mut tx, mut rx) = socket.split();
 
     if needs_auth && !pre_authed {
-        let authed = match tokio::time::timeout(std::time::Duration::from_secs(10), rx.next()).await
-        {
-            Ok(Some(Ok(AxumWsMsg::Text(text)))) => serde_json::from_str::<Value>(&text)
-                .ok()
-                .and_then(|value| value.get("auth")?.as_str().map(String::from))
-                .map(|token| auth::validate(&token))
-                .unwrap_or(false),
+        let authed = match tokio::time::timeout(std::time::Duration::from_secs(10), rx.next()).await {
+            Ok(Some(Ok(AxumWsMsg::Text(text)))) => serde_json::from_str::<Value>(&text).ok().and_then(|value| value.get("auth")?.as_str().map(String::from)).map(|token| auth::validate(&token)).unwrap_or(false),
             _ => false,
         };
 
         if !authed {
-            let _ = tx
-                .send(AxumWsMsg::Text(r#"{"error":"Unauthorized"}"#.into()))
-                .await;
+            let _ = tx.send(AxumWsMsg::Text(r#"{"error":"Unauthorized"}"#.into())).await;
             let _ = tx.close().await;
             return;
         }
@@ -334,14 +288,8 @@ async fn handle_ws_connection(
         log::info!("[HTTP-WS] Pi agent disconnected: session={sid}");
         app_state.pi_agent_registry.remove(sid);
 
-        let ws_event = crate::app_state::WsEvent {
-            event_type: "event".to_string(),
-            event: "pi-live:session_disconnected".to_string(),
-            payload: serde_json::json!({ "sessionId": sid }),
-        };
+        let ws_event = crate::app_state::WsEvent { event_type: "event".to_string(), event: "pi-live:session_disconnected".to_string(), payload: serde_json::json!({ "sessionId": sid }) };
         let _ = app_state.event_tx.send(ws_event.clone());
-        let _ = app_state
-            .app_handle
-            .emit("pi-live:session_disconnected", &ws_event.payload);
+        let _ = app_state.app_handle.emit("pi-live:session_disconnected", &ws_event.payload);
     }
 }
