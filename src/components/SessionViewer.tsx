@@ -29,6 +29,7 @@ import { useSessionViewerHotkeys } from "@/hooks/useSessionViewerHotkeys";
 import { useSessionViewerInMessageSearch } from "@/hooks/useSessionViewerInMessageSearch";
 import { useSettings } from "@/hooks/useSettings";
 import { usePiLiveSessions } from "@/hooks/usePiLiveSessions";
+import { useClipboard } from "@/hooks/useClipboard";
 import { saveAppSettings } from "@/utils/settingsApi";
 
 import { getPlatformDefaults } from "./settings/types";
@@ -91,6 +92,7 @@ function SessionViewerContent({
   } = useSessionView();
   const isMobile = useIsMobile();
   const { getSessionSetting, updateSessionSetting, settings } = useSettings();
+  const { copyText } = useClipboard();
   const collapseToolCalls = getSessionSetting('collapseToolCalls') !== false;
   const cmdFBehavior = getSessionSetting('cmdFBehavior') ?? 'inSessionSearch';
   const scrollMarkersEnabledSetting =
@@ -119,7 +121,6 @@ function SessionViewerContent({
   const [showSystemPromptDialog, setShowSystemPromptDialog] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [traceMode, setTraceMode] = useState(false);
-  const [copyToast, setCopyToast] = useState<string | null>(null);
 
   const sessionDataIsAtBottomRef = useRef(true);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -222,17 +223,11 @@ function SessionViewerContent({
         piPath,
         resumeCommand,
       });
-      await navigator.clipboard.writeText(command);
-      // Show success toast instead of alert
-      setCopyToast(t("session.copyResumeCommand.success", "Resume command copied!"));
-      // Auto-dismiss after 2 seconds
-      setTimeout(() => setCopyToast(null), 2000);
+      await copyText(command);
     } catch (err) {
       console.error("Failed to copy resume command:", err);
-      setCopyToast(t("session.copyResumeCommand.failed", "Failed to copy"));
-      setTimeout(() => setCopyToast(null), 2000);
     }
-  }, [session, piPath, resumeCommand, t]);
+  }, [session, piPath, resumeCommand, copyText]);
 
   useSessionViewerHotkeys({
     enabled: !previewMode && !showSystemPromptDialog && !showMobileMenu,
@@ -484,15 +479,6 @@ function SessionViewerContent({
           entries={entries}
           sessionPath={session.path}
         />
-      )}
-
-      {/* Toast notification for copy feedback */}
-      {copyToast && (
-        <div className="fixed bottom-6 right-6 z-[9999] animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <div className="rounded-lg border border-border bg-surface px-4 py-3 shadow-lg">
-            <p className="text-sm text-foreground">{copyToast}</p>
-          </div>
-        </div>
       )}
     </div>
   );
