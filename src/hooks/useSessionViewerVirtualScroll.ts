@@ -155,10 +155,27 @@ export function useSessionViewerVirtualScroll({
 
   // When tools expand/collapse individually, re-measure with debounce to let DOM settle
   useEffect(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    // Save current scroll position relative to visible content
+    const scrollTop = container.scrollTop
+    const scrollRatio = container.scrollHeight > 0 ? scrollTop / container.scrollHeight : 0
+
     const timeoutId = requestAnimationFrame(() => {
       rowVirtualizer.measure()
+
+      // Restore scroll ratio after measurement to prevent jumping
+      requestAnimationFrame(() => {
+        if (container.scrollHeight > 0) {
+          const newScrollTop = container.scrollHeight * scrollRatio
+          container.scrollTop = newScrollTop
+        }
+      })
     })
-    return () => cancelAnimationFrame(timeoutId)
+    return () => {
+      cancelAnimationFrame(timeoutId)
+    }
   }, [expandedToolIds, rowVirtualizer])
 
   useEffect(() => {
