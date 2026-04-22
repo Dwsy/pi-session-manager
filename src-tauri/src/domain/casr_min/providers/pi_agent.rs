@@ -91,7 +91,7 @@ fn read_session_from_reader<R: BufRead>(path: &Path, reader: R) -> Result<Canoni
                     let msg_model = msg.get("model").and_then(|v| v.as_str());
 
                     if let (Some(provider), Some(model)) = (msg_provider, msg_model) {
-                        Some(format!("{}/{}", provider, model))
+                        Some(format!("{provider}/{model}"))
                     } else if let Some(model) = msg_model {
                         Some(model.to_string())
                     } else {

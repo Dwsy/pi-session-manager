@@ -30,9 +30,13 @@ pub async fn scan_sessions_paginated_impl(offset: Option<usize>, limit: Option<u
             // Keep the paginated endpoint non-blocking on cold start, but warm the
             // in-memory cache/database in the background so follow-up refreshes do
             // not stay empty until the user manually rescans.
-            tauri::async_runtime::spawn(async {
-                let _ = scanner::scan_sessions().await;
-            });
+            #[cfg(feature = "gui")]
+            {
+                use tauri::async_runtime::spawn;
+                spawn(async {
+                    let _ = scanner::scan_sessions().await;
+                });
+            }
         }
         db_sessions
     };
