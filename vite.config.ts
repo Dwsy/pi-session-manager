@@ -1,5 +1,6 @@
-import { defineConfig } from 'vite'
+import fs from 'fs'
 import path from 'path'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { codeInspectorPlugin } from 'code-inspector-plugin'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -16,7 +17,26 @@ function resolveBuildVersion(): string {
   return '0.0.0'
 }
 
+function getPsmPort(): number {
+  try {
+    const configPath = path.join(
+      process.env.HOME || '',
+      '.pi',
+      'pi-session-manager',
+      'config.json'
+    )
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+      return config.server?.http_port || 5002
+    }
+  } catch {
+    // ignore
+  }
+  return 5002
+}
+
 const buildVersion = resolveBuildVersion()
+const psmPort = getPsmPort()
 
 export default defineConfig(({ mode }) => {
   const isDemoBuild = mode === 'demo'
@@ -122,11 +142,11 @@ export default defineConfig(({ mode }) => {
       allowedHosts: true,
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:5002',
+          target: `http://127.0.0.1:${psmPort}`,
           changeOrigin: true,
         },
         '/ws': {
-          target: 'ws://127.0.0.1:5002',
+          target: `ws://127.0.0.1:${psmPort}`,
           ws: true,
         },
       },
