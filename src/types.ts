@@ -272,15 +272,6 @@ export interface SubagentArtifactPaths {
   metadataPath: string
 }
 
-// @tintinweb/pi-subagents JSONL output file entry format
-export interface SubagentOutputEntry {
-  isSidechain: boolean
-  agentId: string
-  type: 'user' | 'assistant' | 'toolResult'
-  message: Message
-  timestamp: string
-  cwd: string
-}
 
 export interface Content {
   type: 'text' | 'thinking' | 'image' | 'toolCall'
@@ -375,26 +366,9 @@ export interface TimeDistributionPoint {
   message_count: number
 }
 
-export interface DailyActivity {
-  date: string
-  message_count: number
-  session_count: number
-}
 
 // Pi Settings types
-export interface SkillInfo {
-  name: string
-  path: string
-  description: string
-  enabled: boolean
-}
 
-export interface PromptInfo {
-  name: string
-  path: string
-  description: string
-  enabled: boolean
-}
 
 export interface PiSettings {
   skills: string[]
