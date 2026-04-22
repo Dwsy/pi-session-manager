@@ -1,19 +1,19 @@
 export const search = {
   panel: {
-    placeholder: '搜索session...',
+    placeholder: '搜索会话...',
     searching: '搜索中...',
     results: '{count} 个结果',
   },
   clear: '清除',
   clearAll: '清除搜索 (Esc)',
-  placeholder: '在session中搜索...',
+  placeholder: '在会话中搜索...',
   noResults: '无结果',
   resultsCounter: '{{current}} / {{total}}',
   scope: {
     label: '范围',
     all: '全部',
-    messages: '用户 + 助手message',
-    user: '用户message',
+    messages: '用户 + 助手消息',
+    user: '用户消息',
   },
   previousAction: '上一个搜索结果',
   nextAction: '下一个搜索结果',
@@ -23,7 +23,7 @@ export const search = {
   searching: '搜索中...',
   results: '{{count}} 个结果',
   fullText: {
-    placeholder: '搜索所有session...',
+    placeholder: '搜索所有会话...',
     resultsFound: '找到 {{count}} 个匹配项',
     filters: '过滤器',
     role: {

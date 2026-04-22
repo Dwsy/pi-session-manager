@@ -5,23 +5,23 @@ export const onboarding = {
   finish: '开始使用',
   steps: {
     welcome: {
-      title: '欢迎使用 Pi session管理器',
-      description: '一款强大的工具，用于浏览、搜索和管理你的 Pi AI 编程session。让我们快速了解一下核心功能。',
+      title: '欢迎使用 Pi 会话管理器',
+      description: '一款强大的工具，用于浏览、搜索和管理你的 Pi AI 编程会话。让我们快速了解一下核心功能。',
     },
     browse: {
-      title: '按project浏览session',
-      description: '所有编程session都按project分组。在列表视图和project视图之间切换，快速找到你需要的session。',
-      hint: 'Cmd+P 切换到project视图',
+      title: '按项目浏览会话',
+      description: '所有编程会话都按项目分组。在列表视图和项目视图之间切换，快速找到你需要的会话。',
+      hint: 'Cmd+P 切换到项目视图',
     },
     search: {
-      title: '跨session全局搜索',
-      description: '使用全局搜索来查找所有工作区中的message、session和project。session内搜索帮助你在单个conversation中快速定位。',
-      hint: 'Cmd+K 全局搜索，Cmd+F session内搜索',
+      title: '跨会话全局搜索',
+      description: '使用全局搜索来查找所有工作区中的消息、会话和项目。会话内搜索帮助你在单个对话中快速定位。',
+      hint: 'Cmd+K 全局搜索，Cmd+F 会话内搜索',
     },
     tree: {
-      title: '导航session树',
-      description: '侧边栏树形视图展示了conversation流程，支持展开和折叠分支。点击箭头来收起或展开区域，专注于重要Content。',
-      hint: '点击节点跳转到message，点击箭头折叠/展开',
+      title: '导航会话树',
+      description: '侧边栏树形视图展示了对话流程，支持展开和折叠分支。点击箭头来收起或展开区域，专注于重要内容。',
+      hint: '点击节点跳转到消息，点击箭头折叠/展开',
     },
     settings: {
       title: '自定义你的体验',

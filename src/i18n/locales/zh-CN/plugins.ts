@@ -1,14 +1,14 @@
 export const plugins = {
   session: {
-    name: 'session搜索',
-    description: '搜索sessionName和元数据',
+    name: '会话搜索',
+    description: '搜索会话名称和元数据',
   },
   project: {
-    name: 'project搜索',
-    description: '搜索project路径',
+    name: '项目搜索',
+    description: '搜索项目路径',
   },
   message: {
-    name: 'message搜索',
-    description: '搜索用户message和助手回复',
+    name: '消息搜索',
+    description: '搜索用户消息和助手回复',
   },
 } as const
