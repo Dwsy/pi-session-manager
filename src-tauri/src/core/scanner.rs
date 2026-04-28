@@ -327,6 +327,48 @@ pub(crate) struct ParsedFileResult {
     pub(crate) path_str: String,
 }
 
+/// Parallel scan all JSONL files using tokio tasks (header-only, fast initial scan)
+/// Returns minimal SessionInfo with empty message fields for DB bootstrap
+pub(crate) async fn parallel_parse_headers_only(files: Vec<PathBuf>) -> Vec<ParsedFileResult> {
+    use tokio::task::JoinSet;
+
+    let mut set = JoinSet::new();
+
+    for file_path in files {
+        set.spawn(async move {
+            let path_str = file_path.to_string_lossy().to_string();
+            let metadata = fs::metadata(crate::domain::session_bridge::backing_file_path(&file_path));
+            let file_modified: DateTime<Utc> = match metadata {
+                Ok(m) => DateTime::from(m.modified().unwrap_or(std::time::SystemTime::now())),
+                Err(e) => {
+                    warn!("Failed to get metadata for {}: {}", path_str, e);
+                    return None;
+                }
+            };
+
+            // Lightweight header-only parse
+            match crate::domain::session_bridge::parse_session_info_header_only(&file_path, file_modified) {
+                Ok(info) => Some(ParsedFileResult { info, entries: vec![], file_modified, path_str }),
+                Err(e) => {
+                    warn!("Failed to parse header {}: {}", path_str, e);
+                    None
+                }
+            }
+        });
+    }
+
+    let mut parsed_results: Vec<ParsedFileResult> = Vec::new();
+    while let Some(result) = set.join_next().await {
+        match result {
+            Ok(Some(data)) => parsed_results.push(data),
+            Ok(None) => {}
+            Err(e) => warn!("Task join error: {}", e),
+        }
+    }
+
+    parsed_results
+}
+
 /// Parallel scan all JSONL files using tokio tasks
 /// Strategy: Parse files in parallel (pure CPU work), return results for caller to handle DB
 pub(crate) async fn parallel_parse_files(files: Vec<PathBuf>) -> Vec<ParsedFileResult> {
@@ -448,8 +490,17 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
         info!("Need to parse {} files ({} cached, {} to parse) [db_load={}ms classify={}ms]", total_files, total_files - files_to_parse.len(), files_to_parse.len(), db_load_elapsed_ms, classify_elapsed_ms);
 
         // Parse only files that need updates
+        // Use lightweight header-only parse for initial DB bootstrap (many files, empty DB)
+        let is_initial_bootstrap = db_sessions.is_empty() && files_to_parse.len() > 100;
         let parse_started_at = Instant::now();
-        let parsed_results = if files_to_parse.is_empty() { Vec::new() } else { parallel_parse_files(files_to_parse).await };
+        let parsed_results = if files_to_parse.is_empty() {
+            Vec::new()
+        } else if is_initial_bootstrap {
+            info!("Initial bootstrap: using lightweight header-only parse for {} files", files_to_parse.len());
+            parallel_parse_headers_only(files_to_parse).await
+        } else {
+            parallel_parse_files(files_to_parse).await
+        };
         let parse_elapsed_ms = parse_started_at.elapsed().as_millis();
 
         // Process results: separate realtime vs historical, upsert to DB

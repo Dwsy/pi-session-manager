@@ -160,6 +160,71 @@ fn parse_pi_session(path: &Path) -> Result<(PiSessionHeader, Vec<RawPiEntry>), S
     parse_pi_session_reader(BufReader::new(file), path)
 }
 
+/// Lightweight header-only parse: reads only the first line.
+/// Returns a minimal SessionInfo with empty message fields.
+/// Used for fast initial scan when DB is empty.
+pub fn parse_pi_session_header_only(path: &Path, file_modified: DateTime<Utc>) -> Result<SessionInfo, String> {
+    let file = File::open(path).map_err(|e| format!("Failed to open Pi session {}: {e}", path.display()))?;
+    let mut reader = BufReader::new(file);
+    let mut header_line = String::new();
+    reader.read_line(&mut header_line).map_err(|e| format!("Failed to read Pi session header {}: {e}", path.display()))?;
+
+    let header = parse_header(&header_line.trim(), path)?;
+
+    // Try to read last non-empty line for last_message hint
+    let mut last_line = String::new();
+    let mut last_message = String::new();
+    let mut last_message_role = String::new();
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() {
+                last_line = trimmed.to_string();
+            }
+        }
+    }
+    if !last_line.is_empty() {
+        if let Ok(value) = serde_json::from_str::<Value>(&last_line) {
+            if let Some(msg) = value.get("message") {
+                if let Some(role) = msg.get("role").and_then(Value::as_str) {
+                    last_message_role = role.to_string();
+                }
+                if let Some(parts) = msg.get("content").and_then(Value::as_array) {
+                    for part in parts {
+                        if let Some(text) = part.get("text").and_then(Value::as_str) {
+                            last_message = truncate_text(text, 150);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Estimate message count from file size (rough: ~200 bytes per message)
+    let estimated_message_count = if let Ok(metadata) = std::fs::metadata(path) {
+        (metadata.len() / 200) as usize
+    } else {
+        0
+    };
+
+    Ok(SessionInfo {
+        path: path.to_string_lossy().to_string(),
+        id: header.id,
+        cwd: header.cwd,
+        name: header.name,
+        created: header.timestamp,
+        modified: file_modified.max(header.timestamp),
+        message_count: estimated_message_count,
+        first_message: String::new(),  // Will be filled on full scan
+        user_messages_text: String::new(),
+        assistant_messages_text: String::new(),
+        last_message,
+        last_message_role,
+        parent_session_path: header.parent_session_path,
+    })
+}
+
 fn parse_pi_session_reader<R: BufRead>(reader: R, path: &Path) -> Result<(PiSessionHeader, Vec<RawPiEntry>), String> {
     let mut lines = reader.lines();
     let header_line = lines.next().ok_or_else(|| format!("Pi session {} is empty", path.display()))?.map_err(|e| format!("Failed to read Pi session header {}: {e}", path.display()))?;

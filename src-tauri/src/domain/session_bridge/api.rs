@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use chrono::{DateTime, Utc};
 use crate::config::Config;
 use crate::types::{SessionEntry, SessionInfo};
 
@@ -100,6 +101,20 @@ pub fn read_canonical_session_from_str(content: &str, path_hint: Option<&Path>) 
 
 pub fn parse_session_info_from_path(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
     crate::domain::casr_min::bridge_ops::parse_session_info_from_path(path)
+}
+
+/// Lightweight header-only parse for fast initial scan.
+/// Returns only metadata from the first line, with empty message fields.
+pub fn parse_session_info_header_only(path: &Path, file_modified: DateTime<Utc>) -> Result<SessionInfo, String> {
+    // Use path-based detection (no file read) to determine provider
+    if let Some(provider) = crate::domain::casr_min::providers::detect_provider(Some(path), "") {
+        if provider == ProviderKind::Pi {
+            return crate::domain::pi_session::parse_pi_session_header_only(path, file_modified);
+        }
+    }
+    // For non-Pi formats, fall back to full parse (they're typically smaller)
+    let (info, _) = parse_session_info_from_path(path)?;
+    Ok(info)
 }
 
 pub fn parse_session_entries_from_path(path: &Path) -> Result<Vec<SessionEntry>, String> {
