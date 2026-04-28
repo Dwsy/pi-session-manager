@@ -40,10 +40,12 @@ export function useCommandSearch({
   const requestIdRef = useRef(0)
   const ftsOptionsRef = useRef(ftsOptions)
   const resultsRef = useRef(results)
+  const contextRef = useRef(context)
   const [searchError, setSearchError] = useState<string | undefined>()
 
   ftsOptionsRef.current = ftsOptions
   resultsRef.current = results
+  contextRef.current = context
 
   const supportsMessageFilters = activeTab === 'all' || activeTab === 'message'
   const parsedSourceToken = useMemo(
@@ -196,7 +198,7 @@ export function useCommandSearch({
 
         const searchPromise =
           isLabelsBrowseMode && messagePlugin
-            ? messagePlugin.search('', context)
+            ? messagePlugin.search('', contextRef.current)
             : search(normalizedQuery, {
                 pluginIds: scopedPluginIds,
                 cacheKeyParts: parts,
@@ -243,7 +245,6 @@ export function useCommandSearch({
     search,
     setIsSearching,
     setResults,
-    context,
     activeTab,
     scopedPluginIds,
     registry,

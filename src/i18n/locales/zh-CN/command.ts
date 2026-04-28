@@ -16,6 +16,10 @@ export const command = {
     open: '打开',
     navigate: '导航',
     go: '前往',
+    preview: '预览',
+    hide: '隐藏',
+    showPreview: '显示预览',
+    hidePreview: '隐藏预览',
   },
   preview: {
     title: '预览',

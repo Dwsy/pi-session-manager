@@ -16,6 +16,10 @@ export const command = {
     open: 'Open',
     navigate: 'Navigate',
     go: 'Go',
+    preview: 'Preview',
+    hide: 'Hide',
+    showPreview: 'Show preview',
+    hidePreview: 'Hide preview',
   },
   preview: {
     title: 'Preview',

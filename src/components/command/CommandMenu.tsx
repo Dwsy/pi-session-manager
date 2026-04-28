@@ -7,7 +7,7 @@ import {
   memo,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { SearchPluginResult, SearchContext } from "@/plugins/types";
 import { useSearchPlugins } from "@/hooks/useSearchPlugins";
 import { getPathBasename } from "@/utils/path";
@@ -60,6 +60,25 @@ export default memo(function CommandMenu({
   const { t } = useTranslation();
   const { registry, search } = useSearchPlugins(context);
   const [activeTab, setActiveTab] = useState<TabType>("all");
+
+  // Collapsible preview panel - persisted to localStorage
+  const [previewCollapsed, setPreviewCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("command-preview-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const togglePreview = useCallback(() => {
+    setPreviewCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("command-preview-collapsed", String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     registryRef.current = registry;
@@ -208,7 +227,9 @@ export default memo(function CommandMenu({
           />
         </div>
 
-        <div className="flex-1 h-full min-h-0 overflow-hidden bg-background">
+        <div
+          className={`flex-1 h-full min-h-0 overflow-hidden bg-background transition-[width] duration-200 ease-in-out ${previewCollapsed ? "w-0" : "w-auto"}`}
+        >
           <SessionPreviewPanel
             result={selectedResult}
             context={context}
@@ -232,6 +253,20 @@ export default memo(function CommandMenu({
               {t("command.actions.open", "Open")}
             </span>
           </div>
+          <button
+            onClick={togglePreview}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/40 px-2.5 py-1 hover:bg-surface/60 motion-color transition-colors"
+            title={previewCollapsed ? t("command.actions.showPreview", "Show preview") : t("command.actions.hidePreview", "Hide preview")}
+          >
+            {previewCollapsed ? (
+              <PanelRightOpen className="w-3 h-3" />
+            ) : (
+              <PanelRightClose className="w-3 h-3" />
+            )}
+            <span className="text-[11px]">
+              {previewCollapsed ? t("command.actions.preview", "Preview") : t("command.actions.hide", "Hide")}
+            </span>
+          </button>
         </div>
         <button
           onClick={handleSelect}
