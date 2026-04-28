@@ -565,8 +565,6 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     if (metadata.entryId && context.setPendingScrollEntryId) {
       context.setPendingScrollEntryId(metadata.entryId);
     }
-
-    context.closeCommandMenu();
   }
 
   renderItem(result: SearchPluginResult): ReactNode {

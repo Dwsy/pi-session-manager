@@ -142,7 +142,6 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
 
     if (session) {
       context.setSelectedSession(session)
-      context.closeCommandMenu()
     }
   }
 

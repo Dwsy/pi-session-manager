@@ -120,7 +120,6 @@ export class ProjectSearchPlugin extends BaseSearchPlugin {
 
     if (project) {
       context.setSelectedProject(project)
-      context.closeCommandMenu()
     }
   }
 

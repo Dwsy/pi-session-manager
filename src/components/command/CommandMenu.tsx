@@ -158,11 +158,40 @@ export default memo(function CommandMenu({
     ? registry.get(selectedResult.pluginId)
     : null;
 
+  // Check if a result corresponds to the currently active session/project
+  const isResultActive = useCallback((result: SearchPluginResult | null): boolean => {
+    if (!result) return false;
+
+    if (result.pluginId === 'session-search') {
+      const session = result.metadata?.session;
+      return session && context.selectedSession?.id === session.id;
+    }
+
+    if (result.pluginId === 'message-search') {
+      const sessionId = result.metadata?.sessionId;
+      return sessionId && context.selectedSession?.id === sessionId;
+    }
+
+    if (result.pluginId === 'project-search') {
+      const project = result.metadata?.project;
+      return project && context.selectedProject === project;
+    }
+
+    return false;
+  }, [context.selectedSession, context.selectedProject]);
+
   const handleSelect = useCallback(() => {
     if (!selectedResult || !selectedPlugin) return;
-    selectedPlugin.onSelect(selectedResult, context);
-    onClose();
-  }, [selectedResult, selectedPlugin, context, onClose]);
+
+    // If the result is for the currently active session/project, close the menu and navigate
+    if (isResultActive(selectedResult)) {
+      selectedPlugin.onSelect(selectedResult, context);
+      onClose();
+    } else {
+      // Otherwise, just activate it without closing the menu
+      selectedPlugin.onSelect(selectedResult, context);
+    }
+  }, [selectedResult, selectedPlugin, context, onClose, isResultActive]);
 
   const inputPlaceholder =
     effectiveSourceFilter === "labels_only"
