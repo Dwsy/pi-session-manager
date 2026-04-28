@@ -150,7 +150,10 @@ fn rebuild_all_message_entries(conn: &Connection) -> Result<usize, String> {
                 continue;
             }
 
-            insert_message_entries_for_path(conn, &path)?;
+            if let Err(e) = insert_message_entries_for_path(conn, &path) {
+                warn!("[Migration] Failed to rebuild message_entries for {}: {}", path, e);
+                continue; // Skip failed sessions instead of aborting entire rebuild
+            }
             rebuilt_count += 1;
         }
 
@@ -186,7 +189,8 @@ fn backfill_missing_message_entries(conn: &Connection) -> Result<usize, String> 
              WHERE NOT EXISTS (
                  SELECT 1 FROM message_entries m WHERE m.session_path = s.path
              )
-             ORDER BY s.modified DESC, s.path ASC",
+             ORDER BY s.modified DESC, s.path ASC
+             LIMIT 10",
         )
         .map_err(|e| format!("Failed to prepare missing session paths for message_entries backfill: {e}"))?;
 
@@ -209,7 +213,10 @@ fn backfill_missing_message_entries(conn: &Connection) -> Result<usize, String> 
             continue;
         }
 
-        insert_message_entries_for_path(conn, &path)?;
+        if let Err(e) = insert_message_entries_for_path(conn, &path) {
+            warn!("[Migration] Failed to backfill message_entries for {}: {}", path, e);
+            continue; // Skip failed sessions instead of aborting entire batch
+        }
         backfilled += 1;
     }
 
