@@ -19,6 +19,7 @@ import {
   Pencil,
   Play,
   Search,
+  Workflow,
 } from "lucide-react";
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
@@ -252,17 +253,7 @@ export default function SessionViewerToolbar({
                       aria-label={t("trace.toggle", "Trace mode")}
                       aria-pressed={traceModeActive}
                     >
-                      <svg
-                        className="h-3.5 w-3.5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="22 12 18 12 工具调用折叠按钮（⌘O）保留，仅隐藏聚合工具调用切换按钮。previewMode 下只显示搜索、系统提示、滚动按钮。round" />
-                      </svg>
+                      <Workflow className="h-3.5 w-3.5" />
                     </button>
                   )}
                 </>

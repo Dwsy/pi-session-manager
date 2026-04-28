@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useEffect, memo } from 'react'
+import { useMemo, useCallback, useEffect, useRef, memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ReactFlow,
@@ -17,6 +17,7 @@ import {
 import { User, Bot, Wrench, Settings, FileText, ZoomIn, ZoomOut, Maximize, LocateFixed, GitBranch, List } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import type { SessionEntry } from '@/types'
+import { buildTree as buildSessionTree, isNoneParent, type TreeNodeData } from '@/utils/session-tree'
 
 type FilterMode = 'default' | 'no-tools' | 'user-only' | 'labeled-only' | 'all' | `tool-${string}`
 
@@ -101,34 +102,7 @@ function getLabel(entry: SessionEntry): string {
   return msg.role || 'unknown'
 }
 
-// --- Tree building ---
-interface TreeNode {
-  entry: SessionEntry
-  children: TreeNode[]
-}
 
-function buildTree(entries: SessionEntry[]): TreeNode[] {
-  const byId = new Map<string, SessionEntry>()
-  const childrenMap = new Map<string, TreeNode[]>()
-  for (const e of entries) { byId.set(e.id, e); childrenMap.set(e.id, []) }
-  for (const e of entries) {
-    const pid = e.parentId
-    const ep = (pid == null || pid === "None" || pid === "null" || pid === "NONE") ? null : pid
-    if (ep && byId.has(ep)) childrenMap.get(ep)!.push({ entry: e, children: childrenMap.get(e.id) || [] })
-  }
-  const roots: TreeNode[] = []
-  for (const e of entries) {
-    const pid = e.parentId
-    const ep = (pid == null || pid === "None" || pid === "null" || pid === "NONE") ? null : pid
-    if (!ep || !byId.has(ep)) roots.push({ entry: e, children: childrenMap.get(e.id) || [] })
-  }
-  const sort = (n: TreeNode) => {
-    n.children.sort((a, b) => new Date(a.entry.timestamp || 0).getTime() - new Date(b.entry.timestamp || 0).getTime())
-    n.children.forEach(sort)
-  }
-  roots.forEach(sort)
-  return roots
-}
 
 // --- Key: collapse linear chains, keep only significant nodes ---
 // Significant = user message, branch point (>1 child), leaf (0 children), meta event
@@ -142,7 +116,7 @@ interface CompactNode {
 // Skip these types entirely - they're metadata, not conversation
 const SKIP_TYPES = new Set(['session', 'thinking_level_change', 'label'])
 
-function isSignificant(node: TreeNode, filter: FilterMode): boolean {
+function isSignificant(node: TreeNodeData, filter: FilterMode): boolean {
   const entry = node.entry
   if (SKIP_TYPES.has(entry.type)) return false
 
@@ -207,8 +181,8 @@ function getSkipLabel(entry: SessionEntry): string {
   return msg.role || 'unknown'
 }
 
-function compactTree(roots: TreeNode[], filter: FilterMode): CompactNode[] {
-  function compact(node: TreeNode): CompactNode | null {
+function compactTree(roots: TreeNodeData[], filter: FilterMode): CompactNode[] {
+  function compact(node: TreeNodeData): CompactNode | null {
     let current = node
     let skipped = 0
     const skippedLabels: string[] = []
@@ -257,12 +231,12 @@ function compactTree(roots: TreeNode[], filter: FilterMode): CompactNode[] {
 interface LayoutResult { nodes: Node[]; edges: Edge[] }
 
 // Hierarchy layout: show ALL nodes (no compaction)
-function layoutHierarchy(roots: TreeNode[], activePathIds: Set<string>, activeLeafId?: string): LayoutResult {
+function layoutHierarchy(roots: TreeNodeData[], activePathIds: Set<string>, activeLeafId?: string): LayoutResult {
   const nodes: Node[] = []
   const edges: Edge[] = []
   let nextX = 0
 
-  function place(node: TreeNode, depth: number): [number, number] {
+  function place(node: TreeNodeData, depth: number): [number, number] {
     const role = getRole(node.entry)
     const label = getLabel(node.entry)
     const isActive = node.entry.id === activeLeafId
@@ -372,7 +346,7 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default
   }, [entries, activeLeafId])
 
   const { layoutNodes, layoutEdges } = useMemo(() => {
-    const rawTree = buildTree(entries)
+    const rawTree = buildSessionTree(entries)
 
     // Hierarchy mode: show all nodes without compacting
     if (viewMode === 'hierarchy') {
@@ -400,7 +374,7 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default
     for (const e of entries) { byId.set(e.id, e); childrenMap.set(e.id, []) }
     for (const e of entries) {
       const pid = e.parentId
-      const ep = (pid == null || pid === "None" || pid === "null" || pid === "NONE") ? null : pid
+      const ep = isNoneParent(pid) ? null : pid
       if (ep && byId.has(ep)) childrenMap.get(ep)!.push(e)
     }
     let current = nodeId
@@ -446,6 +420,20 @@ interface FlowInnerProps {
 function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, activeLeafId, viewMode = 'flow', onViewModeChange }: FlowInnerProps) {
   const { t } = useTranslation()
   const { zoomIn, zoomOut, fitView, setCenter, getZoom } = useReactFlow()
+  const fitViewDoneRef = useRef(false)
+
+  // Only fitView on initial mount, not on every nodes/edges change
+  useEffect(() => {
+    if (!fitViewDoneRef.current && nodes.length > 0) {
+      fitViewDoneRef.current = true
+      requestAnimationFrame(() => fitView({ padding: 0.2, duration: 0 }))
+    }
+  }, [nodes.length, fitView])
+
+  // Reset fitView flag when entries change significantly (new session)
+  useEffect(() => {
+    fitViewDoneRef.current = false
+  }, [nodes.length === 0])
 
   const focusActive = useCallback(() => {
     if (!activeLeafId) { fitView({ padding: 0.2 }); return }
@@ -476,7 +464,6 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
         onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
-        fitView fitViewOptions={{ padding: 0.2 }}
         minZoom={0.05} maxZoom={2}
         proOptions={{ hideAttribution: true }}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={true}

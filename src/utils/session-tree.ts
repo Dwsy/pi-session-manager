@@ -53,7 +53,8 @@ export function buildTree(
 
   for (const entry of entries) {
     const parentId = isNoneParent(entry.parentId) ? null : entry.parentId;
-    if (parentId && entriesById.has(parentId)) {
+    // Self-reference (parentId === entry.id) or missing parent → treated as root below
+    if (parentId && parentId !== entry.id && entriesById.has(parentId)) {
       childrenById.get(parentId)?.push(createNode(entry));
     }
   }
@@ -61,7 +62,7 @@ export function buildTree(
   const roots = entries
     .filter((entry) => {
       const parentId = isNoneParent(entry.parentId) ? null : entry.parentId;
-      return !parentId || !entriesById.has(parentId);
+      return !parentId || parentId === entry.id || !entriesById.has(parentId);
     })
     .map(createNode);
 
@@ -80,10 +81,33 @@ export function buildTree(
 
 export function flattenTree(
   roots: TreeNodeData[],
-  _activePathIds: Set<string>,
+  activePathIds: Set<string>,
 ): FlatNode[] {
   const result: FlatNode[] = [];
   const multipleRoots = roots.length > 1;
+
+  // Pre-compute which subtrees contain the active path (post-order)
+  const containsActive = new Map<TreeNodeData, boolean>();
+  {
+    const allNodes: TreeNodeData[] = [];
+    const preStack: TreeNodeData[] = [...roots];
+    while (preStack.length > 0) {
+      const n = preStack.pop()!;
+      allNodes.push(n);
+      for (let i = n.children.length - 1; i >= 0; i -= 1) {
+        preStack.push(n.children[i]);
+      }
+    }
+    // Post-order: children before parents
+    for (let i = allNodes.length - 1; i >= 0; i -= 1) {
+      const n = allNodes[i];
+      let has = activePathIds.has(n.entry.id);
+      for (const child of n.children) {
+        if (containsActive.get(child)) has = true;
+      }
+      containsActive.set(n, has);
+    }
+  }
 
   type StackItem = [
     TreeNodeData,
@@ -96,13 +120,17 @@ export function flattenTree(
   ];
 
   const stack: StackItem[] = [];
-  for (let index = roots.length - 1; index >= 0; index -= 1) {
+  // Sort roots: active path first, then by timestamp
+  const orderedRoots = [...roots].sort(
+    (a, b) => Number(containsActive.get(b)) - Number(containsActive.get(a)),
+  );
+  for (let index = orderedRoots.length - 1; index >= 0; index -= 1) {
     stack.push([
-      roots[index],
+      orderedRoots[index],
       multipleRoots ? 1 : 0,
       multipleRoots,
       multipleRoots,
-      index === roots.length - 1,
+      index === orderedRoots.length - 1,
       [],
       multipleRoots,
     ]);
@@ -143,13 +171,17 @@ export function flattenTree(
       ? [...gutters, { position: connectorPosition, show: !isLast }]
       : gutters;
 
-    for (let index = children.length - 1; index >= 0; index -= 1) {
+    // Sort children: active path first, then by timestamp
+    const orderedChildren = [...children].sort(
+      (a, b) => Number(containsActive.get(b)) - Number(containsActive.get(a)),
+    );
+    for (let index = orderedChildren.length - 1; index >= 0; index -= 1) {
       stack.push([
-        children[index],
+        orderedChildren[index],
         childIndent,
         multipleChildren,
         multipleChildren,
-        index === children.length - 1,
+        index === orderedChildren.length - 1,
         childGutters,
         false,
       ]);
@@ -283,20 +315,7 @@ export function getSearchableText(
 }
 
 function isSettingsEntry(entry: SessionEntry): boolean {
-  if (TREE_SETTINGS_TYPES.has(entry.type)) {
-    return true;
-  }
-
-  if (entry.type === "message" && entry.message?.role === "assistant") {
-    const content = Array.isArray(entry.message.content)
-      ? entry.message.content
-      : [];
-    return content.some(
-      (block: any) => block.type === "text" && block.text?.trim() === "",
-    );
-  }
-
-  return false;
+  return TREE_SETTINGS_TYPES.has(entry.type);
 }
 
 export function filterFlatNodes(

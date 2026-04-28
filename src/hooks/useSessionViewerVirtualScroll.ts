@@ -91,13 +91,28 @@ export function useSessionViewerVirtualScroll({
       switch (entry.type) {
         case 'message': {
           const content = entry.message?.content ?? []
-          // In previewMode, only count text content for height estimation
-          const textItems = content.filter((item) => item.type === 'text')
-          const textLength = textItems.reduce((sum, item) => sum + (item.text?.length ?? 0), 0)
           const role = entry.message?.role
-          const baseHeight = previewMode ? (role === 'user' ? 48 : 40) : 100
-          const contentHeight = previewMode ? Math.ceil(textLength / 90) * 24 : Math.ceil(textLength / 80) * 32
-          height = Math.min(baseHeight + contentHeight, 800)
+          if (previewMode) {
+            // In previewMode, tool calls are stripped from rendering —
+            // only count text content to match actual rendered height.
+            const textItems = content.filter((item) => item.type === 'text')
+            const textLength = textItems.reduce((sum, item) => sum + (item.text?.length ?? 0), 0)
+            const baseHeight = role === 'user' ? 48 : 40
+            const contentHeight = Math.ceil(textLength / 90) * 24
+            height = Math.min(baseHeight + contentHeight, 800)
+          } else {
+            // Normal mode: account for tool calls, thinking blocks, text
+            const textLength = content.reduce((sum, item) => {
+              if (item.type === 'text') return sum + (item.text?.length ?? 0)
+              if (item.type === 'toolCall') return sum + 80 // tool call name + params preview
+              if (item.type === 'thinking') return sum + (item.thinking?.length ?? 0) * 0.3
+              return sum
+            }, 0)
+            const hasTools = content.some((item) => item.type === 'toolCall')
+            const baseHeight = hasTools ? 140 : 100
+            const contentHeight = Math.ceil(textLength / 80) * 32
+            height = Math.min(baseHeight + contentHeight, 800)
+          }
           break
         }
         case 'model_change':
