@@ -131,12 +131,11 @@ pub fn calculate_stats(sessions: &[SessionInfo]) -> SessionStats {
 
 fn should_refresh_cached_details(cached: &crate::data::sqlite::SessionDetailsCache) -> bool {
     let has_messages = cached.user_messages + cached.assistant_messages > 0;
-    let has_no_usage = cached.input_tokens == 0 && cached.output_tokens == 0 && cached.cache_read_tokens == 0 && cached.cache_write_tokens == 0 && cached.input_cost == 0.0 && cached.output_cost == 0.0 && cached.cache_read_cost == 0.0 && cached.cache_write_cost == 0.0;
-    // Also refresh if model_usage_json is empty but there are messages
-    // (happens after migration_12 clears model data)
+    // Only refresh if we have messages but no model data at all
+    // Don't refresh just because usage is 0 — many sessions legitimately have 0 usage
     let has_no_model_data = cached.model_usage_json == "{}" || cached.model_usage_json.is_empty();
 
-    has_messages && (has_no_usage || has_no_model_data)
+    has_messages && has_no_model_data
 }
 
 /// Process a single session's data from cache or file
