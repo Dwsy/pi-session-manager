@@ -240,6 +240,7 @@ export default function AdvancedSettings({
                 "127.0.0.1 for local access only, 0.0.0.0 allows remote connections",
               )}
               className="space-y-2"
+              searchKey="advanced-bindAddr"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <SettingsSelect
@@ -273,6 +274,7 @@ export default function AdvancedSettings({
               onChange={(checked) => updateServer("ws_enabled", checked)}
               className="items-start pt-4 border-t border-border/60"
               descriptionClassName="text-xs text-muted-foreground mt-0.5 font-mono"
+              searchKey="advanced-wsPort"
             />
             {serverSettings.ws_enabled && (
               <SettingsField
@@ -300,6 +302,7 @@ export default function AdvancedSettings({
               onChange={(checked) => updateServer("http_enabled", checked)}
               className="items-start py-2 border-t border-border/60"
               descriptionClassName="text-xs text-muted-foreground mt-0.5 font-mono"
+              searchKey="advanced-httpPort"
             />
             {serverSettings.http_enabled && (
               <SettingsField
@@ -330,6 +333,7 @@ export default function AdvancedSettings({
               onChange={(checked) => updateServer("auth_enabled", checked)}
               className="items-start py-2 border-t border-border/60"
               descriptionClassName="text-xs text-muted-foreground mt-0.5"
+              searchKey="advanced-auth"
             />
 
             {serverDirty && (
@@ -361,6 +365,7 @@ export default function AdvancedSettings({
             "Used for remote connection authentication via Authorization: Bearer <key>",
           )}
           icon={<Key className="h-4 w-4" />}
+          searchKey="advanced-apiKeys"
         >
           <div className="space-y-4">
             {apiKeys.length > 0 && (
@@ -532,6 +537,7 @@ export default function AdvancedSettings({
               "Storage location for Pi session files, default path is always included",
             )}
             icon={<FolderOpen className="h-4 w-4" />}
+            searchKey="advanced-sessionDir"
           >
             <div className="space-y-3">
               <div className="flex gap-2 items-center">

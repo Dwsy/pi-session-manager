@@ -20,6 +20,8 @@ interface SettingsVisualSliderFieldProps {
   thumbClassName?: string
   inputClassName?: string
   tickClassName?: string
+  /** Unique key for settings search indexing and scroll targeting */
+  searchKey?: string
 }
 
 /**
@@ -44,6 +46,7 @@ export default function SettingsVisualSliderField({
   thumbClassName = 'w-5 h-5 rounded-full bg-info shadow-[0_0_8px_rgba(86,156,214,0.6)] border-2 border-white/20',
   inputClassName = '',
   tickClassName = 'text-xs text-muted-foreground',
+  searchKey,
 }: SettingsVisualSliderFieldProps) {
   const range = max - min
   const progress = range > 0 ? ((value - min) / range) * 100 : 0
@@ -51,6 +54,7 @@ export default function SettingsVisualSliderField({
 
   return (
     <SettingsField
+      {...(searchKey ? { searchKey } : {})}
       label={
         <div className="flex items-center justify-between">
           <span className={labelTextClassName}>{label}</span>

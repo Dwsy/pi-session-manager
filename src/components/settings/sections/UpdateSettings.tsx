@@ -481,6 +481,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
           'Choose which release track to receive updates from',
         )}
         icon={<Zap className="h-4 w-4" />}
+        searchKey="update-channel"
       >
         <SettingsField label={t('settings.update.channel.label', 'Channel')}>
           <SettingsOptionGroup

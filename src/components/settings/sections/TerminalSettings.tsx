@@ -248,6 +248,7 @@ export default function TerminalSettings({
                 "settings.terminal.builtinEnabledHelp",
                 "Use integrated terminal panel (Ctrl+`)",
               )}
+              searchKey="terminal-builtinEnabled"
               checked={settings.terminal.builtinTerminalEnabled}
               onChange={(enabled) =>
                 onUpdate("terminal", "builtinTerminalEnabled", enabled)
@@ -271,6 +272,7 @@ export default function TerminalSettings({
                 label={t("settings.terminal.defaultShell", "Default Shell")}
                 className="space-y-2"
                 labelClassName="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                searchKey="terminal-defaultShell"
               >
                 <div className="flex flex-wrap gap-2">
                   {SHELL_OPTIONS.map((shell) => (
@@ -293,6 +295,7 @@ export default function TerminalSettings({
 
               <SettingsVisualSliderField
                 label={t("settings.terminal.fontSize", "Terminal Font Size")}
+                searchKey="terminal-fontSize"
                 value={settings.terminal.terminalFontSize}
                 min={10}
                 max={20}
@@ -335,7 +338,7 @@ export default function TerminalSettings({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-settings-search="terminal-defaultTerminal">
               {platformTerminals.map((term) => (
                 <button
                   key={term.id}
@@ -385,6 +388,7 @@ export default function TerminalSettings({
                 onChange={(e) =>
                   onUpdate("terminal", "resumeCommand", e.target.value)
                 }
+                searchKey="terminal-resumeCommand"
                 placeholder={t(
                   "settings.terminal.resumeCommandPlaceholder",
                   "e.g., /opt/homebrew/bin/tmux new-session -A -s pi",
@@ -555,6 +559,7 @@ export default function TerminalSettings({
                 "Specify full path if pi is not in system PATH",
               )}
               className="space-y-2"
+              searchKey="terminal-piCommandPath"
             >
               <SettingsInput
                 type="text"

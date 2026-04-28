@@ -1008,6 +1008,7 @@ export default function SessionSettings({
                 }
               }}
               className="items-start pt-4 border-t border-border/60"
+              searchKey="session-scrollMarkersEnabled"
             />
 
             <SettingsToggleRow
@@ -1043,6 +1044,7 @@ export default function SessionSettings({
                 }
               }}
               className="items-start pt-4 border-t border-border/60"
+              searchKey="session-timelineNavEnabled"
             />
 
             <SettingsToggleRow
@@ -1059,6 +1061,7 @@ export default function SessionSettings({
                 onUpdate("session", "collapseToolCalls", checked)
               }
               className="items-start pt-4 border-t border-border/60"
+              searchKey="session-collapseToolCalls"
             />
 
             <SettingsField
@@ -1066,6 +1069,7 @@ export default function SessionSettings({
                 "settings.session.openPosition",
                 "Task positioning open position",
               )}
+              searchKey="session-openPosition"
             >
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {(["top", "bottom"] as const).map((position) => (
@@ -1092,6 +1096,7 @@ export default function SessionSettings({
                 "settings.session.cmdFBehaviorHelp",
                 "Choose Cmd+F shortcut function",
               )}
+              searchKey="session-cmdFBehavior"
             >
               <SettingsRadioCardGroup
                 name="session-cmdf-behavior"

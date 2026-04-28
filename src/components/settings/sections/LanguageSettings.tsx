@@ -28,7 +28,7 @@ export default function LanguageSettings({ settings, onUpdate }: LanguageSetting
 
   return (
     <div className="space-y-6">
-      <SettingsField label={t('settings.language.select', 'Select language')}>
+      <SettingsField label={t('settings.language.select', 'Select language')} searchKey="language-locale">
         <SettingsRadioCardGroup
           options={languages.map((lang) => lang.code)}
           value={settings.language.locale}

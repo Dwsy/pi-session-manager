@@ -39,7 +39,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
 
   return (
     <div className="space-y-6">
-      <SettingsField label={t('settings.appearance.theme', 'Theme')}>
+      <SettingsField label={t('settings.appearance.theme', 'Theme')} searchKey="appearance-theme">
         <SettingsOptionGroup
           options={['dark', 'light', 'system', 'custom'] as const}
           value={settings.appearance.theme}
@@ -59,6 +59,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         <SettingsField
           label={t('settings.appearance.customTheme', 'Custom Theme Preset')}
           description={t('settings.appearance.customThemeHelp', 'Uses theme files from ~/.pi/agent/themes')}
+          searchKey="appearance-customTheme"
         >
           <SettingsSelect
             value={settings.appearance.customTheme}
@@ -77,7 +78,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         </SettingsField>
       )}
 
-      <SettingsField label={t('settings.appearance.fontSize', 'Font size')}>
+      <SettingsField label={t('settings.appearance.fontSize', 'Font size')} searchKey="appearance-fontSize">
         <SettingsOptionGroup
           options={['small', 'medium', 'large'] as const}
           value={settings.appearance.fontSize}
@@ -90,7 +91,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         />
       </SettingsField>
 
-      <SettingsField label={t('settings.appearance.fontFamily', 'Font Family')}>
+      <SettingsField label={t('settings.appearance.fontFamily', 'Font Family')} searchKey="appearance-fontFamily">
         <SettingsInput
           type="text"
           value={settings.appearance.fontFamily}
@@ -99,7 +100,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         />
       </SettingsField>
 
-      <SettingsField label={t('settings.appearance.fontFamilyMono', 'Monospace Font Family')}>
+      <SettingsField label={t('settings.appearance.fontFamilyMono', 'Monospace Font Family')} searchKey="appearance-fontFamilyMono">
         <SettingsInput
           type="text"
           value={settings.appearance.fontFamilyMono}
@@ -108,7 +109,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         />
       </SettingsField>
 
-      <SettingsField label={t('settings.appearance.codeBlockTheme', 'Code block theme')}>
+      <SettingsField label={t('settings.appearance.codeBlockTheme', 'Code block theme')} searchKey="appearance-codeBlockTheme">
         <SettingsSelect
           value={settings.appearance.codeBlockTheme}
           onChange={(e) => onUpdate('appearance', 'codeBlockTheme', e.target.value)}
@@ -120,7 +121,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         </SettingsSelect>
       </SettingsField>
 
-      <SettingsField label={t('settings.appearance.messageSpacing', 'Message spacing')}>
+      <SettingsField label={t('settings.appearance.messageSpacing', 'Message spacing')} searchKey="appearance-messageSpacing">
         <SettingsOptionGroup
           options={['compact', 'comfortable', 'spacious'] as const}
           value={settings.appearance.messageSpacing}
@@ -137,6 +138,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
           'settings.appearance.disableToolSuccessStyleDesc',
           'Disable green background and border on successful tool execution for cleaner tool cards'
         )}
+        searchKey="appearance-disableToolSuccessStyle"
       >
         <label className="flex items-center gap-3 cursor-pointer">
           <input

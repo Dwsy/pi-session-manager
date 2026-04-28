@@ -1,6 +1,9 @@
 export const settings = {
   title: '設定',
   subtitle: '体験をカスタマイズ',
+  searchPlaceholder: 'すべての設定を検索...',
+  searchEmpty: '一致する設定はありません',
+  searchResults: '設定項目',
   saved: '保存済み',
   reset: '設定をリセット',
   confirmReset: 'すべての設定をリセットしますか？',

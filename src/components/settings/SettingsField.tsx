@@ -7,6 +7,8 @@ interface SettingsFieldProps {
   className?: string
   labelClassName?: string
   descriptionClassName?: string
+  /** Unique key for settings search indexing and scroll targeting */
+  searchKey?: string
 }
 
 /**
@@ -19,9 +21,13 @@ export default function SettingsField({
   className = '',
   labelClassName = 'text-sm font-medium text-foreground',
   descriptionClassName = 'text-xs text-muted-foreground',
+  searchKey,
 }: SettingsFieldProps) {
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div
+      className={`space-y-3 ${className}`}
+      {...(searchKey ? { 'data-settings-search': searchKey } : {})}
+    >
       <div className={labelClassName}>{label}</div>
       {children}
       {description && <p className={descriptionClassName}>{description}</p>}

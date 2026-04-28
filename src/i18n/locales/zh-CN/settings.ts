@@ -1,6 +1,9 @@
 export const settings = {
   title: "设置",
   subtitle: "自定义您的体验",
+  searchPlaceholder: "搜索所有设置...",
+  searchEmpty: "没有匹配的设置项",
+  searchResults: "设置项",
   saved: "已保存",
   reset: "重置设置",
   confirmReset: "确定要重置所有设置吗？",

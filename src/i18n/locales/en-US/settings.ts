@@ -1,6 +1,9 @@
 export const settings = {
   title: "Settings",
   subtitle: "Customize your experience",
+  searchPlaceholder: "Search all settings...",
+  searchEmpty: "No matching settings",
+  searchResults: "Settings",
   saved: "Saved",
   reset: "Reset Settings",
   confirmReset: "Are you sure you want to reset all settings?",

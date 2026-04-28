@@ -12,6 +12,8 @@ interface SettingsToggleRowProps {
   contentClassName?: string
   toggleSize?: 'sm' | 'md'
   toggleClassName?: string
+  /** Unique key for settings search indexing and scroll targeting */
+  searchKey?: string
 }
 
 /**
@@ -28,9 +30,13 @@ export default function SettingsToggleRow({
   contentClassName = 'min-w-0',
   toggleSize = 'md',
   toggleClassName = '',
+  searchKey,
 }: SettingsToggleRowProps) {
   return (
-    <div className={`flex items-center justify-between gap-4 ${className}`}>
+    <div
+      className={`flex items-center justify-between gap-4 ${className}`}
+      {...(searchKey ? { 'data-settings-search': searchKey } : {})}
+    >
       <div className={contentClassName}>
         <div className={titleClassName}>{title}</div>
         {description && <p className={descriptionClassName}>{description}</p>}

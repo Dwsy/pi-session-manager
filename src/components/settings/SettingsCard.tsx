@@ -8,6 +8,8 @@ interface SettingsCardProps {
   icon?: React.ReactNode
   children: React.ReactNode
   className?: string
+  /** Unique key for settings search indexing and scroll targeting */
+  searchKey?: string
 }
 
 export default function SettingsCard({
@@ -16,10 +18,12 @@ export default function SettingsCard({
   icon,
   children,
   className = '',
+  searchKey,
 }: SettingsCardProps) {
   return (
     <div
       className={`rounded-xl border border-border bg-surface/50 overflow-hidden ${className}`}
+      {...(searchKey ? { 'data-settings-search': searchKey } : {})}
     >
       {(title || description) && (
         <div className="px-4 py-3 border-b border-border/60 bg-background/40">

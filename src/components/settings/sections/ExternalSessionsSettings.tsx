@@ -255,6 +255,7 @@ export default function ExternalSessionsSettings({
               onUpdate("session", "externalSessionsIncludeInStats", checked)
             }
             className="items-start py-0"
+            searchKey="external-sessions-includeInStats"
           />
 
           <SettingsToggleRow
@@ -271,6 +272,7 @@ export default function ExternalSessionsSettings({
               onUpdate("session", "externalSessionsIncludeInSearch", checked)
             }
             className="items-start py-0"
+            searchKey="external-sessions-includeInSearch"
           />
 
           <SettingsToggleRow
@@ -287,6 +289,7 @@ export default function ExternalSessionsSettings({
               onUpdate("session", "showAgentIconInSessionBadge", checked)
             }
             className="items-start py-0"
+            searchKey="external-sessions-showAgentIcon"
           />
         </div>
       </SettingsCard>

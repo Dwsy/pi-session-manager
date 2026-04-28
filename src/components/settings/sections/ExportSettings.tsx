@@ -13,7 +13,7 @@ export default function ExportSettings({ settings, onUpdate }: ExportSettingsPro
 
   return (
     <div className="space-y-6">
-      <SettingsField label={t('settings.export.defaultFormat', 'Default export format')}>
+      <SettingsField label={t('settings.export.defaultFormat', 'Default export format')} searchKey="export-defaultFormat">
         <SettingsOptionGroup
           options={['html', 'md', 'json'] as const}
           value={settings.export.defaultFormat}
@@ -29,6 +29,7 @@ export default function ExportSettings({ settings, onUpdate }: ExportSettingsPro
         description={t('settings.export.includeMetadataHelp', 'Include session metadata when exporting')}
         checked={settings.export.includeMetadata}
         onChange={(checked) => onUpdate('export', 'includeMetadata', checked)}
+        searchKey="export-includeMetadata"
       />
 
       <SettingsToggleRow
@@ -36,6 +37,7 @@ export default function ExportSettings({ settings, onUpdate }: ExportSettingsPro
         description={t('settings.export.includeTimestampsHelp', 'Include message timestamps when exporting')}
         checked={settings.export.includeTimestamps}
         onChange={(checked) => onUpdate('export', 'includeTimestamps', checked)}
+        searchKey="export-includeTimestamps"
       />
     </div>
   )
