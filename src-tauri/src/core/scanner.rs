@@ -222,65 +222,9 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
         CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
     }
 
-    // Background warm-up: pre-populate details cache for stats
-    // This prevents get_session_stats from reading all files synchronously
-    let sessions_for_warmup = result.clone();
-    tokio::spawn(async move {
-        warm_details_cache(sessions_for_warmup).await;
-    });
-
     Ok(result)
 }
 
-/// Background warm-up: populate details cache for stats calculation.
-/// This prevents get_session_stats from reading all files synchronously.
-async fn warm_details_cache(sessions: Vec<SessionInfo>) {
-    use std::time::Instant;
-    let start = Instant::now();
-    let mut warmed = 0;
-    let total = sessions.len();
-
-    let conn = match crate::data::sqlite::init_db() {
-        Ok(conn) => conn,
-        Err(e) => {
-            warn!("Failed to init DB for details warm-up: {e}");
-            return;
-        }
-    };
-
-    for session in &sessions {
-        // Check if already cached with valid data
-        let needs_refresh = match crate::data::sqlite::get_session_details_cache(&conn, &session.path) {
-            Ok(Some(cached)) => {
-                // Refresh if: file changed, OR model_usage is empty for a session with messages
-                let stale = cached.file_modified < session.modified;
-                let empty_usage = (cached.model_usage_json == "{}" || cached.model_usage_json.is_empty()) && (cached.user_messages + cached.assistant_messages > 0);
-                stale || empty_usage
-            }
-            Ok(None) => true, // Not cached at all
-            Err(_) => true, // DB error
-        };
-
-        if !needs_refresh {
-            continue;
-        }
-
-        // Check memory buffer
-        if crate::core::write_buffer::get_buffered_details(&session.path).is_some() {
-            continue;
-        }
-
-        // Parse and cache directly (skip creating SessionEntry objects)
-        if let Ok(content) = std::fs::read_to_string(&session.path) {
-            let details = crate::core::parser::parse_session_details(&content);
-            crate::core::write_buffer::buffer_details_write(&session.path, session.modified, &details);
-            let _ = crate::data::sqlite::upsert_session_details_cache(&conn, &session.path, session.modified, &details);
-            warmed += 1;
-        }
-    }
-
-    info!("Details cache warm-up complete: {warmed}/{total} sessions in {}ms", start.elapsed().as_millis());
-}
 
 /// Collect all JSONL file paths from all session directories
 pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
