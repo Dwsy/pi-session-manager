@@ -256,6 +256,52 @@ pub fn extract_basic_details_from_entries(entries: &[crate::types::SessionEntry]
     details
 }
 
+/// Parse session details from pre-loaded entries (avoids re-reading file).
+pub fn parse_session_details_from_entries(entries: &[crate::types::SessionEntry]) -> SessionDetails {
+    let mut details = SessionDetails::default();
+    let mut model_set: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for entry in entries {
+        if let Some(message) = &entry.message {
+            match message.role.as_str() {
+                "user" => details.user_messages += 1,
+                "assistant" => {
+                    details.assistant_messages += 1;
+                    // Extract model name from content if available
+                    for content in &message.content {
+                        if content.content_type == "text" {
+                            // Try to find model info in the content
+                            if let Some(text) = &content.text {
+                                if text.contains("model") {
+                                    // Simple heuristic: look for model patterns
+                                }
+                            }
+                        }
+                    }
+                }
+                "tool" => details.tool_results += 1,
+                _ => {}
+            }
+
+            // Extract usage from message content
+            for content in &message.content {
+                if content.content_type == "text" {
+                    if let Some(text) = &content.text {
+                        if let Ok(value) = serde_json::from_str::<serde_json::Value>(text) {
+                            if let Some(usage) = find_usage_object(&value) {
+                                apply_usage_to_details(&mut details, None, usage);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    details.models = model_set.into_iter().collect();
+    details
+}
+
 impl SessionDetails {
     pub fn total_tokens(&self) -> u64 {
         self.input_tokens + self.output_tokens

@@ -222,7 +222,55 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
         CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
     }
 
+    // Background warm-up: pre-populate details cache for stats
+    // This prevents get_session_stats from reading all files synchronously
+    let sessions_for_warmup = result.clone();
+    tokio::spawn(async move {
+        warm_details_cache(sessions_for_warmup).await;
+    });
+
     Ok(result)
+}
+
+/// Background warm-up: populate details cache for stats calculation.
+/// This prevents get_session_stats from reading all files synchronously.
+async fn warm_details_cache(sessions: Vec<SessionInfo>) {
+    use std::time::Instant;
+    let start = Instant::now();
+    let mut warmed = 0;
+    let total = sessions.len();
+
+    let conn = match crate::data::sqlite::init_db() {
+        Ok(conn) => conn,
+        Err(e) => {
+            warn!("Failed to init DB for details warm-up: {e}");
+            return;
+        }
+    };
+
+    for session in &sessions {
+        // Check if already cached
+        if let Ok(Some(cached)) = crate::data::sqlite::get_session_details_cache(&conn, &session.path) {
+            if cached.file_modified >= session.modified {
+                continue; // Already cached and fresh
+            }
+        }
+
+        // Check memory buffer
+        if crate::core::write_buffer::get_buffered_details(&session.path).is_some() {
+            continue;
+        }
+
+        // Parse and cache
+        if let Ok((_, entries)) = parse_session_info(&PathBuf::from(&session.path)) {
+            let details = crate::core::parser::parse_session_details_from_entries(&entries);
+            crate::core::write_buffer::buffer_details_write(&session.path, session.modified, &details);
+            let _ = crate::data::sqlite::upsert_session_details_cache(&conn, &session.path, session.modified, &details);
+            warmed += 1;
+        }
+    }
+
+    info!("Details cache warm-up complete: {warmed}/{total} sessions in {}ms", start.elapsed().as_millis());
 }
 
 /// Collect all JSONL file paths from all session directories
@@ -516,9 +564,11 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             if result.file_modified > realtime_cutoff {
                 // Realtime file: add to results, buffer for DB
                 write_buffer::buffer_session_write(&info, result.file_modified);
-                // Also buffer basic details to avoid re-reading file for stats
-                let basic_details = crate::core::parser::extract_basic_details_from_entries(&result.entries);
-                write_buffer::buffer_details_write(&result.path_str, result.file_modified, &basic_details);
+                // Only buffer details if we have actual entries (not header-only parse)
+                if !result.entries.is_empty() {
+                    let basic_details = crate::core::parser::extract_basic_details_from_entries(&result.entries);
+                    write_buffer::buffer_details_write(&result.path_str, result.file_modified, &basic_details);
+                }
                 let _ = sqlite::upsert_scan_state_for_session(&conn, &info, result.file_modified, "ok");
                 realtime_buffered += 1;
             } else {
