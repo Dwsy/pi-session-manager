@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import {
   X,
   Coins,
@@ -7,6 +7,11 @@ import {
   FolderGit2,
   Sparkles,
   ChevronsDown,
+  ChevronRight,
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import type { SessionStats } from "@/types";
 import { getPathBasename } from "@/utils/path";
@@ -43,6 +48,9 @@ type ProviderGroup = {
   tokens: number;
   models: UsageRow[];
 };
+
+type SortField = "provider" | "sessions" | "messages" | "cost" | "tokens" | "input" | "output" | "cache";
+type SortDirection = "asc" | "desc";
 
 function formatTokens(count: number): string {
   if (count === 0) return "-";
@@ -85,6 +93,20 @@ export default function DashboardInsightModal({
   const totalCostIncSubagents =
     stats.token_details.total_cost + (stats.subagent_summary?.total_cost ?? 0);
 
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  // Sort state
+  const [sortField, setSortField] = useState<SortField>("cost");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  // Collapsed state for provider groups
+  const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -94,6 +116,125 @@ export default function DashboardInsightModal({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
+  // Get unique providers and models for suggestions
+  const uniqueProviders = useMemo(() => {
+    const providers = new Set<string>();
+    for (const fullModel of Object.keys(stats.token_details.tokens_by_model)) {
+      const provider = fullModel.includes("/") ? fullModel.split("/")[0] : fullModel;
+      providers.add(provider);
+    }
+    return Array.from(providers).sort();
+  }, [stats.token_details.tokens_by_model]);
+
+  const uniqueModels = useMemo(() => {
+    const models = new Set<string>();
+    for (const fullModel of Object.keys(stats.token_details.tokens_by_model)) {
+      const model = fullModel.includes("/")
+        ? fullModel.split("/").slice(1).join("/")
+        : fullModel;
+      models.add(model);
+    }
+    return Array.from(models).sort();
+  }, [stats.token_details.tokens_by_model]);
+
+  // Generate search suggestions
+  const suggestions = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    const results: Array<{ type: "provider" | "model"; value: string; fullModel?: string }> = [];
+
+    // Match providers
+    for (const provider of uniqueProviders) {
+      if (provider.toLowerCase().includes(query)) {
+        results.push({ type: "provider", value: provider });
+      }
+    }
+
+    // Match models
+    for (const fullModel of Object.keys(stats.token_details.tokens_by_model)) {
+      const model = fullModel.includes("/")
+        ? fullModel.split("/").slice(1).join("/")
+        : fullModel;
+      const displayModel = formatModelName(model);
+      if (displayModel.toLowerCase().includes(query) || model.toLowerCase().includes(query)) {
+        results.push({ type: "model", value: displayModel, fullModel });
+      }
+    }
+
+    return results.slice(0, 8); // Limit to 8 suggestions
+  }, [searchQuery, uniqueProviders, uniqueModels, stats.token_details.tokens_by_model]);
+
+  // Handle search input change
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setShowSuggestions(value.trim().length > 0);
+    setSelectedSuggestionIndex(-1);
+  }, []);
+
+  // Handle suggestion click
+  const handleSuggestionClick = useCallback((suggestion: { type: "provider" | "model"; value: string; fullModel?: string }) => {
+    if (suggestion.type === "provider") {
+      setSearchQuery(suggestion.value);
+    } else {
+      setSearchQuery(suggestion.value);
+    }
+    setShowSuggestions(false);
+    setSelectedSuggestionIndex(-1);
+  }, []);
+
+  // Handle keyboard navigation in suggestions
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!showSuggestions || suggestions.length === 0) {
+      if (e.key === "Escape") {
+        setSearchQuery("");
+        setShowSuggestions(false);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) =>
+          prev < suggestions.length - 1 ? prev + 1 : 0
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) =>
+          prev > 0 ? prev - 1 : suggestions.length - 1
+        );
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < suggestions.length) {
+          handleSuggestionClick(suggestions[selectedSuggestionIndex]);
+        }
+        break;
+      case "Escape":
+        setShowSuggestions(false);
+        setSelectedSuggestionIndex(-1);
+        break;
+    }
+  }, [showSuggestions, suggestions, selectedSuggestionIndex, handleSuggestionClick]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        searchInputRef.current &&
+        !searchInputRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Build provider groups with data
   const providerGroups = useMemo<ProviderGroup[]>(() => {
     const groupMap = new Map<string, ProviderGroup>();
 
@@ -143,24 +284,109 @@ export default function DashboardInsightModal({
       groupMap.set(provider, current);
     }
 
-    return Array.from(groupMap.values())
-      .map((group) => ({
-        ...group,
-        models: group.models.sort((a, b) => {
-          if (b.cost !== a.cost) return b.cost - a.cost;
-          if (b.tokens !== a.tokens) return b.tokens - a.tokens;
-          return a.fullModel.localeCompare(b.fullModel);
-        }),
-      }))
-      .sort((a, b) => {
-        if (b.cost !== a.cost) return b.cost - a.cost;
-        if (b.tokens !== a.tokens) return b.tokens - a.tokens;
-        return a.provider.localeCompare(b.provider);
-      });
+    return Array.from(groupMap.values());
   }, [stats.token_details.tokens_by_model, stats.sessions_by_model]);
 
+  // Filter and sort provider groups
+  const filteredAndSortedGroups = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+
+    // Filter groups based on search query
+    const filtered = providerGroups.filter((group) => {
+      if (!query) return true;
+
+      // Check if provider name matches
+      if (group.provider.toLowerCase().includes(query)) return true;
+
+      // Check if any model in the group matches
+      return group.models.some((model) => {
+        const displayName = formatModelName(model.model);
+        return (
+          displayName.toLowerCase().includes(query) ||
+          model.model.toLowerCase().includes(query) ||
+          model.fullModel.toLowerCase().includes(query)
+        );
+      });
+    });
+
+    // Sort groups
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortField) {
+        case "provider":
+          comparison = a.provider.localeCompare(b.provider);
+          break;
+        case "sessions":
+          comparison = a.sessions - b.sessions;
+          break;
+        case "messages":
+          comparison = a.messages - b.messages;
+          break;
+        case "cost":
+          comparison = a.cost - b.cost;
+          break;
+        case "tokens":
+          comparison = a.tokens - b.tokens;
+          break;
+        case "input":
+          comparison = a.input - b.input;
+          break;
+        case "output":
+          comparison = a.output - b.output;
+          break;
+        case "cache":
+          comparison = a.cache - b.cache;
+          break;
+      }
+
+      // For provider name, sort alphabetically
+      if (sortField === "provider") {
+        return sortDirection === "asc" ? comparison : -comparison;
+      }
+
+      // For numeric fields, sort by magnitude
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    // Sort models within each group
+    return sorted.map((group) => ({
+      ...group,
+      models: [...group.models].sort((a, b) => {
+        let comparison = 0;
+        switch (sortField) {
+          case "provider":
+            comparison = a.model.localeCompare(b.model);
+            break;
+          case "sessions":
+            comparison = a.sessions - b.sessions;
+            break;
+          case "messages":
+            comparison = a.messages - b.messages;
+            break;
+          case "cost":
+            comparison = a.cost - b.cost;
+            break;
+          case "tokens":
+            comparison = a.tokens - b.tokens;
+            break;
+          case "input":
+            comparison = a.input - b.input;
+            break;
+          case "output":
+            comparison = a.output - b.output;
+            break;
+          case "cache":
+            comparison = a.cache - b.cache;
+            break;
+        }
+        return sortDirection === "asc" ? comparison : -comparison;
+      }),
+    }));
+  }, [providerGroups, searchQuery, sortField, sortDirection]);
+
   const usageTotals = useMemo(() => {
-    return providerGroups.reduce(
+    return filteredAndSortedGroups.reduce(
       (acc, group) => {
         acc.sessions += group.sessions;
         acc.messages += group.messages;
@@ -181,7 +407,7 @@ export default function DashboardInsightModal({
         tokens: 0,
       },
     );
-  }, [providerGroups]);
+  }, [filteredAndSortedGroups]);
 
   const modelProjects = useMemo(() => {
     if (!selectedModel) return [];
@@ -192,6 +418,41 @@ export default function DashboardInsightModal({
       return a[0].localeCompare(b[0]);
     });
   }, [selectedModel, stats.model_usage_by_project]);
+
+  // Toggle provider collapse
+  const toggleProviderCollapse = useCallback((provider: string) => {
+    setCollapsedProviders((prev) => {
+      const next = new Set(prev);
+      if (next.has(provider)) {
+        next.delete(provider);
+      } else {
+        next.add(provider);
+      }
+      return next;
+    });
+  }, []);
+
+  // Handle sort click
+  const handleSort = useCallback((field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection(field === "provider" ? "asc" : "desc");
+    }
+  }, [sortField]);
+
+  // Render sort icon
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-3 h-3 text-muted-foreground/40" />;
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUp className="w-3 h-3 text-info" />
+    ) : (
+      <ArrowDown className="w-3 h-3 text-info" />
+    );
+  };
 
   if (!open) return null;
 
@@ -256,46 +517,170 @@ export default function DashboardInsightModal({
                 />
               </div>
 
+              {/* Search and Filter Bar */}
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      onFocus={() => searchQuery.trim() && setShowSuggestions(true)}
+                      onKeyDown={handleSearchKeyDown}
+                      placeholder="Search providers or models..."
+                      className="w-full pl-9 pr-4 py-2 rounded-lg border border-border/30 bg-background/50 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-info/30 focus:border-info/50"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => {
+                          setSearchQuery("");
+                          setShowSuggestions(false);
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted/50 text-muted-foreground/50 hover:text-muted-foreground"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {searchQuery && (
+                    <div className="text-xs text-muted-foreground">
+                      {filteredAndSortedGroups.length} providers
+                    </div>
+                  )}
+                </div>
+
+                {/* Suggestions Dropdown */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div
+                    ref={suggestionsRef}
+                    className="absolute top-full left-0 right-0 mt-1 bg-background border border-border/30 rounded-lg shadow-lg z-20 max-h-64 overflow-y-auto"
+                  >
+                    {suggestions.map((suggestion, index) => (
+                      <button
+                        key={`${suggestion.type}-${suggestion.value}`}
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-muted/50 ${
+                          index === selectedSuggestionIndex ? "bg-muted/50" : ""
+                        }`}
+                      >
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          suggestion.type === "provider"
+                            ? "bg-info/20 text-info"
+                            : "bg-warning/20 text-warning"
+                        }`}>
+                          {suggestion.type === "provider" ? "Provider" : "Model"}
+                        </span>
+                        <span className="text-foreground truncate">
+                          {suggestion.value}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <section className="rounded-xl border border-border/20 bg-background/35 overflow-hidden">
-                <div className="px-3.5 py-2.5 border-b border-border/20 bg-muted/20 text-[11px] text-muted-foreground">
-                  Provider grouped usage table · fixed-height scroll area, total
-                  pinned at bottom
+                <div className="px-3.5 py-2.5 border-b border-border/20 bg-muted/20 text-[11px] text-muted-foreground flex items-center justify-between">
+                  <span>Provider grouped usage table</span>
+                  <span>{filteredAndSortedGroups.length} providers, {filteredAndSortedGroups.reduce((sum, g) => sum + g.models.length, 0)} models</span>
                 </div>
 
                 <div className="max-h-[46vh] overflow-y-auto">
                   <table className="w-full min-w-[860px] text-xs">
                     <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/20">
                       <tr className="text-muted-foreground">
-                        <th className="px-3 py-2 text-left font-medium">
-                          Provider / Model
+                        <th
+                          className="px-3 py-2 text-left font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          onClick={() => handleSort("provider")}
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            Provider / Model
+                            {renderSortIcon("provider")}
+                          </span>
                         </th>
-                        <th className="px-2 py-2 text-right font-medium">
-                          Sessions
+                        <th
+                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          onClick={() => handleSort("sessions")}
+                        >
+                          <span className="inline-flex items-center gap-1 justify-end">
+                            Sessions
+                            {renderSortIcon("sessions")}
+                          </span>
                         </th>
-                        <th className="px-2 py-2 text-right font-medium">
-                          Msgs
+                        <th
+                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          onClick={() => handleSort("messages")}
+                        >
+                          <span className="inline-flex items-center gap-1 justify-end">
+                            Msgs
+                            {renderSortIcon("messages")}
+                          </span>
                         </th>
-                        <th className="px-2 py-2 text-right font-medium">
-                          Cost
+                        <th
+                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          onClick={() => handleSort("cost")}
+                        >
+                          <span className="inline-flex items-center gap-1 justify-end">
+                            Cost
+                            {renderSortIcon("cost")}
+                          </span>
                         </th>
-                        <th className="px-2 py-2 text-right font-medium">
-                          Tokens
+                        <th
+                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          onClick={() => handleSort("tokens")}
+                        >
+                          <span className="inline-flex items-center gap-1 justify-end">
+                            Tokens
+                            {renderSortIcon("tokens")}
+                          </span>
                         </th>
-                        <th className="px-2 py-2 text-right font-medium">
-                          ↑In
+                        <th
+                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          onClick={() => handleSort("input")}
+                        >
+                          <span className="inline-flex items-center gap-1 justify-end">
+                            ↑In
+                            {renderSortIcon("input")}
+                          </span>
                         </th>
-                        <th className="px-2 py-2 text-right font-medium">
-                          ↓Out
+                        <th
+                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          onClick={() => handleSort("output")}
+                        >
+                          <span className="inline-flex items-center gap-1 justify-end">
+                            ↓Out
+                            {renderSortIcon("output")}
+                          </span>
                         </th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Cache
+                        <th
+                          className="px-3 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          onClick={() => handleSort("cache")}
+                        >
+                          <span className="inline-flex items-center gap-1 justify-end">
+                            Cache
+                            {renderSortIcon("cache")}
+                          </span>
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {providerGroups.map((group) => (
-                        <FragmentGroup key={group.provider} group={group} />
+                      {filteredAndSortedGroups.map((group) => (
+                        <FragmentGroup
+                          key={group.provider}
+                          group={group}
+                          isCollapsed={collapsedProviders.has(group.provider)}
+                          onToggleCollapse={() => toggleProviderCollapse(group.provider)}
+                        />
                       ))}
+                      {filteredAndSortedGroups.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
+                            No providers or models match "{searchQuery}"
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -387,13 +772,28 @@ export default function DashboardInsightModal({
   );
 }
 
-function FragmentGroup({ group }: { group: ProviderGroup }) {
+function FragmentGroup({
+  group,
+  isCollapsed,
+  onToggleCollapse,
+}: {
+  group: ProviderGroup;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}) {
   return (
     <>
-      <tr className="bg-muted/20 text-foreground border-b border-border/10">
+      <tr
+        className="bg-muted/20 text-foreground border-b border-border/10 cursor-pointer hover:bg-muted/30"
+        onClick={onToggleCollapse}
+      >
         <td className="px-3 py-2 font-medium">
           <span className="inline-flex items-center gap-1.5">
-            <ChevronsDown className="w-3.5 h-3.5 text-muted-foreground" />
+            {isCollapsed ? (
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+            ) : (
+              <ChevronsDown className="w-3.5 h-3.5 text-muted-foreground" />
+            )}
             {group.provider}
           </span>
         </td>
@@ -420,40 +820,41 @@ function FragmentGroup({ group }: { group: ProviderGroup }) {
         </td>
       </tr>
 
-      {group.models.map((row) => (
-        <tr
-          key={`${row.provider}-${row.fullModel}`}
-          className="border-b border-border/10 last:border-b-0"
-        >
-          <td
-            className="px-3 py-2 text-muted-foreground max-w-[320px] truncate"
-            title={row.fullModel}
+      {!isCollapsed &&
+        group.models.map((row) => (
+          <tr
+            key={`${row.provider}-${row.fullModel}`}
+            className="border-b border-border/10 last:border-b-0"
           >
-            <span className="pl-5">{formatModelName(row.model)}</span>
-          </td>
-          <td className="px-2 py-2 text-right text-muted-foreground tabular-nums">
-            {formatNumber(row.sessions)}
-          </td>
-          <td className="px-2 py-2 text-right text-muted-foreground tabular-nums">
-            {formatNumber(row.messages)}
-          </td>
-          <td className="px-2 py-2 text-right text-foreground tabular-nums">
-            {formatCost(row.cost)}
-          </td>
-          <td className="px-2 py-2 text-right text-foreground tabular-nums">
-            {formatTokens(row.tokens)}
-          </td>
-          <td className="px-2 py-2 text-right text-muted-foreground tabular-nums">
-            {formatTokens(row.input)}
-          </td>
-          <td className="px-2 py-2 text-right text-muted-foreground tabular-nums">
-            {formatTokens(row.output)}
-          </td>
-          <td className="px-3 py-2 text-right text-muted-foreground tabular-nums">
-            {formatTokens(row.cache)}
-          </td>
-        </tr>
-      ))}
+            <td
+              className="px-3 py-2 text-muted-foreground max-w-[320px] truncate"
+              title={row.fullModel}
+            >
+              <span className="pl-5">{formatModelName(row.model)}</span>
+            </td>
+            <td className="px-2 py-2 text-right text-muted-foreground tabular-nums">
+              {formatNumber(row.sessions)}
+            </td>
+            <td className="px-2 py-2 text-right text-muted-foreground tabular-nums">
+              {formatNumber(row.messages)}
+            </td>
+            <td className="px-2 py-2 text-right text-foreground tabular-nums">
+              {formatCost(row.cost)}
+            </td>
+            <td className="px-2 py-2 text-right text-foreground tabular-nums">
+              {formatTokens(row.tokens)}
+            </td>
+            <td className="px-2 py-2 text-right text-muted-foreground tabular-nums">
+              {formatTokens(row.input)}
+            </td>
+            <td className="px-2 py-2 text-right text-muted-foreground tabular-nums">
+              {formatTokens(row.output)}
+            </td>
+            <td className="px-3 py-2 text-right text-muted-foreground tabular-nums">
+              {formatTokens(row.cache)}
+            </td>
+          </tr>
+        ))}
     </>
   );
 }
