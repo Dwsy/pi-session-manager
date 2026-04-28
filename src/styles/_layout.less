@@ -8,14 +8,15 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid rgba(var(--accent-rgb), 0.15);
+  border-right: 1px solid rgba(var(--border-rgb), 0.6);
   height: 100%;
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
   z-index: 20;
-  box-shadow: 4px 0 12px rgba(var(--shadow-rgb), 0.4);
+  box-shadow: 4px 0 16px rgba(var(--shadow-rgb), 0.12);
+  backdrop-filter: blur(8px);
 }
 
 // Session Viewer
@@ -76,10 +77,9 @@
   max-width: 1200px;
   margin: 0 auto;
   overflow-anchor: none;
-}
-
-.messages > * + * {
-  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .empty-state {

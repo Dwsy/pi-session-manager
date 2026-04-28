@@ -11,15 +11,16 @@
 
 // User Message
 .user-message {
-  background: var(--userMessageBg);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.08), rgba(var(--accent-rgb), 0.12), rgba(var(--accent-rgb), 0.08));
   color: var(--userMessageText);
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 12px;
   position: relative;
   max-height: 380px;
   overflow-y: auto;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
+  backdrop-filter: blur(10px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .user-message-header {
@@ -76,6 +77,12 @@
 .assistant-message {
   padding: 0;
   position: relative;
+  border-radius: 12px;
+  transition: background-color 0.2s ease;
+}
+
+.assistant-message:hover {
+  background-color: rgba(var(--accent-rgb), 0.03);
 }
 
 .assistant-message > .message-timestamp {
