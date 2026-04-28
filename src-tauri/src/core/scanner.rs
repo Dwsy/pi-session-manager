@@ -249,11 +249,20 @@ async fn warm_details_cache(sessions: Vec<SessionInfo>) {
     };
 
     for session in &sessions {
-        // Check if already cached
-        if let Ok(Some(cached)) = crate::data::sqlite::get_session_details_cache(&conn, &session.path) {
-            if cached.file_modified >= session.modified {
-                continue; // Already cached and fresh
+        // Check if already cached with valid data
+        let needs_refresh = match crate::data::sqlite::get_session_details_cache(&conn, &session.path) {
+            Ok(Some(cached)) => {
+                // Refresh if: file changed, OR model_usage is empty for a session with messages
+                let stale = cached.file_modified < session.modified;
+                let empty_usage = (cached.model_usage_json == "{}" || cached.model_usage_json.is_empty()) && (cached.user_messages + cached.assistant_messages > 0);
+                stale || empty_usage
             }
+            Ok(None) => true, // Not cached at all
+            Err(_) => true, // DB error
+        };
+
+        if !needs_refresh {
+            continue;
         }
 
         // Check memory buffer
@@ -261,9 +270,9 @@ async fn warm_details_cache(sessions: Vec<SessionInfo>) {
             continue;
         }
 
-        // Parse and cache
-        if let Ok((_, entries)) = parse_session_info(&PathBuf::from(&session.path)) {
-            let details = crate::core::parser::parse_session_details_from_entries(&entries);
+        // Parse and cache directly (skip creating SessionEntry objects)
+        if let Ok(content) = std::fs::read_to_string(&session.path) {
+            let details = crate::core::parser::parse_session_details(&content);
             crate::core::write_buffer::buffer_details_write(&session.path, session.modified, &details);
             let _ = crate::data::sqlite::upsert_session_details_cache(&conn, &session.path, session.modified, &details);
             warmed += 1;

@@ -1,5 +1,4 @@
 //! Day-specific statistics
-use crate::core::parser::parse_session_details;
 use crate::domain::stats::aggregator::extract_project_name;
 use crate::domain::stats::types::{DayProjectBreakdown, DaySession, DayStats};
 use crate::types::SessionInfo;
@@ -68,14 +67,8 @@ fn get_session_detailed_stats(path: &str, session_modified: chrono::DateTime<chr
         return (cached.user_messages + cached.assistant_messages, cached.input_tokens + cached.output_tokens, models.first().cloned().unwrap_or_else(|| "unknown".to_string()));
     }
 
-    // Parse file
-    if let Ok(content) = std::fs::read_to_string(path) {
-        let details = parse_session_details(&content);
-        return (details.user_messages + details.assistant_messages, (details.input_tokens + details.output_tokens) as usize, details.models.first().cloned().unwrap_or_else(|| "unknown".to_string()));
-    }
-
-    // Fallback
-    (fallback_message_count, fallback_message_count * 100, "unknown".to_string())
+    // Cache miss: use fallback (no file I/O)
+    (fallback_message_count, 0, "unknown".to_string())
 }
 
 pub fn get_activity_timeline(sessions: &[SessionInfo]) -> Vec<crate::domain::stats::types::DailyActivity> {

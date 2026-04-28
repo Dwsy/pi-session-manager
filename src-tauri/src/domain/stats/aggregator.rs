@@ -1,5 +1,5 @@
 //! Stats aggregation logic
-use crate::core::parser::{parse_session_details, SessionModelUsage};
+use crate::core::parser::SessionModelUsage;
 use crate::domain::stats::types::*;
 use crate::types::SessionInfo;
 use chrono::{Datelike, Local, Timelike, Weekday};
@@ -129,14 +129,6 @@ pub fn calculate_stats(sessions: &[SessionInfo]) -> SessionStats {
     calculate_stats_from_inputs(&light_sessions)
 }
 
-fn should_refresh_cached_details(cached: &crate::data::sqlite::SessionDetailsCache) -> bool {
-    let has_messages = cached.user_messages + cached.assistant_messages > 0;
-    // Only refresh if we have messages but no model data at all
-    // Don't refresh just because usage is 0 — many sessions legitimately have 0 usage
-    let has_no_model_data = cached.model_usage_json == "{}" || cached.model_usage_json.is_empty();
-
-    has_messages && has_no_model_data
-}
 
 /// Process a single session's data from cache or file
 #[allow(clippy::too_many_arguments)]
@@ -179,27 +171,8 @@ fn process_session_data(
     let cached_details = conn.and_then(|conn| crate::data::sqlite::get_session_details_cache(conn, &session.path).ok().flatten().filter(|cached| cached.file_modified >= session_modified));
 
     if let Some(cached) = cached_details {
-        let parsed_override = if should_refresh_cached_details(&cached) { std::fs::read_to_string(&session.path).ok().map(|content| parse_session_details(&content)).filter(|parsed| parsed.total_tokens() > 0 || parsed.total_cost() > 0.0) } else { None };
-
-        if let Some(parsed) = parsed_override {
-            crate::core::write_buffer::buffer_details_write(&session.path, session_modified, &parsed);
-            if let Some(conn) = conn {
-                let _ = crate::data::sqlite::upsert_session_details_cache(conn, &session.path, session_modified, &parsed);
-            }
-            if parsed.model_usage.is_empty() {
-                record_model_presence(&parsed.models, project_path, sessions_by_model, sessions_by_provider, model_usage_by_project);
-            } else {
-                merge_model_usage(&parsed.model_usage, project_path, sessions_by_model, sessions_by_provider, tokens_by_model, tokens_by_provider, model_usage_by_project);
-            }
-
-            let msg_count = parsed.user_messages + parsed.assistant_messages;
-            let date = session_modified.format("%Y-%m-%d").to_string();
-            *messages_by_date.entry(date.clone()).or_insert(0) += msg_count;
-            daily_stats.add_session(&date, project, msg_count, (parsed.input_tokens + parsed.output_tokens) as usize, parsed.total_cost());
-            add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, msg_count);
-
-            return (parsed.user_messages, parsed.assistant_messages, parsed.input_tokens as usize, parsed.output_tokens as usize, parsed.cache_read_tokens as usize, parsed.cache_write_tokens as usize, parsed.total_cost());
-        }
+        // Use cached data directly — no file I/O in stats calculation.
+        // Background warm_details_cache handles stale/empty model_usage_json refresh.
 
         match serde_json::from_str::<HashMap<String, SessionModelUsage>>(&cached.model_usage_json) {
             Ok(model_usage) if !model_usage.is_empty() => {
@@ -221,42 +194,16 @@ fn process_session_data(
         return (cached.user_messages, cached.assistant_messages, cached.input_tokens, cached.output_tokens, cached.cache_read_tokens, cached.cache_write_tokens, cached.input_cost + cached.output_cost + cached.cache_read_cost + cached.cache_write_cost);
     }
 
-    // 3. Parse session file (cache miss or stale)
-    if let Ok(content) = std::fs::read_to_string(&session.path) {
-        let session_stats = parse_session_details(&content);
-        crate::core::write_buffer::buffer_details_write(&session.path, session_modified, &session_stats);
-
-        if session_stats.model_usage.is_empty() {
-            record_model_presence(&session_stats.models, project_path, sessions_by_model, sessions_by_provider, model_usage_by_project);
-        } else {
-            merge_model_usage(&session_stats.model_usage, project_path, sessions_by_model, sessions_by_provider, tokens_by_model, tokens_by_provider, model_usage_by_project);
-        }
-
-        let msg_count = session_stats.user_messages + session_stats.assistant_messages;
-        let date = session_modified.format("%Y-%m-%d").to_string();
-        *messages_by_date.entry(date.clone()).or_insert(0) += msg_count;
-        daily_stats.add_session(&date, project, msg_count, (session_stats.input_tokens + session_stats.output_tokens) as usize, session_stats.total_cost());
-        add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, msg_count);
-
-        return (
-            session_stats.user_messages,
-            session_stats.assistant_messages,
-            session_stats.input_tokens as usize,
-            session_stats.output_tokens as usize,
-            session_stats.cache_read_tokens as usize,
-            session_stats.cache_write_tokens as usize,
-            session_stats.input_cost + session_stats.output_cost + session_stats.cache_read_cost + session_stats.cache_write_cost,
-        );
-    }
-
-    // 4. Fallback
+    // 3. Cache miss: use session-level fallback (NO file I/O)
+    // Background warm_details_cache will populate cache asynchronously.
+    // On next stats calculation, this entry will hit the cache.
     bump_model_project_count(model_usage_by_project, "unknown", project_path);
     *sessions_by_model.entry("unknown".to_string()).or_insert(0) += 1;
-    // No provider tracking for unknown
+    let msg_count = session.message_count;
     let date = session_modified.format("%Y-%m-%d").to_string();
-    *messages_by_date.entry(date.clone()).or_insert(0) += session.message_count;
-    daily_stats.add_session(&date, project, session.message_count, session.message_count * 100, 0.0);
-    add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, session.message_count);
+    *messages_by_date.entry(date.clone()).or_insert(0) += msg_count;
+    daily_stats.add_session(&date, project, msg_count, 0, 0.0);
+    add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, msg_count);
 
     (0, 0, 0, 0, 0, 0, 0.0)
 }
@@ -366,10 +313,16 @@ mod tests {
         )
         .expect("write session");
 
-        let modified = chrono::Utc::now().to_rfc3339();
-        let stats = calculate_stats_from_inputs(&[SessionStatsInput { path: session_path.to_string_lossy().to_string(), cwd: "/repo/demo".to_string(), modified: modified.clone(), message_count: 2 }]);
+        // Pre-populate DB cache (since process_session_data no longer reads files)
+        let modified = chrono::Utc::now();
+        let content = std::fs::read_to_string(&session_path).unwrap();
+        let details = crate::core::parser::parse_session_details(&content);
+        let conn = crate::data::sqlite::init_db().unwrap();
+        crate::data::sqlite::upsert_session_details_cache(&conn, &session_path.to_string_lossy(), modified, &details).unwrap();
 
-        let date = parse_modified(&modified).format("%Y-%m-%d").to_string();
+        let stats = calculate_stats_from_inputs(&[SessionStatsInput { path: session_path.to_string_lossy().to_string(), cwd: "/repo/demo".to_string(), modified: modified.to_rfc3339(), message_count: 2 }]);
+
+        let date = modified.format("%Y-%m-%d").to_string();
         let point = stats.heatmap_data.iter().find(|point| point.date == date).expect("heatmap point");
 
         assert_eq!(point.total_tokens, 40);
