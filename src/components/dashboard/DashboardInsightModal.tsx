@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   X,
   Coins,
@@ -90,6 +91,7 @@ export default function DashboardInsightModal({
   selectedModel,
   onClose,
 }: DashboardInsightModalProps) {
+  const { t } = useTranslation();
   const totalCostIncSubagents =
     stats.token_details.total_cost + (stats.subagent_summary?.total_cost ?? 0);
 
@@ -126,17 +128,6 @@ export default function DashboardInsightModal({
     return Array.from(providers).sort();
   }, [stats.token_details.tokens_by_model]);
 
-  const uniqueModels = useMemo(() => {
-    const models = new Set<string>();
-    for (const fullModel of Object.keys(stats.token_details.tokens_by_model)) {
-      const model = fullModel.includes("/")
-        ? fullModel.split("/").slice(1).join("/")
-        : fullModel;
-      models.add(model);
-    }
-    return Array.from(models).sort();
-  }, [stats.token_details.tokens_by_model]);
-
   // Generate search suggestions
   const suggestions = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -162,7 +153,7 @@ export default function DashboardInsightModal({
     }
 
     return results.slice(0, 8); // Limit to 8 suggestions
-  }, [searchQuery, uniqueProviders, uniqueModels, stats.token_details.tokens_by_model]);
+  }, [searchQuery, uniqueProviders, stats.token_details.tokens_by_model]);
 
   // Handle search input change
   const handleSearchChange = useCallback((value: string) => {
@@ -173,11 +164,8 @@ export default function DashboardInsightModal({
 
   // Handle suggestion click
   const handleSuggestionClick = useCallback((suggestion: { type: "provider" | "model"; value: string; fullModel?: string }) => {
-    if (suggestion.type === "provider") {
-      setSearchQuery(suggestion.value);
-    } else {
-      setSearchQuery(suggestion.value);
-    }
+    // For models, use fullModel for precise filtering; for providers, use the value directly
+    setSearchQuery(suggestion.type === "model" && suggestion.fullModel ? suggestion.fullModel : suggestion.value);
     setShowSuggestions(false);
     setSelectedSuggestionIndex(-1);
   }, []);
@@ -529,7 +517,7 @@ export default function DashboardInsightModal({
                       onChange={(e) => handleSearchChange(e.target.value)}
                       onFocus={() => searchQuery.trim() && setShowSuggestions(true)}
                       onKeyDown={handleSearchKeyDown}
-                      placeholder="Search providers or models..."
+                      placeholder={t("dashboard.insight.searchPlaceholder", "Search providers or models...")}
                       className="w-full pl-9 pr-4 py-2 rounded-lg border border-border/30 bg-background/50 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-info/30 focus:border-info/50"
                     />
                     {searchQuery && (

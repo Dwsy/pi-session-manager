@@ -405,12 +405,15 @@ export function useSessions(): UseSessionsReturn {
         if (!sessionId) return;
         // Patch in a lightweight stub; the next file-watcher diff will fill details.
         const now = new Date().toISOString();
+        // Extract a meaningful display name from path/cwd, fallback to sessionId
+        const sessionPath = payload.sessionPath || "";
+        const displayName = sessionPath.split("/").pop()?.replace(/\.jsonl$/, "") || payload.cwd?.split("/").pop() || sessionId;
         patchSessions({
           updated: [{
             id: sessionId,
-            path: payload.sessionPath || sessionId,
+            path: sessionPath,
             cwd: payload.cwd || "",
-            name: sessionId,
+            name: displayName,
             created: now,
             modified: now,
             message_count: payload.entries?.length || 0,

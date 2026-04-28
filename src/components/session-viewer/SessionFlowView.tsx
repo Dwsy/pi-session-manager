@@ -422,6 +422,9 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
   const { zoomIn, zoomOut, fitView, setCenter, getZoom } = useReactFlow()
   const fitViewDoneRef = useRef(false)
 
+  // Derive a stable key from node IDs to detect session changes
+  const nodeKey = useMemo(() => nodes.map(n => n.id).join(','), [nodes])
+
   // Only fitView on initial mount, not on every nodes/edges change
   useEffect(() => {
     if (!fitViewDoneRef.current && nodes.length > 0) {
@@ -430,10 +433,10 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
     }
   }, [nodes.length, fitView])
 
-  // Reset fitView flag when entries change significantly (new session)
+  // Reset fitView flag when session changes (new node set)
   useEffect(() => {
     fitViewDoneRef.current = false
-  }, [nodes.length === 0])
+  }, [nodeKey])
 
   const focusActive = useCallback(() => {
     if (!activeLeafId) { fitView({ padding: 0.2 }); return }

@@ -141,4 +141,7 @@ export const dashboard = {
   activeDays: 'Active Days',
   less: 'Less',
   more: 'More',
+  insight: {
+    searchPlaceholder: 'Search providers or models...',
+  },
 } as const

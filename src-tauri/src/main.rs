@@ -291,21 +291,29 @@ fn main() {
 
                         // Batch all writes in a single transaction
                         let mut conn = conn;
-                        let flush_result = (|| -> Result<(), String> {
+                        let flush_result = (|| -> Result<usize, String> {
                             let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|e| format!("Failed to begin batch transaction: {e}"))?;
 
+                            let mut ok_count = 0;
                             for entry in &sessions {
-                                pi_session_manager::data::sqlite::upsert_session_in_tx(&tx, &entry.session, entry.file_modified, None)?;
+                                if let Err(e) = pi_session_manager::data::sqlite::upsert_session_in_tx(&tx, &entry.session, entry.file_modified, None) {
+                                    log::error!("Skipping session {}: {e}", entry.session.path);
+                                } else {
+                                    ok_count += 1;
+                                }
                             }
                             for entry in &details {
-                                pi_session_manager::data::sqlite::upsert_session_details_cache_in_tx(&tx, &entry.path, entry.file_modified, &entry.details)?;
+                                if let Err(e) = pi_session_manager::data::sqlite::upsert_session_details_cache_in_tx(&tx, &entry.path, entry.file_modified, &entry.details) {
+                                    log::error!("Skipping details {}: {e}", entry.path);
+                                }
                             }
 
-                            tx.commit().map_err(|e| format!("Failed to commit batch transaction: {e}"))
+                            tx.commit().map_err(|e| format!("Failed to commit batch transaction: {e}"))?;
+                            Ok(ok_count)
                         })();
 
                         match flush_result {
-                            Ok(()) => log::trace!("Flushed {sessions_count} sessions and {details_count} details to database"),
+                            Ok(count) => log::trace!("Flushed {count}/{} sessions and {} details to database", sessions_count, details_count),
                             Err(e) => log::error!("Failed to batch flush: {e}"),
                         }
 
@@ -331,22 +339,33 @@ fn main() {
                 if let Some((sessions, details)) = pi_session_manager::core::write_buffer::force_flush_all() {
                     match pi_session_manager::data::sqlite::init_db() {
                         Ok(mut conn) => {
-                            let mut flush_error = false;
-                            for entry in &sessions {
-                                if let Err(e) = pi_session_manager::data::sqlite::upsert_session(&mut conn, &entry.session, entry.file_modified, None) {
-                                    log::error!("Failed to upsert session on exit: {e}");
-                                    flush_error = true;
+                            // Use batch transaction for exit flush
+                            let flush_result = (|| -> Result<usize, String> {
+                                let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|e| format!("Failed to begin exit transaction: {e}"))?;
+
+                                let mut ok_count = 0;
+                                for entry in &sessions {
+                                    if let Err(e) = pi_session_manager::data::sqlite::upsert_session_in_tx(&tx, &entry.session, entry.file_modified, None) {
+                                        log::error!("Skipping session on exit {}: {e}", entry.session.path);
+                                    } else {
+                                        ok_count += 1;
+                                    }
                                 }
-                            }
-                            for entry in &details {
-                                if let Err(e) = pi_session_manager::data::sqlite::upsert_session_details_cache(&conn, &entry.path, entry.file_modified, &entry.details) {
-                                    log::error!("Failed to upsert session details on exit: {e}");
-                                    flush_error = true;
+                                for entry in &details {
+                                    if let Err(e) = pi_session_manager::data::sqlite::upsert_session_details_cache_in_tx(&tx, &entry.path, entry.file_modified, &entry.details) {
+                                        log::error!("Skipping details on exit {}: {e}", entry.path);
+                                    }
                                 }
+
+                                tx.commit().map_err(|e| format!("Failed to commit exit transaction: {e}"))?;
+                                Ok(ok_count)
+                            })();
+
+                            match flush_result {
+                                Ok(count) => log::info!("Flushed {count}/{} sessions to database on exit", sessions.len()),
+                                Err(e) => log::error!("Failed to flush on exit: {e}"),
                             }
-                            if !flush_error {
-                                log::info!("Flushed {} sessions and {} details to database on exit", sessions.len(), details.len());
-                            }
+
                             // Final WAL checkpoint on exit
                             match conn.execute("PRAGMA wal_checkpoint(TRUNCATE)", []) {
                                 Ok(_) => log::info!("WAL checkpoint completed on exit"),

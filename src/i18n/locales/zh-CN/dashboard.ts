@@ -100,4 +100,7 @@ export const dashboard = {
   activeDays: '活跃天数',
   less: '少',
   more: '多',
+  insight: {
+    searchPlaceholder: '搜索提供商或模型...',
+  },
 } as const

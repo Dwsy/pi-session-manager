@@ -577,6 +577,10 @@ pub fn append_message_entries(conn: &Connection, session_path: &str, entries: &[
 
 /// Sync message entries incrementally: only delete removed entries and insert new ones.
 /// This avoids the expensive delete-all + reinsert-all pattern.
+///
+/// Assumes JSONL append-only semantics: existing entries are never modified,
+/// only new entries are appended. If a session file is rewritten (e.g., via
+/// `pi session edit`), stale content may persist until a full rescan.
 pub fn sync_message_entries(conn: &Connection, session_path: &str, entries: &[SessionEntry]) -> Result<(), String> {
     if !message_entries_table_exists(conn)? {
         return Ok(());
