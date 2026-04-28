@@ -238,6 +238,24 @@ pub struct SessionDetails {
     pub last_message_time: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+/// Extract basic session details from pre-parsed entries (message counts only).
+/// This is much faster than reading the full JSONL file.
+pub fn extract_basic_details_from_entries(entries: &[crate::types::SessionEntry]) -> SessionDetails {
+    let mut details = SessionDetails::default();
+
+    for entry in entries {
+        if let Some(message) = &entry.message {
+            match message.role.as_str() {
+                "user" => details.user_messages += 1,
+                "assistant" => details.assistant_messages += 1,
+                _ => {}
+            }
+        }
+    }
+
+    details
+}
+
 impl SessionDetails {
     pub fn total_tokens(&self) -> u64 {
         self.input_tokens + self.output_tokens

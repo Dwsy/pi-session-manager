@@ -575,6 +575,78 @@ pub fn append_message_entries(conn: &Connection, session_path: &str, entries: &[
     Ok(())
 }
 
+/// Sync message entries incrementally: only delete removed entries and insert new ones.
+/// This avoids the expensive delete-all + reinsert-all pattern.
+pub fn sync_message_entries(conn: &Connection, session_path: &str, entries: &[SessionEntry]) -> Result<(), String> {
+    if !message_entries_table_exists(conn)? {
+        return Ok(());
+    }
+
+    // Get existing entry IDs for this session
+    let existing_ids: std::collections::HashSet<String> = {
+        let mut stmt = conn.prepare("SELECT id FROM message_entries WHERE session_path = ?").map_err(|e| format!("Failed to prepare existing ids query: {e}"))?;
+        let rows = stmt.query_map(params![session_path], |row| row.get::<_, String>(0)).map_err(|e| format!("Failed to query existing ids: {e}"))?;
+        rows.filter_map(|r| r.ok()).collect()
+    };
+
+    // Build new rows
+    let include_thinking = load_include_thinking_in_search();
+    let new_rows = build_rows_from_session_entries(session_path, entries, include_thinking);
+
+    // Collect new row IDs
+    let new_ids: std::collections::HashSet<&str> = new_rows.iter().map(|r| r.row_id.as_str()).collect();
+
+    // Delete entries that are no longer present
+    let ids_to_delete: Vec<&String> = existing_ids.iter().filter(|id| !new_ids.contains(id.as_str())).collect();
+    if !ids_to_delete.is_empty() {
+        // Batch delete in chunks
+        for chunk in ids_to_delete.chunks(INSERT_CHUNK_SIZE) {
+            let placeholders: Vec<String> = chunk.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+            let sql = format!("DELETE FROM message_entries WHERE id IN ({})", placeholders.join(", "));
+            let params: Vec<&dyn rusqlite::ToSql> = chunk.iter().map(|id| *id as &dyn rusqlite::ToSql).collect();
+            conn.execute(&sql, params.as_slice()).map_err(|e| format!("Failed to batch delete stale entries: {e}"))?;
+        }
+        debug!("Deleted {} stale message entries for session: {}", ids_to_delete.len(), session_path);
+    }
+
+    // Insert only new entries (INSERT OR REPLACE handles updates)
+    let rows_to_insert: Vec<&MessageEntryRow> = new_rows.iter().filter(|r| !existing_ids.contains(&r.row_id)).collect();
+    if !rows_to_insert.is_empty() {
+        for chunk in rows_to_insert.chunks(INSERT_CHUNK_SIZE) {
+            let values_sql = (0..chunk.len())
+                .map(|index| {
+                    let base = index * 8;
+                    format!("(?{}, ?{}, ?{}, ?{}, ?{}, ?{}, ?{}, ?{})", base + 1, base + 2, base + 3, base + 4, base + 5, base + 6, base + 7, base + 8)
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            let sql = format!("INSERT OR REPLACE INTO message_entries (id, entry_id, session_path, role, source_type, content, search_text, timestamp) VALUES {values_sql}");
+
+            let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(chunk.len() * 8);
+            for row in chunk {
+                params.push(&row.row_id);
+                params.push(&row.entry_id);
+                params.push(&row.session_path);
+                params.push(&row.role);
+                params.push(&row.source_type);
+                params.push(&row.content);
+                params.push(&row.search_text);
+                params.push(&row.timestamp);
+            }
+
+            conn.execute(&sql, params.as_slice()).map_err(|e| format!("Failed to batch insert new entries: {e}"))?;
+        }
+        debug!("Inserted {} new message entries for session: {}", rows_to_insert.len(), session_path);
+    }
+
+    if ids_to_delete.is_empty() && rows_to_insert.is_empty() {
+        debug!("No changes to message entries for session: {}", session_path);
+    }
+
+    Ok(())
+}
+
 #[allow(clippy::type_complexity)]
 pub fn search_message_fts(conn: &Connection, query: &str, role_filter: Option<&str>, limit: usize) -> Result<Vec<(String, String, String, String, String, f32)>, String> {
     let trimmed = query.trim();

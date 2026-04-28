@@ -400,8 +400,42 @@ export function useSessions(): UseSessionsReturn {
 
     let unlisten: (() => void) | null = null;
     const setupSubscriptions = async () => {
-      const u1 = await listen("pi-live:session_registered", () => loadSessions());
-      const u2 = await listen("pi-live:session_disconnected", () => loadSessions());
+      const u1 = await listen<any>("pi-live:session_registered", ({ payload }) => {
+        const sessionId = payload?.sessionId;
+        if (!sessionId) return;
+        // Patch in a lightweight stub; the next file-watcher diff will fill details.
+        const now = new Date().toISOString();
+        patchSessions({
+          updated: [{
+            id: sessionId,
+            path: payload.sessionPath || sessionId,
+            cwd: payload.cwd || "",
+            name: sessionId,
+            created: now,
+            modified: now,
+            message_count: payload.entries?.length || 0,
+            first_message: "",
+            user_messages_text: "",
+            assistant_messages_text: "",
+            last_message: "",
+            last_message_role: "assistant",
+            parent_session_path: undefined,
+            isLive: true,
+            pid: payload.pid,
+          }],
+          removed: [],
+        });
+      });
+      const u2 = await listen<any>("pi-live:session_disconnected", ({ payload }) => {
+        const sessionId = payload?.sessionId;
+        if (!sessionId) return;
+        // Just mark as not-live; no full rescan needed.
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === sessionId ? { ...s, isLive: false, pid: undefined } : s,
+          ),
+        );
+      });
       unlisten = () => {
         if (u1) u1();
         if (u2) u2();
@@ -412,7 +446,7 @@ export function useSessions(): UseSessionsReturn {
     return () => {
       if (unlisten) unlisten();
     };
-  }, [loadSessions]);
+  }, [patchSessions]);
 
   useEffect(() => {
     if (!isBrowserDatasetModeEnabled() || typeof window === "undefined") return;

@@ -1,5 +1,16 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::RwLock;
+use std::time::Instant;
+
+/// Cached config with TTL to avoid repeated disk reads
+static CONFIG_CACHE: RwLock<Option<CachedConfig>> = RwLock::new(None);
+const CONFIG_CACHE_TTL_SECS: u64 = 30;
+
+struct CachedConfig {
+    config: Config,
+    updated_at: Instant,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
@@ -186,13 +197,37 @@ pub fn get_config_path() -> Result<PathBuf, String> {
 }
 
 pub fn load_config() -> Result<Config, String> {
+    // Check cache first
+    if let Ok(guard) = CONFIG_CACHE.read() {
+        if let Some(cached) = guard.as_ref() {
+            if cached.updated_at.elapsed().as_secs() < CONFIG_CACHE_TTL_SECS {
+                return Ok(cached.config.clone());
+            }
+        }
+    }
+
+    // Load from disk
     let value = crate::unified_config::read_section("session")?;
-    serde_json::from_value::<Config>(value).map_err(|e| format!("Failed to parse session config: {e}"))
+    let config = serde_json::from_value::<Config>(value).map_err(|e| format!("Failed to parse session config: {e}"))?;
+
+    // Update cache
+    if let Ok(mut guard) = CONFIG_CACHE.write() {
+        *guard = Some(CachedConfig { config: config.clone(), updated_at: Instant::now() });
+    }
+
+    Ok(config)
 }
 
 pub fn save_config(config: &Config) -> Result<(), String> {
     let value = serde_json::to_value(config).map_err(|e| format!("Failed to serialize session config: {e}"))?;
-    crate::unified_config::write_section("session", value)
+    crate::unified_config::write_section("session", value)?;
+
+    // Invalidate cache
+    if let Ok(mut guard) = CONFIG_CACHE.write() {
+        *guard = None;
+    }
+
+    Ok(())
 }
 
 pub fn reset_config() -> Result<Config, String> {

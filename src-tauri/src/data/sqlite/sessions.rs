@@ -1,5 +1,5 @@
 use super::deps::*;
-use super::message_index::{delete_message_entries_for_session, insert_message_entries, upsert_message_entries};
+use super::message_index::{delete_message_entries_for_session, insert_message_entries, sync_message_entries, upsert_message_entries};
 use super::util::parse_timestamp;
 
 pub fn upsert_session(conn: &mut Connection, session: &SessionInfo, file_modified: DateTime<Utc>, entries: Option<&[SessionEntry]>) -> Result<(), String> {
@@ -44,7 +44,7 @@ pub fn upsert_session(conn: &mut Connection, session: &SessionInfo, file_modifie
     Err(last_error.unwrap_or_else(|| "Unknown upsert error".to_string()))
 }
 
-fn upsert_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInfo, file_modified: DateTime<Utc>, entries: Option<&[SessionEntry]>) -> Result<(), String> {
+pub fn upsert_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInfo, file_modified: DateTime<Utc>, entries: Option<&[SessionEntry]>) -> Result<(), String> {
     tx.execute(
         "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 0, NULL)
@@ -82,13 +82,13 @@ fn upsert_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInfo, f
 
     // Populate message_entries table if it exists (for per-message FTS)
     if tx.query_row("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, String>(0)).map(|_| true).unwrap_or(false) {
-        debug!("[Upsert] Updating message entries for session: {}", session.path);
-        // Clear existing entries for this session to avoid duplicates
-        delete_message_entries_for_session(tx, &session.path)?;
-        // Insert fresh entries (use pre-parsed if available to avoid re-reading file)
+        debug!("[Upsert] Syncing message entries for session: {}", session.path);
+        // Use incremental sync instead of delete-all + reinsert
         if let Some(entries) = entries {
-            upsert_message_entries(tx, &session.path, entries)?;
+            sync_message_entries(tx, &session.path, entries)?;
         } else {
+            // Fallback: reinsert from file (only if no pre-parsed entries)
+            delete_message_entries_for_session(tx, &session.path)?;
             insert_message_entries(tx, session)?;
         }
         debug!("[Upsert] Completed message entries for session: {}", session.path);

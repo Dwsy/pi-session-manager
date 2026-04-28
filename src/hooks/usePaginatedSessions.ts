@@ -354,11 +354,20 @@ export function usePaginatedSessions({
 
     void requestPage(0, { append: false });
 
-    // Auto-refresh on live events
+    // Auto-refresh on live events (debounced to avoid scan storms)
     if (shouldUseBackend) {
-      const u1 = listen("pi-live:session_registered", () => refresh({ silent: true }));
-      const u2 = listen("pi-live:session_disconnected", () => refresh({ silent: true }));
+      let liveDebounce: ReturnType<typeof setTimeout> | null = null;
+      const debouncedRefresh = () => {
+        if (liveDebounce) clearTimeout(liveDebounce);
+        liveDebounce = setTimeout(() => {
+          liveDebounce = null;
+          refresh({ silent: true });
+        }, 5000);
+      };
+      const u1 = listen("pi-live:session_registered", debouncedRefresh);
+      const u2 = listen("pi-live:session_disconnected", debouncedRefresh);
       return () => {
+        if (liveDebounce) clearTimeout(liveDebounce);
         u1.then((f) => f());
         u2.then((f) => f());
       };

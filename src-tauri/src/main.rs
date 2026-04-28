@@ -266,9 +266,13 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
                 let mut last_conn: Option<rusqlite::Connection> = None;
+                let mut ticks_since_checkpoint: u64 = 0;
+                const CHECKPOINT_INTERVAL_TICKS: u64 = 12; // checkpoint every 60s (12 * 5s)
 
                 loop {
                     interval.tick().await;
+                    ticks_since_checkpoint += 1;
+
                     if let Some((sessions, details)) = pi_session_manager::core::write_buffer::check_and_take_flush_data() {
                         let sessions_count = sessions.len();
                         let details_count = details.len();
@@ -285,27 +289,39 @@ fn main() {
                             },
                         };
 
-                        let mut flush_error = false;
-                        let mut conn = conn; // make mutable
-                        for entry in &sessions {
-                            if let Err(e) = pi_session_manager::data::sqlite::upsert_session(&mut conn, &entry.session, entry.file_modified, None) {
-                                log::error!("Failed to upsert session during flush: {e}");
-                                flush_error = true;
-                            }
-                        }
-                        for entry in &details {
-                            if let Err(e) = pi_session_manager::data::sqlite::upsert_session_details_cache(&conn, &entry.path, entry.file_modified, &entry.details) {
-                                log::error!("Failed to upsert session details during flush: {e}");
-                                flush_error = true;
-                            }
-                        }
+                        // Batch all writes in a single transaction
+                        let mut conn = conn;
+                        let flush_result = (|| -> Result<(), String> {
+                            let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|e| format!("Failed to begin batch transaction: {e}"))?;
 
-                        if !flush_error {
-                            log::trace!("Flushed {sessions_count} sessions and {details_count} details to database");
+                            for entry in &sessions {
+                                pi_session_manager::data::sqlite::upsert_session_in_tx(&tx, &entry.session, entry.file_modified, None)?;
+                            }
+                            for entry in &details {
+                                pi_session_manager::data::sqlite::upsert_session_details_cache_in_tx(&tx, &entry.path, entry.file_modified, &entry.details)?;
+                            }
+
+                            tx.commit().map_err(|e| format!("Failed to commit batch transaction: {e}"))
+                        })();
+
+                        match flush_result {
+                            Ok(()) => log::trace!("Flushed {sessions_count} sessions and {details_count} details to database"),
+                            Err(e) => log::error!("Failed to batch flush: {e}"),
                         }
 
                         // Keep connection for next iteration
                         last_conn = Some(conn);
+                    }
+
+                    // Periodic WAL checkpoint to prevent WAL file growth
+                    if ticks_since_checkpoint >= CHECKPOINT_INTERVAL_TICKS {
+                        ticks_since_checkpoint = 0;
+                        if let Some(conn) = &last_conn {
+                            match conn.execute("PRAGMA wal_checkpoint(TRUNCATE)", []) {
+                                Ok(_) => log::trace!("WAL checkpoint completed"),
+                                Err(e) => log::warn!("WAL checkpoint failed: {e}"),
+                            }
+                        }
                     }
                 }
             });
@@ -330,6 +346,11 @@ fn main() {
                             }
                             if !flush_error {
                                 log::info!("Flushed {} sessions and {} details to database on exit", sessions.len(), details.len());
+                            }
+                            // Final WAL checkpoint on exit
+                            match conn.execute("PRAGMA wal_checkpoint(TRUNCATE)", []) {
+                                Ok(_) => log::info!("WAL checkpoint completed on exit"),
+                                Err(e) => log::warn!("WAL checkpoint failed on exit: {e}"),
                             }
                         }
                         Err(e) => {

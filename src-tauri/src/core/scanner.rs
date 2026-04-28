@@ -23,6 +23,15 @@ static SCAN_CACHE: RwLock<Option<Vec<SessionInfo>>> = RwLock::new(None);
 static SCAN_ENTRIES_CACHE: RwLock<Option<std::collections::HashMap<String, Vec<SessionEntry>>>> = RwLock::new(None);
 static CACHE_VERSION: AtomicU64 = AtomicU64::new(0);
 
+/// Cached directory listing to avoid repeated recursive walks
+static FILE_LIST_CACHE: RwLock<Option<CachedFileList>> = RwLock::new(None);
+const FILE_LIST_CACHE_TTL_SECS: u64 = 30;
+
+struct CachedFileList {
+    files: Vec<PathBuf>,
+    updated_at: std::time::Instant,
+}
+
 /// Invalidate the scan cache so the next scan re-reads all directories
 pub fn invalidate_cache() {
     if let Ok(mut guard) = SCAN_CACHE.write() {
@@ -30,6 +39,9 @@ pub fn invalidate_cache() {
         CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
     }
     if let Ok(mut guard) = SCAN_ENTRIES_CACHE.write() {
+        *guard = None;
+    }
+    if let Ok(mut guard) = FILE_LIST_CACHE.write() {
         *guard = None;
     }
 }
@@ -215,6 +227,15 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
 
 /// Collect all JSONL file paths from all session directories
 pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
+    // Check cache first
+    if let Ok(guard) = FILE_LIST_CACHE.read() {
+        if let Some(cached) = guard.as_ref() {
+            if cached.updated_at.elapsed().as_secs() < FILE_LIST_CACHE_TTL_SECS {
+                return cached.files.clone();
+            }
+        }
+    }
+
     fn should_skip_dir(path: &Path, root: &Path, default_root: Option<&Path>) -> bool {
         let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
             return false;
@@ -284,6 +305,12 @@ pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
     }
     files.sort();
     files.dedup();
+
+    // Update cache
+    if let Ok(mut guard) = FILE_LIST_CACHE.write() {
+        *guard = Some(CachedFileList { files: files.clone(), updated_at: std::time::Instant::now() });
+    }
+
     files
 }
 
@@ -438,6 +465,9 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             if result.file_modified > realtime_cutoff {
                 // Realtime file: add to results, buffer for DB
                 write_buffer::buffer_session_write(&info, result.file_modified);
+                // Also buffer basic details to avoid re-reading file for stats
+                let basic_details = crate::core::parser::extract_basic_details_from_entries(&result.entries);
+                write_buffer::buffer_details_write(&result.path_str, result.file_modified, &basic_details);
                 let _ = sqlite::upsert_scan_state_for_session(&conn, &info, result.file_modified, "ok");
                 realtime_buffered += 1;
             } else {
