@@ -51,6 +51,7 @@ pub fn get_scan_state(conn: &Connection, path: &str) -> Result<Option<ScanStateE
 }
 
 pub fn get_all_scan_state(conn: &Connection) -> Result<HashMap<String, ScanStateEntry>, String> {
+    let start = std::time::Instant::now();
     let mut stmt = conn
         .prepare(
             "SELECT path, backing_path, provider_slug, file_modified, file_size, last_scanned_at, last_parse_status, read_offset, append_trust_count
@@ -87,6 +88,9 @@ pub fn get_all_scan_state(conn: &Connection) -> Result<HashMap<String, ScanState
         .map_err(|e| format!("Failed to query scan_state rows: {e}"))?
         .collect::<SqliteResult<Vec<_>>>()
         .map_err(|e| format!("Failed to collect scan_state rows: {e}"))?;
+
+    let elapsed = start.elapsed();
+    tracing::info!("[IO] get_all_scan_state count={} elapsed={:?}", rows.len(), elapsed);
 
     Ok(rows.into_iter().collect())
 }

@@ -22,6 +22,7 @@ fn is_corruption_error(err: &str) -> bool {
 static SCAN_CACHE: RwLock<Option<Vec<SessionInfo>>> = RwLock::new(None);
 static SCAN_ENTRIES_CACHE: RwLock<Option<std::collections::HashMap<String, Vec<SessionEntry>>>> = RwLock::new(None);
 static CACHE_VERSION: AtomicU64 = AtomicU64::new(0);
+static SCAN_IN_PROGRESS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Cached directory listing to avoid repeated recursive walks
 static FILE_LIST_CACHE: RwLock<Option<CachedFileList>> = RwLock::new(None);
@@ -213,6 +214,19 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
         }
     }
 
+    // Wait for in-progress scan to complete instead of starting a duplicate
+    while SCAN_IN_PROGRESS.load(Ordering::Acquire) {
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        if let Ok(guard) = SCAN_CACHE.read() {
+            if let Some(ref cached) = *guard {
+                return Ok(cached.clone());
+            }
+        }
+    }
+
+    // Mark scan in progress
+    SCAN_IN_PROGRESS.store(true, Ordering::Release);
+
     // First call: full scan to populate cache
     let config = Config::load().unwrap_or_default();
     let result = scan_sessions_with_config(&config).await?;
@@ -221,6 +235,9 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
         *guard = Some(result.clone());
         CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
     }
+
+    // Mark scan complete
+    SCAN_IN_PROGRESS.store(false, Ordering::Release);
 
     Ok(result)
 }

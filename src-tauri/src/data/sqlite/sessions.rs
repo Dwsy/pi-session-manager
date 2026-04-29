@@ -135,6 +135,7 @@ pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>,
 }
 
 pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
+    let start = std::time::Instant::now();
     let mut stmt = conn
         .prepare(
             "SELECT id, path, cwd, name, created, modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
@@ -164,10 +165,14 @@ pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
         .collect::<SqliteResult<Vec<_>>>()
         .map_err(|e| format!("Failed to collect sessions: {e}"))?;
 
+    let elapsed = start.elapsed();
+    tracing::info!("[IO] get_all_sessions count={} elapsed={:?}", sessions.len(), elapsed);
+
     Ok(sessions)
 }
 
 pub fn get_all_sessions_for_list(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
+    let start = std::time::Instant::now();
     let mut stmt = conn
         .prepare(
             "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path
@@ -196,6 +201,9 @@ pub fn get_all_sessions_for_list(conn: &Connection) -> Result<Vec<SessionInfo>, 
         .map_err(|e| format!("Failed to query list sessions: {e}"))?
         .collect::<SqliteResult<Vec<_>>>()
         .map_err(|e| format!("Failed to collect list sessions: {e}"))?;
+
+    let elapsed = start.elapsed();
+    tracing::info!("[IO] get_all_sessions_for_list count={} elapsed={:?}", sessions.len(), elapsed);
 
     Ok(sessions)
 }
