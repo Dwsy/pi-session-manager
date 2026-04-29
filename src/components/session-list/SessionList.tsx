@@ -749,8 +749,8 @@ export default function SessionList({
                         key={session.id}
                         data-session-id={session.id}
                         onClick={(event) => {
-                          // Cmd+Option+Click → open preview modal
-                          if ((event.metaKey || event.ctrlKey) && event.altKey) {
+                          // Option+Click (macOS) / Alt+Click (Windows) → open preview modal
+                          if (event.altKey) {
                             event.preventDefault();
                             setPreviewClickPoint({ x: event.clientX, y: event.clientY });
                             setPreviewSession(session);
