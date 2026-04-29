@@ -169,18 +169,16 @@ pub fn parse_pi_session_header_only(path: &Path, file_modified: DateTime<Utc>) -
     let mut header_line = String::new();
     reader.read_line(&mut header_line).map_err(|e| format!("Failed to read Pi session header {}: {e}", path.display()))?;
 
-    let header = parse_header(&header_line.trim(), path)?;
+    let header = parse_header(header_line.trim(), path)?;
 
     // Try to read last non-empty line for last_message hint
     let mut last_line = String::new();
     let mut last_message = String::new();
     let mut last_message_role = String::new();
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            let trimmed = line.trim();
-            if !trimmed.is_empty() {
-                last_line = trimmed.to_string();
-            }
+    for line in reader.lines().flatten() {
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            last_line = trimmed.to_string();
         }
     }
     if !last_line.is_empty() {
