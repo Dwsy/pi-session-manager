@@ -175,7 +175,7 @@ pub fn parse_pi_session_header_only(path: &Path, file_modified: DateTime<Utc>) -
     let mut last_line = String::new();
     let mut last_message = String::new();
     let mut last_message_role = String::new();
-    for line in reader.lines().flatten() {
+    for line in reader.lines().map_while(Result::ok) {
         let trimmed = line.trim();
         if !trimmed.is_empty() {
             last_line = trimmed.to_string();
