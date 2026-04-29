@@ -12,14 +12,6 @@ interface LoopSegmentProps {
   onHoverPosition: (x: number) => void
 }
 
-function formatMs(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
-  const m = Math.floor(ms / 60000)
-  const s = Math.floor((ms % 60000) / 1000)
-  return m > 0 ? `${m}m${s}s` : `${s}s`
-}
-
 export default function LoopSegment({
   loop,
   widthPct,
