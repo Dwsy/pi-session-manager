@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use chrono::{DateTime, Utc};
 use crate::config::Config;
 use crate::types::{SessionEntry, SessionInfo};
+use chrono::{DateTime, Utc};
 
 pub use crate::domain::casr_min::adapters::{canonical_to_session_entries, canonical_to_session_info};
 use crate::domain::casr_min::providers::{detect_provider, ProviderKind};

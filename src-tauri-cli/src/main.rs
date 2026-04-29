@@ -18,8 +18,8 @@ use tokio::sync::broadcast;
 use tracing::error;
 
 mod file_watcher;
-mod terminal;
 mod run;
+mod terminal;
 use terminal::TerminalManager;
 
 #[derive(Embed)]

@@ -225,7 +225,6 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
     Ok(result)
 }
 
-
 /// Collect all JSONL file paths from all session directories
 pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
     // Check cache first

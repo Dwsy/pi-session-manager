@@ -8,7 +8,9 @@ use std::time::Duration;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(about = "Pi Session Manager CLI")]
-#[command(long_about = "A CLI tool to manage Pi sessions, models, tags, and more.\n\nExample: pi-session-cli status")]
+#[command(
+    long_about = "A CLI tool to manage Pi sessions, models, tags, and more.\n\nExample: pi-session-cli status"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -73,13 +75,13 @@ enum Commands {
         command: ConfigCommands,
     },
     /// Search sessions
-    Search {
-        query: String,
-    },
+    Search { query: String },
 }
 
 #[derive(Subcommand)]
-#[command(after_help = "EXAMPLES:\n  pi-session-cli session list\n  pi-session-cli session get -p /path/to/session\n  pi-session-cli session delete -p /path/to/session")]
+#[command(
+    after_help = "EXAMPLES:\n  pi-session-cli session list\n  pi-session-cli session get -p /path/to/session\n  pi-session-cli session delete -p /path/to/session"
+)]
 enum SessionCommands {
     /// List sessions
     List,
@@ -117,7 +119,9 @@ enum SessionCommands {
 }
 
 #[derive(Subcommand)]
-#[command(after_help = "EXAMPLES:\n  pi-session-cli model list\n  pi-session-cli model test -p openai -m gpt-4")]
+#[command(
+    after_help = "EXAMPLES:\n  pi-session-cli model list\n  pi-session-cli model test -p openai -m gpt-4"
+)]
 enum ModelCommands {
     /// List models
     List,
@@ -136,7 +140,9 @@ enum ModelCommands {
 }
 
 #[derive(Subcommand)]
-#[command(after_help = "EXAMPLES:\n  pi-session-cli tag list\n  pi-session-cli tag create -n my-tag -c blue\n  pi-session-cli tag delete -i 123")]
+#[command(
+    after_help = "EXAMPLES:\n  pi-session-cli tag list\n  pi-session-cli tag create -n my-tag -c blue\n  pi-session-cli tag delete -i 123"
+)]
 enum TagCommands {
     /// List tags
     List,
@@ -155,7 +161,9 @@ enum TagCommands {
 }
 
 #[derive(Subcommand)]
-#[command(after_help = "EXAMPLES:\n  pi-session-cli favorite list\n  pi-session-cli favorite add -i 123 -t session -n my-fav -p /path/to/session")]
+#[command(
+    after_help = "EXAMPLES:\n  pi-session-cli favorite list\n  pi-session-cli favorite add -i 123 -t session -n my-fav -p /path/to/session"
+)]
 enum FavoriteCommands {
     /// List favorites
     List,
@@ -178,7 +186,9 @@ enum FavoriteCommands {
 }
 
 #[derive(Subcommand)]
-#[command(after_help = "EXAMPLES:\n  pi-session-cli api-key list\n  pi-session-cli api-key create -n my-key -k sk-123\n  pi-session-cli api-key revoke -k sk-123")]
+#[command(
+    after_help = "EXAMPLES:\n  pi-session-cli api-key list\n  pi-session-cli api-key create -n my-key -k sk-123\n  pi-session-cli api-key revoke -k sk-123"
+)]
 enum ApiKeyCommands {
     /// List API keys
     List,
@@ -199,7 +209,9 @@ enum ApiKeyCommands {
 }
 
 #[derive(Subcommand)]
-#[command(after_help = "EXAMPLES:\n  pi-session-cli skill scan\n  pi-session-cli skill get -p /path/to/skill")]
+#[command(
+    after_help = "EXAMPLES:\n  pi-session-cli skill scan\n  pi-session-cli skill get -p /path/to/skill"
+)]
 enum SkillCommands {
     /// Scan skills
     Scan,
@@ -211,7 +223,9 @@ enum SkillCommands {
 }
 
 #[derive(Subcommand)]
-#[command(after_help = "EXAMPLES:\n  pi-session-cli prompt scan\n  pi-session-cli prompt get -p /path/to/prompt")]
+#[command(
+    after_help = "EXAMPLES:\n  pi-session-cli prompt scan\n  pi-session-cli prompt get -p /path/to/prompt"
+)]
 enum PromptCommands {
     /// Scan prompts
     Scan,
@@ -223,7 +237,9 @@ enum PromptCommands {
 }
 
 #[derive(Subcommand)]
-#[command(after_help = "EXAMPLES:\n  pi-session-cli settings load\n  pi-session-cli settings save -s '{\"key\":\"value\"}'")]
+#[command(
+    after_help = "EXAMPLES:\n  pi-session-cli settings load\n  pi-session-cli settings save -s '{\"key\":\"value\"}'"
+)]
 enum SettingsCommands {
     /// Load settings
     Load,
@@ -235,7 +251,9 @@ enum SettingsCommands {
 }
 
 #[derive(Subcommand)]
-#[command(after_help = "EXAMPLES:\n  pi-session-cli dataset list\n  pi-session-cli dataset import -s /path/to/dataset")]
+#[command(
+    after_help = "EXAMPLES:\n  pi-session-cli dataset list\n  pi-session-cli dataset import -s /path/to/dataset"
+)]
 enum DatasetCommands {
     /// List datasets
     List,
@@ -247,7 +265,9 @@ enum DatasetCommands {
 }
 
 #[derive(Subcommand)]
-#[command(after_help = "EXAMPLES:\n  pi-session-cli config load\n  pi-session-cli config save -c '{\"key\":\"value\"}'")]
+#[command(
+    after_help = "EXAMPLES:\n  pi-session-cli config load\n  pi-session-cli config save -c '{\"key\":\"value\"}'"
+)]
 enum ConfigCommands {
     /// Load config
     Load,
@@ -281,18 +301,31 @@ fn format_reqwest_error(e: &reqwest::Error, url: &str) -> String {
 
 async fn request_status(client: &Client, base_url: &str) -> Result<Value> {
     let url = format!("{}/health", base_url);
-    let resp = client.get(&url).send().await.map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
     if !resp.status().is_success() {
         return Err(anyhow!("服务端返回 HTTP {}", resp.status()));
     }
-    let body: Value = resp.json().await.map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
+    let body: Value = resp
+        .json()
+        .await
+        .map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
     Ok(body)
 }
 
-async fn request_command(client: &Client, base_url: &str, command: &str, payload: Value) -> Result<Value> {
+async fn request_command(
+    client: &Client,
+    base_url: &str,
+    command: &str,
+    payload: Value,
+) -> Result<Value> {
     let url = format!("{}/api", base_url);
 
-    let resp = client.post(&url)
+    let resp = client
+        .post(&url)
         .json(&json!({ "command": command, "payload": payload }))
         .send()
         .await
@@ -301,11 +334,21 @@ async fn request_command(client: &Client, base_url: &str, command: &str, payload
     let status = resp.status();
     if !status.is_success() {
         let text = resp.text().await.unwrap_or_default();
-        return Err(anyhow!("服务端返回 HTTP {}{}", status,
-            if text.is_empty() { String::new() } else { format!("\n  {}", text.chars().take(200).collect::<String>()) }));
+        return Err(anyhow!(
+            "服务端返回 HTTP {}{}",
+            status,
+            if text.is_empty() {
+                String::new()
+            } else {
+                format!("\n  {}", text.chars().take(200).collect::<String>())
+            }
+        ));
     }
 
-    let body: Value = resp.json().await.map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
+    let body: Value = resp
+        .json()
+        .await
+        .map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
 
     if body["success"].as_bool() == Some(true) {
         Ok(body["data"].clone())
@@ -336,23 +379,57 @@ pub async fn run() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             SessionCommands::Get { path } => {
-                let data = request_command(&client, &base_url, "get_session_by_path", json!({ "path": path })).await?;
+                let data = request_command(
+                    &client,
+                    &base_url,
+                    "get_session_by_path",
+                    json!({ "path": path }),
+                )
+                .await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             SessionCommands::Delete { path } => {
-                request_command(&client, &base_url, "delete_session", json!({ "path": path })).await?;
+                request_command(
+                    &client,
+                    &base_url,
+                    "delete_session",
+                    json!({ "path": path }),
+                )
+                .await?;
                 println!("{}", format!("Session deleted: {path}").green());
             }
             SessionCommands::Fork { path } => {
-                let data = request_command(&client, &base_url, "fork_session", json!({ "sourcePath": path })).await?;
+                let data = request_command(
+                    &client,
+                    &base_url,
+                    "fork_session",
+                    json!({ "sourcePath": path }),
+                )
+                .await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             SessionCommands::Rename { path, new_name } => {
-                request_command(&client, &base_url, "rename_session", json!({ "path": path, "newName": new_name })).await?;
+                request_command(
+                    &client,
+                    &base_url,
+                    "rename_session",
+                    json!({ "path": path, "newName": new_name }),
+                )
+                .await?;
                 println!("{}", format!("Session renamed: {path}").green());
             }
-            SessionCommands::Export { path, format, output_path } => {
-                request_command(&client, &base_url, "export_session", json!({ "path": path, "format": format, "outputPath": output_path })).await?;
+            SessionCommands::Export {
+                path,
+                format,
+                output_path,
+            } => {
+                request_command(
+                    &client,
+                    &base_url,
+                    "export_session",
+                    json!({ "path": path, "format": format, "outputPath": output_path }),
+                )
+                .await?;
                 println!("{}", format!("Session exported: {path}").green());
             }
         },
@@ -362,11 +439,23 @@ pub async fn run() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             ModelCommands::Test { provider, model } => {
-                let data = request_command(&client, &base_url, "test_model", json!({ "provider": provider, "model": model })).await?;
+                let data = request_command(
+                    &client,
+                    &base_url,
+                    "test_model",
+                    json!({ "provider": provider, "model": model }),
+                )
+                .await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             ModelCommands::TestBatch { models } => {
-                let data = request_command(&client, &base_url, "test_models_batch", json!({ "models": models })).await?;
+                let data = request_command(
+                    &client,
+                    &base_url,
+                    "test_models_batch",
+                    json!({ "models": models }),
+                )
+                .await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
         },
@@ -376,7 +465,13 @@ pub async fn run() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             TagCommands::Create { name, color } => {
-                let data = request_command(&client, &base_url, "create_tag", json!({ "name": name, "color": color })).await?;
+                let data = request_command(
+                    &client,
+                    &base_url,
+                    "create_tag",
+                    json!({ "name": name, "color": color }),
+                )
+                .await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             TagCommands::Delete { id } => {
@@ -384,31 +479,52 @@ pub async fn run() -> Result<()> {
                 println!("{}", format!("Tag deleted: {id}").green());
             }
         },
-        Some(Commands::Favorite { command }) => match command {
-            FavoriteCommands::List => {
-                let data = request_command(&client, &base_url, "get_all_favorites", json!({})).await?;
-                println!("{}", serde_json::to_string_pretty(&data)?.green());
+        Some(Commands::Favorite { command }) => {
+            match command {
+                FavoriteCommands::List => {
+                    let data =
+                        request_command(&client, &base_url, "get_all_favorites", json!({})).await?;
+                    println!("{}", serde_json::to_string_pretty(&data)?.green());
+                }
+                FavoriteCommands::Add {
+                    id,
+                    favorite_type,
+                    name,
+                    path,
+                } => {
+                    request_command(&client, &base_url, "add_favorite", json!({ "id": id, "favoriteType": favorite_type, "name": name, "path": path })).await?;
+                    println!("{}", format!("Favorite added: {id}").green());
+                }
+                FavoriteCommands::Remove { id } => {
+                    request_command(&client, &base_url, "remove_favorite", json!({ "id": id }))
+                        .await?;
+                    println!("{}", format!("Favorite removed: {id}").green());
+                }
             }
-            FavoriteCommands::Add { id, favorite_type, name, path } => {
-                request_command(&client, &base_url, "add_favorite", json!({ "id": id, "favoriteType": favorite_type, "name": name, "path": path })).await?;
-                println!("{}", format!("Favorite added: {id}").green());
-            }
-            FavoriteCommands::Remove { id } => {
-                request_command(&client, &base_url, "remove_favorite", json!({ "id": id })).await?;
-                println!("{}", format!("Favorite removed: {id}").green());
-            }
-        },
+        }
         Some(Commands::ApiKey { command }) => match command {
             ApiKeyCommands::List => {
                 let data = request_command(&client, &base_url, "list_api_keys", json!({})).await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             ApiKeyCommands::Create { name, key, value } => {
-                let data = request_command(&client, &base_url, "create_api_key", json!({ "name": name, "key": key, "value": value })).await?;
+                let data = request_command(
+                    &client,
+                    &base_url,
+                    "create_api_key",
+                    json!({ "name": name, "key": key, "value": value }),
+                )
+                .await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             ApiKeyCommands::Revoke { key_preview } => {
-                request_command(&client, &base_url, "revoke_api_key", json!({ "keyPreview": key_preview })).await?;
+                request_command(
+                    &client,
+                    &base_url,
+                    "revoke_api_key",
+                    json!({ "keyPreview": key_preview }),
+                )
+                .await?;
                 println!("{}", format!("API key revoked: {key_preview}").green());
             }
         },
@@ -418,7 +534,13 @@ pub async fn run() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             SkillCommands::Get { path } => {
-                let data = request_command(&client, &base_url, "get_skill_content", json!({ "path": path })).await?;
+                let data = request_command(
+                    &client,
+                    &base_url,
+                    "get_skill_content",
+                    json!({ "path": path }),
+                )
+                .await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
         },
@@ -428,18 +550,31 @@ pub async fn run() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             PromptCommands::Get { path } => {
-                let data = request_command(&client, &base_url, "get_prompt_content", json!({ "path": path })).await?;
+                let data = request_command(
+                    &client,
+                    &base_url,
+                    "get_prompt_content",
+                    json!({ "path": path }),
+                )
+                .await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
         },
         Some(Commands::Settings { command }) => match command {
             SettingsCommands::Load => {
-                let data = request_command(&client, &base_url, "load_pi_settings", json!({})).await?;
+                let data =
+                    request_command(&client, &base_url, "load_pi_settings", json!({})).await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             SettingsCommands::Save { settings } => {
                 let settings: Value = serde_json::from_str(&settings)?;
-                request_command(&client, &base_url, "save_pi_settings", json!({ "settings": settings })).await?;
+                request_command(
+                    &client,
+                    &base_url,
+                    "save_pi_settings",
+                    json!({ "settings": settings }),
+                )
+                .await?;
                 println!("{}", "Settings saved".green());
             }
         },
@@ -449,28 +584,46 @@ pub async fn run() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             DatasetCommands::Import { source } => {
-                let data = request_command(&client, &base_url, "start_dataset_import", json!({ "source": source })).await?;
+                let data = request_command(
+                    &client,
+                    &base_url,
+                    "start_dataset_import",
+                    json!({ "source": source }),
+                )
+                .await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
         },
         Some(Commands::Config { command }) => match command {
             ConfigCommands::Load => {
-                let data = request_command(&client, &base_url, "load_model_config", json!({})).await?;
+                let data =
+                    request_command(&client, &base_url, "load_model_config", json!({})).await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
             ConfigCommands::Save { content } => {
                 let content: Value = serde_json::from_str(&content)?;
-                request_command(&client, &base_url, "save_model_config", json!({ "content": content })).await?;
+                request_command(
+                    &client,
+                    &base_url,
+                    "save_model_config",
+                    json!({ "content": content }),
+                )
+                .await?;
                 println!("{}", "Config saved".green());
             }
         },
         Some(Commands::Search { query }) => {
-            let data = request_command(&client, &base_url, "search_sessions_fts", json!({ "query": query })).await?;
+            let data = request_command(
+                &client,
+                &base_url,
+                "search_sessions_fts",
+                json!({ "query": query }),
+            )
+            .await?;
             println!("{}", serde_json::to_string_pretty(&data)?.green());
-        },
+        }
         None => {
-            clap::Command::new("pi-session-cli")
-                .print_help()?;
+            clap::Command::new("pi-session-cli").print_help()?;
         }
     }
 

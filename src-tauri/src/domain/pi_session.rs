@@ -202,11 +202,7 @@ pub fn parse_pi_session_header_only(path: &Path, file_modified: DateTime<Utc>) -
     }
 
     // Estimate message count from file size (rough: ~200 bytes per message)
-    let estimated_message_count = if let Ok(metadata) = std::fs::metadata(path) {
-        (metadata.len() / 200) as usize
-    } else {
-        0
-    };
+    let estimated_message_count = if let Ok(metadata) = std::fs::metadata(path) { (metadata.len() / 200) as usize } else { 0 };
 
     Ok(SessionInfo {
         path: path.to_string_lossy().to_string(),
@@ -216,7 +212,7 @@ pub fn parse_pi_session_header_only(path: &Path, file_modified: DateTime<Utc>) -
         created: header.timestamp,
         modified: file_modified.max(header.timestamp),
         message_count: estimated_message_count,
-        first_message: String::new(),  // Will be filled on full scan
+        first_message: String::new(), // Will be filled on full scan
         user_messages_text: String::new(),
         assistant_messages_text: String::new(),
         last_message,

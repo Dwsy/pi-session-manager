@@ -450,7 +450,7 @@ export default function DashboardInsightModal({
       onClick={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
-        className="absolute inset-0 bg-background/72 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 

@@ -129,7 +129,6 @@ pub fn calculate_stats(sessions: &[SessionInfo]) -> SessionStats {
     calculate_stats_from_inputs(&light_sessions)
 }
 
-
 /// Process a single session's data from cache or file
 #[allow(clippy::too_many_arguments)]
 fn process_session_data(
