@@ -320,6 +320,7 @@ pub async fn run() -> Result<()> {
     let port = cli.port.unwrap_or_else(load_port_from_config);
     let client = Client::builder()
         .timeout(Duration::from_secs(30))
+        .no_proxy()
         .build()
         .map_err(|e| anyhow!("创建 HTTP 客户端失败: {}", e))?;
     let base_url = format!("http://localhost:{}", port);

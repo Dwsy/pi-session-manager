@@ -3,6 +3,7 @@ use serde_json::Value;
 use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use tracing::info;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::{OnceLock, RwLock};
@@ -67,7 +68,10 @@ fn detect_session_provider(path: &Path) -> Result<Option<crate::domain::casr_min
 }
 
 fn resolve_pi_session_labels(path: &Path) -> Result<HashMap<String, String>, String> {
+    let start = std::time::Instant::now();
     let entries = crate::domain::pi_session::parse_pi_session_entries(path)?;
+    let elapsed = start.elapsed();
+    info!("[IO] resolve_pi_session_labels path={} entries={} elapsed={:?}", path.display(), entries.len(), elapsed);
     Ok(crate::domain::pi_session::resolve_labels(&entries).into_iter().map(|(target_id, resolved)| (target_id, resolved.text)).collect())
 }
 
@@ -86,7 +90,10 @@ fn get_session_labels_sync(path: &str) -> Result<HashMap<String, String>, String
         }
     }
 
+    let start = std::time::Instant::now();
     let labels = resolve_pi_session_labels(session_path)?;
+    let elapsed = start.elapsed();
+    info!("[IO] get_session_labels cache_miss path={} elapsed={:?}", path, elapsed);
 
     if let Ok(mut guard) = session_labels_cache().write() {
         guard.insert(path.to_string(), SessionLabelsCacheEntry { modified_at_ms, labels: labels.clone() });
@@ -105,9 +112,12 @@ fn transformed_session_content(path: &str) -> Result<Option<String>, String> {
         }
     }
 
+    let start = std::time::Instant::now();
     let Ok((source, canonical)) = crate::domain::session_bridge::read_canonical_session_from_path(session_path) else {
         return Ok(None);
     };
+    let elapsed = start.elapsed();
+    info!("[IO] transformed_session_content casr_parse path={} elapsed={:?}", path, elapsed);
 
     let modified_at_ms = file_modified_ms(path)?;
     if let Ok(guard) = transformed_session_cache().read() {
@@ -165,12 +175,17 @@ fn chunk_string_content(content: &str, offset: Option<u64>, max_bytes: Option<us
 }
 
 pub(super) async fn read_session_file_chunk_impl(path: String, offset: Option<u64>, max_bytes: Option<usize>) -> Result<SessionChunk, String> {
+    let start = std::time::Instant::now();
     if let Some(transformed) = transformed_session_content(&path)? {
+        let elapsed = start.elapsed();
+        info!("[IO] read_session_file_chunk transformed path={} bytes={} elapsed={:?}", path, transformed.len(), elapsed);
         return chunk_string_content(&transformed, offset, max_bytes);
     }
 
     if looks_like_json_array_file(&path) {
         let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
+        let elapsed = start.elapsed();
+        info!("[IO] read_session_file_chunk json_array path={} bytes={} elapsed={:?}", path, content.len(), elapsed);
         let file_size = content.len() as u64;
         let start_offset = offset.unwrap_or(0);
         if start_offset > 0 {
@@ -236,16 +251,25 @@ pub(super) async fn read_session_file_chunk_impl(path: String, offset: Option<u6
 }
 
 pub(super) async fn read_session_file_impl(path: String) -> Result<String, String> {
+    let start = std::time::Instant::now();
     if let Some(transformed) = transformed_session_content(&path)? {
+        let elapsed = start.elapsed();
+        info!("[IO] read_session_file transformed path={} bytes={} elapsed={:?}", path, transformed.len(), elapsed);
         return Ok(transformed);
     }
-    fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))
+    let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
+    let elapsed = start.elapsed();
+    info!("[IO] read_session_file direct path={} bytes={} elapsed={:?}", path, content.len(), elapsed);
+    Ok(content)
 }
 
 pub(super) async fn read_session_file_incremental_impl(path: String, from_line: usize) -> Result<(usize, String), String> {
+    let start = std::time::Instant::now();
     if let Some(transformed) = transformed_session_content(&path)? {
         let lines: Vec<&str> = transformed.lines().collect();
         let total_lines = lines.len();
+        let elapsed = start.elapsed();
+        info!("[IO] read_session_file_incremental transformed path={} bytes={} lines={} elapsed={:?}", path, transformed.len(), total_lines, elapsed);
         if from_line >= total_lines {
             return Ok((total_lines, String::new()));
         }

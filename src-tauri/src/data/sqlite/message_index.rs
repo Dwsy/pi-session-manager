@@ -182,6 +182,7 @@ fn list_all_session_paths(conn: &Connection) -> Result<Vec<String>, String> {
 }
 
 fn backfill_missing_message_entries(conn: &Connection) -> Result<usize, String> {
+    let start = std::time::Instant::now();
     let mut stmt = conn
         .prepare(
             "SELECT s.path
@@ -221,6 +222,8 @@ fn backfill_missing_message_entries(conn: &Connection) -> Result<usize, String> 
         backfilled += 1;
     }
 
+    let elapsed = start.elapsed();
+    info!("[IO] backfill_missing_message_entries backfilled={} elapsed={:?}", backfilled, elapsed);
     Ok(backfilled)
 }
 
@@ -539,11 +542,15 @@ fn insert_message_entries_rows(conn: &Connection, rows: &[MessageEntryRow]) -> R
 }
 
 fn insert_message_entries_for_path(conn: &Connection, session_path: &str) -> Result<(), String> {
+    let start = std::time::Instant::now();
     let include_thinking = load_include_thinking_in_search();
     let entries = crate::domain::casr_min::bridge_ops::parse_session_entries_from_path(Path::new(session_path))?;
     let rows = build_rows_from_session_entries(session_path, &entries, include_thinking);
     delete_message_entries_for_session(conn, session_path)?;
-    insert_message_entries_rows(conn, &rows)
+    insert_message_entries_rows(conn, &rows)?;
+    let elapsed = start.elapsed();
+    info!("[IO] insert_message_entries_for_path path={} entries={} rows={} elapsed={:?}", session_path, entries.len(), rows.len(), elapsed);
+    Ok(())
 }
 
 pub fn insert_message_entries(conn: &Connection, session: &SessionInfo) -> Result<(), String> {

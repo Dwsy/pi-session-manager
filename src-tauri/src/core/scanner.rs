@@ -583,7 +583,11 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
 /// Optimization: Use BufReader for streaming to reduce memory usage on large files
 /// Returns: (SessionInfo, Vec<SessionEntry>) - session info and message entry list
 pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
-    crate::domain::session_bridge::parse_session_info_from_path(path)
+    let start = std::time::Instant::now();
+    let result = crate::domain::session_bridge::parse_session_info_from_path(path)?;
+    let elapsed = start.elapsed();
+    info!("[IO] parse_session_info path={} entries={} elapsed={:?}", path.display(), result.1.len(), elapsed);
+    Ok(result)
 }
 
 pub fn extract_message_text(entry: &Value) -> String {
