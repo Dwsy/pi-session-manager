@@ -200,82 +200,94 @@ function GenericToolCall({
         )}
       </div>
 
-      {hasArgs && isExpanded && (
-        <div className="tool-output-wrapper">
-          <div className="tool-output-header">
-            <span className="tool-output-label">Arguments</span>
-          </div>
-          <div
-            className="tool-arguments"
-            style={{
-              maxHeight: OUTPUT_MAX_HEIGHT,
-              overflowY: "auto",
-              margin: 0,
-            }}
-          >
-            {canRenderStructuredArgs ? (
-              <div style={{ display: "grid", gap: 10 }}>
-                {Object.entries(args).map(([key, value]) => {
-                  const shouldRenderMarkdown =
-                    typeof value === "string" &&
-                    looksLikeMarkdownByFirstChars(value);
-
-                  return (
-                    <div key={key}>
-                      <div
-                        className="tool-arguments-title"
-                        style={{ marginBottom: 6, textTransform: "none" }}
-                      >
-                        {key}
-                      </div>
-                      {shouldRenderMarkdown ? (
-                        <div
-                          style={{ fontFamily: "var(--font-family, inherit)" }}
-                        >
-                          <MarkdownContent
-                            content={value}
-                            searchQuery={searchQuery}
-                          />
-                        </div>
-                      ) : (
-                        <pre>
-                          <code
-                            dangerouslySetInnerHTML={{
-                              __html: getHighlightedArgumentHtml(value),
-                            }}
-                          />
-                        </pre>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <pre>
-                <code
-                  dangerouslySetInnerHTML={{
-                    __html: getHighlightedArgumentHtml(argsText),
+      {hasArgs && (
+        <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
+          <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
+            {isExpanded && (
+              <>
+                <div className="tool-output-header">
+                  <span className="tool-output-label">Arguments</span>
+                </div>
+                <div
+                  className="tool-arguments"
+                  style={{
+                    maxHeight: OUTPUT_MAX_HEIGHT,
+                    overflowY: "auto",
+                    margin: 0,
                   }}
-                />
-              </pre>
+                >
+                  {canRenderStructuredArgs ? (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {Object.entries(args).map(([key, value]) => {
+                        const shouldRenderMarkdown =
+                          typeof value === "string" &&
+                          looksLikeMarkdownByFirstChars(value);
+
+                        return (
+                          <div key={key}>
+                            <div
+                              className="tool-arguments-title"
+                              style={{ marginBottom: 6, textTransform: "none" }}
+                            >
+                              {key}
+                            </div>
+                            {shouldRenderMarkdown ? (
+                              <div
+                                style={{ fontFamily: "var(--font-family, inherit)" }}
+                              >
+                                <MarkdownContent
+                                  content={value}
+                                  searchQuery={searchQuery}
+                                />
+                              </div>
+                            ) : (
+                              <pre>
+                                <code
+                                  dangerouslySetInnerHTML={{
+                                    __html: getHighlightedArgumentHtml(value),
+                                  }}
+                                />
+                              </pre>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <pre>
+                      <code
+                        dangerouslySetInnerHTML={{
+                          __html: getHighlightedArgumentHtml(argsText),
+                        }}
+                      />
+                    </pre>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </div>
       )}
 
-      {hasOutput && isExpanded && (
-        <div className="tool-output-wrapper">
-          <div className="tool-output-header">
-            <span className="tool-output-label">Output</span>
-          </div>
-          <div
-            className="tool-output"
-            style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: "auto" }}
-          >
-            <pre
-              className="whitespace-pre-wrap m-0"
-              dangerouslySetInnerHTML={{ __html: highlightedOutput }}
-            />
+      {hasOutput && (
+        <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
+          <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
+            {isExpanded && (
+              <>
+                <div className="tool-output-header">
+                  <span className="tool-output-label">Output</span>
+                </div>
+                <div
+                  className="tool-output"
+                  style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: "auto" }}
+                >
+                  <pre
+                    className="whitespace-pre-wrap m-0"
+                    dangerouslySetInnerHTML={{ __html: highlightedOutput }}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
