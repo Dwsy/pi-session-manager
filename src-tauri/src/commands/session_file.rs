@@ -345,6 +345,7 @@ fn parse_session_entry(line: &str) -> Option<SessionEntry> {
 }
 
 pub(super) async fn get_session_entries_impl(path: String) -> Result<Vec<SessionEntry>, String> {
+    let start = std::time::Instant::now();
     if let Some(transformed) = transformed_session_content(&path)? {
         let mut entries = Vec::new();
         for line in transformed.lines() {
@@ -355,9 +356,14 @@ pub(super) async fn get_session_entries_impl(path: String) -> Result<Vec<Session
                 entries.push(entry);
             }
         }
+        let elapsed = start.elapsed();
+        info!("[IO] get_session_entries transformed path={} entries={} elapsed={:?}", path, entries.len(), elapsed);
         return Ok(entries);
     }
-    crate::domain::session_bridge::parse_session_entries_from_path(Path::new(&path))
+    let result = crate::domain::session_bridge::parse_session_entries_from_path(Path::new(&path))?;
+    let elapsed = start.elapsed();
+    info!("[IO] get_session_entries direct path={} entries={} elapsed={:?}", path, result.len(), elapsed);
+    Ok(result)
 }
 
 pub(super) async fn get_session_labels_impl(path: String) -> Result<HashMap<String, String>, String> {
