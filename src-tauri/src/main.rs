@@ -313,7 +313,7 @@ fn main() {
                         })();
 
                         match flush_result {
-                            Ok(count) => log::trace!("Flushed {count}/{} sessions and {} details to database", sessions_count, details_count),
+                            Ok(count) => log::trace!("Flushed {count}/{sessions_count} sessions and {details_count} details to database"),
                             Err(e) => log::error!("Failed to batch flush: {e}"),
                         }
 
