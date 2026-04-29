@@ -178,6 +178,7 @@ fn find_matches(session: &SessionInfo, parsed_query: &ParsedQuotedQuery, query_h
     }
 
     let mut matches = Vec::new();
+    let start = std::time::Instant::now();
 
     // Use BufReader to read file line by line, avoid large file memory issues
     let file = match std::fs::File::open(&session.path) {
@@ -188,6 +189,8 @@ fn find_matches(session: &SessionInfo, parsed_query: &ParsedQuotedQuery, query_h
 
     // Parse session entries
     let entries = parse_session_entries_from_reader(reader, role_filter, include_tools);
+    let elapsed = start.elapsed();
+    tracing::info!("[IO] search::find_matches path={} entries={} elapsed={:?}", session.path, entries.len(), elapsed);
 
     for entry in &entries {
         let normalized_content = crate::utils::normalize_search_text(&entry.content);
@@ -305,7 +308,10 @@ fn parse_session_entries_from_reader<R: std::io::BufRead>(reader: R, role_filter
 }
 
 fn get_filtered_session_content(path: &str, role_filter: RoleFilter) -> Result<String, String> {
+    let start = std::time::Instant::now();
     let content = std::fs::read_to_string(path).map_err(|e| format!("Failed to read session file: {e}"))?;
+    let elapsed = start.elapsed();
+    tracing::info!("[IO] search::get_filtered_session_content path={} bytes={} elapsed={:?}", path, content.len(), elapsed);
 
     let mut full_text = String::new();
 
@@ -356,7 +362,10 @@ fn role_to_string(role_filter: RoleFilter) -> String {
 }
 
 fn get_full_session_content(path: &str) -> Result<String, String> {
+    let start = std::time::Instant::now();
     let content = std::fs::read_to_string(path).map_err(|e| format!("Failed to read session file: {e}"))?;
+    let elapsed = start.elapsed();
+    tracing::info!("[IO] search::get_full_session_content path={} bytes={} elapsed={:?}", path, content.len(), elapsed);
 
     let mut full_text = String::new();
 

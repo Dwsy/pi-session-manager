@@ -19,7 +19,10 @@ const ARGS_PREVIEW_MAX: usize = 200;
 const CMD_PREFIX_MAX: usize = 80;
 
 pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalytics, String> {
+    let start = std::time::Instant::now();
     let content = std::fs::read_to_string(session_path).map_err(|e| format!("Failed to read session file: {e}"))?;
+    let elapsed = start.elapsed();
+    tracing::info!("[IO] trace::extract_trace_analytics path={} bytes={} elapsed={:?}", session_path, content.len(), elapsed);
 
     let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
     if lines.is_empty() {

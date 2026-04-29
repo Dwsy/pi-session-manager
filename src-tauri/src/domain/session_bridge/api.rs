@@ -83,7 +83,10 @@ pub fn read_canonical_session_from_path(path: &Path) -> Result<(SessionBridgeSou
         return result;
     }
 
+    let start = std::time::Instant::now();
     let content = std::fs::read_to_string(path).map_err(|error| format!("Failed to read session file {}: {error}", path.display()))?;
+    let elapsed = start.elapsed();
+    tracing::info!("[IO] session_bridge::read_canonical_session_from_path path={} bytes={} elapsed={:?}", path.display(), content.len(), elapsed);
     let result = read_canonical_session_from_str(&content, Some(path));
     match &result {
         Ok((source, _)) => debug!("session_bridge read {} via content fallback {} in {}ms", path.display(), source.display_name(), started_at.elapsed().as_millis()),
