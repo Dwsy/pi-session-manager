@@ -27,6 +27,7 @@ import { SessionBadge } from "@/components/session-viewer/SessionBadge";
 import TagBadge from "@/components/tags/TagBadge";
 import TagPicker from "@/components/tags/TagPicker";
 import SessionContextMenu from "@/components/session-viewer/SessionContextMenu";
+import SessionPreviewModal from "@/components/kanban/SessionPreviewModal";
 import type { DeleteSessionRequestOptions } from "@/components/dialogs/deleteSessionTypes";
 import {
   formatShortSessionId,
@@ -144,6 +145,8 @@ export default function SessionList({
     y: number;
     sessionId: string;
   } | null>(null);
+  const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null);
+  const [previewClickPoint, setPreviewClickPoint] = useState<{ x: number; y: number } | null>(null);
   const lastSelectedSessionIdRef = useRef<string | null>(null);
   const selectionAnchorSessionIdRef = useRef<string | null>(null);
   const selectedSessionsRef = useRef<SessionInfo[]>([]);
@@ -746,6 +749,14 @@ export default function SessionList({
                         key={session.id}
                         data-session-id={session.id}
                         onClick={(event) => {
+                          // Cmd+Option+Click → open preview modal
+                          if ((event.metaKey || event.ctrlKey) && event.altKey) {
+                            event.preventDefault();
+                            setPreviewClickPoint({ x: event.clientX, y: event.clientY });
+                            setPreviewSession(session);
+                            return;
+                          }
+
                           const wantsMultiSelect =
                             !!onDeleteSessions &&
                             (event.metaKey || event.ctrlKey || event.shiftKey);

@@ -188,11 +188,12 @@ fn backfill_missing_message_entries(conn: &Connection) -> Result<usize, String> 
             "SELECT s.path
              FROM sessions s
              WHERE s.message_count > 0
+             AND s.modified > datetime('now', '-30 days')
              AND NOT EXISTS (
                  SELECT 1 FROM message_entries m WHERE m.session_path = s.path
              )
              ORDER BY s.modified DESC, s.path ASC
-             LIMIT 10",
+             LIMIT 50",
         )
         .map_err(|e| format!("Failed to prepare missing session paths for message_entries backfill: {e}"))?;
 

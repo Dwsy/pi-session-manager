@@ -267,7 +267,7 @@ fn main() {
                 let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
                 let mut last_conn: Option<rusqlite::Connection> = None;
                 let mut ticks_since_checkpoint: u64 = 0;
-                const CHECKPOINT_INTERVAL_TICKS: u64 = 12; // checkpoint every 60s (12 * 5s)
+                const CHECKPOINT_INTERVAL_TICKS: u64 = 60; // checkpoint every 300s (60 * 5s)
 
                 loop {
                     interval.tick().await;
