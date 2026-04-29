@@ -97,13 +97,17 @@ fn get_session_labels_sync(path: &str) -> Result<HashMap<String, String>, String
 
 fn transformed_session_content(path: &str) -> Result<Option<String>, String> {
     let session_path = Path::new(path);
+
+    // Fast path: detect provider without reading file content
+    if let Some(provider) = crate::domain::casr_min::providers::detect_provider(Some(session_path), "") {
+        if provider == crate::domain::casr_min::providers::ProviderKind::Pi {
+            return Ok(None); // Pi sessions use native chunked reading
+        }
+    }
+
     let Ok((source, canonical)) = crate::domain::session_bridge::read_canonical_session_from_path(session_path) else {
         return Ok(None);
     };
-
-    if source == crate::domain::session_bridge::SessionBridgeSource::Pi {
-        return Ok(None);
-    }
 
     let modified_at_ms = file_modified_ms(path)?;
     if let Ok(guard) = transformed_session_cache().read() {

@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use colored::*;
 use reqwest::Client;
 use serde_json::{json, Value};
+use std::time::Duration;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -12,8 +13,9 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    #[arg(short, long, default_value_t = 52131)]
-    port: u16,
+    /// Server port (default: reads from config, fallback 52131)
+    #[arg(short, long)]
+    port: Option<u16>,
 }
 
 #[derive(Subcommand)]
@@ -256,10 +258,34 @@ enum ConfigCommands {
     },
 }
 
+fn load_port_from_config() -> u16 {
+    let value = pi_session_manager::unified_config::read_section("server")
+        .unwrap_or_else(|_| serde_json::json!({}));
+    value["http_port"].as_u64().unwrap_or(52131) as u16
+}
+
+fn format_reqwest_error(e: &reqwest::Error, url: &str) -> String {
+    if e.is_connect() {
+        format!(
+            "无法连接到 {} — 服务端是否已启动？\n  提示: 先运行 `pi-session-cli` 启动服务端，或用 `-p <port>` 指定端口",
+            url
+        )
+    } else if e.is_timeout() {
+        format!("请求超时: {}", url)
+    } else if e.is_decode() {
+        format!("服务端返回了非 JSON 响应 ({}) — 可能服务端版本不匹配", url)
+    } else {
+        format!("请求失败 ({}): {}", url, e)
+    }
+}
+
 async fn request_status(client: &Client, base_url: &str) -> Result<Value> {
     let url = format!("{}/health", base_url);
-    let resp = client.get(&url).send().await?;
-    let body: Value = resp.json().await?;
+    let resp = client.get(&url).send().await.map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
+    if !resp.status().is_success() {
+        return Err(anyhow!("服务端返回 HTTP {}", resp.status()));
+    }
+    let body: Value = resp.json().await.map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
     Ok(body)
 }
 
@@ -269,22 +295,34 @@ async fn request_command(client: &Client, base_url: &str, command: &str, payload
     let resp = client.post(&url)
         .json(&json!({ "command": command, "payload": payload }))
         .send()
-        .await?;
+        .await
+        .map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
 
-    let body: Value = resp.json().await?;
+    let status = resp.status();
+    if !status.is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(anyhow!("服务端返回 HTTP {}{}", status,
+            if text.is_empty() { String::new() } else { format!("\n  {}", text.chars().take(200).collect::<String>()) }));
+    }
+
+    let body: Value = resp.json().await.map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
 
     if body["success"].as_bool() == Some(true) {
         Ok(body["data"].clone())
     } else {
         let error = body["error"].as_str().unwrap_or("Unknown error");
-        Err(anyhow!(error.to_string()))
+        Err(anyhow!("命令 '{}' 失败: {}", command, error))
     }
 }
 
 pub async fn run() -> Result<()> {
     let cli = Cli::parse();
-    let client = Client::new();
-    let base_url = format!("http://localhost:{}", cli.port);
+    let port = cli.port.unwrap_or_else(load_port_from_config);
+    let client = Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| anyhow!("创建 HTTP 客户端失败: {}", e))?;
+    let base_url = format!("http://localhost:{}", port);
 
     match cli.command {
         Some(Commands::Status) => {

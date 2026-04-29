@@ -13,6 +13,7 @@ import { MultiFileDiff, type FileContents } from '@pierre/diffs/react';
 import { useSessionTrace } from '@/hooks/useSessionTrace';
 import { useTheme } from '@/hooks/useAppearance';
 import { parseMarkdown, renderCodeHtml } from '@/utils/markdown';
+import { LoopStrip } from './LoopStrip';
 import type {
   SessionTraceAnalytics,
   TraceEvent,
@@ -659,7 +660,7 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
               );
             })}
           </div>
-          <MiniTimelineScrubber
+          <LoopStrip
             totalDuration={totalDuration}
             events={a.events}
             viewportStartMs={viewportStartMs}
