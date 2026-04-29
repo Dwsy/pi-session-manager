@@ -154,6 +154,18 @@ export default function TraceView({ session, onClose }: TraceViewProps) {
   const [activeTab, setActiveTab] = useState<TraceTab>('details');
   const [selectedEvent, setSelectedEvent] = useState<TraceEvent | null>(null);
 
+  // Escape key to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const tabs: { key: TraceTab; label: string }[] = [
     { key: 'details', label: t('trace.tab.details', 'Details') },
     { key: 'analytics', label: t('trace.tab.analytics', 'Analytics') },
