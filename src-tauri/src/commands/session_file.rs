@@ -23,10 +23,18 @@ fn utf8_safe_cut(buf: &[u8], mut end: usize) -> usize {
 }
 
 fn looks_like_json_array_file(path: &str) -> bool {
-    let Ok(content) = fs::read_to_string(path) else {
+    // Only read first 100 bytes to check if file starts with '['
+    let Ok(mut file) = fs::File::open(path) else {
         return false;
     };
-    content.trim_start().starts_with('[')
+    let mut buf = [0u8; 100];
+    let Ok(n) = std::io::Read::read(&mut file, &mut buf) else {
+        return false;
+    };
+    let Ok(text) = std::str::from_utf8(&buf[..n]) else {
+        return false;
+    };
+    text.trim_start().starts_with('[')
 }
 
 #[derive(Clone)]
