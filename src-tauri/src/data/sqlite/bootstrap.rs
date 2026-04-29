@@ -120,6 +120,9 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         // Enable busy timeout to handle concurrent write locks gracefully
         conn.busy_timeout(std::time::Duration::from_secs(5)).map_err(|e| format!("Failed to set busy_timeout: {e}"))?;
 
+        // Increase page cache size to reduce disk reads (default 2000 pages = 8MB is too small for 485MB DB)
+        conn.execute("PRAGMA cache_size = 16000;", []).map_err(|e| format!("Failed to set cache_size: {e}"))?; // ~64MB cache
+
         // Enable foreign key constraints
         conn.execute("PRAGMA foreign_keys=ON;", []).map_err(|e| format!("Failed to enable foreign keys: {e}"))?;
 
