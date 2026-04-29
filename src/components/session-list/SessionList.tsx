@@ -27,7 +27,6 @@ import { SessionBadge } from "@/components/session-viewer/SessionBadge";
 import TagBadge from "@/components/tags/TagBadge";
 import TagPicker from "@/components/tags/TagPicker";
 import SessionContextMenu from "@/components/session-viewer/SessionContextMenu";
-import SessionPreviewModal from "@/components/kanban/SessionPreviewModal";
 import type { DeleteSessionRequestOptions } from "@/components/dialogs/deleteSessionTypes";
 import {
   formatShortSessionId,
@@ -1153,6 +1152,40 @@ export default function SessionList({
               : undefined
           }
           onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {previewSession && (
+        <SessionPreviewModal
+          session={previewSession}
+          isOpen={!!previewSession}
+          onClose={() => {
+            setPreviewSession(null);
+            setPreviewClickPoint(null);
+          }}
+          onExpand={() => {
+            if (previewSession) {
+              onSelectSession(previewSession);
+            }
+            setPreviewSession(null);
+            setPreviewClickPoint(null);
+          }}
+          onExport={() => {}}
+          onConvert={
+            onConvertSession
+              ? () => {
+                  if (previewSession) onConvertSession(previewSession);
+                }
+              : undefined
+          }
+          onRename={() => {}}
+          onResumeSession={onResumeSession}
+          terminal={terminal}
+          piPath={piPath}
+          customCommand={customCommand}
+          resumeCommand={resumeCommand}
+          initialClickPoint={previewClickPoint}
+          animationMode="origin-point"
         />
       )}
 
