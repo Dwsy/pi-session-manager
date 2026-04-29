@@ -92,7 +92,10 @@ fn get_session_labels_sync(path: &str) -> Result<HashMap<String, String>, String
     let modified_at_ms = file_modified_ms(path)?;
     if let Ok(guard) = session_labels_cache().read() {
         if let Some(entry) = guard.get(path) {
-            if entry.modified_at_ms == modified_at_ms {
+            // Use cache if modified time matches, OR if cache is less than 10 seconds old
+            // This prevents re-reading active sessions on every label request
+            let cache_age_ms = entry.modified_at_ms.abs_diff(modified_at_ms);
+            if cache_age_ms < 10_000 || entry.modified_at_ms >= modified_at_ms {
                 return Ok(entry.labels.clone());
             }
         }
