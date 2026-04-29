@@ -496,7 +496,7 @@ mod tests {
             {"type": "text", "text": "Part 1"},
             {"type": "text", "text": "Part 2"}
         ]);
-        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#, content);
+        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{content}}}}}"#);
         let session = read_piagent(&[&line]);
 
         assert!(session.messages[0].content.contains("Part 1"));
@@ -509,7 +509,7 @@ mod tests {
             {"type": "thinking", "thinking": "Let me analyze..."},
             {"type": "text", "text": "Here's my answer."}
         ]);
-        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#, content);
+        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{content}}}}}"#);
         let session = read_piagent(&[&line]);
 
         assert!(session.messages[0].content.contains("[Thinking] Let me analyze..."));
@@ -522,7 +522,7 @@ mod tests {
             {"type": "text", "text": "Let me check."},
             {"type": "toolCall", "name": "read_file", "arguments": {"path": "/test.rs"}}
         ]);
-        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#, content);
+        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{content}}}}}"#);
         let session = read_piagent(&[&line]);
 
         assert!(session.messages[0].content.contains("[Tool: read_file]"));
@@ -537,7 +537,7 @@ mod tests {
             {"type": "image", "url": "data:image/png;base64,..."},
             {"type": "text", "text": "After image"}
         ]);
-        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#, content);
+        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{content}}}}}"#);
         let session = read_piagent(&[&line]);
 
         assert!(session.messages[0].content.contains("Before image"));

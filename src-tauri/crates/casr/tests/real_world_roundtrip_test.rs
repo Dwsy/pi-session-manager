@@ -131,7 +131,7 @@ fn real_world_fixture_files_are_redacted() {
         let path = fixtures_dir().join(name);
         let content = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {} failed: {e}", path.display()));
         for pat in redaction_patterns {
-            assert!(!content.contains(pat), "fixture {} still contains sensitive marker '{}'", name, pat);
+            assert!(!content.contains(pat), "fixture {name} still contains sensitive marker '{pat}'");
         }
     }
 }

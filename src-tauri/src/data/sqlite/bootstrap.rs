@@ -370,7 +370,7 @@ mod tests {
         let db_path = get_db_path_for_config(&config).expect("dataset db path");
         let path_str = db_path.to_string_lossy();
         // Use Path instead of string contains for cross-platform compatibility
-        assert!(db_path.components().any(|c| c.as_os_str() == "datasets") && db_path.components().any(|c| c.as_os_str() == "badlogicgames__pi-mono"), "Path should contain datasets/badlogicgames__pi-mono: {}", path_str);
+        assert!(db_path.components().any(|c| c.as_os_str() == "datasets") && db_path.components().any(|c| c.as_os_str() == "badlogicgames__pi-mono"), "Path should contain datasets/badlogicgames__pi-mono: {path_str}");
         assert!(db_path.ends_with("sessions.db"));
     }
 }

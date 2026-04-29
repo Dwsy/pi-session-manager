@@ -172,7 +172,7 @@ mod unix_error_paths {
         let _guard = PermGuard { path: target_file.clone(), mode: 0o644 };
 
         let err = ClaudeCode.read_session(&target_file);
-        assert!(err.is_err(), "reading unreadable file should fail; got {:?}", err);
+        assert!(err.is_err(), "reading unreadable file should fail; got {err:?}");
         let msg = err.unwrap_err().to_string();
         assert!(msg.contains("ermission denied") || msg.contains("access") || msg.contains("open"), "error should mention permission; got: {msg}");
     }
@@ -196,7 +196,7 @@ mod unix_error_paths {
         let _guard = PermGuard { path: target_file.clone(), mode: 0o644 };
 
         let err = Codex.read_session(&target_file);
-        assert!(err.is_err(), "Codex: reading unreadable file should fail; got {:?}", err);
+        assert!(err.is_err(), "Codex: reading unreadable file should fail; got {err:?}");
     }
 
     #[test]
@@ -215,7 +215,7 @@ mod unix_error_paths {
         let _guard = PermGuard { path: session_file.clone(), mode: 0o644 };
 
         let err = Gemini.read_session(&session_file);
-        assert!(err.is_err(), "Gemini: reading unreadable file should fail; got {:?}", err);
+        assert!(err.is_err(), "Gemini: reading unreadable file should fail; got {err:?}");
     }
 
     // =========================================================================
@@ -313,7 +313,7 @@ mod unix_error_paths {
 
         let session = make_session("/tmp");
         let err = Codex.write_session(&session, &WriteOptions { force: false });
-        assert!(err.is_err(), "Codex: writing to read-only dir should fail; got {:?}", err);
+        assert!(err.is_err(), "Codex: writing to read-only dir should fail; got {err:?}");
     }
 
     #[test]
@@ -328,7 +328,7 @@ mod unix_error_paths {
 
         let session = make_session("/tmp");
         let err = ClawdBot.write_session(&session, &WriteOptions { force: false });
-        assert!(err.is_err(), "ClawdBot: writing to read-only dir should fail; got {:?}", err);
+        assert!(err.is_err(), "ClawdBot: writing to read-only dir should fail; got {err:?}");
     }
 
     #[test]
@@ -343,7 +343,7 @@ mod unix_error_paths {
 
         let session = make_session("/tmp");
         let err = Vibe.write_session(&session, &WriteOptions { force: false });
-        assert!(err.is_err(), "Vibe: writing to read-only dir should fail; got {:?}", err);
+        assert!(err.is_err(), "Vibe: writing to read-only dir should fail; got {err:?}");
     }
 
     #[test]
@@ -358,7 +358,7 @@ mod unix_error_paths {
 
         let session = make_session("/tmp");
         let err = Factory.write_session(&session, &WriteOptions { force: false });
-        assert!(err.is_err(), "Factory: writing to read-only dir should fail; got {:?}", err);
+        assert!(err.is_err(), "Factory: writing to read-only dir should fail; got {err:?}");
     }
 
     #[test]
@@ -373,7 +373,7 @@ mod unix_error_paths {
 
         let session = make_session("/tmp");
         let err = OpenClaw.write_session(&session, &WriteOptions { force: false });
-        assert!(err.is_err(), "OpenClaw: writing to read-only dir should fail; got {:?}", err);
+        assert!(err.is_err(), "OpenClaw: writing to read-only dir should fail; got {err:?}");
     }
 
     #[test]
@@ -389,7 +389,7 @@ mod unix_error_paths {
 
         let session = make_session("/tmp");
         let err = PiAgent.write_session(&session, &WriteOptions { force: false });
-        assert!(err.is_err(), "PiAgent: writing to read-only dir should fail; got {:?}", err);
+        assert!(err.is_err(), "PiAgent: writing to read-only dir should fail; got {err:?}");
     }
 
     // =========================================================================
@@ -408,7 +408,7 @@ mod unix_error_paths {
         let session_roots = ClaudeCode.session_roots();
         // Roots may be empty or non-existent — either way owns_session should return None.
         let owns = ClaudeCode.owns_session("some-session-id");
-        assert!(owns.is_none(), "CC: home-is-file should not own any session; roots: {:?}, detection: {:?}", session_roots, detection);
+        assert!(owns.is_none(), "CC: home-is-file should not own any session; roots: {session_roots:?}, detection: {detection:?}");
     }
 
     #[test]

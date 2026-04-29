@@ -287,20 +287,19 @@ fn load_port_from_config() -> u16 {
 fn format_reqwest_error(e: &reqwest::Error, url: &str) -> String {
     if e.is_connect() {
         format!(
-            "无法连接到 {} — 服务端是否已启动？\n  提示: 先运行 `pi-session-cli` 启动服务端，或用 `-p <port>` 指定端口",
-            url
+            "无法连接到 {url} — 服务端是否已启动？\n  提示: 先运行 `pi-session-cli` 启动服务端，或用 `-p <port>` 指定端口"
         )
     } else if e.is_timeout() {
-        format!("请求超时: {}", url)
+        format!("请求超时: {url}")
     } else if e.is_decode() {
-        format!("服务端返回了非 JSON 响应 ({}) — 可能服务端版本不匹配", url)
+        format!("服务端返回了非 JSON 响应 ({url}) — 可能服务端版本不匹配")
     } else {
-        format!("请求失败 ({}): {}", url, e)
+        format!("请求失败 ({url}): {e}")
     }
 }
 
 async fn request_status(client: &Client, base_url: &str) -> Result<Value> {
-    let url = format!("{}/health", base_url);
+    let url = format!("{base_url}/health");
     let resp = client
         .get(&url)
         .send()
@@ -322,7 +321,7 @@ async fn request_command(
     command: &str,
     payload: Value,
 ) -> Result<Value> {
-    let url = format!("{}/api", base_url);
+    let url = format!("{base_url}/api");
 
     let resp = client
         .post(&url)
@@ -354,7 +353,7 @@ async fn request_command(
         Ok(body["data"].clone())
     } else {
         let error = body["error"].as_str().unwrap_or("Unknown error");
-        Err(anyhow!("命令 '{}' 失败: {}", command, error))
+        Err(anyhow!("命令 '{command}' 失败: {error}"))
     }
 }
 
@@ -365,8 +364,8 @@ pub async fn run() -> Result<()> {
         .timeout(Duration::from_secs(30))
         .no_proxy()
         .build()
-        .map_err(|e| anyhow!("创建 HTTP 客户端失败: {}", e))?;
-    let base_url = format!("http://localhost:{}", port);
+        .map_err(|e| anyhow!("创建 HTTP 客户端失败: {e}"))?;
+    let base_url = format!("http://localhost:{port}");
 
     match cli.command {
         Some(Commands::Status) => {

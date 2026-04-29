@@ -9,7 +9,7 @@ fn test_full_text_search_accepts_extra_arg_silently() {
 
     let db_path = dirs::home_dir().unwrap().join(".pi/agent/sessions/sessions.db");
     if !db_path.exists() {
-        eprintln!("User database not found at {:?}, skipping test", db_path);
+        eprintln!("User database not found at {db_path:?}, skipping test");
         return;
     }
 
@@ -26,7 +26,7 @@ fn test_full_text_search_accepts_extra_arg_silently() {
             assert!(r.total_hits > 0, "Expected hits for '内置默认'");
         }
         Err(e) => {
-            panic!("full_text_search failed: {}", e);
+            panic!("full_text_search failed: {e}");
         }
     }
 }

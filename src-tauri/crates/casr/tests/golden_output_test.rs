@@ -504,7 +504,7 @@ mod codex_golden {
             let entry: serde_json::Value = serde_json::from_str(line).unwrap();
             let ts = entry["timestamp"].as_f64();
             assert!(ts.is_some(), "Codex entry {i} should have numeric timestamp");
-            assert!(is_epoch_seconds(ts.unwrap()), "Codex entry {i} timestamp out of range: {:?}", ts);
+            assert!(is_epoch_seconds(ts.unwrap()), "Codex entry {i} timestamp out of range: {ts:?}");
         }
     }
 

@@ -618,7 +618,7 @@ mod tests {
         }
 
         // Pick the largest file
-        let mut files: Vec<_> = fs::read_dir(&psm_dir).unwrap().filter_map(|e| e.ok()).filter(|e| e.path().extension().map_or(false, |ext| ext == "jsonl")).collect();
+        let mut files: Vec<_> = fs::read_dir(&psm_dir).unwrap().filter_map(|e| e.ok()).filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl")).collect();
         files.sort_by_key(|e| e.metadata().map(|m| m.len()).unwrap_or(0));
 
         let test_file = files.last().expect("no session files");

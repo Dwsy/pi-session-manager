@@ -10,7 +10,7 @@ fn test_full_text_search_builtin_default() {
     // This test connects to the real user database and verifies Chinese search works.
     let db_path = dirs::home_dir().unwrap().join(".pi/agent/sessions/sessions.db");
     if !db_path.exists() {
-        eprintln!("User database not found at {:?}, skipping test", db_path);
+        eprintln!("User database not found at {db_path:?}, skipping test");
         return;
     }
 
@@ -24,12 +24,12 @@ fn test_full_text_search_builtin_default() {
             for hit in &result.hits {
                 println!("  [{}] {} | entry={} | score={} | match_reason={:?}", hit.role, hit.session_path, hit.entry_id, hit.score, hit.match_reason);
                 let preview: String = hit.content.chars().take(120).collect();
-                println!("    content preview: {}", preview);
+                println!("    content preview: {preview}");
             }
             assert!(result.total_hits > 0, "Expected at least 1 hit for '内置默认' in real database");
         }
         Err(e) => {
-            panic!("full_text_search failed: {}", e);
+            panic!("full_text_search failed: {e}");
         }
     }
 }

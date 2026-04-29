@@ -861,7 +861,7 @@ async fn test_full_text_search_source_filters_and_label_browse_mode() {
 
     let session_id_content_only = full_text_search_with_source_filter("feedface".to_string(), "all".to_string(), Some("content_only".to_string()), 0, 10).await.unwrap();
     assert!(session_id_content_only.hits.iter().all(|hit| hit.match_reason.as_deref() == Some("content")));
-    assert!(session_id_content_only.hits.iter().all(|hit| hit.entry_id != ""));
+    assert!(session_id_content_only.hits.iter().all(|hit| !hit.entry_id.is_empty()));
 
     let session_id_labels_only = full_text_search_with_source_filter("feedface".to_string(), "all".to_string(), Some("labels_only".to_string()), 0, 10).await.unwrap();
     assert_eq!(session_id_labels_only.total_hits, 0);
