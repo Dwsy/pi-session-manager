@@ -8,16 +8,18 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use colored::*;
 use futures_util::{SinkExt, StreamExt};
 use rust_embed::Embed;
 use serde_json::Value;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
-use tracing::{error, info, warn};
+use tracing::error;
 
 mod file_watcher;
 mod terminal;
+mod run;
 use terminal::TerminalManager;
 
 #[derive(Embed)]
@@ -74,11 +76,6 @@ impl Default for ServerConfig {
     }
 }
 
-fn default_config_path() -> std::path::PathBuf {
-    pi_session_manager::unified_config::config_file_path()
-        .unwrap_or_else(|_| std::env::temp_dir().join("config.json"))
-}
-
 fn load_config() -> ServerConfig {
     let value = pi_session_manager::unified_config::read_section("server").unwrap_or_else(|_| {
         serde_json::json!({
@@ -95,101 +92,6 @@ fn load_config() -> ServerConfig {
         bind_addr: value["bind_addr"].as_str().unwrap_or("0.0.0.0").to_string(),
         auth_enabled: value["auth_enabled"].as_bool().unwrap_or(true),
     }
-}
-
-#[derive(Debug, Default)]
-struct CliArgs {
-    show_help: bool,
-    http_port: Option<u16>,
-    bind_addr: Option<String>,
-    auth_enabled: Option<bool>,
-    runtime_token: Option<String>,
-}
-
-fn parse_port_arg(value: &str, flag: &str) -> Result<u16, String> {
-    value
-        .parse::<u16>()
-        .map_err(|_| format!("Invalid value for {flag}: `{value}`"))
-}
-
-fn parse_cli_args() -> Result<CliArgs, String> {
-    let raw_args: Vec<String> = std::env::args().skip(1).collect();
-    if raw_args.iter().any(|arg| arg == "-h" || arg == "--help") {
-        return Ok(CliArgs {
-            show_help: true,
-            ..CliArgs::default()
-        });
-    }
-
-    let mut parsed = CliArgs::default();
-    let mut iter = raw_args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "-p" | "--port" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
-                parsed.http_port = Some(parse_port_arg(value, arg)?);
-            }
-            "-b" | "--bind" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
-                if value.trim().is_empty() {
-                    return Err(format!("Invalid value for `{arg}`: empty address"));
-                }
-                parsed.bind_addr = Some(value.clone());
-            }
-            "--auth" => {
-                if parsed.auth_enabled == Some(false) {
-                    return Err("Cannot use `--auth` with `--no-auth`".to_string());
-                }
-                parsed.auth_enabled = Some(true);
-            }
-            "--no-auth" => {
-                if parsed.auth_enabled == Some(true) {
-                    return Err("Cannot use `--auth` with `--no-auth`".to_string());
-                }
-                parsed.auth_enabled = Some(false);
-            }
-            "--token" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for `--token`".to_string())?;
-                let token = value.trim();
-                if token.is_empty() {
-                    return Err("Invalid value for `--token`: empty token".to_string());
-                }
-                parsed.runtime_token = Some(token.to_string());
-            }
-            _ => return Err(format!("Unknown argument: `{arg}`")),
-        }
-    }
-
-    Ok(parsed)
-}
-
-fn print_help() {
-    let default_path = default_config_path();
-    println!(
-        "Pi Session Manager CLI\n\
-         \n\
-         USAGE:\n\
-           pi-session-cli [OPTIONS]\n\
-         \n\
-         OPTIONS:\n\
-           -h, --help           Show this help message\n\
-           -p, --port <PORT>    Shared HTTP/WS port (overrides config http_port)\n\
-           -b, --bind <ADDR>    Bind address (overrides config bind_addr)\n\
-               --auth           Enable auth (requires token for non-local requests)\n\
-               --no-auth        Disable auth\n\
-               --token <TOKEN>  Runtime-only token, overrides DB tokens for this process\n\
-         \n\
-         NOTES:\n\
-           - Config file default: {}\n\
-           - Command-line options override values from config file",
-        default_path.display()
-    );
 }
 
 fn query_param(uri: &Uri, key: &str) -> Option<String> {
@@ -242,32 +144,20 @@ async fn main() {
     }
     tracing_subscriber::fmt::init();
 
-    let cli_args = match parse_cli_args() {
-        Ok(args) => args,
-        Err(err) => {
-            eprintln!("Error: {err}");
-            eprintln!();
-            print_help();
-            std::process::exit(2);
-        }
-    };
+    let config = load_config();
 
-    if cli_args.show_help {
-        print_help();
+    if std::env::args().len() > 1 {
+        if let Err(e) = run::run().await {
+            error!("Command failed: {e}");
+            std::process::exit(1);
+        }
         return;
     }
 
-    let mut config = load_config();
-    if let Some(port) = cli_args.http_port {
-        config.http_port = port;
-    }
-    if let Some(bind_addr) = cli_args.bind_addr {
-        config.bind_addr = bind_addr;
-    }
-    if let Some(auth_enabled) = cli_args.auth_enabled {
-        config.auth_enabled = auth_enabled;
-    }
-    let runtime_token = cli_args.runtime_token;
+    println!("{}", "🚀 Pi Session Manager — CLI Mode".green().bold());
+    println!("{}", "═══════════════════════════════════════".blue());
+    println!("Version: {}", env!("CARGO_PKG_VERSION").yellow());
+    println!("PID: {}", std::process::id().to_string().yellow());
 
     let (event_tx, _) = broadcast::channel(100);
     let state = Arc::new(AppState {
@@ -275,33 +165,17 @@ async fn main() {
         terminal_manager: Mutex::new(TerminalManager::new()),
     });
 
-    info!("🚀 Pi Session Manager — CLI Mode");
-    info!("═══════════════════════════════════════");
-
     // Init auth
     if config.auth_enabled {
         match pi_session_manager::auth::init() {
             Ok(token) => {
-                if let Some(cli_token) = runtime_token.as_ref() {
-                    if let Err(e) =
-                        pi_session_manager::auth::set_runtime_tokens(vec![cli_token.clone()])
-                    {
-                        error!("Failed to set runtime token: {e}");
-                        std::process::exit(2);
-                    }
-                    info!("🔑 Auth enabled, runtime token loaded from CLI");
-                } else {
-                    let _ = pi_session_manager::auth::set_runtime_tokens(Vec::new());
-                    info!("🔑 Auth enabled, token: {token}");
-                }
+                let _ = pi_session_manager::auth::set_runtime_tokens(Vec::new());
+                println!("{} Token: {}", "🔑 Auth enabled,".green(), token.yellow());
             }
             Err(e) => error!("Failed to init auth: {e}"),
         }
     } else {
-        if runtime_token.is_some() {
-            warn!("`--token` is ignored because auth is disabled");
-        }
-        info!("🔓 Auth disabled");
+        println!("{}", "🔓 Auth disabled".yellow());
     }
 
     if !config.http_enabled {
@@ -311,7 +185,7 @@ async fn main() {
 
     let _watcher_guard = match file_watcher::CliFileWatcher::start(state.event_tx.clone()) {
         Ok(w) => {
-            info!("👀 File watcher started");
+            println!("{}", "👀 File watcher started".green());
             Some(w)
         }
         Err(e) => {
@@ -321,8 +195,8 @@ async fn main() {
     };
 
     let addr = format!("{}:{}", config.bind_addr, config.http_port);
-    info!("🌐 http://{addr}  (API + WS)");
-    info!("═══════════════════════════════════════");
+    println!("{} http://{addr}  (API + WS)", "🌐".blue());
+    println!("{}", "═══════════════════════════════════════".blue());
 
     let s = state.clone();
     let handle = tokio::spawn(async move {
@@ -332,7 +206,7 @@ async fn main() {
     });
 
     tokio::select! {
-        _ = tokio::signal::ctrl_c() => info!("👋 Shutting down..."),
+        _ = tokio::signal::ctrl_c() => println!("{}", "👋 Shutting down...".red()),
         r = handle => { if let Err(e) = r { error!("Server task failed: {e}"); } }
     }
 }
@@ -517,7 +391,7 @@ async fn run_server(state: SharedState, addr: &str) -> Result<(), Box<dyn std::e
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    info!("Server listening on {addr}");
+    println!("{} Server listening on {addr}", "🌐".blue());
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

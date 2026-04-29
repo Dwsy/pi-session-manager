@@ -81,7 +81,7 @@ pub fn upsert_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInf
     .map_err(|e| format!("Failed to upsert session: {e}"))?;
 
     // Populate message_entries table if it exists (for per-message FTS)
-    if tx.query_row("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, String>(0)).map(|_| true).unwrap_or(false) {
+    if session.message_count > 0 && tx.query_row("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, String>(0)).map(|_| true).unwrap_or(false) {
         debug!("[Upsert] Syncing message entries for session: {}", session.path);
         // Use incremental sync instead of delete-all + reinsert
         if let Some(entries) = entries {
@@ -92,8 +92,8 @@ pub fn upsert_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInf
             insert_message_entries(tx, session)?;
         }
         debug!("[Upsert] Completed message entries for session: {}", session.path);
-    } else {
-        debug!("[Upsert] message_entries table does not exist, skipping");
+    } else if session.message_count == 0 {
+        debug!("[Upsert] Skipping message entries for session with 0 messages: {}", session.path);
     }
 
     Ok(())

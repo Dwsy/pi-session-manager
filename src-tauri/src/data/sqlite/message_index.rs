@@ -174,7 +174,7 @@ fn rebuild_all_message_entries(conn: &Connection) -> Result<usize, String> {
 }
 
 fn list_all_session_paths(conn: &Connection) -> Result<Vec<String>, String> {
-    let mut stmt = conn.prepare("SELECT path FROM sessions ORDER BY modified DESC, path ASC").map_err(|e| format!("Failed to prepare session path listing for rebuild: {e}"))?;
+    let mut stmt = conn.prepare("SELECT path FROM sessions WHERE message_count > 0 ORDER BY modified DESC, path ASC").map_err(|e| format!("Failed to prepare session path listing for rebuild: {e}"))?;
 
     let rows = stmt.query_map([], |row| row.get(0)).map_err(|e| format!("Failed to query session paths for rebuild: {e}"))?;
 
@@ -186,7 +186,8 @@ fn backfill_missing_message_entries(conn: &Connection) -> Result<usize, String> 
         .prepare(
             "SELECT s.path
              FROM sessions s
-             WHERE NOT EXISTS (
+             WHERE s.message_count > 0
+             AND NOT EXISTS (
                  SELECT 1 FROM message_entries m WHERE m.session_path = s.path
              )
              ORDER BY s.modified DESC, s.path ASC
