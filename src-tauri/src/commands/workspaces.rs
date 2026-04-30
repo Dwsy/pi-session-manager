@@ -1,4 +1,5 @@
 use chrono::Utc;
+use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
 
@@ -96,6 +97,11 @@ pub async fn save_workspace(workspace: KanbanWorkspace) -> Result<(), String> {
     }
 
     save_workspaces_file(&file)
+}
+
+pub async fn save_workspace_from_value(value: Value) -> Result<(), String> {
+    let workspace: KanbanWorkspace = serde_json::from_value(value).map_err(|e| format!("Invalid workspace: {e}"))?;
+    save_workspace(workspace).await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
