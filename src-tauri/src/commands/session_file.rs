@@ -440,6 +440,69 @@ pub(super) async fn get_session_entries_impl(path: String) -> Result<Vec<Session
     Ok(result)
 }
 
+/// Read message entries from SQLite for preview mode.
+/// Returns only user/assistant messages with text content, skipping tool calls/thinking.
+pub(super) async fn get_session_preview_entries_impl(session_path: String) -> Result<Vec<SessionEntry>, String> {
+    let start = std::time::Instant::now();
+    let entries = tokio::task::spawn_blocking(move || -> Result<Vec<SessionEntry>, String> {
+        let config = config::load_config()?;
+        let conn = crate::data::sqlite::init_db_with_config(&config)?;
+        let mut stmt = conn
+            .prepare("SELECT entry_id, role, content, timestamp FROM message_entries WHERE session_path = ?1 AND role IN ('user', 'assistant') ORDER BY timestamp ASC")
+            .map_err(|e| format!("Failed to prepare preview query: {e}"))?;
+
+        let rows = stmt
+            .query_map(rusqlite::params![session_path], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            })
+            .map_err(|e| format!("Failed to query preview entries: {e}"))?;
+
+        let mut entries = Vec::new();
+        for row in rows {
+            let (entry_id, role, content_text, timestamp_str) = row
+                .map_err(|e| format!("Failed to read preview row: {e}"))?;
+
+            let timestamp: chrono::DateTime<chrono::Utc> = chrono::DateTime::parse_from_rfc3339(&timestamp_str)
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .unwrap_or_else(|_| chrono::Utc::now());
+
+            let content = if content_text.trim().is_empty() {
+                Vec::new()
+            } else {
+                vec![crate::types::Content {
+                    content_type: "text".to_string(),
+                    text: Some(content_text),
+                }]
+            };
+
+            entries.push(SessionEntry {
+                entry_type: "message".to_string(),
+                id: entry_id,
+                parent_id: None,
+                timestamp,
+                message: Some(crate::types::Message {
+                    role,
+                    content,
+                }),
+                target_id: None,
+                label: None,
+            });
+        }
+        Ok(entries)
+    })
+    .await
+    .map_err(|e| format!("Failed to join preview task: {e}"))??;
+
+    let elapsed = start.elapsed();
+    info!("[IO] get_session_preview_entries path={} entries={} elapsed={:?}", entries.first().map(|e| e.id.as_str()).unwrap_or(""), entries.len(), elapsed);
+    Ok(entries)
+}
+
 pub(super) async fn get_session_labels_impl(path: String) -> Result<HashMap<String, String>, String> {
     tokio::task::spawn_blocking(move || get_session_labels_sync(&path)).await.map_err(|e| format!("Failed to join get_session_labels task: {e}"))?
 }

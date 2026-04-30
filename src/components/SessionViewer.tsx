@@ -162,6 +162,7 @@ function SessionViewerContent({
     loadErrorMessage: t("session.loadError"),
     isAtBottomRef: sessionDataIsAtBottomRef,
     isLive,
+    previewMode,
   });
 
   const handleToggleSidebar = useCallback(() => {

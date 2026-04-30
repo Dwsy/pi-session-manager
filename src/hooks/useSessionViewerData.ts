@@ -12,6 +12,7 @@ import {
 } from "@/browser-dataset";
 import {
   readRuntimeSessionChunk,
+  getPreviewEntriesFromDB,
   shouldListenRuntimeSessionEvents,
 } from "@/runtime-data/sessionSource";
 
@@ -144,6 +145,8 @@ export interface UseSessionViewerDataOptions {
   loadErrorMessage: string;
   isAtBottomRef: MutableRefObject<boolean>;
   isLive?: boolean;
+  /** Preview mode: read from SQLite DB instead of JSONL files */
+  previewMode?: boolean;
 }
 
 export interface UseSessionViewerDataResult {
@@ -169,6 +172,7 @@ export function useSessionViewerData({
   loadErrorMessage,
   isAtBottomRef,
   isLive,
+  previewMode = false,
 }: UseSessionViewerDataOptions): UseSessionViewerDataResult {
   const [entries, setEntries] = useState<SessionEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -337,6 +341,31 @@ export function useSessionViewerData({
         setLoading(true);
         setShowLoading(false);
         setError(null);
+
+        // Preview mode: read directly from SQLite DB.
+        // Skips JSONL parsing, file chunking, caching, and pagination.
+        if (previewMode) {
+          let dbEntries: SessionEntry[] | null = null;
+          try {
+            dbEntries = await getPreviewEntriesFromDB(sessionPath);
+            if (cancelled) return;
+
+            setEntries(dbEntries);
+            setLineCount(dbEntries.length);
+            updateHasMoreHistory(false);
+            setActiveEntryId(getDefaultActiveEntryId(dbEntries));
+            pendingScrollToBottomRef.current = false;
+          } catch (dbError) {
+            // Fallback to JSONL if DB read fails (e.g. message_entries not populated yet)
+            console.warn("[useSessionViewerData] DB preview read failed, falling back to JSONL:", dbError);
+          }
+          if (dbEntries) {
+            setLoading(false);
+            setShowLoading(false);
+            return;
+          }
+          // DB read failed — fall through to JSONL path
+        }
 
         const openPosition = getCachedSettings().session?.openPosition ?? "top";
 

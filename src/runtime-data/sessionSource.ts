@@ -1,9 +1,11 @@
+import { invoke } from "@/transport";
 import type {
   DayStats,
   FullTextSearchResponse,
   FullTextSearchSourceFilter,
   SearchResult,
   SessionChunk,
+  SessionEntry,
   SessionInfo,
   SessionStats,
 } from "@/types";
@@ -73,6 +75,17 @@ export async function getRuntimeSessionLabels(
   path: string,
 ): Promise<Record<string, string>> {
   return resolveSessionProvider().getSessionLabels(path);
+}
+
+/**
+ * Preview mode: read user/assistant messages from SQLite.
+ * Skips JSONL parsing, tool calls, thinking blocks, and non-message entries.
+ * Only works in Tauri/CLI mode (not demo/browser-dataset).
+ */
+export async function getPreviewEntriesFromDB(
+  sessionPath: string,
+): Promise<SessionEntry[]> {
+  return invoke<SessionEntry[]>("get_session_preview_entries", { sessionPath });
 }
 
 export async function getRuntimeStats(

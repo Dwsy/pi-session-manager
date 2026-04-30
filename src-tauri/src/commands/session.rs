@@ -99,6 +99,13 @@ pub async fn get_session_entries(path: String) -> Result<Vec<SessionEntry>, Stri
     super::session_file::get_session_entries_impl(path).await
 }
 
+/// Preview mode: read user/assistant messages from SQLite instead of JSONL.
+/// Skips tool calls, thinking blocks, and non-message entries.
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn get_session_preview_entries(session_path: String) -> Result<Vec<SessionEntry>, String> {
+    super::session_file::get_session_preview_entries_impl(session_path).await
+}
+
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_labels(path: String) -> Result<HashMap<String, String>, String> {
     super::session_file::get_session_labels_impl(path).await

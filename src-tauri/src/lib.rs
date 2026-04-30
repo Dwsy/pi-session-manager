@@ -72,6 +72,7 @@ pub fn run() {
             read_session_file_incremental_offset,
             get_file_stats,
             get_session_entries,
+            get_session_preview_entries,
             get_session_labels,
             detect_session_format,
             list_supported_session_providers,

@@ -20,6 +20,8 @@ import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
 import SearchFilterBar from '@/components/search/SearchFilterBar'
 import SessionPreviewModal from './SessionPreviewModal'
+import TimeRangeSelector from './TimeRangeSelector'
+import type { TimeRange } from '@/utils/sessionFilters'
 import { filterSessions } from '@/utils/sessionFilters'
 import { getPathBasename } from '@/utils/path'
 
@@ -99,9 +101,10 @@ export default function KanbanBoard({
   const [searchQuery, setSearchQuery] = useState('')
   const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null)
   const [initialClickPoint, setInitialClickPoint] = useState<{ x: number; y: number } | null>(null)
+  const [timeRange, setTimeRange] = useState<TimeRange>('any')
   const suppressPreviewOpenUntilRef = useRef(0)
 
-  // Filter sessions by project + search query
+  // Filter sessions by project + search query + time range
   const filteredSessions = useMemo(() => {
     return filterSessions({
       sessions,
@@ -111,8 +114,9 @@ export default function KanbanBoard({
       filterTagIds,
       sessionTags,
       getDescendantIds,
+      timeRange,
     })
-  }, [sessions, projectFilter, searchQuery, sourceFilterSlugs, filterTagIds, sessionTags, getDescendantIds])
+  }, [sessions, projectFilter, searchQuery, sourceFilterSlugs, filterTagIds, sessionTags, getDescendantIds, timeRange])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -320,6 +324,11 @@ export default function KanbanBoard({
         <span className="text-[10px] text-muted-foreground shrink-0">
           {filteredSessions.length} {t('project.list.sessions')}
         </span>
+        <TimeRangeSelector
+          value={timeRange}
+          onChange={setTimeRange}
+          compact
+        />
         {onNewSession && (
           <button
             onClick={() => onNewSession(projectFilter || '')}

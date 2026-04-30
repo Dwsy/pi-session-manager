@@ -3,6 +3,8 @@ import { getSessionSourceSlug } from "./session";
 import { getSessionIdMatchKind, normalizeSessionIdQuery } from "./session";
 import { parseQuotedQuery } from "./search";
 
+export type TimeRange = 'any' | '1h' | '24h' | '7d' | '30d';
+
 interface SessionSearchOptions {
   includeId?: boolean;
 }
@@ -15,6 +17,7 @@ interface FilterSessionsOptions {
   sourceFilterSlugs?: string[];
   sessionTags?: SessionTag[];
   getDescendantIds?: (tagId: string) => string[];
+  timeRange?: TimeRange;
 }
 
 function buildSearchableFields(
@@ -145,6 +148,7 @@ export function filterSessions({
   sourceFilterSlugs = [],
   sessionTags = [],
   getDescendantIds = () => [],
+  timeRange = 'any',
 }: FilterSessionsOptions): SessionInfo[] {
   let result = sessions;
 
@@ -163,6 +167,24 @@ export function filterSessions({
 
   if (sourceFilterSlugs.length > 0) {
     result = filterSessionsBySourceSlugs(result, sourceFilterSlugs);
+  }
+
+  if (timeRange !== 'any') {
+    const now = Date.now();
+    const timeLimits: Record<TimeRange, number> = {
+      'any': 0,
+      '1h': 60 * 60 * 1000,
+      '24h': 24 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      '30d': 30 * 24 * 60 * 60 * 1000,
+    };
+    const limit = timeLimits[timeRange];
+    if (limit > 0) {
+      result = result.filter((session) => {
+        const modified = new Date(session.modified).getTime();
+        return now - modified <= limit;
+      });
+    }
   }
 
   if (searchQuery?.trim()) {
