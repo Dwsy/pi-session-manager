@@ -100,7 +100,9 @@ export function useSessionViewerDerivedData(
           toolResultByCallId.set(entry.message.toolCallId, entry)
         }
 
-        if (!isRenderableMessageEntry(entry, pathEntryIds, isLive)) {
+        // In preview mode, skip path filtering — DB already returns only
+        // the messages we need, and DB entries have no parentId for path resolution.
+        if (!isRenderableMessageEntry(entry, pathEntryIds, isLive || previewMode)) {
           continue
         }
 

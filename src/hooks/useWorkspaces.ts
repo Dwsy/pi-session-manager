@@ -4,8 +4,6 @@ import { invoke, isTauri } from '@/transport'
 export interface KanbanWorkspace {
   id: string
   name: string
-  icon?: string
-  color?: string
   config: {
     projectFilter: string | null
     filterTagIds: string[]
@@ -18,7 +16,6 @@ export interface KanbanWorkspace {
 const DEFAULT_WORKSPACE: KanbanWorkspace = {
   id: '__default__',
   name: 'All Projects',
-  icon: '🌐',
   config: {
     projectFilter: null,
     filterTagIds: [],

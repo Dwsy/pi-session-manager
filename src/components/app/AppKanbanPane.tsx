@@ -1,5 +1,6 @@
 import {
   Suspense,
+  useState,
   type ComponentProps,
   type ComponentType,
   type LazyExoticComponent,
@@ -46,11 +47,6 @@ export interface AppKanbanPaneProps extends AppKanbanPaneBaseProps {
   fallback: ReactNode;
   KanbanBoardComponent: LazyExoticComponent<ComponentType<KanbanBoardProps>>;
   loading?: boolean;
-  showWorkspaceEditor?: boolean;
-  editingWorkspace?: KanbanWorkspace | null;
-  onCloseWorkspaceEditor?: () => void;
-  onSaveWorkspace?: (workspace: Omit<KanbanWorkspace, 'createdAt' | 'updatedAt'>) => Promise<void>;
-  projectFilter?: string | null;
 }
 
 function AppKanbanPane({
@@ -81,10 +77,6 @@ function AppKanbanPane({
   getDescendantIds,
   liveSessionIds,
   loading = false,
-  showWorkspaceEditor = false,
-  editingWorkspace = null,
-  onCloseWorkspaceEditor,
-  onSaveWorkspace,
 }: AppKanbanPaneProps) {
   const {
     workspaces,
@@ -95,12 +87,26 @@ function AppKanbanPane({
     selectWorkspace,
   } = useWorkspaces();
 
-  const handleSaveWorkspace = async (workspace: Omit<KanbanWorkspace, 'createdAt' | 'updatedAt'>) => {
-    await saveWorkspace(workspace);
-    onCloseWorkspaceEditor?.();
+  const [showEditor, setShowEditor] = useState(false);
+  const [editingWorkspace, setEditingWorkspace] = useState<KanbanWorkspace | null>(null);
+
+  const handleCreate = () => {
+    setEditingWorkspace(null);
+    setShowEditor(true);
   };
 
-  const handleDeleteWorkspace = async (id: string) => {
+  const handleEdit = (workspace: KanbanWorkspace) => {
+    setEditingWorkspace(workspace);
+    setShowEditor(true);
+  };
+
+  const handleSave = async (workspace: Omit<KanbanWorkspace, 'createdAt' | 'updatedAt'>) => {
+    await saveWorkspace(workspace);
+    setShowEditor(false);
+    setEditingWorkspace(null);
+  };
+
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this workspace?')) {
       await deleteWorkspace(id);
     }
@@ -108,62 +114,60 @@ function AppKanbanPane({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Workspace Switcher */}
-      <div className="px-4 py-2 border-b border-border/40">
+      <div className="px-4 py-2 border-b border-border/40 flex-shrink-0">
         <WorkspaceSwitcher
           workspaces={workspaces}
           activeWorkspaceId={activeWorkspaceId}
           onSelect={selectWorkspace}
-          onCreate={() => {
-            onCloseWorkspaceEditor?.()
-          }}
-          onEdit={(_) => {
-            onCloseWorkspaceEditor?.()
-          }}
-          onDelete={handleDeleteWorkspace}
+          onCreate={handleCreate}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
         />
       </div>
 
-      {/* Kanban Board */}
-      <Suspense fallback={fallback}>
-        <KanbanBoardComponent
-          sessions={sessions}
-          tags={tags}
-          sessionTags={sessionTags}
-          selectedSession={selectedSession}
-          onSelectSession={onSelectSession}
-          onMoveSession={onMoveSession}
-          getTagsForSession={getTagsForSession}
-          onToggleTag={onToggleTag}
-          onDeleteSession={onDeleteSession}
-          onConvertSession={onConvertSession}
-          onResumeSession={onResumeSession}
-          onCopyResumeSession={onCopyResumeSession}
-          onNewSession={onNewSession}
-          favorites={favorites}
-          onToggleFavorite={onToggleFavorite}
-          terminal={terminal}
-          piPath={piPath}
-          customCommand={customCommand}
-          onCreateTag={onCreateTag}
-          projectFilter={activeWorkspace.config.projectFilter}
-          filterTagIds={activeWorkspace.config.filterTagIds.length > 0 ? activeWorkspace.config.filterTagIds : filterTagIds}
-          sourceFilterSlugs={activeWorkspace.config.sourceFilterSlugs.length > 0 ? activeWorkspace.config.sourceFilterSlugs : sourceFilterSlugs}
-          onFilterChange={onFilterChange}
-          getDescendantIds={getDescendantIds}
-          liveSessionIds={liveSessionIds}
-          loading={loading}
-        />
-      </Suspense>
+      <div className="flex-1 min-h-0">
+        <Suspense fallback={fallback}>
+          <KanbanBoardComponent
+            sessions={sessions}
+            tags={tags}
+            sessionTags={sessionTags}
+            selectedSession={selectedSession}
+            onSelectSession={onSelectSession}
+            onMoveSession={onMoveSession}
+            getTagsForSession={getTagsForSession}
+            onToggleTag={onToggleTag}
+            onDeleteSession={onDeleteSession}
+            onConvertSession={onConvertSession}
+            onResumeSession={onResumeSession}
+            onCopyResumeSession={onCopyResumeSession}
+            onNewSession={onNewSession}
+            favorites={favorites}
+            onToggleFavorite={onToggleFavorite}
+            terminal={terminal}
+            piPath={piPath}
+            customCommand={customCommand}
+            onCreateTag={onCreateTag}
+            projectFilter={activeWorkspace.config.projectFilter}
+            filterTagIds={activeWorkspace.config.filterTagIds.length > 0 ? activeWorkspace.config.filterTagIds : filterTagIds}
+            sourceFilterSlugs={activeWorkspace.config.sourceFilterSlugs.length > 0 ? activeWorkspace.config.sourceFilterSlugs : sourceFilterSlugs}
+            onFilterChange={onFilterChange}
+            getDescendantIds={getDescendantIds}
+            liveSessionIds={liveSessionIds}
+            loading={loading}
+          />
+        </Suspense>
+      </div>
 
-      {/* Workspace Editor Modal */}
-      {showWorkspaceEditor && (
+      {showEditor && (
         <WorkspaceEditor
           workspace={editingWorkspace}
           sessions={sessions}
           tags={tags}
-          onSave={onSaveWorkspace || handleSaveWorkspace}
-          onClose={onCloseWorkspaceEditor || (() => {})}
+          onSave={handleSave}
+          onClose={() => {
+            setShowEditor(false);
+            setEditingWorkspace(null);
+          }}
         />
       )}
     </div>

@@ -7,10 +7,8 @@ import ProjectFilterList from "@/components/project/ProjectFilterList";
 import ProjectList from "@/components/project/ProjectList";
 import SessionList from "@/components/session-list/SessionList";
 import SelectedProjectHeader from "@/components/project/SelectedProjectHeader";
-import WorkspaceSwitcher from "@/components/kanban/WorkspaceSwitcher";
 import type { FavoriteItem, SessionInfo } from "@/types";
 import type { AppDesktopSidebarViewMode } from "./AppDesktopSidebar";
-import type { KanbanWorkspace } from "@/hooks/useWorkspaces";
 
 type SessionListProps = ComponentProps<typeof SessionList>;
 type ProjectListProps = ComponentProps<typeof ProjectList>;
@@ -80,12 +78,6 @@ export interface AppDesktopSidebarContentProps {
   onRemoveFavorite: FavoritesPanelProps["onRemoveFavorite"];
   onToggleFavorite: NonNullable<ProjectListProps["onToggleFavorite"]>;
   liveSessionIds?: Set<string>;
-  workspaces?: KanbanWorkspace[];
-  activeWorkspaceId?: string;
-  onSelectWorkspace?: (id: string) => void;
-  onCreateWorkspace?: () => void;
-  onEditWorkspace?: (workspace: KanbanWorkspace) => void;
-  onDeleteWorkspace?: (id: string) => void;
 }
 
 function AppDesktopSidebarContent({
@@ -119,12 +111,6 @@ function AppDesktopSidebarContent({
   onRemoveFavorite,
   onToggleFavorite,
   liveSessionIds,
-  workspaces,
-  activeWorkspaceId,
-  onSelectWorkspace,
-  onCreateWorkspace,
-  onEditWorkspace,
-  onDeleteWorkspace,
 }: AppDesktopSidebarContentProps) {
   const { t } = useTranslation();
 
@@ -137,18 +123,6 @@ function AppDesktopSidebarContent({
 
   return (
     <>
-      {!showFavorites && viewMode === "kanban" && workspaces && activeWorkspaceId && onSelectWorkspace && (
-        <div className="px-3 py-2 border-b border-border/40">
-          <WorkspaceSwitcher
-            workspaces={workspaces}
-            activeWorkspaceId={activeWorkspaceId}
-            onSelect={onSelectWorkspace}
-            onCreate={onCreateWorkspace || (() => {})}
-            onEdit={onEditWorkspace || (() => {})}
-            onDelete={onDeleteWorkspace || (() => {})}
-          />
-        </div>
-      )}
       {!showFavorites && viewMode === "kanban" && (
         <ProjectFilterList
           sessions={sessions}

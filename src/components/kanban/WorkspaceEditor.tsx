@@ -1,19 +1,17 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { X, Tag, FolderInput } from 'lucide-react'
 import type { KanbanWorkspace } from '@/hooks/useWorkspaces'
-import type { SessionInfo, Tag } from '@/types'
+import type { SessionInfo, Tag as TagType } from '@/types'
+import TagBadge from '@/components/tags/TagBadge'
 
 interface WorkspaceEditorProps {
   workspace?: KanbanWorkspace | null
   sessions: SessionInfo[]
-  tags: Tag[]
+  tags: TagType[]
   onSave: (workspace: Omit<KanbanWorkspace, 'createdAt' | 'updatedAt'>) => void
   onClose: () => void
 }
-
-const ICONS = ['📋', '🎨', '💻', '🚀', '🔧', '📊', '🎯', '🌟', '📁', '🧪']
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
 
 export default function WorkspaceEditor({
   workspace,
@@ -24,8 +22,6 @@ export default function WorkspaceEditor({
 }: WorkspaceEditorProps) {
   const { t } = useTranslation()
   const [name, setName] = useState(workspace?.name || '')
-  const [icon, setIcon] = useState(workspace?.icon || ICONS[0])
-  const [color, setColor] = useState(workspace?.color || COLORS[0])
   const [projectFilter, setProjectFilter] = useState<string | null>(workspace?.config.projectFilter || null)
   const [filterTagIds, setFilterTagIds] = useState<string[]>(workspace?.config.filterTagIds || [])
 
@@ -45,8 +41,6 @@ export default function WorkspaceEditor({
     onSave({
       id: workspace?.id || '__new__',
       name: name.trim(),
-      icon,
-      color,
       config: {
         projectFilter,
         filterTagIds,
@@ -58,12 +52,12 @@ export default function WorkspaceEditor({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-surface rounded-lg shadow-2xl border border-border w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h3 className="text-sm font-medium">
+      <div className="bg-card rounded-lg shadow-2xl border border-border w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+          <h3 className="text-sm font-medium text-foreground">
             {workspace ? t('kanban.workspace.edit') : t('kanban.workspace.create')}
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-muted">
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted text-muted-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -77,56 +71,21 @@ export default function WorkspaceEditor({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:ring-1 focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:ring-1 focus:ring-ring focus:border-primary outline-none"
               placeholder={t('kanban.workspace.namePlaceholder')}
+              autoFocus
             />
           </div>
 
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              {t('kanban.workspace.icon')}
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {ICONS.map(i => (
-                <button
-                  key={i}
-                  onClick={() => setIcon(i)}
-                  className={`w-8 h-8 rounded-md flex items-center justify-center text-lg ${
-                    icon === i ? 'bg-primary/10 ring-1 ring-primary' : 'hover:bg-muted'
-                  }`}
-                >
-                  {i}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              {t('kanban.workspace.color')}
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {COLORS.map(c => (
-                <button
-                  key={c}
-                  onClick={() => setColor(c)}
-                  className={`w-6 h-6 rounded-full ${
-                    color === c ? 'ring-2 ring-offset-2 ring-primary' : ''
-                  }`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <FolderInput className="h-3 w-3" />
               {t('kanban.workspace.projectFilter')}
             </label>
             <select
               value={projectFilter || ''}
               onChange={(e) => setProjectFilter(e.target.value || null)}
-              className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+              className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:ring-1 focus:ring-ring outline-none"
             >
               <option value="">{t('kanban.workspace.allProjects')}</option>
               {projects.map(project => (
@@ -138,7 +97,8 @@ export default function WorkspaceEditor({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <Tag className="h-3 w-3" />
               {t('kanban.workspace.tagFilters')}
             </label>
             <div className="flex flex-wrap gap-2">
@@ -146,20 +106,21 @@ export default function WorkspaceEditor({
                 <button
                   key={tag.id}
                   onClick={() => handleToggleTag(tag.id)}
-                  className={`px-2.5 py-1 rounded-md text-xs ${
+                  className={`px-2 py-1 rounded-md text-xs flex items-center gap-1 ${
                     filterTagIds.includes(tag.id)
-                      ? 'bg-primary/10 text-primary ring-1 ring-primary'
+                      ? 'bg-primary/10 text-primary ring-1 ring-primary/50'
                       : 'bg-muted hover:bg-muted/80 text-muted-foreground'
                   }`}
                 >
-                  {tag.name}
+                  <TagBadge tag={tag} compact />
+                  <span>{tag.name}</span>
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
+        <div className="flex justify-end gap-2 px-4 py-3 border-t border-border/40 bg-muted/30">
           <button
             onClick={onClose}
             className="px-3 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted motion-color"
