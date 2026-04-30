@@ -332,7 +332,7 @@ export default function KanbanBoard({
         {onNewSession && (
           <button
             onClick={() => onNewSession(projectFilter || '')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-accent/10 text-accent hover:bg-accent/20 text-[11px] shrink-0 motion-color motion-press focus-ring"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md border border-accent/25 bg-accent/15 text-accent hover:bg-accent/25 hover:border-accent/40 text-[11px] shrink-0 motion-color motion-press focus-ring"
             title={t('kanban.newSession', 'New Session')}
           >
             <Plus className="h-3.5 w-3.5" />

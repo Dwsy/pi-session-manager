@@ -415,7 +415,7 @@ fn parse_session_entry(line: &str) -> Option<SessionEntry> {
 
     let message = value.get("message").and_then(|m| serde_json::from_value(m.clone()).ok());
 
-    Some(SessionEntry { entry_type, id, parent_id, timestamp, message, target_id: value.get("targetId").and_then(|field| field.as_str()).map(|field| field.to_string()), label: value.get("label").and_then(|field| field.as_str()).map(|field| field.to_string()) })
+    Some(SessionEntry { entry_type, id, parent_id, timestamp, message, target_id: value.get("targetId").and_then(|field| field.as_str()).map(|field| field.to_string()), label: value.get("label").and_then(|field| field.as_str()).map(|field| field.to_string()), provider: None, model_id: None })
 }
 
 pub(super) async fn get_session_entries_impl(path: String) -> Result<Vec<SessionEntry>, String> {
@@ -440,15 +440,80 @@ pub(super) async fn get_session_entries_impl(path: String) -> Result<Vec<Session
     Ok(result)
 }
 
+/// Read the first line of a JSONL file (session metadata).
+fn read_first_jsonl_line(path: &str) -> Result<String, String> {
+    let mut file = fs::File::open(path).map_err(|e| format!("Failed to open {path}: {e}"))?;
+    let mut buf = Vec::new();
+    // Read until first newline or 64KB
+    let mut tmp = [0u8; 4096];
+    loop {
+        let n = file.read(&mut tmp).map_err(|e| format!("Read error: {e}"))?;
+        if n == 0 { break; }
+        buf.extend_from_slice(&tmp[..n]);
+        if let Some(pos) = buf.iter().position(|&b| b == b'\n') {
+            buf.truncate(pos);
+            break;
+        }
+        if buf.len() > 65536 { break; }
+    }
+    String::from_utf8(buf).map_err(|e| format!("UTF-8 error: {e}"))
+}
+
 /// Read message entries from SQLite for preview mode.
 /// Returns only user/assistant messages with text content, skipping tool calls/thinking.
 pub(super) async fn get_session_preview_entries_impl(session_path: String) -> Result<Vec<SessionEntry>, String> {
     let start = std::time::Instant::now();
-    let entries = tokio::task::spawn_blocking(move || -> Result<Vec<SessionEntry>, String> {
+    let all_entries_result = tokio::task::spawn_blocking(move || -> Result<Vec<SessionEntry>, String> {
+        let mut all_entries: Vec<SessionEntry> = Vec::new();
+
+        // 1. Read first line of JSONL for session metadata (timestamp, model, provider)
+        if let Ok(first_line) = read_first_jsonl_line(&session_path) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&first_line) {
+                if val.get("type").and_then(|v| v.as_str()) == Some("session") {
+                    let timestamp = val.get("timestamp")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                        .map(|dt| dt.with_timezone(&chrono::Utc))
+                        .unwrap_or_else(|| chrono::Utc::now());
+                    let provider = val.get("provider").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let model_id = val.get("modelId").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let session_id = val.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+                    all_entries.push(SessionEntry {
+                        entry_type: "session".to_string(),
+                        id: session_id.clone(),
+                        parent_id: None,
+                        timestamp,
+                        message: None,
+                        target_id: None,
+                        label: None,
+                        provider: Some(provider.clone()),
+                        model_id: Some(model_id.clone()),
+                    });
+
+                    // Also emit a model_change entry so computeStats picks up the model
+                    if !provider.is_empty() || !model_id.is_empty() {
+                        all_entries.push(SessionEntry {
+                            entry_type: "model_change".to_string(),
+                            id: format!("{}-model", session_id.clone()),
+                            parent_id: None,
+                            timestamp,
+                            message: None,
+                            target_id: None,
+                            label: None,
+                            provider: Some(provider),
+                            model_id: Some(model_id),
+                        });
+                    }
+                }
+            }
+        }
+
+        // 2. Query message entries from SQLite (user + assistant text only)
         let config = config::load_config()?;
         let conn = crate::data::sqlite::init_db_with_config(&config)?;
         let mut stmt = conn
-            .prepare("SELECT entry_id, role, content, timestamp FROM message_entries WHERE session_path = ?1 AND role IN ('user', 'assistant') ORDER BY timestamp ASC")
+            .prepare("SELECT entry_id, role, content, timestamp FROM message_entries WHERE session_path = ?1 AND role IN ('user', 'assistant') AND TRIM(content) != '' AND content NOT LIKE '[Tool:%' AND content NOT LIKE '[Tool Output]%' ORDER BY timestamp ASC")
             .map_err(|e| format!("Failed to prepare preview query: {e}"))?;
 
         let rows = stmt
@@ -462,7 +527,6 @@ pub(super) async fn get_session_preview_entries_impl(session_path: String) -> Re
             })
             .map_err(|e| format!("Failed to query preview entries: {e}"))?;
 
-        let mut entries = Vec::new();
         for row in rows {
             let (entry_id, role, content_text, timestamp_str) = row
                 .map_err(|e| format!("Failed to read preview row: {e}"))?;
@@ -480,7 +544,11 @@ pub(super) async fn get_session_preview_entries_impl(session_path: String) -> Re
                 }]
             };
 
-            entries.push(SessionEntry {
+            if content.is_empty() {
+                continue;
+            }
+
+            all_entries.push(SessionEntry {
                 entry_type: "message".to_string(),
                 id: entry_id,
                 parent_id: None,
@@ -491,16 +559,18 @@ pub(super) async fn get_session_preview_entries_impl(session_path: String) -> Re
                 }),
                 target_id: None,
                 label: None,
+                provider: None,
+                model_id: None,
             });
         }
-        Ok(entries)
+        Ok(all_entries)
     })
     .await
     .map_err(|e| format!("Failed to join preview task: {e}"))??;
 
     let elapsed = start.elapsed();
-    info!("[IO] get_session_preview_entries path={} entries={} elapsed={:?}", entries.first().map(|e| e.id.as_str()).unwrap_or(""), entries.len(), elapsed);
-    Ok(entries)
+    info!("[IO] get_session_preview_entries path={} entries={} elapsed={:?}", all_entries_result.first().map(|e| e.id.as_str()).unwrap_or(""), all_entries_result.len(), elapsed);
+    Ok(all_entries_result)
 }
 
 pub(super) async fn get_session_labels_impl(path: String) -> Result<HashMap<String, String>, String> {

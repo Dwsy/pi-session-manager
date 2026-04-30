@@ -86,7 +86,7 @@ pub fn canonical_to_session_entries(canonical: &CanonicalSession) -> Vec<Session
         };
         let timestamp = message.timestamp.and_then(DateTime::<Utc>::from_timestamp_millis).unwrap_or_else(Utc::now);
 
-        entries.push(SessionEntry { entry_type: "message".to_string(), id: id.clone(), parent_id: previous_id.clone(), timestamp, message: Some(Message { role, content }), target_id: None, label: None });
+        entries.push(SessionEntry { entry_type: "message".to_string(), id: id.clone(), parent_id: previous_id.clone(), timestamp, message: Some(Message { role, content }), target_id: None, label: None, provider: None, model_id: None });
         previous_id = Some(id);
     }
 

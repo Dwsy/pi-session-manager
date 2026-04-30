@@ -7,8 +7,10 @@ import ProjectFilterList from "@/components/project/ProjectFilterList";
 import ProjectList from "@/components/project/ProjectList";
 import SessionList from "@/components/session-list/SessionList";
 import SelectedProjectHeader from "@/components/project/SelectedProjectHeader";
+import WorkspacePanel from "@/components/kanban/WorkspacePanel";
 import type { FavoriteItem, SessionInfo } from "@/types";
 import type { AppDesktopSidebarViewMode } from "./AppDesktopSidebar";
+import type { KanbanWorkspace } from "@/hooks/useWorkspaces";
 
 type SessionListProps = ComponentProps<typeof SessionList>;
 type ProjectListProps = ComponentProps<typeof ProjectList>;
@@ -78,6 +80,12 @@ export interface AppDesktopSidebarContentProps {
   onRemoveFavorite: FavoritesPanelProps["onRemoveFavorite"];
   onToggleFavorite: NonNullable<ProjectListProps["onToggleFavorite"]>;
   liveSessionIds?: Set<string>;
+  workspaces: KanbanWorkspace[];
+  activeWorkspaceId: string;
+  onSelectWorkspace: (id: string) => void;
+  onCreateWorkspace: () => void;
+  onEditWorkspace: (w: KanbanWorkspace) => void;
+  onDeleteWorkspace: (id: string) => void;
 }
 
 function AppDesktopSidebarContent({
@@ -111,6 +119,12 @@ function AppDesktopSidebarContent({
   onRemoveFavorite,
   onToggleFavorite,
   liveSessionIds,
+  workspaces,
+  activeWorkspaceId,
+  onSelectWorkspace,
+  onCreateWorkspace,
+  onEditWorkspace,
+  onDeleteWorkspace,
 }: AppDesktopSidebarContentProps) {
   const { t } = useTranslation();
 
@@ -124,11 +138,16 @@ function AppDesktopSidebarContent({
   return (
     <>
       {!showFavorites && viewMode === "kanban" && (
-        <ProjectFilterList
+        <WorkspacePanel
           sessions={sessions}
           selectedProject={selectedProject}
           onSelectProject={onSelectKanbanFilterProject}
-          scrollParentRef={listScrollRef}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          onSelectWorkspace={onSelectWorkspace}
+          onCreateWorkspace={onCreateWorkspace}
+          onEditWorkspace={onEditWorkspace}
+          onDeleteWorkspace={onDeleteWorkspace}
         />
       )}
       {showFavorites ? (

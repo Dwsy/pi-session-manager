@@ -875,7 +875,7 @@ mod tests {
     }
 
     fn model_change_entry(id: &str, timestamp: &str) -> SessionEntry {
-        SessionEntry { entry_type: "model_change".to_string(), id: id.to_string(), parent_id: None, timestamp: parse_test_timestamp(timestamp), message: None, target_id: None, label: None }
+        SessionEntry { entry_type: "model_change".to_string(), id: id.to_string(), parent_id: None, timestamp: parse_test_timestamp(timestamp), message: None, target_id: None, label: None, provider: None, model_id: None }
     }
 
     #[test]
