@@ -14,9 +14,6 @@ pub fn canonical_to_session_info(canonical: &CanonicalSession, path: &Path, modi
     let mut first_message = String::new();
     let mut last_message = String::new();
     let mut last_message_role = String::new();
-    let mut all_messages = Vec::new();
-    let mut user_messages = Vec::new();
-    let mut assistant_messages = Vec::new();
 
     for entry in &entries {
         let Some(message) = &entry.message else {
@@ -35,12 +32,6 @@ pub fn canonical_to_session_info(canonical: &CanonicalSession, path: &Path, modi
         }
         last_message = truncate_text(&text, 150);
         last_message_role = message.role.clone();
-        all_messages.push(text.clone());
-        if message.role == "user" {
-            user_messages.push(text);
-        } else {
-            assistant_messages.push(text);
-        }
     }
 
     SessionInfo {
@@ -52,8 +43,8 @@ pub fn canonical_to_session_info(canonical: &CanonicalSession, path: &Path, modi
         modified,
         message_count,
         first_message,
-        user_messages_text: user_messages.join("\n"),
-        assistant_messages_text: assistant_messages.join("\n"),
+        user_messages_text: String::new(),
+        assistant_messages_text: String::new(),
         last_message,
         last_message_role,
         parent_session_path: None,

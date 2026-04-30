@@ -82,7 +82,7 @@ pub fn cleanup_missing_files(conn: &Connection) -> Result<usize, String> {
 pub fn preload_recent_sessions(conn: &Connection, count: usize) -> Result<Vec<SessionInfo>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, path, cwd, name, created, modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path
+            "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path
          FROM sessions
          ORDER BY last_accessed DESC, access_count DESC, modified DESC, path ASC
          LIMIT ?",
@@ -100,11 +100,11 @@ pub fn preload_recent_sessions(conn: &Connection, count: usize) -> Result<Vec<Se
                 modified: parse_timestamp(&row.get::<_, String>(5)?),
                 message_count: row.get(6)?,
                 first_message: row.get(7)?,
-                user_messages_text: row.get(8).unwrap_or_default(),
-                assistant_messages_text: row.get(9).unwrap_or_default(),
-                last_message: row.get(10).unwrap_or_default(),
-                last_message_role: row.get(11).unwrap_or_default(),
-                parent_session_path: row.get(12)?,
+                user_messages_text: String::new(),
+                assistant_messages_text: String::new(),
+                last_message: row.get(8).unwrap_or_default(),
+                last_message_role: row.get(9).unwrap_or_default(),
+                parent_session_path: row.get(10)?,
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?

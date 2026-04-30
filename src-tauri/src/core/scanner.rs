@@ -33,6 +33,14 @@ struct CachedFileList {
     updated_at: std::time::Instant,
 }
 
+struct ScanInProgressGuard;
+
+impl Drop for ScanInProgressGuard {
+    fn drop(&mut self) {
+        SCAN_IN_PROGRESS.store(false, Ordering::Release);
+    }
+}
+
 /// Invalidate the scan cache so the next scan re-reads all directories
 pub fn invalidate_cache() {
     if let Ok(mut guard) = SCAN_CACHE.write() {
@@ -226,6 +234,7 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
 
     // Mark scan in progress
     SCAN_IN_PROGRESS.store(true, Ordering::Release);
+    let _scan_guard = ScanInProgressGuard;
 
     // First call: full scan to populate cache
     let config = Config::load().unwrap_or_default();
@@ -235,10 +244,6 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
         *guard = Some(result.clone());
         CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
     }
-
-    // Mark scan complete
-    SCAN_IN_PROGRESS.store(false, Ordering::Release);
-
     Ok(result)
 }
 
@@ -679,6 +684,8 @@ fn safe_append_only_read_jsonl(path: &Path, last_offset: u64) -> Result<(u64, Ve
 /// Incrementally update SessionInfo by appending new entries.
 fn incremental_update_session_info(old: &SessionInfo, new_entries: &[SessionEntry], file_modified: DateTime<Utc>) -> SessionInfo {
     let mut info = old.clone();
+    info.user_messages_text.clear();
+    info.assistant_messages_text.clear();
     let mut modified = info.modified;
 
     for entry in new_entries {
@@ -691,17 +698,6 @@ fn incremental_update_session_info(old: &SessionInfo, new_entries: &[SessionEntr
                 if message.role == "user" || message.role == "assistant" {
                     if info.first_message.is_empty() && message.role == "user" {
                         info.first_message = text.clone();
-                    }
-                    if message.role == "user" {
-                        if !info.user_messages_text.is_empty() {
-                            info.user_messages_text.push(' ');
-                        }
-                        info.user_messages_text.push_str(&text);
-                    } else if message.role == "assistant" {
-                        if !info.assistant_messages_text.is_empty() {
-                            info.assistant_messages_text.push(' ');
-                        }
-                        info.assistant_messages_text.push_str(&text);
                     }
                     info.last_message = text;
                     info.last_message_role = message.role.clone();
@@ -909,32 +905,46 @@ impl ScannerScheduler {
         let mut conn = sqlite::init_db_with_config(&self.config)?;
         let realtime_cutoff = Utc::now() - Duration::days(self.config.realtime_cutoff_days);
 
-        // Use parallel parse
-        let parsed_results = parallel_parse_files(files).await;
+        let cached_file_modified = sqlite::get_all_cached_file_modified(&conn)?;
+        let mut files_to_parse = Vec::new();
+        let mut skipped = 0;
+
+        for path in files {
+            let path_str = path.to_string_lossy().to_string();
+            let backing_path = crate::domain::session_bridge::backing_file_path(&path);
+            let file_modified: DateTime<Utc> = match fs::metadata(&backing_path).and_then(|metadata| metadata.modified()) {
+                Ok(modified) => DateTime::from(modified),
+                Err(error) => {
+                    warn!("Failed to get metadata for {}: {}", path.display(), error);
+                    continue;
+                }
+            };
+
+            if cached_file_modified.get(&path_str).is_some_and(|cached| file_modified <= *cached) {
+                skipped += 1;
+                continue;
+            }
+
+            files_to_parse.push(path);
+        }
+
+        // Use parallel parse only for files that changed since the DB snapshot.
+        let parsed_results = parallel_parse_files(files_to_parse).await;
 
         // Process and upsert to DB
         let mut sessions: Vec<SessionInfo> = Vec::with_capacity(parsed_results.len());
         let mut updated = 0;
         let mut added = 0;
-        let mut skipped = 0;
-
         for result in parsed_results {
             let path_str = &result.path_str;
             let file_modified = result.file_modified;
-            let cached_mtime = sqlite::get_cached_file_modified(&conn, path_str)?;
+            let was_cached = cached_file_modified.contains_key(path_str);
 
-            match cached_mtime {
-                Some(cached) if file_modified <= cached => {
-                    skipped += 1;
-                }
-                Some(_) => {
-                    sqlite::upsert_session(&mut conn, &result.info, file_modified, Some(&result.entries))?;
-                    updated += 1;
-                }
-                None => {
-                    sqlite::upsert_session(&mut conn, &result.info, file_modified, Some(&result.entries))?;
-                    added += 1;
-                }
+            sqlite::upsert_session(&mut conn, &result.info, file_modified, Some(&result.entries))?;
+            if was_cached {
+                updated += 1;
+            } else {
+                added += 1;
             }
 
             sessions.push(result.info);

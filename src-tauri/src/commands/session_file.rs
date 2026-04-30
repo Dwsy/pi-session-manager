@@ -46,8 +46,11 @@ struct TransformedSessionCacheEntry {
 #[derive(Clone)]
 struct SessionLabelsCacheEntry {
     modified_at_ms: u128,
+    file_size: u64,
     labels: HashMap<String, String>,
 }
+
+const PROVIDER_DETECTION_PROBE_BYTES: usize = 64 * 1024;
 
 fn transformed_session_cache() -> &'static RwLock<HashMap<String, TransformedSessionCacheEntry>> {
     static CACHE: OnceLock<RwLock<HashMap<String, TransformedSessionCacheEntry>>> = OnceLock::new();
@@ -65,12 +68,63 @@ fn file_modified_ms(path: &str) -> Result<u128, String> {
     modified.duration_since(std::time::UNIX_EPOCH).map(|duration| duration.as_millis()).map_err(|e| format!("Failed to convert modified time: {e}"))
 }
 
+fn file_modified_ms_and_size(path: &str) -> Result<(u128, u64), String> {
+    let backing_path = crate::domain::session_bridge::backing_file_path(Path::new(path));
+    let metadata = fs::metadata(backing_path).map_err(|e| format!("Failed to get session file metadata: {e}"))?;
+    let modified = metadata.modified().map_err(|e| format!("Failed to get modified time: {e}"))?;
+    let modified_at_ms = modified.duration_since(std::time::UNIX_EPOCH).map(|duration| duration.as_millis()).map_err(|e| format!("Failed to convert modified time: {e}"))?;
+    Ok((modified_at_ms, metadata.len()))
+}
+
+fn appended_range_may_contain_label(path: &str, from_size: u64, to_size: u64) -> bool {
+    const LABEL_APPEND_PROBE_BYTES: u64 = 64 * 1024;
+
+    if to_size <= from_size {
+        return true;
+    }
+
+    let appended_bytes = to_size - from_size;
+    if appended_bytes > LABEL_APPEND_PROBE_BYTES {
+        return true;
+    }
+
+    let backing_path = crate::domain::session_bridge::backing_file_path(Path::new(path));
+    let Ok(mut file) = fs::File::open(backing_path) else {
+        return true;
+    };
+    if file.seek(SeekFrom::Start(from_size)).is_err() {
+        return true;
+    }
+
+    let mut buffer = vec![0u8; appended_bytes as usize];
+    let Ok(bytes_read) = file.read(&mut buffer) else {
+        return true;
+    };
+    buffer.truncate(bytes_read);
+
+    let text = String::from_utf8_lossy(&buffer);
+    text.lines().filter_map(|line| serde_json::from_str::<Value>(line.trim()).ok()).any(|value| value.get("type").and_then(Value::as_str) == Some("label"))
+}
+
 fn detect_session_provider(path: &Path) -> Result<Option<crate::domain::casr_min::providers::ProviderKind>, String> {
     if let Some(provider) = crate::domain::casr_min::providers::detect_provider(Some(path), "") {
         return Ok(Some(provider));
     }
 
     let backing_path = crate::domain::casr_min::bridge_ops::backing_file_path(path);
+    let mut file = fs::File::open(&backing_path).map_err(|e| format!("Failed to read session file {}: {e}", backing_path.display()))?;
+    let mut buffer = vec![0u8; PROVIDER_DETECTION_PROBE_BYTES];
+    let bytes_read = file.read(&mut buffer).map_err(|e| format!("Failed to read session file {}: {e}", backing_path.display()))?;
+    buffer.truncate(bytes_read);
+
+    let probe = String::from_utf8_lossy(&buffer);
+    if let Some(provider) = crate::domain::casr_min::providers::detect_provider(Some(path), &probe) {
+        return Ok(Some(provider));
+    }
+    if bytes_read < PROVIDER_DETECTION_PROBE_BYTES {
+        return Ok(None);
+    }
+
     let content = fs::read_to_string(&backing_path).map_err(|e| format!("Failed to read session file {}: {e}", backing_path.display()))?;
     Ok(crate::domain::casr_min::providers::detect_provider(Some(path), &content))
 }
@@ -89,13 +143,18 @@ fn get_session_labels_sync(path: &str) -> Result<HashMap<String, String>, String
         return Ok(HashMap::new());
     }
 
-    let modified_at_ms = file_modified_ms(path)?;
+    let (modified_at_ms, file_size) = file_modified_ms_and_size(path)?;
     if let Ok(guard) = session_labels_cache().read() {
         if let Some(entry) = guard.get(path) {
-            // Use cache if modified time matches, OR if cache is less than 10 seconds old
-            // This prevents re-reading active sessions on every label request
+            if entry.modified_at_ms == modified_at_ms && entry.file_size == file_size {
+                return Ok(entry.labels.clone());
+            }
+
+            // Active sessions often append ordinary message rows. Avoid a full
+            // label reparse unless the append tail contains label rows; rewrites,
+            // truncations, or large appends refresh conservatively.
             let cache_age_ms = entry.modified_at_ms.abs_diff(modified_at_ms);
-            if cache_age_ms < 10_000 || entry.modified_at_ms >= modified_at_ms {
+            if cache_age_ms < 10_000 && file_size > entry.file_size && !appended_range_may_contain_label(path, entry.file_size, file_size) {
                 return Ok(entry.labels.clone());
             }
         }
@@ -107,7 +166,7 @@ fn get_session_labels_sync(path: &str) -> Result<HashMap<String, String>, String
     info!("[IO] get_session_labels cache_miss path={} elapsed={:?}", path, elapsed);
 
     if let Ok(mut guard) = session_labels_cache().write() {
-        guard.insert(path.to_string(), SessionLabelsCacheEntry { modified_at_ms, labels: labels.clone() });
+        guard.insert(path.to_string(), SessionLabelsCacheEntry { modified_at_ms, file_size, labels: labels.clone() });
     }
 
     Ok(labels)
@@ -123,13 +182,6 @@ fn transformed_session_content(path: &str) -> Result<Option<String>, String> {
         }
     }
 
-    let start = std::time::Instant::now();
-    let Ok((source, canonical)) = crate::domain::session_bridge::read_canonical_session_from_path(session_path) else {
-        return Ok(None);
-    };
-    let elapsed = start.elapsed();
-    info!("[IO] transformed_session_content casr_parse path={} elapsed={:?}", path, elapsed);
-
     let modified_at_ms = file_modified_ms(path)?;
     if let Ok(guard) = transformed_session_cache().read() {
         if let Some(entry) = guard.get(path) {
@@ -137,6 +189,17 @@ fn transformed_session_content(path: &str) -> Result<Option<String>, String> {
                 return Ok(Some(entry.content.clone()));
             }
         }
+    }
+
+    let start = std::time::Instant::now();
+    let Ok((source, canonical)) = crate::domain::session_bridge::read_canonical_session_from_path(session_path) else {
+        return Ok(None);
+    };
+    let elapsed = start.elapsed();
+    info!("[IO] transformed_session_content casr_parse path={} elapsed={:?}", path, elapsed);
+
+    if source == crate::domain::session_bridge::SessionBridgeSource::Pi {
+        return Ok(None);
     }
 
     let content = crate::domain::session_bridge::preview_canonical_for_viewer(&canonical)?;

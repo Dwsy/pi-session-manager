@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -10,6 +11,8 @@ use crate::domain::casr_min::providers::{detect_provider, ProviderKind};
 use crate::domain::casr_min::write_support;
 use crate::domain::session_bridge::types::{map_read_result, CanonicalSession, SessionBridgeConvertOptions, SessionBridgeConvertResult, SessionBridgeSource};
 use tracing::{debug, warn};
+
+const PROVIDER_DETECTION_PROBE_BYTES: usize = 64 * 1024;
 
 pub fn default_session_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
@@ -109,8 +112,8 @@ pub fn parse_session_info_from_path(path: &Path) -> Result<(SessionInfo, Vec<Ses
 /// Lightweight header-only parse for fast initial scan.
 /// Returns only metadata from the first line, with empty message fields.
 pub fn parse_session_info_header_only(path: &Path, file_modified: DateTime<Utc>) -> Result<SessionInfo, String> {
-    // Use path-based detection (no file read) to determine provider
-    if let Some(provider) = crate::domain::casr_min::providers::detect_provider(Some(path), "") {
+    // Use path detection first, then a bounded header probe for custom Pi roots.
+    if let Some(provider) = detect_provider_from_path_or_probe(path) {
         if provider == ProviderKind::Pi {
             return crate::domain::pi_session::parse_pi_session_header_only(path, file_modified);
         }
@@ -118,6 +121,20 @@ pub fn parse_session_info_header_only(path: &Path, file_modified: DateTime<Utc>)
     // For non-Pi formats, fall back to full parse (they're typically smaller)
     let (info, _) = parse_session_info_from_path(path)?;
     Ok(info)
+}
+
+fn detect_provider_from_path_or_probe(path: &Path) -> Option<ProviderKind> {
+    if let Some(provider) = crate::domain::casr_min::providers::detect_provider(Some(path), "") {
+        return Some(provider);
+    }
+
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut buffer = vec![0u8; PROVIDER_DETECTION_PROBE_BYTES];
+    let bytes_read = file.read(&mut buffer).ok()?;
+    buffer.truncate(bytes_read);
+
+    let probe = String::from_utf8_lossy(&buffer);
+    detect_provider(Some(path), &probe)
 }
 
 pub fn parse_session_entries_from_path(path: &Path) -> Result<Vec<SessionEntry>, String> {

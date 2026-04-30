@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
@@ -64,9 +64,6 @@ pub fn parse_pi_session_info(path: &Path, file_modified: DateTime<Utc>) -> Resul
     let mut last_message = String::new();
     let mut last_message_role = String::new();
     let mut latest_message_activity = None;
-    let mut all_messages = Vec::new();
-    let mut user_messages = Vec::new();
-    let mut assistant_messages = Vec::new();
 
     for raw_entry in &raw_entries {
         let RawPiEntry::Message { message, .. } = raw_entry else {
@@ -91,12 +88,6 @@ pub fn parse_pi_session_info(path: &Path, file_modified: DateTime<Utc>) -> Resul
 
         last_message = truncate_text(&visible_text, 150);
         last_message_role = message.role.clone();
-        all_messages.push(visible_text.clone());
-        if message.role == "user" {
-            user_messages.push(visible_text);
-        } else {
-            assistant_messages.push(visible_text);
-        }
     }
 
     let latest_entry_activity = raw_entries.iter().map(RawPiEntry::timestamp).max();
@@ -113,8 +104,8 @@ pub fn parse_pi_session_info(path: &Path, file_modified: DateTime<Utc>) -> Resul
             modified,
             message_count,
             first_message,
-            user_messages_text: user_messages.join("\n"),
-            assistant_messages_text: assistant_messages.join("\n"),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
             last_message,
             last_message_role,
             parent_session_path: header.parent_session_path,
@@ -171,36 +162,12 @@ pub fn parse_pi_session_header_only(path: &Path, file_modified: DateTime<Utc>) -
 
     let header = parse_header(header_line.trim(), path)?;
 
-    // Try to read last non-empty line for last_message hint
-    let mut last_line = String::new();
-    let mut last_message = String::new();
-    let mut last_message_role = String::new();
-    for line in reader.lines().map_while(Result::ok) {
-        let trimmed = line.trim();
-        if !trimmed.is_empty() {
-            last_line = trimmed.to_string();
-        }
-    }
-    if !last_line.is_empty() {
-        if let Ok(value) = serde_json::from_str::<Value>(&last_line) {
-            if let Some(msg) = value.get("message") {
-                if let Some(role) = msg.get("role").and_then(Value::as_str) {
-                    last_message_role = role.to_string();
-                }
-                if let Some(parts) = msg.get("content").and_then(Value::as_array) {
-                    for part in parts {
-                        if let Some(text) = part.get("text").and_then(Value::as_str) {
-                            last_message = truncate_text(text, 150);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    let metadata = std::fs::metadata(path).ok();
+    let file_size = metadata.as_ref().map(|item| item.len()).unwrap_or(0);
+    let (last_message, last_message_role) = read_last_message_hint(path, file_size).unwrap_or_default();
 
-    // Estimate message count from file size (rough: ~200 bytes per message)
-    let estimated_message_count = if let Ok(metadata) = std::fs::metadata(path) { (metadata.len() / 200) as usize } else { 0 };
+    // Estimate message count from file size (rough: ~200 bytes per message).
+    let estimated_message_count = (file_size / 200) as usize;
 
     Ok(SessionInfo {
         path: path.to_string_lossy().to_string(),
@@ -217,6 +184,60 @@ pub fn parse_pi_session_header_only(path: &Path, file_modified: DateTime<Utc>) -
         last_message_role,
         parent_session_path: header.parent_session_path,
     })
+}
+
+const HEADER_ONLY_TAIL_PROBE_BYTES: u64 = 64 * 1024;
+
+fn read_last_message_hint(path: &Path, file_size: u64) -> Option<(String, String)> {
+    if file_size == 0 {
+        return None;
+    }
+
+    let probe_len = file_size.min(HEADER_ONLY_TAIL_PROBE_BYTES) as usize;
+    if probe_len == 0 {
+        return None;
+    }
+
+    let mut file = File::open(path).ok()?;
+    let start = file_size.saturating_sub(probe_len as u64);
+    file.seek(SeekFrom::Start(start)).ok()?;
+
+    let mut buffer = vec![0u8; probe_len];
+    let bytes_read = file.read(&mut buffer).ok()?;
+    buffer.truncate(bytes_read);
+
+    let tail = String::from_utf8_lossy(&buffer);
+    for line in tail.lines().rev() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some(hint) = parse_message_hint(trimmed) {
+            return Some(hint);
+        }
+    }
+
+    None
+}
+
+fn parse_message_hint(line: &str) -> Option<(String, String)> {
+    let value = serde_json::from_str::<Value>(line).ok()?;
+    let message = value.get("message")?;
+    let role = message.get("role").and_then(Value::as_str)?.to_string();
+    if !is_searchable_message_role(&role) {
+        return None;
+    }
+
+    let text = message_text_hint(message)?;
+    Some((truncate_text(&text, 150), role))
+}
+
+fn message_text_hint(message: &Value) -> Option<String> {
+    match message.get("content") {
+        Some(Value::String(text)) => Some(text.trim().to_string()).filter(|text| !text.is_empty()),
+        Some(Value::Array(parts)) => parts.iter().filter_map(|part| part.get("text").and_then(Value::as_str)).map(str::trim).find(|text| !text.is_empty()).map(str::to_string),
+        _ => None,
+    }
 }
 
 fn parse_pi_session_reader<R: BufRead>(reader: R, path: &Path) -> Result<(PiSessionHeader, Vec<RawPiEntry>), String> {
@@ -366,7 +387,7 @@ fn truncate_text(text: &str, max_len: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_pi_session_entries, parse_pi_session_info, resolve_labels};
+    use super::{parse_pi_session_entries, parse_pi_session_header_only, parse_pi_session_info, resolve_labels};
     use chrono::{DateTime, Utc};
     use std::fs;
     use tempfile::tempdir;
@@ -401,6 +422,29 @@ mod tests {
         assert_eq!(info.last_message, "hi back");
         assert_eq!(info.last_message_role, "assistant");
         assert_eq!(entries.len(), 2);
+    }
+
+    #[test]
+    fn header_only_parse_reads_tail_hint_without_full_parse() {
+        let filler = "x".repeat(96 * 1024);
+        let contents = format!(
+            concat!(
+                "{{\"type\":\"session\",\"version\":3,\"id\":\"sess-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace/project\"}}\n",
+                "{{\"type\":\"message\",\"id\":\"m1\",\"parentId\":null,\"timestamp\":\"2026-04-09T10:01:00Z\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"early\"}}]}}}}\n",
+                "{{\"type\":\"label\",\"id\":\"l1\",\"targetId\":\"m1\",\"timestamp\":\"2026-04-09T10:02:00Z\",\"label\":\"{filler}\"}}\n",
+                "{{\"type\":\"message\",\"id\":\"m2\",\"parentId\":\"m1\",\"timestamp\":\"2026-04-09T10:03:00Z\",\"message\":{{\"role\":\"assistant\",\"content\":[{{\"type\":\"text\",\"text\":\"tail hint\"}}]}}}}\n"
+            ),
+            filler = filler,
+        );
+        let (_temp_dir, path) = write_session_file(&contents);
+
+        let info = parse_pi_session_header_only(&path, timestamp("2026-04-09T10:05:00Z")).expect("header-only parse");
+
+        assert_eq!(info.id, "sess-1");
+        assert_eq!(info.last_message, "tail hint");
+        assert_eq!(info.last_message_role, "assistant");
+        assert!(info.message_count > 0);
+        assert!(info.first_message.is_empty());
     }
 
     #[test]

@@ -301,10 +301,36 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsString;
+
+    struct EnvVarGuard {
+        key: &'static str,
+        previous: Option<OsString>,
+    }
+
+    impl EnvVarGuard {
+        fn set(key: &'static str, value: impl AsRef<std::ffi::OsStr>) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::set_var(key, value);
+            Self { key, previous }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            if let Some(previous) = self.previous.as_ref() {
+                std::env::set_var(self.key, previous);
+            } else {
+                std::env::remove_var(self.key);
+            }
+        }
+    }
 
     #[test]
     fn calculate_stats_from_inputs_populates_daily_token_and_cost_totals() {
+        let _env_lock = crate::paths::test_env_lock().lock().expect("test env lock");
         let temp = tempfile::tempdir().expect("tempdir");
+        let _test_db = EnvVarGuard::set("PPM_TEST_DB", temp.path().join("stats.db"));
         let session_path = temp.path().join("stats-session.jsonl");
         std::fs::write(
             &session_path,

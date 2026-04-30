@@ -20,8 +20,13 @@ struct MessageEntryRow {
 
 const INSERT_CHUNK_SIZE: usize = 32;
 const MESSAGE_INDEX_ROW_VERSION: &str = "3";
+const MESSAGE_INDEX_REBUILD_BATCH_SIZE: usize = 25;
+const MESSAGE_INDEX_REFRESH_MIN_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
+const MESSAGE_INDEX_REBUILD_TARGET_KEY: &str = "row_version_rebuild_target";
+const MESSAGE_INDEX_REBUILD_CURSOR_KEY: &str = "row_version_rebuild_cursor";
 
 static MESSAGE_ENTRIES_BACKFILL_STATE: Mutex<Option<HashMap<String, MessageEntriesBackfillState>>> = Mutex::new(None);
+static MESSAGE_ENTRIES_REFRESH_LAST_RUN: Mutex<Option<HashMap<String, std::time::Instant>>> = Mutex::new(None);
 
 fn try_claim_message_entries_backfill(db_key: &str) -> Result<bool, String> {
     let mut guard = MESSAGE_ENTRIES_BACKFILL_STATE.lock().map_err(|_| "Failed to lock backfill state guard".to_string())?;
@@ -51,12 +56,42 @@ fn finish_message_entries_backfill(db_key: &str, _mark_done: bool) -> Result<(),
     Ok(())
 }
 
+fn message_entries_refresh_is_throttled(db_key: &str) -> Result<bool, String> {
+    let mut guard = MESSAGE_ENTRIES_REFRESH_LAST_RUN.lock().map_err(|_| "Failed to lock message index refresh throttle".to_string())?;
+    let last_runs = guard.get_or_insert_with(HashMap::new);
+
+    if let Some(last_run) = last_runs.get(db_key) {
+        if last_run.elapsed() < MESSAGE_INDEX_REFRESH_MIN_INTERVAL {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+fn mark_message_entries_refresh(db_key: &str) -> Result<(), String> {
+    let mut guard = MESSAGE_ENTRIES_REFRESH_LAST_RUN.lock().map_err(|_| "Failed to lock message index refresh throttle".to_string())?;
+    guard.get_or_insert_with(HashMap::new).insert(db_key.to_string(), std::time::Instant::now());
+    Ok(())
+}
+
 #[cfg(test)]
 fn clear_message_entries_backfill_state_for_tests(db_key: &str) {
     let mut guard = MESSAGE_ENTRIES_BACKFILL_STATE.lock().expect("mutex poisoned");
     if let Some(states) = guard.as_mut() {
         states.remove(db_key);
         if states.is_empty() {
+            *guard = None;
+        }
+    }
+}
+
+#[cfg(test)]
+fn clear_message_entries_refresh_throttle_for_tests(db_key: &str) {
+    let mut guard = MESSAGE_ENTRIES_REFRESH_LAST_RUN.lock().expect("mutex poisoned");
+    if let Some(last_runs) = guard.as_mut() {
+        last_runs.remove(db_key);
+        if last_runs.is_empty() {
             *guard = None;
         }
     }
@@ -75,16 +110,29 @@ fn ensure_message_index_state_table(conn: &Connection) -> Result<(), String> {
 }
 
 fn get_message_index_row_version(conn: &Connection) -> Result<Option<String>, String> {
-    conn.query_row("SELECT value FROM message_index_state WHERE key = 'row_version'", [], |row| row.get(0)).optional().map_err(|e| format!("Failed to read message index row version: {e}"))
+    get_message_index_state(conn, "row_version")
 }
 
 fn set_message_index_row_version(conn: &Connection, version: &str) -> Result<(), String> {
+    set_message_index_state(conn, "row_version", version)
+}
+
+fn get_message_index_state(conn: &Connection, key: &str) -> Result<Option<String>, String> {
+    conn.query_row("SELECT value FROM message_index_state WHERE key = ?1", params![key], |row| row.get(0)).optional().map_err(|e| format!("Failed to read message index state {key}: {e}"))
+}
+
+fn set_message_index_state(conn: &Connection, key: &str, value: &str) -> Result<(), String> {
     conn.execute(
-        "INSERT INTO message_index_state (key, value) VALUES ('row_version', ?1)
+        "INSERT INTO message_index_state (key, value) VALUES (?1, ?2)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        params![version],
+        params![key, value],
     )
-    .map_err(|e| format!("Failed to persist message index row version: {e}"))?;
+    .map_err(|e| format!("Failed to persist message index state {key}: {e}"))?;
+    Ok(())
+}
+
+fn delete_message_index_state(conn: &Connection, key: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM message_index_state WHERE key = ?1", params![key]).map_err(|e| format!("Failed to delete message index state {key}: {e}"))?;
     Ok(())
 }
 
@@ -106,12 +154,25 @@ fn refresh_message_entries_if_needed(conn: &Connection) -> Result<(), String> {
         let needs_full_rebuild = stored_row_version.as_deref() != Some(MESSAGE_INDEX_ROW_VERSION);
 
         if needs_full_rebuild {
-            let rebuilt_count = rebuild_all_message_entries(conn)?;
-            info!("[Migration] Rebuilt message_entries rows for {} sessions with row version {}", rebuilt_count, MESSAGE_INDEX_ROW_VERSION);
-            return Ok(true);
+            if message_entries_refresh_is_throttled(&db_key)? {
+                debug!("[Migration] message_entries row-version rebuild throttled for db {}", db_key);
+                return Ok(false);
+            }
+            let rebuilt_count = rebuild_message_entries_row_version_batch(conn)?;
+            if rebuilt_count > 0 {
+                mark_message_entries_refresh(&db_key)?;
+            }
+            return Ok(rebuilt_count > 0);
         }
 
+        if message_entries_refresh_is_throttled(&db_key)? {
+            debug!("[Migration] message_entries backfill throttled for db {}", db_key);
+            return Ok(false);
+        }
         let backfilled = backfill_missing_message_entries(conn)?;
+        if backfilled > 0 {
+            mark_message_entries_refresh(&db_key)?;
+        }
         Ok(backfilled > 0)
     })();
 
@@ -127,43 +188,131 @@ fn refresh_message_entries_if_needed(conn: &Connection) -> Result<(), String> {
     }
 }
 
-fn rebuild_all_message_entries(conn: &Connection) -> Result<usize, String> {
-    let session_paths = list_all_session_paths(conn)?;
+#[derive(Clone, Debug)]
+struct RebuildCursor {
+    modified: String,
+    path: String,
+}
+
+fn encode_rebuild_cursor(cursor: &RebuildCursor) -> String {
+    format!("{}\n{}", cursor.modified, cursor.path)
+}
+
+fn decode_rebuild_cursor(raw: &str) -> Option<RebuildCursor> {
+    let (modified, path) = raw.split_once('\n')?;
+    if modified.is_empty() || path.is_empty() {
+        return None;
+    }
+    Some(RebuildCursor { modified: modified.to_string(), path: path.to_string() })
+}
+
+fn ensure_rebuild_target(conn: &Connection) -> Result<(), String> {
+    let target = get_message_index_state(conn, MESSAGE_INDEX_REBUILD_TARGET_KEY)?;
+    if target.as_deref() == Some(MESSAGE_INDEX_ROW_VERSION) {
+        return Ok(());
+    }
+
+    set_message_index_state(conn, MESSAGE_INDEX_REBUILD_TARGET_KEY, MESSAGE_INDEX_ROW_VERSION)?;
+    delete_message_index_state(conn, MESSAGE_INDEX_REBUILD_CURSOR_KEY)?;
+    Ok(())
+}
+
+fn get_rebuild_cursor(conn: &Connection) -> Result<Option<RebuildCursor>, String> {
+    Ok(get_message_index_state(conn, MESSAGE_INDEX_REBUILD_CURSOR_KEY)?.and_then(|raw| decode_rebuild_cursor(&raw)))
+}
+
+fn list_message_entries_rebuild_batch(conn: &Connection, cursor: Option<&RebuildCursor>, limit: usize) -> Result<Vec<RebuildCursor>, String> {
+    let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+
+    let rows = if let Some(cursor) = cursor {
+        let mut stmt = conn
+            .prepare(
+                "SELECT path, modified
+                 FROM sessions
+                 WHERE message_count > 0
+                   AND (modified < ?1 OR (modified = ?1 AND path > ?2))
+                 ORDER BY modified DESC, path ASC
+                 LIMIT ?3",
+            )
+            .map_err(|e| format!("Failed to prepare cursor message_entries rebuild listing: {e}"))?;
+
+        let rows = stmt
+            .query_map(params![&cursor.modified, &cursor.path, limit], |row| Ok(RebuildCursor { path: row.get(0)?, modified: row.get(1)? }))
+            .map_err(|e| format!("Failed to query cursor message_entries rebuild listing: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect cursor message_entries rebuild listing: {e}"))?;
+        rows
+    } else {
+        let mut stmt = conn
+            .prepare(
+                "SELECT path, modified
+                 FROM sessions
+                 WHERE message_count > 0
+                 ORDER BY modified DESC, path ASC
+                 LIMIT ?1",
+            )
+            .map_err(|e| format!("Failed to prepare message_entries rebuild listing: {e}"))?;
+
+        let rows = stmt
+            .query_map(params![limit], |row| Ok(RebuildCursor { path: row.get(0)?, modified: row.get(1)? }))
+            .map_err(|e| format!("Failed to query message_entries rebuild listing: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect message_entries rebuild listing: {e}"))?;
+        rows
+    };
+
+    Ok(rows)
+}
+
+fn rebuild_message_entries_row_version_batch(conn: &Connection) -> Result<usize, String> {
+    ensure_rebuild_target(conn)?;
+    let cursor = get_rebuild_cursor(conn)?;
+    let batch = list_message_entries_rebuild_batch(conn, cursor.as_ref(), MESSAGE_INDEX_REBUILD_BATCH_SIZE)?;
+
+    if batch.is_empty() {
+        set_message_index_row_version(conn, MESSAGE_INDEX_ROW_VERSION)?;
+        delete_message_index_state(conn, MESSAGE_INDEX_REBUILD_TARGET_KEY)?;
+        delete_message_index_state(conn, MESSAGE_INDEX_REBUILD_CURSOR_KEY)?;
+        info!("[Migration] message_entries row version {} rebuild complete", MESSAGE_INDEX_ROW_VERSION);
+        return Ok(0);
+    }
+
     conn.execute_batch("BEGIN IMMEDIATE TRANSACTION").map_err(|e| format!("Failed to begin message_entries rebuild transaction: {e}"))?;
+    let reached_end = batch.len() < MESSAGE_INDEX_REBUILD_BATCH_SIZE;
 
     let rebuild_result = (|| -> Result<usize, String> {
-        if session_paths.is_empty() {
-            conn.execute("DELETE FROM message_entries", []).map_err(|e| format!("Failed to clear message_entries during empty rebuild: {e}"))?;
-            set_message_index_row_version(conn, MESSAGE_INDEX_ROW_VERSION)?;
-            return Ok(0);
-        }
-
-        conn.execute("DELETE FROM message_entries", []).map_err(|e| format!("Failed to clear message_entries for rebuild: {e}"))?;
-
         let mut rebuilt_count = 0usize;
-        for path in session_paths {
-            if !backing_store_exists(&path) {
-                warn!("[Migration] Removing stale session cache entry for missing backing file: {}", path);
-                if let Err(delete_err) = super::maintenance::delete_session(conn, &path) {
-                    warn!("[Migration] Failed to remove stale session cache entry {}: {}", path, delete_err);
+        for item in &batch {
+            if !backing_store_exists(&item.path) {
+                warn!("[Migration] Removing stale session cache entry for missing backing file: {}", item.path);
+                if let Err(delete_err) = super::maintenance::delete_session(conn, &item.path) {
+                    warn!("[Migration] Failed to remove stale session cache entry {}: {}", item.path, delete_err);
                 }
                 continue;
             }
 
-            if let Err(e) = insert_message_entries_for_path(conn, &path) {
-                warn!("[Migration] Failed to rebuild message_entries for {}: {}", path, e);
+            if let Err(e) = insert_message_entries_for_path(conn, &item.path) {
+                warn!("[Migration] Failed to rebuild message_entries for {}: {}", item.path, e);
                 continue; // Skip failed sessions instead of aborting entire rebuild
             }
             rebuilt_count += 1;
         }
 
-        set_message_index_row_version(conn, MESSAGE_INDEX_ROW_VERSION)?;
+        if reached_end {
+            set_message_index_row_version(conn, MESSAGE_INDEX_ROW_VERSION)?;
+            delete_message_index_state(conn, MESSAGE_INDEX_REBUILD_TARGET_KEY)?;
+            delete_message_index_state(conn, MESSAGE_INDEX_REBUILD_CURSOR_KEY)?;
+        } else if let Some(last) = batch.last() {
+            set_message_index_state(conn, MESSAGE_INDEX_REBUILD_CURSOR_KEY, &encode_rebuild_cursor(last))?;
+        }
+
         Ok(rebuilt_count)
     })();
 
     match rebuild_result {
         Ok(rebuilt_count) => {
             conn.execute_batch("COMMIT").map_err(|e| format!("Failed to commit message_entries rebuild transaction: {e}"))?;
+            info!("[IO] message_entries row-version rebuild batch rebuilt={} scanned={} target_version={} cursor_set={}", rebuilt_count, batch.len(), MESSAGE_INDEX_ROW_VERSION, !reached_end);
             Ok(rebuilt_count)
         }
         Err(error) => {
@@ -171,14 +320,6 @@ fn rebuild_all_message_entries(conn: &Connection) -> Result<usize, String> {
             Err(error)
         }
     }
-}
-
-fn list_all_session_paths(conn: &Connection) -> Result<Vec<String>, String> {
-    let mut stmt = conn.prepare("SELECT path FROM sessions WHERE message_count > 0 ORDER BY modified DESC, path ASC").map_err(|e| format!("Failed to prepare session path listing for rebuild: {e}"))?;
-
-    let rows = stmt.query_map([], |row| row.get(0)).map_err(|e| format!("Failed to query session paths for rebuild: {e}"))?;
-
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("Failed to collect session paths for rebuild: {e}"))
 }
 
 fn backfill_missing_message_entries(conn: &Connection) -> Result<usize, String> {
@@ -774,6 +915,18 @@ mod tests {
         assert!(try_claim_message_entries_backfill(db_key).unwrap());
 
         clear_message_entries_backfill_state_for_tests(db_key);
+    }
+
+    #[test]
+    fn message_entries_refresh_throttle_skips_immediate_repeat() {
+        let db_key = "/tmp/test-refresh-throttle.db";
+        clear_message_entries_refresh_throttle_for_tests(db_key);
+
+        assert!(!message_entries_refresh_is_throttled(db_key).unwrap());
+        mark_message_entries_refresh(db_key).unwrap();
+        assert!(message_entries_refresh_is_throttled(db_key).unwrap());
+
+        clear_message_entries_refresh_throttle_for_tests(db_key);
     }
 
     #[test]
