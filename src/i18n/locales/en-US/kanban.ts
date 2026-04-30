@@ -1,4 +1,21 @@
 export const kanban = {
   expand: 'Expand to full view',
   untitledSession: 'Untitled Session',
+  minimize: 'Minimize',
+  maximize: 'Maximize',
+  close: 'Close',
+  newSession: 'New Session',
+  workspace: {
+    default: 'All Projects',
+    create: 'New Workspace',
+    edit: 'Edit Workspace',
+    name: 'Workspace Name',
+    namePlaceholder: 'Enter workspace name',
+    icon: 'Icon',
+    color: 'Color',
+    projectFilter: 'Project Filter',
+    allProjects: 'All Projects',
+    tagFilters: 'Tag Filters',
+    deleteConfirm: 'Are you sure you want to delete this workspace?',
+  },
 } as const

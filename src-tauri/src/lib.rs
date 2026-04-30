@@ -180,7 +180,10 @@ pub fn run() {
             preview_config_bundle,
             import_config_bundle,
             restore_import_backup,
-            set_window_zoom_level
+            set_window_zoom_level,
+            get_workspaces,
+            save_workspace,
+            delete_workspace
         ])
         .setup(|app| {
             let app_state = app_state::create_app_state(app.handle().clone());

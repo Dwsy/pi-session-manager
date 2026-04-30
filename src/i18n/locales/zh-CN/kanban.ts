@@ -1,4 +1,21 @@
 export const kanban = {
   expand: '展开到完整视图',
   untitledSession: '未命名会话',
+  minimize: '最小化',
+  maximize: '最大化',
+  close: '关闭',
+  newSession: '新建会话',
+  workspace: {
+    default: '所有项目',
+    create: '新建工作区',
+    edit: '编辑工作区',
+    name: '工作区名称',
+    namePlaceholder: '输入工作区名称',
+    icon: '图标',
+    color: '颜色',
+    projectFilter: '项目过滤',
+    allProjects: '所有项目',
+    tagFilters: '标签过滤',
+    deleteConfirm: '确定要删除此工作区吗？',
+  },
 } as const

@@ -60,6 +60,7 @@ import AppSettingsPane from "./components/app/AppSettingsPane";
 import AppTerminalPane from "./components/app/AppTerminalPane";
 import DeleteSessionPopover from "./components/dialogs/DeleteSessionPopover";
 import type { DeleteSessionRequestOptions } from "./components/dialogs/deleteSessionTypes";
+import { useWorkspaces, type KanbanWorkspace } from "./hooks/useWorkspaces";
 import {
   DEFAULT_STANDALONE_DATASET_ID,
   getActiveDatasetId,
@@ -299,6 +300,15 @@ function App() {
     removeFavorite,
     toggleFavorite,
   } = useFavorites({ enabled: isInitialized });
+  const {
+    workspaces,
+    activeWorkspaceId,
+    saveWorkspace,
+    deleteWorkspace,
+    selectWorkspace,
+  } = useWorkspaces();
+  const [showWorkspaceEditor, setShowWorkspaceEditor] = useState(false);
+  const [editingWorkspace, setEditingWorkspace] = useState<KanbanWorkspace | null>(null);
   const { updateInfo, closeUpdateNotice, openUpdateReleasePage } =
     useUpdateChecker();
   useAppUiEffects({
@@ -856,12 +866,22 @@ function App() {
       customCommand={standaloneDatasetRuntime ? undefined : customCommand}
       resumeCommand={standaloneDatasetRuntime ? undefined : resumeCommand}
       onCreateTag={createTag}
-      projectFilter={selectedProject}
       filterTagIds={filterTagIds}
       sourceFilterSlugs={sourceFilterSlugs}
       onFilterChange={setFilterTagIds}
       getDescendantIds={getDescendantIds}
       liveSessionIds={liveSessionIds}
+      showWorkspaceEditor={showWorkspaceEditor}
+      editingWorkspace={editingWorkspace}
+      onCloseWorkspaceEditor={() => {
+        setShowWorkspaceEditor(false);
+        setEditingWorkspace(null);
+      }}
+      onSaveWorkspace={async (workspace) => {
+        await saveWorkspace(workspace);
+        setShowWorkspaceEditor(false);
+        setEditingWorkspace(null);
+      }}
     />
   );
 
@@ -1108,6 +1128,18 @@ function App() {
       onRemoveFavorite={removeFavorite}
       onToggleFavorite={toggleFavorite}
       liveSessionIds={liveSessionIds}
+      workspaces={workspaces}
+      activeWorkspaceId={activeWorkspaceId}
+      onSelectWorkspace={selectWorkspace}
+      onCreateWorkspace={() => {
+        setShowWorkspaceEditor(true)
+        setEditingWorkspace(null)
+      }}
+      onEditWorkspace={(workspace) => {
+        setShowWorkspaceEditor(true)
+        setEditingWorkspace(workspace)
+      }}
+      onDeleteWorkspace={deleteWorkspace}
     />
   );
 

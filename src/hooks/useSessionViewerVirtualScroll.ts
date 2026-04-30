@@ -84,8 +84,12 @@ export function useSessionViewerVirtualScroll({
       const entry = renderableEntries[index]
       if (!entry) return 140 + MESSAGE_ITEM_GAP
 
-      const cachedHeight = measuredHeightsRef.current.get(entry.id)
-      if (cachedHeight) return cachedHeight
+      // In preview mode, skip stale cache — content is stripped so cached heights
+      // from normal mode (including tool calls/thinking) are wildly inaccurate.
+      if (!previewMode) {
+        const cachedHeight = measuredHeightsRef.current.get(entry.id)
+        if (cachedHeight) return cachedHeight
+      }
 
       let height: number
       switch (entry.type) {
@@ -154,19 +158,25 @@ export function useSessionViewerVirtualScroll({
     },
   })
 
-  // Only reset scroll when session changes, not when individual tools expand/collapse
+  // Reset on session change: clear cache, force re-measure, scroll to top
   useEffect(() => {
     measuredHeightsRef.current.clear()
     hasTriggeredReachBottomRef.current = false
-    // Force virtualizer to recalculate all sizes
     rowVirtualizer.measure()
-    // Reset scroll position to top when session changes
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = 0
     }
     setIsAtBottom(true)
     isAtBottomRef.current = true
-  }, [sessionPath, previewMode, rowVirtualizer])
+  }, [sessionPath, rowVirtualizer])
+
+  // Preview mode change: clear cache and let virtualizer re-estimate.
+  // Do NOT call measure() here — React hasn't re-rendered with stripped content yet,
+  // so measuring would cache stale heights from the old DOM.
+  useEffect(() => {
+    measuredHeightsRef.current.clear()
+    hasTriggeredReachBottomRef.current = false
+  }, [previewMode])
 
   // When tools expand/collapse individually, re-measure with debounce to let DOM settle
   useEffect(() => {
@@ -245,11 +255,16 @@ export function useSessionViewerVirtualScroll({
     [entryIndexById, rowVirtualizer],
   )
 
+  const scrollTargetRafRef = useRef<number | null>(null)
+  const scrollTargetTimeoutsRef = useRef<number[]>([])
+
   useEffect(() => {
     if (!scrollTargetId || !messagesContainerRef.current) return
+    // If entry not yet in the virtualizer (data still loading), skip —
+    // this effect will re-run when renderableEntries changes and
+    // scrollToEntryId updates, so the target is NOT consumed yet.
     if (!scrollToEntryId(scrollTargetId, 'center')) return
 
-    const highlightTimeoutIds: number[] = []
     const tryHighlight = () => {
       const element = document.getElementById(`entry-${scrollTargetId}`)
       if (!element) return false
@@ -258,26 +273,29 @@ export function useSessionViewerVirtualScroll({
       const timeoutId = window.setTimeout(() => {
         element.classList.remove('highlight')
       }, HIGHLIGHT_DURATION_MS)
-      highlightTimeoutIds.push(timeoutId)
+      scrollTargetTimeoutsRef.current.push(timeoutId)
       return true
     }
 
-    const rafId = requestAnimationFrame(() => {
+    scrollTargetRafRef.current = requestAnimationFrame(() => {
       if (!tryHighlight()) {
         const retryId = window.setTimeout(() => {
           tryHighlight()
         }, HIGHLIGHT_RETRY_DELAY_MS)
-        highlightTimeoutIds.push(retryId)
+        scrollTargetTimeoutsRef.current.push(retryId)
       }
     })
 
     setScrollTargetId(null)
 
     return () => {
-      cancelAnimationFrame(rafId)
-      for (const timeoutId of highlightTimeoutIds) {
-        window.clearTimeout(timeoutId)
+      if (scrollTargetRafRef.current !== null) {
+        cancelAnimationFrame(scrollTargetRafRef.current)
       }
+      for (const tid of scrollTargetTimeoutsRef.current) {
+        window.clearTimeout(tid)
+      }
+      scrollTargetTimeoutsRef.current = []
     }
   }, [scrollTargetId, scrollToEntryId, setScrollTargetId])
 

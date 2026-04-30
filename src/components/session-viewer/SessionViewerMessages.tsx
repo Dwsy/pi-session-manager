@@ -21,6 +21,7 @@ import type { LegacySessionStats, SessionEntry } from "@/types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
 
 const MESSAGE_ITEM_GAP = 16;
+const PREVIEW_ITEM_GAP = 8;
 const SEARCH_MATCH_RETRY_COUNT = 8;
 const SEARCH_MATCH_RETRY_DELAY_MS = 50;
 
@@ -280,7 +281,9 @@ const SessionViewerMessages = forwardRef<
                       paddingBottom:
                         virtualRow.index === renderableEntries.length - 1
                           ? 0
-                          : MESSAGE_ITEM_GAP,
+                          : previewMode
+                            ? PREVIEW_ITEM_GAP
+                            : MESSAGE_ITEM_GAP,
                     }}
                   >
                     <SessionEntryRenderer

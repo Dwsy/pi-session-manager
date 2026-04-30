@@ -22,6 +22,7 @@ mod tags;
 #[cfg(feature = "gui")]
 pub mod terminal;
 mod trace;
+mod workspaces;
 
 pub use auth::*;
 pub use config_bundle::*;
@@ -43,6 +44,7 @@ pub use tags::*;
 #[cfg(feature = "gui")]
 pub use terminal::*;
 pub use trace::*;
+pub use workspaces::*;
 
 #[cfg(feature = "gui")]
 #[tauri::command]
