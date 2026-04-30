@@ -514,6 +514,24 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         }
 
         // ═══════════════════════════════════════════════════════════════
+        // Workspaces
+        // ═══════════════════════════════════════════════════════════════
+        "get_workspaces" => {
+            let result = crate::get_workspaces().await?;
+            Ok(to_val(result, "serialize result")?)
+        }
+        "save_workspace" => {
+            let workspace = serde_json::from_value(payload.get("workspace").cloned().unwrap_or(Value::Object(Default::default()))).map_err(|e| format!("Invalid workspace: {e}"))?;
+            crate::save_workspace(workspace).await?;
+            Ok(Value::Null)
+        }
+        "delete_workspace" => {
+            let id = extract(payload, "id")?;
+            crate::delete_workspace(id).await?;
+            Ok(Value::Null)
+        }
+
+        // ═══════════════════════════════════════════════════════════════
         // Tags
         // ═══════════════════════════════════════════════════════════════
         "get_all_tags" => {

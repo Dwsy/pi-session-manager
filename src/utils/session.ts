@@ -122,8 +122,10 @@ export function computeStats(entries: SessionEntry[]): LegacySessionStats {
       if (msg.role === 'user') stats.userMessages++
       if (msg.role === 'assistant') {
         stats.assistantMessages++
-        if (msg.model) {
-          const modelName = msg.provider ? `${msg.provider}/${msg.model}` : msg.model
+        const model = msg.model || entry.modelId
+        const provider = msg.provider || entry.provider
+        if (model) {
+          const modelName = provider ? `${provider}/${model}` : model
           modelSet.add(modelName)
         }
         if (msg.usage) {
@@ -141,6 +143,12 @@ export function computeStats(entries: SessionEntry[]): LegacySessionStats {
         stats.toolCalls += msg.content.filter(c => c.type === 'toolCall').length
       }
       if (msg.role === 'toolResult') stats.toolResults++
+    } else if (entry.type === 'model_change') {
+      // Preview mode: model_change entries carry provider/modelId from JSONL first line
+      if (entry.modelId) {
+        const modelName = entry.provider ? `${entry.provider}/${entry.modelId}` : entry.modelId
+        modelSet.add(modelName)
+      }
     } else if (entry.type === 'compaction') {
       stats.compactions++
     } else if (entry.type === 'branch_summary') {
