@@ -522,7 +522,7 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         }
         "save_workspace" => {
             let workspace = payload.get("workspace").cloned().unwrap_or(Value::Object(Default::default()));
-            crate::save_workspace_from_value(workspace).await?;
+            crate::save_workspace(workspace).await?;
             Ok(Value::Null)
         }
         "delete_workspace" => {
