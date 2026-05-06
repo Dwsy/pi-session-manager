@@ -50,7 +50,8 @@ impl RawPiEntry {
         match self {
             Self::Message { base, message } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: Some(message.clone()), target_id: None, label: None, provider: None, model_id: None },
             Self::Label { base, target_id, label } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: None, target_id: Some(target_id.clone()), label: label.clone(), provider: None, model_id: None },
-            Self::SessionInfo { base, .. } | Self::Other { base } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: None, target_id: None, label: None, provider: None, model_id: None },
+            Self::SessionInfo { base, name } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: None, target_id: None, label: name.clone(), provider: None, model_id: None },
+            Self::Other { base } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: None, target_id: None, label: None, provider: None, model_id: None },
         }
     }
 }
@@ -308,8 +309,11 @@ fn parse_message_entry(value: &Value, base: RawEntryBase) -> Option<RawPiEntry> 
     let message_value = value.get("message")?;
     let role = message_value.get("role").and_then(Value::as_str).unwrap_or("unknown").to_string();
     let content = parse_message_content(message_value.get("content"));
+    let model = message_value.get("model").and_then(Value::as_str).map(String::from);
+    let provider = message_value.get("provider").and_then(Value::as_str).map(String::from);
+    let usage = message_value.get("usage").cloned();
 
-    Some(RawPiEntry::Message { base, message: Message { role, content } })
+    Some(RawPiEntry::Message { base, message: Message { role, content, model, provider, usage } })
 }
 
 fn parse_label_entry(value: &Value, base: RawEntryBase) -> Option<RawPiEntry> {

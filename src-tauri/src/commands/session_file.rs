@@ -350,19 +350,30 @@ pub(super) async fn read_session_file_incremental_impl(path: String, from_line: 
         return Ok((total_lines, lines[from_line..].join("\n")));
     }
 
-    let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
+    // Stream line-by-line with BufReader to avoid loading entire file into memory.
+    // For a 10MB file this still reads all bytes but avoids a 10MB String allocation.
+    use std::io::{BufRead, BufReader};
+    let file = fs::File::open(&path).map_err(|e| format!("Failed to open session file: {e}"))?;
+    let reader = BufReader::with_capacity(256 * 1024, file);
 
-    let lines: Vec<&str> = content.lines().collect();
-    let total_lines = lines.len();
+    let mut total_lines = 0usize;
+    let mut new_lines = Vec::new();
+    for line_result in reader.lines() {
+        let line = line_result.map_err(|e| format!("Failed to read line: {e}"))?;
+        if total_lines >= from_line {
+            new_lines.push(line);
+        }
+        total_lines += 1;
+    }
+
+    let elapsed = start.elapsed();
+    info!("[IO] read_session_file_incremental path={} from_line={} total_lines={} elapsed={:?}", path, from_line, total_lines, elapsed);
 
     if from_line >= total_lines {
         return Ok((total_lines, String::new()));
     }
 
-    let new_lines: Vec<&str> = lines[from_line..].to_vec();
-    let new_content = new_lines.join("\n");
-
-    Ok((total_lines, new_content))
+    Ok((total_lines, new_lines.join("\n")))
 }
 
 pub(super) async fn read_session_file_incremental_offset_impl(path: String, from_offset: u64) -> Result<(u64, String), String> {
@@ -448,13 +459,17 @@ fn read_first_jsonl_line(path: &str) -> Result<String, String> {
     let mut tmp = [0u8; 4096];
     loop {
         let n = file.read(&mut tmp).map_err(|e| format!("Read error: {e}"))?;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         buf.extend_from_slice(&tmp[..n]);
         if let Some(pos) = buf.iter().position(|&b| b == b'\n') {
             buf.truncate(pos);
             break;
         }
-        if buf.len() > 65536 { break; }
+        if buf.len() > 65536 {
+            break;
+        }
     }
     String::from_utf8(buf).map_err(|e| format!("UTF-8 error: {e}"))
 }
@@ -470,40 +485,16 @@ pub(super) async fn get_session_preview_entries_impl(session_path: String) -> Re
         if let Ok(first_line) = read_first_jsonl_line(&session_path) {
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&first_line) {
                 if val.get("type").and_then(|v| v.as_str()) == Some("session") {
-                    let timestamp = val.get("timestamp")
-                        .and_then(|v| v.as_str())
-                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                        .map(|dt| dt.with_timezone(&chrono::Utc))
-                        .unwrap_or_else(|| chrono::Utc::now());
+                    let timestamp = val.get("timestamp").and_then(|v| v.as_str()).and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|dt| dt.with_timezone(&chrono::Utc)).unwrap_or_else(chrono::Utc::now);
                     let provider = val.get("provider").and_then(|v| v.as_str()).unwrap_or("").to_string();
                     let model_id = val.get("modelId").and_then(|v| v.as_str()).unwrap_or("").to_string();
                     let session_id = val.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
-                    all_entries.push(SessionEntry {
-                        entry_type: "session".to_string(),
-                        id: session_id.clone(),
-                        parent_id: None,
-                        timestamp,
-                        message: None,
-                        target_id: None,
-                        label: None,
-                        provider: Some(provider.clone()),
-                        model_id: Some(model_id.clone()),
-                    });
+                    all_entries.push(SessionEntry { entry_type: "session".to_string(), id: session_id.clone(), parent_id: None, timestamp, message: None, target_id: None, label: None, provider: Some(provider.clone()), model_id: Some(model_id.clone()) });
 
                     // Also emit a model_change entry so computeStats picks up the model
                     if !provider.is_empty() || !model_id.is_empty() {
-                        all_entries.push(SessionEntry {
-                            entry_type: "model_change".to_string(),
-                            id: format!("{}-model", session_id.clone()),
-                            parent_id: None,
-                            timestamp,
-                            message: None,
-                            target_id: None,
-                            label: None,
-                            provider: Some(provider),
-                            model_id: Some(model_id),
-                        });
+                        all_entries.push(SessionEntry { entry_type: "model_change".to_string(), id: format!("{}-model", session_id.clone()), parent_id: None, timestamp, message: None, target_id: None, label: None, provider: Some(provider), model_id: Some(model_id) });
                     }
                 }
             }
@@ -516,52 +507,20 @@ pub(super) async fn get_session_preview_entries_impl(session_path: String) -> Re
             .prepare("SELECT entry_id, role, content, timestamp FROM message_entries WHERE session_path = ?1 AND role IN ('user', 'assistant') AND TRIM(content) != '' AND content NOT LIKE '[Tool:%' AND content NOT LIKE '[Tool Output]%' ORDER BY timestamp ASC")
             .map_err(|e| format!("Failed to prepare preview query: {e}"))?;
 
-        let rows = stmt
-            .query_map(rusqlite::params![session_path], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                ))
-            })
-            .map_err(|e| format!("Failed to query preview entries: {e}"))?;
+        let rows = stmt.query_map(rusqlite::params![session_path], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?))).map_err(|e| format!("Failed to query preview entries: {e}"))?;
 
         for row in rows {
-            let (entry_id, role, content_text, timestamp_str) = row
-                .map_err(|e| format!("Failed to read preview row: {e}"))?;
+            let (entry_id, role, content_text, timestamp_str) = row.map_err(|e| format!("Failed to read preview row: {e}"))?;
 
-            let timestamp: chrono::DateTime<chrono::Utc> = chrono::DateTime::parse_from_rfc3339(&timestamp_str)
-                .map(|dt| dt.with_timezone(&chrono::Utc))
-                .unwrap_or_else(|_| chrono::Utc::now());
+            let timestamp: chrono::DateTime<chrono::Utc> = chrono::DateTime::parse_from_rfc3339(&timestamp_str).map(|dt| dt.with_timezone(&chrono::Utc)).unwrap_or_else(|_| chrono::Utc::now());
 
-            let content = if content_text.trim().is_empty() {
-                Vec::new()
-            } else {
-                vec![crate::types::Content {
-                    content_type: "text".to_string(),
-                    text: Some(content_text),
-                }]
-            };
+            let content = if content_text.trim().is_empty() { Vec::new() } else { vec![crate::types::Content { content_type: "text".to_string(), text: Some(content_text) }] };
 
             if content.is_empty() {
                 continue;
             }
 
-            all_entries.push(SessionEntry {
-                entry_type: "message".to_string(),
-                id: entry_id,
-                parent_id: None,
-                timestamp,
-                message: Some(crate::types::Message {
-                    role,
-                    content,
-                }),
-                target_id: None,
-                label: None,
-                provider: None,
-                model_id: None,
-            });
+            all_entries.push(SessionEntry { entry_type: "message".to_string(), id: entry_id, parent_id: None, timestamp, message: Some(crate::types::Message { role, content, model: None, provider: None, usage: None }), target_id: None, label: None, provider: None, model_id: None });
         }
         Ok(all_entries)
     })

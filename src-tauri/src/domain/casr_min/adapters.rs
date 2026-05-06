@@ -86,7 +86,17 @@ pub fn canonical_to_session_entries(canonical: &CanonicalSession) -> Vec<Session
         };
         let timestamp = message.timestamp.and_then(DateTime::<Utc>::from_timestamp_millis).unwrap_or_else(Utc::now);
 
-        entries.push(SessionEntry { entry_type: "message".to_string(), id: id.clone(), parent_id: previous_id.clone(), timestamp, message: Some(Message { role, content }), target_id: None, label: None, provider: None, model_id: None });
+        // Extract model/usage from canonical message extra field
+        let (model, provider, usage) = if matches!(message.role, MessageRole::Assistant) {
+            let model = canonical.model_name.clone().or_else(|| message.extra.get("model").and_then(|v| v.as_str()).map(String::from));
+            let provider = message.extra.get("provider").and_then(|v| v.as_str()).map(String::from).or_else(|| Some(canonical.provider_slug.clone()));
+            let usage = find_usage_in_value(&message.extra);
+            (model, provider, usage)
+        } else {
+            (None, None, None)
+        };
+
+        entries.push(SessionEntry { entry_type: "message".to_string(), id: id.clone(), parent_id: previous_id.clone(), timestamp, message: Some(Message { role, content, model, provider, usage }), target_id: None, label: None, provider: None, model_id: None });
         previous_id = Some(id);
     }
 
@@ -129,4 +139,28 @@ fn truncate_text(text: &str, max_len: usize) -> String {
     }
     truncated.push_str("...");
     truncated
+}
+
+/// Recursively search a JSON value for a usage object (contains input/output token fields).
+fn find_usage_in_value(value: &Value) -> Option<Value> {
+    match value {
+        Value::Object(map) => {
+            if map.contains_key("input") || map.contains_key("output") || map.contains_key("input_tokens") || map.contains_key("cacheRead") || map.contains_key("cache_read") {
+                return Some(value.clone());
+            }
+            if let Some(usage) = map.get("usage") {
+                if let Some(found) = find_usage_in_value(usage) {
+                    return Some(found);
+                }
+            }
+            for nested in map.values() {
+                if let Some(found) = find_usage_in_value(nested) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        Value::Array(items) => items.iter().find_map(find_usage_in_value),
+        _ => None,
+    }
 }

@@ -51,6 +51,15 @@ pub struct SessionEntry {
 pub struct Message {
     pub role: String,
     pub content: Vec<Content>,
+    /// Model name (e.g. "gpt-5", "claude-sonnet-4-20250514")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Provider name (e.g. "openai", "anthropic")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// Token usage and cost data from the raw JSONL
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

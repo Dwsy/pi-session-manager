@@ -208,6 +208,9 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
             let rescan_started_at = Instant::now();
             debug!("Incremental rescan: {} changed files", changed_count);
 
+            // Mark watcher as active so scanner scheduler skips redundant full scans
+            crate::core::scanner::mark_watcher_active();
+
             // Update backend cache, get diff
             match rt.block_on(crate::core::scanner::rescan_changed_files(changed)) {
                 Ok(diff) => {

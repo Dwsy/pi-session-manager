@@ -864,14 +864,16 @@ mod tests {
             id: id.to_string(),
             parent_id: None,
             timestamp: parse_test_timestamp(timestamp),
-            message: Some(crate::types::Message { role: role.to_string(), content: vec![crate::types::Content { content_type: "text".to_string(), text: Some(text.to_string()) }] }),
+            message: Some(crate::types::Message { role: role.to_string(), content: vec![crate::types::Content { content_type: "text".to_string(), text: Some(text.to_string()) }], model: None, provider: None, usage: None }),
             target_id: None,
             label: None,
+            provider: None,
+            model_id: None,
         }
     }
 
     fn label_entry(id: &str, timestamp: &str, target_id: &str, label: Option<&str>) -> SessionEntry {
-        SessionEntry { entry_type: "label".to_string(), id: id.to_string(), parent_id: None, timestamp: parse_test_timestamp(timestamp), message: None, target_id: Some(target_id.to_string()), label: label.map(ToString::to_string) }
+        SessionEntry { entry_type: "label".to_string(), id: id.to_string(), parent_id: None, timestamp: parse_test_timestamp(timestamp), message: None, target_id: Some(target_id.to_string()), label: label.map(ToString::to_string), provider: None, model_id: None }
     }
 
     fn model_change_entry(id: &str, timestamp: &str) -> SessionEntry {

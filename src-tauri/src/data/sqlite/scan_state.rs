@@ -98,8 +98,8 @@ pub fn get_all_scan_state(conn: &Connection) -> Result<HashMap<String, ScanState
 pub fn upsert_scan_state(conn: &Connection, path: &str, backing_path: &str, provider_slug: &str, file_modified: DateTime<Utc>, file_size: u64, last_parse_status: &str) -> Result<(), String> {
     conn.execute(
         "INSERT INTO scan_state (
-            path, backing_path, provider_slug, file_modified, file_size, last_scanned_at, last_parse_status
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            path, backing_path, provider_slug, file_modified, file_size, last_scanned_at, last_parse_status, read_offset, append_trust_count
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
          ON CONFLICT(path) DO UPDATE SET
             backing_path = excluded.backing_path,
             provider_slug = excluded.provider_slug,
@@ -107,7 +107,9 @@ pub fn upsert_scan_state(conn: &Connection, path: &str, backing_path: &str, prov
             file_size = excluded.file_size,
             last_scanned_at = excluded.last_scanned_at,
             last_parse_status = excluded.last_parse_status",
-        params![path, backing_path, provider_slug, file_modified.to_rfc3339(), i64::try_from(file_size).unwrap_or(i64::MAX), Utc::now().to_rfc3339(), last_parse_status,],
+        // New entries start with trust=3 and offset=file_size so incremental reads activate immediately.
+        // Existing entries keep their trust/offset (not updated on conflict).
+        params![path, backing_path, provider_slug, file_modified.to_rfc3339(), i64::try_from(file_size).unwrap_or(i64::MAX), Utc::now().to_rfc3339(), last_parse_status, i64::try_from(file_size).unwrap_or(i64::MAX), 3i64,],
     )
     .map_err(|e| format!("Failed to upsert scan_state for {path}: {e}"))?;
     Ok(())
@@ -117,9 +119,10 @@ pub fn update_scan_state_offset_and_trust(conn: &Connection, path: &str, read_of
     conn.execute(
         "UPDATE scan_state SET
             read_offset = ?1,
-            append_trust_count = ?2
-         WHERE path = ?3",
-        params![i64::try_from(read_offset).unwrap_or(i64::MAX), append_trust_count as i64, path,],
+            append_trust_count = ?2,
+            last_scanned_at = ?3
+         WHERE path = ?4",
+        params![i64::try_from(read_offset).unwrap_or(i64::MAX), append_trust_count as i64, Utc::now().to_rfc3339(), path,],
     )
     .map_err(|e| format!("Failed to update scan_state trust for {path}: {e}"))?;
     Ok(())
@@ -157,8 +160,9 @@ mod tests {
         assert_eq!(entry.provider_slug, "pi");
         assert_eq!(entry.file_size, 123);
         assert_eq!(entry.last_parse_status, "ok");
-        assert_eq!(entry.read_offset, 0);
-        assert_eq!(entry.append_trust_count, 0);
+        // New entries start with trust=3 and offset=file_size for immediate incremental reads
+        assert_eq!(entry.read_offset, 123);
+        assert_eq!(entry.append_trust_count, 3);
 
         update_scan_state_offset_and_trust(&conn, "/tmp/session.jsonl", 456, 3).expect("update trust");
         let states_after = get_all_scan_state(&conn).expect("load scan_state after trust update");

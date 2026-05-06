@@ -219,6 +219,7 @@ pub fn extract_basic_details_from_entries(entries: &[crate::types::SessionEntry]
 }
 
 /// Parse session details from pre-loaded entries (avoids re-reading file).
+/// Uses model/provider/usage fields populated during initial parse.
 pub fn parse_session_details_from_entries(entries: &[crate::types::SessionEntry]) -> SessionDetails {
     let mut details = SessionDetails::default();
     let mut model_set: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -229,34 +230,28 @@ pub fn parse_session_details_from_entries(entries: &[crate::types::SessionEntry]
                 "user" => details.user_messages += 1,
                 "assistant" => {
                     details.assistant_messages += 1;
-                    // Extract model name from content if available
-                    for content in &message.content {
-                        if content.content_type == "text" {
-                            // Try to find model info in the content
-                            if let Some(text) = &content.text {
-                                if text.contains("model") {
-                                    // Simple heuristic: look for model patterns
-                                }
-                            }
-                        }
+                    // Extract model/provider/usage from fields populated during parse
+                    let model_key = match (&message.model, &message.provider) {
+                        (Some(model), Some(provider)) => format!("{provider}/{model}"),
+                        (Some(model), None) => model.clone(),
+                        _ => String::new(),
+                    };
+                    if !model_key.is_empty() {
+                        model_set.insert(model_key.clone());
+                    }
+                    if let Some(usage) = &message.usage {
+                        let key_ref = if model_key.is_empty() { None } else { Some(model_key.as_str()) };
+                        apply_usage_to_details(&mut details, key_ref, usage);
                     }
                 }
-                "tool" => details.tool_results += 1,
+                "toolResult" => details.tool_results += 1,
                 _ => {}
             }
 
-            // Extract usage from message content
-            for content in &message.content {
-                if content.content_type == "text" {
-                    if let Some(text) = &content.text {
-                        if let Ok(value) = serde_json::from_str::<serde_json::Value>(text) {
-                            if let Some(usage) = find_usage_object(&value) {
-                                apply_usage_to_details(&mut details, None, usage);
-                            }
-                        }
-                    }
-                }
-            }
+            // Track timestamps
+            let ts = entry.timestamp;
+            details.first_message_time = Some(details.first_message_time.unwrap_or(ts).min(ts));
+            details.last_message_time = Some(details.last_message_time.unwrap_or(ts).max(ts));
         }
     }
 

@@ -94,7 +94,7 @@ fn default_realtime_cutoff_days() -> i64 {
 }
 
 fn default_scan_interval_seconds() -> u64 {
-    30
+    300
 }
 
 fn default_enable_fts5() -> bool {

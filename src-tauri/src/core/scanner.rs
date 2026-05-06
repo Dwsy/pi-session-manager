@@ -24,6 +24,25 @@ static SCAN_ENTRIES_CACHE: RwLock<Option<std::collections::HashMap<String, Vec<S
 static CACHE_VERSION: AtomicU64 = AtomicU64::new(0);
 static SCAN_IN_PROGRESS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// Timestamp (epoch seconds) of last file watcher activity.
+/// Scanner skips full directory walk when watcher is recently active.
+static WATCHER_LAST_ACTIVE: AtomicU64 = AtomicU64::new(0);
+
+/// Mark watcher as active (called from file_watcher on each event batch)
+pub fn mark_watcher_active() {
+    WATCHER_LAST_ACTIVE.store(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(), Ordering::Relaxed);
+}
+
+/// Check if watcher has been active within the last `secs` seconds
+fn watcher_active_within(secs: u64) -> bool {
+    let last = WATCHER_LAST_ACTIVE.load(Ordering::Relaxed);
+    if last == 0 {
+        return false;
+    }
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+    now.saturating_sub(last) < secs
+}
+
 /// Cached directory listing to avoid repeated recursive walks
 static FILE_LIST_CACHE: RwLock<Option<CachedFileList>> = RwLock::new(None);
 const FILE_LIST_CACHE_TTL_SECS: u64 = 30;
@@ -76,6 +95,10 @@ fn set_cached_entries(path: &str, entries: Vec<SessionEntry>) {
 
 fn get_cached_entries(path: &str) -> Option<Vec<SessionEntry>> {
     SCAN_ENTRIES_CACHE.read().ok().and_then(|g| g.as_ref().and_then(|m| m.get(path).cloned()))
+}
+
+fn get_cached_session_info(path: &str) -> Option<SessionInfo> {
+    SCAN_CACHE.read().ok().and_then(|g| g.as_ref().and_then(|sessions| sessions.iter().find(|s| s.path == path).cloned()))
 }
 
 pub fn remove_cached_sessions(paths: &[String]) {
@@ -538,19 +561,24 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             if result.file_modified > realtime_cutoff {
                 // Realtime file: add to results, buffer for DB
                 write_buffer::buffer_session_write(&info, result.file_modified);
-                // Only buffer details if we have actual entries (not header-only parse)
+                // Buffer full details (token/model/cost) from already-parsed entries
                 if !result.entries.is_empty() {
-                    let basic_details = crate::core::parser::extract_basic_details_from_entries(&result.entries);
-                    write_buffer::buffer_details_write(&result.path_str, result.file_modified, &basic_details);
+                    let details = crate::core::parser::parse_session_details_from_entries(&result.entries);
+                    write_buffer::buffer_details_write(&result.path_str, result.file_modified, &details);
                 }
                 let _ = sqlite::upsert_scan_state_for_session(&conn, &info, result.file_modified, "ok");
                 realtime_buffered += 1;
             } else {
-                // Historical file: upsert to DB
+                // Historical file: upsert to DB and warm details cache
                 if let Err(e) = sqlite::upsert_session(&mut conn, &info, result.file_modified, Some(&result.entries)) {
                     error!("Failed to upsert historical session {}: {}", result.path_str, e);
                     continue;
                 } else {
+                    // Populate session_details_cache from already-parsed entries
+                    if !result.entries.is_empty() {
+                        let details = crate::core::parser::parse_session_details_from_entries(&result.entries);
+                        let _ = sqlite::upsert_session_details_cache(&conn, &result.path_str, result.file_modified, &details);
+                    }
                     let _ = sqlite::upsert_scan_state_for_session(&conn, &info, result.file_modified, "ok");
                     historical_upserts += 1;
                 }
@@ -595,6 +623,8 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             realtime_buffered,
             historical_upserts,
         );
+        // Details cache will be populated by the next full scan (30s) via parse_session_details_from_entries.
+        // No need for a background warming task that re-reads all files.
 
         break Ok(all_sessions);
     }
@@ -810,7 +840,9 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                         Ok((info, entries)) => {
                             let file_size = fs::metadata(&backing).map(|m| m.len()).unwrap_or(0);
                             set_cached_entries(&session_path_str, entries.clone());
-                            (info, entries, file_size, trust.saturating_add(1))
+                            // After successful full parse, set trust to 3 so next event uses incremental read.
+                            // No need to wait for 3 full parses — the file is verified as valid JSONL.
+                            (info, entries, file_size, 3u32)
                         }
                         Err(e) => {
                             warn!("Failed to re-parse {}: {}", expanded_path.display(), e);
@@ -830,6 +862,14 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             }
 
             crate::core::write_buffer::buffer_session_write(&info, file_modified);
+
+            // Buffer details from already-parsed entries (avoids re-reading file)
+            // For incremental case, details will be computed from DB on next stats request.
+            if new_trust == 3 && !entries.is_empty() {
+                let details = crate::core::parser::parse_session_details_from_entries(&entries);
+                write_buffer::buffer_details_write(&session_path_str, file_modified, &details);
+            }
+
             diff.updated.push(info.clone());
 
             if let Some(existing) = sessions.iter_mut().find(|s| s.path == info.path) {
@@ -881,6 +921,15 @@ impl ScannerScheduler {
 
         loop {
             ticker.tick().await;
+
+            // Skip full scan if file watcher has been active recently (within 2x interval).
+            // Watcher handles real-time changes; scanner is only a safety net.
+            let interval_secs = self.scan_interval.as_secs();
+            if watcher_active_within(interval_secs * 2) {
+                trace!("Scanner: watcher recently active, skipping full scan");
+                continue;
+            }
+
             if let Err(e) = self.scan_and_update().await {
                 error!("Scanner error: {}", e);
             }
@@ -906,6 +955,10 @@ impl ScannerScheduler {
         let realtime_cutoff = Utc::now() - Duration::days(self.config.realtime_cutoff_days);
 
         let cached_file_modified = sqlite::get_all_cached_file_modified(&conn)?;
+        let all_scan_states = sqlite::get_all_scan_state(&conn).unwrap_or_default();
+
+        // Separate changed files into incremental (high trust) vs full-parse (low trust/new)
+        let mut incremental_files: Vec<(PathBuf, DateTime<Utc>, u64)> = Vec::new();
         let mut files_to_parse = Vec::new();
         let mut skipped = 0;
 
@@ -925,16 +978,68 @@ impl ScannerScheduler {
                 continue;
             }
 
+            // Skip files recently processed by file watcher (within 10s) to avoid duplicate work
+            if let Some(ss) = all_scan_states.get(&path_str) {
+                let recently_scanned = Utc::now().signed_duration_since(ss.last_scanned_at).num_seconds() < 10;
+                if recently_scanned {
+                    skipped += 1;
+                    continue;
+                }
+            }
+
+            // Check if we can do incremental read (trust >= 3 and has offset)
+            if let Some(ss) = all_scan_states.get(&path_str) {
+                if ss.append_trust_count >= 3 && ss.read_offset > 0 {
+                    incremental_files.push((path, file_modified, ss.read_offset));
+                    continue;
+                }
+            }
+
             files_to_parse.push(path);
         }
 
-        // Use parallel parse only for files that changed since the DB snapshot.
-        let parsed_results = parallel_parse_files(files_to_parse).await;
-
-        // Process and upsert to DB
-        let mut sessions: Vec<SessionInfo> = Vec::with_capacity(parsed_results.len());
         let mut updated = 0;
         let mut added = 0;
+
+        // Process high-trust files with incremental tail-read (seek to offset, read only new bytes)
+        for (path, file_modified, last_offset) in incremental_files {
+            let path_str = path.to_string_lossy().to_string();
+            let backing = crate::domain::session_bridge::backing_file_path(&path);
+
+            match safe_append_only_read_jsonl(&backing, last_offset) {
+                Ok((new_offset, new_entries)) if !new_entries.is_empty() => {
+                    // Merge new entries into cached session info
+                    if let (Some(old_entries), Some(old_info)) = (get_cached_entries(&path_str), get_cached_session_info(&path_str)) {
+                        let mut all_entries = old_entries;
+                        all_entries.extend(new_entries.clone());
+                        let info = incremental_update_session_info(&old_info, &new_entries, file_modified);
+                        set_cached_entries(&path_str, all_entries.clone());
+                        let _ = sqlite::append_message_entries(&conn, &path_str, &new_entries);
+                        upsert_cached_session(info);
+                        let trust = all_scan_states.get(&path_str).map(|s| s.append_trust_count).unwrap_or(3);
+                        let _ = sqlite::update_scan_state_offset_and_trust(&conn, &path_str, new_offset, trust.saturating_add(1));
+                        updated += 1;
+                    } else {
+                        // No cached entries/info, fall back to full parse
+                        files_to_parse.push(path);
+                    }
+                }
+                Ok((new_offset, _)) => {
+                    // No new complete lines, just update offset
+                    let trust = all_scan_states.get(&path_str).map(|s| s.append_trust_count).unwrap_or(3);
+                    let _ = sqlite::update_scan_state_offset_and_trust(&conn, &path_str, new_offset, trust);
+                    skipped += 1;
+                }
+                Err(_) => {
+                    // Incremental read failed (file truncated/rewritten), fall back to full parse
+                    files_to_parse.push(path);
+                }
+            }
+        }
+
+        // Full parse only for low-trust/new files
+        let parsed_results = parallel_parse_files(files_to_parse).await;
+
         for result in parsed_results {
             let path_str = &result.path_str;
             let file_modified = result.file_modified;
@@ -947,11 +1052,13 @@ impl ScannerScheduler {
                 added += 1;
             }
 
-            sessions.push(result.info);
-
             // Buffer realtime files for stats
             if file_modified > realtime_cutoff {
-                write_buffer::buffer_session_write(sessions.last().expect("session just pushed"), file_modified);
+                write_buffer::buffer_session_write(&result.info, file_modified);
+                if !result.entries.is_empty() {
+                    let details = crate::core::parser::parse_session_details_from_entries(&result.entries);
+                    write_buffer::buffer_details_write(path_str, file_modified, &details);
+                }
             }
         }
 
