@@ -821,10 +821,12 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                 match safe_append_only_read_jsonl(&backing, last_offset) {
                     Ok((new_offset, new_entries)) if !new_entries.is_empty() => {
                         if let Some(old_entries) = get_cached_entries(&session_path_str) {
-                            if let Some(old_info) = sessions.iter().find(|s| s.path == session_path_str) {
+                            // Try in-memory first, then DB, then construct minimal info
+                            let old_info = sessions.iter().find(|s| s.path == session_path_str).cloned().or_else(|| sqlite::get_session(&conn, &session_path_str).ok().flatten());
+                            if let Some(old_info) = old_info {
                                 let mut all_entries = old_entries;
                                 all_entries.extend(new_entries.clone());
-                                let info = incremental_update_session_info(old_info, &new_entries, file_modified);
+                                let info = incremental_update_session_info(&old_info, &new_entries, file_modified);
                                 set_cached_entries(&session_path_str, all_entries.clone());
                                 let _ = sqlite::append_message_entries(&conn, &session_path_str, &new_entries);
                                 Some((info, all_entries, new_offset, trust.saturating_add(1)))

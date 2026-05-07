@@ -1,5 +1,5 @@
 use super::deps::*;
-use super::message_index::{delete_message_entries_for_session, insert_message_entries, sync_message_entries};
+use super::message_index::sync_message_entries;
 use super::util::parse_timestamp;
 
 pub fn upsert_session(conn: &mut Connection, session: &SessionInfo, file_modified: DateTime<Utc>, entries: Option<&[SessionEntry]>) -> Result<(), String> {
@@ -89,19 +89,12 @@ pub fn upsert_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInf
     .map_err(|e| format!("Failed to upsert session: {e}"))?;
 
     // Populate message_entries table if it exists (for per-message FTS)
-    if session.message_count > 0 && tx.query_row("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, String>(0)).map(|_| true).unwrap_or(false) {
+    // Only sync when entries are provided. entries=None means caller already
+    // handled message entry insertion (e.g., append_message_entries for incremental).
+    if session.message_count > 0 && entries.is_some() && tx.query_row("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, String>(0)).map(|_| true).unwrap_or(false) {
         debug!("[Upsert] Syncing message entries for session: {}", session.path);
-        // Use incremental sync instead of delete-all + reinsert
-        if let Some(entries) = entries {
-            sync_message_entries(tx, &session.path, entries)?;
-        } else {
-            // Fallback: reinsert from file (only if no pre-parsed entries)
-            delete_message_entries_for_session(tx, &session.path)?;
-            insert_message_entries(tx, session)?;
-        }
+        sync_message_entries(tx, &session.path, entries.unwrap())?;
         debug!("[Upsert] Completed message entries for session: {}", session.path);
-    } else if session.message_count == 0 {
-        debug!("[Upsert] Skipping message entries for session with 0 messages: {}", session.path);
     }
 
     Ok(())
