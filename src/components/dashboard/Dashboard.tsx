@@ -66,6 +66,7 @@ export default function Dashboard({
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const isLoadingRef = useRef(false);
   const hasLoadedOnce = useRef(false);
+  const warmRetryDone = useRef(false);
   const prevProjectRef = useRef(projectName);
   const statsKey = useMemo(() => {
     const first = sessions[0];
@@ -88,12 +89,14 @@ export default function Dashboard({
     if (prevProjectRef.current !== projectName) {
       prevProjectRef.current = projectName;
       hasLoadedOnce.current = false;
+      warmRetryDone.current = false;
       setStats(null);
     }
 
     if (sessions.length === 0) {
       setStats(null);
       hasLoadedOnce.current = false;
+      warmRetryDone.current = false;
       return;
     }
     loadStats();
@@ -111,6 +114,21 @@ export default function Dashboard({
       const result = await getRuntimeStats(sessions);
       setStats(result);
       hasLoadedOnce.current = true;
+
+      // Cold start: backend uses header-only parse for bootstrap so stats come back
+      // with zero tokens. A background task warms the cache; retry once after a delay.
+      if (
+        !warmRetryDone.current &&
+        result.total_tokens === 0 &&
+        sessions.length > 0
+      ) {
+        warmRetryDone.current = true;
+        setTimeout(() => {
+          isLoadingRef.current = false;
+          void loadStats();
+        }, 3000);
+        return;
+      }
     } catch (error) {
       console.error("Failed to load stats:", error);
     } finally {
