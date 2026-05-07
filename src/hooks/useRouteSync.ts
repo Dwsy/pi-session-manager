@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { buildSessionUrl } from '../router/config';
 import type { SessionInfo } from '../types';
@@ -28,7 +28,6 @@ export function useRouteSync({
 }: RouteSyncOptions) {
   const navigate = useNavigate();
   const location = useLocation();
-  const resolvedRef = useRef(false);
 
   // ─── URL → State (session only) ──────────────────────────
   useEffect(() => {
@@ -38,13 +37,17 @@ export function useRouteSync({
       const session = sessions.find(s => s.id === parsed.sessionId);
 
       if (session) {
+        // Session found in list — sync state if needed
         if (selectedSession?.id !== session.id) {
           setSelectedSession(session);
         }
-        resolvedRef.current = true;
-      } else if (sessions.length > 0 && !resolvedRef.current) {
-        // Sessions loaded but ID not found — redirect once
-        resolvedRef.current = true;
+      } else if (selectedSession) {
+        // selectedSession already set (user clicked a session), trust it —
+        // don't redirect. The session list may use a different data source
+        // (usePaginatedSessions) that hasn't synced to `sessions` yet.
+      } else if (sessions.length > 0) {
+        // Deep-link / initial load: session not in list and nothing selected.
+        // Redirect to home once to avoid showing a broken viewer.
         navigate('/', { replace: true });
       }
       // else: sessions not loaded yet, wait for next effect run
@@ -53,12 +56,7 @@ export function useRouteSync({
 
     // root or anything else: clear session
     if (selectedSession) setSelectedSession(null);
-  }, [location.pathname, sessions]);
-
-  // Reset resolvedRef when URL changes to a new session
-  useEffect(() => {
-    resolvedRef.current = false;
-  }, [location.pathname]);
+  }, [location.pathname, sessions, selectedSession, setSelectedSession, navigate]);
 
   // ─── Navigation helpers ───────────────────────────────────
   const navigateToSession = useCallback(
