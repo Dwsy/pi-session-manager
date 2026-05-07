@@ -15,7 +15,7 @@ pub fn upsert_session(conn: &mut Connection, session: &SessionInfo, file_modifie
             std::thread::sleep(delay);
         }
 
-        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|e| format!("Failed to begin transaction: {e}"))?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Deferred).map_err(|e| format!("Failed to begin transaction: {e}"))?;
 
         let result = upsert_session_in_tx(&tx, session, file_modified, entries);
 
@@ -289,4 +289,62 @@ pub fn get_sessions_modified_before(conn: &Connection, cutoff: DateTime<Utc>) ->
         .map_err(|e| format!("Failed to collect sessions: {e}"))?;
 
     Ok(sessions)
+}
+
+/// Batch upsert multiple sessions in a single transaction.
+/// Used by rescan_changed_files to avoid per-file transaction overhead.
+pub fn upsert_sessions_batch(conn: &mut Connection, updates: &[(SessionInfo, DateTime<Utc>)]) -> Result<(), String> {
+    if updates.is_empty() {
+        return Ok(());
+    }
+    let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Deferred).map_err(|e| format!("Failed to begin batch transaction: {e}"))?;
+    for (session, file_modified) in updates {
+        // Update session row
+        upsert_session_row(&tx, session, *file_modified)?;
+        // Update scan_state
+        let path = std::path::Path::new(&session.path);
+        let backing_path = crate::domain::session_bridge::backing_file_path(path);
+        let file_size = std::fs::metadata(&backing_path).map(|m| m.len()).unwrap_or(0);
+        let provider_slug = crate::domain::session_bridge::source_from_path(path).map(|s| s.slug().replace('_', "-")).unwrap_or_else(|| "pi".to_string());
+        let _ = super::scan_state::upsert_scan_state(&tx, &session.path, &backing_path.to_string_lossy(), &provider_slug, *file_modified, file_size, "ok");
+    }
+    tx.commit().map_err(|e| format!("Failed to commit batch transaction: {e}"))?;
+    Ok(())
+}
+
+/// Just the session row update (no scan_state, no message_entries).
+fn upsert_session_row(conn: &Connection, session: &SessionInfo, file_modified: DateTime<Utc>) -> Result<(), String> {
+    conn.execute(
+        "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, cached_at, access_count, last_accessed)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 0, NULL)
+         ON CONFLICT(path) DO UPDATE SET
+            name = excluded.name,
+            modified = excluded.modified,
+            file_modified = excluded.file_modified,
+            message_count = excluded.message_count,
+            first_message = excluded.first_message,
+            last_message = excluded.last_message,
+            last_message_role = excluded.last_message_role,
+            parent_session_path = excluded.parent_session_path,
+            cached_at = excluded.cached_at",
+        rusqlite::params![
+            &session.id,
+            &session.path,
+            &session.cwd,
+            &session.name,
+            &session.created.to_rfc3339(),
+            &session.modified.to_rfc3339(),
+            &file_modified.to_rfc3339(),
+            session.message_count as i64,
+            &session.first_message,
+            "",
+            "",
+            &session.last_message,
+            &session.last_message_role,
+            &session.parent_session_path,
+            &Utc::now().to_rfc3339(),
+        ],
+    )
+    .map_err(|e| format!("Failed to upsert session row: {e}"))?;
+    Ok(())
 }

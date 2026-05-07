@@ -775,6 +775,10 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
     }
 
     let mut diff = SessionsDiff { updated: vec![], removed: vec![] };
+    // Collect updates for single batch DB commit (avoids per-file transaction overhead)
+    let mut batch_updates: Vec<(SessionInfo, DateTime<Utc>)> = Vec::new();
+    // Track offset/trust updates to apply after batch commit
+    let mut offset_updates: Vec<(String, u64, u32)> = Vec::new();
 
     let config = Config::load().unwrap_or_default();
     let mut conn = crate::data::sqlite::init_db_with_config(&config)?;
@@ -871,17 +875,15 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
 
             seen_paths.insert(info.path.clone());
 
-            // For incremental updates: append_message_entries already inserted new entries,
-            // so pass None to upsert_session to skip redundant sync_message_entries (O(n) on ALL entries).
-            // For full-parse fallback: pass entries so sync_message_entries does differential insert.
-            let entries_for_upsert = if is_incremental { None } else { Some(entries.as_slice()) };
-
-            if let Err(e) = sqlite::upsert_session(&mut conn, &info, file_modified, entries_for_upsert) {
-                warn!("Failed to upsert session for {}: {}", info.path, e);
-            } else {
-                let _ = sqlite::upsert_scan_state_for_session(&conn, &info, file_modified, "ok");
-                let _ = sqlite::update_scan_state_offset_and_trust(&conn, &session_path_str, new_offset, new_trust);
+            // For incremental updates: append_message_entries already inserted new entries.
+            // For full-parse fallback: sync message entries now.
+            if !is_incremental && !entries.is_empty() {
+                let _ = sqlite::sync_message_entries(&conn, &session_path_str, &entries);
             }
+
+            // Collect for batch DB commit (avoids per-file transaction overhead)
+            batch_updates.push((info.clone(), file_modified));
+            offset_updates.push((session_path_str.clone(), new_offset, new_trust));
 
             crate::core::write_buffer::buffer_session_write(&info, file_modified);
 
@@ -910,6 +912,17 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                 let _ = crate::data::sqlite::delete_scan_state(&conn, &removed);
                 diff.removed.push(removed);
             }
+        }
+    }
+
+    // Batch commit all session + scan_state updates in a single transaction
+    if !batch_updates.is_empty() {
+        if let Err(e) = sqlite::upsert_sessions_batch(&mut conn, &batch_updates) {
+            warn!("Batch upsert failed: {}", e);
+        }
+        // Apply offset/trust updates individually (lightweight, no message_entries)
+        for (path, offset, trust) in &offset_updates {
+            let _ = sqlite::update_scan_state_offset_and_trust(&conn, path, *offset, *trust);
         }
     }
 
