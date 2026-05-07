@@ -304,15 +304,11 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             apply_migrations(&conn, current_version)?;
         }
 
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_session ON message_entries(session_path)", []).map_err(|e| format!("Failed to create index on message_entries: {e}"))?;
-
         conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id)", []).map_err(|e| format!("Failed to create entry_id index on message_entries: {e}"))?;
 
         conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_session_time ON message_entries(session_path, timestamp)", []).map_err(|e| format!("Failed to create session/timestamp index on message_entries: {e}"))?;
 
         conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_timestamp ON message_entries(timestamp DESC)", []).map_err(|e| format!("Failed to create timestamp index on message_entries: {e}"))?;
-
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_timestamp_julianday ON message_entries(julianday(timestamp) DESC)", []).map_err(|e| format!("Failed to create julianday timestamp index on message_entries: {e}"))?;
 
         // Message-level FTS is the primary search path. Always reconcile it here so
         // legacy config flags cannot leave search_text / message_fts stale.

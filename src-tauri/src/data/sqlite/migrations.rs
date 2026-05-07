@@ -19,6 +19,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             10 => migration_10(conn)?,
             11 => migration_11(conn)?,
             12 => migration_12(conn)?,
+            13 => migration_13(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -241,5 +242,14 @@ fn migration_12(conn: &Connection) -> Result<(), String> {
     // Token/cost fields are preserved so deleted-session stats survive
     conn.execute("UPDATE session_details_cache SET model_usage_json = '{}', models_json = '[]' WHERE model_usage_json != '{}' OR models_json != '[]'", []).map_err(|e| format!("Migration 12 failed clearing model cache: {e}"))?;
 
+    Ok(())
+}
+
+fn migration_13(conn: &Connection) -> Result<(), String> {
+    // Drop redundant indexes on message_entries to reduce DB size and IO.
+    // - idx_message_entries_session is covered by idx_message_entries_session_time(session_path, timestamp)
+    // - idx_message_entries_timestamp_julianday duplicates idx_message_entries_timestamp
+    conn.execute("DROP INDEX IF EXISTS idx_message_entries_session", []).map_err(|e| format!("Migration 13 failed dropping session index: {e}"))?;
+    conn.execute("DROP INDEX IF EXISTS idx_message_entries_timestamp_julianday", []).map_err(|e| format!("Migration 13 failed dropping julianday index: {e}"))?;
     Ok(())
 }

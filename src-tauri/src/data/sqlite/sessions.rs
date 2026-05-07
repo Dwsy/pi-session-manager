@@ -2,6 +2,9 @@ use super::deps::*;
 use super::message_index::sync_message_entries;
 use super::util::parse_timestamp;
 
+/// Cached flag: does message_entries table exist?
+static MESSAGE_ENTRIES_EXISTS: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
 pub fn upsert_session(conn: &mut Connection, session: &SessionInfo, file_modified: DateTime<Utc>, entries: Option<&[SessionEntry]>) -> Result<(), String> {
     let start = std::time::Instant::now();
     let entries_count = entries.map(|e| e.len()).unwrap_or(0);
@@ -91,7 +94,8 @@ pub fn upsert_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInf
     // Populate message_entries table if it exists (for per-message FTS)
     // Only sync when entries are provided. entries=None means caller already
     // handled message entry insertion (e.g., append_message_entries for incremental).
-    if session.message_count > 0 && entries.is_some() && tx.query_row("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, String>(0)).map(|_| true).unwrap_or(false) {
+    let has_me_table = *MESSAGE_ENTRIES_EXISTS.get_or_init(|| tx.query_row("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, String>(0)).is_ok());
+    if session.message_count > 0 && entries.is_some() && has_me_table {
         debug!("[Upsert] Syncing message entries for session: {}", session.path);
         sync_message_entries(tx, &session.path, entries.unwrap())?;
         debug!("[Upsert] Completed message entries for session: {}", session.path);
