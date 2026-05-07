@@ -51,6 +51,91 @@ import {
 const ESTIMATED_ROW_HEIGHT = 122;
 const STICKY_SCROLL_TOP_THRESHOLD = 48;
 
+/* ── MarqueeText: hover-to-scroll for truncated single-line text ── */
+function MarqueeText({ children, className }: { children: React.ReactNode; className?: string }) {
+  const containerRef = useRef<HTMLSpanElement>(null);
+  const innerRef = useRef<HTMLSpanElement>(null);
+  const [overflow, setOverflow] = useState(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const rafId = useRef(0);
+
+  /* detect overflow on mount & resize */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const check = () => setOverflow(el.scrollWidth > el.clientWidth);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [children]);
+
+  /* JS-driven animation: slide inner span from 0 to -(scrollWidth - clientWidth) */
+  const startAnimation = useCallback(() => {
+    const container = containerRef.current;
+    const inner = innerRef.current;
+    if (!container || !inner) return;
+
+    const offset = inner.scrollWidth - container.clientWidth;
+    if (offset <= 0) return;
+
+    const HOLD_MS = 600;
+    const SLIDE_MS = 2500;
+    const total = HOLD_MS + SLIDE_MS + HOLD_MS;
+    const startTime = performance.now();
+
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      if (elapsed >= total) {
+        inner.style.transform = 'translateX(0)';
+        return;
+      }
+      let x = 0;
+      if (elapsed > HOLD_MS && elapsed <= HOLD_MS + SLIDE_MS) {
+        const t = (elapsed - HOLD_MS) / SLIDE_MS;
+        x = -offset * t;
+      } else if (elapsed > HOLD_MS + SLIDE_MS) {
+        x = -offset;
+      }
+      inner.style.transform = `translateX(${x}px)`;
+      rafId.current = requestAnimationFrame(tick);
+    };
+
+    rafId.current = requestAnimationFrame(tick);
+  }, []);
+
+  const stopAnimation = useCallback(() => {
+    clearTimeout(hoverTimer.current);
+    cancelAnimationFrame(rafId.current);
+    if (innerRef.current) innerRef.current.style.transform = 'translateX(0)';
+  }, []);
+
+  /* cleanup on unmount */
+  useEffect(() => () => { clearTimeout(hoverTimer.current); cancelAnimationFrame(rafId.current); }, []);
+
+  if (!overflow) {
+    return (
+      <span ref={containerRef} className={className} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', width: '100%' }}>
+        {children}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      ref={containerRef}
+      className={className}
+      onMouseEnter={() => { hoverTimer.current = setTimeout(startAnimation, 250); }}
+      onMouseLeave={stopAnimation}
+      style={{ display: 'block', width: '100%', overflow: 'hidden', whiteSpace: 'nowrap' }}
+    >
+      <span ref={innerRef} style={{ display: 'inline-block', transition: 'transform 0.05s linear' }}>
+        {children}
+      </span>
+    </span>
+  );
+}
+
 interface SessionListProps {
   sessions: SessionInfo[];
   selectedSession: SessionInfo | null;
@@ -839,10 +924,12 @@ export default function SessionList({
                                       <Zap className="h-3 w-3 text-green-500 fill-current" />
                                     </div>
                                   )}
-                                  <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0">
-                                    {session.name ||
-                                      session.first_message ||
-                                      t("session.list.untitled")}
+                                  <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-tight flex-1 min-w-0" style={{ overflow: 'hidden' }}>
+                                    <MarqueeText className="leading-tight">
+                                      {session.name ||
+                                        session.first_message ||
+                                        t("session.list.untitled")}
+                                    </MarqueeText>
                                   </h3>
                                 </div>
                                 {isSelectionMode && isSelectionMarked && (

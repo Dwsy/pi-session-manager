@@ -208,6 +208,7 @@ function normalizeSessionEntry(raw: any): SessionEntry | null {
   }
 
   if (
+    type === 'session' ||
     type === 'session_info' ||
     type === 'label' ||
     type === 'model_change' ||
