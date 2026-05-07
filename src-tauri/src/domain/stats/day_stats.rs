@@ -50,7 +50,7 @@ pub fn get_day_stats(date: &str, sessions: &[SessionInfo]) -> Result<DayStats, S
 
     let mut project_breakdown: Vec<DayProjectBreakdown> = project_stats.into_iter().map(|(path, (name, sessions, messages, tokens))| DayProjectBreakdown { project_path: path, project_name: name, session_count: sessions, message_count: messages, token_count: tokens }).collect();
 
-    project_breakdown.sort_by(|a, b| b.message_count.cmp(&a.message_count));
+    project_breakdown.sort_by_key(|b| std::cmp::Reverse(b.message_count));
 
     Ok(DayStats { date: date.to_string(), total_messages, total_tokens, session_count: day_sessions.len(), project_count: project_breakdown.len(), project_breakdown, sessions: day_sessions, hourly_distribution, models_used })
 }

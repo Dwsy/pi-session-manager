@@ -82,7 +82,7 @@ pub fn upsert_cached_session(session: SessionInfo) {
         } else {
             sessions.push(session);
         }
-        sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+        sessions.sort_by_key(|b| std::cmp::Reverse(b.modified));
         CACHE_VERSION.fetch_add(1, Ordering::Relaxed);
     }
 }
@@ -607,7 +607,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             all_sessions.push(session);
         }
 
-        all_sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+        all_sessions.sort_by_key(|b| std::cmp::Reverse(b.modified));
 
         let merge_elapsed_ms = merge_started_at.elapsed().as_millis();
         let realtime_count = all_sessions.iter().filter(|s| s.modified > realtime_cutoff).count();
@@ -927,7 +927,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
     }
 
     if !diff.updated.is_empty() || !diff.removed.is_empty() {
-        sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+        sessions.sort_by_key(|b| std::cmp::Reverse(b.modified));
         if let Ok(mut guard) = SCAN_CACHE.write() {
             *guard = Some(sessions);
             CACHE_VERSION.fetch_add(1, Ordering::Relaxed);

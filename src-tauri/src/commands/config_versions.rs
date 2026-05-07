@@ -52,7 +52,7 @@ fn load_all_versions() -> Result<Vec<ConfigVersion>, String> {
         }
     }
 
-    versions.sort_by(|a, b| b.id.cmp(&a.id));
+    versions.sort_by_key(|b| std::cmp::Reverse(b.id));
     Ok(versions)
 }
 

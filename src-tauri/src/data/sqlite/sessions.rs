@@ -95,10 +95,12 @@ pub fn upsert_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInf
     // Only sync when entries are provided. entries=None means caller already
     // handled message entry insertion (e.g., append_message_entries for incremental).
     let has_me_table = *MESSAGE_ENTRIES_EXISTS.get_or_init(|| tx.query_row("SELECT name FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, String>(0)).is_ok());
-    if session.message_count > 0 && entries.is_some() && has_me_table {
-        debug!("[Upsert] Syncing message entries for session: {}", session.path);
-        sync_message_entries(tx, &session.path, entries.unwrap())?;
-        debug!("[Upsert] Completed message entries for session: {}", session.path);
+    if session.message_count > 0 && has_me_table {
+        if let Some(entries) = entries {
+            debug!("[Upsert] Syncing message entries for session: {}", session.path);
+            sync_message_entries(tx, &session.path, entries)?;
+            debug!("[Upsert] Completed message entries for session: {}", session.path);
+        }
     }
 
     Ok(())
