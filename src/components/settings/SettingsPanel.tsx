@@ -303,7 +303,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         className={`${
           isMobile
             ? "w-full h-full rounded-none"
-            : "w-[1320px] h-[780px] max-w-[96vw] max-h-[92vh] rounded-xl"
+            : "w-[95vw] h-[95vh] rounded-xl"
         } bg-surface-dark border border-border shadow-2xl flex ${
           isMobile ? "flex-col" : ""
         } overflow-hidden transition-all duration-200 ease-out ${
