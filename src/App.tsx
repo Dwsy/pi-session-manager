@@ -261,7 +261,8 @@ function App() {
   });
 
   // Deep link: pi-session://sessions/{id} etc.
-  useDeepLink({ onNavigate: (path) => navigate(path) });
+  const handleDeepLink = useCallback((path: string) => navigate(path), [navigate]);
+  useDeepLink({ onNavigate: handleDeepLink });
 
   useSwipe(mobileViewerRef, {
     onSwipeRight: () => {

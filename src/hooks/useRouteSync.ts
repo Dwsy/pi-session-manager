@@ -43,9 +43,11 @@ export function useRouteSync({
         }
         resolvedRef.current = true;
       } else if (sessions.length > 0 && !resolvedRef.current) {
+        // Sessions loaded but ID not found — redirect once
         resolvedRef.current = true;
         navigate('/', { replace: true });
       }
+      // else: sessions not loaded yet, wait for next effect run
       return;
     }
 
