@@ -55,7 +55,7 @@ pub use server::ws as ws_adapter;
 #[cfg(feature = "gui")]
 use std::sync::Mutex;
 #[cfg(feature = "gui")]
-use tauri::{Listener, Manager};
+use tauri::{Emitter, Listener, Manager};
 
 #[cfg(feature = "gui")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -63,6 +63,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             scan_sessions,
             scan_sessions_paginated,
@@ -219,6 +220,22 @@ pub fn run() {
                         for entry in details {
                             let _ = sqlite_cache::upsert_session_details_cache(&conn, &entry.path, entry.file_modified, &entry.details);
                         }
+                    }
+                }
+            });
+
+            // ── Deep link: forward pi-session:// URLs to frontend ──
+            let app_handle_dl = app.handle().clone();
+            app.listen("deep-link://new-url", move |event| {
+                if let Ok(urls) = serde_json::from_str::<serde_json::Value>(event.payload()) {
+                    if let Some(arr) = urls.as_array() {
+                        for url_val in arr {
+                            if let Some(url_str) = url_val.as_str() {
+                                let _ = app_handle_dl.emit("deep-link://navigate", url_str.to_string());
+                            }
+                        }
+                    } else if let Some(url_str) = urls.as_str() {
+                        let _ = app_handle_dl.emit("deep-link://navigate", url_str.to_string());
                     }
                 }
             });

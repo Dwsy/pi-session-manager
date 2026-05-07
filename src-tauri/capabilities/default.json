@@ -11,6 +11,7 @@
     "shell:default",
     "dialog:default",
     "core:webview:allow-set-webview-zoom",
-    "updater:default"
+    "updater:default",
+    "deep-link:default"
   ]
 }
