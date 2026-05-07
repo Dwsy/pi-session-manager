@@ -272,6 +272,7 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
 
 /// Collect all JSONL file paths from all session directories
 pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
+    let walk_start = std::time::Instant::now();
     // Check cache first
     if let Ok(guard) = FILE_LIST_CACHE.read() {
         if let Some(cached) = guard.as_ref() {
@@ -350,6 +351,9 @@ pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
     }
     files.sort();
     files.dedup();
+
+    let walk_elapsed = walk_start.elapsed();
+    super::io_trace::trace_scan("collect_files", &format!("{} files in {:?}", files.len(), walk_elapsed));
 
     // Update cache
     if let Ok(mut guard) = FILE_LIST_CACHE.write() {
@@ -639,6 +643,7 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
     let file_size = fs::metadata(&backing).map(|m| m.len()).unwrap_or(0);
     let result = crate::domain::session_bridge::parse_session_info_from_path(path)?;
     let elapsed = start.elapsed();
+    super::io_trace::trace_file_read(&path.to_string_lossy(), file_size, elapsed);
     info!("[IO:full_parse] path={} size={}bytes entries={} elapsed={:?}", path.display(), file_size, result.1.len(), elapsed);
     Ok(result)
 }
@@ -680,10 +685,13 @@ fn safe_append_only_read_jsonl(path: &Path, last_offset: u64) -> Result<(u64, Ve
     reader.seek(std::io::SeekFrom::Start(last_offset)).map_err(|_| "fallback".to_string())?;
 
     let delta = current_size - last_offset;
+    let read_start = std::time::Instant::now();
     let mut new_content = String::new();
     use std::io::Read;
     reader.read_to_string(&mut new_content).map_err(|_| "fallback".to_string())?;
-    info!("[IO:incremental] path={} offset={} delta={}bytes read={}bytes", path.display(), last_offset, delta, new_content.len());
+    let read_elapsed = read_start.elapsed();
+    super::io_trace::trace_file_seek_read(&path.to_string_lossy(), last_offset, new_content.len() as u64, read_elapsed);
+    info!("[IO:incremental] path={} offset={} delta={}bytes read={}bytes elapsed={:?}", path.display(), last_offset, delta, new_content.len(), read_elapsed);
 
     // Layer 2: trailing-newline guard against half-written lines
     let effective_bytes = if !new_content.ends_with('\n') {
@@ -758,6 +766,8 @@ fn incremental_update_session_info(old: &SessionInfo, new_entries: &[SessionEntr
 
 /// Incremental update: re-parse changed files, update cache, return diff for frontend merge.
 pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<SessionsDiff, String> {
+    let rescan_start = std::time::Instant::now();
+    super::io_trace::trace_scan("rescan_start", &format!("{} files", changed_paths.len()));
     let mut sessions = if let Ok(guard) = SCAN_CACHE.read() { guard.clone().unwrap_or_default() } else { vec![] };
 
     if sessions.is_empty() {
@@ -909,7 +919,9 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
         }
     }
 
-    debug!("Incremental rescan: {} updated, {} removed", diff.updated.len(), diff.removed.len());
+    let rescan_elapsed = rescan_start.elapsed();
+    super::io_trace::trace_scan("rescan_done", &format!("updated={} removed={} elapsed={:?}", diff.updated.len(), diff.removed.len(), rescan_elapsed));
+    debug!("Incremental rescan: {} updated, {} removed in {:?}", diff.updated.len(), diff.removed.len(), rescan_elapsed);
 
     Ok(diff)
 }
@@ -1075,6 +1087,7 @@ impl ScannerScheduler {
         }
 
         let elapsed = start.elapsed();
+        super::io_trace::trace_scan("scan_complete", &format!("+{added} added ~{updated} updated {skipped} skipped elapsed={elapsed:?}"));
         info!("Scanner complete: +{} added, ~{} updated, {} skipped in {:?}", added, updated, skipped, elapsed);
 
         Ok(format!("Scanned: +{added} added, ~{updated} updated, {skipped} skipped"))

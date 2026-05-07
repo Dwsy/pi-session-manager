@@ -724,10 +724,13 @@ pub fn append_message_entries(conn: &Connection, session_path: &str, entries: &[
         return Ok(());
     }
 
+    let start = std::time::Instant::now();
     let include_thinking = load_include_thinking_in_search();
     let rows = build_rows_from_session_entries(session_path, entries, include_thinking);
     insert_message_entries_rows(conn, &rows)?;
+    let elapsed = start.elapsed();
 
+    crate::core::io_trace::trace_db("append_entries", session_path, rows.len(), elapsed);
     debug!("Appended {} message entry rows for session: {}", rows.len(), session_path);
     Ok(())
 }

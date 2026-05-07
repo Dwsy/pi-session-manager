@@ -43,6 +43,7 @@ pub fn read_canonical_session_from_path(path: &Path) -> Result<(ProviderKind, Ca
     let start = std::time::Instant::now();
     let content = fs::read_to_string(path).map_err(|e| format!("Failed to read session file {}: {e}", path.display()))?;
     let elapsed = start.elapsed();
+    crate::core::io_trace::trace_file_read(&path.to_string_lossy(), content.len() as u64, elapsed);
     tracing::info!("[IO] bridge_ops::read_canonical_session_from_path path={} bytes={} elapsed={:?}", path.display(), content.len(), elapsed);
     read_canonical_session_from_str(&content, Some(path))
 }

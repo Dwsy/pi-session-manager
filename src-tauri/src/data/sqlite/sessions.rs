@@ -3,6 +3,9 @@ use super::message_index::{delete_message_entries_for_session, insert_message_en
 use super::util::parse_timestamp;
 
 pub fn upsert_session(conn: &mut Connection, session: &SessionInfo, file_modified: DateTime<Utc>, entries: Option<&[SessionEntry]>) -> Result<(), String> {
+    let start = std::time::Instant::now();
+    let entries_count = entries.map(|e| e.len()).unwrap_or(0);
+    let has_entries = entries.is_some();
     const MAX_RETRIES: usize = 3;
     let mut last_error = None;
 
@@ -27,6 +30,8 @@ pub fn upsert_session(conn: &mut Connection, session: &SessionInfo, file_modifie
                     }
                     return Err(err_msg);
                 }
+                let elapsed = start.elapsed();
+                crate::core::io_trace::trace_db("upsert_session", &format!("{} entries={} sync={}", session.path, entries_count, has_entries), entries_count, elapsed);
                 return Ok(());
             }
             Err(e) => {
@@ -41,6 +46,8 @@ pub fn upsert_session(conn: &mut Connection, session: &SessionInfo, file_modifie
         }
     }
 
+    let elapsed = start.elapsed();
+    crate::core::io_trace::trace_db("upsert_session:FAILED", &session.path, 0, elapsed);
     Err(last_error.unwrap_or_else(|| "Unknown upsert error".to_string()))
 }
 

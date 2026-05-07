@@ -57,7 +57,11 @@ impl RawPiEntry {
 }
 
 pub fn parse_pi_session_info(path: &Path, file_modified: DateTime<Utc>) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
+    let start = std::time::Instant::now();
+    let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
     let (header, raw_entries) = parse_pi_session(path)?;
+    let elapsed = start.elapsed();
+    crate::core::io_trace::trace_file_read(&path.to_string_lossy(), file_size, elapsed);
     let entries = raw_entries.iter().map(RawPiEntry::to_session_entry).collect::<Vec<_>>();
 
     let mut message_count = 0usize;
