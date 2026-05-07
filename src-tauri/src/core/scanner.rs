@@ -832,6 +832,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                 None
             };
 
+            let is_incremental = parse_result.is_some();
             let (info, entries, new_offset, new_trust) = match parse_result {
                 Some(triple) => triple,
                 None => {
@@ -854,7 +855,12 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
 
             seen_paths.insert(info.path.clone());
 
-            if let Err(e) = sqlite::upsert_session(&mut conn, &info, file_modified, Some(&entries)) {
+            // For incremental updates: append_message_entries already inserted new entries,
+            // so pass None to upsert_session to skip redundant sync_message_entries (O(n) on ALL entries).
+            // For full-parse fallback: pass entries so sync_message_entries does differential insert.
+            let entries_for_upsert = if is_incremental { None } else { Some(entries.as_slice()) };
+
+            if let Err(e) = sqlite::upsert_session(&mut conn, &info, file_modified, entries_for_upsert) {
                 warn!("Failed to upsert session for {}: {}", info.path, e);
             } else {
                 let _ = sqlite::upsert_scan_state_for_session(&conn, &info, file_modified, "ok");
@@ -1015,6 +1021,8 @@ impl ScannerScheduler {
                         let info = incremental_update_session_info(&old_info, &new_entries, file_modified);
                         set_cached_entries(&path_str, all_entries.clone());
                         let _ = sqlite::append_message_entries(&conn, &path_str, &new_entries);
+                        // Update sessions table (pass None to skip redundant sync_message_entries)
+                        let _ = sqlite::upsert_session(&mut conn, &info, file_modified, None);
                         upsert_cached_session(info);
                         let trust = all_scan_states.get(&path_str).map(|s| s.append_trust_count).unwrap_or(3);
                         let _ = sqlite::update_scan_state_offset_and_trust(&conn, &path_str, new_offset, trust.saturating_add(1));
