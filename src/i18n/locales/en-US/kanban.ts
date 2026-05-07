@@ -16,6 +16,7 @@ export const kanban = {
     projectFilter: 'Project Filter',
     allProjects: 'All Projects',
     tagFilters: 'Tag Filters',
+    sourceFilters: 'Source Filters',
     deleteConfirm: 'Are you sure you want to delete this workspace?',
   },
 } as const

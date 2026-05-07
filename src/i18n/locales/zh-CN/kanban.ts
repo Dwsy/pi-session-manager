@@ -15,7 +15,8 @@ export const kanban = {
     color: '颜色',
     projectFilter: '项目过滤',
     allProjects: '所有项目',
-    tagFilters: '标签过滤',
+    tagFilters: '标签筛选',
+    sourceFilters: '来源筛选',
     deleteConfirm: '确定要删除此工作区吗？',
   },
 } as const

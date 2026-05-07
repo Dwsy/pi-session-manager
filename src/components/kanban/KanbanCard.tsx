@@ -17,6 +17,7 @@ interface KanbanCardProps {
   isOverlay?: boolean
   onSelect: (rect: DOMRect, clickPoint?: { x: number; y: number }) => void
   onContextMenu?: (e: React.MouseEvent) => void
+  hideProjectInfo?: boolean
 }
 
 function KanbanCardInner({
@@ -27,6 +28,7 @@ function KanbanCardInner({
   isOverlay,
   onSelect,
   onContextMenu,
+  hideProjectInfo = false,
 }: KanbanCardProps) {
   const { getSessionSetting } = useSettings()
   const cardRef = useRef<HTMLDivElement>(null)
@@ -128,7 +130,7 @@ function KanbanCardInner({
           <Clock size={9} />
           {timeLabel}
         </span>
-        {dir && (
+        {dir && !hideProjectInfo && (
           <span className="font-mono truncate flex-1 text-right">{dir}</span>
         )}
       </div>

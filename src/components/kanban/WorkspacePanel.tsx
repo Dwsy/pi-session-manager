@@ -1,15 +1,17 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, Folder, Check, Search, Plus, Settings, Trash2, ChevronDown } from 'lucide-react'
+import { FolderOpen, Folder, Check, Search, Plus, Settings, Trash2, ChevronDown, Filter, Tag, LayoutGrid, FolderKanban } from 'lucide-react'
 import type { SessionInfo } from '@/types'
 import type { KanbanWorkspace } from '@/hooks/useWorkspaces'
 import { getDirectoryName } from '@/utils/sessionDisplay'
 
 interface WorkspacePanelProps {
   sessions: SessionInfo[]
+  workspaceSessions?: SessionInfo[]
   selectedProject: string | null
   onSelectProject: (project: string | null) => void
   workspaces: KanbanWorkspace[]
+  activeWorkspace: KanbanWorkspace
   activeWorkspaceId: string
   onSelectWorkspace: (id: string) => void
   onCreateWorkspace: () => void
@@ -21,13 +23,16 @@ interface Project {
   dir: string
   dirName: string
   sessionCount: number
+  lastModified: number
 }
 
 export default function WorkspacePanel({
   sessions,
+  workspaceSessions,
   selectedProject,
   onSelectProject,
   workspaces,
+  activeWorkspace,
   activeWorkspaceId,
   onSelectWorkspace,
   onCreateWorkspace,
@@ -37,10 +42,11 @@ export default function WorkspacePanel({
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState('')
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false)
-  const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId)
+
+  const effectiveSessions = workspaceSessions ?? sessions
 
   const projects: Project[] = useMemo(() => {
-    const projectMap = sessions.reduce((acc, session) => {
+    const projectMap = effectiveSessions.reduce((acc, session) => {
       const cwd = session.cwd || t('common.unknown')
       if (!acc[cwd]) {
         acc[cwd] = []
@@ -54,10 +60,18 @@ export default function WorkspacePanel({
         dir,
         dirName: getDirectoryName(dir),
         sessionCount: dirSessions.length,
+        lastModified: Math.max(
+          ...dirSessions.map((s) => new Date(s.modified).getTime()),
+        ),
       }))
       .filter(p => !searchQuery || p.dirName.toLowerCase().includes(searchQuery.toLowerCase()))
-      .sort((a, b) => b.sessionCount - a.sessionCount)
-  }, [sessions, searchQuery, t])
+      .sort((a, b) => b.lastModified - a.lastModified)
+  }, [effectiveSessions, searchQuery, t])
+
+  const hasFilters =
+    activeWorkspace.config.projectFilter ||
+    activeWorkspace.config.filterTagIds.length > 0 ||
+    activeWorkspace.config.sourceFilterSlugs.length > 0
 
   return (
     <div className="h-full flex flex-col bg-card border-r border-border/10">
@@ -67,19 +81,28 @@ export default function WorkspacePanel({
           onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
           className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted motion-color text-xs font-medium"
         >
-          <Folder className="h-3.5 w-3.5 text-primary" />
-          <span className="flex-1 text-left truncate">{activeWorkspace?.name}</span>
+          {activeWorkspace.id === '__default__' ? (
+            <LayoutGrid className="h-3.5 w-3.5 text-muted-foreground" />
+          ) : (
+            <FolderKanban className="h-3.5 w-3.5 text-primary" />
+          )}
+          <span className="flex-1 text-left truncate">{activeWorkspace.name}</span>
           <ChevronDown className={`h-3 w-3 transition-transform ${isWorkspaceOpen ? 'rotate-180' : ''}`} />
         </button>
 
         {isWorkspaceOpen && (
           <div className="absolute z-50 top-full left-2 right-2 mt-1 bg-popover border border-border rounded-md shadow-lg py-1 animate-in fade-in-0 zoom-in-95">
             {workspaces.map(w => (
-              <div key={w.id} className="flex items-center group px-1">
+              <div key={w.id} className={`flex items-center group px-1 ${w.id === activeWorkspaceId ? 'bg-primary/5' : ''}`}>
                 <button
                   onClick={() => { onSelectWorkspace(w.id); setIsWorkspaceOpen(false) }}
                   className="flex-1 flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted rounded-sm"
                 >
+                  {w.id === '__default__' ? (
+                    <LayoutGrid className="h-3.5 w-3.5 text-muted-foreground" />
+                  ) : (
+                    <FolderKanban className="h-3.5 w-3.5 text-primary/80" />
+                  )}
                   <span className="truncate">{w.name}</span>
                 </button>
                 {w.id !== '__default__' && (
@@ -98,6 +121,30 @@ export default function WorkspacePanel({
           </div>
         )}
       </div>
+
+      {/* Active Filter Badges */}
+      {hasFilters && (
+        <div className="px-2 py-1.5 border-b border-border/10 flex flex-wrap gap-1">
+          {activeWorkspace.config.projectFilter && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px]">
+              <FolderOpen className="h-3 w-3" />
+              {activeWorkspace.config.projectFilter.split('/').pop()}
+            </span>
+          )}
+          {activeWorkspace.config.filterTagIds.length > 0 && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px]">
+              <Tag className="h-3 w-3" />
+              {activeWorkspace.config.filterTagIds.length} tags
+            </span>
+          )}
+          {activeWorkspace.config.sourceFilterSlugs.length > 0 && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px]">
+              <Filter className="h-3 w-3" />
+              {activeWorkspace.config.sourceFilterSlugs.length} sources
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Search Input */}
       <div className="px-2 py-1.5 border-b border-border/10">
@@ -139,6 +186,12 @@ export default function WorkspacePanel({
             <span className="text-[10px] opacity-60">{project.sessionCount}</span>
           </button>
         ))}
+
+        {projects.length === 0 && (
+          <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+            {searchQuery ? t('common.noResults') : t('project.noProjects')}
+          </div>
+        )}
       </div>
     </div>
   )

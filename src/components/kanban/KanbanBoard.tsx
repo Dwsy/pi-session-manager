@@ -8,7 +8,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  closestCenter,
+  closestCorners,
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
@@ -146,7 +146,12 @@ export default function KanbanBoard({
     for (const tag of sortedTags) {
       const tagSessions = sessionTags
         .filter(st => st.tagId === tag.id)
-        .sort((a, b) => a.position - b.position)
+        .sort((a, b) => {
+          const sessionA = sessionMap.get(a.sessionId)
+          const sessionB = sessionMap.get(b.sessionId)
+          if (!sessionA || !sessionB) return 0
+          return new Date(sessionB.modified).getTime() - new Date(sessionA.modified).getTime()
+        })
         .map(st => sessionMap.get(st.sessionId))
         .filter((s): s is SessionInfo => s !== undefined)
 
@@ -154,14 +159,21 @@ export default function KanbanBoard({
     }
 
     // Untagged column FIRST (before tagged columns)
-    const untaggedSessions = filteredSessions.filter(s => !taggedSessionIds.has(s.id))
+    const untaggedSessions = filteredSessions
+      .filter(s => !taggedSessionIds.has(s.id))
+      .sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime())
     cols.push({ id: '__untagged__', tag: null, sessions: untaggedSessions })
 
     // Then add tagged columns
     for (const tag of sortedTags) {
       const tagSessions = sessionTags
         .filter(st => st.tagId === tag.id)
-        .sort((a, b) => a.position - b.position)
+        .sort((a, b) => {
+          const sessionA = sessionMap.get(a.sessionId)
+          const sessionB = sessionMap.get(b.sessionId)
+          if (!sessionA || !sessionB) return 0
+          return new Date(sessionB.modified).getTime() - new Date(sessionA.modified).getTime()
+        })
         .map(st => sessionMap.get(st.sessionId))
         .filter((s): s is SessionInfo => s !== undefined)
 
@@ -332,7 +344,7 @@ export default function KanbanBoard({
         {onNewSession && (
           <button
             onClick={() => onNewSession(projectFilter || '')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-md border border-accent/25 bg-accent/15 text-accent hover:bg-accent/25 hover:border-accent/40 text-[11px] shrink-0 motion-color motion-press focus-ring"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md border border-accent/25 bg-accent/15 text-foreground hover:bg-accent/25 hover:border-accent/40 text-[11px] shrink-0 motion-color motion-press focus-ring"
             title={t('kanban.newSession', 'New Session')}
           >
             <Plus className="h-3.5 w-3.5" />
@@ -344,7 +356,7 @@ export default function KanbanBoard({
       {/* Board */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={closestCorners}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
@@ -388,6 +400,7 @@ export default function KanbanBoard({
                     onCopyResumeSession={onCopyResumeSession}
                     isMobile
                     liveSessionIds={liveSessionIds}
+                    hideProjectInfo={!!projectFilter}
                 />
               )}
             </div>
@@ -413,6 +426,7 @@ export default function KanbanBoard({
                     onResumeSession={onResumeSession}
                     onCopyResumeSession={onCopyResumeSession}
                     liveSessionIds={liveSessionIds}
+                    hideProjectInfo={!!projectFilter}
                   />
                 </div>
               ))}

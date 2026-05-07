@@ -38,6 +38,7 @@ interface KanbanColumnProps {
   resumeCommand?: string
   isMobile?: boolean
   liveSessionIds?: Set<string>
+  hideProjectInfo?: boolean
 }
 
 // Threshold for enabling virtualization
@@ -64,6 +65,7 @@ export default function KanbanColumn({
   resumeCommand: propResumeCommand,
   isMobile,
   liveSessionIds,
+  hideProjectInfo = false,
 }: KanbanColumnProps) {
   const { t } = useTranslation()
   const { copyText } = useClipboard()
@@ -141,6 +143,7 @@ export default function KanbanColumn({
                     isSelected={selectedSession?.id === session.id}
                     onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}
                     onContextMenu={(e) => handleContextMenu(session, e)}
+                    hideProjectInfo={hideProjectInfo}
                   />
                 </div>
               </div>
@@ -161,6 +164,7 @@ export default function KanbanColumn({
             isSelected={selectedSession?.id === session.id}
             onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}
             onContextMenu={(e) => handleContextMenu(session, e)}
+            hideProjectInfo={hideProjectInfo}
           />
         ))}
       </div>

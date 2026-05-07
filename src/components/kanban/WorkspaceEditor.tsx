@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Tag, FolderInput } from 'lucide-react'
+import { X, Tag, FolderInput, Database } from 'lucide-react'
 import type { KanbanWorkspace } from '@/hooks/useWorkspaces'
 import type { SessionInfo, Tag as TagType } from '@/types'
 import TagBadge from '@/components/tags/TagBadge'
@@ -9,6 +9,7 @@ interface WorkspaceEditorProps {
   workspace?: KanbanWorkspace | null
   sessions: SessionInfo[]
   tags: TagType[]
+  sourceOptions?: Array<{ slug: string; label: string }>
   onSave: (workspace: Omit<KanbanWorkspace, 'createdAt' | 'updatedAt'>) => void
   onClose: () => void
 }
@@ -17,6 +18,7 @@ export default function WorkspaceEditor({
   workspace,
   sessions,
   tags,
+  sourceOptions = [],
   onSave,
   onClose,
 }: WorkspaceEditorProps) {
@@ -24,6 +26,7 @@ export default function WorkspaceEditor({
   const [name, setName] = useState(workspace?.name || '')
   const [projectFilter, setProjectFilter] = useState<string | null>(workspace?.config.projectFilter || null)
   const [filterTagIds, setFilterTagIds] = useState<string[]>(workspace?.config.filterTagIds || [])
+  const [sourceFilterSlugs, setSourceFilterSlugs] = useState<string[]>(workspace?.config.sourceFilterSlugs || [])
 
   const projects = Array.from(new Set(sessions.map(s => s.cwd).filter(Boolean)))
 
@@ -32,6 +35,14 @@ export default function WorkspaceEditor({
       prev.includes(tagId)
         ? prev.filter(id => id !== tagId)
         : [...prev, tagId]
+    )
+  }
+
+  const handleToggleSource = (slug: string) => {
+    setSourceFilterSlugs(prev =>
+      prev.includes(slug)
+        ? prev.filter(s => s !== slug)
+        : [...prev, slug]
     )
   }
 
@@ -44,7 +55,7 @@ export default function WorkspaceEditor({
       config: {
         projectFilter,
         filterTagIds,
-        sourceFilterSlugs: workspace?.config.sourceFilterSlugs || [],
+        sourceFilterSlugs,
       },
     })
     onClose()
@@ -118,6 +129,30 @@ export default function WorkspaceEditor({
               ))}
             </div>
           </div>
+
+          {sourceOptions.length > 0 && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                <Database className="h-3 w-3" />
+                {t('kanban.workspace.sourceFilters')}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {sourceOptions.map(source => (
+                  <button
+                    key={source.slug}
+                    onClick={() => handleToggleSource(source.slug)}
+                    className={`px-2 py-1 rounded-md text-xs flex items-center gap-1 ${
+                      sourceFilterSlugs.includes(source.slug)
+                        ? 'bg-primary/10 text-primary ring-1 ring-primary/50'
+                        : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                    }`}
+                  >
+                    <span>{source.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-border/40 bg-muted/30">

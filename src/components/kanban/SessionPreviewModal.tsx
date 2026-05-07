@@ -109,6 +109,13 @@ export default function SessionPreviewModal({
       return;
     }
 
+    // Clear any pending open animation timeout to prevent it from
+    // overwriting the close animation styles mid-flight.
+    if (animationTimeoutRef.current) {
+      clearTimeout(animationTimeoutRef.current);
+      animationTimeoutRef.current = null;
+    }
+
     closeInFlightRef.current = true;
     onCloseStart?.();
 
