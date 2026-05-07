@@ -635,9 +635,11 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
 /// Returns: (SessionInfo, Vec<SessionEntry>) - session info and message entry list
 pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
     let start = std::time::Instant::now();
+    let backing = crate::domain::session_bridge::backing_file_path(path);
+    let file_size = fs::metadata(&backing).map(|m| m.len()).unwrap_or(0);
     let result = crate::domain::session_bridge::parse_session_info_from_path(path)?;
     let elapsed = start.elapsed();
-    info!("[IO] parse_session_info path={} entries={} elapsed={:?}", path.display(), result.1.len(), elapsed);
+    info!("[IO:full_parse] path={} size={}bytes entries={} elapsed={:?}", path.display(), file_size, result.1.len(), elapsed);
     Ok(result)
 }
 
@@ -677,9 +679,11 @@ fn safe_append_only_read_jsonl(path: &Path, last_offset: u64) -> Result<(u64, Ve
     let mut reader = std::io::BufReader::new(file);
     reader.seek(std::io::SeekFrom::Start(last_offset)).map_err(|_| "fallback".to_string())?;
 
+    let delta = current_size - last_offset;
     let mut new_content = String::new();
     use std::io::Read;
     reader.read_to_string(&mut new_content).map_err(|_| "fallback".to_string())?;
+    info!("[IO:incremental] path={} offset={} delta={}bytes read={}bytes", path.display(), last_offset, delta, new_content.len());
 
     // Layer 2: trailing-newline guard against half-written lines
     let effective_bytes = if !new_content.ends_with('\n') {

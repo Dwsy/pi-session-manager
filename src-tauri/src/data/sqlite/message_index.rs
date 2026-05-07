@@ -743,6 +743,9 @@ pub fn sync_message_entries(conn: &Connection, session_path: &str, entries: &[Se
         return Ok(());
     }
 
+    let start = std::time::Instant::now();
+    let _total_entries = entries.len();
+
     // Get existing entry IDs for this session
     let existing_ids: std::collections::HashSet<String> = {
         let mut stmt = conn.prepare("SELECT id FROM message_entries WHERE session_path = ?").map_err(|e| format!("Failed to prepare existing ids query: {e}"))?;
@@ -801,8 +804,11 @@ pub fn sync_message_entries(conn: &Connection, session_path: &str, entries: &[Se
         debug!("Inserted {} new message entries for session: {}", rows_to_insert.len(), session_path);
     }
 
+    let elapsed = start.elapsed();
     if ids_to_delete.is_empty() && rows_to_insert.is_empty() {
         debug!("No changes to message entries for session: {}", session_path);
+    } else {
+        info!("[IO:sync_entries] session={} total_entries={} existing={} deleted={} inserted={} elapsed={:?}", session_path, _total_entries, existing_ids.len(), ids_to_delete.len(), rows_to_insert.len(), elapsed);
     }
 
     Ok(())
