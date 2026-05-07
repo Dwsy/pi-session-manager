@@ -69,6 +69,8 @@ export interface AppSettings {
     codeBlockTheme: "github" | "monokai" | "dracula" | "one-dark";
     messageSpacing: "compact" | "comfortable" | "spacious";
     disableToolSuccessStyle: boolean;
+    /** macOS native translucent blur for sidebar */
+    sidebarVibrancy: "off" | "on";
   };
   language: {
     locale: string;
@@ -157,6 +159,7 @@ export const defaultSettings: AppSettings = {
     codeBlockTheme: "github",
     messageSpacing: "comfortable",
     disableToolSuccessStyle: true,
+    sidebarVibrancy: "off",
   },
   language: {
     locale: getDefaultLocale(),

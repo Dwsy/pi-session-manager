@@ -127,6 +127,9 @@ export const settings = {
     disableToolSuccessStyleDesc:
       "禁用工具执行成功时的绿色背景和边框，使工具卡片更简洁",
     enabled: "已启用",
+    sidebarVibrancy: "侧边栏模糊",
+    sidebarVibrancyDesc:
+      "仅 macOS。为侧边栏应用原生半透明模糊效果。需要系统设置中开启「在窗口中允许使用壁纸色调」。",
   },
   language: {
     select: "选择语言",

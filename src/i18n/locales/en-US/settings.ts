@@ -152,6 +152,9 @@ export const settings = {
     disableToolSuccessStyleDesc:
       "Disable green background and border on successful tool execution for cleaner tool cards",
     enabled: "Enabled",
+    sidebarVibrancy: "Sidebar Blur",
+    sidebarVibrancyDesc:
+      "macOS only. Native translucent blur on sidebar. System Settings -> Desktop & Dock -> Allow wallpaper tinting in windows must be on.",
   },
   language: {
     select: "Select Language",

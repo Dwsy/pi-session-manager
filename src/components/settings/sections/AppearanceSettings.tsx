@@ -152,6 +152,30 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
           </span>
         </label>
       </SettingsField>
+
+      {/* Sidebar Blur — temporarily hidden, effect quality not satisfactory */}
+      {false && (
+        <SettingsField
+          label={t('settings.appearance.sidebarVibrancy', 'Sidebar Blur')}
+          description={t(
+            'settings.appearance.sidebarVibrancyDesc',
+            'macOS only. Native translucent blur on sidebar.'
+          )}
+          searchKey="appearance-sidebarVibrancy"
+        >
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.appearance.sidebarVibrancy === 'on'}
+              onChange={(e) => onUpdate('appearance', 'sidebarVibrancy', e.target.checked ? 'on' : 'off')}
+              className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-2"
+            />
+            <span className="text-sm text-muted-foreground ml-2">
+              {t('settings.appearance.enabled', 'Enabled')}
+            </span>
+          </label>
+        </SettingsField>
+      )}
     </div>
   )
 }

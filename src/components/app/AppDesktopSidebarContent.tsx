@@ -81,7 +81,9 @@ export interface AppDesktopSidebarContentProps {
   onToggleFavorite: NonNullable<ProjectListProps["onToggleFavorite"]>;
   liveSessionIds?: Set<string>;
   workspaces: KanbanWorkspace[];
+  activeWorkspace: KanbanWorkspace;
   activeWorkspaceId: string;
+  workspaceSessions?: SessionInfo[];
   onSelectWorkspace: (id: string) => void;
   onCreateWorkspace: () => void;
   onEditWorkspace: (w: KanbanWorkspace) => void;
@@ -120,7 +122,9 @@ function AppDesktopSidebarContent({
   onToggleFavorite,
   liveSessionIds,
   workspaces,
+  activeWorkspace,
   activeWorkspaceId,
+  workspaceSessions,
   onSelectWorkspace,
   onCreateWorkspace,
   onEditWorkspace,
@@ -140,9 +144,11 @@ function AppDesktopSidebarContent({
       {!showFavorites && viewMode === "kanban" && (
         <WorkspacePanel
           sessions={sessions}
+          workspaceSessions={workspaceSessions}
           selectedProject={selectedProject}
           onSelectProject={onSelectKanbanFilterProject}
           workspaces={workspaces}
+          activeWorkspace={activeWorkspace}
           activeWorkspaceId={activeWorkspaceId}
           onSelectWorkspace={onSelectWorkspace}
           onCreateWorkspace={onCreateWorkspace}
