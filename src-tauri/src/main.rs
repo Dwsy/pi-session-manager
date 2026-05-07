@@ -546,7 +546,10 @@ fn main() {
             pi_session_manager::pi_agent_abort,
             pi_session_manager::list_config_versions,
             pi_session_manager::get_config_version,
-            pi_session_manager::restore_config_version
+            pi_session_manager::restore_config_version,
+            pi_session_manager::get_workspaces,
+            pi_session_manager::save_workspace,
+            pi_session_manager::delete_workspace
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

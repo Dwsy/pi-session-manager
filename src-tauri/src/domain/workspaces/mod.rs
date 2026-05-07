@@ -32,10 +32,7 @@ struct WorkspacesFile {
 
 impl Default for WorkspacesFile {
     fn default() -> Self {
-        Self {
-            version: 1,
-            workspaces: Vec::new(),
-        }
+        Self { version: 1, workspaces: Vec::new() }
     }
 }
 
