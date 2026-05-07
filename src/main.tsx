@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { HashRouter } from 'react-router-dom'
 import App from './App.tsx'
 import AuthGate from './components/AuthGate'
 import { TransportProvider } from './contexts/TransportContext'
@@ -117,15 +118,17 @@ if (isTauri()) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ErrorBoundary>
-      <AuthGate>
-        <TransportProvider>
-          <SettingsProvider>
-            <ClipboardBridge />
-            <App />
-          </SettingsProvider>
-        </TransportProvider>
-      </AuthGate>
-    </ErrorBoundary>
+    <HashRouter>
+      <ErrorBoundary>
+        <AuthGate>
+          <TransportProvider>
+            <SettingsProvider>
+              <ClipboardBridge />
+              <App />
+            </SettingsProvider>
+          </TransportProvider>
+        </AuthGate>
+      </ErrorBoundary>
+    </HashRouter>
   </React.StrictMode>,
 )

@@ -54,6 +54,7 @@
     "react-i18next": "^16.5.4",
     "react-is": "^19.2.4",
     "react-resizable-panels": "^4.10.0",
+    "react-router-dom": "^7.14.2",
     "recharts": "^3.7.0",
     "ws": "^8.20.0"
   },
@@ -78,5 +79,6 @@
     "vite": "^5.4.11",
     "vite-plugin-pwa": "^1.2.0",
     "vitest": "^3.2.4"
-  }
+  },
+  "packageManager": "pnpm@10.33.4+sha512.1c67b3b359b2d408119ba1ed289f34b8fc3c6873412bec6fd264fbdc82489e510fcbecb9ce9d22dae7f3b76269d8441046014bdca53b9979cd7a561ad631b800"
 }

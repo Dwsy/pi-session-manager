@@ -1,16 +1,20 @@
 import { useState, useMemo, useRef, useCallback, lazy, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
+import { useRouteSync } from "./hooks/useRouteSync";
+import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSwipe } from "./hooks/useSwipe";
 import { triggerHaptic } from "./utils/haptics";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useDeepLink } from "./hooks/useDeepLink";
 import { useSessionBadges } from "./hooks/useSessionBadges";
 import { listSupportedSessionProviders } from "./utils/sessionProvidersApi";
 import { useSessions } from "./hooks/useSessions";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useSessionActions } from "./hooks/useSessionActions";
 import { useAppearance } from "./hooks/useAppearance";
+import { useSidebarVibrancy } from "./hooks/useSidebarVibrancy";
 import { useToolStyles } from "./hooks/useToolStyles";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useClipboard } from "./hooks/useClipboard";
@@ -33,6 +37,7 @@ import type { SearchContext } from "./plugins/types";
 import { invoke, isTauri } from "./transport";
 import { getCachedSettings } from "./utils/settingsApi";
 import { getSessionSourceSlug } from "./utils/session";
+import { filterSessions } from "./utils/sessionFilters";
 import {
   buildPiResumeCommand,
   buildPiForkCommand,
@@ -122,15 +127,6 @@ function App() {
 
   const mobileViewerRef = useRef<HTMLDivElement>(null);
 
-  useSwipe(mobileViewerRef, {
-    onSwipeRight: () => {
-      triggerHaptic("light");
-      setSelectedSession(null);
-    },
-    threshold: 40,
-    edgeZone: 40,
-  });
-
   const {
     sessions,
     loading,
@@ -177,6 +173,7 @@ function App() {
     loadTags,
   } = useTags();
   useAppearance();
+  const { isVibrancyEnabled } = useSidebarVibrancy();
   useToolStyles();
   const { liveSessionIds: runtimeLiveSessionIds } = usePiLive();
   const liveSessionIds = standaloneDatasetRuntime
@@ -251,6 +248,30 @@ function App() {
   });
   const [showTerminal, setShowTerminal] = useState(false);
 
+  const navigate = useNavigate();
+
+  // Route sync for deep linking and URL-based navigation
+  const {
+    navigateToSession,
+    navigateToSessions,
+  } = useRouteSync({
+    setSelectedSession,
+    selectedSession,
+    sessions,
+  });
+
+  // Deep link: pi-session://sessions/{id} etc.
+  useDeepLink({ onNavigate: (path) => navigate(path) });
+
+  useSwipe(mobileViewerRef, {
+    onSwipeRight: () => {
+      triggerHaptic("light");
+      navigateToSessions();
+    },
+    threshold: 40,
+    edgeZone: 40,
+  });
+
   const [pendingScrollEntryId, setPendingScrollEntryId] = useState<
     string | null
   >(null);
@@ -303,11 +324,49 @@ function App() {
   } = useFavorites({ enabled: isInitialized });
   const {
     workspaces,
+    activeWorkspace,
     activeWorkspaceId,
     saveWorkspace,
     deleteWorkspace,
     selectWorkspace,
   } = useWorkspaces();
+
+  // Sync selectedProject to workspace config when active workspace changes
+  useEffect(() => {
+    if (activeWorkspace.config.projectFilter) {
+      setSelectedProject(activeWorkspace.config.projectFilter);
+    } else if (activeWorkspace.id === "__default__") {
+      setSelectedProject(null);
+    }
+  }, [activeWorkspace]);
+
+  const kanbanProjectFilter = useMemo(
+    () => activeWorkspace.config.projectFilter ?? selectedProject,
+    [activeWorkspace, selectedProject],
+  );
+
+  const kanbanFilterTagIds = useMemo(
+    () => activeWorkspace.config.filterTagIds,
+    [activeWorkspace],
+  );
+
+  const kanbanSourceFilterSlugs = useMemo(
+    () => activeWorkspace.config.sourceFilterSlugs,
+    [activeWorkspace],
+  );
+
+  const workspaceSessions = useMemo(() => {
+    return filterSessions({
+      sessions,
+      projectFilter: activeWorkspace.config.projectFilter,
+      filterTagIds: activeWorkspace.config.filterTagIds,
+      sourceFilterSlugs: activeWorkspace.config.sourceFilterSlugs,
+      sessionTags,
+      getDescendantIds,
+      timeRange: "any",
+    });
+  }, [sessions, activeWorkspace, sessionTags, getDescendantIds]);
+
   const [showWorkspaceEditor, setShowWorkspaceEditor] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<KanbanWorkspace | null>(null);
   const { updateInfo, closeUpdateNotice, openUpdateReleasePage } =
@@ -332,8 +391,9 @@ function App() {
     (session: SessionInfo) => {
       setSelectedSession(session);
       clearBadge(session.id);
+      navigateToSession(session.id);
     },
-    [setSelectedSession, clearBadge],
+    [setSelectedSession, navigateToSession, clearBadge],
   );
 
   const buildResumeCommand = useCallback(
@@ -399,7 +459,7 @@ function App() {
   const requestResumeSession = useCallback(
     async (session: SessionInfo) => {
       const configuredTarget = getConfiguredExternalResumeTarget();
-      setSelectedSession(session);
+      navigateToSession(session.id);
       if (!configuredTarget) {
         setResumeDialogMode("resume");
         setShowResumeDialog(true);
@@ -424,7 +484,7 @@ function App() {
   const requestCopyResumeCommand = useCallback(
     async (session: SessionInfo) => {
       const configuredTarget = getConfiguredExternalResumeTarget();
-      setSelectedSession(session);
+      navigateToSession(session.id);
       if (!configuredTarget) {
         setResumeDialogMode("copy");
         setShowResumeDialog(true);
@@ -505,11 +565,13 @@ function App() {
         setViewMode("list");
         setSelectedProject(null);
         setShowFavorites(false);
+        navigateToSessions();
       },
       "cmd+p": () => {
         setViewMode("project");
         setSelectedProject(null);
         setShowFavorites(false);
+        navigateToSessions();
       },
       "cmd+b": () => {
         setViewMode("kanban");
@@ -545,8 +607,9 @@ function App() {
           }
         } else if (selectedProject) {
           setSelectedProject(null);
+          navigateToSessions();
         } else {
-          setSelectedSession(null);
+          navigateToSessions();
         }
       },
     }),
@@ -569,6 +632,7 @@ function App() {
       isBlockingShortcutOverlayOpen,
       standaloneDatasetRuntime,
       terminalConfig.enabled,
+      navigateToSessions,
     ],
   );
 
@@ -581,12 +645,21 @@ function App() {
     allowInTextEntry: GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY,
   });
 
+  // Wrap setSelectedSession to also update URL
+  const selectSessionAndNavigate = useCallback(
+    (session: SessionInfo | null) => {
+      setSelectedSession(session);
+      if (session) navigateToSession(session.id);
+    },
+    [setSelectedSession, navigateToSession],
+  );
+
   const commandContext = useMemo<SearchContext>(
     () => ({
       sessions,
       selectedProject,
       selectedSession,
-      setSelectedSession,
+      setSelectedSession: selectSessionAndNavigate,
       setSelectedProject,
       closeCommandMenu: () => {},
       setPendingScrollEntryId,
@@ -598,7 +671,7 @@ function App() {
       selectedProject,
       selectedSession,
       t,
-      setSelectedSession,
+      selectSessionAndNavigate,
       setPendingScrollEntryId,
     ],
   );
@@ -631,7 +704,7 @@ function App() {
     onDeleteSession: handleDeleteSession,
     onDeleteSessions: handleDeleteSessionsWithRef,
     onConvertSession: async (session) => {
-      setSelectedSession(session);
+      navigateToSession(session.id);
       setShowConvertDialog(true);
     },
     onResumeSession: requestResumeSession,
@@ -683,7 +756,7 @@ function App() {
     if (!selectedSession) return;
     const newSession = await forkSession(selectedSession.path, targetName);
     if (newSession) {
-      setSelectedSession(newSession);
+      navigateToSession(newSession.id);
       setShowForkDialog(false);
       // Open terminal with `pi --fork <path>` just like resume opens with `--session`
       const forkCommand = buildPiForkCommand(newSession, {
@@ -727,9 +800,9 @@ function App() {
   };
 
   const handleStartConvertSession = useCallback((session: SessionInfo) => {
-    setSelectedSession(session);
+    navigateToSession(session.id);
     setShowConvertDialog(true);
-  }, [setSelectedSession]);
+  }, [navigateToSession]);
 
   const handleOpenConvertedPath = useCallback(
     async (path: string) => {
@@ -818,7 +891,7 @@ function App() {
       projectScrollRef={projectScrollRef}
       selectedProject={selectedProject}
       selectedProjectSummary={selectedProjectSummary}
-      onBackFromProject={() => setSelectedProject(null)}
+      onBackFromProject={() => { setSelectedProject(null); navigateToSessions(); }}
       backLabel={t("project.list.back", "Back")}
       sessionListCommonProps={runtimeSessionListCommonProps}
       sidebarSessions={sidebarSessions}
@@ -847,7 +920,7 @@ function App() {
       fallback={<LoadingSpinner />}
       KanbanBoardComponent={KanbanBoard}
       loading={loading}
-      sessions={filteredSessions}
+      sessions={sessions}
       tags={tags}
       sessionTags={sessionTags}
       selectedSession={selectedSession}
@@ -867,9 +940,9 @@ function App() {
       customCommand={standaloneDatasetRuntime ? undefined : customCommand}
       resumeCommand={standaloneDatasetRuntime ? undefined : resumeCommand}
       onCreateTag={createTag}
-      projectFilter={selectedProject}
-      filterTagIds={filterTagIds}
-      sourceFilterSlugs={sourceFilterSlugs}
+      projectFilter={kanbanProjectFilter}
+      filterTagIds={kanbanFilterTagIds}
+      sourceFilterSlugs={kanbanSourceFilterSlugs}
       onFilterChange={setFilterTagIds}
       getDescendantIds={getDescendantIds}
       liveSessionIds={liveSessionIds}
@@ -896,7 +969,7 @@ function App() {
       }
       selectedProject={selectedProject}
       onManageDatasets={() => setShowSettings(true)}
-      onSessionSelect={setSelectedSession}
+      onSessionSelect={handleSelectSession}
       onProjectSelect={handleDatasetOverviewProjectSelect}
     />
   );
@@ -910,7 +983,7 @@ function App() {
           ? sessions.filter((s) => s.cwd === selectedProject)
           : sessions
       }
-      onSessionSelect={setSelectedSession}
+      onSessionSelect={handleSelectSession}
       onProjectSelect={handleDatasetOverviewProjectSelect}
       projectName={selectedProject || undefined}
       loading={loading}
@@ -931,7 +1004,7 @@ function App() {
       onFork={
         standaloneDatasetRuntime ? undefined : () => setShowForkDialog(true)
       }
-      onBack={() => setSelectedSession(null)}
+      onBack={() => navigateToSessions()}
       onResumeSession={standaloneDatasetRuntime ? undefined : requestResumeSession}
       onWebResume={
         standaloneDatasetRuntime
@@ -1059,6 +1132,11 @@ function App() {
   }
 
   const handleSidebarShowDashboard = () => {
+    setViewMode("list");
+    setSelectedProject(null);
+    setShowFavorites(false);
+    setShowSettings(false);
+    setShowTerminal(false);
     setSelectedSession(null);
   };
 
@@ -1120,7 +1198,9 @@ function App() {
       onToggleFavorite={toggleFavorite}
       liveSessionIds={liveSessionIds}
       workspaces={workspaces}
+      activeWorkspace={activeWorkspace}
       activeWorkspaceId={activeWorkspaceId}
+      workspaceSessions={workspaceSessions}
       onSelectWorkspace={selectWorkspace}
       onCreateWorkspace={() => {
         setEditingWorkspace(null);
@@ -1134,13 +1214,15 @@ function App() {
     />
   );
 
-  const desktopMainContent = selectedSession
-    ? renderSessionViewer()
-    : viewMode === "kanban"
-      ? renderKanban()
-      : standaloneDatasetRuntime
-        ? renderStandaloneDatasetOverview()
-        : renderDashboard();
+  function renderDesktopMainContent() {
+    if (selectedSession) return renderSessionViewer();
+    if (viewMode === "kanban") return renderKanban();
+    if (viewMode === "list") return renderSessionList();
+    if (viewMode === "project" && selectedProject) return renderProjectList();
+    if (standaloneDatasetRuntime) return renderStandaloneDatasetOverview();
+    return renderDashboard();
+  }
+  const desktopMainContent = renderDesktopMainContent();
 
   const desktopTerminalPanel = standaloneDatasetRuntime ? null : (
     <AppTerminalPane
@@ -1165,7 +1247,7 @@ function App() {
   // Desktop layout: sidebar + content
   // ═══════════════════════════════════
   return (
-    <div className="flex flex-col h-screen-safe bg-background text-foreground">
+    <div className="flex flex-col h-screen-safe bg-background text-foreground" {...(isVibrancyEnabled ? { 'data-sidebar-vibrancy': '' } : {})} >
       <ConnectionBanner />
       <div className="flex flex-1 min-h-0">
         <AppDesktopSidebar
@@ -1219,6 +1301,7 @@ function App() {
           workspace={editingWorkspace}
           sessions={sessions}
           tags={tags}
+          sourceOptions={sourceOptions}
           onSave={async (w) => {
             await saveWorkspace(w);
             setShowWorkspaceEditor(false);
