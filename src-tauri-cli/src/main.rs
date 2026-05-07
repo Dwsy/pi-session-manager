@@ -194,13 +194,22 @@ async fn main() {
         }
     };
 
-    let addr = format!("{}:{}", config.bind_addr, config.http_port);
-    println!("{} http://{addr}  (API + WS)", "🌐".blue());
+    let port = config.http_port;
+    let bind_is_any = config.bind_addr == "0.0.0.0";
+    let addr = format!("{}:{}", config.bind_addr, port);
+    println!("{} http://127.0.0.1:{port}  (API + WS)", "🌐".blue());
+    if bind_is_any {
+        println!("   Also listening on [::1]:{port} (IPv6)");
+    }
     println!("{}", "═══════════════════════════════════════".blue());
 
     let s = state.clone();
     let handle = tokio::spawn(async move {
-        if let Err(e) = run_server(s, &addr).await {
+        if bind_is_any {
+            if let Err(e) = run_server_dual(s, port).await {
+                error!("Server error: {e}");
+            }
+        } else if let Err(e) = run_server(s, &addr).await {
             error!("Server error: {e}");
         }
     });
@@ -378,8 +387,8 @@ async fn static_handler(uri: Uri) -> Response {
 
 // ─── Unified server ─────────────────────────────────────────
 
-async fn run_server(state: SharedState, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let app = Router::new()
+fn build_router(state: SharedState) -> Router {
+    Router::new()
         .route(
             "/api/auth-check",
             get(auth_check).options(preflight_handler),
@@ -388,8 +397,11 @@ async fn run_server(state: SharedState, addr: &str) -> Result<(), Box<dyn std::e
         .route("/health", get(health_handler))
         .route("/ws", get(ws_upgrade))
         .fallback(static_handler)
-        .with_state(state);
+        .with_state(state)
+}
 
+async fn run_server(state: SharedState, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let app = build_router(state);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("{} Server listening on {addr}", "🌐".blue());
     axum::serve(
@@ -397,6 +409,33 @@ async fn run_server(state: SharedState, addr: &str) -> Result<(), Box<dyn std::e
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await?;
+    Ok(())
+}
+
+/// Dual-stack: bind IPv4 (0.0.0.0) + IPv6 ([::1]) simultaneously
+async fn run_server_dual(state: SharedState, port: u16) -> Result<(), Box<dyn std::error::Error>> {
+    let app = build_router(state);
+    let v4_addr = format!("0.0.0.0:{port}");
+    let v6_addr = format!("[::1]:{port}");
+
+    let listener_v4 = tokio::net::TcpListener::bind(&v4_addr).await?;
+    let listener_v6 = tokio::net::TcpListener::bind(&v6_addr).await?;
+
+    let svc = app.into_make_service_with_connect_info::<SocketAddr>();
+    let svc_v6 = svc.clone();
+
+    let h1 = tokio::spawn(async move {
+        axum::serve(listener_v4, svc).await.ok();
+    });
+    let h2 = tokio::spawn(async move {
+        axum::serve(listener_v6, svc_v6).await.ok();
+    });
+
+    // Wait for either to finish (shouldn't unless error)
+    tokio::select! {
+        r = h1 => { if let Err(e) = r { error!("IPv4 listener failed: {e}"); } }
+        r = h2 => { if let Err(e) = r { error!("IPv6 listener failed: {e}"); } }
+    }
     Ok(())
 }
 
