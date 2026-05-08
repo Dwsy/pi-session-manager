@@ -114,14 +114,14 @@ export function searchSessions(query: string, cwdFilter?: string): SearchResult[
       SELECT s.id, s.path, COALESCE(s.name, '') as name,
              COALESCE(s.first_message, '') as first_message,
              COALESCE(s.last_message, '') as last_message,
-             s.modified, s.message_count
+             s.created, s.modified, s.message_count
       FROM sessions s
       WHERE (lower(s.name) LIKE ? OR lower(s.first_message) LIKE ? OR lower(s.last_message) LIKE ?)${cwdClause}
       ORDER BY s.modified DESC
       LIMIT 50
     `).all(`%${q}%`, `%${q}%`, `%${q}%`, ...cwdParams) as Array<{
       id: string; path: string; name: string;
-      first_message: string; last_message: string; modified: string; message_count: number;
+      first_message: string; last_message: string; created: string; modified: string; message_count: number;
     }>;
 
     for (const r of rows) {
@@ -131,7 +131,7 @@ export function searchSessions(query: string, cwdFilter?: string): SearchResult[
       const matchType: SearchResult["matchType"] = r.name && r.name.toLowerCase().includes(q) ? "name" : "message";
       results.push({
         sessionId: r.id, sessionPath: r.path, sessionName: displayName,
-        matchType, matchSnippet: "", modified: r.modified,
+        matchType, matchSnippet: "", created: r.created, modified: r.modified,
         messageCount: r.message_count,
       });
     }
@@ -140,7 +140,7 @@ export function searchSessions(query: string, cwdFilter?: string): SearchResult[
     const msgCwdClause = cwdFilter ? " AND s.cwd = ?" : "";
     const msgRows = db.prepare(`
       SELECT me.session_path, me.role, me.content, me.timestamp,
-             s.id as session_id, COALESCE(s.name, '') as session_name, s.modified, s.message_count
+             s.id as session_id, COALESCE(s.name, '') as session_name, s.created, s.modified, s.message_count
       FROM message_entries me
       JOIN sessions s ON s.path = me.session_path
       WHERE lower(me.content) LIKE ?${msgCwdClause}
@@ -148,7 +148,7 @@ export function searchSessions(query: string, cwdFilter?: string): SearchResult[
       LIMIT 50
     `).all(`%${q}%`, ...cwdParams) as Array<{
       session_path: string; role: string; content: string; timestamp: string;
-      session_id: string; session_name: string; modified: string; message_count: number;
+      session_id: string; session_name: string; created: string; modified: string; message_count: number;
     }>;
 
     for (const r of msgRows) {
@@ -163,7 +163,7 @@ export function searchSessions(query: string, cwdFilter?: string): SearchResult[
         sessionId: r.session_id, sessionPath: r.session_path,
         sessionName: displayName,
         matchType: "message", matchSnippet: "",
-        modified: r.modified, messageCount: r.message_count,
+        created: r.created, modified: r.modified, messageCount: r.message_count,
       });
     }
 
@@ -176,15 +176,15 @@ export function searchSessions(query: string, cwdFilter?: string): SearchResult[
         if (seen.has(sid)) continue;
         seen.add(sid);
         const sessionRows = db.prepare(`
-          SELECT path, COALESCE(name, '') as name, modified, message_count FROM sessions WHERE id = ?
-        `).get(sid) as { path: string; name: string; modified: string; message_count: number } | undefined;
+          SELECT path, COALESCE(s.name, '') as name, s.created, s.modified, s.message_count FROM sessions s WHERE id = ?
+        `).get(sid) as { path: string; name: string; created: string; modified: string; message_count: number } | undefined;
         if (sessionRows) {
           const displayName = sessionRows.name || `#${tag.name}`;
           results.push({
             sessionId: sid, sessionPath: sessionRows.path,
             sessionName: displayName,
             matchType: "tag", matchSnippet: "",
-            modified: sessionRows.modified, messageCount: sessionRows.message_count,
+            created: sessionRows.created, modified: sessionRows.modified, messageCount: sessionRows.message_count,
           });
         }
       }
@@ -270,8 +270,8 @@ export function buildSearchLines(
   const end = Math.min(start + maxVisibleResults, shown.length);
 
   const badgeCol = 4;
-  const metaCol = 16;
-  const nameMaxW = Math.max(10, width - 6 - badgeCol - metaCol);
+  const metaCol = 12;
+  const nameMaxW = Math.max(10, width - 4 - badgeCol - metaCol);
 
   for (let i = start; i < end; i++) {
     const r = shown[i];
@@ -340,7 +340,7 @@ export function buildSearchDetailLines(
     lines.push(` ${theme.fg("muted", "Model ")}${modelStr}`);
   }
 
-  // Tokens + cost
+  // Tokens
   if (detail) {
     const tp: string[] = [];
     if (detail.inputTokens > 0) tp.push(`${theme.fg("muted", "in")} ${theme.fg("accent", fmtTokens(detail.inputTokens))}`);
@@ -349,13 +349,21 @@ export function buildSearchDetailLines(
     if (tp.length > 0) {
       lines.push(` ${theme.fg("muted", "Tokens ")}${tp.join(theme.fg("muted", " "))}`);
     }
-    const costColor = detail.totalCost === 0 ? "success" : "muted";
-    lines.push(` ${theme.fg("muted", "Cost ")}${theme.fg(costColor, fmtCost(detail.totalCost))}`);
   }
 
-  // Message count
-  if (sessionData?.messageCount && sessionData.messageCount > 0) {
-    lines.push(` ${theme.fg("muted", "Messages ")}${theme.fg("accent", String(sessionData.messageCount))}`);
+  // Cost + Messages (one line)
+  if (detail || sessionData?.messageCount) {
+    const parts: string[] = [];
+    if (detail) {
+      const costColor = detail.totalCost === 0 ? "success" : "muted";
+      parts.push(`${theme.fg("muted", "Cost ")}${theme.fg(costColor, fmtCost(detail.totalCost))}`);
+    }
+    if (sessionData?.messageCount && sessionData.messageCount > 0) {
+      parts.push(`${theme.fg("muted", "Msgs ")}${theme.fg("accent", String(sessionData.messageCount))}`);
+    }
+    if (parts.length > 0) {
+      lines.push(` ${parts.join(theme.fg("muted", "  "))}`);
+    }
   }
 
   // Kanban tags

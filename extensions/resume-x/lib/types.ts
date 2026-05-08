@@ -50,6 +50,7 @@ export interface SearchResult {
   sessionName: string;
   matchType: "name" | "message" | "tag";
   matchSnippet: string;
+  created: string;
   modified: string;
   messageCount: number;
 }
