@@ -485,6 +485,14 @@ export default function SessionList({
     };
   }, [sessions, scrollParentRef]);
 
+  // Scroll to top when search query changes
+  useEffect(() => {
+    const el = scrollParentRef?.current;
+    if (el && el.scrollTop > 0) {
+      el.scrollTop = 0;
+    }
+  }, [searchQuery, scrollParentRef]);
+
   useEffect(() => {
     const liveIds = new Set(sessions.map((session) => session.id));
     if (
@@ -818,17 +826,6 @@ export default function SessionList({
                               : "border-transparent hover:bg-surface/60"
                         }`}
                         style={{ contain: "layout paint" }}
-                        onMouseEnter={(e) => {
-                          const card = e.currentTarget;
-                          const rect = card.getBoundingClientRect();
-                          hoverTimerRef.current = setTimeout(() => {
-                            setHoveredCard({ session, rect });
-                          }, 250);
-                        }}
-                        onMouseLeave={() => {
-                          clearTimeout(hoverTimerRef.current);
-                          setHoveredCard(null);
-                        }}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -871,7 +868,19 @@ export default function SessionList({
                                       <Zap className="h-3 w-3 text-green-500 fill-current" />
                                     </div>
                                   )}
-                                  <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0">
+                                  <h3
+                                    className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0 cursor-pointer"
+                                    onMouseEnter={(e) => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      hoverTimerRef.current = setTimeout(() => {
+                                        setHoveredCard({ session, rect });
+                                      }, 500);
+                                    }}
+                                    onMouseLeave={() => {
+                                      clearTimeout(hoverTimerRef.current);
+                                      setHoveredCard(null);
+                                    }}
+                                  >
                                     {session.name ||
                                       session.first_message ||
                                       t("session.list.untitled")}
@@ -1225,23 +1234,19 @@ export default function SessionList({
       {/* ── Hover title overlay ── */}
       {hoveredCard && createPortal(
         <div
-          onMouseEnter={() => clearTimeout(hoverTimerRef.current)}
-          onMouseLeave={() => { clearTimeout(hoverTimerRef.current); setHoveredCard(null); }}
           style={{
             position: "fixed",
-            top: hoveredCard.rect.top,
-            left: hoveredCard.rect.left,
-            width: hoveredCard.rect.width,
-            padding: "6px 12px",
+            top: hoveredCard.rect.top - 4,
+            left: hoveredCard.rect.left - 1,
+            width: hoveredCard.rect.width + 2,
+            padding: "4px 10px",
             zIndex: 50,
-            pointerEvents: "auto",
-            borderRadius: "0.5rem",
+            pointerEvents: "none",
+            borderRadius: "0.375rem",
             background: "var(--surface, hsl(0 0% 100%))",
-            border: "1px solid var(--border, hsl(0 0% 90%))",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)",
-            transform: "scale(1.02)",
-            transformOrigin: "top left",
-            transition: "transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 180ms ease",
+            border: "1px solid var(--primary, hsl(217 91% 60%))",
+            boxShadow: "0 0 0 1px var(--primary, hsl(217 91% 60%))",
+            transition: "border-color 150ms ease, box-shadow 150ms ease",
           }}
         >
           <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-snug" style={{ whiteSpace: "normal", wordBreak: "break-word" }}>
