@@ -4,7 +4,7 @@
  * Preview pane, detail pane, and monkey-patch for SessionList.
  */
 
-import { visibleWidth } from "@mariozechner/pi-tui";
+import { visibleWidth, wrapTextWithAnsi, Text } from "@mariozechner/pi-tui";
 import type { SessionMessage } from "./types.js";
 import { TOOL_PREVIEW_LINES } from "./types.js";
 import { loadSessionDetail } from "./db.js";
@@ -62,116 +62,140 @@ export function buildPreviewLines(
   const theme = getTheme();
   if (!theme) return { lines: [], totalLines: 0 };
 
+  const W = Math.max(20, width);
+  const innerW = Math.max(10, W - 2);  // 1-char padding each side
+
+  // Helper: pad line to exact width
+  const pad = (s: string): string => {
+    const vw = visibleWidth(s);
+    return vw >= W ? s.slice(0, W) : s + " ".repeat(W - vw);
+  };
+
+  // Helper: border line
+  const border = (): string => theme.fg("border", "\u2500".repeat(W));
+
+  // Helper: wrap colored text to inner width
+  const wrapContent = (text: string, maxW: number): string[] => {
+    if (!text) return [];
+    const lines: string[] = [];
+    for (const rawLine of text.split("\n")) {
+      if (rawLine.length === 0) { lines.push(""); continue; }
+      const wrapped = wrapTextWithAnsi(rawLine, maxW);
+      lines.push(...wrapped);
+    }
+    return lines;
+  };
+
   const allLines: string[] = [];
-  const sep = "\u2500".repeat(Math.max(10, width));
-  const innerW = Math.max(10, width - 4);
 
-  // Header
-  allLines.push(theme.fg("border", sep));
+  // ── Header ──
+  allLines.push(border());
   const shortPath = sessionPath.split("/").pop() || sessionPath;
-  const titleText = `Preview: ${shortPath} \u00b7 ${messages.length} turns`;
-  const title = titleText.length > width ? titleText.slice(0, width) : titleText;
-  allLines.push(theme.fg("accent", title));
-  const hintText = "\u2191\u2193 scroll \u00b7 ctrl+o expand/collapse tools \u00b7 \u2190 back \u00b7 \u23b5 resume";
-  const hintPadding = Math.max(0, width - hintText.length);
-  allLines.push(theme.fg("muted", hintText) + " ".repeat(hintPadding));
-  allLines.push(theme.fg("border", sep));
+  const title = `Preview: ${shortPath} \u00b7 ${messages.length} turns`;
+  allLines.push(pad(" " + theme.fg("accent", title.slice(0, innerW))));
+  const hint = " \u2191\u2193 scroll \u00b7 ctrl+o tools \u00b7 \u2190 back \u00b7 \u23b5 resume";
+  allLines.push(pad(theme.fg("muted", hint)));
+  allLines.push(border());
 
-  // Messages
+  // ── Messages ──
   for (const msg of messages) {
     if (!msg.content || msg.content.trim().length === 0) continue;
 
     const isTool = msg.sourceType === "tool_use" || msg.sourceType === "tool_result";
 
-    // Try to parse tool call JSON
+    // Parse tool call JSON
     let toolNames: string[] = [];
-    let toolContent = "";
+    let toolInput = "";
+    let toolOutput = "";
     if (isTool) {
       try {
         const parsed = JSON.parse(msg.content);
         if (Array.isArray(parsed)) {
           toolNames = parsed.map((t: any) => t.name || t.tool_name || "tool").filter(Boolean);
-          toolContent = parsed.map((t: any) => {
+          toolInput = parsed.map((t: any) => {
             if (t.input) return typeof t.input === "string" ? t.input : JSON.stringify(t.input, null, 2);
+            return "";
+          }).filter(Boolean).join("\n");
+          toolOutput = parsed.map((t: any) => {
             if (t.content) return typeof t.content === "string" ? t.content : JSON.stringify(t.content, null, 2);
             return "";
           }).filter(Boolean).join("\n");
         } else if (parsed.name || parsed.tool_name) {
           toolNames = [parsed.name || parsed.tool_name];
-          toolContent = parsed.input ? (typeof parsed.input === "string" ? parsed.input : JSON.stringify(parsed.input, null, 2)) : "";
-          if (!toolContent && parsed.content) toolContent = typeof parsed.content === "string" ? parsed.content : JSON.stringify(parsed.content, null, 2);
+          toolInput = parsed.input ? (typeof parsed.input === "string" ? parsed.input : JSON.stringify(parsed.input, null, 2)) : "";
+          toolOutput = parsed.content ? (typeof parsed.content === "string" ? parsed.content : JSON.stringify(parsed.content, null, 2)) : "";
         }
-      } catch { /* not JSON, show as text */ }
+      } catch { /* not JSON */ }
     }
 
-    // Separator between messages
-    allLines.push("");
+    // Gap between messages
+    allLines.push(pad(""));
 
-    // Role + time header
+    // Role header
     const roleLabel = msg.role === "user" ? "User" : isTool ? "Tool" : "Agent";
     const roleColor = msg.role === "user" ? "accent" : isTool ? "warning" : "success";
     const timeStr = fmtTime(msg.timestamp);
-    const header = `  ${roleLabel} \u00b7 ${timeStr}`;
-    allLines.push(theme.fg(roleColor, header));
+    allLines.push(pad(" " + theme.fg(roleColor, theme.bold(roleLabel)) + theme.fg("muted", ` \u00b7 ${timeStr}`)));
 
     if (isTool && toolNames.length > 0) {
-      // Tool call with fold/expand
-      const toolSep = "\u2500".repeat(Math.min(40, width - 2));
-      allLines.push(theme.fg("border", `  ${toolSep}`));
+      // ── Tool call rendering ──
+      const toolSep = "\u2500".repeat(Math.min(40, innerW));
+      allLines.push(pad(" " + theme.fg("border", toolSep)));
 
       const summary = toolNames.length === 1
         ? toolNames[0]
         : `${toolNames.length} calls: ${toolNames.slice(0, 4).join(", ")}${toolNames.length > 4 ? "..." : ""}`;
 
+      const content = toolOutput || toolInput;
+
       if (toolExpanded) {
-        // Expanded: show name + full content with box border
-        allLines.push(safeLine(`  ${theme.fg("warning", "\u25b6 ")}${theme.fg("accent", summary)} ${theme.fg("muted", "(ctrl+o collapse)")}`, width));
-        if (toolContent) {
-          const boxTop = "  \u250c" + "\u2500".repeat(innerW - 1);
-          allLines.push(theme.fg("border", boxTop));
-          const contentLines = toolContent.split("\n");
+        // Expanded: full output with box
+        allLines.push(pad(" " + theme.fg("warning", "\u25b6 ") + theme.fg("accent", theme.bold(summary)) + theme.fg("muted", " (ctrl+o collapse)")));
+        if (content) {
+          allLines.push(pad(" " + theme.fg("border", "\u250c" + "\u2500".repeat(innerW - 1))));
+          const contentLines = wrapContent(content, innerW - 3);
           for (const cl of contentLines) {
-            const wrapped = wrapText(cl, innerW - 3);
-            for (const wcl of wrapped) {
-              allLines.push(safeLine(theme.fg("border", "\u2502 ") + theme.fg("muted", wcl), width));
-            }
+            allLines.push(pad(" " + theme.fg("border", "\u2502 ") + theme.fg("muted", cl)));
           }
-          const boxBot = "  \u2514" + "\u2500".repeat(innerW - 1);
-          allLines.push(theme.fg("border", boxBot));
+          allLines.push(pad(" " + theme.fg("border", "\u2514" + "\u2500".repeat(innerW - 1))));
         }
       } else {
-        // Collapsed: show name + preview lines + expand hint
-        allLines.push(safeLine(`  ${theme.fg("muted", "\u25b8 ")}${theme.fg("accent", summary)} ${theme.fg("muted", "(ctrl+o expand)")}`, width));
-        if (toolContent) {
-          const previewLines = toolContent.split("\n").slice(0, TOOL_PREVIEW_LINES);
+        // Collapsed: preview lines
+        allLines.push(pad(" " + theme.fg("muted", "\u25b8 ") + theme.fg("accent", summary) + theme.fg("muted", " (ctrl+o expand)")));
+        if (content) {
+          const allContentLines = content.split("\n");
+          const previewLines = allContentLines.slice(0, TOOL_PREVIEW_LINES);
           for (const pl of previewLines) {
             const truncated = pl.length > innerW - 4 ? pl.slice(0, innerW - 7) + "..." : pl;
-            allLines.push(safeLine(`    ${theme.fg("muted", truncated)}`, width));
+            allLines.push(pad("   " + theme.fg("muted", truncated)));
           }
-          const totalContentLines = toolContent.split("\n").length;
-          if (totalContentLines > TOOL_PREVIEW_LINES) {
-            allLines.push(safeLine(`    ${theme.fg("muted", `... ${totalContentLines - TOOL_PREVIEW_LINES} more lines`)}`, width));
+          if (allContentLines.length > TOOL_PREVIEW_LINES) {
+            const hidden = allContentLines.length - TOOL_PREVIEW_LINES;
+            allLines.push(pad("   " + theme.fg("muted", `... ${hidden} more line${hidden > 1 ? "s" : ""}`)));
           }
         }
       }
     } else {
-      // Non-tool message: normal display
-      const msgSep = "\u2500".repeat(Math.min(40, width - 2));
-      allLines.push(theme.fg("border", `  ${msgSep}`));
-      const wrapped = wrapText(msg.content, innerW);
-      for (const chunk of wrapped) {
-        allLines.push(safeLine(`    ${chunk}`, width));
+      // ── Normal message rendering ──
+      const msgSep = "\u2500".repeat(Math.min(40, innerW));
+      allLines.push(pad(" " + theme.fg("border", msgSep)));
+
+      // Use Text component for proper word wrap
+      const textComponent = new Text(msg.content, 1, 0);
+      const renderedLines = textComponent.render(innerW);
+      for (const rl of renderedLines) {
+        allLines.push(pad(" " + rl));
       }
     }
   }
 
+  // ── Scroll window ──
   const totalLines = allLines.length;
   const maxVisible = getMaxVisible();
-
   const start = Math.min(scrollOffset, Math.max(0, totalLines - maxVisible));
   const end = Math.min(start + maxVisible, totalLines);
 
-  return { lines: allLines.slice(start, end).map((l) => safeLine(l, width)), totalLines };
+  return { lines: allLines.slice(start, end).map((l) => pad(l)), totalLines };
 }
 
 // ── Detail pane (appended to SessionList) ────────────────────────────
