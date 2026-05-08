@@ -4,7 +4,7 @@
  * Preview pane, detail pane, and monkey-patch for SessionList.
  */
 
-import { visibleWidth, wrapTextWithAnsi, Text } from "@mariozechner/pi-tui";
+import { visibleWidth, Markdown, Box, Container, Text, Spacer, type MarkdownTheme } from "@mariozechner/pi-tui";
 import type { SessionMessage } from "./types.js";
 import { TOOL_PREVIEW_LINES } from "./types.js";
 import { loadSessionDetail } from "./db.js";
@@ -52,6 +52,26 @@ export function patchSessionListRender(sessionList: any): void {
 
 // ── Preview pane ─────────────────────────────────────────────────────
 
+// Build MarkdownTheme from global theme (same tokens as pi-coding-agent)
+function getMarkdownTheme(t: any): MarkdownTheme {
+  return {
+    heading: (text: string) => t.fg("mdHeading", text),
+    link: (text: string) => t.fg("mdLink", text),
+    linkUrl: (text: string) => t.fg("mdLinkUrl", text),
+    code: (text: string) => t.fg("mdCode", text),
+    codeBlock: (text: string) => t.fg("mdCodeBlock", text),
+    codeBlockBorder: (text: string) => t.fg("mdCodeBlockBorder", text),
+    quote: (text: string) => t.fg("mdQuote", t.italic(text)),
+    quoteBorder: (text: string) => t.fg("mdQuoteBorder", text),
+    hr: (text: string) => t.fg("mdHr", text),
+    listBullet: (text: string) => t.fg("mdListBullet", text),
+    bold: (text: string) => t.bold(text),
+    italic: (text: string) => t.italic(text),
+    underline: (text: string) => t.underline(text),
+    strikethrough: (text: string) => t.strikethrough(text),
+  };
+}
+
 export function buildPreviewLines(
   width: number,
   messages: SessionMessage[],
@@ -63,39 +83,20 @@ export function buildPreviewLines(
   if (!theme) return { lines: [], totalLines: 0 };
 
   const W = Math.max(20, width);
-  const innerW = Math.max(10, W - 2);  // 1-char padding each side
-
-  // Helper: pad line to exact width
-  const pad = (s: string): string => {
-    const vw = visibleWidth(s);
-    return vw >= W ? s.slice(0, W) : s + " ".repeat(W - vw);
-  };
+  const mdTheme = getMarkdownTheme(theme);
 
   // Helper: border line
   const border = (): string => theme.fg("border", "\u2500".repeat(W));
 
-  // Helper: wrap colored text to inner width
-  const wrapContent = (text: string, maxW: number): string[] => {
-    if (!text) return [];
-    const lines: string[] = [];
-    for (const rawLine of text.split("\n")) {
-      if (rawLine.length === 0) { lines.push(""); continue; }
-      const wrapped = wrapTextWithAnsi(rawLine, maxW);
-      lines.push(...wrapped);
-    }
-    return lines;
-  };
-
-  const allLines: string[] = [];
+  // Build component tree
+  const root = new Container();
 
   // ── Header ──
-  allLines.push(border());
+  root.addChild(new Text(border(), 0, 0));
   const shortPath = sessionPath.split("/").pop() || sessionPath;
-  const title = `Preview: ${shortPath} \u00b7 ${messages.length} turns`;
-  allLines.push(pad(" " + theme.fg("accent", title.slice(0, innerW))));
-  const hint = " \u2191\u2193 scroll \u00b7 ctrl+o tools \u00b7 \u2190 back \u00b7 \u23b5 resume";
-  allLines.push(pad(theme.fg("muted", hint)));
-  allLines.push(border());
+  root.addChild(new Text(theme.fg("accent", `Preview: ${shortPath} \u00b7 ${messages.length} turns`), 1, 0));
+  root.addChild(new Text(theme.fg("muted", "\u2191\u2193 scroll \u00b7 ctrl+o tools \u00b7 \u2190 back \u00b7 \u23ce resume"), 1, 0));
+  root.addChild(new Text(border(), 0, 0));
 
   // ── Messages ──
   for (const msg of messages) {
@@ -128,74 +129,65 @@ export function buildPreviewLines(
       } catch { /* not JSON */ }
     }
 
-    // Gap between messages
-    allLines.push(pad(""));
-
-    // Role header
-    const roleLabel = msg.role === "user" ? "User" : isTool ? "Tool" : "Agent";
-    const roleColor = msg.role === "user" ? "accent" : isTool ? "warning" : "success";
-    const timeStr = fmtTime(msg.timestamp);
-    allLines.push(pad(" " + theme.fg(roleColor, theme.bold(roleLabel)) + theme.fg("muted", ` \u00b7 ${timeStr}`)));
+    // Gap
+    root.addChild(new Spacer(1));
 
     if (isTool && toolNames.length > 0) {
-      // ── Tool call rendering ──
-      const toolSep = "\u2500".repeat(Math.min(40, innerW));
-      allLines.push(pad(" " + theme.fg("border", toolSep)));
-
+      // ── Tool call ──
       const summary = toolNames.length === 1
         ? toolNames[0]
         : `${toolNames.length} calls: ${toolNames.slice(0, 4).join(", ")}${toolNames.length > 4 ? "..." : ""}`;
-
       const content = toolOutput || toolInput;
 
+      root.addChild(new Text(theme.fg("border", "\u2500".repeat(Math.min(40, W))), 0, 0));
+
       if (toolExpanded) {
-        // Expanded: full output with box
-        allLines.push(pad(" " + theme.fg("warning", "\u25b6 ") + theme.fg("accent", theme.bold(summary)) + theme.fg("muted", " (ctrl+o collapse)")));
+        root.addChild(new Text(
+          theme.fg("warning", "\u25b6 ") + theme.fg("accent", theme.bold(summary)) + theme.fg("muted", " (ctrl+o collapse)"),
+          1, 0,
+        ));
         if (content) {
-          allLines.push(pad(" " + theme.fg("border", "\u250c" + "\u2500".repeat(innerW - 1))));
-          const contentLines = wrapContent(content, innerW - 3);
-          for (const cl of contentLines) {
-            allLines.push(pad(" " + theme.fg("border", "\u2502 ") + theme.fg("muted", cl)));
-          }
-          allLines.push(pad(" " + theme.fg("border", "\u2514" + "\u2500".repeat(innerW - 1))));
+          // Render tool output as markdown (same as agent output)
+          root.addChild(new Markdown(content, 1, 0, mdTheme));
         }
       } else {
-        // Collapsed: preview lines
-        allLines.push(pad(" " + theme.fg("muted", "\u25b8 ") + theme.fg("accent", summary) + theme.fg("muted", " (ctrl+o expand)")));
+        root.addChild(new Text(
+          theme.fg("muted", "\u25b8 ") + theme.fg("accent", summary) + theme.fg("muted", " (ctrl+o expand)"),
+          1, 0,
+        ));
         if (content) {
-          const allContentLines = content.split("\n");
-          const previewLines = allContentLines.slice(0, TOOL_PREVIEW_LINES);
-          for (const pl of previewLines) {
-            const truncated = pl.length > innerW - 4 ? pl.slice(0, innerW - 7) + "..." : pl;
-            allLines.push(pad("   " + theme.fg("muted", truncated)));
+          const lines = content.split("\n");
+          const preview = lines.slice(0, TOOL_PREVIEW_LINES);
+          for (const pl of preview) {
+            const truncated = pl.length > W - 6 ? pl.slice(0, W - 9) + "..." : pl;
+            root.addChild(new Text(theme.fg("muted", truncated), 2, 0));
           }
-          if (allContentLines.length > TOOL_PREVIEW_LINES) {
-            const hidden = allContentLines.length - TOOL_PREVIEW_LINES;
-            allLines.push(pad("   " + theme.fg("muted", `... ${hidden} more line${hidden > 1 ? "s" : ""}`)));
+          if (lines.length > TOOL_PREVIEW_LINES) {
+            root.addChild(new Text(theme.fg("muted", `... ${lines.length - TOOL_PREVIEW_LINES} more lines`), 2, 0));
           }
         }
       }
+    } else if (msg.role === "user") {
+      // ── User message: Box + Markdown (same as UserMessageComponent) ──
+      const box = new Box(1, 1, (text: string) => theme.bg("userMessageBg", text));
+      box.addChild(new Markdown(msg.content.trim(), 0, 0, mdTheme, {
+        color: (text: string) => theme.fg("userMessageText", text),
+      }));
+      root.addChild(box);
     } else {
-      // ── Normal message rendering ──
-      const msgSep = "\u2500".repeat(Math.min(40, innerW));
-      allLines.push(pad(" " + theme.fg("border", msgSep)));
-
-      // Use Text component for proper word wrap
-      const textComponent = new Text(msg.content, 1, 0);
-      const renderedLines = textComponent.render(innerW);
-      for (const rl of renderedLines) {
-        allLines.push(pad(" " + rl));
-      }
+      // ── Assistant message: Markdown (same as AssistantMessageComponent) ──
+      root.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
     }
   }
 
-  // ── Scroll window ──
+  // ── Render and scroll ──
+  const allLines = root.render(W);
   const totalLines = allLines.length;
   const maxVisible = getMaxVisible();
   const start = Math.min(scrollOffset, Math.max(0, totalLines - maxVisible));
   const end = Math.min(start + maxVisible, totalLines);
 
-  return { lines: allLines.slice(start, end).map((l) => pad(l)), totalLines };
+  return { lines: allLines.slice(start, end), totalLines };
 }
 
 // ── Detail pane (appended to SessionList) ────────────────────────────
