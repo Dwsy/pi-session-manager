@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
 import type { FullTextSearchSourceFilter } from '@/types'
+import CompositionInput from '@/components/ui/CompositionInput'
 import {
   TABS,
   SOURCE_FILTERS,
@@ -166,13 +167,13 @@ export default function CommandFilterBar({
 
       <div className="ml-auto flex min-w-[190px] items-center gap-2 rounded-full border border-border/70 bg-background px-3 py-2">
         <Globe className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />
-        <input
+        <CompositionInput
           type="text"
           value={ftsOptions.globPattern || ''}
-          onChange={(e) =>
+          onChange={(value) =>
             setFtsOptions({
               ...ftsOptions,
-              globPattern: e.target.value || undefined,
+              globPattern: value || undefined,
               page: 0,
             })
           }

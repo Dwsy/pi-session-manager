@@ -20,6 +20,7 @@ import MarkdownContent from "@/components/ui/MarkdownContent";
 import SettingsInput from "@/components/settings/SettingsInput";
 import SettingsSelect from "@/components/settings/SettingsSelect";
 import SettingsTabs from "@/components/settings/SettingsTabs";
+import CompositionInput from "@/components/ui/CompositionInput";
 import type {
   ResourceInfo,
   ResourceType,
@@ -251,10 +252,10 @@ function ResourcesTab() {
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-        <input
+        <CompositionInput
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={setSearch}
           placeholder={t("settings.piConfig.searchPlaceholder", "Filter...")}
           className="w-full pl-8 pr-7 py-1.5 text-xs bg-surface border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-info"
         />

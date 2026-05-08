@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ListFilter, Check, Plus, Search } from "lucide-react";
 import type { Tag as TagType, SessionTag } from "@/types";
+import CompositionInput from "@/components/ui/CompositionInput";
 import { AgentIcon } from "@/components/session-viewer/AgentIcon";
 
 const COLOR_CSS: Record<string, string> = {
@@ -393,11 +394,11 @@ export default function LabelFilter({
             {/* Search */}
             <div className="border-b border-border/50 px-3 py-2 flex items-center gap-2">
               <Search className="h-3 w-3 text-muted-foreground/50 shrink-0" />
-              <input
+              <CompositionInput
                 ref={inputRef}
                 type="text"
                 value={filter}
-                onChange={(e) => setFilter(e.target.value)}
+                onChange={setFilter}
                 placeholder={t("tags.filter.searchPlaceholder")}
                 className="w-full bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/50"
               />

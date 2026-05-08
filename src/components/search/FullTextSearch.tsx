@@ -37,6 +37,7 @@ import {
 } from "@/runtime-data/sessionSource";
 import { formatShortSessionId } from "@/utils/session";
 import { useCompositionInput } from "@/hooks/useCompositionInput";
+import CompositionInput from "@/components/ui/CompositionInput";
 
 const HIGHLIGHT_CACHE_MAX_ENTRIES = 500;
 const HTML_ESCAPE_MAP: Record<string, string> = {
@@ -662,10 +663,10 @@ export default function FullTextSearch({
             </div>
             <div className="flex-1 min-w-[200px] relative">
               <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/70" />
-              <input
+              <CompositionInput
                 type="text"
                 value={globPattern}
-                onChange={(e) => setGlobPattern(e.target.value)}
+                onChange={setGlobPattern}
                 placeholder={t("search.fullText.globPlaceholder")}
                 className="w-full pl-10 pr-4 py-2 bg-[#252636] border border-[#2a2b36]/50 rounded-lg text-sm focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/20 motion-surface motion-color placeholder:text-muted-foreground/70"
               />

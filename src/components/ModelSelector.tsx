@@ -10,6 +10,7 @@ import {
 import { createPortal } from 'react-dom'
 import { ChevronDown, Search, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import CompositionInput from '@/components/ui/CompositionInput'
 
 export interface RPCModel {
   id: string
@@ -350,12 +351,12 @@ export default function ModelSelector({
       <div className="border-b border-border/60 p-2">
         <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background/70 px-2 py-1.5">
           <Search className="h-3.5 w-3.5 text-muted-foreground/70" />
-          <input
+          <CompositionInput
             ref={searchInputRef}
             type="text"
             value={searchQuery}
-            onChange={(event) => {
-              setSearchQuery(event.target.value)
+            onChange={(value) => {
+              setSearchQuery(value)
               setSelectedIndex(0)
             }}
             placeholder={t('session.modelControls.searchPlaceholder', 'Search models...')}

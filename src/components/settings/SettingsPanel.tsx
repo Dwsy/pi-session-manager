@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import type { AppSettings, SettingsSection } from "./types";
+import CompositionInput from "@/components/ui/CompositionInput";
 import { defaultSettings } from "./types";
 import { loadAppSettings, saveAppSettings } from "@/utils/settingsApi";
 import { applyPiChatTheme, resolvePiThemeColorScheme } from "@/utils/piTheme";
@@ -510,10 +511,10 @@ function MobileSettings({
           <div className="px-4 pt-2 pb-1 flex-shrink-0">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60 pointer-events-none" />
-              <input
+              <CompositionInput
                 type="text"
                 value={mobileSearchQuery}
-                onChange={(e) => setMobileSearchQuery(e.target.value)}
+                onChange={setMobileSearchQuery}
                 placeholder={t("settings.searchPlaceholder", "Search settings...")}
                 className="w-full pl-8 pr-3 py-2 text-sm bg-surface/60 border border-border/60 rounded-lg text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-info/50 focus:ring-1 focus:ring-info/20 transition-colors"
               />
@@ -789,10 +790,10 @@ function SettingsSidebar({
       <div className="px-3 pt-3 pb-1 flex-shrink-0">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60 pointer-events-none" />
-          <input
+          <CompositionInput
             type="text"
             value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={onSearchChange}
             placeholder={t("settings.searchPlaceholder", "Search settings...")}
             className="w-full pl-8 pr-3 py-2 text-sm bg-surface/60 border border-border/60 rounded-lg text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-info/50 focus:ring-1 focus:ring-info/20 transition-colors"
           />

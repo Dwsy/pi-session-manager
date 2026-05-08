@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { SessionStats } from "@/types";
 import { getPathBasename } from "@/utils/path";
+import CompositionInput from "@/components/ui/CompositionInput";
 
 interface DashboardInsightModalProps {
   open: boolean;
@@ -510,11 +511,11 @@ export default function DashboardInsightModal({
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
-                    <input
+                    <CompositionInput
                       ref={searchInputRef}
                       type="text"
                       value={searchQuery}
-                      onChange={(e) => handleSearchChange(e.target.value)}
+                      onChange={handleSearchChange}
                       onFocus={() => searchQuery.trim() && setShowSuggestions(true)}
                       onKeyDown={handleSearchKeyDown}
                       placeholder={t("dashboard.insight.searchPlaceholder", "Search providers or models...")}

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Search, Plus, Check, ChevronRight, ChevronDown } from 'lucide-react'
 import type { Tag } from '@/types'
 import { getColorClass, getColorStyle } from './TagBadge'
+import CompositionInput from '@/components/ui/CompositionInput'
 
 interface TagPickerProps {
   tags: Tag[]
@@ -96,9 +97,9 @@ export default function TagPicker({ tags, selectedTagIds, onToggle, onCreateTag,
       <div className="p-2 border-b border-border/50">
         <div className="flex items-center gap-1.5 px-2 py-1 bg-background rounded">
           <Search className="h-3 w-3 text-muted-foreground" />
-          <input
+          <CompositionInput
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={setSearch}
             placeholder={t('tags.search')}
             className="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
             autoFocus
