@@ -107,31 +107,43 @@ export function buildPreviewLines(
   for (const msg of messages) {
     if (!msg.content || msg.content.trim().length === 0) continue;
 
-    const isTool = msg.sourceType === "tool_use" || msg.sourceType === "tool_result";
+    const isTool = msg.sourceType === "tool_use" || msg.sourceType === "tool_result" || msg.content.startsWith("[Tool:") || msg.content.startsWith("[Tool Output]");
 
     // Parse tool call JSON
     let toolNames: string[] = [];
     let toolInput = "";
     let toolOutput = "";
     if (isTool) {
-      try {
-        const parsed = JSON.parse(msg.content);
-        if (Array.isArray(parsed)) {
-          toolNames = parsed.map((t: any) => t.name || t.tool_name || "tool").filter(Boolean);
-          toolInput = parsed.map((t: any) => {
-            if (t.input) return typeof t.input === "string" ? t.input : JSON.stringify(t.input, null, 2);
-            return "";
-          }).filter(Boolean).join("\n");
-          toolOutput = parsed.map((t: any) => {
-            if (t.content) return typeof t.content === "string" ? t.content : JSON.stringify(t.content, null, 2);
-            return "";
-          }).filter(Boolean).join("\n");
-        } else if (parsed.name || parsed.tool_name) {
-          toolNames = [parsed.name || parsed.tool_name];
-          toolInput = parsed.input ? (typeof parsed.input === "string" ? parsed.input : JSON.stringify(parsed.input, null, 2)) : "";
-          toolOutput = parsed.content ? (typeof parsed.content === "string" ? parsed.content : JSON.stringify(parsed.content, null, 2)) : "";
+      // Handle [Tool: name] and [Tool Output] formats from PSM SQLite
+      if (msg.content.startsWith("[Tool: ")) {
+        const endBracket = msg.content.indexOf("]");
+        if (endBracket > 0) {
+          toolNames = [msg.content.slice(7, endBracket).trim()];
+          toolInput = msg.content.slice(endBracket + 1).trim();
         }
-      } catch { /* not JSON */ }
+      } else if (msg.content.startsWith("[Tool Output]")) {
+        toolOutput = msg.content.slice(14).trim();
+        toolNames = ["output"];
+      } else {
+        try {
+          const parsed = JSON.parse(msg.content);
+          if (Array.isArray(parsed)) {
+            toolNames = parsed.map((t: any) => t.name || t.tool_name || "tool").filter(Boolean);
+            toolInput = parsed.map((t: any) => {
+              if (t.input) return typeof t.input === "string" ? t.input : JSON.stringify(t.input, null, 2);
+              return "";
+            }).filter(Boolean).join("\n");
+            toolOutput = parsed.map((t: any) => {
+              if (t.content) return typeof t.content === "string" ? t.content : JSON.stringify(t.content, null, 2);
+              return "";
+            }).filter(Boolean).join("\n");
+          } else if (parsed.name || parsed.tool_name) {
+            toolNames = [parsed.name || parsed.tool_name];
+            toolInput = parsed.input ? (typeof parsed.input === "string" ? parsed.input : JSON.stringify(parsed.input, null, 2)) : "";
+            toolOutput = parsed.content ? (typeof parsed.content === "string" ? parsed.content : JSON.stringify(parsed.content, null, 2)) : "";
+          }
+        } catch { /* not JSON */ }
+      }
     }
 
     // Gap

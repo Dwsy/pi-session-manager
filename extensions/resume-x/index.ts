@@ -434,6 +434,16 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                   tui.requestRender();
                   return;
                 }
+                // Left arrow — back to list mode
+                if (seq === "1b5b44" || seq === "1b4f44") {
+                  mode = "list";
+                  searchQuery = "";
+                  searchResults = [];
+                  searchSelectedSession = null;
+                  escBuffer = "";
+                  tui.requestRender();
+                  return;
+                }
                 escBuffer = "";
                 return;
               }
