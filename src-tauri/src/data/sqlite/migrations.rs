@@ -20,6 +20,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             11 => migration_11(conn)?,
             12 => migration_12(conn)?,
             13 => migration_13(conn)?,
+            14 => migration_14(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -251,5 +252,28 @@ fn migration_13(conn: &Connection) -> Result<(), String> {
     // - idx_message_entries_timestamp_julianday duplicates idx_message_entries_timestamp
     conn.execute("DROP INDEX IF EXISTS idx_message_entries_session", []).map_err(|e| format!("Migration 13 failed dropping session index: {e}"))?;
     conn.execute("DROP INDEX IF EXISTS idx_message_entries_timestamp_julianday", []).map_err(|e| format!("Migration 13 failed dropping julianday index: {e}"))?;
+    Ok(())
+}
+
+/// Migration to version 14: create session_info_entries table for session_info JSONL entries.
+/// This stores all session_info entries from JSONL files, enabling name history tracking.
+fn migration_14(conn: &Connection) -> Result<(), String> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS session_info_entries (
+            id TEXT PRIMARY KEY,
+            entry_id TEXT NOT NULL,
+            session_path TEXT NOT NULL,
+            name TEXT NOT NULL,
+            parent_id TEXT,
+            timestamp TEXT NOT NULL,
+            FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
+        )",
+        [],
+    )
+    .map_err(|e| format!("Migration 14 failed creating session_info_entries: {e}"))?;
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_session_info_entries_session ON session_info_entries(session_path)", []).map_err(|e| format!("Migration 14 failed creating session index: {e}"))?;
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_session_info_entries_timestamp ON session_info_entries(timestamp DESC)", []).map_err(|e| format!("Migration 14 failed creating timestamp index: {e}"))?;
+
     Ok(())
 }
