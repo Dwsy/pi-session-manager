@@ -439,12 +439,12 @@ pub async fn ws_dispatch(app_state: &SharedAppState, command: &str, payload: &Va
             return Ok(Value::Null);
         }
         "get_default_shell" => {
-            let shells = crate::commands::terminal::scan_shells();
+            let shells = crate::utils::scan_shells();
             let fallback = if cfg!(windows) { "cmd.exe" } else { "/bin/sh" };
             return Ok(serde_json::json!(shells.first().map(|(_, p)| p.as_str()).unwrap_or(fallback)));
         }
         "get_available_shells" => {
-            return Ok(serde_json::json!(crate::commands::terminal::scan_shells()));
+            return Ok(serde_json::json!(crate::utils::scan_shells()));
         }
         "get_pi_live_sessions" => {
             let sessions = app_state.pi_agent_registry.list();
