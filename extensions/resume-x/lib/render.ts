@@ -52,19 +52,24 @@ export function patchSessionListRender(sessionList: any): void {
 
 // ── Preview pane ─────────────────────────────────────────────────────
 
+// Safe fg lookup — falls back to identity if theme token missing
+function safeFg(t: any, token: string, text: string): string {
+  try { return t.fg(token, text); } catch { return text; }
+}
+
 // Build MarkdownTheme from global theme (same tokens as pi-coding-agent)
 function getMarkdownTheme(t: any): MarkdownTheme {
   return {
-    heading: (text: string) => t.fg("mdHeading", text),
-    link: (text: string) => t.fg("mdLink", text),
-    linkUrl: (text: string) => t.fg("mdLinkUrl", text),
-    code: (text: string) => t.fg("mdCode", text),
-    codeBlock: (text: string) => t.fg("mdCodeBlock", text),
-    codeBlockBorder: (text: string) => t.fg("mdCodeBlockBorder", text),
-    quote: (text: string) => t.fg("mdQuote", t.italic(text)),
-    quoteBorder: (text: string) => t.fg("mdQuoteBorder", text),
-    hr: (text: string) => t.fg("mdHr", text),
-    listBullet: (text: string) => t.fg("mdListBullet", text),
+    heading: (text: string) => safeFg(t, "mdHeading", text),
+    link: (text: string) => safeFg(t, "mdLink", text),
+    linkUrl: (text: string) => safeFg(t, "mdLinkUrl", text),
+    code: (text: string) => safeFg(t, "mdCode", text),
+    codeBlock: (text: string) => safeFg(t, "mdCodeBlock", text),
+    codeBlockBorder: (text: string) => safeFg(t, "mdCodeBlockBorder", text),
+    quote: (text: string) => safeFg(t, "mdQuote", t.italic(text)),
+    quoteBorder: (text: string) => safeFg(t, "mdQuoteBorder", text),
+    hr: (text: string) => safeFg(t, "mdHr", text),
+    listBullet: (text: string) => safeFg(t, "mdListBullet", text),
     bold: (text: string) => t.bold(text),
     italic: (text: string) => t.italic(text),
     underline: (text: string) => t.underline(text),
@@ -143,16 +148,15 @@ export function buildPreviewLines(
 
       if (toolExpanded) {
         root.addChild(new Text(
-          theme.fg("warning", "\u25b6 ") + theme.fg("accent", theme.bold(summary)) + theme.fg("muted", " (ctrl+o collapse)"),
+          (theme.fg("warning", "\u25b6 ") || "\u25b6 ") + (theme.fg("accent", theme.bold(summary)) || summary) + (theme.fg("muted", " (ctrl+o collapse)") || " (ctrl+o collapse)"),
           1, 0,
         ));
         if (content) {
-          // Render tool output as markdown (same as agent output)
           root.addChild(new Markdown(content, 1, 0, mdTheme));
         }
       } else {
         root.addChild(new Text(
-          theme.fg("muted", "\u25b8 ") + theme.fg("accent", summary) + theme.fg("muted", " (ctrl+o expand)"),
+          (theme.fg("muted", "\u25b8 ") || "\u25b8 ") + (theme.fg("accent", summary) || summary) + (theme.fg("muted", " (ctrl+o expand)") || " (ctrl+o expand)"),
           1, 0,
         ));
         if (content) {
@@ -169,11 +173,18 @@ export function buildPreviewLines(
       }
     } else if (msg.role === "user") {
       // ── User message: Box + Markdown (same as UserMessageComponent) ──
-      const box = new Box(1, 1, (text: string) => theme.bg("subtle", text));
-      box.addChild(new Markdown(msg.content.trim(), 0, 0, mdTheme, {
-        color: (text: string) => theme.fg("userMessageText", text),
-      }));
-      root.addChild(box);
+      try {
+        const box = new Box(1, 1, (text: string) => {
+          try { return theme.bg("subtle", text); } catch { return text; }
+        });
+        box.addChild(new Markdown(msg.content.trim(), 0, 0, mdTheme, {
+          color: (text: string) => { try { return theme.fg("userMessageText", text); } catch { return text; } },
+        }));
+        root.addChild(box);
+      } catch {
+        // Fallback: plain text
+        root.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
+      }
     } else {
       // ── Assistant message: Markdown (same as AssistantMessageComponent) ──
       root.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));

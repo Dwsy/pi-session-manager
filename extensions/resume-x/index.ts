@@ -162,8 +162,7 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
               previewTotalLines = result.totalLines;
               return [...baseLines, ...result.lines];
             } catch (e) {
-              mode = "list";
-              previewMessages = [];
+              // Don't reset mode — keep preview state, just show base lines
               return baseLines;
             }
           },
