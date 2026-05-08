@@ -584,6 +584,14 @@ fn build_rows_from_session_entries(session_path: &str, entries: &[SessionEntry],
         let (visible_text, thinking_text) = extract_message_segments(message, include_thinking);
         let timestamp = entry.timestamp.to_rfc3339();
 
+        // Include label in search_text for FTS indexing
+        let search_content = match (&visible_text, &entry_label) {
+            (Some(text), Some(label)) => format!("[{}] {}", label, text),
+            (None, Some(label)) => format!("[{}]", label),
+            (Some(text), None) => text.clone(),
+            (None, None) => String::new(),
+        };
+
         rows.push(MessageEntryRow {
             row_id: build_row_id(session_path, &entry.id, &message.role),
             entry_id: entry.id.clone(),
@@ -591,7 +599,7 @@ fn build_rows_from_session_entries(session_path: &str, entries: &[SessionEntry],
             role: message.role.clone(),
             source_type: message.role.clone(),
             content: visible_text.clone().unwrap_or_default(),
-            search_text: crate::utils::normalize_search_text(visible_text.as_deref().unwrap_or_default()),
+            search_text: crate::utils::normalize_search_text(&search_content),
             timestamp: timestamp.clone(),
             label: entry_label.clone(),
         });
