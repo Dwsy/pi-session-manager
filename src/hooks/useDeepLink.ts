@@ -23,6 +23,9 @@ export function useDeepLink({
   onNavigateRef.current = onNavigate;
 
   useEffect(() => {
+    // Guard: skip in non-Tauri environments (browser dev)
+    if (!(window as any).__TAURI_INTERNALS__) return;
+
     let unlisten: (() => void) | undefined;
 
     listen<string>('deep-link://navigate', (event) => {

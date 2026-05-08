@@ -4,6 +4,7 @@ export interface UseSessionViewerHotkeysOptions {
   enabled?: boolean
   isSearchOpen: boolean
   cmdFBehavior: 'inSessionSearch' | 'toggleSidebar'
+  previewMode?: boolean
   onToggleThinking: () => void
   onToggleToolsExpanded: () => void
   onToggleSidebar: () => void
@@ -12,12 +13,14 @@ export interface UseSessionViewerHotkeysOptions {
   onNextSearchMatch: () => void
   onPreviousSearchMatch: () => void
   onCopyResumeCommand?: () => void
+  onResume?: () => void
 }
 
 export function useSessionViewerHotkeys({
   enabled = true,
   isSearchOpen,
   cmdFBehavior = 'inSessionSearch',
+  previewMode = false,
   onToggleThinking,
   onToggleToolsExpanded,
   onToggleSidebar,
@@ -26,6 +29,7 @@ export function useSessionViewerHotkeys({
   onNextSearchMatch,
   onPreviousSearchMatch,
   onCopyResumeCommand,
+  onResume,
 }: UseSessionViewerHotkeysOptions): void {
   useEffect(() => {
     if (!enabled) {
@@ -44,10 +48,8 @@ export function useSessionViewerHotkeys({
         event.preventDefault()
         event.stopPropagation()
         if (cmdFBehavior === 'inSessionSearch') {
-          // Cmd+Shift+F toggles sidebar when Cmd+F is in-session search
           onToggleSidebar()
         } else {
-          // Cmd+Shift+F opens in-session search when Cmd+F toggles sidebar
           onOpenSearch()
         }
         return
@@ -58,7 +60,6 @@ export function useSessionViewerHotkeys({
         event.preventDefault()
         event.stopPropagation()
         if (cmdFBehavior === 'inSessionSearch') {
-          // Toggle: close if open, open if closed
           if (isSearchOpen) {
             onCloseSearch()
           } else {
@@ -70,6 +71,7 @@ export function useSessionViewerHotkeys({
         return
       }
 
+      // Search navigation (only when search is open)
       if (isSearchOpen && (event.metaKey || event.ctrlKey) && key === 'g') {
         event.preventDefault()
         event.stopPropagation()
@@ -81,6 +83,7 @@ export function useSessionViewerHotkeys({
         return
       }
 
+      // Escape closes search
       if (isSearchOpen && event.key === 'Escape') {
         event.preventDefault()
         event.stopPropagation()
@@ -88,31 +91,43 @@ export function useSessionViewerHotkeys({
         return
       }
 
+      // Modifier key required for rest
       if (!(event.metaKey || event.ctrlKey)) {
         return
       }
 
-      if (key === 't') {
-        event.preventDefault()
-        event.stopPropagation()
-        onToggleThinking()
-        return
+      // Cmd+T / Cmd+O: disabled in preview mode
+      if (!previewMode) {
+        if (key === 't') {
+          event.preventDefault()
+          event.stopPropagation()
+          onToggleThinking()
+          return
+        }
+
+        if (key === 'o') {
+          event.preventDefault()
+          event.stopPropagation()
+          onToggleToolsExpanded()
+          return
+        }
       }
 
-      if (key === 'o') {
-        event.preventDefault()
-        event.stopPropagation()
-        onToggleToolsExpanded()
-        return
-      }
-
-      // Cmd+Shift+C: Copy resume command
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && key === 'c') {
+      // Cmd+Shift+C: Copy resume command (allowed in preview)
+      if (event.shiftKey && key === 'c') {
         if (onCopyResumeCommand) {
           event.preventDefault()
           event.stopPropagation()
           onCopyResumeCommand()
         }
+        return
+      }
+
+      // Cmd+R: Resume (allowed in preview)
+      if (key === 'r' && onResume) {
+        event.preventDefault()
+        event.stopPropagation()
+        onResume()
         return
       }
     }
@@ -125,6 +140,7 @@ export function useSessionViewerHotkeys({
     enabled,
     isSearchOpen,
     cmdFBehavior,
+    previewMode,
     onCloseSearch,
     onCopyResumeCommand,
     onNextSearchMatch,
@@ -133,5 +149,6 @@ export function useSessionViewerHotkeys({
     onToggleThinking,
     onToggleToolsExpanded,
     onToggleSidebar,
+    onResume,
   ])
 }

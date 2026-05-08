@@ -22,21 +22,6 @@ fn utf8_safe_cut(buf: &[u8], mut end: usize) -> usize {
     end
 }
 
-fn looks_like_json_array_file(path: &str) -> bool {
-    // Only read first 100 bytes to check if file starts with '['
-    let Ok(mut file) = fs::File::open(path) else {
-        return false;
-    };
-    let mut buf = [0u8; 100];
-    let Ok(n) = std::io::Read::read(&mut file, &mut buf) else {
-        return false;
-    };
-    let Ok(text) = std::str::from_utf8(&buf[..n]) else {
-        return false;
-    };
-    text.trim_start().starts_with('[')
-}
-
 #[derive(Clone)]
 struct TransformedSessionCacheEntry {
     modified_at_ms: u128,
@@ -256,11 +241,28 @@ pub(super) async fn read_session_file_chunk_impl(path: String, offset: Option<u6
         return chunk_string_content(&transformed, offset, max_bytes);
     }
 
-    if looks_like_json_array_file(&path) {
-        let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read session file: {e}"))?;
+    const DEFAULT_CHUNK_BYTES: usize = 256 * 1024;
+    const MAX_CHUNK_BYTES: usize = 1024 * 1024;
+    const JSON_ARRAY_PROBE_BYTES: usize = 100;
+
+    let mut file = fs::File::open(&path).map_err(|e| format!("Failed to open session file: {e}"))?;
+    let file_size = file.metadata().map_err(|e| format!("Failed to get session file metadata: {e}"))?.len();
+
+    // Single file open: probe first bytes for JSON array detection
+    let mut probe = [0u8; JSON_ARRAY_PROBE_BYTES];
+    let probe_n = file.read(&mut probe).unwrap_or(0);
+    let is_json_array = std::str::from_utf8(&probe[..probe_n]).map(|text| text.trim_start().starts_with('[')).unwrap_or(false);
+
+    if is_json_array {
+        // Read entire file content (JSON array files are typically small)
+        let mut content = String::with_capacity(file_size as usize);
+        // Reuse the probe bytes we already read
+        if probe_n > 0 {
+            content.push_str(std::str::from_utf8(&probe[..probe_n]).unwrap_or(""));
+        }
+        file.read_to_string(&mut content).map_err(|e| format!("Failed to read session file: {e}"))?;
         let elapsed = start.elapsed();
         info!("[IO] read_session_file_chunk json_array path={} bytes={} elapsed={:?}", path, content.len(), elapsed);
-        let file_size = content.len() as u64;
         let start_offset = offset.unwrap_or(0);
         if start_offset > 0 {
             return Ok(SessionChunk { content: String::new(), next_offset: file_size, file_size, has_more: false });
@@ -268,12 +270,7 @@ pub(super) async fn read_session_file_chunk_impl(path: String, offset: Option<u6
         return Ok(SessionChunk { content, next_offset: file_size, file_size, has_more: false });
     }
 
-    const DEFAULT_CHUNK_BYTES: usize = 256 * 1024;
-    const MAX_CHUNK_BYTES: usize = 1024 * 1024;
-
-    let mut file = fs::File::open(&path).map_err(|e| format!("Failed to open session file: {e}"))?;
-    let file_size = file.metadata().map_err(|e| format!("Failed to get session file metadata: {e}"))?.len();
-
+    // Normal JSONL path: seek to start_offset and read chunk
     let start_offset = offset.unwrap_or(0).min(file_size);
 
     if start_offset >= file_size {

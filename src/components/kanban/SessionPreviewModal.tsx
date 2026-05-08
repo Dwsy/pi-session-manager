@@ -1,6 +1,7 @@
 import { useLayoutEffect, useCallback, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { X, Maximize2, Minus } from "lucide-react";
+import { Play, X, Maximize2, Minus } from "lucide-react";
+import KbdTooltip from "@/components/ui/KbdTooltip";
 import type { SessionInfo } from "@/types";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import type { TerminalType } from "@/components/settings/types";
@@ -177,6 +178,18 @@ export default function SessionPreviewModal({
   const toolbarSlots: SessionViewerToolbarSlots = {
     right: (
       <>
+        {onResumeSession && (
+          <KbdTooltip shortcut="Cmd+R">
+            <button
+              onClick={() => session && onResumeSession(session)}
+              className="p-1.5 rounded border border-border/70 bg-secondary hover:bg-secondary-hover transition-colors no-drag"
+              title={t("session.resume", "Resume")}
+              aria-label={t("session.resume", "Resume")}
+            >
+              <Play className="h-3.5 w-3.5" />
+            </button>
+          </KbdTooltip>
+        )}
         <div className="h-4 w-px bg-border/60 mx-0.5" />
         <button
           onClick={handleMinimize}

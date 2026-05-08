@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { buildSessionUrl, buildFeatureUrl, parseRoute } from '../router/config';
 import type { SessionInfo } from '../types';
@@ -27,12 +27,15 @@ export function useRouteSync({
 }: RouteSyncOptions) {
   const navigate = useNavigate();
   const location = useLocation();
+  const prevPathnameRef = useRef(location.pathname);
 
   // ─── URL → State (single source of truth) ─────────────
   // This effect syncs ALL app state from the URL.
   // No circular deps: we read selectedSession but only write when mismatch.
   useEffect(() => {
     const parsed = parseRoute(location.pathname);
+    const routeChanged = prevPathnameRef.current !== location.pathname;
+    prevPathnameRef.current = location.pathname;
 
     switch (parsed.route) {
       case 'session': {
@@ -55,7 +58,9 @@ export function useRouteSync({
         setSelectedProject(parsed.projectPath);
         setViewMode('project');
         setShowFavorites(false);
-        setShowSettings(false);
+        if (routeChanged) {
+          setShowSettings(false);
+        }
         setShowTerminal(false);
         break;
       }
@@ -63,7 +68,9 @@ export function useRouteSync({
       case 'feature': {
         // Clear session selection for feature pages
         setSelectedSession(null);
-        setShowSettings(false);
+        if (routeChanged) {
+          setShowSettings(false);
+        }
         setShowTerminal(false);
         setShowFavorites(false);
 
@@ -93,6 +100,9 @@ export function useRouteSync({
       case 'root': {
         // Home: clear session, keep current viewMode unless it's a feature-specific one
         setSelectedSession(null);
+        if (routeChanged) {
+          setShowSettings(false);
+        }
         break;
       }
     }

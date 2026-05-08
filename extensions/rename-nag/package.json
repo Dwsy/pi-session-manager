@@ -1,0 +1,13 @@
+{
+  "name": "rename-nag",
+  "version": "0.1.0",
+  "description": "Smart session rename reminder for Pi agents — nudges agent to name sessions after repeated interactions.",
+  "type": "module",
+  "keywords": ["pi-package"],
+  "engines": {
+    "node": ">=21.0.0"
+  },
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

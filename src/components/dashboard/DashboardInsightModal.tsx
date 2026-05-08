@@ -447,15 +447,15 @@ export default function DashboardInsightModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4 ui-enter-fade"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4"
       onClick={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm ui-enter-fade"
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-6xl rounded-2xl border border-border/25 bg-background/95 shadow-[0_20px_50px_rgba(0,0,0,0.35)] ui-enter-zoom overflow-hidden">
+      <div className="relative w-full max-w-6xl rounded-2xl border border-border/25 bg-background/95 shadow-[0_20px_50px_rgba(0,0,0,0.35)] ui-enter-fade ui-enter-zoom overflow-hidden">
         <div className="px-5 py-4 border-b border-border/20 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 text-xs text-muted-foreground mb-1.5">

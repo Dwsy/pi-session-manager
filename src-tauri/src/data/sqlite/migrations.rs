@@ -21,6 +21,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             12 => migration_12(conn)?,
             13 => migration_13(conn)?,
             14 => migration_14(conn)?,
+            15 => migration_15(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -274,6 +275,18 @@ fn migration_14(conn: &Connection) -> Result<(), String> {
 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_session_info_entries_session ON session_info_entries(session_path)", []).map_err(|e| format!("Migration 14 failed creating session index: {e}"))?;
     conn.execute("CREATE INDEX IF NOT EXISTS idx_session_info_entries_timestamp ON session_info_entries(timestamp DESC)", []).map_err(|e| format!("Migration 14 failed creating timestamp index: {e}"))?;
+
+    Ok(())
+}
+
+/// Migration to version 15: add label column to message_entries table.
+/// This stores user-defined labels for specific entries (bookmarks, markers).
+fn migration_15(conn: &Connection) -> Result<(), String> {
+    // Add label column to message_entries
+    conn.execute("ALTER TABLE message_entries ADD COLUMN label TEXT", []).map_err(|e| format!("Migration 15 failed adding label column: {e}"))?;
+
+    // Create index for label lookups
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_label ON message_entries(label) WHERE label IS NOT NULL", []).map_err(|e| format!("Migration 15 failed creating label index: {e}"))?;
 
     Ok(())
 }

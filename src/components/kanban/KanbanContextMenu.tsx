@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Terminal, Globe, Star, Trash2, Tag, X, Copy } from 'lucide-react'
+import { Play, Terminal, Globe, Star, Trash2, Tag, X, Copy } from 'lucide-react'
 import type { SessionInfo, Tag as TagType, FavoriteItem } from '@/types'
 import type { DeleteSessionAnchorPoint } from '@/components/dialogs/deleteSessionTypes'
 import TagBadge from '@/components/tags/TagBadge'
@@ -25,6 +25,7 @@ interface ContextMenuProps {
   onOpenInTerminal: () => void
   onOpenInBrowser: () => void
   onToggleFavorite: () => void
+  onResume?: () => void
   onCopyResume?: () => void
   onToggleTag: (tagId: string, assigned: boolean) => void
   onDelete: (anchorPoint: DeleteSessionAnchorPoint) => void
@@ -40,6 +41,7 @@ export default function KanbanContextMenu({
   onOpenInTerminal,
   onOpenInBrowser,
   onToggleFavorite,
+  onResume,
   onCopyResume,
   onToggleTag,
   onDelete,
@@ -109,6 +111,12 @@ export default function KanbanContextMenu({
       icon: <Tag size={14} />,
       onClick: () => setShowTagSubmenu(true),
     },
+    ...(onResume ? [{
+      id: 'resume' as const,
+      label: `${t('session.resume', 'Resume')} (⌘R)`,
+      icon: <Play size={14} />,
+      onClick: onResume,
+    }] : []),
     ...(onCopyResume ? [{
       id: 'copyResume' as const,
       label: t('tags.contextMenu.copyResume'),

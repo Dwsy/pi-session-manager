@@ -64,11 +64,14 @@ fn test_full_text_search_pagination_respects_per_session_limit() {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS message_entries (
             id TEXT PRIMARY KEY,
+            entry_id TEXT NOT NULL,
             session_path TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking', 'label')),
             content TEXT NOT NULL,
             search_text TEXT NOT NULL DEFAULT '',
             timestamp TEXT NOT NULL,
+            label TEXT,
             FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
         )",
         [],

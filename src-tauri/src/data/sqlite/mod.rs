@@ -19,7 +19,7 @@ pub use details_cache::{get_session_details_cache, upsert_session_details_cache,
 pub use favorites::{add_favorite, get_all_favorites, is_favorite, remove_favorite, toggle_favorite};
 pub use legacy_fts::{full_rebuild_fts, search_fts5};
 pub use maintenance::{cleanup_missing_files, clear_all_cache, delete_session, delete_sessions_by_source_slugs, get_cached_file_modified, get_session_count, needs_reindexing, optimize_database, preload_recent_sessions, vacuum};
-pub use message_index::{append_message_entries, delete_message_entries_for_session, ensure_message_fts_schema, insert_message_entries, search_message_fts, sync_message_entries, upsert_message_entries};
+pub use message_index::{append_message_entries, delete_message_entries_for_session, ensure_message_fts_schema, insert_message_entries, search_message_fts, sync_message_entries, update_labels_for_entries, upsert_message_entries};
 pub use scan_state::{delete_scan_state, get_all_scan_state, get_scan_state, update_scan_state_offset_and_trust, upsert_scan_state, upsert_scan_state_for_session};
 pub use sessions::{get_all_cached_file_modified, get_all_sessions, get_all_sessions_for_list, get_session, get_sessions_modified_after, get_sessions_modified_before, upsert_session, upsert_session_in_tx, upsert_sessions_batch};
 pub use subagent_meta::{get_cached_subagent_meta, upsert_subagent_meta};

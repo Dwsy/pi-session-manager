@@ -200,15 +200,15 @@ export default function HeatmapDayModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-3 md:p-4 ui-enter-fade"
+      className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-3 md:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm ui-enter-fade"
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-[980px] h-[min(84vh,700px)] overflow-hidden rounded-2xl border border-border/30 bg-background/95 shadow-[0_18px_40px_rgba(0,0,0,0.28)] ui-enter-zoom flex flex-col">
+      <div className="relative w-full max-w-[980px] h-[min(84vh,700px)] overflow-hidden rounded-2xl border border-border/30 bg-background/95 shadow-[0_18px_40px_rgba(0,0,0,0.28)] ui-enter-fade ui-enter-zoom flex flex-col">
         <div className="relative border-b border-border/20 px-4 py-3 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">

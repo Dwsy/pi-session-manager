@@ -874,7 +874,7 @@ export default function SessionList({
                                       const rect = e.currentTarget.getBoundingClientRect();
                                       hoverTimerRef.current = setTimeout(() => {
                                         setHoveredCard({ session, rect });
-                                      }, 500);
+                                      }, 1000);
                                     }}
                                     onMouseLeave={() => {
                                       clearTimeout(hoverTimerRef.current);
@@ -1244,8 +1244,8 @@ export default function SessionList({
             pointerEvents: "none",
             borderRadius: "0.375rem",
             background: "var(--surface, hsl(0 0% 100%))",
-            border: "1px solid var(--primary, hsl(217 91% 60%))",
-            boxShadow: "0 0 0 1px var(--primary, hsl(217 91% 60%))",
+            border: "1px solid var(--primary, hsl(217 91% 30% / 0.3))",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
             transition: "border-color 150ms ease, box-shadow 150ms ease",
           }}
         >

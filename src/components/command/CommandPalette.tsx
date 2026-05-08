@@ -39,10 +39,12 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
+        e.stopPropagation()
         isOpen ? close() : open()
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
         e.preventDefault()
+        e.stopPropagation()
         isOpen ? close() : open()
       }
       if (e.key === 'Escape' && isOpen) {

@@ -279,6 +279,13 @@ export default function KanbanColumn({
               path: contextMenu.session.path,
             })
           }}
+          onResume={
+            onResumeSession
+              ? async () => {
+                  await onResumeSession(contextMenu.session)
+                }
+              : undefined
+          }
           onToggleTag={(tagId, assigned) => {
             onToggleTag(contextMenu.session.id, tagId, assigned)
           }}

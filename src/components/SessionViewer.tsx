@@ -231,9 +231,10 @@ function SessionViewerContent({
   }, [session, piPath, resumeCommand, copyText]);
 
   useSessionViewerHotkeys({
-    enabled: !previewMode && !showSystemPromptDialog && !showMobileMenu,
+    enabled: !showSystemPromptDialog && !showMobileMenu,
     isSearchOpen,
     cmdFBehavior,
+    previewMode,
     onToggleThinking: toggleThinking,
     onToggleToolsExpanded: toggleToolsExpanded,
     onToggleSidebar: handleToggleSidebar,
@@ -242,6 +243,7 @@ function SessionViewerContent({
     onNextSearchMatch: goToNextMatch,
     onPreviousSearchMatch: goToPreviousMatch,
     onCopyResumeCommand: hasResumeAction ? handleCopyResumeCommand : undefined,
+    onResume: hasResumeAction ? handleResume : undefined,
   });
 
   const handleReachBottom = useCallback(() => {
@@ -427,7 +429,7 @@ function SessionViewerContent({
           error={error}
           hasNewMessages={hasNewMessages}
           sessionId={headerEntry?.id || session.id}
-          headerTimestamp={headerEntry?.timestamp}
+          headerTimestamp={headerEntry?.timestamp || session.created}
           stats={stats}
           renderableEntries={renderableEntries}
           searchQuery={searchQuery}

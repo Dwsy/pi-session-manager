@@ -833,6 +833,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
                                 let info = incremental_update_session_info(&old_info, &new_entries, file_modified);
                                 set_cached_entries(&session_path_str, all_entries.clone());
                                 let _ = sqlite::append_message_entries(&conn, &session_path_str, &new_entries);
+                                let _ = sqlite::update_labels_for_entries(&conn, &session_path_str, &all_entries);
                                 Some((info, all_entries, new_offset, trust.saturating_add(1)))
                             } else {
                                 None
@@ -1052,6 +1053,7 @@ impl ScannerScheduler {
                         let info = incremental_update_session_info(&old_info, &new_entries, file_modified);
                         set_cached_entries(&path_str, all_entries.clone());
                         let _ = sqlite::append_message_entries(&conn, &path_str, &new_entries);
+                        let _ = sqlite::update_labels_for_entries(&conn, &path_str, &all_entries);
                         // Update sessions table (pass None to skip redundant sync_message_entries)
                         let _ = sqlite::upsert_session(&mut conn, &info, file_modified, None);
                         upsert_cached_session(info);

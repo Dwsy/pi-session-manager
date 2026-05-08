@@ -3,7 +3,7 @@ import { getSessionSourceSlug } from "./session";
 import { getSessionIdMatchKind, normalizeSessionIdQuery } from "./session";
 import { parseQuotedQuery } from "./search";
 
-export type TimeRange = 'any' | '1h' | '24h' | '7d' | '30d';
+export type TimeRange = 'any' | '1h' | '24h' | '2d' | '7d' | '30d';
 
 interface SessionSearchOptions {
   includeId?: boolean;
@@ -175,6 +175,7 @@ export function filterSessions({
       'any': 0,
       '1h': 60 * 60 * 1000,
       '24h': 24 * 60 * 60 * 1000,
+      '2d': 2 * 24 * 60 * 60 * 1000,
       '7d': 7 * 24 * 60 * 60 * 1000,
       '30d': 30 * 24 * 60 * 60 * 1000,
     };

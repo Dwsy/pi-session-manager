@@ -16,6 +16,7 @@ struct MessageEntryRow {
     content: String,
     search_text: String,
     timestamp: String,
+    label: Option<String>,
 }
 
 const INSERT_CHUNK_SIZE: usize = 32;
@@ -567,6 +568,7 @@ fn build_row_id(session_path: &str, entry_id: &str, source_type: &str) -> String
 fn build_rows_from_session_entries(session_path: &str, entries: &[SessionEntry], include_thinking: bool) -> Vec<MessageEntryRow> {
     let mut rows = Vec::new();
     let mut message_roles_by_entry_id = HashMap::new();
+    let labels = resolve_labels(entries);
 
     for entry in entries {
         let Some(message) = entry.message.as_ref() else {
@@ -577,6 +579,7 @@ fn build_rows_from_session_entries(session_path: &str, entries: &[SessionEntry],
         }
 
         message_roles_by_entry_id.insert(entry.id.clone(), message.role.clone());
+        let entry_label = labels.get(&entry.id).map(|l| l.text.clone());
 
         let (visible_text, thinking_text) = extract_message_segments(message, include_thinking);
         let timestamp = entry.timestamp.to_rfc3339();
@@ -590,6 +593,7 @@ fn build_rows_from_session_entries(session_path: &str, entries: &[SessionEntry],
             content: visible_text.clone().unwrap_or_default(),
             search_text: crate::utils::normalize_search_text(visible_text.as_deref().unwrap_or_default()),
             timestamp: timestamp.clone(),
+            label: entry_label.clone(),
         });
 
         if let Some(content) = thinking_text {
@@ -602,11 +606,12 @@ fn build_rows_from_session_entries(session_path: &str, entries: &[SessionEntry],
                 search_text: crate::utils::normalize_search_text(&content),
                 content,
                 timestamp,
+                label: entry_label,
             });
         }
     }
 
-    for (target_id, resolved_label) in resolve_labels(entries) {
+    for (target_id, resolved_label) in labels {
         let Some(role) = message_roles_by_entry_id.get(&target_id) else {
             continue;
         };
@@ -620,6 +625,7 @@ fn build_rows_from_session_entries(session_path: &str, entries: &[SessionEntry],
             search_text: crate::utils::normalize_search_text(&resolved_label.text),
             content: resolved_label.text,
             timestamp: resolved_label.labeled_at.to_rfc3339(),
+            label: None,
         });
     }
 
@@ -657,15 +663,15 @@ fn insert_message_entries_rows(conn: &Connection, rows: &[MessageEntryRow]) -> R
     for chunk in rows.chunks(INSERT_CHUNK_SIZE) {
         let values_sql = (0..chunk.len())
             .map(|index| {
-                let base = index * 8;
-                format!("(?{}, ?{}, ?{}, ?{}, ?{}, ?{}, ?{}, ?{})", base + 1, base + 2, base + 3, base + 4, base + 5, base + 6, base + 7, base + 8)
+                let base = index * 9;
+                format!("(?{}, ?{}, ?{}, ?{}, ?{}, ?{}, ?{}, ?{}, ?{})", base + 1, base + 2, base + 3, base + 4, base + 5, base + 6, base + 7, base + 8, base + 9)
             })
             .collect::<Vec<_>>()
             .join(", ");
 
-        let sql = format!("INSERT OR REPLACE INTO message_entries (id, entry_id, session_path, role, source_type, content, search_text, timestamp) VALUES {values_sql}");
+        let sql = format!("INSERT OR REPLACE INTO message_entries (id, entry_id, session_path, role, source_type, content, search_text, timestamp, label) VALUES {values_sql}");
 
-        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(chunk.len() * 8);
+        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(chunk.len() * 9);
         for row in chunk {
             params.push(&row.row_id);
             params.push(&row.entry_id);
@@ -675,6 +681,7 @@ fn insert_message_entries_rows(conn: &Connection, rows: &[MessageEntryRow]) -> R
             params.push(&row.content);
             params.push(&row.search_text);
             params.push(&row.timestamp);
+            params.push(&row.label);
         }
 
         conn.execute(&sql, params.as_slice()).map_err(|e| format!("Failed to bulk insert message entries: {e}"))?;
@@ -732,6 +739,34 @@ pub fn append_message_entries(conn: &Connection, session_path: &str, entries: &[
 
     crate::core::io_trace::trace_db("append_entries", session_path, rows.len(), elapsed);
     debug!("Appended {} message entry rows for session: {}", rows.len(), session_path);
+    Ok(())
+}
+
+/// Update labels for existing message entries when new label entries are discovered.
+/// This handles the case where a label entry targets an already-indexed message.
+pub fn update_labels_for_entries(conn: &Connection, session_path: &str, entries: &[SessionEntry]) -> Result<(), String> {
+    if !message_entries_table_exists(conn)? {
+        return Ok(());
+    }
+
+    let labels = crate::domain::pi_session::resolve_labels(entries);
+    if labels.is_empty() {
+        return Ok(());
+    }
+
+    let start = std::time::Instant::now();
+    let mut updated = 0;
+
+    for (target_id, resolved_label) in &labels {
+        // Update all rows for this entry_id (message, thinking, etc.)
+        let rows_affected = conn.execute("UPDATE message_entries SET label = ?1 WHERE session_path = ?2 AND entry_id = ?3", rusqlite::params![resolved_label.text, session_path, target_id]).map_err(|e| format!("Failed to update label for entry {}: {e}", target_id))?;
+        updated += rows_affected;
+    }
+
+    let elapsed = start.elapsed();
+    if updated > 0 {
+        debug!("Updated labels for {} rows in session: {} ({:?})", updated, session_path, elapsed);
+    }
     Ok(())
 }
 

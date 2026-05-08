@@ -321,7 +321,7 @@ export default function KanbanBoard({
             {t('tags.kanban.allProjects', 'All Projects')}
           </span>
         )}
-        <div className="flex-1 min-w-0 max-w-[360px]">
+        <div className="flex-1 min-w-0 max-w-[480px]">
           <SearchFilterBar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
