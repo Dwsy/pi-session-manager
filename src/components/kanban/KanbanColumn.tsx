@@ -1,7 +1,7 @@
-import { useRef, useMemo, useState } from 'react'
+import { useRef, useMemo, useState, useLayoutEffect } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { useVirtualizer, measureElement as virtualMeasureElement } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo, Tag, FavoriteItem } from '@/types'
 import KanbanCard from './KanbanCard'
@@ -104,7 +104,18 @@ export default function KanbanColumn({
     estimateSize: () => ESTIMATED_CARD_HEIGHT,
     overscan: 5,
     enabled: useVirtual,
+    measureElement: (element, entry, instance) => {
+      const height = virtualMeasureElement(element, entry, instance)
+      return height
+    },
   })
+
+  // Reset size cache when sessions change so virtualizer re-measures
+  useLayoutEffect(() => {
+    if (useVirtual) {
+      virtualizer.measure()
+    }
+  }, [sessions.length, useVirtual, virtualizer])
 
   // Memoize session IDs for SortableContext
   const sessionIds = useMemo(() => sessions.map(s => s.id), [sessions])
@@ -125,7 +136,7 @@ export default function KanbanColumn({
             const session = sessions[virtualRow.index]
             return (
               <div
-                key={session.id}
+                key={virtualRow.key}
                 data-index={virtualRow.index}
                 ref={virtualizer.measureElement}
                 style={{
