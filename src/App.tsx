@@ -254,10 +254,16 @@ function App() {
   const {
     navigateToSession,
     navigateToSessions,
+    navigateToFeature,
   } = useRouteSync({
     setSelectedSession,
     selectedSession,
     sessions,
+    setViewMode: setViewMode as (mode: 'list' | 'project' | 'kanban') => void,
+    setSelectedProject,
+    setShowSettings,
+    setShowTerminal,
+    setShowFavorites,
   });
 
   // Deep link: pi-session://sessions/{id} etc.
@@ -578,6 +584,7 @@ function App() {
         setViewMode("kanban");
         setSelectedSession(null);
         setShowFavorites(false);
+        navigateToFeature('kanban');
       },
       "cmd+,": () => setShowSettings(true),
       "cmd+`": () => {
@@ -634,6 +641,7 @@ function App() {
       standaloneDatasetRuntime,
       terminalConfig.enabled,
       navigateToSessions,
+      navigateToFeature,
     ],
   );
 
@@ -662,6 +670,7 @@ function App() {
       selectedSession,
       setSelectedSession: selectSessionAndNavigate,
       setSelectedProject,
+      setViewMode: setViewMode as (mode: 'list' | 'project' | 'kanban') => void,
       closeCommandMenu: () => {},
       setPendingScrollEntryId,
       searchCurrentProjectOnly: false,
@@ -1097,6 +1106,8 @@ function App() {
     setShowFavorites,
     setShowTerminal,
     setShowSettings,
+    navigateToSessions,
+    navigateToFeature,
   });
 
   // ═══════════════════════════════════
@@ -1139,6 +1150,7 @@ function App() {
     setShowSettings(false);
     setShowTerminal(false);
     setSelectedSession(null);
+    navigateToSessions();
   };
 
   const desktopSearchBar = (
@@ -1215,11 +1227,11 @@ function App() {
     />
   );
 
+  // Desktop main content: session viewer > kanban > dashboard (fallback).
+  // viewMode controls sidebar content only, not main content.
   function renderDesktopMainContent() {
     if (selectedSession) return renderSessionViewer();
     if (viewMode === "kanban") return renderKanban();
-    if (viewMode === "list") return renderSessionList();
-    if (viewMode === "project" && selectedProject) return renderProjectList();
     if (standaloneDatasetRuntime) return renderStandaloneDatasetOverview();
     return renderDashboard();
   }
