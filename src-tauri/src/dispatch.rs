@@ -789,7 +789,17 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         // ═══════════════════════════════════════════════════════════════
         // Desktop/GUI-only commands
         // ═══════════════════════════════════════════════════════════════
-        "terminal_create" | "terminal_write" | "terminal_resize" | "terminal_close" | "get_default_shell" | "get_available_shells" => Err(format!("Command '{command}' requires GUI mode (terminal not available in CLI)")),
+        "get_default_shell" => {
+            let shells = crate::utils::scan_shells();
+            let fallback = if cfg!(windows) { "cmd.exe" } else { "/bin/sh" };
+            let default_shell = shells.first().map(|(_, p)| p.clone()).unwrap_or_else(|| fallback.to_string());
+            Ok(serde_json::json!(default_shell))
+        }
+        "get_available_shells" => {
+            let shells = crate::utils::scan_shells();
+            Ok(serde_json::json!(shells))
+        }
+        "terminal_create" | "terminal_write" | "terminal_resize" | "terminal_close" => Err(format!("Command '{command}' requires GUI mode (terminal not available in CLI)")),
         "open_session_in_browser" => Err("open_session_in_browser is desktop-only".to_string()),
         "open_session_in_terminal" => Err("open_session_in_terminal is desktop-only".to_string()),
         "toggle_devtools" => Err("toggle_devtools is not supported via WebSocket".to_string()),

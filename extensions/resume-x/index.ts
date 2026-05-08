@@ -160,7 +160,7 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
             try {
               const result = buildPreviewLines(width, previewMessages, previewScrollOffset, previewSessionPath, toolExpanded);
               previewTotalLines = result.totalLines;
-              return [...baseLines, ...result.lines];
+              return result.lines;
             } catch (e) {
               // Don't reset mode — keep preview state, just show base lines
               return baseLines;
