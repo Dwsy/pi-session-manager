@@ -9,5 +9,8 @@
   },
   "pi": {
     "extensions": ["./index.ts"]
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0"
   }
 }
