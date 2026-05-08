@@ -5,6 +5,11 @@
 //! - sorting.rs: Sorting logic (8 sort modes)
 //! - filtering.rs: Search, project, and tag filtering
 //! - pagination.rs: Pagination and payload stripping
+//!
+//! The paginated endpoint caches the filtered+sorted result so that
+//! repeated calls with the same parameters (e.g. paging through results)
+//! skip the full clone + filter + sort pipeline. The cache is invalidated
+//! when the underlying scanner cache version changes or filter params change.
 
 pub mod filtering;
 pub mod pagination;
@@ -16,9 +21,47 @@ pub use pagination::*;
 pub use sorting::*;
 pub use types::*;
 
+use crate::types::SessionInfo;
+use std::sync::RwLock;
+
+/// Cached filtered+sorted session list for the paginated endpoint.
+/// Avoids re-cloning from SCAN_CACHE and re-filtering/re-sorting on
+/// every page request when only offset/limit changes.
+struct ListCacheEntry {
+    /// Scanner cache version when this entry was computed.
+    scanner_version: u64,
+    /// Session count when computed (extra staleness signal).
+    scanner_count: usize,
+    search_query: Option<String>,
+    project_filter: Option<String>,
+    filter_tag_ids: Option<Vec<String>>,
+    source_filter_slugs: Option<Vec<String>>,
+    sort_by: Option<String>,
+    /// The fully filtered and sorted session list, ready for pagination.
+    sessions: Vec<SessionInfo>,
+}
+
+static LIST_CACHE: RwLock<Option<ListCacheEntry>> = RwLock::new(None);
+
 /// Main entry point: scan sessions with pagination, filtering, and sorting
 pub async fn scan_sessions_paginated_impl(offset: Option<usize>, limit: Option<usize>, search_query: Option<String>, project_filter: Option<String>, filter_tag_ids: Option<Vec<String>>, source_filter_slugs: Option<Vec<String>>, sort_by: Option<String>) -> Result<PaginatedSessionsResult, String> {
     use crate::{config, scanner};
+
+    let (scanner_version, scanner_count) = scanner::get_session_digest();
+
+    // Try to serve from list cache: same scanner version + same filter params.
+    {
+        let guard = LIST_CACHE.read().map_err(|e| format!("List cache lock: {e}"))?;
+        if let Some(ref entry) = *guard {
+            if entry.scanner_version == scanner_version && entry.scanner_count == scanner_count && entry.search_query == search_query && entry.project_filter == project_filter && entry.filter_tag_ids == filter_tag_ids && entry.source_filter_slugs == source_filter_slugs && entry.sort_by == sort_by {
+                tracing::debug!("[ListCache] hit: version={scanner_version} count={scanner_count}");
+                return Ok(build_paginated_result(&entry.sessions, offset, limit));
+            }
+        }
+    }
+
+    // Cache miss: rebuild the filtered+sorted list.
+    tracing::debug!("[ListCache] miss: version={scanner_version} count={scanner_count}");
 
     let mut sessions = if let Some(cached) = scanner::get_cached_sessions_for_list() {
         cached
@@ -27,9 +70,6 @@ pub async fn scan_sessions_paginated_impl(offset: Option<usize>, limit: Option<u
         let conn = crate::data::sqlite::init_db_with_config(&config)?;
         let db_sessions = crate::data::sqlite::get_all_sessions_for_list(&conn)?;
         if db_sessions.is_empty() {
-            // Keep the paginated endpoint non-blocking on cold start, but warm the
-            // in-memory cache/database in the background so follow-up refreshes do
-            // not stay empty until the user manually rescans.
             #[cfg(feature = "gui")]
             {
                 use tauri::async_runtime::spawn;
@@ -59,5 +99,14 @@ pub async fn scan_sessions_paginated_impl(offset: Option<usize>, limit: Option<u
 
     sort_sessions(&mut sessions, sort_by.as_deref());
 
-    Ok(build_paginated_result(&sessions, offset, limit))
+    // Store in cache for subsequent paginated calls.
+    {
+        let mut guard = LIST_CACHE.write().map_err(|e| format!("List cache lock: {e}"))?;
+        *guard = Some(ListCacheEntry { scanner_version, scanner_count, search_query: search_query.clone(), project_filter: project_filter.clone(), filter_tag_ids: filter_tag_ids.clone(), source_filter_slugs: source_filter_slugs.clone(), sort_by: sort_by.clone(), sessions });
+    }
+
+    // Re-read from cache to paginate (avoids moving data out).
+    let guard = LIST_CACHE.read().map_err(|e| format!("List cache lock: {e}"))?;
+    let entry = guard.as_ref().ok_or("List cache empty after write")?;
+    Ok(build_paginated_result(&entry.sessions, offset, limit))
 }

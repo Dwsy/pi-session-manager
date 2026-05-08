@@ -332,11 +332,12 @@ const SessionTree = memo(
           <div className="tree-container">
             {filteredNodes.map((flatNode) => {
               const entry = flatNode.node.entry;
+              const label = flatNode.node.label;
               const prefix = buildTreePrefix(flatNode);
               const isActive = entry.id === activeLeafId;
               const isInPath = activePathIds.has(entry.id);
               const marker = isInPath ? "•" : "·";
-              const displayText = getEntryDisplayText(entry, flatNode.node.label);
+              const displayText = getEntryDisplayText(entry);
               const roleClass = getEntryRoleClass(entry);
               const toolName = getEntryToolName(entry);
               const isSearchMatch = searchResultSet.has(entry.id);
@@ -354,6 +355,7 @@ const SessionTree = memo(
                   {entry.type === "message" && entry.message?.role === "user" ? (
                     <span className={`tree-content tree-content-user ${roleClass}`}>
                       <p className="tree-user-label">
+                        {label ? <span className="tree-label-badge">[{label}]</span> : null}
                         User:
                         <span className="tree-user-text">{displayText}</span>
                       </p>
@@ -367,6 +369,7 @@ const SessionTree = memo(
                           : undefined
                       }
                     >
+                      {label ? <span className="tree-label-badge">[{label}]</span> : null}
                       {displayText}
                     </span>
                   )}

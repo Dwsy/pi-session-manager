@@ -28,16 +28,20 @@ function TreeNodeDisplay({ entry }: { entry: SessionEntry }) {
 
     const toolCalls = content.filter(c => c.type === 'toolCall')
 
+    const labelBadge = entry.label ? <span className="tree-label-badge">[{entry.label}]</span> : null
+
     if (role === 'user') {
-      return <span className="tree-role-user">User: {text || '(empty)'}</span>
+      return <span className="tree-role-user">{labelBadge} User: {text || '(empty)'}</span>
     } else if (role === 'assistant') {
       const parts = []
       if (text) parts.push(text)
       if (toolCalls.length > 0) parts.push(`[${t(toolCalls.length > 1 ? 'session.tree.toolCallsPlural' : 'session.tree.toolCalls', { count: toolCalls.length })}]`)
-      return <span className="tree-role-assistant">Assistant: {parts.join(' ') || '(empty)'}</span>
+      return <span className="tree-role-assistant">{labelBadge} Assistant: {parts.join(' ') || '(empty)'}</span>
     } else if (role === 'toolResult') {
       return <span className="tree-role-tool">Tool Result</span>
     }
+  } else if (entry.type === 'label') {
+    return <span className="tree-label">Label: {entry.label || '(empty)'}</span>
   } else if (entry.type === 'model_change') {
     return <span>{t('session.tree.model')}: {entry.provider}/{entry.modelId}</span>
   } else if (entry.type === 'compaction') {
