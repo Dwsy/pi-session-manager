@@ -182,27 +182,46 @@ export function buildPreviewLines(
             contentContainer.addChild(new Text(theme.fg("muted", truncated), 2, 0));
           }
           if (lines.length > TOOL_PREVIEW_LINES) {
-            contentContainer.addChild(new Text(theme.fg("muted", `... ${lines.length - TOOL_PREVIEW_LINES} more lines`), 2, 0));
+                        contentContainer.addChild(new Text(theme.fg("muted", `... ${lines.length - TOOL_PREVIEW_LINES} more lines`), 2, 0));
           }
         }
       }
     } else if (msg.role === "user") {
-      // ── User message: Box + Markdown with background ──
+      // ── User message: Box with background (like UserMessageComponent) ──
       try {
         const bgFn = (text: string): string => {
-          try { return theme.bg("userMessageBg", text); } catch {
-            // Fallback: manual dim background via ANSI
-            return `[48;2;60;60;70m${text}[0m`;
-          }
+          const styled = theme.bg ? theme.bg("userMessageBg", text) : "";
+          if (styled && styled !== text) return styled;
+          return "\x1b[48;2;55;60;72m" + text + "\x1b[0m";
+        };
+        const colorFn = (text: string): string => {
+          const styled = theme.fg ? theme.fg("userMessageText", text) : "";
+          if (styled && styled !== text) return styled;
+          return "\x1b[38;2;180;195;220m" + text + "\x1b[0m";
         };
         const box = new Box(1, 1, bgFn);
-        const colorFn = (text: string): string => {
-          try { return theme.fg("userMessageText", text); } catch { return text; }
-        };
         box.addChild(new Markdown(msg.content.trim(), 0, 0, mdTheme, { color: colorFn }));
         contentContainer.addChild(box);
       } catch {
-        // Fallback: markdown without background
+        contentContainer.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
+      }
+      // ── User message: Box with background (like UserMessageComponent) ──
+      try {
+        const bgFn = (text: string): string => {
+          // Theme bg with ANSI fallback — bg token may be missing in extension context
+          const styled = theme.bg ? theme.bg("userMessageBg", text) : "";
+          if (styled && styled !== text) return styled;
+          return "[48;2;55;60;72m" + text + "[0m";
+        };
+        const colorFn = (text: string): string => {
+          const styled = theme.fg ? theme.fg("userMessageText", text) : "";
+          if (styled && styled !== text) return styled;
+          return "[38;2;180;195;220m" + text + "[0m";
+        };
+        const box = new Box(1, 1, bgFn);
+        box.addChild(new Markdown(msg.content.trim(), 0, 0, mdTheme, { color: colorFn }));
+        contentContainer.addChild(box);
+      } catch {
         contentContainer.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
       }
     } else {
