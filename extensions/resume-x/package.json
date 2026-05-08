@@ -1,0 +1,13 @@
+{
+  "name": "resume-x",
+  "version": "0.1.0",
+  "description": "Enhanced resume command using PSM SQLite — fast, no disk scan",
+  "type": "module",
+  "keywords": ["pi-package"],
+  "engines": {
+    "node": ">=21.0.0"
+  },
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

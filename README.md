@@ -201,6 +201,71 @@ src/plugins/tools-render/
 └── extensions/  # subagent, ...
 ```
 
+### resume-x (Pi Extension)
+
+Fast session resume from Pi's TUI — SQLite-backed, no disk scan.
+
+**Location**: `extensions/resume-x/`
+
+**Install**: add to `~/.pi/agent/settings.json` → `extensions` array:
+```json
+{
+  "extensions": [
+    "/path/to/pi-session-manager/extensions/resume-x/index.ts"
+  ]
+}
+```
+Or from the project directory:
+```json
+{
+  "extensions": [
+    "~/Dev/AI/pi-session-manager/extensions/resume-x/index.ts"
+  ]
+}
+```
+
+**Usage**:
+```
+/resume-x
+```
+or press `⌥X` to toggle open/close.
+
+**Features**:
+- SQLite fast path — reads from `sessions.db`, no filesystem scan
+- CWD filter — shows current project sessions first
+- Detail pane — model, tokens, cost, kanban tags per session
+- Message preview — browse full conversation history before resuming
+- Full-text search (`⌥Q`) — search across session names, messages, and tags
+
+**Keybindings**:
+
+*List mode:*
+
+| Key | Action |
+|-----|--------|
+| `⌥X` | Toggle open/close |
+| `⌥Q` | Search (default: CWD, Tab: toggle global) |
+| `→` | Enter preview (browse messages) |
+| `⏎` | Resume session |
+
+*Search mode:*
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` / `j` / `k` | Navigate results |
+| `⏎` | Open selected |
+| `Tab` | Toggle CWD / global scope |
+| `Esc` | Back to list |
+
+*Preview mode:*
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Scroll one line |
+| `⇧↑` / `⇧↓` | Page up / down |
+| `⏎` | Resume session |
+| `←` / `Esc` | Back to list |
+
 ### Search Plugins
 
 ```
