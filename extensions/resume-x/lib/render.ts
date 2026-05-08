@@ -187,17 +187,22 @@ export function buildPreviewLines(
         }
       }
     } else if (msg.role === "user") {
-      // ── User message: Box + Markdown (same as UserMessageComponent) ──
+      // ── User message: Box + Markdown with background ──
       try {
-        const box = new Box(1, 1, (text: string) => {
-          try { return theme.bg("subtle", text); } catch { return text; }
-        });
-        box.addChild(new Markdown(msg.content.trim(), 0, 0, mdTheme, {
-          color: (text: string) => { try { return theme.fg("userMessageText", text); } catch { return text; } },
-        }));
+        const bgFn = (text: string): string => {
+          try { return theme.bg("userMessageBg", text); } catch {
+            // Fallback: manual dim background via ANSI
+            return `[48;2;60;60;70m${text}[0m`;
+          }
+        };
+        const box = new Box(1, 1, bgFn);
+        const colorFn = (text: string): string => {
+          try { return theme.fg("userMessageText", text); } catch { return text; }
+        };
+        box.addChild(new Markdown(msg.content.trim(), 0, 0, mdTheme, { color: colorFn }));
         contentContainer.addChild(box);
       } catch {
-        // Fallback: plain text
+        // Fallback: markdown without background
         contentContainer.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
       }
     } else {
