@@ -11,6 +11,8 @@ export interface UseDesktopSidebarActionsOptions {
   setShowFavorites: Dispatch<SetStateAction<boolean>>;
   setShowTerminal: Dispatch<SetStateAction<boolean>>;
   setShowSettings: Dispatch<SetStateAction<boolean>>;
+  navigateToSessions: () => void;
+  navigateToFeature: (feature: string) => void;
 }
 
 export interface UseDesktopSidebarActionsReturn {
@@ -32,24 +34,29 @@ export function useDesktopSidebarActions({
   setShowFavorites,
   setShowTerminal,
   setShowSettings,
+  navigateToSessions,
+  navigateToFeature,
 }: UseDesktopSidebarActionsOptions): UseDesktopSidebarActionsReturn {
   const onSelectListView = useCallback(() => {
     setViewMode("list");
     setSelectedProject(null);
     setShowFavorites(false);
-  }, [setSelectedProject, setShowFavorites, setViewMode]);
+    navigateToSessions();
+  }, [setSelectedProject, setShowFavorites, setViewMode, navigateToSessions]);
 
   const onSelectProjectView = useCallback(() => {
     setViewMode("project");
     setSelectedProject(null);
     setShowFavorites(false);
-  }, [setSelectedProject, setShowFavorites, setViewMode]);
+    navigateToSessions();
+  }, [setSelectedProject, setShowFavorites, setViewMode, navigateToSessions]);
 
   const onSelectKanbanView = useCallback(() => {
     setViewMode("kanban");
     setSelectedSession(null);
     setShowFavorites(false);
-  }, [setSelectedSession, setShowFavorites, setViewMode]);
+    navigateToFeature('kanban');
+  }, [setSelectedSession, setShowFavorites, setViewMode, navigateToFeature]);
 
   const onToggleFavorites = useCallback(() => {
     setShowFavorites((prev) => !prev);

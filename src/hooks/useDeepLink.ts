@@ -4,11 +4,14 @@ import { listen } from '@tauri-apps/api/event';
 /**
  * Listen for pi-session:// deep link events from Tauri and navigate.
  *
- * Only session routes are supported for bidirectional sync:
+ * Supported routes:
  *   pi-session://                          → /#/  (home)
  *   pi-session://sessions/{sessionId}      → /#/sessions/{sessionId}
- *
- * Other paths are ignored — they have no state sync in useRouteSync.
+ *   pi-session://kanban                    → /#/kanban
+ *   pi-session://dashboard                 → /#/dashboard
+ *   pi-session://settings                  → /#/settings
+ *   pi-session://terminal                  → /#/terminal
+ *   pi-session://favorites                 → /#/favorites
  */
 export function useDeepLink({
   onNavigate,
@@ -35,10 +38,24 @@ export function useDeepLink({
           return;
         }
 
-        // Only accept /sessions/:id — ignore unsupported routes
         const parts = routePath.split('/').filter(Boolean);
+
+        // /sessions/:id
         if (parts[0] === 'sessions' && parts[1]) {
           onNavigateRef.current('/sessions/' + encodeURIComponent(decodeURIComponent(parts[1])));
+          return;
+        }
+
+        // /projects/:path
+        if (parts[0] === 'projects' && parts[1]) {
+          onNavigateRef.current('/projects/' + encodeURIComponent(decodeURIComponent(parts[1])));
+          return;
+        }
+
+        // Feature routes: /kanban, /dashboard, /settings, /terminal, /favorites
+        const FEATURES = new Set(['kanban', 'dashboard', 'settings', 'terminal', 'favorites']);
+        if (parts[0] && FEATURES.has(parts[0])) {
+          onNavigateRef.current('/' + parts[0]);
           return;
         }
 

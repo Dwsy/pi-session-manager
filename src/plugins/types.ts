@@ -102,6 +102,9 @@ export interface SearchContext {
   /** Set selected project */
   setSelectedProject: (project: string | null) => void
 
+  /** Set view mode (list | project | kanban) */
+  setViewMode?: (mode: 'list' | 'project' | 'kanban') => void
+
   /** Close command palette */
   closeCommandMenu: () => void
 

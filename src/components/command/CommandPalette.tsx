@@ -79,43 +79,15 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
     }
   }, [results, selectedResult])
 
-  // Check if a result corresponds to the currently active session/project
-  const isResultActive = useCallback((result: SearchPluginResult | null): boolean => {
-    if (!result) return false
-
-    if (result.pluginId === 'session-search') {
-      const session = result.metadata?.session
-      return session && context.selectedSession?.id === session.id
-    }
-
-    if (result.pluginId === 'message-search') {
-      const sessionId = result.metadata?.sessionId
-      return sessionId && context.selectedSession?.id === sessionId
-    }
-
-    if (result.pluginId === 'project-search') {
-      const project = result.metadata?.project
-      return project && context.selectedProject === project
-    }
-
-    return false
-  }, [context.selectedSession, context.selectedProject])
-
   // Navigate to selected session
   const handleNavigate = useCallback(() => {
     if (!selectedResult || !registryRef.current) return
     const plugin = registryRef.current.get(selectedResult.pluginId)
     if (plugin) {
-      // If the result is for the currently active session/project, close the menu
-      if (isResultActive(selectedResult)) {
-        plugin.onSelect(selectedResult, enhancedContext)
-        close()
-      } else {
-        // Otherwise, just activate it without closing the menu
-        plugin.onSelect(selectedResult, enhancedContext)
-      }
+      plugin.onSelect(selectedResult, enhancedContext)
+      close()
     }
-  }, [selectedResult, enhancedContext, isResultActive, close])
+  }, [selectedResult, enhancedContext, close])
 
   // Action keyboard shortcuts (only when palette is open)
   useEffect(() => {
