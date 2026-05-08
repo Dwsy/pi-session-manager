@@ -6,6 +6,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo } from '@/types'
 import { MessageSquare, Calendar, Trash2, FolderOpen, ChevronDown, ChevronRight, Search } from 'lucide-react'
 import { DirectoryListSkeleton } from '@/components/ui/Skeleton'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import OpenInTerminalButton from '@/components/OpenInTerminalButton'
 import { SessionBadge } from '@/components/session-viewer/SessionBadge'
 import type { TerminalType } from '@/components/settings/types'
@@ -83,7 +84,9 @@ export default function SessionListByDirectory({
     })
   }
 
-  if (loading) {
+  const showDelayedLoading = useDelayedLoading(loading)
+
+  if (showDelayedLoading) {
     return <DirectoryListSkeleton />
   }
 

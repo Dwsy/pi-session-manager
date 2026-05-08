@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { SessionInfo, FavoriteItem } from '@/types'
 import { SessionBadge } from './session-viewer/SessionBadge'
 import { FavoritesSkeleton } from './ui/Skeleton'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { getPathBasename } from '@/utils/path'
 import { getSessionSourceSlug, getSessionSourceTag } from '@/utils/session'
 import { useSettings } from '@/hooks/useSettings'
@@ -38,7 +39,9 @@ export default function FavoritesPanel({
   const favoriteSessions = favorites.filter(f => f.type === 'session')
   const favoriteProjects = favorites.filter(f => f.type === 'project')
 
-  if (loading) {
+  const showDelayedLoading = useDelayedLoading(loading)
+
+  if (showDelayedLoading) {
     return <FavoritesSkeleton />
   }
 

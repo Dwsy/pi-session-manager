@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import type { RefObject } from "react";
+import { createPortal } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
 import type { SessionInfo, FavoriteItem, Tag } from "@/types";
@@ -21,6 +22,7 @@ import {
   Zap,
 } from "lucide-react";
 import { SessionListSkeleton } from "@/components/ui/Skeleton";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import OpenInBrowserButton from "@/components/OpenInBrowserButton";
 import OpenInTerminalButton from "@/components/OpenInTerminalButton";
 import { SessionBadge } from "@/components/session-viewer/SessionBadge";
@@ -51,90 +53,7 @@ import {
 const ESTIMATED_ROW_HEIGHT = 122;
 const STICKY_SCROLL_TOP_THRESHOLD = 48;
 
-/* ── MarqueeText: hover-to-scroll for truncated single-line text ── */
-function MarqueeText({ children, className }: { children: React.ReactNode; className?: string }) {
-  const containerRef = useRef<HTMLSpanElement>(null);
-  const innerRef = useRef<HTMLSpanElement>(null);
-  const [overflow, setOverflow] = useState(false);
-  const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const rafId = useRef(0);
 
-  /* detect overflow on mount & resize */
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const check = () => setOverflow(el.scrollWidth > el.clientWidth);
-    check();
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [children]);
-
-  /* JS-driven animation: slide inner span from 0 to -(scrollWidth - clientWidth) */
-  const startAnimation = useCallback(() => {
-    const container = containerRef.current;
-    const inner = innerRef.current;
-    if (!container || !inner) return;
-
-    const offset = inner.scrollWidth - container.clientWidth;
-    if (offset <= 0) return;
-
-    const HOLD_MS = 600;
-    const SLIDE_MS = 2500;
-    const total = HOLD_MS + SLIDE_MS + HOLD_MS;
-    const startTime = performance.now();
-
-    const tick = (now: number) => {
-      const elapsed = now - startTime;
-      if (elapsed >= total) {
-        inner.style.transform = 'translateX(0)';
-        return;
-      }
-      let x = 0;
-      if (elapsed > HOLD_MS && elapsed <= HOLD_MS + SLIDE_MS) {
-        const t = (elapsed - HOLD_MS) / SLIDE_MS;
-        x = -offset * t;
-      } else if (elapsed > HOLD_MS + SLIDE_MS) {
-        x = -offset;
-      }
-      inner.style.transform = `translateX(${x}px)`;
-      rafId.current = requestAnimationFrame(tick);
-    };
-
-    rafId.current = requestAnimationFrame(tick);
-  }, []);
-
-  const stopAnimation = useCallback(() => {
-    clearTimeout(hoverTimer.current);
-    cancelAnimationFrame(rafId.current);
-    if (innerRef.current) innerRef.current.style.transform = 'translateX(0)';
-  }, []);
-
-  /* cleanup on unmount */
-  useEffect(() => () => { clearTimeout(hoverTimer.current); cancelAnimationFrame(rafId.current); }, []);
-
-  if (!overflow) {
-    return (
-      <span ref={containerRef} className={className} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', width: '100%' }}>
-        {children}
-      </span>
-    );
-  }
-
-  return (
-    <span
-      ref={containerRef}
-      className={className}
-      onMouseEnter={() => { hoverTimer.current = setTimeout(startAnimation, 250); }}
-      onMouseLeave={stopAnimation}
-      style={{ display: 'block', width: '100%', overflow: 'hidden', whiteSpace: 'nowrap' }}
-    >
-      <span ref={innerRef} style={{ display: 'inline-block', transition: 'transform 0.05s linear' }}>
-        {children}
-      </span>
-    </span>
-  );
-}
 
 interface SessionListProps {
   sessions: SessionInfo[];
@@ -217,6 +136,8 @@ export default function SessionList({
     getSessionSetting("showAgentIconInSessionBadge") !== false;
   const listContainerRef = useRef<HTMLDivElement>(null);
   const [columnCount, setColumnCount] = useState(1);
+  const [hoveredCard, setHoveredCard] = useState<{ session: SessionInfo; rect: DOMRect } | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [tagPickerSessionId, setTagPickerSessionId] = useState<string | null>(
     null,
   );
@@ -313,6 +234,19 @@ export default function SessionList({
   useEffect(() => {
     selectedSessionsRef.current = selectedSessions;
   }, [selectedSessions]);
+
+  /* dismiss hover overlay on scroll/resize */
+  useEffect(() => {
+    if (!hoveredCard) return;
+    const dismiss = () => { clearTimeout(hoverTimerRef.current); setHoveredCard(null); };
+    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("resize", dismiss);
+    return () => {
+      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("resize", dismiss);
+    };
+  }, [hoveredCard]);
+
   const allSessionsSelected =
     sessions.length > 0 && selectedSessionIds.size === sessions.length;
   const handleExitSelectionMode = useCallback(() => {
@@ -700,7 +634,9 @@ export default function SessionList({
     }
   }, [hasMore, loadingMore, onLoadMore, totalRows, virtualRows]);
 
-  if (loading) {
+  const showDelayedLoading = useDelayedLoading(loading);
+
+  if (showDelayedLoading) {
     return <SessionListSkeleton showDirectory={showDirectory} />;
   }
 
@@ -882,6 +818,17 @@ export default function SessionList({
                               : "border-transparent hover:bg-surface/60"
                         }`}
                         style={{ contain: "layout paint" }}
+                        onMouseEnter={(e) => {
+                          const card = e.currentTarget;
+                          const rect = card.getBoundingClientRect();
+                          hoverTimerRef.current = setTimeout(() => {
+                            setHoveredCard({ session, rect });
+                          }, 250);
+                        }}
+                        onMouseLeave={() => {
+                          clearTimeout(hoverTimerRef.current);
+                          setHoveredCard(null);
+                        }}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -924,12 +871,10 @@ export default function SessionList({
                                       <Zap className="h-3 w-3 text-green-500 fill-current" />
                                     </div>
                                   )}
-                                  <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-tight flex-1 min-w-0" style={{ overflow: 'hidden' }}>
-                                    <MarqueeText className="leading-tight">
-                                      {session.name ||
-                                        session.first_message ||
-                                        t("session.list.untitled")}
-                                    </MarqueeText>
+                                  <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0">
+                                    {session.name ||
+                                      session.first_message ||
+                                      t("session.list.untitled")}
                                   </h3>
                                 </div>
                                 {isSelectionMode && isSelectionMarked && (
@@ -1275,6 +1220,37 @@ export default function SessionList({
           initialClickPoint={previewClickPoint}
           animationMode="origin-point"
         />
+      )}
+
+      {/* ── Hover title overlay ── */}
+      {hoveredCard && createPortal(
+        <div
+          onMouseEnter={() => clearTimeout(hoverTimerRef.current)}
+          onMouseLeave={() => { clearTimeout(hoverTimerRef.current); setHoveredCard(null); }}
+          style={{
+            position: "fixed",
+            top: hoveredCard.rect.top,
+            left: hoveredCard.rect.left,
+            width: hoveredCard.rect.width,
+            padding: "6px 12px",
+            zIndex: 50,
+            pointerEvents: "auto",
+            borderRadius: "0.5rem",
+            background: "var(--surface, hsl(0 0% 100%))",
+            border: "1px solid var(--border, hsl(0 0% 90%))",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)",
+            transform: "scale(1.02)",
+            transformOrigin: "top left",
+            transition: "transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 180ms ease",
+          }}
+        >
+          <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-snug" style={{ whiteSpace: "normal", wordBreak: "break-word" }}>
+            {hoveredCard.session.name ||
+              hoveredCard.session.first_message ||
+              t("session.list.untitled")}
+          </h3>
+        </div>,
+        document.body,
       )}
 
     </div>
