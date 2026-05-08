@@ -205,25 +205,6 @@ export function buildPreviewLines(
       } catch {
         contentContainer.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
       }
-      // ── User message: Box with background (like UserMessageComponent) ──
-      try {
-        const bgFn = (text: string): string => {
-          // Theme bg with ANSI fallback — bg token may be missing in extension context
-          const styled = theme.bg ? theme.bg("userMessageBg", text) : "";
-          if (styled && styled !== text) return styled;
-          return "[48;2;55;60;72m" + text + "[0m";
-        };
-        const colorFn = (text: string): string => {
-          const styled = theme.fg ? theme.fg("userMessageText", text) : "";
-          if (styled && styled !== text) return styled;
-          return "[38;2;180;195;220m" + text + "[0m";
-        };
-        const box = new Box(1, 1, bgFn);
-        box.addChild(new Markdown(msg.content.trim(), 0, 0, mdTheme, { color: colorFn }));
-        contentContainer.addChild(box);
-      } catch {
-        contentContainer.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
-      }
     } else {
       // ── Assistant message: Markdown (same as AssistantMessageComponent) ──
       contentContainer.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
