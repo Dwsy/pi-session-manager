@@ -96,7 +96,7 @@ pub fn canonical_to_session_entries(canonical: &CanonicalSession) -> Vec<Session
             (None, None, None)
         };
 
-        entries.push(SessionEntry { entry_type: "message".to_string(), id: id.clone(), parent_id: previous_id.clone(), timestamp, message: Some(Message { role, content, model, provider, usage }), target_id: None, label: None, provider: None, model_id: None });
+        entries.push(SessionEntry { entry_type: "message".to_string(), id: id.clone(), parent_id: previous_id.clone(), timestamp, message: Some(Message { role, content, model, provider, usage }), target_id: None, label: None, name: None, provider: None, model_id: None });
         previous_id = Some(id);
     }
 

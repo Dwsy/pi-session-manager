@@ -426,7 +426,18 @@ fn parse_session_entry(line: &str) -> Option<SessionEntry> {
 
     let message = value.get("message").and_then(|m| serde_json::from_value(m.clone()).ok());
 
-    Some(SessionEntry { entry_type, id, parent_id, timestamp, message, target_id: value.get("targetId").and_then(|field| field.as_str()).map(|field| field.to_string()), label: value.get("label").and_then(|field| field.as_str()).map(|field| field.to_string()), provider: None, model_id: None })
+    Some(SessionEntry {
+        entry_type,
+        id,
+        parent_id,
+        timestamp,
+        message,
+        target_id: value.get("targetId").and_then(|field| field.as_str()).map(|field| field.to_string()),
+        label: value.get("label").and_then(|field| field.as_str()).map(|field| field.to_string()),
+        name: value.get("name").and_then(|field| field.as_str()).map(|field| field.to_string()),
+        provider: None,
+        model_id: None,
+    })
 }
 
 pub(super) async fn get_session_entries_impl(path: String) -> Result<Vec<SessionEntry>, String> {
@@ -490,11 +501,11 @@ pub(super) async fn get_session_preview_entries_impl(session_path: String) -> Re
                     let model_id = val.get("modelId").and_then(|v| v.as_str()).unwrap_or("").to_string();
                     let session_id = val.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
-                    all_entries.push(SessionEntry { entry_type: "session".to_string(), id: session_id.clone(), parent_id: None, timestamp, message: None, target_id: None, label: None, provider: Some(provider.clone()), model_id: Some(model_id.clone()) });
+                    all_entries.push(SessionEntry { entry_type: "session".to_string(), id: session_id.clone(), parent_id: None, timestamp, message: None, target_id: None, label: None, name: None, provider: Some(provider.clone()), model_id: Some(model_id.clone()) });
 
                     // Also emit a model_change entry so computeStats picks up the model
                     if !provider.is_empty() || !model_id.is_empty() {
-                        all_entries.push(SessionEntry { entry_type: "model_change".to_string(), id: format!("{}-model", session_id.clone()), parent_id: None, timestamp, message: None, target_id: None, label: None, provider: Some(provider), model_id: Some(model_id) });
+                        all_entries.push(SessionEntry { entry_type: "model_change".to_string(), id: format!("{}-model", session_id.clone()), parent_id: None, timestamp, message: None, target_id: None, label: None, name: None, provider: Some(provider), model_id: Some(model_id) });
                     }
                 }
             }
@@ -520,7 +531,7 @@ pub(super) async fn get_session_preview_entries_impl(session_path: String) -> Re
                 continue;
             }
 
-            all_entries.push(SessionEntry { entry_type: "message".to_string(), id: entry_id, parent_id: None, timestamp, message: Some(crate::types::Message { role, content, model: None, provider: None, usage: None }), target_id: None, label: None, provider: None, model_id: None });
+            all_entries.push(SessionEntry { entry_type: "message".to_string(), id: entry_id, parent_id: None, timestamp, message: Some(crate::types::Message { role, content, model: None, provider: None, usage: None }), target_id: None, label: None, name: None, provider: None, model_id: None });
         }
         Ok(all_entries)
     })

@@ -42,6 +42,8 @@ pub struct SessionEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
     #[serde(rename = "modelId", skip_serializing_if = "Option::is_none")]
     pub model_id: Option<String>,

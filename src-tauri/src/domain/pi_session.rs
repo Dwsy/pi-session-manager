@@ -48,10 +48,12 @@ impl RawPiEntry {
 
     fn to_session_entry(&self) -> SessionEntry {
         match self {
-            Self::Message { base, message } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: Some(message.clone()), target_id: None, label: None, provider: None, model_id: None },
-            Self::Label { base, target_id, label } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: None, target_id: Some(target_id.clone()), label: label.clone(), provider: None, model_id: None },
-            Self::SessionInfo { base, name } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: None, target_id: None, label: name.clone(), provider: None, model_id: None },
-            Self::Other { base } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: None, target_id: None, label: None, provider: None, model_id: None },
+            Self::Message { base, message } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: Some(message.clone()), target_id: None, label: None, name: None, provider: None, model_id: None },
+            Self::Label { base, target_id, label } => {
+                SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: None, target_id: Some(target_id.clone()), label: label.clone(), name: None, provider: None, model_id: None }
+            }
+            Self::SessionInfo { base, name } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: None, target_id: None, label: None, name: name.clone(), provider: None, model_id: None },
+            Self::Other { base } => SessionEntry { entry_type: base.entry_type.clone(), id: base.id.clone(), parent_id: base.parent_id.clone(), timestamp: base.timestamp, message: None, target_id: None, label: None, name: None, provider: None, model_id: None },
         }
     }
 }

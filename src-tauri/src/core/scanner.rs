@@ -746,7 +746,7 @@ fn incremental_update_session_info(old: &SessionInfo, new_entries: &[SessionEntr
                 }
             }
         } else if entry.entry_type == "session_info" {
-            if let Some(ref name) = entry.label {
+            if let Some(ref name) = entry.name {
                 info.name = Some(name.clone());
             }
         }
