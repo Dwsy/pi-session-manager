@@ -880,6 +880,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             // For full-parse fallback: sync message entries now.
             if !is_incremental && !entries.is_empty() {
                 let _ = sqlite::sync_message_entries(&conn, &session_path_str, &entries);
+                let _ = sqlite::update_labels_for_entries(&conn, &session_path_str, &entries);
             }
 
             // Collect for batch DB commit (avoids per-file transaction overhead)
