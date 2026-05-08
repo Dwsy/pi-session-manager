@@ -169,7 +169,7 @@ export function buildPreviewLines(
       }
     } else if (msg.role === "user") {
       // ── User message: Box + Markdown (same as UserMessageComponent) ──
-      const box = new Box(1, 1, (text: string) => theme.bg("userMessageBg", text));
+      const box = new Box(1, 1, (text: string) => theme.bg("subtle", text));
       box.addChild(new Markdown(msg.content.trim(), 0, 0, mdTheme, {
         color: (text: string) => theme.fg("userMessageText", text),
       }));
