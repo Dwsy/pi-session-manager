@@ -93,15 +93,18 @@ export function buildPreviewLines(
   // Helper: border line
   const border = (): string => theme.fg("border", "\u2500".repeat(W));
 
-  // Build component tree
-  const root = new Container();
-
-  // ── Header ──
-  root.addChild(new Text(border(), 0, 0));
+  // ── Fixed header (never scrolls) ──
+  const headerContainer = new Container();
+  headerContainer.addChild(new Text(border(), 0, 0));
   const shortPath = sessionPath.split("/").pop() || sessionPath;
-  root.addChild(new Text(theme.fg("accent", `Preview: ${shortPath} \u00b7 ${messages.length} turns`), 1, 0));
-  root.addChild(new Text(theme.fg("muted", "\u2191\u2193 scroll \u00b7 ctrl+o tools \u00b7 \u2190 back \u00b7 \u23ce resume"), 1, 0));
-  root.addChild(new Text(border(), 0, 0));
+  headerContainer.addChild(new Text(theme.fg("accent", `Preview: ${shortPath} \u00b7 ${messages.length} turns`), 1, 0));
+  headerContainer.addChild(new Text(theme.fg("muted", "\u2191\u2193 scroll \u00b7 ctrl+o tools \u00b7 \u2190 back \u00b7 \u23ce resume"), 1, 0));
+  headerContainer.addChild(new Text(border(), 0, 0));
+  const headerLines = headerContainer.render(W);
+  const headerHeight = headerLines.length;
+
+  // ── Scrollable content ──
+  const contentContainer = new Container();
 
   // ── Messages ──
   for (const msg of messages) {
@@ -147,7 +150,7 @@ export function buildPreviewLines(
     }
 
     // Gap
-    root.addChild(new Spacer(1));
+    contentContainer.addChild(new Spacer(1));
 
     if (isTool && toolNames.length > 0) {
       // ── Tool call ──
@@ -156,18 +159,18 @@ export function buildPreviewLines(
         : `${toolNames.length} calls: ${toolNames.slice(0, 4).join(", ")}${toolNames.length > 4 ? "..." : ""}`;
       const content = toolOutput || toolInput;
 
-      root.addChild(new Text(theme.fg("border", "\u2500".repeat(Math.min(40, W))), 0, 0));
+      contentContainer.addChild(new Text(theme.fg("border", "\u2500".repeat(Math.min(40, W))), 0, 0));
 
       if (toolExpanded) {
-        root.addChild(new Text(
+        contentContainer.addChild(new Text(
           (theme.fg("warning", "\u25b6 ") || "\u25b6 ") + (theme.fg("accent", theme.bold(summary)) || summary) + (theme.fg("muted", " (ctrl+o collapse)") || " (ctrl+o collapse)"),
           1, 0,
         ));
         if (content) {
-          root.addChild(new Markdown(content, 1, 0, mdTheme));
+          contentContainer.addChild(new Markdown(content, 1, 0, mdTheme));
         }
       } else {
-        root.addChild(new Text(
+        contentContainer.addChild(new Text(
           (theme.fg("muted", "\u25b8 ") || "\u25b8 ") + (theme.fg("accent", summary) || summary) + (theme.fg("muted", " (ctrl+o expand)") || " (ctrl+o expand)"),
           1, 0,
         ));
@@ -176,10 +179,10 @@ export function buildPreviewLines(
           const preview = lines.slice(0, TOOL_PREVIEW_LINES);
           for (const pl of preview) {
             const truncated = pl.length > W - 6 ? pl.slice(0, W - 9) + "..." : pl;
-            root.addChild(new Text(theme.fg("muted", truncated), 2, 0));
+            contentContainer.addChild(new Text(theme.fg("muted", truncated), 2, 0));
           }
           if (lines.length > TOOL_PREVIEW_LINES) {
-            root.addChild(new Text(theme.fg("muted", `... ${lines.length - TOOL_PREVIEW_LINES} more lines`), 2, 0));
+            contentContainer.addChild(new Text(theme.fg("muted", `... ${lines.length - TOOL_PREVIEW_LINES} more lines`), 2, 0));
           }
         }
       }
@@ -192,25 +195,26 @@ export function buildPreviewLines(
         box.addChild(new Markdown(msg.content.trim(), 0, 0, mdTheme, {
           color: (text: string) => { try { return theme.fg("userMessageText", text); } catch { return text; } },
         }));
-        root.addChild(box);
+        contentContainer.addChild(box);
       } catch {
         // Fallback: plain text
-        root.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
+        contentContainer.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
       }
     } else {
       // ── Assistant message: Markdown (same as AssistantMessageComponent) ──
-      root.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
+      contentContainer.addChild(new Markdown(msg.content.trim(), 1, 0, mdTheme));
     }
   }
 
-  // ── Render and scroll ──
-  const allLines = root.render(W);
-  const totalLines = allLines.length;
-  const maxVisible = getMaxVisible();
+  // ── Render and scroll (content only, header is fixed) ──
+  const contentLines = contentContainer.render(W);
+  const totalLines = contentLines.length;
+  const maxVisible = getMaxVisible() - headerHeight;
   const start = Math.min(scrollOffset, Math.max(0, totalLines - maxVisible));
   const end = Math.min(start + maxVisible, totalLines);
+  const scrolledLines = contentLines.slice(start, end);
 
-  return { lines: allLines.slice(start, end), totalLines };
+  return { lines: [...headerLines, ...scrolledLines], totalLines };
 }
 
 // ── Detail pane (appended to SessionList) ────────────────────────────
