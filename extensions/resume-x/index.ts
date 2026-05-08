@@ -19,7 +19,7 @@ import { matchesKey, getKeybindings } from "@mariozechner/pi-tui";
 
 // ── Module imports ───────────────────────────────────────────────────
 import { loadSessionsFromSqlite, loadSessionMessages } from "./lib/db.js";
-import { searchSessions, buildSearchLines } from "./lib/search.js";
+import { searchSessions, buildSearchLines, buildSearchDetailLines } from "./lib/search.js";
 import { patchSessionListRender, buildPreviewLines } from "./lib/render.js";
 import { clampScroll, getTermHeight, getMaxVisible } from "./lib/utils.js";
 import type { SessionMessage, SearchResult } from "./lib/types.js";
@@ -119,6 +119,7 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
         let previewScrollOffset = 0;
         let previewTotalLines = 0;
         let previewSessionPath = "";
+        let toolExpanded = false;
 
         // Search mode state
         let searchQuery = "";
@@ -129,11 +130,22 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
         const searchCwd = process.cwd();
         let escBuffer = "";
         let escTimer: ReturnType<typeof setTimeout> | null = null;
+        let searchSelectedSession: { sessionId?: string; sessionPath?: string; created?: string; modified?: string; messageCount?: number; lastMessage?: string; lastMessageRole?: string } | null = null;
 
         return {
           render(width: number) {
             if (mode === "search") {
-              return buildSearchLines(width, searchQuery, searchResults, searchSelectedIdx, searchScrollOffset, searchCwdOnly, searchCwd);
+              const baseLines = buildSearchLines(width, searchQuery, searchResults, searchSelectedIdx, searchScrollOffset, searchCwdOnly, searchCwd);
+              // Append detail pane for selected search result
+              if (searchResults.length > 0 && searchSelectedIdx < searchResults.length) {
+                const sel = searchResults[searchSelectedIdx];
+                if (sel?.sessionPath) {
+                  const detailData = searchSelectedSession?.sessionPath === sel.sessionPath ? searchSelectedSession : null;
+                  const detailLines = buildSearchDetailLines(sel.sessionPath, width, detailData || { sessionId: sel.sessionId, modified: sel.modified, messageCount: sel.messageCount, lastMessage: "", lastMessageRole: "" });
+                  return [...baseLines, ...detailLines];
+                }
+              }
+              return baseLines;
             }
 
             let baseLines: string[];
@@ -146,7 +158,7 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
               return baseLines;
             }
             try {
-              const result = buildPreviewLines(width, previewMessages, previewScrollOffset, previewSessionPath);
+              const result = buildPreviewLines(width, previewMessages, previewScrollOffset, previewSessionPath, toolExpanded);
               previewTotalLines = result.totalLines;
               return [...baseLines, ...result.lines];
             } catch (e) {
@@ -171,6 +183,7 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                 searchSelectedIdx = 0;
                 searchScrollOffset = 0;
                 searchCwdOnly = true;
+                searchSelectedSession = null;
                 tui.requestRender();
                 return;
               }
@@ -189,6 +202,7 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                         previewSessionPath = session.path;
                         previewScrollOffset = 0;
                         previewTotalLines = 0;
+                        toolExpanded = false;
                         mode = "preview";
                         tui.requestRender();
                         return;
@@ -215,6 +229,7 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                 if (isLeft || isCancel || isInterrupt) {
                   mode = "list";
                   previewMessages = [];
+                  toolExpanded = false;
                   tui.requestRender();
                   return;
                 }
@@ -227,6 +242,16 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                     sessionManager.setSessionFile(previewSessionPath);
                   }
                   done(previewSessionPath);
+                  return;
+                }
+
+                // ctrl+o — toggle tool expand/collapse
+                const kb2 = getKeybindings();
+                const isToggleExpand = kb2.matches(data, "app.tools.expand") || data === "\x0f";
+                if (isToggleExpand) {
+                  toolExpanded = !toolExpanded;
+                  previewScrollOffset = 0;
+                  tui.requestRender();
                   return;
                 }
 
@@ -264,6 +289,7 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                 mode = "list";
                 searchQuery = "";
                 searchResults = [];
+                searchSelectedSession = null;
                 if (escTimer) { clearTimeout(escTimer); escTimer = null; }
                 escBuffer = "";
                 tui.requestRender();
@@ -277,6 +303,13 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                 searchResults = searchSessions(searchQuery, searchCwdOnly ? searchCwd : undefined);
                 searchSelectedIdx = 0;
                 searchScrollOffset = 0;
+                // Load first result detail
+                if (searchResults.length > 0) {
+                  const sel = searchResults[0];
+                  searchSelectedSession = { sessionId: sel.sessionId, sessionPath: sel.sessionPath, modified: sel.modified, messageCount: sel.messageCount, lastMessage: "", lastMessageRole: "" };
+                } else {
+                  searchSelectedSession = null;
+                }
                 tui.requestRender();
                 return;
               }
@@ -299,6 +332,27 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                 return;
               }
 
+              // → — preview selected search result
+              const isRight = kb.matches(data, "tui.editor.cursorRight") || keybindings.matches(data, "tui.editor.cursorRight");
+              if (isRight && maxResults > 0) {
+                const selected = searchResults[searchSelectedIdx];
+                if (selected?.sessionPath) {
+                  try {
+                    const msgs = loadSessionMessages(selected.sessionPath);
+                    if (msgs.length > 0) {
+                      previewMessages = msgs;
+                      previewSessionPath = selected.sessionPath;
+                      previewScrollOffset = 0;
+                      previewTotalLines = 0;
+                      toolExpanded = false;
+                      mode = "preview";
+                      tui.requestRender();
+                      return;
+                    }
+                  } catch { /* silent */ }
+                }
+              }
+
               // Arrow navigation
               const isUp = kb.matches(data, "tui.select.up") || keybindings.matches(data, "tui.select.up") || data === "k";
               const isDown = kb.matches(data, "tui.select.down") || keybindings.matches(data, "tui.select.down") || data === "j";
@@ -306,6 +360,11 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
               if (isUp && maxResults > 0) {
                 searchSelectedIdx = Math.max(0, searchSelectedIdx - 1);
                 if (searchSelectedIdx < searchScrollOffset) searchScrollOffset = searchSelectedIdx;
+                // Load detail for newly selected
+                const sel = searchResults[searchSelectedIdx];
+                if (sel?.sessionPath) {
+                  searchSelectedSession = { sessionId: sel.sessionId, sessionPath: sel.sessionPath, modified: sel.modified, messageCount: sel.messageCount, lastMessage: "", lastMessageRole: "" };
+                }
                 tui.requestRender();
                 return;
               }
@@ -314,6 +373,11 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                 const termHeight = getTermHeight();
                 const mvr = Math.max(2, termHeight - 10);
                 if (searchSelectedIdx >= searchScrollOffset + mvr) searchScrollOffset = searchSelectedIdx - mvr + 1;
+                // Load detail for newly selected
+                const sel = searchResults[searchSelectedIdx];
+                if (sel?.sessionPath) {
+                  searchSelectedSession = { sessionId: sel.sessionId, sessionPath: sel.sessionPath, modified: sel.modified, messageCount: sel.messageCount, lastMessage: "", lastMessageRole: "" };
+                }
                 tui.requestRender();
                 return;
               }
@@ -354,6 +418,8 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                 if (seq === "1b5b41" || seq === "1b4f41") {
                   searchSelectedIdx = Math.max(0, searchSelectedIdx - 1);
                   if (searchSelectedIdx < searchScrollOffset) searchScrollOffset = searchSelectedIdx;
+                  const sel = searchResults[searchSelectedIdx];
+                  if (sel?.sessionPath) searchSelectedSession = { sessionId: sel.sessionId, sessionPath: sel.sessionPath, modified: sel.modified, messageCount: sel.messageCount, lastMessage: "", lastMessageRole: "" };
                   escBuffer = "";
                   tui.requestRender();
                   return;
@@ -363,6 +429,8 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                   const termHeight = getTermHeight();
                   const mvr = Math.max(2, termHeight - 10);
                   if (searchSelectedIdx >= searchScrollOffset + mvr) searchScrollOffset = searchSelectedIdx - mvr + 1;
+                  const sel = searchResults[searchSelectedIdx];
+                  if (sel?.sessionPath) searchSelectedSession = { sessionId: sel.sessionId, sessionPath: sel.sessionPath, modified: sel.modified, messageCount: sel.messageCount, lastMessage: "", lastMessageRole: "" };
                   escBuffer = "";
                   tui.requestRender();
                   return;
@@ -379,6 +447,13 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
               searchResults = searchSessions(searchQuery, searchCwdOnly ? searchCwd : undefined);
               searchSelectedIdx = 0;
               searchScrollOffset = 0;
+              // Load first result detail
+              if (searchResults.length > 0) {
+                const sel = searchResults[0];
+                searchSelectedSession = { sessionId: sel.sessionId, sessionPath: sel.sessionPath, modified: sel.modified, messageCount: sel.messageCount, lastMessage: "", lastMessageRole: "" };
+              } else {
+                searchSelectedSession = null;
+              }
               tui.requestRender();
               return;
             }

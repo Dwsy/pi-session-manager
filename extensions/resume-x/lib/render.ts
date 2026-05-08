@@ -6,6 +6,7 @@
 
 import { visibleWidth } from "@mariozechner/pi-tui";
 import type { SessionMessage } from "./types.js";
+import { TOOL_PREVIEW_LINES } from "./types.js";
 import { loadSessionDetail } from "./db.js";
 import { getSessionKanbanTags, mapTagColorToTheme } from "./search.js";
 import { fmtTokens, fmtCost, shortModel, fmtTime, wrapText, safeLine, getTheme, getTermHeight, getMaxVisible } from "./utils.js";
@@ -56,39 +57,49 @@ export function buildPreviewLines(
   messages: SessionMessage[],
   scrollOffset: number,
   sessionPath: string,
+  toolExpanded = false,
 ): { lines: string[]; totalLines: number } {
   const theme = getTheme();
   if (!theme) return { lines: [], totalLines: 0 };
 
   const allLines: string[] = [];
-  const sep = "─".repeat(Math.max(10, width));
+  const sep = "\u2500".repeat(Math.max(10, width));
+  const innerW = Math.max(10, width - 4);
 
   // Header
   allLines.push(theme.fg("border", sep));
   const shortPath = sessionPath.split("/").pop() || sessionPath;
-  const titleText = `Preview: ${shortPath} · ${messages.length} turns`;
+  const titleText = `Preview: ${shortPath} \u00b7 ${messages.length} turns`;
   const title = titleText.length > width ? titleText.slice(0, width) : titleText;
   allLines.push(theme.fg("accent", title));
-  const hintText = "↑↓ scroll · ⇧↑↓ page · ← back · ⏎ resume";
+  const hintText = "\u2191\u2193 scroll \u00b7 ctrl+o expand/collapse tools \u00b7 \u2190 back \u00b7 \u23b5 resume";
   const hintPadding = Math.max(0, width - hintText.length);
   allLines.push(theme.fg("muted", hintText) + " ".repeat(hintPadding));
   allLines.push(theme.fg("border", sep));
 
-  // Messages (skip empty content, compact tool calls)
+  // Messages
   for (const msg of messages) {
     if (!msg.content || msg.content.trim().length === 0) continue;
 
     const isTool = msg.sourceType === "tool_use" || msg.sourceType === "tool_result";
 
-    // Try to parse tool call JSON for compact display
+    // Try to parse tool call JSON
     let toolNames: string[] = [];
+    let toolContent = "";
     if (isTool) {
       try {
         const parsed = JSON.parse(msg.content);
         if (Array.isArray(parsed)) {
           toolNames = parsed.map((t: any) => t.name || t.tool_name || "tool").filter(Boolean);
+          toolContent = parsed.map((t: any) => {
+            if (t.input) return typeof t.input === "string" ? t.input : JSON.stringify(t.input, null, 2);
+            if (t.content) return typeof t.content === "string" ? t.content : JSON.stringify(t.content, null, 2);
+            return "";
+          }).filter(Boolean).join("\n");
         } else if (parsed.name || parsed.tool_name) {
           toolNames = [parsed.name || parsed.tool_name];
+          toolContent = parsed.input ? (typeof parsed.input === "string" ? parsed.input : JSON.stringify(parsed.input, null, 2)) : "";
+          if (!toolContent && parsed.content) toolContent = typeof parsed.content === "string" ? parsed.content : JSON.stringify(parsed.content, null, 2);
         }
       } catch { /* not JSON, show as text */ }
     }
@@ -100,22 +111,54 @@ export function buildPreviewLines(
     const roleLabel = msg.role === "user" ? "User" : isTool ? "Tool" : "Agent";
     const roleColor = msg.role === "user" ? "accent" : isTool ? "warning" : "success";
     const timeStr = fmtTime(msg.timestamp);
-    const header = `${roleLabel} · ${timeStr}`;
+    const header = `  ${roleLabel} \u00b7 ${timeStr}`;
     allLines.push(theme.fg(roleColor, header));
 
-    // Thin separator
-    allLines.push(theme.fg("border", "─".repeat(Math.min(40, width))));
-
-    // Content
-    const contentWidth = Math.max(10, width - 4);
-
     if (isTool && toolNames.length > 0) {
+      // Tool call with fold/expand
+      const toolSep = "\u2500".repeat(Math.min(40, width - 2));
+      allLines.push(theme.fg("border", `  ${toolSep}`));
+
       const summary = toolNames.length === 1
         ? toolNames[0]
         : `${toolNames.length} calls: ${toolNames.slice(0, 4).join(", ")}${toolNames.length > 4 ? "..." : ""}`;
-      allLines.push(safeLine(`    ${theme.fg("muted", summary)}`, width));
+
+      if (toolExpanded) {
+        // Expanded: show name + full content with box border
+        allLines.push(safeLine(`  ${theme.fg("warning", "\u25b6 ")}${theme.fg("accent", summary)} ${theme.fg("muted", "(ctrl+o collapse)")}`, width));
+        if (toolContent) {
+          const boxTop = "  \u250c" + "\u2500".repeat(innerW - 1);
+          allLines.push(theme.fg("border", boxTop));
+          const contentLines = toolContent.split("\n");
+          for (const cl of contentLines) {
+            const wrapped = wrapText(cl, innerW - 3);
+            for (const wcl of wrapped) {
+              allLines.push(safeLine(theme.fg("border", "\u2502 ") + theme.fg("muted", wcl), width));
+            }
+          }
+          const boxBot = "  \u2514" + "\u2500".repeat(innerW - 1);
+          allLines.push(theme.fg("border", boxBot));
+        }
+      } else {
+        // Collapsed: show name + preview lines + expand hint
+        allLines.push(safeLine(`  ${theme.fg("muted", "\u25b8 ")}${theme.fg("accent", summary)} ${theme.fg("muted", "(ctrl+o expand)")}`, width));
+        if (toolContent) {
+          const previewLines = toolContent.split("\n").slice(0, TOOL_PREVIEW_LINES);
+          for (const pl of previewLines) {
+            const truncated = pl.length > innerW - 4 ? pl.slice(0, innerW - 7) + "..." : pl;
+            allLines.push(safeLine(`    ${theme.fg("muted", truncated)}`, width));
+          }
+          const totalContentLines = toolContent.split("\n").length;
+          if (totalContentLines > TOOL_PREVIEW_LINES) {
+            allLines.push(safeLine(`    ${theme.fg("muted", `... ${totalContentLines - TOOL_PREVIEW_LINES} more lines`)}`, width));
+          }
+        }
+      }
     } else {
-      const wrapped = wrapText(msg.content, contentWidth);
+      // Non-tool message: normal display
+      const msgSep = "\u2500".repeat(Math.min(40, width - 2));
+      allLines.push(theme.fg("border", `  ${msgSep}`));
+      const wrapped = wrapText(msg.content, innerW);
       for (const chunk of wrapped) {
         allLines.push(safeLine(`    ${chunk}`, width));
       }
@@ -123,7 +166,6 @@ export function buildPreviewLines(
   }
 
   const totalLines = allLines.length;
-  const termHeight = getTermHeight();
   const maxVisible = getMaxVisible();
 
   const start = Math.min(scrollOffset, Math.max(0, totalLines - maxVisible));

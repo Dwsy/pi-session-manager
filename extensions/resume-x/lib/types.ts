@@ -75,3 +75,7 @@ export const SCROLL = {
   HALF_PAGE: 9,
   PAGE: 18,
 } as const;
+
+// ── Tool fold state ──────────────────────────────────────────────────
+
+export const TOOL_PREVIEW_LINES = 3;  // lines shown when collapsed

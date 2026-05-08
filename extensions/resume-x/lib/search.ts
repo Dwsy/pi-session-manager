@@ -10,8 +10,8 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { visibleWidth } from "@mariozechner/pi-tui";
 import type { KanbanTag, SessionTagMark, SearchResult } from "./types.js";
-import { _crash, getDb } from "./db.js";
-import { fmtTime, getTheme } from "./utils.js";
+import { _crash, getDb, loadSessionDetail } from "./db.js";
+import { fmtTime, fmtTokens, fmtCost, shortModel, wrapText, getTheme } from "./utils.js";
 
 // Re-export types for convenience
 export type { KanbanTag, SessionTagMark, SearchResult } from "./types.js";
@@ -306,7 +306,84 @@ export function buildSearchLines(
   }
 
   lines.push("");
-  lines.push(theme.fg("muted", "  ↑↓ navigate · ⏎ open · Tab scope · Esc back"));
+  lines.push(theme.fg("muted", "  ↑↓ navigate · ⏎ open · → preview · Tab scope · Esc back"));
+
+  return lines;
+}
+
+// ── Search detail pane (appended below results) ─────────────────────
+
+export function buildSearchDetailLines(
+  sessionPath: string,
+  width: number,
+  sessionData?: { sessionId?: string; created?: string; modified?: string; messageCount?: number; lastMessage?: string; lastMessageRole?: string } | null,
+): string[] {
+  const theme = getTheme();
+  if (!theme) return [];
+
+  const detail = loadSessionDetail(sessionPath);
+  const lines: string[] = [];
+  const sep = "\u2500".repeat(Math.min(50, width - 4));
+  lines.push(theme.fg("border", " " + sep));
+
+  // Time
+  if (sessionData?.created) {
+    lines.push(` ${theme.fg("muted", "Started ")}${theme.fg("accent", fmtTime(sessionData.created))}`);
+  }
+  if (sessionData?.modified) {
+    lines.push(` ${theme.fg("muted", "Updated ")}${theme.fg("accent", fmtTime(sessionData.modified))}`);
+  }
+
+  // Model
+  if (detail && detail.models && detail.models.length > 0) {
+    const modelStr = detail.models.map((m: string) => theme.fg("accent", shortModel(m))).join(theme.fg("muted", " + "));
+    lines.push(` ${theme.fg("muted", "Model ")}${modelStr}`);
+  }
+
+  // Tokens + cost
+  if (detail) {
+    const tp: string[] = [];
+    if (detail.inputTokens > 0) tp.push(`${theme.fg("muted", "in")} ${theme.fg("accent", fmtTokens(detail.inputTokens))}`);
+    if (detail.outputTokens > 0) tp.push(`${theme.fg("muted", "out")} ${theme.fg("accent", fmtTokens(detail.outputTokens))}`);
+    if (detail.cacheReadTokens > 0) tp.push(`${theme.fg("muted", "cache")} ${theme.fg("muted", fmtTokens(detail.cacheReadTokens))}`);
+    if (tp.length > 0) {
+      lines.push(` ${theme.fg("muted", "Tokens ")}${tp.join(theme.fg("muted", " "))}`);
+    }
+    const costColor = detail.totalCost === 0 ? "success" : "muted";
+    lines.push(` ${theme.fg("muted", "Cost ")}${theme.fg(costColor, fmtCost(detail.totalCost))}`);
+  }
+
+  // Message count
+  if (sessionData?.messageCount && sessionData.messageCount > 0) {
+    lines.push(` ${theme.fg("muted", "Messages ")}${theme.fg("accent", String(sessionData.messageCount))}`);
+  }
+
+  // Kanban tags
+  const sessionId = sessionData?.sessionId;
+  if (sessionId) {
+    const kbTags = getSessionKanbanTags(sessionId);
+    if (kbTags.length > 0) {
+      const tagStr = kbTags.map((t: any) => theme.fg(mapTagColorToTheme(t.color), t.name)).join(theme.fg("muted", ", "));
+      lines.push(` ${theme.fg("muted", "Kanban ")}${tagStr}`);
+    }
+  }
+
+  // Last user message
+  const lastMsg = sessionData?.lastMessage?.trim();
+  const lastRole = sessionData?.lastMessageRole?.trim();
+  if (lastMsg && lastRole === "user") {
+    const label = "User ";
+    const prefixLen = 2 + label.length;
+    const contentWidth = Math.max(10, width - prefixLen);
+    const wrapped = wrapText(lastMsg, contentWidth);
+    wrapped.forEach((chunk: string, idx: number) => {
+      if (idx === 0) {
+        lines.push(` ${theme.fg("muted", label)}${theme.fg("accent", chunk)}`);
+      } else {
+        lines.push(` ${" ".repeat(label.length)}${theme.fg("accent", chunk)}`);
+      }
+    });
+  }
 
   return lines;
 }
