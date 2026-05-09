@@ -172,4 +172,4 @@ pi -e extensions/rename-nag/index.ts
 
 所有插件依赖 `better-sqlite3` (^12.9.0)，解析自项目根目录的 `node_modules`。
 
-`@mariozechner/pi-coding-agent` 和 `@mariozechner/pi-tui` 由 pi 运行时注入，无需声明。
+`@earendil-works/pi-coding-agent` 和 `@earendil-works/pi-tui` 由 pi 运行时注入，无需声明。

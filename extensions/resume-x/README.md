@@ -73,18 +73,30 @@ Tables used:
 
 ### ctx.switchSession Staleness
 
-`ctx.switchSession()` internally calls `teardownCurrent()` → `dispose()` → `invalidate()`, which makes the `ctx` object stale. Any subsequent `ctx.xxx()` call will throw.
+`ctx.switchSession()` internally calls `teardownCurrent()` → `dispose()` → `invalidate()`, which makes the `ctx` object stale. Any subsequent `ctx.xxx()` call will throw (including `ctx.ui.notify` in error handlers).
 
-**Solution:** For search/preview modes, call `switchSessionFn` BEFORE `done()` (while ctx is still valid). For the main selector, the switch happens after `done()` resolves (via post-factory path).
+**Solution:** ALL modes (list, preview, search) use `doResume()` — a helper defined inside the `ctx.ui.custom()` factory — which calls `switchSessionFn` BEFORE `done()`. This ensures:
+1. `switchSessionFn` runs while ctx is still valid (assertActive passes)
+2. `done()` runs after switch completes, triggering `restoreEditor()` which re-renders the TUI with the new session
+3. Post-factory code never touches `ctx.ui` (it's stale after the switch)
 
 ### Shortcut vs Command Context
 
 - `registerCommand` handler receives `ExtensionCommandContext` (has `switchSession`)
 - `registerShortcut` handler receives `ExtensionContext` (no `switchSession`)
 
-Alt+X shortcut falls back to `sessionManager.setSessionFile()` which doesn't refresh the UI.
+Alt+X shortcut falls back to `sessionManager.setSessionFile()` which changes the file but may not fully refresh the UI. Use `/resume-x` command for full session switch support.
 
 ## Changelog
+
+### 2026-05-09
+
+- **Bug fix (critical, attempt 2):** `doResume()` now mirrors built-in `showSessionSelector` exactly: `done()` first (synchronous, closes UI), then `switchSessionFn()` as fire-and-forget. Previous attempt had switch BEFORE done, which is wrong — `renderCurrentSessionState()` would fire before editor was restored.
+- **Root cause confirmed:** Built-in pattern is `done() → handleResumeSession()`. The `done()` closure never touches ctx. `handleResumeSession` uses `this` (interactive mode). Only the post-factory code accessing `ctx.ui.notify()` was dangerous.
+
+### 2026-05-09 (attempt 1)
+
+- **Bug fix (attempt 1, reverted):** Moved switchSessionFn BEFORE done() — wrong order, render fires before UI restored
 
 ### 2026-05-08
 

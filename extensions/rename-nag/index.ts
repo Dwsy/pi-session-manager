@@ -14,7 +14,7 @@
  * No external dependencies — uses pi's SessionManager.list() API.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 // ── Helpers ──────────────────────────────────────────
 
