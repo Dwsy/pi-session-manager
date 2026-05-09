@@ -12,9 +12,11 @@ Pi agent 扩展集合，为 `pi` CLI 提供会话管理能力。
 |------|------|------|
 | [pi-session-bridge](./pi-session-bridge/) | 会话同步、搜索、标签、上下文召回 | better-sqlite3 |
 | [resume-x](./resume-x/) | 增强版会话恢复，SQLite 快速路径 | better-sqlite3 |
-| [rename-nag](./rename-nag/) | 智能会话命名提醒 | better-sqlite3 |
+| [rename-nag](./rename-nag/) | 智能会话命名提醒 | — |
 
-三个插件共享同一个 SQLite 数据库 (`~/.pi/agent/sessions/sessions.db`)，各自独立加载，互不干扰。
+bridge 和 resume-x 共享同一个 SQLite 数据库 (`~/.pi/agent/sessions/sessions.db`)，各自独立加载，互不干扰。rename-nag 通过 Pi API 管理会话名称，不直接访问 SQLite。
+
+**包名差异**：bridge 使用旧版 `@mariozechner/pi-coding-agent`，resume-x 和 rename-nag 使用新版 `@earendil-works/pi-coding-agent`。
 
 ---
 
@@ -57,6 +59,8 @@ pi install npm:Dwsy/psm-bridge
 | `session_recall` | 搜索 + 召回上下文 |
 | `session_context` | 获取指定会话的消息 |
 | `session_tag` | 标签管理 (list/set/remove) |
+
+> 注：`session_rename` 工具已迁移至 [rename-nag](#rename-nag)。
 
 ### 命令
 
@@ -126,7 +130,7 @@ pi install npm:Dwsy/psm-bridge
 | 首次 | 工具调用 > 6 + 未命名 | 完整提醒：说明可用工具 + 命名建议 |
 | 后续 | 每 40 次工具调用 (40, 80, 120...) + 已命名 | 提醒检查名称是否仍匹配当前话题，转向则更新 |
 
-**"未命名"判定**：会话名为 NULL 或匹配默认时间戳格式 `YYYY-MM-DDTHH-MM-SS`。
+**"未命名"判定**：会话名为 NULL 或匹配默认时间戳格式 `YYYY-MM-DDTHH:MM:SS` 或 `YYYY-MM-DDTHH-MM-SS`。
 
 ### 工作原理
 
@@ -170,6 +174,6 @@ pi -e extensions/rename-nag/index.ts
 
 ### 依赖
 
-所有插件依赖 `better-sqlite3` (^12.9.0)，解析自项目根目录的 `node_modules`。
-
-`@earendil-works/pi-coding-agent` 和 `@earendil-works/pi-tui` 由 pi 运行时注入，无需声明。
+- **better-sqlite3** (^12.9.0)：bridge 和 resume-x 用于 SQLite 访问，解析自项目根目录的 `node_modules`
+- **@mariozechner/pi-coding-agent**：bridge 使用的旧版 pi 扩展 API
+- **@earendil-works/pi-coding-agent** / **@earendil-works/pi-tui**：resume-x 和 rename-nag 使用的新版 pi 扩展 API，由 pi 运行时注入，无需声明

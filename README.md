@@ -13,9 +13,10 @@
 <p align="center">
   <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">Releases</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/">Documentation</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/cn/">中文文档</a> ·
+  <a href="https://dwsy.github.io/pi-session-manager/cn/">zh</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/demo/">Demo</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/dataset/">Dataset</a>
+  <a href="https://dwsy.github.io/pi-session-manager/dataset/">Dataset</a> ·
+  <a href="#extension-system">Extensions</a>
 </p>
 
 ## UI Preview
@@ -61,23 +62,6 @@ Data <- search (SQLite FTS5 normalized index) sqlite (cache)
 Server (protocol) <- HTTP adapter, WebSocket adapter
 ```
 
-### Tech Stack
-
-| Layer | Tech |
-|-------|------|
-| Frontend | React 18, TypeScript 5, Vite 5, Tailwind CSS, i18next, cmdk, @dnd-kit, @xyflow/react, recharts, @xterm/xterm |
-| Backend | Rust 2021, Tauri 2, Tokio, Axum, rusqlite, SQLite FTS5, notify, portable-pty |
-| Protocol | Tauri IPC · WebSocket (/ws) · HTTP (/api) · SSE (/api/events) |
-
-### Code Scale
-
-| Module | Language | Scale |
-|--------|----------|-------|
-| Frontend Components | TypeScript/React | 155+ components |
-| Frontend Hooks | TypeScript | 40+ hooks |
-| Backend | Rust | ~27K lines |
-
-
 ## Quick Start
 
 ### Prerequisites
@@ -93,18 +77,6 @@ git clone https://github.com/Dwsy/pi-session-manager.git
 cd pi-session-manager
 pnpm install
 ```
-
-### Common Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Frontend dev server |
-| `npm run tauri:dev` | Full desktop dev (frontend + Rust) |
-| `npm run build` | Production frontend build to `dist/` |
-| `npm run build:demo` | Static demo build to `dist-demo/` |
-| `npm run build:dataset` | Static dataset build to `dist-dataset/` |
-| `npm run build:cli` | Build standalone `pi-session-cli` binary |
-| `npm run tauri:build` | Desktop production bundle |
 
 ## Runtime Modes
 
@@ -153,69 +125,50 @@ pnpm install
 
 ## Extension System
 
-### psm-bridge (Pi Plugin)
+Pi extensions live in `extensions/` and follow the [pi-package](https://github.com/mariozechner/pi-coding-agent) spec. Install to `~/.pi/agent/extensions/` for auto-loading.
 
-Bridge Pi agent sessions to PSM with live sync, search, tags, and context recall.
+| Extension | Purpose | Dependency |
+|-----------|---------|------------|
+| [pi-session-bridge](#pi-session-bridge) | Live sync, search, tags, context recall | better-sqlite3 |
+| [resume-x](#resume-x) | Enhanced session resume via SQLite | better-sqlite3 |
+| [rename-nag](#rename-nag) | Smart session naming reminder | — |
+
+bridge and resume-x share `~/.pi/agent/sessions/sessions.db`. rename-nag uses Pi API only.
+
+### pi-session-bridge
+
+Bridge Pi agent sessions to PSM.
 
 **Repository**: [Dwsy/psm-bridge](https://github.com/Dwsy/psm-bridge)
 
-**Install**:
 ```bash
 pi install Dwsy/psm-bridge
 ```
 
-**Features**:
-- Live mode: real-time session sync via WebSocket
-- Search: full-text search across indexed sessions
-- Tags: SQLite-backed session tagging
-- Context: recall and context from past sessions
+| Tool | Description |
+|------|-------------|
+| `session_search` | Full-text search across indexed sessions |
+| `session_recall` | Search + retrieve surrounding dialogue context |
+| `session_context` | Fetch messages from a specific session |
+| `session_tag` | List/set/remove session tags |
 
-**Usage**:
-```bash
-/psm-live on      # Enable live mode
-/session_search   # Search sessions
-/state-set wip    # Set tag
-```
+| Command | Description |
+|---------|-------------|
+| `/psm-live on/off` | Toggle real-time sync |
+| `/psm-connect` / `/psm-disconnect` | Manual connection control |
+| `/state` `/state-set` `/state-list` `/state-clear` | Tag management |
+| `/flow <action>` | Quick transitions (todo → wip → done) |
+| `/open-in-psm` | Open current session in PSM desktop app |
 
-**Local Development**:
-```bash
-# Already included as submodule
-git clone --recurse-submodules https://github.com/Dwsy/pi-session-manager.git
-```
+Status indicators: `[psm]` connected, `[retry N]` reconnecting, `[timeout]` disconnected, `[psm: off]` live mode disabled.
 
-**Update submodule**:
-```bash
-cd extensions/psm-bridge
-git pull  # Update code
-git push  # Push to psm-bridge repo
-cd ../..
-git add extensions/psm-bridge
-git commit -m "Update psm-bridge"
-```
+### resume-x
 
-### Tool Render Plugins
-
-```
-src/plugins/tools-render/
-├── builtins/    # bash, edit, read, write, generic
-└── extensions/  # subagent, ...
-```
-
-### resume-x (Pi Extension)
-
-Fast session resume from Pi's TUI — SQLite-backed, no disk scan.
+Enhanced session resume — SQLite fast path, no disk scan.
 
 **Location**: `extensions/resume-x/`
 
-**Install**: add to `~/.pi/agent/settings.json` → `extensions` array:
-```json
-{
-  "extensions": [
-    "/path/to/pi-session-manager/extensions/resume-x/index.ts"
-  ]
-}
-```
-Or from the project directory:
+Add to `~/.pi/agent/settings.json` → `extensions` array:
 ```json
 {
   "extensions": [
@@ -224,47 +177,62 @@ Or from the project directory:
 }
 ```
 
-**Usage**:
 ```
-/resume-x
+/resume-x    # or press ⌥X
 ```
-or press `⌥X` to toggle open/close.
 
-**Features**:
-- SQLite fast path — reads from `sessions.db`, no filesystem scan
-- CWD filter — shows current project sessions first
-- Detail pane — model, tokens, cost, kanban tags per session
-- Message preview — browse full conversation history before resuming
-- Full-text search (`⌥Q`) — search across session names, messages, and tags
+| Feature | Description |
+|---------|-------------|
+| SQLite fast path | Reads from `sessions.db`, no filesystem scan |
+| CWD filter | Shows current project sessions first |
+| Detail pane | Model, tokens, cost, kanban tags |
+| Message preview | Browse full conversation before resuming |
+| Full-text search | `⌥Q` — search names, messages, tags |
 
 **Keybindings**:
 
-*List mode:*
+| Key | List Mode | Preview Mode | Search Mode |
+|-----|-----------|--------------|-------------|
+| `⌥X` | Toggle open/close | — | — |
+| `⌥Q` | Search | — | — |
+| `→` | Enter preview | — | — |
+| `←` / `Esc` | — | Back to list | Back to list |
+| `↑` / `↓` | Navigate | Scroll 1 line | Navigate |
+| `⇧↑` / `⇧↓` | — | Page up/down | — |
+| `⏎` | Resume | Resume | Open selected |
+| `Tab` | — | — | Toggle CWD/global |
 
-| Key | Action |
-|-----|--------|
-| `⌥X` | Toggle open/close |
-| `⌥Q` | Search (default: CWD, Tab: toggle global) |
-| `→` | Enter preview (browse messages) |
-| `⏎` | Resume session |
+### rename-nag
 
-*Search mode:*
+Smart session naming reminder — nudges agent to name sessions.
 
-| Key | Action |
-|-----|--------|
-| `↑` / `↓` / `j` / `k` | Navigate results |
-| `⏎` | Open selected |
-| `Tab` | Toggle CWD / global scope |
-| `Esc` | Back to list |
+**Location**: `extensions/rename-nag/`
 
-*Preview mode:*
+```json
+{
+  "extensions": [
+    "~/Dev/AI/pi-session-manager/extensions/rename-nag/index.ts"
+  ]
+}
+```
 
-| Key | Action |
-|-----|--------|
-| `↑` / `↓` | Scroll one line |
-| `⇧↑` / `⇧↓` | Page up / down |
-| `⏎` | Resume session |
-| `←` / `Esc` | Back to list |
+| Tool | Description |
+|------|-------------|
+| `session_rename` | Rename the current session |
+
+Triggers:
+- **First**: tool calls > 6 + unnamed → full reminder with naming suggestions
+- **Follow-up**: every 40 tool calls (40, 80, 120...) + named → check if topic shifted
+
+"Unnamed" = NULL or matches `YYYY-MM-DDTHH-MM-SS` timestamp format.
+
+### Tool Render Plugins
+
+```
+src/plugins/tools-render/
+├── builtins/    # bash, edit, read, write, generic
+└── extensions/  # subagent, ...
+```
 
 ### Search Plugins
 

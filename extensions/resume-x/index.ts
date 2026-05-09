@@ -499,11 +499,11 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
 
   pi.registerShortcut("alt+x", {
     description: "Open/close resume-x session picker",
-    handler: async (_ctx: ExtensionContext) => {
-      // Shortcut ctx is ExtensionContext (no switchSession) — can't switch sessions.
-      // Send "/resume-x" as user message so command dispatch gives runResumeX
-      // a full ExtensionCommandContext with switchSession.
-      pi.sendUserMessage("/resume-x");
+    handler: async (ctx: ExtensionContext) => {
+      // oh-my-pi dev source: shortcut ctx is ExtensionCommandContext at runtime (has switchSession).
+      // Published v0.74.0: shortcut ctx is plain ExtensionContext (no switchSession), falls back to setSessionFile.
+      // Cast to ExtensionCommandContext so dev source works fully; published version uses fallback.
+      await runResumeX(ctx as ExtensionCommandContext);
     },
   });
 

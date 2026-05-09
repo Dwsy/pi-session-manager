@@ -121,7 +121,7 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         conn.busy_timeout(std::time::Duration::from_secs(5)).map_err(|e| format!("Failed to set busy_timeout: {e}"))?;
 
         // Use execute_batch for PRAGMAs that may return result rows
-        conn.execute_batch("PRAGMA cache_size = -65536; PRAGMA wal_autocheckpoint = 100000;").map_err(|e| format!("Failed to set cache_size/wal_autocheckpoint: {e}"))?; // 64MB cache, 400MB checkpoint threshold
+        conn.execute_batch("PRAGMA cache_size = -262144; PRAGMA wal_autocheckpoint = 1000;").map_err(|e| format!("Failed to set cache_size/wal_autocheckpoint: {e}"))?; // 256MB cache, 4MB checkpoint threshold
 
         // Enable foreign key constraints
         conn.execute("PRAGMA foreign_keys=ON;", []).map_err(|e| format!("Failed to enable foreign keys: {e}"))?;

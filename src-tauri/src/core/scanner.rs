@@ -5,6 +5,7 @@ use crate::data::sqlite;
 use crate::types::{SessionEntry, SessionInfo, SessionsDiff};
 /// Check if an error message indicates database corruption
 use chrono::{DateTime, Duration, Utc};
+use rusqlite::Connection;
 use serde_json::Value;
 use std::fs;
 use std::io::{BufRead, Read, Seek, SeekFrom};
@@ -21,6 +22,8 @@ fn is_corruption_error(err: &str) -> bool {
 
 static SCAN_CACHE: RwLock<Option<Vec<SessionInfo>>> = RwLock::new(None);
 static SCAN_ENTRIES_CACHE: RwLock<Option<std::collections::HashMap<String, Vec<SessionEntry>>>> = RwLock::new(None);
+static SCAN_STATE_CACHE: RwLock<Option<std::collections::HashMap<String, sqlite::scan_state::ScanStateEntry>>> = RwLock::new(None);
+static CACHED_FILE_MODIFIED: RwLock<Option<std::collections::HashMap<String, chrono::DateTime<chrono::Utc>>>> = RwLock::new(None);
 static CACHE_VERSION: AtomicU64 = AtomicU64::new(0);
 static SCAN_IN_PROGRESS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -71,6 +74,71 @@ pub fn invalidate_cache() {
     }
     if let Ok(mut guard) = FILE_LIST_CACHE.write() {
         *guard = None;
+    }
+    if let Ok(mut guard) = SCAN_STATE_CACHE.write() {
+        *guard = None;
+    }
+    if let Ok(mut guard) = CACHED_FILE_MODIFIED.write() {
+        *guard = None;
+    }
+}
+
+/// Get cached file modified timestamps from cache or DB. Populates cache on first access.
+pub fn get_cached_file_modified_cached(conn: &Connection) -> std::collections::HashMap<String, chrono::DateTime<chrono::Utc>> {
+    // Try cache first
+    if let Ok(guard) = CACHED_FILE_MODIFIED.read() {
+        if let Some(ref cached) = *guard {
+            return cached.clone();
+        }
+    }
+    // Cache miss: load from DB and populate cache
+    let modified = sqlite::get_all_cached_file_modified(conn).unwrap_or_default();
+    if let Ok(mut guard) = CACHED_FILE_MODIFIED.write() {
+        *guard = Some(modified.clone());
+    }
+    modified
+}
+
+/// Update cached file modified after a session write
+pub fn update_cached_file_modified(path: String, file_modified: chrono::DateTime<chrono::Utc>) {
+    if let Ok(mut guard) = CACHED_FILE_MODIFIED.write() {
+        if let Some(ref mut cached) = *guard {
+            cached.insert(path, file_modified);
+        }
+    }
+}
+
+/// Get scan state from cache or DB. Populates cache on first access.
+pub fn get_scan_state_cached(conn: &Connection) -> std::collections::HashMap<String, sqlite::scan_state::ScanStateEntry> {
+    // Try cache first
+    if let Ok(guard) = SCAN_STATE_CACHE.read() {
+        if let Some(ref cached) = *guard {
+            return cached.clone();
+        }
+    }
+    // Cache miss: load from DB and populate cache
+    let states = sqlite::get_all_scan_state(conn).unwrap_or_default();
+    if let Ok(mut guard) = SCAN_STATE_CACHE.write() {
+        *guard = Some(states.clone());
+    }
+    states
+}
+
+/// Update scan state cache after a write (call after upsert_scan_state/update_scan_state)
+pub fn update_scan_state_cache(path: String, entry: sqlite::scan_state::ScanStateEntry) {
+    if let Ok(mut guard) = SCAN_STATE_CACHE.write() {
+        if let Some(ref mut cached) = *guard {
+            cached.insert(path, entry);
+        }
+    }
+}
+
+/// Remove a path from scan state cache
+pub fn remove_from_scan_state_cache(path: &str) {
+    if let Ok(mut guard) = SCAN_STATE_CACHE.write() {
+        if let Some(ref mut cached) = *guard {
+            cached.remove(path);
+        }
     }
 }
 
@@ -466,7 +534,7 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
         let db_sessions = sqlite::get_all_sessions(&conn)?.into_iter().filter(|session| crate::domain::session_bridge::is_session_visible_under_config(Path::new(&session.path), config)).collect::<Vec<_>>();
         let db_load_elapsed_ms = db_load_started_at.elapsed().as_millis();
         let db_paths: std::collections::HashSet<&str> = db_sessions.iter().map(|s| s.path.as_str()).collect();
-        let scan_state_by_path = sqlite::get_all_scan_state(&conn)?;
+        let scan_state_by_path = get_scan_state_cached(&conn);
 
         // Identify files that need parsing: new files or files whose scan_state metadata is stale
         let classify_started_at = Instant::now();
@@ -540,6 +608,14 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             updated_sessions.push(info);
         }
         let upsert_elapsed_ms = upsert_started_at.elapsed().as_millis();
+
+        // Invalidate scan state cache after batch upserts
+        if let Ok(mut guard) = SCAN_STATE_CACHE.write() {
+            *guard = None;
+        }
+        if let Ok(mut guard) = CACHED_FILE_MODIFIED.write() {
+            *guard = None;
+        }
 
         // Start with DB sessions, update only those that were re-parsed
         let merge_started_at = Instant::now();
@@ -940,8 +1016,8 @@ impl ScannerScheduler {
         let mut conn = sqlite::init_db_with_config(&self.config)?;
         let realtime_cutoff = Utc::now() - Duration::days(self.config.realtime_cutoff_days);
 
-        let cached_file_modified = sqlite::get_all_cached_file_modified(&conn)?;
-        let all_scan_states = sqlite::get_all_scan_state(&conn).unwrap_or_default();
+        let cached_file_modified = get_cached_file_modified_cached(&conn);
+        let all_scan_states = get_scan_state_cached(&conn);
 
         // Separate changed files into incremental (high trust) vs full-parse (low trust/new)
         let mut incremental_files: Vec<(PathBuf, DateTime<Utc>, u64)> = Vec::new();
