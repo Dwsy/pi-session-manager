@@ -180,10 +180,13 @@ pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
 
 pub fn get_all_sessions_for_list(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
     let start = std::time::Instant::now();
+    // Truncate first_message/last_message to 200 chars — list view only needs preview.
     let mut stmt = conn
         .prepare(
-            "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path
-         FROM sessions ORDER BY modified DESC, path ASC",
+            "SELECT id, path, cwd, name, created, modified, message_count,
+                    SUBSTR(first_message, 1, 200), SUBSTR(last_message, 1, 200),
+                    last_message_role, parent_session_path
+             FROM sessions ORDER BY modified DESC, path ASC",
         )
         .map_err(|e| format!("Failed to prepare list statement: {e}"))?;
 
