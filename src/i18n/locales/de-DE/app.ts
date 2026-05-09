@@ -31,4 +31,8 @@ export const app = {
     deleteSessions: '{{count}} ausgewählte Sitzungen löschen?',
     deleteIrreversible: 'Diese Aktion kann nicht rückgängig gemacht werden.',
   },
+  splash: {
+    scanning: 'Sitzungen werden gescannt...',
+    firstLaunchHint: 'Der erste Start kann einen Moment dauern',
+  },
 } as const

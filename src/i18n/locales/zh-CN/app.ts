@@ -32,4 +32,8 @@ export const app = {
     deleteSessions: '确定要删除选中的 {{count}} 个会话吗？',
     deleteIrreversible: '此操作无法撤销。',
   },
+  splash: {
+    scanning: '正在扫描会话...',
+    firstLaunchHint: '首次启动可能需要一点时间',
+  },
 } as const

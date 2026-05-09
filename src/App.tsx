@@ -114,6 +114,10 @@ function App() {
   const { t } = useTranslation();
   const standaloneDatasetRuntime = isStandaloneDatasetRuntime();
 
+  // Delayed scanning page: only show if loading takes >500ms (avoids flash on fast DB loads)
+  const [showScanningPage, setShowScanningPage] = useState(false);
+  const loadingRef = useRef(true);
+
   // Register tool render plugins
   useEffect(() => {
     registerBuiltinToolPlugins();
@@ -142,6 +146,19 @@ function App() {
     confirmDeleteSession,
     cancelDeleteSession,
   } = useSessions();
+
+  // Delayed scanning page: only show if loading takes >500ms
+  useEffect(() => {
+    loadingRef.current = loading;
+    if (loading) {
+      const timer = setTimeout(() => {
+        if (loadingRef.current) setShowScanningPage(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setShowScanningPage(false);
+    }
+  }, [loading]);
 
   const { terminal, piPath, customCommand, resumeCommand, loadSettings } =
     useAppSettings();
@@ -338,7 +355,7 @@ function App() {
     selectWorkspace,
   } = useWorkspaces();
 
-  // Sync selectedProject to workspace config when active workspace changes
+  // Sync selectedProject to workspace config when active workspace changes.
   useEffect(() => {
     if (activeWorkspace.config.projectFilter) {
       setSelectedProject(activeWorkspace.config.projectFilter);
@@ -988,14 +1005,9 @@ function App() {
     <AppDashboardPane
       fallback={<LoadingSpinner />}
       DashboardComponent={Dashboard}
-      sessions={
-        selectedProject
-          ? sessions.filter((s) => s.cwd === selectedProject)
-          : sessions
-      }
+      sessions={sessions}
       onSessionSelect={handleSelectSession}
       onProjectSelect={handleDatasetOverviewProjectSelect}
-      projectName={selectedProject || undefined}
       loading={loading}
       liveSessionIds={liveSessionIds}
     />
@@ -1255,6 +1267,39 @@ function App() {
       onCommandConsumed={() => setTerminalPendingCommand(null)}
     />
   );
+
+  // ═══════════════════════════════════
+  // Scanning gate: show loading page while initial scan is in progress
+  // ═══════════════════════════════════
+  if (showScanningPage && sessions.length === 0) {
+    return (
+      <div className="flex flex-col h-screen-safe bg-background text-foreground items-center justify-center">
+        <div className="flex flex-col items-center gap-6">
+          {/* Logo with ambient glow */}
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full bg-accent/20 blur-xl animate-pulse" />
+            <img
+              src="/icon-128.png"
+              alt="Pi Session Manager"
+              className="relative w-16 h-16 rounded-2xl shadow-lg"
+            />
+            <div className="absolute -right-1 -bottom-1">
+              <Loader2 className="w-5 h-5 animate-spin text-accent" />
+            </div>
+          </div>
+          {/* Text */}
+          <div className="flex flex-col items-center gap-1.5">
+            <p className="text-sm font-medium text-foreground">
+              {t("app.splash.scanning", "Scanning sessions...")}
+            </p>
+            <p className="text-xs text-muted-foreground/60">
+              {t("app.splash.firstLaunchHint", "This may take a moment on first launch")}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ═══════════════════════════════════
   // Desktop layout: sidebar + content

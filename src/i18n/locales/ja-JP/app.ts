@@ -31,4 +31,8 @@ export const app = {
     deleteSessions: '選択した {{count}} 件のセッションを削除しますか？',
     deleteIrreversible: 'この操作は元に戻せません。',
   },
+  splash: {
+    scanning: 'セッションをスキャン中...',
+    firstLaunchHint: '初回起動時はしばらくお待ちください',
+  },
 } as const

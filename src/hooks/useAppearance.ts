@@ -13,6 +13,10 @@ function applyThemeClass(theme: 'dark' | 'light' | 'system') {
     root.classList.add('theme-dark')
   } else if (theme === 'light') {
     root.classList.add('theme-light')
+  } else {
+    // system: follow OS preference
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    root.classList.add(isDark ? 'theme-dark' : 'theme-light')
   }
 }
 

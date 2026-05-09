@@ -32,4 +32,8 @@ export const app = {
     deleteSessions: 'Delete {{count}} selected sessions?',
     deleteIrreversible: 'This action cannot be undone.',
   },
+  splash: {
+    scanning: 'Scanning sessions...',
+    firstLaunchHint: 'This may take a moment on first launch',
+  },
 } as const

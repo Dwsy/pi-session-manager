@@ -31,4 +31,8 @@ export const app = {
     deleteSessions: '¿Eliminar las {{count}} sesiones seleccionadas?',
     deleteIrreversible: 'Esta acción no se puede deshacer.',
   },
+  splash: {
+    scanning: 'Escaneando sesiones...',
+    firstLaunchHint: 'El primer inicio puede tardar un momento',
+  },
 } as const

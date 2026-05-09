@@ -31,4 +31,8 @@ export const app = {
     deleteSessions: 'Supprimer les {{count}} sessions sélectionnées ?',
     deleteIrreversible: 'Cette action est irréversible.',
   },
+  splash: {
+    scanning: 'Analyse des sessions...',
+    firstLaunchHint: 'Le premier lancement peut prendre un instant',
+  },
 } as const
