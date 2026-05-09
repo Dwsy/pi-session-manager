@@ -25,7 +25,20 @@ import { existsSync, mkdirSync } from "node:fs";
 
 // ── Config ─────────────────────────────────────────────
 
-const PSM_URL = process.env.PSM_URL || "ws://127.0.0.1:52131/ws";
+/** Read port from ~/.pi/pi-session-manager/config.json */
+function getPsmPort(): number {
+  try {
+    const configPath = path.join(homedir(), ".pi", "pi-session-manager", "config.json");
+    if (existsSync(configPath)) {
+      const config = JSON.parse(readFileSync(configPath, "utf-8"));
+      return config.server?.http_port || 52131;
+    }
+  } catch { /* ignore */ }
+  return 52131;
+}
+
+const PSM_PORT = getPsmPort();
+const PSM_URL = process.env.PSM_URL || `ws://127.0.0.1:${PSM_PORT}/ws`;
 const PSM_TOKEN = process.env.PSM_TOKEN || "";
 const DB_PATH = path.join(homedir(), ".pi", "agent", "sessions", "sessions.db");
 const HB_INTERVAL = 15_000;
@@ -550,7 +563,7 @@ function extractSessionId(ctx: ExtensionContext): { sessionId: string; sessionPa
 
 // ── Extension ──────────────────────────────────────────
 
-export default function (pi: ExtensionAPI) {
+export default async function (pi: ExtensionAPI) {
   const localCommandHandlers = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>();
   let latestCtx: ExtensionContext | null = null;
   let sessionId = "";
@@ -787,7 +800,8 @@ export default function (pi: ExtensionAPI) {
 
   async function getEntriesForSession(sessionId: string): Promise<SessionEntry[]> {
     const sessions = await getSessions();
-    const session = sessions.find((s) => s.id === sessionId);
+    // Support both full UUID and 8-char prefix
+    const session = sessions.find((s) => s.id === sessionId || s.id.startsWith(sessionId));
     if (!session?.path) return [];
     const resp = await httpPost<{ success: boolean; data?: SessionEntry[] }>(
       "/api",
@@ -812,7 +826,7 @@ export default function (pi: ExtensionAPI) {
     name: "session_search",
     label: "Session Search",
     description:
-      "Search indexed Pi sessions via PSM HTTP API. Use this to find relevant past conversations.",
+      "Search across all indexed Pi sessions. Use this to find relevant past conversations.",
     parameters: {
       type: "object",
       properties: {
@@ -979,7 +993,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "session_context",
     label: "Session Context",
-    description: "Fetch message context from a specific session via PSM HTTP API.",
+    description: "Fetch message context from a specific session.",
     parameters: {
       type: "object",
       properties: {
@@ -1001,7 +1015,8 @@ export default function (pi: ExtensionAPI) {
         let entries: SessionEntry[] = [];
         if (sid) {
           entries = await getEntriesForSession(sid);
-        } else if (path) {
+        }
+        if (entries.length === 0 && path) {
           entries = await getEntriesByPath(path);
         }
 
