@@ -406,7 +406,7 @@ async fn init_http_adapter(
     port: u16,
     embedding_service: Option<Arc<EmbeddingService>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use axum::extract::Query;
+    use axum::extract::{Path, Query};
     use axum::{routing::get, routing::post, Json, Router};
     use pi_session_manager::api_readonly;
     use serde::Deserialize;
@@ -457,6 +457,23 @@ async fn init_http_adapter(
     async fn api_handler(Json(body): Json<CmdReq>) -> Json<Value> {
         match pi_session_manager::dispatch::dispatch(&body.command, &body.payload).await {
             Ok(data) => Json(serde_json::json!({ "success": true, "data": data })),
+            Err(error) => Json(serde_json::json!({ "success": false, "error": error })),
+        }
+    }
+
+    async fn v1_session_entries(Path(id): Path<String>) -> Json<Value> {
+        let sessions_payload = serde_json::json!({});
+        let sessions_value = match pi_session_manager::dispatch::dispatch("scan_sessions", &sessions_payload).await {
+            Ok(v) => v,
+            Err(error) => return Json(serde_json::json!({ "success": false, "error": error })),
+        };
+        let sessions: Vec<pi_session_manager::types::SessionInfo> = serde_json::from_value(sessions_value).unwrap_or_default();
+        let session = match sessions.into_iter().find(|s| s.id == id) {
+            Some(s) => s,
+            None => return Json(serde_json::json!({ "success": false, "error": format!("Session not found: {id}") })),
+        };
+        match pi_session_manager::dispatch::dispatch("get_session_entries", &serde_json::json!({ "path": session.path })).await {
+            Ok(entries) => Json(serde_json::json!({ "success": true, "data": entries })),
             Err(error) => Json(serde_json::json!({ "success": false, "error": error })),
         }
     }
@@ -713,6 +730,7 @@ pi_sessions_total 0
     let mut app = Router::new()
         .route("/api", post(api_handler))
         .route("/v1/sessions", get(v1_sessions))
+        .route("/v1/sessions/{id}/entries", get(v1_session_entries))
         .route("/v1/search/fulltext", post(v1_search_fulltext))
         .route("/v1/memory/recall", post(v1_memory_recall))
         .route("/v1/memory/unified", post(v1_memory_unified))

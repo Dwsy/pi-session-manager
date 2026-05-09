@@ -799,7 +799,50 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let shells = crate::utils::scan_shells();
             Ok(serde_json::json!(shells))
         }
-        "terminal_create" | "terminal_write" | "terminal_resize" | "terminal_close" => Err(format!("Command '{command}' requires GUI mode (terminal not available in CLI)")),
+        "terminal_create" | "terminal_write" | "terminal_resize" | "terminal_close" => {
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or("Terminal commands require GUI mode")?;
+                match command {
+                    "terminal_create" => {
+                        let id = extract(payload, "id")?;
+                        let cwd = extract(payload, "cwd")?;
+                        let shell = extract(payload, "shell")?;
+                        let rows = payload.get("rows").and_then(|v| v.as_u64()).unwrap_or(24) as u16;
+                        let cols = payload.get("cols").and_then(|v| v.as_u64()).unwrap_or(80) as u16;
+                        let manager = state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+                        manager.create_session(id, state.app_handle.clone(), state.event_tx.clone(), cwd, shell, rows, cols)?;
+                        Ok(serde_json::json!("Terminal created"))
+                    }
+                    "terminal_write" => {
+                        let id = extract(payload, "id")?;
+                        let data = extract(payload, "data")?;
+                        let manager = state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+                        manager.write_to_session(&id, data)?;
+                        Ok(Value::Null)
+                    }
+                    "terminal_resize" => {
+                        let id = extract(payload, "id")?;
+                        let rows = payload.get("rows").and_then(|v| v.as_u64()).unwrap_or(24) as u16;
+                        let cols = payload.get("cols").and_then(|v| v.as_u64()).unwrap_or(80) as u16;
+                        let manager = state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+                        manager.resize_session(&id, rows, cols)?;
+                        Ok(Value::Null)
+                    }
+                    "terminal_close" => {
+                        let id = extract(payload, "id")?;
+                        let manager = state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+                        manager.close_session(&id)?;
+                        Ok(Value::Null)
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            #[cfg(not(feature = "gui"))]
+            {
+                Err(format!("Command '{command}' requires GUI mode (terminal not available in CLI)"))
+            }
+        }
         "open_session_in_browser" => Err("open_session_in_browser is desktop-only".to_string()),
         "open_session_in_terminal" => Err("open_session_in_terminal is desktop-only".to_string()),
         "toggle_devtools" => Err("toggle_devtools is not supported via WebSocket".to_string()),
