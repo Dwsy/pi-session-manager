@@ -48,7 +48,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -68,12 +68,12 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install frontend dependencies
@@ -94,7 +94,7 @@ jobs:
 
       # ── Desktop (Tauri) ───────────────────────────────────
       - name: Build Tauri desktop app
-        uses: tauri-apps/tauri-action@v0.5
+        uses: tauri-apps/tauri-action@v0.6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -129,7 +129,7 @@ jobs:
           "$hash  ${{ matrix.cli_artifact }}" | Out-File -FilePath "cli-dist/${{ matrix.cli_artifact }}.sha256" -Encoding ASCII
 
       - name: Upload CLI artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cli-${{ matrix.cli_artifact }}
           path: cli-dist/*
@@ -143,12 +143,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Download CLI artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: cli-*
           path: cli-artifacts
@@ -279,7 +279,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Update release with CLI assets and notes
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: "Pi Session Manager ${{ github.ref_name }}"
