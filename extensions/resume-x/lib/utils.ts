@@ -5,7 +5,7 @@
  * No side effects, no database access.
  */
 
-import { visibleWidth } from "@mariozechner/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 
 // ── Scroll helpers ───────────────────────────────────────────────────
 
@@ -109,7 +109,7 @@ export function safeLine(line: string, maxWidth: number): string {
 /**
  * Theme accessor — uses global symbol from pi-coding-agent.
  */
-const THEME_KEY = Symbol.for("@mariozechner/pi-coding-agent:theme");
+const THEME_KEY = Symbol.for("@earendil-works/pi-coding-agent:theme");
 export function getTheme(): any {
   return (globalThis as any)[THEME_KEY];
 }

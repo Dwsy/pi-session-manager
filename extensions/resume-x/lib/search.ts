@@ -8,7 +8,7 @@
 import * as path from "node:path";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { visibleWidth } from "@mariozechner/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import type { KanbanTag, SessionTagMark, SearchResult } from "./types.js";
 import { _crash, getDb, loadSessionDetail } from "./db.js";
 import { fmtTime, fmtTokens, fmtCost, shortModel, wrapText, getTheme } from "./utils.js";

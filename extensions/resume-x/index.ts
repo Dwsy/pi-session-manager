@@ -11,11 +11,11 @@
  * Usage: /resume-x
  */
 
-import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import * as path from "node:path";
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { matchesKey, getKeybindings } from "@mariozechner/pi-tui";
+import { matchesKey, getKeybindings } from "@earendil-works/pi-tui";
 
 // ── Module imports ───────────────────────────────────────────────────
 import { loadSessionsFromSqlite, loadSessionMessages } from "./lib/db.js";
@@ -92,7 +92,6 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
       // Save reference before ctx.ui.custom() — ctx may become stale after
       const switchSessionFn = ctx.switchSession?.bind(ctx);
       const sessionManager = ctx.sessionManager;
-      let sessionSwitched = false;
 
       // Use ctx.ui.custom() — patch SessionList.render inside the factory
       const selectedPath = await ctx.ui.custom<string | null>((tui, _theme, keybindings, done) => {
@@ -233,13 +232,6 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                   return;
                 }
                 if (isConfirm && previewSessionPath) {
-                  // Switch session BEFORE done() to keep ctx valid
-                  sessionSwitched = true;
-                  if (typeof switchSessionFn === "function") {
-                    switchSessionFn(previewSessionPath);
-                  } else if (sessionManager) {
-                    sessionManager.setSessionFile(previewSessionPath);
-                  }
                   done(previewSessionPath);
                   return;
                 }
@@ -319,13 +311,6 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
               if (isConfirm && maxResults > 0) {
                 const selected = searchResults[searchSelectedIdx];
                 if (selected) {
-                  // Switch session BEFORE done() to keep ctx valid
-                  sessionSwitched = true;
-                  if (typeof switchSessionFn === "function") {
-                    switchSessionFn(selected.sessionPath);
-                  } else if (sessionManager) {
-                    sessionManager.setSessionFile(selected.sessionPath);
-                  }
                   done(selected.sessionPath);
                 }
                 return;
@@ -474,9 +459,6 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
       isOpen = false;
 
       if (!selectedPath) { return; }
-
-      // Skip if already switched inside factory (search/preview modes)
-      if (sessionSwitched) return;
 
       try {
         if (typeof switchSessionFn === "function") {

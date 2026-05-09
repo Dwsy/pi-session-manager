@@ -4,7 +4,7 @@
  * Preview pane, detail pane, and monkey-patch for SessionList.
  */
 
-import { visibleWidth, Markdown, Box, Container, Text, Spacer, type MarkdownTheme } from "@mariozechner/pi-tui";
+import { visibleWidth, Markdown, Box, Container, Text, Spacer, type MarkdownTheme } from "@earendil-works/pi-tui";
 import type { SessionMessage } from "./types.js";
 import { TOOL_PREVIEW_LINES } from "./types.js";
 import { loadSessionDetail } from "./db.js";

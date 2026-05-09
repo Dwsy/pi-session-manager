@@ -53,8 +53,8 @@ lib/
 
 ## Dependencies
 
-- `@mariozechner/pi-coding-agent` — ExtensionContext, ExtensionCommandContext, SessionSelectorComponent
-- `@mariozechner/pi-tui` — visibleWidth, matchesKey, getKeybindings
+- `@earendil-works/pi-coding-agent` — ExtensionContext, ExtensionCommandContext, SessionSelectorComponent
+- `@earendil-works/pi-tui` — visibleWidth, matchesKey, getKeybindings
 - `better-sqlite3` — SQLite access
 
 ## Data Source
