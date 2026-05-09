@@ -460,6 +460,9 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
 
       if (!selectedPath) { return; }
 
+      // Small delay to let custom UI fully dismiss before switching session
+      await new Promise((r) => setTimeout(r, 50));
+
       try {
         if (typeof switchSessionFn === "function") {
           await switchSessionFn(selectedPath);

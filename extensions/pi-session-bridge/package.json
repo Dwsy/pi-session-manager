@@ -1,0 +1,13 @@
+{
+  "name": "psm-bridge",
+  "version": "0.1.0",
+  "description": "Bridge Pi agent sessions to Pi Session Manager — live sync, search, tags, and context recall.",
+  "type": "module",
+  "keywords": ["pi-package"],
+  "engines": {
+    "node": ">=21.0.0"
+  },
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}
