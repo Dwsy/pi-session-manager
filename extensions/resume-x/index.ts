@@ -95,11 +95,32 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
 
       // Use ctx.ui.custom() — patch SessionList.render inside the factory
       const selectedPath = await ctx.ui.custom<string | null>((tui, _theme, keybindings, done) => {
+        // doResume — mirror built-in selector-controller.ts handleResumeSession:
+        //   1. done() first — synchronous, closes UI, restores editor
+        //   2. await switchSession — async, switches session + renders new state
+        //
+        // SessionSelectorComponent.handleInput calls onSelect but does NOT await the
+        // returned Promise, so the await runs in the background — identical to built-in.
+        const doResume = async (sessionPath: string) => {
+          done(sessionPath);
+          if (typeof switchSessionFn === "function") {
+            try {
+              await switchSessionFn(sessionPath, {
+                withSession: async (_newCtx) => { /* no-op */ },
+              });
+            } catch (err) {
+              _crash("SWITCH-AFTER-DONE", err);
+            }
+          } else {
+            sessionManager.setSessionFile(sessionPath);
+          }
+        };
+
         closeFn = () => done(null);
         const selector = new SessionSelectorComponent(
           currentLoader,
           allLoader,
-          (p: string) => done(p),
+          (p: string) => { void doResume(p); },
           () => done(null),
           () => { done(null); ctx.shutdown(); },
           () => tui.requestRender(),
@@ -232,7 +253,7 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
                   return;
                 }
                 if (isConfirm && previewSessionPath) {
-                  done(previewSessionPath);
+                  void doResume(previewSessionPath);
                   return;
                 }
 
@@ -311,7 +332,7 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
               if (isConfirm && maxResults > 0) {
                 const selected = searchResults[searchSelectedIdx];
                 if (selected) {
-                  done(selected.sessionPath);
+                  void doResume(selected.sessionPath);
                 }
                 return;
               }
@@ -458,33 +479,14 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
       closeFn = null;
       isOpen = false;
 
+      // Session switch already happened inside the factory (doResume).
+      // DO NOT access ctx.ui here — runner may be invalidated after switchSessionFn.
       if (!selectedPath) { return; }
-
-      try {
-        if (typeof switchSessionFn === "function") {
-          await switchSessionFn(selectedPath, {
-            withSession: async (newCtx) => {
-              // newCtx is fresh context for the replacement session
-              // No need to do anything — the session is already rendered
-            },
-          });
-          return;
-        }
-
-        if (sessionManager && typeof sessionManager.setSessionFile === "function") {
-          sessionManager.setSessionFile(selectedPath);
-          // Don't use ctx.ui.notify — ctx may be stale
-          return;
-        }
-      } catch (err) {
-        // ctx may be stale, log instead of notify
-        _crash("SWITCH-FAIL", err);
-      }
     } catch (e) {
       isOpen = false;
       closeFn = null;
       _crash("HANDLER-TOP", e);
-      ctx.ui.notify(`resume-x crashed: ${e instanceof Error ? e.message : e}`, "error");
+      // ctx.ui may be stale after switchSession — use _crash only, never ctx.ui.notify
     }
   };
 
@@ -497,8 +499,11 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
 
   pi.registerShortcut("alt+x", {
     description: "Open/close resume-x session picker",
-    handler: async (ctx: ExtensionContext) => {
-      await runResumeX(ctx);
+    handler: async (_ctx: ExtensionContext) => {
+      // Shortcut ctx is ExtensionContext (no switchSession) — can't switch sessions.
+      // Send "/resume-x" as user message so command dispatch gives runResumeX
+      // a full ExtensionCommandContext with switchSession.
+      pi.sendUserMessage("/resume-x");
     },
   });
 
