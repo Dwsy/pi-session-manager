@@ -148,7 +148,7 @@ fn process_session_data(
     daily_stats: &mut DailyStatsCollector,
 ) -> (usize, usize, usize, usize, usize, usize, f64) {
     // 1. Check memory buffer first (fastest)
-    let memory_cached = crate::core::write_buffer::get_buffered_details(&session.path).filter(|(_, file_modified)| *file_modified >= session_modified);
+    let memory_cached = crate::core::write_buffer::get_buffered_details(&session.path).filter(|(_, file_modified)| file_modified.timestamp() >= session_modified.timestamp());
 
     if let Some((details, _)) = memory_cached {
         if details.model_usage.is_empty() {
@@ -167,7 +167,9 @@ fn process_session_data(
     }
 
     // 2. Then check database cache
-    let cached_details = conn.and_then(|conn| crate::data::sqlite::get_session_details_cache(conn, &session.path).ok().flatten().filter(|cached| cached.file_modified >= session_modified));
+    // Compare at second-level precision: filesystem mtime may lack sub-second granularity
+    // while sessions.modified retains milliseconds, causing false "stale" detections.
+    let cached_details = conn.and_then(|conn| crate::data::sqlite::get_session_details_cache(conn, &session.path).ok().flatten().filter(|cached| cached.file_modified.timestamp() >= session_modified.timestamp()));
 
     if let Some(cached) = cached_details {
         // Use cached data directly — no file I/O in stats calculation.

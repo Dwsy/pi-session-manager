@@ -171,7 +171,6 @@ export function useSidebarSessions({
     loading: pagedSidebarLoading,
     loadingMore: pagedSidebarLoadingMore,
     hasMore: pagedSidebarHasMore,
-    hasLoadedOnce: pagedSidebarLoadedOnce,
     loadMore: loadMoreSidebarSessions,
     refresh: refreshSidebarSessions,
   } = usePaginatedSessions({
@@ -185,40 +184,51 @@ export function useSidebarSessions({
     sortOrder,
   });
 
-  const latestSessionsRef = useRef(sessions);
-  const latestSessionTagsRef = useRef(sessionTags);
+  // Track the last refresh trigger to avoid redundant full refreshes.
+  // The file watcher already patches sessions incrementally via patchSessions;
+  // we should NOT re-trigger scan_sessions_paginated on every file watcher diff.
+  // Only refresh when: (1) first load, (2) filter/sort params change, (3) session count changes (new/deleted).
+  const lastRefreshKeyRef = useRef<string>("");
+  const lastSessionCountRef = useRef(0);
 
   useEffect(() => {
     if (!shouldEnablePagedSidebar) {
+      lastRefreshKeyRef.current = "";
+      lastSessionCountRef.current = 0;
       return;
     }
 
-    if (!pagedSidebarLoadedOnce) {
-      latestSessionsRef.current = sessions;
-      latestSessionTagsRef.current = sessionTags;
+    // Build a key from the filter/sort params that actually matter for the paginated query.
+    const refreshKey = [
+      listProjectFilter || "__all__",
+      sidebarSearchQuery || "__empty__",
+      effectiveFilterTagIds.join(",") || "__no_tags__",
+      sourceFilterSlugs.join(",") || "__no_sources__",
+      sortBy,
+      sortOrder,
+    ].join("|");
+
+    const sessionCountChanged = sessions.length !== lastSessionCountRef.current;
+    lastSessionCountRef.current = sessions.length;
+
+    // Only refresh when filter/sort params change OR session count changes (new/deleted sessions).
+    // Skip refresh when only existing sessions are updated (file watcher metadata changes).
+    if (refreshKey === lastRefreshKeyRef.current && !sessionCountChanged) {
       return;
     }
 
-    const sessionsChanged = latestSessionsRef.current !== sessions;
-    const sessionTagsChanged = latestSessionTagsRef.current !== sessionTags;
-
-    if (!sessionsChanged && !sessionTagsChanged) {
-      return;
-    }
-
-    latestSessionsRef.current = sessions;
-    latestSessionTagsRef.current = sessionTags;
-
-    void refreshSidebarSessions({
-      silent: true,
-      preserveCount: true,
-    });
+    lastRefreshKeyRef.current = refreshKey;
+    void refreshSidebarSessions({ silent: true, preserveCount: true });
   }, [
     shouldEnablePagedSidebar,
-    pagedSidebarLoadedOnce,
     refreshSidebarSessions,
     sessions,
-    sessionTags,
+    listProjectFilter,
+    sidebarSearchQuery,
+    effectiveFilterTagIds,
+    sourceFilterSlugs,
+    sortBy,
+    sortOrder,
   ]);
 
   const selectedProjectSummary = useMemo(() => {

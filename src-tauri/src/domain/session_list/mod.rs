@@ -70,15 +70,12 @@ pub async fn scan_sessions_paginated_impl(offset: Option<usize>, limit: Option<u
         let conn = crate::data::sqlite::init_db_with_config(&config)?;
         let db_sessions = crate::data::sqlite::get_all_sessions_for_list(&conn)?;
         if db_sessions.is_empty() {
-            #[cfg(feature = "gui")]
-            {
-                use tauri::async_runtime::spawn;
-                spawn(async {
-                    let _ = scanner::scan_sessions().await;
-                });
-            }
+            // Synchronous scan: block until all files are parsed.
+            // Frontend shows loading page while this runs.
+            scanner::scan_sessions().await?
+        } else {
+            db_sessions
         }
-        db_sessions
     };
 
     if let Some(project) = project_filter.as_deref().map(str::trim).filter(|value| !value.is_empty()) {

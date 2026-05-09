@@ -61,8 +61,8 @@ fn get_session_detailed_stats(path: &str, session_modified: chrono::DateTime<chr
         return (details.user_messages + details.assistant_messages, (details.input_tokens + details.output_tokens) as usize, details.models.first().cloned().unwrap_or_else(|| "unknown".to_string()));
     }
 
-    // Try DB cache
-    if let Some(cached) = conn.and_then(|c| crate::data::sqlite::get_session_details_cache(c, path).ok().flatten().filter(|c| c.file_modified >= session_modified)) {
+    // Try DB cache (compare at second-level precision to avoid false staleness)
+    if let Some(cached) = conn.and_then(|c| crate::data::sqlite::get_session_details_cache(c, path).ok().flatten().filter(|c| c.file_modified.timestamp() >= session_modified.timestamp())) {
         let models: Vec<String> = serde_json::from_str(&cached.models_json).unwrap_or_default();
         return (cached.user_messages + cached.assistant_messages, cached.input_tokens + cached.output_tokens, models.first().cloned().unwrap_or_else(|| "unknown".to_string()));
     }
