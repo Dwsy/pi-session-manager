@@ -175,9 +175,10 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                             if is_jsonl || is_opencode_db || is_gemini_json {
                                 // Skip non-pi-session files: subagent artifacts and
                                 // gateway transcripts use different JSONL formats.
+                                // Aligned with should_skip_dir in core/scanner.rs.
                                 let dominated_by_excluded = path.components().any(|c| {
                                     let s = c.as_os_str();
-                                    s == "subagent-artifacts" || s == "transcripts" || s == "datasets"
+                                    s == "subagent-artifacts" || s == "transcripts" || s == "subagents" || s == ".timelines" || s == "checkpoints" || s == "datasets"
                                 });
                                 if !dominated_by_excluded {
                                     pending_paths.insert(path.clone());

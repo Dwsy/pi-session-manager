@@ -10,6 +10,28 @@ use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 
+/// Check if a path should be excluded from watching.
+/// Aligned with `should_skip_dir` in core/scanner.rs.
+fn is_excluded_path(path: &std::path::Path) -> bool {
+    path.components().any(|c| {
+        let s = c.as_os_str();
+        s == "subagent-artifacts"
+            || s == "transcripts"
+            || s == "subagents"
+            || s == ".timelines"
+            || s == "checkpoints"
+    })
+}
+
+/// Check if a path is a session file (any supported format).
+/// Aligned with `extend_candidate` in core/scanner.rs.
+fn is_session_file(path: &std::path::Path) -> bool {
+    let is_jsonl = path.extension().is_some_and(|ext| ext == "jsonl");
+    let is_gemini = pi_session_manager::domain::session_bridge::is_gemini_session_file(path);
+    let is_opencode = pi_session_manager::domain::session_bridge::is_opencode_db_path(path);
+    is_jsonl || is_gemini || is_opencode
+}
+
 pub struct CliFileWatcher {
     _debouncer: Arc<Mutex<Debouncer<RecommendedWatcher, FileIdMap>>>,
 }
@@ -74,15 +96,11 @@ fn process_events(
                 Ok(events) => {
                     for event in &events {
                         for path in &event.paths {
-                            if !path.extension().map(|ext| ext == "jsonl").unwrap_or(false) {
+                            if !is_session_file(path) {
                                 continue;
                             }
 
-                            let excluded = path.components().any(|c| {
-                                let s = c.as_os_str();
-                                s == "subagent-artifacts" || s == "transcripts"
-                            });
-                            if !excluded {
+                            if !is_excluded_path(path) {
                                 pending_paths.insert(path.clone());
                             }
                         }
@@ -99,6 +117,9 @@ fn process_events(
         if pending_paths.is_empty() || last_notification.elapsed() < min_interval {
             continue;
         }
+
+        // Mark watcher as active so ScannerScheduler skips redundant full scans.
+        pi_session_manager::scanner::mark_watcher_active();
 
         let changed: Vec<String> = pending_paths
             .drain()

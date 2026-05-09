@@ -22,6 +22,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             13 => migration_13(conn)?,
             14 => migration_14(conn)?,
             15 => migration_15(conn)?,
+            16 => migration_16(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -282,11 +283,43 @@ fn migration_14(conn: &Connection) -> Result<(), String> {
 /// Migration to version 15: add label column to message_entries table.
 /// This stores user-defined labels for specific entries (bookmarks, markers).
 fn migration_15(conn: &Connection) -> Result<(), String> {
-    // Add label column to message_entries
-    conn.execute("ALTER TABLE message_entries ADD COLUMN label TEXT", []).map_err(|e| format!("Migration 15 failed adding label column: {e}"))?;
+    fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
+        let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})")).map_err(|e| format!("Failed to prepare PRAGMA table_info for {table}: {e}"))?;
+        let column_names: Vec<String> = stmt.query_map([], |row| row.get(1)).map_err(|e| format!("Failed to query columns for {table}: {e}"))?.collect::<Result<Vec<_>, _>>().map_err(|e| format!("Failed to collect columns for {table}: {e}"))?;
+        Ok(column_names.iter().any(|name| name == column))
+    }
 
-    // Create index for label lookups
+    if !column_exists(conn, "message_entries", "label")? {
+        conn.execute("ALTER TABLE message_entries ADD COLUMN label TEXT", []).map_err(|e| format!("Migration 15 failed adding label column: {e}"))?;
+    }
+
     conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_label ON message_entries(label) WHERE label IS NOT NULL", []).map_err(|e| format!("Migration 15 failed creating label index: {e}"))?;
+
+    Ok(())
+}
+
+/// Migration to version 16: force full re-scan by clearing all session data.
+///
+/// Old databases have stale session_details_cache (timestamp precision), sparse
+/// message_entries (9580 for 4419 sessions), and empty user_messages_text.
+/// Clearing these tables forces the next scan to classify every file as "new"
+/// and fully re-parse all caches, message entries, and text columns.
+///
+/// Preserved tables: tags, session_tags, favorites, schema_version, message_index_state
+fn migration_16(conn: &Connection) -> Result<(), String> {
+    conn.execute("DELETE FROM session_details_cache", []).map_err(|e| format!("Migration 16 failed clearing session_details_cache: {e}"))?;
+    // message_fts is an FTS5 virtual table created lazily after migrations;
+    // it may not exist yet on fresh DBs, so guard with existence check.
+    let fts_exists: bool = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='message_fts'", [], |row| row.get::<_, i64>(0)).map(|c| c > 0).unwrap_or(false);
+    if fts_exists {
+        conn.execute("DELETE FROM message_fts", []).map_err(|e| format!("Migration 16 failed clearing message_fts: {e}"))?;
+    }
+    conn.execute("DELETE FROM message_entries", []).map_err(|e| format!("Migration 16 failed clearing message_entries: {e}"))?;
+    conn.execute("DELETE FROM session_info_entries", []).map_err(|e| format!("Migration 16 failed clearing session_info_entries: {e}"))?;
+    conn.execute("DELETE FROM subagent_meta_cache", []).map_err(|e| format!("Migration 16 failed clearing subagent_meta_cache: {e}"))?;
+    conn.execute("DELETE FROM scan_state", []).map_err(|e| format!("Migration 16 failed clearing scan_state: {e}"))?;
+    // sessions last — it has FK references from other tables we just cleared
+    conn.execute("DELETE FROM sessions", []).map_err(|e| format!("Migration 16 failed clearing sessions: {e}"))?;
 
     Ok(())
 }

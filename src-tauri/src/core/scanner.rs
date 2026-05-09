@@ -376,48 +376,6 @@ pub(crate) struct ParsedFileResult {
     pub(crate) path_str: String,
 }
 
-/// Parallel scan all JSONL files using tokio tasks (header-only, fast initial scan)
-/// Returns minimal SessionInfo with empty message fields for DB bootstrap
-pub(crate) async fn parallel_parse_headers_only(files: Vec<PathBuf>) -> Vec<ParsedFileResult> {
-    use tokio::task::JoinSet;
-
-    let mut set = JoinSet::new();
-
-    for file_path in files {
-        set.spawn(async move {
-            let path_str = file_path.to_string_lossy().to_string();
-            let metadata = fs::metadata(crate::domain::session_bridge::backing_file_path(&file_path));
-            let file_modified: DateTime<Utc> = match metadata {
-                Ok(m) => DateTime::from(m.modified().unwrap_or(std::time::SystemTime::now())),
-                Err(e) => {
-                    warn!("Failed to get metadata for {}: {}", path_str, e);
-                    return None;
-                }
-            };
-
-            // Lightweight header-only parse
-            match crate::domain::session_bridge::parse_session_info_header_only(&file_path, file_modified) {
-                Ok(info) => Some(ParsedFileResult { info, entries: vec![], file_modified, path_str }),
-                Err(e) => {
-                    warn!("Failed to parse header {}: {}", path_str, e);
-                    None
-                }
-            }
-        });
-    }
-
-    let mut parsed_results: Vec<ParsedFileResult> = Vec::new();
-    while let Some(result) = set.join_next().await {
-        match result {
-            Ok(Some(data)) => parsed_results.push(data),
-            Ok(None) => {}
-            Err(e) => warn!("Task join error: {}", e),
-        }
-    }
-
-    parsed_results
-}
-
 /// Parallel scan all JSONL files using tokio tasks
 /// Strategy: Parse files in parallel (pure CPU work), return results for caller to handle DB
 pub(crate) async fn parallel_parse_files(files: Vec<PathBuf>) -> Vec<ParsedFileResult> {
@@ -539,17 +497,8 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
         info!("Need to parse {} files ({} cached, {} to parse) [db_load={}ms classify={}ms]", total_files, total_files - files_to_parse.len(), files_to_parse.len(), db_load_elapsed_ms, classify_elapsed_ms);
 
         // Parse only files that need updates
-        // Use lightweight header-only parse for initial DB bootstrap (many files, empty DB)
-        let is_initial_bootstrap = db_sessions.is_empty() && files_to_parse.len() > 100;
         let parse_started_at = Instant::now();
-        let parsed_results = if files_to_parse.is_empty() {
-            Vec::new()
-        } else if is_initial_bootstrap {
-            info!("Initial bootstrap: using lightweight header-only parse for {} files", files_to_parse.len());
-            parallel_parse_headers_only(files_to_parse).await
-        } else {
-            parallel_parse_files(files_to_parse).await
-        };
+        let parsed_results = if files_to_parse.is_empty() { Vec::new() } else { parallel_parse_files(files_to_parse).await };
         let parse_elapsed_ms = parse_started_at.elapsed().as_millis();
 
         // Process results: separate realtime vs historical, upsert to DB
@@ -627,8 +576,6 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             realtime_buffered,
             historical_upserts,
         );
-        // Details cache will be populated by the next full scan (30s) via parse_session_details_from_entries.
-        // No need for a background warming task that re-reads all files.
 
         break Ok(all_sessions);
     }
@@ -1143,4 +1090,63 @@ pub fn start_background_scanner(sessions_dir: PathBuf, interval_secs: u64) {
         let scheduler = ScannerScheduler::new(sessions_dir, interval_secs, config);
         scheduler.start().await;
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_full_parse_populates_details_and_message_entries() {
+        let test_dir = std::path::PathBuf::from("/Users/dengwenyu/.pi/agent/sessions/--Users-dengwenyu-.pi-agent-extensions--");
+        if !test_dir.exists() {
+            eprintln!("Skipping: test directory not found");
+            return;
+        }
+
+        // Use a temp DB directly (no env var to avoid test isolation issues)
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db_path = temp.path().join("sessions.db");
+        let config = Config::default();
+        let conn = sqlite::init_db_with_path(&db_path, &config).expect("db init");
+
+        // Find one file to test with
+        let mut test_file: Option<PathBuf> = None;
+        for entry in std::fs::read_dir(&test_dir).expect("read_dir").flatten() {
+            let path = entry.path();
+            if path.extension().map_or(false, |e| e == "jsonl") {
+                test_file = Some(path);
+                break;
+            }
+        }
+        let test_file = test_file.expect("should find a jsonl file");
+        eprintln!("Testing with: {}", test_file.display());
+
+        // Full parse
+        let (info, entries) = parse_session_info(&test_file).expect("parse");
+        assert!(entries.len() > 0, "full parse should return entries, got {}", entries.len());
+        assert!(info.message_count > 0, "should have messages");
+
+        // Upsert session with entries → populates message_entries
+        let file_modified = Utc::now();
+        let mut c = conn;
+        sqlite::upsert_session(&mut c, &info, file_modified, Some(&entries)).expect("upsert");
+
+        // Upsert details cache → populates tokens/cost
+        let details = crate::core::parser::parse_session_details_from_entries(&entries);
+        assert!(details.user_messages + details.assistant_messages > 0, "details should have messages");
+        sqlite::upsert_session_details_cache(&c, &info.path, file_modified, &details).expect("details cache");
+
+        // Verify message_entries
+        let me_count: i64 = c.query_row("SELECT COUNT(*) FROM message_entries WHERE session_path = ?1", rusqlite::params![info.path], |row| row.get(0)).unwrap_or(0);
+        assert!(me_count > 0, "message_entries should be populated, got {}", me_count);
+
+        // Verify session_details_cache
+        let cached = sqlite::get_session_details_cache(&c, &info.path).expect("get cache").expect("cache should exist");
+        assert!(cached.user_messages + cached.assistant_messages > 0, "cached details should have messages");
+
+        eprintln!("OK: entries={} message_entries={} details: user={} assistant={} tokens={}/{} cost={}", entries.len(), me_count, cached.user_messages, cached.assistant_messages, cached.input_tokens, cached.output_tokens, cached.input_cost + cached.output_cost);
+
+        // temp dir drops here, cleaning up the DB file
+    }
 }
