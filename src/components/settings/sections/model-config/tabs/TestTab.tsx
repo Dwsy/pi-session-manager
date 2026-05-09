@@ -90,7 +90,7 @@ export function TestTab({
         )}
 
         {!selectedModelEntry?.id?.trim() && selectedProviderEntry && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
             {t(
               "settings.modelConfigCenter.help.noModelId",
               "Current model has no ID filled, cannot make HTTP test.",
@@ -165,7 +165,7 @@ export function TestTab({
           <div className="rounded-xl border border-border/70 bg-background/30 p-4 text-sm">
             <div className="flex flex-wrap items-center gap-3">
               <span
-                className={`inline-flex items-center gap-1.5 font-medium ${testResult.ok ? "text-green-300" : "text-red-300"}`}
+                className={`inline-flex items-center gap-1.5 font-medium ${testResult.ok ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}
               >
                 {testResult.ok ? (
                   <Check className="h-4 w-4" />
@@ -214,12 +214,12 @@ export function TestTab({
               </div>
             </div>
             {testResult.responsePreview && (
-              <div className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+              <div className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-200">
                 {testResult.responsePreview}
               </div>
             )}
             {testResult.error && (
-              <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+              <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
                 {testResult.error}
               </div>
             )}

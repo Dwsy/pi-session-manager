@@ -594,7 +594,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {isLabelMatch && (
-              <span className="inline-flex items-center h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200">
+              <span className="inline-flex items-center h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border border-amber-500/40 bg-amber-500/15 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
                 {this.context?.t(
                   "search.fullText.labelMatch",
                   "label",
@@ -602,7 +602,7 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
               </span>
             )}
             {isSessionIdMatch && (
-              <span className="inline-flex items-center h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+              <span className="inline-flex items-center h-5 px-2 rounded-md text-[11px] font-medium tracking-[0.01em] border border-emerald-500/40 bg-emerald-500/15 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
                 {this.context?.t(
                   "search.fullText.sessionIdMatch",
                   "session id",

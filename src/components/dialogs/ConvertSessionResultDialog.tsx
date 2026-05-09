@@ -31,13 +31,13 @@ export default function ConvertSessionResultDialog({
   const providerTone = (provider: string) => {
     const normalized = provider.toLowerCase()
     if (normalized.includes('claude')) {
-      return 'border-orange-500/30 bg-orange-500/10 text-orange-200'
+      return 'border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-200'
     }
     if (normalized.includes('codex')) {
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
     }
     if (normalized.includes('pi')) {
-      return 'border-blue-500/30 bg-blue-500/10 text-blue-200'
+      return 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-200'
     }
     return 'border-border/60 bg-secondary/30 text-foreground'
   }

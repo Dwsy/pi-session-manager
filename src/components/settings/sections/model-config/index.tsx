@@ -132,8 +132,8 @@ export default function ModelConfigCenter() {
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
                       isDirty
-                        ? "bg-amber-500/10 text-amber-300"
-                        : "bg-green-500/10 text-green-300"
+                        ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                        : "bg-green-500/10 text-green-700 dark:text-green-300"
                     }`}
                   >
                     {isDirty

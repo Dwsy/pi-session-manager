@@ -151,7 +151,7 @@ export function ConfigureTab({
                       event.stopPropagation();
                       requestDeleteProvider(providerName);
                     }}
-                    className="rounded-lg p-2 text-muted-foreground hover:bg-red-500/10 hover:text-red-300 motion-color motion-press focus-ring"
+                    className="rounded-lg p-2 text-muted-foreground hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300 motion-color motion-press focus-ring"
                     title={t(
                       "settings.modelConfigCenter.actions.delete",
                       "Delete",
@@ -263,7 +263,7 @@ export function ConfigureTab({
                           )}
                       </span>
                       {model.reasoning && (
-                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-300">
+                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-300">
                           {t(
                             "settings.modelConfigCenter.fields.reasoning",
                             "Inference",
@@ -488,7 +488,7 @@ export function ConfigureTab({
                 onClick={() =>
                   requestDeleteProvider(selectedProvider)
                 }
-                className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300 hover:bg-red-500/20 motion-color motion-press focus-ring"
+                className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-500/20 motion-color motion-press focus-ring"
               >
                 <Trash2 className="h-4 w-4" />
                 {t(
@@ -546,7 +546,7 @@ export function ConfigureTab({
                   onClick={() =>
                     requestDeleteModel(selectedModelIndex)
                   }
-                  className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300 hover:bg-red-500/20 motion-color motion-press focus-ring"
+                  className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-500/20 motion-color motion-press focus-ring"
                 >
                   <Trash2 className="h-4 w-4" />
                   {t(

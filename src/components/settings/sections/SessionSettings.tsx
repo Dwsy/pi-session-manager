@@ -502,7 +502,7 @@ export default function SessionSettings({
                     </button>
                     <button
                       onClick={handleClearAllBrowserCaches}
-                      className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-red-300 transition-colors hover:bg-red-500/15"
+                      className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-red-700 dark:text-red-300 transition-colors hover:bg-red-500/15"
                     >
                       {t(
                         "settings.session.clearAllBrowserCache",
@@ -819,7 +819,7 @@ export default function SessionSettings({
               </button>
               <button
                 onClick={handleClearAllBrowserCaches}
-                className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-red-300 transition-colors hover:bg-red-500/15"
+                className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-red-700 dark:text-red-300 transition-colors hover:bg-red-500/15"
               >
                 {t(
                   "settings.session.clearAllBrowserCache",

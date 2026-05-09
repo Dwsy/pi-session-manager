@@ -11,9 +11,9 @@ export function StatusBanner({
   onClose: () => void;
 }) {
   const palette = {
-    success: "border-green-500/30 bg-green-500/10 text-green-300",
-    error: "border-red-500/30 bg-red-500/10 text-red-300",
-    warning: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+    success: "border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-300",
+    error: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
+    warning: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
     info: "border-info/30 bg-info/10 text-info",
   } as const;
 

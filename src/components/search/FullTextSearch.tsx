@@ -587,7 +587,7 @@ export default function FullTextSearch({
                       onClick={() => applySuggestedSourceFilter(value)}
                       className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-[#252636] motion-surface motion-color"
                     >
-                      <span className="font-mono text-blue-300">
+                      <span className="font-mono text-blue-700 dark:text-blue-300">
                         {formatSourceFilterToken(value)}
                       </span>
                       <span className="text-muted-foreground">
@@ -791,13 +791,13 @@ export default function FullTextSearch({
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 mb-0.5">
                               <h3
-                                className="text-sm font-semibold text-foreground truncate group-hover:text-blue-300 motion-color"
+                                className="text-sm font-semibold text-foreground truncate group-hover:text-blue-700 dark:group-hover:text-blue-300 motion-color"
                                 title={`Session: ${title}\nID: ${hit.session_id}\nPath: ${hit.session_path}`}
                               >
                                 {title}
                               </h3>
                               {count > 1 && (
-                                <span className="px-2 py-0.5 bg-blue-500/15 text-blue-300 text-xs font-bold rounded-full border border-blue-500/30 ml-auto flex-shrink-0">
+                                <span className="px-2 py-0.5 bg-blue-500/15 text-blue-700 dark:text-blue-300 text-xs font-bold rounded-full border border-blue-500/30 ml-auto flex-shrink-0">
                                   {count}
                                 </span>
                               )}
@@ -813,7 +813,7 @@ export default function FullTextSearch({
                                 {formatShortSessionId(hit.session_id)}
                               </span>
                               {isSessionIdMatch && (
-                                <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                                <span className="inline-flex items-center rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
                                   {t(
                                     "search.fullText.sessionIdMatch",
                                     "session id",
@@ -821,7 +821,7 @@ export default function FullTextSearch({
                                 </span>
                               )}
                               {isLabelMatch && (
-                                <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
+                                <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
                                   {t("search.fullText.labelMatch")}
                                 </span>
                               )}
@@ -830,8 +830,8 @@ export default function FullTextSearch({
                               <span
                                 className={`px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${
                                   hit.role === "user"
-                                    ? "bg-gradient-to-r from-blue-500/20 to-blue-600/20 text-blue-300 border border-blue-500/30"
-                                    : "bg-gradient-to-r from-purple-500/20 to-purple-600/20 text-purple-300 border border-purple-500/30"
+                                    ? "bg-gradient-to-r from-blue-500/20 to-blue-600/20 text-blue-700 dark:text-blue-300 border border-blue-500/30"
+                                    : "bg-gradient-to-r from-purple-500/20 to-purple-600/20 text-purple-700 dark:text-purple-300 border border-purple-500/30"
                                 }`}
                               >
                                 {hit.role.toUpperCase()}
