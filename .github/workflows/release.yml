@@ -154,6 +154,12 @@ jobs:
           path: cli-artifacts
           merge-multiple: true
 
+      - name: Fix CLI permissions
+        run: |
+          for f in cli-artifacts/pi-session-cli-*; do
+            [ -f "$f" ] && [ ! -name "*.sha256" ] && [ ! -name "*.exe" ] && chmod +x "$f"
+          done
+
       - name: Download updater metadata
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
