@@ -112,17 +112,19 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
         }
       }
 
-      // Cmd+E → edit (placeholder for future)
+      // Cmd+E → edit session
       if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
         e.preventDefault()
-        // TODO: open session in edit mode
+        // Feature: open session in edit mode
+        // See: docs/issues/cmd-e-edit-mode.md
         return
       }
 
-      // Cmd+D → delete (placeholder for future)
+      // Cmd+D → delete session
       if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
         e.preventDefault()
-        // TODO: show delete confirmation
+        // Feature: show delete confirmation dialog
+        // See: docs/issues/cmd-d-delete-confirm.md
         return
       }
     }

@@ -8,7 +8,6 @@
 | `npm run tauri:dev` | Tauri GUI |
 | `npm run build && npm run tauri:build` | Production |
 | `npm run tauri:build:local-signed` | Production build using local signing env file |
-| `npm run tauri:build:local-test` | Local test build without updater artifacts/signing |
 | `npm run build:cli` | CLI standalone |
 
 ## Rust

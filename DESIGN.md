@@ -907,6 +907,8 @@ All components support `env(safe-area-inset-*)` for mobile notches and keyboards
 | `src/styles/_scroll-markers.less` | Scroll behavior |
 | `src/styles/_flow.less` | Flow chart styles |
 | `src/styles/_subagent.less` | Subagent-specific animations |
+| `src/styles/_model-selector.less` | Model selector dropdown styles |
+| `src/styles/index.less` | Main entry point, imports all partials |
 
 ### Components (Design-Relevant)
 | Directory | Key Components | Design Notes |

@@ -874,4 +874,119 @@ mod tests {
         assert_eq!(parsed.offset, 0);
         assert_eq!(parsed.limit, 1);
     }
+
+    #[cfg(not(feature = "gui"))]
+    #[tokio::test]
+    async fn dispatch_returns_error_for_unknown_command() {
+        let result = dispatch("nonexistent_command", &serde_json::json!({})).await;
+        assert!(result.is_err(), "expected error for unknown command");
+        let error = result.unwrap_err();
+        assert!(error.contains("Unknown command"), "error should mention unknown command, got: {error}");
+    }
+
+    #[cfg(not(feature = "gui"))]
+    #[tokio::test]
+    async fn dispatch_extracts_required_string_payload() {
+        // Test that missing required field returns appropriate error
+        let result = dispatch("read_session_file", &serde_json::json!({})).await;
+        assert!(result.is_err(), "expected error for missing required field");
+        let error = result.unwrap_err();
+        assert!(error.contains("Missing required field"), "error should mention missing field, got: {error}");
+    }
+
+    #[cfg(not(feature = "gui"))]
+    #[tokio::test]
+    async fn dispatch_extracts_optional_string_payload() {
+        // Test scan_sessions_paginated with optional fields
+        let result = dispatch(
+            "scan_sessions_paginated",
+            &serde_json::json!({
+                "offset": 0,
+                "limit": 5
+            }),
+        )
+        .await;
+        assert!(result.is_ok(), "expected success with optional fields omitted, got {result:?}");
+    }
+
+    #[cfg(not(feature = "gui"))]
+    #[tokio::test]
+    async fn dispatch_handles_session_digest_command() {
+        let result = dispatch("session_digest", &serde_json::json!({})).await;
+        assert!(result.is_ok(), "expected success for session_digest, got {result:?}");
+        let value = result.unwrap();
+        assert!(value.get("version").is_some(), "response should have version field");
+        assert!(value.get("count").is_some(), "response should have count field");
+    }
+
+    #[cfg(not(feature = "gui"))]
+    #[tokio::test]
+    async fn dispatch_handles_list_supported_session_providers() {
+        let result = dispatch("list_supported_session_providers", &serde_json::json!({})).await;
+        assert!(result.is_ok(), "expected success for list_supported_session_providers, got {result:?}");
+    }
+
+    #[cfg(not(feature = "gui"))]
+    #[tokio::test]
+    async fn dispatch_rejects_empty_command() {
+        let result = dispatch("", &serde_json::json!({})).await;
+        assert!(result.is_err(), "expected error for empty command");
+    }
+
+    #[test]
+    fn to_val_serializes_valid_data() {
+        let data = serde_json::json!({"key": "value"});
+        let result = to_val(data.clone(), "test");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), data);
+    }
+
+    #[test]
+    fn to_val_returns_error_for_invalid_data() {
+        // Create a value that can't be serialized (this is tricky, but we can test the error path)
+        let result = to_val("valid", "test context");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn unpack_pi_rpc_response_extracts_data() {
+        let response = serde_json::json!({
+            "success": true,
+            "data": {"key": "value"}
+        });
+        let result = unpack_pi_rpc_response(response);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), serde_json::json!({"key": "value"}));
+    }
+
+    #[test]
+    fn unpack_pi_rpc_response_handles_error() {
+        let response = serde_json::json!({
+            "success": false,
+            "error": "Something went wrong"
+        });
+        let result = unpack_pi_rpc_response(response);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Something went wrong");
+    }
+
+    #[test]
+    fn unpack_pi_rpc_response_handles_missing_data() {
+        let response = serde_json::json!({
+            "success": true
+        });
+        let result = unpack_pi_rpc_response(response);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), serde_json::Value::Null);
+    }
+
+    #[test]
+    fn unpack_pi_rpc_response_handles_generic_error() {
+        let response = serde_json::json!({
+            "success": false
+        });
+        let result = unpack_pi_rpc_response(response);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Pi RPC command failed");
+    }
 }

@@ -1,3 +1,4 @@
+pub mod cli_common;
 pub mod commands;
 pub mod core;
 pub mod data;

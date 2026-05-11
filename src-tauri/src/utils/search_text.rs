@@ -1,7 +1,7 @@
-// TODO: Missing Korean Hangul (U+AC00–U+D7AF), Japanese Hiragana (U+3040–U+309F),
-// Katakana (U+30A0–U+30FF), CJK Radicals (U+2E80–U+2EFF) etc.
-// Korean/Japanese kana queries won't be detected as CJK, skipping per-char tokenization,
-// which may cause missed or inaccurate search results.
+// CJK character detection - currently supports Chinese characters only
+// Missing: Korean Hangul (U+AC00–U+D7AF), Japanese Hiragana (U+3040–U+309F),
+// Katakana (U+30A0–U+30FF), CJK Radicals (U+2E80–U+2EFF)
+// See: docs/issues/expand-cjk-support.md
 pub fn is_cjk_char(ch: char) -> bool {
     matches!(
         ch as u32,

@@ -37,7 +37,7 @@ pub async fn my_command(
 ```rust
 // server/http/mod.rs
 async fn handle_command(req: Json<HttpRequest>) -> Response {
-    dispatch(&app_state, &req.command, &req.payload).await
+    dispatch_with_state(&app_state, &req.command, &req.payload).await
 }
 ```
 
@@ -46,7 +46,7 @@ async fn handle_command(req: Json<HttpRequest>) -> Response {
 ```rust
 // server/ws.rs
 async fn handle_message(&self, msg: WsRequest) -> WsResponse {
-    dispatch(&app_state, &msg.command, &msg.payload).await
+    dispatch_with_state(&app_state, &msg.command, &msg.payload).await
 }
 ```
 
@@ -56,16 +56,19 @@ async fn handle_message(&self, msg: WsRequest) -> WsResponse {
 
 ```rust
 // dispatch.rs
-pub async fn dispatch(
+// CLI/external callers (no app_state)
+pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
+    dispatch_impl(&None, command, payload).await
+}
+
+// GUI-only callers (with app_state)
+#[cfg(feature = "gui")]
+pub async fn dispatch_with_state(
     app_state: &Option<SharedAppState>,
     command: &str,
     payload: &Value,
 ) -> Result<Value, String> {
-    match command {
-        "scan_sessions" => { /* ... */ }
-        "my_new_command" => my_new_command_handler(app_state, payload).await
-        // ...
-    }
+    dispatch_impl(app_state, command, payload).await
 }
 ```
 

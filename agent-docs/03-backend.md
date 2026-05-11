@@ -17,7 +17,7 @@ src-tauri/src/
 
 ## Commands
 
-`session.rs` (CRUD) | `session_file.rs` (read) | `session_list.rs` (list) | `session_open.rs` (open) | `search.rs` | `settings.rs` | `tags.rs` | `favorites.rs` | `terminal.rs` | `skills.rs` | `models.rs` | `model_config.rs` | `pi_live.rs` | `auth.rs` | `config_versions.rs` | `config_bundle.rs`
+`session.rs` (CRUD) | `session_file.rs` (read) | `session_list.rs` (list) | `session_open.rs` (open) | `search.rs` | `settings.rs` | `tags.rs` | `favorites.rs` | `terminal.rs` | `skills.rs` | `models.rs` | `model_config.rs` | `pi_live.rs` | `auth.rs` | `config_versions.rs` | `config_bundle.rs` | `datasets.rs` | `trace.rs` | `workspaces.rs`
 
 ## Domain
 
@@ -27,11 +27,15 @@ src-tauri/src/
 | `session_list/` | filtering, pagination, sorting |
 | `stats/` | aggregator, day_stats, heatmap |
 | `terminal/` | api, launch, utils |
-| Root | delete, intel, parser, scanner, write_buffer |
+| `trace/` | trace analytics extraction |
+| `workspaces/` | workspace management |
+| `session_bridge/` | session bridge integration |
+| `casr_min/` | minimal CASR integration |
+| Root | datasets, pi_session, delete, intel, parser, scanner, write_buffer |
 
 ## Core
 
-`delete.rs` | `intel.rs` | `parser.rs` | `scanner.rs` | `write_buffer.rs`
+`delete.rs` | `intel.rs` | `io_trace.rs` | `parser.rs` | `scanner.rs` | `write_buffer.rs`
 
 ## Data
 
@@ -92,10 +96,12 @@ pub async fn my_new_command(
 **This makes the command available via HTTP and WS:**
 
 ```rust
-// dispatch.rs
+// dispatch.rs — inside dispatch_impl()
 "my_new_command" => {
-    use crate::commands::my_feature::my_new_command;
-    my_new_command(app_state.clone(), payload).await
+    // For simple commands that don't need app_state:
+    my_new_command(payload).await
+    // Or if app_state is needed:
+    // my_new_command(app_state, payload).await
 }
 ```
 

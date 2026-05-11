@@ -5,13 +5,13 @@
 ```
 src/
   App.tsx, main.tsx, transport.ts, types.ts
-  components/    # 155 components
-  hooks/         # 40 hooks
+  components/    # ~199 .tsx files
+  hooks/         # ~51 hooks
   contexts/      # 3 contexts
   plugins/       # Plugin system
-  utils/         # 15 utilities
+  utils/         # 15+ utilities
   i18n/          # i18n (en-US, zh-CN, ja-JP, de-DE, fr-FR, es-ES)
-  styles/        # 19 Less files
+  styles/        # 20 Less files
 ```
 
 ## Components (components/)

@@ -201,9 +201,8 @@ fn find_matches(session: &SessionInfo, parsed_query: &ParsedQuotedQuery, query_h
             query_has_cjk,
             false, // Content search uses OR logic
         ) {
-            // TODO: Snippet takes first 130 chars; if the match is in the middle or later,
-            // it won't be visible. Should center around the match position instead,
-            // e.g. substr(content, instr(content, ?) - 40, 120).
+            // Snippet takes first 130 chars; consider centering around match position for better UX
+            // See: docs/issues/search-snippet-centering.md
             let snippet = entry.content.chars().take(130).collect::<String>();
             matches.push(Match { entry_id: entry.id.clone(), role: entry.role.clone(), snippet, timestamp: entry.timestamp });
         }

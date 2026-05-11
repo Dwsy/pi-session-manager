@@ -201,7 +201,7 @@ pub fn get_session_digest() -> (u64, usize) {
 /// Snapshot cached sessions without forcing a rescan.
 /// Returns None when cache is not initialized yet.
 pub fn get_cached_sessions() -> Option<Vec<SessionInfo>> {
-    SCAN_CACHE.read().ok().and_then(|g| g.as_ref().cloned())
+    SCAN_CACHE.read().ok().and_then(|g| g.as_ref().map(|sessions| sessions.iter().map(clone_session_for_list).collect()))
 }
 
 fn clone_session_for_list(session: &SessionInfo) -> SessionInfo {
@@ -225,7 +225,7 @@ fn clone_session_for_list(session: &SessionInfo) -> SessionInfo {
 /// Snapshot cached sessions optimized for list/pagination APIs.
 /// Drops heavy conversation blobs to reduce clone cost and memory pressure.
 pub fn get_cached_sessions_for_list() -> Option<Vec<SessionInfo>> {
-    SCAN_CACHE.read().ok().and_then(|guard| guard.as_ref().map(|sessions| sessions.iter().map(clone_session_for_list).collect()))
+    get_cached_sessions()
 }
 
 pub fn get_sessions_dir() -> Result<PathBuf, String> {
@@ -309,7 +309,7 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
     // Return cached list if available — file_watcher keeps it fresh
     if let Ok(guard) = SCAN_CACHE.read() {
         if let Some(ref cached) = *guard {
-            return Ok(cached.clone());
+            return Ok(cached.iter().map(clone_session_for_list).collect());
         }
     }
 
@@ -318,7 +318,7 @@ pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         if let Ok(guard) = SCAN_CACHE.read() {
             if let Some(ref cached) = *guard {
-                return Ok(cached.clone());
+                return Ok(cached.iter().map(clone_session_for_list).collect());
             }
         }
     }

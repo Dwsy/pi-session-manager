@@ -1,3 +1,4 @@
+use pi_session_manager::cli_common::{self, CommonCliArgs, ServerConfig};
 use pi_session_manager::data::search::embedding::{
     EmbeddingBatchRequest, EmbeddingConfig, EmbeddingData, EmbeddingRequest, EmbeddingResponse,
     EmbeddingService, EmbeddingStatusResponse,
@@ -33,80 +34,13 @@ impl CliAppState {
 
 pub type SharedCliState = Arc<CliAppState>;
 
-#[derive(Debug, Default)]
-struct CliArgs {
-    show_help: bool,
-    http_port: Option<u16>,
-    bind_addr: Option<String>,
-    auth_enabled: Option<bool>,
-    runtime_token: Option<String>,
-}
-
-fn parse_port_arg(value: &str, flag: &str) -> Result<u16, String> {
-    value
-        .parse::<u16>()
-        .map_err(|_| format!("Invalid value for {flag}: `{value}`"))
-}
-
-fn parse_cli_args() -> Result<CliArgs, String> {
+fn parse_cli_args() -> Result<CommonCliArgs, String> {
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
-    if raw_args.iter().any(|arg| arg == "-h" || arg == "--help") {
-        return Ok(CliArgs {
-            show_help: true,
-            ..CliArgs::default()
-        });
-    }
-
-    let mut parsed = CliArgs::default();
-    let mut iter = raw_args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "-p" | "--port" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
-                parsed.http_port = Some(parse_port_arg(value, arg)?);
-            }
-            "-b" | "--bind" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
-                if value.trim().is_empty() {
-                    return Err(format!("Invalid value for `{arg}`: empty address"));
-                }
-                parsed.bind_addr = Some(value.clone());
-            }
-            "--auth" => {
-                if parsed.auth_enabled == Some(false) {
-                    return Err("Cannot use `--auth` with `--no-auth`".to_string());
-                }
-                parsed.auth_enabled = Some(true);
-            }
-            "--no-auth" => {
-                if parsed.auth_enabled == Some(true) {
-                    return Err("Cannot use `--auth` with `--no-auth`".to_string());
-                }
-                parsed.auth_enabled = Some(false);
-            }
-            "--token" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for `--token`".to_string())?;
-                let token = value.trim();
-                if token.is_empty() {
-                    return Err("Invalid value for `--token`: empty token".to_string());
-                }
-                parsed.runtime_token = Some(token.to_string());
-            }
-            _ => return Err(format!("Unknown argument: `{arg}`")),
-        }
-    }
-
-    Ok(parsed)
+    cli_common::parse_common_args(&raw_args)
 }
 
 fn print_help() {
-    let default_path = default_config_path();
+    let default_path = cli_common::default_config_path();
     println!(
         "Pi Session Manager CLI\n\
          \n\
@@ -127,16 +61,33 @@ fn print_help() {
     );
 }
 
-fn apply_cli_overrides(server_cfg: &mut ServerConfig, cli_args: &CliArgs) {
-    if let Some(port) = cli_args.http_port {
-        server_cfg.http_port = port;
+/// Initialize embedding service if model is available
+fn init_embedding_service() -> Option<Arc<EmbeddingService>> {
+    let model_path = pi_session_manager::paths::pi_root_dir()
+        .unwrap_or_default()
+        .join("models/embedding-models/embeddinggemma-300M-Q8_0.gguf");
+
+    if !model_path.exists() {
+        info!(
+            "Embedding model not found at {:?}, embedding service disabled",
+            model_path
+        );
+        return None;
     }
-    if let Some(bind_addr) = &cli_args.bind_addr {
-        server_cfg.bind_addr = bind_addr.clone();
-    }
-    if let Some(auth_enabled) = cli_args.auth_enabled {
-        server_cfg.auth_enabled = auth_enabled;
-    }
+
+    let config = EmbeddingConfig {
+        enabled: true,
+        model_path,
+        port: 11435,
+        auto_release_minutes: 5,
+        node_path: None,
+    };
+
+    let service = Arc::new(EmbeddingService::new(config));
+    let service_clone = service.clone();
+    service_clone.start_auto_release();
+
+    Some(service)
 }
 
 #[tokio::main]
@@ -159,29 +110,14 @@ async fn main() {
 
     info!("Starting Pi Session Manager - CLI Mode");
 
-    // Load configuration
-    let mut server_cfg = load_server_settings();
-    apply_cli_overrides(&mut server_cfg, &cli_args);
+    // Load configuration and apply CLI overrides
+    let mut server_cfg = cli_common::load_server_config();
+    cli_common::apply_server_overrides(&mut server_cfg, &cli_args);
     let runtime_token = cli_args.runtime_token.clone();
 
+    // Initialize auth
     if server_cfg.auth_enabled {
-        match pi_session_manager::auth::init() {
-            Ok(token) => {
-                if let Some(cli_token) = runtime_token.as_ref() {
-                    if let Err(e) =
-                        pi_session_manager::auth::set_runtime_tokens(vec![cli_token.clone()])
-                    {
-                        error!("Failed to set runtime token: {}", e);
-                        std::process::exit(2);
-                    }
-                    info!("Auth enabled (runtime token loaded from CLI)");
-                } else {
-                    let _ = pi_session_manager::auth::set_runtime_tokens(Vec::new());
-                    info!("Auth enabled, token: {}", token);
-                }
-            }
-            Err(e) => error!("Failed to init auth: {}", e),
-        }
+        cli_common::init_auth(&runtime_token, true);
     } else if runtime_token.is_some() {
         warn!("`--token` is ignored because auth is disabled");
     }
@@ -192,7 +128,7 @@ async fn main() {
     // Start WebSocket service
     if server_cfg.ws_enabled {
         let ws_state = state.clone();
-        let ws_port = server_cfg.ws_port;
+        let ws_port = server_cfg.http_port;
         let ws_bind = server_cfg.bind_addr.clone();
         let ws_bind_log = ws_bind.clone();
         tokio::spawn(async move {
@@ -245,90 +181,13 @@ async fn main() {
     }
 
     info!("CLI mode running. Press Ctrl+C to exit.");
-
-    // Keep running
     tokio::signal::ctrl_c()
         .await
         .expect("Failed to listen for ctrl+c");
     info!("Shutting down...");
 }
 
-// Simplified configuration loading
-#[derive(Debug, Clone)]
-struct ServerConfig {
-    ws_enabled: bool,
-    http_enabled: bool,
-    ws_port: u16,
-    http_port: u16,
-    bind_addr: String,
-    auth_enabled: bool,
-    embedding_enabled: bool,
-}
-
-/// Initialize embedding service if model is available
-fn init_embedding_service() -> Option<Arc<EmbeddingService>> {
-    let model_path = crate::paths::pi_root_dir()
-        .unwrap_or_default()
-        .join("models/embedding-models/embeddinggemma-300M-Q8_0.gguf");
-
-    if !model_path.exists() {
-        info!(
-            "Embedding model not found at {:?}, embedding service disabled",
-            model_path
-        );
-        return None;
-    }
-
-    let config = EmbeddingConfig {
-        enabled: true,
-        model_path,
-        port: 11435,
-        auto_release_minutes: 5,
-        node_path: None,
-    };
-
-    let service = Arc::new(EmbeddingService::new(config));
-
-    // Start auto-release background task
-    let service_clone = service.clone();
-    service_clone.start_auto_release();
-
-    Some(service)
-}
-
-fn default_config_path() -> std::path::PathBuf {
-    pi_session_manager::unified_config::config_file_path()
-        .unwrap_or_else(|_| std::env::temp_dir().join("config.json"))
-}
-
-fn load_server_settings() -> ServerConfig {
-    let value = pi_session_manager::unified_config::read_section("server").unwrap_or_else(|_| {
-        serde_json::json!({
-            "ws_enabled": true,
-            "http_enabled": true,
-            "ws_port": 52131,
-            "http_port": 52131,
-            "bind_addr": "127.0.0.1",
-            "auth_enabled": true,
-            "embedding_enabled": false
-        })
-    });
-
-    ServerConfig {
-        ws_enabled: value["ws_enabled"].as_bool().unwrap_or(true),
-        http_enabled: value["http_enabled"].as_bool().unwrap_or(true),
-        ws_port: value["ws_port"].as_u64().unwrap_or(52131) as u16,
-        http_port: value["http_port"].as_u64().unwrap_or(52131) as u16,
-        bind_addr: value["bind_addr"]
-            .as_str()
-            .unwrap_or("127.0.0.1")
-            .to_string(),
-        auth_enabled: value["auth_enabled"].as_bool().unwrap_or(true),
-        embedding_enabled: value["embedding_enabled"].as_bool().unwrap_or(false),
-    }
-}
-
-// Simplified WS adapter (reuse original logic but adapt for CLI state)
+// Simplified WS adapter for CLI mode
 async fn init_ws_adapter(
     state: SharedCliState,
     bind_addr: &str,
@@ -355,16 +214,13 @@ async fn init_ws_adapter(
 
             let (mut sender, mut receiver) = ws_stream.split();
 
-            // Simple echo + command handling
             while let Some(msg) = receiver.next().await {
                 if let Ok(msg) = msg {
                     if let Ok(text) = msg.to_text() {
-                        // Simple handling: parse JSON command
                         if let Ok(req) = serde_json::from_str::<serde_json::Value>(text) {
                             let cmd = req["command"].as_str().unwrap_or("unknown");
                             let response = match cmd {
                                 "scan_sessions" => {
-                                    // Simplified implementation
                                     serde_json::json!({
                                         "id": req["id"].as_str().unwrap_or(""),
                                         "command": cmd,
@@ -397,9 +253,6 @@ async fn init_ws_adapter(
 }
 
 // CLI HTTP adapter (supports read-only v1 APIs)
-
-// CLI HTTP adapter (supports read-only v1 APIs)
-
 async fn init_http_adapter(
     _state: SharedCliState,
     bind_addr: &str,

@@ -1,6 +1,7 @@
 #![cfg(feature = "gui")]
 
 use tauri::{Listener, Manager};
+use pi_session_manager::cli_common::{self, CommonCliArgs};
 use pi_session_manager::resolve_window_dimensions;
 
 // Window dimension helpers are in lib.rs — used by both main and tray
@@ -12,7 +13,6 @@ mod tests {
     #[test]
     fn test_clamp_window_dimensions_preserves_default_size_on_large_screens() {
         let ((initial_width, initial_height), (min_width, min_height)) = clamp_window_dimensions(1728.0, 1117.0);
-
         assert_eq!(initial_width, 1400.0);
         assert_eq!(initial_height, 900.0);
         assert_eq!(min_width, DEFAULT_MIN_WINDOW_WIDTH);
@@ -22,7 +22,6 @@ mod tests {
     #[test]
     fn test_clamp_window_dimensions_shrinks_to_fit_smaller_work_areas() {
         let ((initial_width, initial_height), (min_width, min_height)) = clamp_window_dimensions(1352.0, 820.0);
-
         assert_eq!(initial_width, 1352.0);
         assert_eq!(initial_height, 820.0);
         assert_eq!(min_width, DEFAULT_MIN_WINDOW_WIDTH);
@@ -32,7 +31,6 @@ mod tests {
     #[test]
     fn test_clamp_window_dimensions_caps_minimum_size_to_available_space() {
         let ((initial_width, initial_height), (min_width, min_height)) = clamp_window_dimensions(920.0, 560.0);
-
         assert_eq!(initial_width, 920.0);
         assert_eq!(initial_height, 560.0);
         assert_eq!(min_width, 920.0);
@@ -40,76 +38,39 @@ mod tests {
     }
 }
 
+/// Extended CLI args for main.rs (adds --cli/--headless on top of common args).
 #[derive(Debug, Default)]
 struct MainCliArgs {
-    show_help: bool,
+    common: CommonCliArgs,
     cli_mode: bool,
-    http_port: Option<u16>,
-    bind_addr: Option<String>,
-    auth_enabled: Option<bool>,
-    runtime_token: Option<String>,
-}
-
-fn parse_port_arg(value: &str, flag: &str) -> Result<u16, String> {
-    value.parse::<u16>().map_err(|_| format!("Invalid value for {flag}: `{value}`"))
 }
 
 fn parse_main_cli_args() -> Result<MainCliArgs, String> {
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
-    if raw_args.iter().any(|arg| arg == "-h" || arg == "--help") {
-        return Ok(MainCliArgs { show_help: true, ..MainCliArgs::default() });
-    }
 
+    // Check for --cli/--headless first
     let cli_mode = raw_args.iter().any(|arg| arg == "--cli" || arg == "--headless");
-    if !cli_mode {
-        return Ok(MainCliArgs { cli_mode: false, ..MainCliArgs::default() });
+
+    // Filter out --cli/--headless for common parsing
+    let filtered: Vec<String> = raw_args
+        .iter()
+        .filter(|arg| arg.as_str() != "--cli" && arg.as_str() != "--headless")
+        .cloned()
+        .collect();
+
+    let common = cli_common::parse_common_args(&filtered)?;
+
+    // If --cli/--headless is present, reject unknown args (already handled by parse_common_args)
+    // If not in CLI mode, skip validation of port/bind/auth args
+    if !cli_mode && !common.show_help {
+        // In GUI mode, these args are ignored
+        return Ok(MainCliArgs {
+            common,
+            cli_mode: false,
+        });
     }
 
-    let mut parsed = MainCliArgs { cli_mode: true, ..MainCliArgs::default() };
-
-    let mut iter = raw_args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--cli" | "--headless" => {}
-            "-p" | "--port" => {
-                let value = iter.next().ok_or_else(|| format!("Missing value for `{arg}`"))?;
-                parsed.http_port = Some(parse_port_arg(value, arg)?);
-            }
-            "-b" | "--bind" => {
-                let value = iter.next().ok_or_else(|| format!("Missing value for `{arg}`"))?;
-                if value.trim().is_empty() {
-                    return Err(format!("Invalid value for `{arg}`: empty address"));
-                }
-                parsed.bind_addr = Some(value.clone());
-            }
-            "--auth" => {
-                if parsed.auth_enabled == Some(false) {
-                    return Err("Cannot use `--auth` with `--no-auth`".to_string());
-                }
-                parsed.auth_enabled = Some(true);
-            }
-            "--no-auth" => {
-                if parsed.auth_enabled == Some(true) {
-                    return Err("Cannot use `--auth` with `--no-auth`".to_string());
-                }
-                parsed.auth_enabled = Some(false);
-            }
-            "--token" => {
-                let value = iter.next().ok_or_else(|| "Missing value for `--token`".to_string())?;
-                let token = value.trim();
-                if token.is_empty() {
-                    return Err("Invalid value for `--token`: empty token".to_string());
-                }
-                parsed.runtime_token = Some(token.to_string());
-            }
-            _ if arg.starts_with('-') => {
-                return Err(format!("Unknown argument in CLI mode: `{arg}`"));
-            }
-            _ => {}
-        }
-    }
-
-    Ok(parsed)
+    Ok(MainCliArgs { common, cli_mode })
 }
 
 fn print_help() {
@@ -135,22 +96,10 @@ fn print_help() {
     );
 }
 
-fn apply_cli_overrides(server_cfg: &mut pi_session_manager::ServerSettings, cli_args: &MainCliArgs) {
-    if let Some(port) = cli_args.http_port {
-        server_cfg.http_port = port;
-    }
-    if let Some(bind_addr) = &cli_args.bind_addr {
-        server_cfg.bind_addr = bind_addr.clone();
-    }
-    if let Some(auth_enabled) = cli_args.auth_enabled {
-        server_cfg.auth_enabled = auth_enabled;
-    }
-}
-
 fn main() {
     tracing_subscriber::fmt::init();
 
-    let cli_args = match parse_main_cli_args() {
+    let main_args = match parse_main_cli_args() {
         Ok(args) => args,
         Err(err) => {
             eprintln!("Error: {err}");
@@ -159,16 +108,16 @@ fn main() {
             std::process::exit(2);
         }
     };
-    if cli_args.show_help {
+    if main_args.common.show_help {
         print_help();
         return;
     }
-    let cli_mode = cli_args.cli_mode;
+    let cli_mode = main_args.cli_mode;
 
-    // Load server settings before builder (sync, no runtime needed)
-    let mut server_cfg = pi_session_manager::load_server_settings_sync();
-    apply_cli_overrides(&mut server_cfg, &cli_args);
-    let runtime_token = cli_args.runtime_token.clone();
+    // Load server settings and apply CLI overrides
+    let mut server_cfg = cli_common::load_server_config();
+    cli_common::apply_server_overrides(&mut server_cfg, &main_args.common);
+    let runtime_token = main_args.common.runtime_token.clone();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -187,27 +136,9 @@ fn main() {
                 }
             }
 
-            // Initialize auth (only if enabled)
+            // Initialize auth
             if server_cfg.auth_enabled {
-                match pi_session_manager::auth::init() {
-                    Ok(token) => {
-                        if let Some(cli_token) = runtime_token.as_ref() {
-                            if let Err(e) = pi_session_manager::auth::set_runtime_tokens(vec![cli_token.clone()]) {
-                                eprintln!("Failed to set runtime token: {e}");
-                                std::process::exit(2);
-                            }
-                            if cli_mode {
-                                log::info!("Auth enabled (runtime token loaded from CLI)");
-                            }
-                        } else {
-                            let _ = pi_session_manager::auth::set_runtime_tokens(Vec::new());
-                            if cli_mode {
-                                log::info!("Auth token: {token}");
-                            }
-                        }
-                    }
-                    Err(e) => eprintln!("Failed to init auth: {e}"),
-                }
+                cli_common::init_auth(&runtime_token, cli_mode);
             } else if runtime_token.is_some() && cli_mode {
                 log::warn!("`--token` is ignored because auth is disabled");
             }
@@ -216,14 +147,10 @@ fn main() {
             let app_state = pi_session_manager::app_state::create_app_state(app_handle);
             app.manage(app_state.clone());
 
-            // Initialize WebSocket adapter
-            // Single-port architecture: both GUI and CLI modes use HTTP /ws path
+            // Initialize WebSocket adapter (single-port: HTTP /ws path)
             if server_cfg.ws_enabled {
-                if cli_mode {
-                    log::info!("CLI mode uses HTTP /ws on {}:{} (unified single-port)", server_cfg.bind_addr, server_cfg.http_port);
-                } else {
-                    log::info!("GUI mode uses HTTP /ws on {}:{} (unified single-port)", server_cfg.bind_addr, server_cfg.http_port);
-                }
+                let mode_label = if cli_mode { "CLI" } else { "GUI" };
+                log::info!("{mode_label} mode uses HTTP /ws on {}:{}", server_cfg.bind_addr, server_cfg.http_port);
             }
 
             // Initialize HTTP adapter
@@ -233,21 +160,18 @@ fn main() {
                 let http_bind = server_cfg.bind_addr.clone();
                 let is_cli = cli_mode;
                 tauri::async_runtime::spawn(async move {
-                    // In GUI mode, don't serve static files (use Vite dev server)
-                    // In CLI mode, serve embedded static files
                     if let Err(e) = pi_session_manager::server::http::init_http_adapter_with_options(http_state, &http_bind, http_port, is_cli).await {
                         eprintln!("Failed to init HTTP adapter: {e}");
                     }
                 });
             }
 
-            // Start periodic write buffer flush (buffers session writes to reduce DB I/O)
-            // 5 second interval balances data safety with I/O efficiency
+            // Start periodic write buffer flush (5s interval)
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
                 let mut last_conn: Option<rusqlite::Connection> = None;
                 let mut ticks_since_checkpoint: u64 = 0;
-                const CHECKPOINT_INTERVAL_TICKS: u64 = 60; // checkpoint every 300s (60 * 5s)
+                const CHECKPOINT_INTERVAL_TICKS: u64 = 60; // checkpoint every 300s
 
                 loop {
                     interval.tick().await;
@@ -257,7 +181,6 @@ fn main() {
                         let sessions_count = sessions.len();
                         let details_count = details.len();
 
-                        // Reuse connection or create new one
                         let conn = match last_conn.take() {
                             Some(c) => c,
                             None => match pi_session_manager::data::sqlite::init_db() {
@@ -269,10 +192,10 @@ fn main() {
                             },
                         };
 
-                        // Batch all writes in a single transaction
                         let mut conn = conn;
                         let flush_result = (|| -> Result<usize, String> {
-                            let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|e| format!("Failed to begin batch transaction: {e}"))?;
+                            let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                                .map_err(|e| format!("Failed to begin batch transaction: {e}"))?;
 
                             let mut ok_count = 0;
                             for entry in &sessions {
@@ -297,11 +220,10 @@ fn main() {
                             Err(e) => log::error!("Failed to batch flush: {e}"),
                         }
 
-                        // Keep connection for next iteration
                         last_conn = Some(conn);
                     }
 
-                    // Periodic WAL checkpoint to prevent WAL file growth
+                    // Periodic WAL checkpoint
                     if ticks_since_checkpoint >= CHECKPOINT_INTERVAL_TICKS {
                         ticks_since_checkpoint = 0;
                         if let Some(conn) = &last_conn {
@@ -319,9 +241,9 @@ fn main() {
                 if let Some((sessions, details)) = pi_session_manager::core::write_buffer::force_flush_all() {
                     match pi_session_manager::data::sqlite::init_db() {
                         Ok(mut conn) => {
-                            // Use batch transaction for exit flush
                             let flush_result = (|| -> Result<usize, String> {
-                                let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|e| format!("Failed to begin exit transaction: {e}"))?;
+                                let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                                    .map_err(|e| format!("Failed to begin exit transaction: {e}"))?;
 
                                 let mut ok_count = 0;
                                 for entry in &sessions {
@@ -346,7 +268,6 @@ fn main() {
                                 Err(e) => log::error!("Failed to flush on exit: {e}"),
                             }
 
-                            // Final WAL checkpoint on exit
                             match conn.execute("PRAGMA wal_checkpoint(TRUNCATE)", []) {
                                 Ok(_) => log::info!("WAL checkpoint completed on exit"),
                                 Err(e) => log::warn!("WAL checkpoint failed on exit: {e}"),
@@ -368,7 +289,7 @@ fn main() {
                 }
                 log::info!("{info}");
             } else {
-                // Create system tray (lightweight mode infrastructure)
+                // Create system tray
                 if let Err(e) = pi_session_manager::tray::create_tray(app.handle()) {
                     log::warn!("Failed to create system tray: {e}");
                 }
@@ -382,11 +303,14 @@ fn main() {
                 };
                 let ((initial_width, initial_height), (min_width, min_height)) = resolve_window_dimensions(monitor.as_ref());
 
-                let builder = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into())).title("Pi Session Manager").inner_size(initial_width, initial_height).min_inner_size(min_width, min_height).center().resizable(true).fullscreen(false);
-
-                // Default to false to avoid accidental pinch zoom on macOS
-                // Enable zoom hotkeys for Cmd+/- support
-                let builder = builder.zoom_hotkeys_enabled(true);
+                let builder = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into()))
+                    .title("Pi Session Manager")
+                    .inner_size(initial_width, initial_height)
+                    .min_inner_size(min_width, min_height)
+                    .center()
+                    .resizable(true)
+                    .fullscreen(false)
+                    .zoom_hotkeys_enabled(true);
 
                 #[cfg(target_os = "macos")]
                 let builder = builder.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
@@ -394,14 +318,12 @@ fn main() {
                 #[cfg(not(target_os = "macos"))]
                 let builder = builder.decorations(true);
 
-                // Build the window
                 let window = builder.build()?;
 
                 // Restore saved zoom level
                 tauri::async_runtime::spawn(async move {
                     match pi_session_manager::settings_store::get::<f64>("window_zoom_level") {
                         Ok(Some(level)) => {
-                            // Ensure zoom level is within valid range (0.75 - 2.0), default to 1.0
                             let safe_level = if (0.75..=2.0).contains(&level) { level } else { 1.0 };
                             if let Err(e) = window.set_zoom(safe_level).map_err(|e| e.to_string()) {
                                 log::warn!("Failed to restore zoom level: {e}");
@@ -413,9 +335,6 @@ fn main() {
                         Err(e) => log::warn!("Failed to load zoom level from settings: {e}"),
                     }
                 });
-
-                // Note: Tauri 2 doesn't provide get_zoom API, so we can't save zoom level on exit
-                // Zoom level is now managed in frontend via localStorage
             }
 
             Ok(())
