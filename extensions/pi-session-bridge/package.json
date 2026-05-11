@@ -8,6 +8,6 @@
     "node": ">=21.0.0"
   },
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": ["./src/index.ts"]
   }
 }

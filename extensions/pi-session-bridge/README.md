@@ -1,59 +1,69 @@
 # psm-bridge
 
-Bridge Pi agent sessions to Pi Session Manager.
+Bridge Pi agent sessions to Pi Session Manager — live sync, search, tags, and context recall.
+
+## Architecture
+
+```
+src/
+├── config.ts               # Env vars + constants (port, WS URL, heartbeat)
+├── types.ts                # Shared interfaces (aligned with PSM backend)
+├── psm-client.ts           # HTTP client for PSM's POST /api dispatch
+├── bridge-connection.ts    # WebSocket connection + heartbeat + RPC
+├── connection-manager.ts   # Live mode lifecycle, event forwarding, RPC handling
+├── tools.ts                # LLM-callable tools (search, context, recall, tag)
+├── commands.ts             # Single /psm interactive panel
+├── env.d.ts                # Pi runtime type declarations
+└── index.ts                # Extension entry point
+```
 
 ## Features
 
+### /psm — Interactive Panel
+
+Single entry point for all bridge operations:
+
+```
+ PSM Bridge
+   Status:    ● connected
+   Live Mode: OFF
+   Session:   abc123...
+ → ● Connect / ○ Disconnect
+   ○ Live: OFF (toggle on)
+   ─── Tags ───
+     Manage Tags...    ← select picker (●/○ toggle)
+     Clear All Tags
+   ───
+     Close
+```
+
 ### Live Mode
-Real-time session sync via WebSocket. Events (messages, tool calls, agent turns) are forwarded to PSM as they happen.
 
-```bash
-/psm-live on     # Enable live mode
-/psm-live off    # Disable live mode
-/psm-status      # Check connection status
-```
+Real-time session sync via WebSocket. When connected:
 
-### Search
-Full-text search across indexed sessions via PSM's HTTP API.
+- **Event forwarding**: agent_start/end, turn_start/end, message_start/update/end, tool_execution_start/update/end, tool_call/result, model_select
+- **RPC handling**: PSM can send prompt, steer, follow_up, set_model, set_thinking_level, get_state, abort
+- **Session state sync**: model, thinking level, streaming state
 
-```
-/session_search query="rust async traits"
-```
+### LLM Tools
+
+| Tool | Description |
+|------|-------------|
+| `session_search` | Full-text search across indexed sessions |
+| `session_recall` | Search + retrieve surrounding dialogue context |
+| `session_context` | Fetch messages from a specific session |
+| `session_tag` | List/set/remove session tags |
 
 ### Tags
-SQLite-backed session tagging with built-in and custom tags.
 
-```
-/state          # Show current session tags
-/state-set wip  # Set tag
-/flow start     # Quick transition: todo -> wip
-```
-
-### Context Recall
-Retrieve surrounding dialogue context from past sessions.
-
-```
-/session_recall query="how to fix the bug"
-```
-
-### Session Rename
-Rename sessions using Pi's native API.
-
-```
-/session_rename name="Fix auth bug"
-```
-
-## Installation
-
-```bash
-pi install npm:Dwsy/psm-bridge
-```
+All tag operations use PSM's backend API (no local SQLite). Tags are managed via the `/psm` panel's "Manage Tags..." picker or the `session_tag` LLM tool.
 
 ## Configuration
 
 ```bash
-# PSM WebSocket URL (default: ws://127.0.0.1:52131/ws)
-export PSM_URL=ws://127.0.0.1:52131/ws
+# PSM port (auto-read from ~/.pi/pi-session-manager/config.json)
+# Fallback: 52131
+export PSM_URL=ws://127.0.0.1:5002/ws
 
 # Optional auth token
 export PSM_TOKEN=your-token
@@ -62,33 +72,7 @@ export PSM_TOKEN=your-token
 ## Requirements
 
 - Node.js >= 21.0.0
-- Pi Session Manager running (for Live mode and search)
-- PSM server mode enabled for search functionality
-
-## Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `session_search` | Full-text search across indexed sessions |
-| `session_recall` | Search + retrieve surrounding dialogue context |
-| `session_context` | Fetch messages from a specific session |
-| `session_tag` | List/set/remove session tags |
-| `session_rename` | Rename the current session |
-
-## Available Commands
-
-| Command | Description |
-|---------|-------------|
-| `/psm` | Show bridge status |
-| `/psm-live on/off` | Toggle live mode |
-| `/psm-connect` | Manual connect |
-| `/psm-disconnect` | Manual disconnect |
-| `/steer` | Steer running agent |
-| `/state` | Show session tags |
-| `/state-set <tag>` | Set tag |
-| `/state-list` | List available tags |
-| `/state-clear` | Clear all tags |
-| `/flow <action>` | Quick transitions |
+- Pi Session Manager running (for live mode and search)
 
 ## Status Indicators
 
@@ -96,9 +80,5 @@ export PSM_TOKEN=your-token
 [psm]         - Connected
 [retry N]     - Reconnecting (attempt N)
 [timeout]     - Connection lost
-[psm: off]    - Live mode disabled
+(no indicator) - Live mode off
 ```
-
-## License
-
-MIT
