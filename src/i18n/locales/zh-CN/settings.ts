@@ -419,6 +419,8 @@ export const settings = {
     debugModeHelp: "启用详细日志记录",
     demoMode: "演示模式",
     demoModeHelp: "查看演示数据以探索所有功能",
+    lightweightMode: "轻量模式",
+    lightweightModeDesc: "开启后，关闭窗口将最小化到系统托盘而非退出。托盘菜单：显示 / 打开网页版 / 退出",
     clearCache: "清除缓存",
     cacheCleared: "缓存已清除",
     clearCacheConfirm:

@@ -214,6 +214,8 @@ export const settings = {
     debugModeHelp: '詳細ログを有効化',
     demoMode: 'デモモード',
     demoModeHelp: 'デモデータで全機能を体験',
+    lightweightMode: 'ライトウェイトモード',
+    lightweightModeDesc: '有効にすると、ウィンドウを閉じても終了せずシステムトレイに最小化されます。トレイメニュー: 表示 / ウェブを開く / 終了',
     clearCache: 'キャッシュをクリア',
     cacheCleared: 'キャッシュをクリアしました',
     clearCacheConfirm: 'すべてのキャッシュデータをクリアしますか？セッションキャッシュは削除されますが、お気に入りは保持されます。',

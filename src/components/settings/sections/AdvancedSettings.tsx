@@ -88,6 +88,25 @@ export default function AdvancedSettings({
     loadApiKeys();
   }, [loadApiKeys]);
 
+  // Lightweight mode (minimize-to-tray on close)
+  const [lightweightMode, setLightweightMode] = useState(false);
+
+  useEffect(() => {
+    invoke<boolean>("get_lightweight_mode")
+      .then(setLightweightMode)
+      .catch(console.error);
+  }, []);
+
+  const handleToggleLightweightMode = async (enabled: boolean) => {
+    setLightweightMode(enabled);
+    try {
+      await invoke("set_lightweight_mode", { enabled });
+    } catch (e) {
+      console.error("Failed to set lightweight mode:", e);
+      setLightweightMode(!enabled);
+    }
+  };
+
   const updateServer = <K extends keyof ServerSettings>(
     key: K,
     value: ServerSettings[K],
@@ -334,6 +353,19 @@ export default function AdvancedSettings({
               className="items-start py-2 border-t border-border/60"
               descriptionClassName="text-xs text-muted-foreground mt-0.5"
               searchKey="advanced-auth"
+            />
+
+            <SettingsToggleRow
+              title={t("settings.advanced.lightweightMode", "Lightweight mode")}
+              description={t(
+                "settings.advanced.lightweightModeDesc",
+                "When enabled, closing the window minimizes to system tray instead of quitting. Tray menu: Show / Open Web / Quit",
+              )}
+              checked={lightweightMode}
+              onChange={handleToggleLightweightMode}
+              className="items-start py-2 border-t border-border/60"
+              descriptionClassName="text-xs text-muted-foreground mt-0.5"
+              searchKey="advanced-lightweightMode"
             />
 
             {serverDirty && (

@@ -451,6 +451,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     extraKeys: ["settings.advanced.sessionDirHelp"],
     keywords: ["session", "directory", "path", "folder", "scan"],
   },
+  {
+    id: "advanced-lightweightMode",
+    section: "advanced",
+    labelKey: "settings.advanced.lightweightMode",
+    fallbackLabel: "Lightweight mode",
+    extraKeys: ["settings.advanced.lightweightModeDesc"],
+    keywords: ["tray", "minimize", "close", "hide", "lightweight", "托盘", "最小化"],
+  },
 
   // ── Tag Manager ──
   {

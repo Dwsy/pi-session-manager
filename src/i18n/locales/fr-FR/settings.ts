@@ -211,6 +211,8 @@ export const settings = {
     debugModeHelp: 'Activer la journalisation détaillée',
     demoMode: 'Mode démo',
     demoModeHelp: 'Afficher des données de démonstration pour explorer toutes les fonctionnalités',
+    lightweightMode: 'Mode léger',
+    lightweightModeDesc: "Lorsqu'il est activé, la fermeture de la fenêtre minimise dans la barre des tâches au lieu de quitter. Menu tray : Afficher / Ouvrir le web / Quitter",
     clearCache: 'Vider le cache',
     cacheCleared: 'Cache vidé',
     clearCacheConfirm: 'Êtes-vous sûr de vouloir vider toutes les données en cache ? Cela supprimera tous les caches de session mais conservera les favoris.',

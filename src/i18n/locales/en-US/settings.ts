@@ -462,6 +462,8 @@ export const settings = {
     debugModeHelp: "Enable detailed logging",
     demoMode: "Demo Mode",
     demoModeHelp: "View demo data to explore all features",
+    lightweightMode: "Lightweight mode",
+    lightweightModeDesc: "When enabled, closing the window minimizes to system tray instead of quitting. Tray menu: Show / Open Web / Quit",
     clearCache: "Clear Cache",
     cacheCleared: "Cache cleared",
     clearCacheConfirm:

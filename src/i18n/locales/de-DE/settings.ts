@@ -211,6 +211,8 @@ export const settings = {
     debugModeHelp: 'Detaillierte Protokollierung aktivieren',
     demoMode: 'Demo-Modus',
     demoModeHelp: 'Demo-Daten anzeigen, um alle Funktionen zu erkunden',
+    lightweightMode: 'Leichtgewichtsmodus',
+    lightweightModeDesc: 'Wenn aktiviert, wird das Fenster beim Schließen in den Systemabschnitt minimiert statt beendet. Tray-Menü: Anzeigen / Web öffnen / Beenden',
     clearCache: 'Cache leeren',
     cacheCleared: 'Cache geleert',
     clearCacheConfirm: 'Möchten Sie wirklich alle zwischengespeicherten Daten löschen? Alle Sitzungs-Caches werden gelöscht, Favoriten bleiben erhalten.',
