@@ -156,13 +156,14 @@ function AssistantMessage({
       )}
 
       {/* Thinking blocks */}
-      {showThinking && thinkingBlocks.length > 0 && (
+      {thinkingBlocks.length > 0 && (
         <>
           {thinkingBlocks.map((thinking, index) => (
             <ThinkingBlock
               key={`thinking-${index}`}
               content={ansiToMarkdown(thinking, { stripColor: true })}
               searchQuery={searchQuery}
+              collapsed={!showThinking}
             />
           ))}
         </>

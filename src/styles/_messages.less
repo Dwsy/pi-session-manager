@@ -117,9 +117,12 @@
 
 .thinking-collapsed {
   display: none;
+  align-items: center;
+  gap: 0.4em;
   padding: var(--line-height);
   color: var(--thinkingText);
   font-style: italic;
+  font-size: 0.85em;
 }
 
 .thinking-block.expanded .thinking-text {
@@ -128,8 +131,16 @@
   overflow-y: auto;
 }
 
+.thinking-block:not(.expanded) .thinking-text {
+  display: none;
+}
+
 .thinking-block.expanded .thinking-collapsed {
   display: none;
+}
+
+.thinking-block:not(.expanded) .thinking-collapsed {
+  display: flex;
 }
 
 // Ultra-compact markdown styles for thinking blocks
