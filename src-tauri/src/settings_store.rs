@@ -7,6 +7,7 @@ fn key_to_path(key: &str) -> Vec<&str> {
         "server_settings" => vec!["server"],
         "session_paths" => vec!["session", "sessionPaths"],
         "window_zoom_level" => vec!["ui", "windowZoomLevel"],
+        "lightweight_mode" => vec!["app", "lightweightMode"],
         other => vec!["app", other],
     }
 }

@@ -74,3 +74,19 @@ pub async fn set_window_zoom_level(window: tauri::WebviewWindow, level: f64) -> 
 pub async fn restart_app(app: tauri::AppHandle) -> Result<(), String> {
     app.restart();
 }
+
+/// Get lightweight mode (minimize-to-tray on close).
+#[cfg(feature = "gui")]
+#[tauri::command]
+pub async fn get_lightweight_mode() -> Result<bool, String> {
+    crate::settings_store::get::<bool>("lightweight_mode").map(|v| v.unwrap_or(false))
+}
+
+/// Set lightweight mode and notify frontend.
+#[cfg(feature = "gui")]
+#[tauri::command]
+pub async fn set_lightweight_mode(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    crate::settings_store::set("lightweight_mode", &enabled)?;
+    crate::tray::emit_lightweight_mode_changed(&app, enabled);
+    Ok(())
+}

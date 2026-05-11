@@ -1,33 +1,13 @@
 #![cfg(feature = "gui")]
 
 use tauri::{Listener, Manager};
+use pi_session_manager::resolve_window_dimensions;
 
-const DEFAULT_WINDOW_WIDTH: f64 = 1400.0;
-const DEFAULT_WINDOW_HEIGHT: f64 = 900.0;
-const DEFAULT_MIN_WINDOW_WIDTH: f64 = 1000.0;
-const DEFAULT_MIN_WINDOW_HEIGHT: f64 = 600.0;
-
-fn clamp_window_dimensions(available_width: f64, available_height: f64) -> ((f64, f64), (f64, f64)) {
-    let initial_width = DEFAULT_WINDOW_WIDTH.min(available_width).max(1.0);
-    let initial_height = DEFAULT_WINDOW_HEIGHT.min(available_height).max(1.0);
-    let min_width = DEFAULT_MIN_WINDOW_WIDTH.min(initial_width);
-    let min_height = DEFAULT_MIN_WINDOW_HEIGHT.min(initial_height);
-
-    ((initial_width, initial_height), (min_width, min_height))
-}
-
-fn resolve_window_dimensions(monitor: Option<&tauri::Monitor>) -> ((f64, f64), (f64, f64)) {
-    monitor.map_or(((DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT), (DEFAULT_MIN_WINDOW_WIDTH, DEFAULT_MIN_WINDOW_HEIGHT)), |monitor| {
-        let work_area = monitor.work_area();
-        let scale_factor = monitor.scale_factor();
-
-        clamp_window_dimensions(f64::from(work_area.size.width) / scale_factor, f64::from(work_area.size.height) / scale_factor)
-    })
-}
+// Window dimension helpers are in lib.rs — used by both main and tray
 
 #[cfg(test)]
 mod tests {
-    use super::{clamp_window_dimensions, DEFAULT_MIN_WINDOW_HEIGHT, DEFAULT_MIN_WINDOW_WIDTH};
+    use pi_session_manager::{clamp_window_dimensions, DEFAULT_MIN_WINDOW_HEIGHT, DEFAULT_MIN_WINDOW_WIDTH};
 
     #[test]
     fn test_clamp_window_dimensions_preserves_default_size_on_large_screens() {
@@ -388,6 +368,11 @@ fn main() {
                 }
                 log::info!("{info}");
             } else {
+                // Create system tray (lightweight mode infrastructure)
+                if let Err(e) = pi_session_manager::tray::create_tray(app.handle()) {
+                    log::warn!("Failed to create system tray: {e}");
+                }
+
                 let monitor = match app.primary_monitor() {
                     Ok(monitor) => monitor,
                     Err(error) => {
@@ -464,6 +449,8 @@ fn main() {
             pi_session_manager::open_session_in_browser,
             pi_session_manager::open_path_in_system,
             pi_session_manager::restart_app,
+            pi_session_manager::get_lightweight_mode,
+            pi_session_manager::set_lightweight_mode,
             pi_session_manager::open_session_in_terminal,
             pi_session_manager::scan_skills,
             pi_session_manager::scan_prompts,
