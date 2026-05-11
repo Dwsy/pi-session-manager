@@ -1,0 +1,13 @@
+[build]
+incremental = false
+
+[profile.dev]
+# 优化编译速度，减少内存使用
+opt-level = 0
+debug = 1
+
+[profile.release]
+# 优化二进制大小
+opt-level = "z"
+lto = true
+codegen-units = 1
