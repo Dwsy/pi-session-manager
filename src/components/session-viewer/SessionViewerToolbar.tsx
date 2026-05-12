@@ -66,8 +66,8 @@ export default function SessionViewerToolbar({
     ? t("session.hideSidebar")
     : t("session.showSidebar");
   const thinkingToggleLabel = showThinking
-    ? t("session.toolbar.hideThinking", "Hide thinking")
-    : t("session.toolbar.showThinking", "Show thinking");
+    ? t("session.toolbar.hideThinking", "Collapse thinking")
+    : t("session.toolbar.showThinking", "Expand thinking");
   const toolsToggleLabel = toolsExpanded
     ? t("session.toolbar.collapseTools", "Collapse tools")
     : t("session.toolbar.expandTools", "Expand tools");

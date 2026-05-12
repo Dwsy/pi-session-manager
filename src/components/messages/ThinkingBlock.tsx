@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Brain } from 'lucide-react'
 import MarkdownContent from '@/components/ui/MarkdownContent'
 
@@ -9,19 +9,22 @@ interface ThinkingBlockProps {
 }
 
 function ThinkingBlock({ content, searchQuery = '', collapsed = false }: ThinkingBlockProps) {
-  const [expanded, setExpanded] = useState(false)
-  const isExpanded = !collapsed && expanded
+  const [expanded, setExpanded] = useState(() => !collapsed)
+
+  useEffect(() => {
+    setExpanded(!collapsed)
+  }, [collapsed])
 
   return (
     <div
-      className={`thinking-block ${isExpanded ? 'expanded' : ''}`}
-      onClick={() => !collapsed && setExpanded(!expanded)}
-      style={{ cursor: collapsed ? 'default' : 'pointer' }}
+      className={`thinking-block ${expanded ? 'expanded' : ''}`}
+      onClick={() => setExpanded(!expanded)}
+      style={{ cursor: 'pointer' }}
     >
       <div className="thinking-text">
         <MarkdownContent content={content} searchQuery={searchQuery} />
       </div>
-      {!isExpanded && (
+      {!expanded && (
         <div className="thinking-collapsed">
           <Brain className="h-3.5 w-3.5" />
           <span>Thinking ...</span>
