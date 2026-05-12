@@ -1,14 +1,11 @@
 import type { RefObject } from "react";
-import type { SessionInfo, FavoriteItem } from "@/types";
-import { FolderOpen, Star } from "lucide-react";
-import { ProjectListSkeleton } from "@/components/ui/Skeleton";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import SessionList from "@/components/session-list/SessionList";
-import SelectedProjectHeader from "./SelectedProjectHeader";
-import type { TerminalType } from "@/components/settings/types";
-import { getPlatformDefaults } from "@/components/settings/types";
+import { FolderOpen, Star } from "lucide-react";
+
+import { ProjectListSkeleton } from "@/components/ui/Skeleton";
+import type { SessionInfo, FavoriteItem } from "@/types";
 import {
   formatDirectory,
   formatShortTime,
@@ -17,21 +14,9 @@ import {
 
 interface ProjectListProps {
   sessions: SessionInfo[];
-  selectedSession: SessionInfo | null;
-  selectedProject?: string | null;
-  onSelectSession: (session: SessionInfo) => void;
   onSelectProject?: (project: string | null) => void;
-  onDeleteSession?: (session: SessionInfo) => void;
-  onConvertSession?: (session: SessionInfo) => void;
-  onResumeSession?: (session: SessionInfo) => void | Promise<void>;
   loading: boolean;
-  terminal?: TerminalType;
-  piPath?: string;
-  customCommand?: string;
-  resumeCommand?: string;
-  getBadgeType?: (sessionId: string) => "new" | "updated" | null;
   scrollParentRef?: RefObject<HTMLDivElement>;
-  showHeader?: boolean;
   favorites?: FavoriteItem[];
   onToggleFavorite?: (item: Omit<FavoriteItem, "addedAt">) => void;
   liveSessionIds?: Set<string>;
@@ -48,38 +33,17 @@ interface Project {
 
 export default function ProjectList({
   sessions,
-  selectedSession,
-  selectedProject: externalSelectedProject,
-  onSelectSession,
   onSelectProject,
-  onDeleteSession,
-  onConvertSession,
-  onResumeSession,
   loading,
-  terminal = getPlatformDefaults().defaultTerminal,
-  piPath,
-  customCommand,
-  resumeCommand,
-  getBadgeType,
   scrollParentRef,
-  showHeader = true,
   favorites = [],
   onToggleFavorite,
   liveSessionIds,
 }: ProjectListProps) {
   const { t } = useTranslation();
-  // Use external selectedProject if provided, otherwise use internal state
-  const [internalSelectedProject, setInternalSelectedProject] = useState<
-    string | null
-  >(null);
-  const selectedProject =
-    externalSelectedProject !== undefined
-      ? externalSelectedProject
-      : internalSelectedProject;
-  const setSelectedProject = onSelectProject || setInternalSelectedProject;
 
-  const projectMap = useMemo(() => {
-    return sessions.reduce(
+  const projects: Project[] = useMemo(() => {
+    const projectMap = sessions.reduce(
       (acc, session) => {
         const cwd = session.cwd || t("common.unknown");
         if (!acc[cwd]) {
@@ -90,9 +54,7 @@ export default function ProjectList({
       },
       {} as Record<string, SessionInfo[]>,
     );
-  }, [sessions, t]);
 
-  const projects: Project[] = useMemo(() => {
     const list = Object.entries(projectMap).map(([dir, dirSessions]) => {
       const liveCount = dirSessions.filter(
         (s) => s.isLive || (liveSessionIds?.has(s.id) ?? false),
@@ -110,201 +72,137 @@ export default function ProjectList({
     });
     list.sort((a, b) => b.lastModified - a.lastModified);
     return list;
-  }, [projectMap, liveSessionIds]);
-
-  const handleBackToProjects = () => {
-    setSelectedProject(null);
-  };
-
-  const handleSelectProject = (dir: string) => {
-    setSelectedProject(dir);
-  };
-
-  const projectSessions = selectedProject
-    ? projectMap[selectedProject] || []
-    : [];
-  const projectInfo = selectedProject
-    ? projects.find((p) => p.dir === selectedProject)
-    : null;
-
-  const projectLiveCount = selectedProject
-    ? projectSessions.filter(
-        (s) => s.isLive || (liveSessionIds?.has(s.id) ?? false),
-      ).length
-    : 0;
+  }, [sessions, t, liveSessionIds]);
 
   const projectsVirtualizer = useVirtualizer({
-    count: selectedProject ? 0 : projects.length,
+    count: projects.length,
     getScrollElement: () => scrollParentRef?.current ?? null,
     estimateSize: () => 68,
     overscan: 8,
   });
 
-  if (!selectedProject) {
-    if (loading) {
-      return <ProjectListSkeleton />;
-    }
+  if (loading) {
+    return <ProjectListSkeleton />;
+  }
 
-    if (projects.length === 0) {
-      return (
-        <div className="p-6 text-center text-muted-foreground">
-          <FolderOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p className="text-xs">{t("project.list.empty")}</p>
-        </div>
-      );
-    }
-
-    const virtualItems = projectsVirtualizer.getVirtualItems();
-
+  if (projects.length === 0) {
     return (
-      <div>
-        <div className="px-3 py-2 text-[11px] text-muted-foreground border-b border-border/10">
-          {t("project.list.count", { count: projects.length })}
-        </div>
-        <div
-          className="relative w-full"
-          style={{ height: `${projectsVirtualizer.getTotalSize()}px` }}
-        >
-          {virtualItems.map((virtualRow) => {
-            const project = projects[virtualRow.index];
-            if (!project) return null;
-            const isFavorite = favorites.some(
-              (f) => f.type === "project" && f.id === project.dir,
-            );
-            return (
-              <div
-                key={project.dir}
-                data-index={virtualRow.index}
-                ref={projectsVirtualizer.measureElement}
-                className="px-3 py-2 hover:bg-background cursor-pointer motion-surface motion-color border-b border-border/10 group"
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
-              >
-                <div className="flex items-start gap-2">
-                  <div
-                    className="min-w-0 flex-1"
-                    onClick={() => handleSelectProject(project.dir)}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <div className={`p-0.5 rounded flex-shrink-0 `}>
-                          {isFavorite ? (
-                            <Star className="h-4 w-4 flex-shrink-0 text-yellow-500 fill-current" />
-                          ) : (
-                            <FolderOpen className="h-4 w-4 flex-shrink-0 text-blue-400" />
-                          )}
-                        </div>
-                        <div className="text-[13px] sm:text-sm font-medium truncate leading-tight">
-                          {project.dirName}
-                        </div>
-                      </div>
-                      <div className="text-[10px] sm:text-[11px] text-muted-foreground flex-shrink-0 pt-0.5 whitespace-nowrap">
-                        {formatShortTime(
-                          new Date(project.lastModified).toISOString(),
-                          t,
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-[11px] sm:text-xs text-muted-foreground/80 truncate mb-2 font-mono">
-                      {formatDirectory(project.dir)}
-                    </div>
-
-                    <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-muted-foreground tabular-nums font-medium">
-                      <span className="px-1.5 py-0.5 rounded bg-muted/40">
-                        {project.sessionCount} {t("project.list.sessions")}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-muted/40">
-                        {project.messageCount} {t("session.list.messages")}
-                      </span>
-                      {project.liveCount > 0 && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 text-green-500">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                          </span>
-                          {project.liveCount}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {onToggleFavorite && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleFavorite({
-                          type: "project",
-                          id: project.dir,
-                          name: project.dirName,
-                          path: project.dir,
-                        });
-                      }}
-                      className={`p-1 rounded motion-color motion-press focus-ring flex-shrink-0 opacity-0 group-hover:opacity-100 ${
-                        isFavorite
-                          ? "text-yellow-400 opacity-100"
-                          : "text-muted-foreground hover:text-yellow-400"
-                      }`}
-                      title={
-                        isFavorite ? t("favorites.remove") : t("favorites.add")
-                      }
-                    >
-                      {/* <Star
-                        className={`h-3 w-3 ${isFavorite ? "fill-current" : ""}`}
-                      /> */}
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="p-6 text-center text-muted-foreground">
+        <FolderOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+        <p className="text-xs">{t("project.list.empty")}</p>
       </div>
     );
   }
 
-  return (
-    <div className="flex flex-col">
-      {showHeader && (
-        <SelectedProjectHeader
-          projectName={projectInfo?.dirName || ""}
-          sessionCount={projectSessions.length}
-          liveCount={projectLiveCount}
-          onBack={handleBackToProjects}
-          backLabel={t("project.list.back")}
-          nameClassName="text-xs"
-          isFavorite={
-            projectInfo
-              ? favorites.some(
-                  (f) => f.type === "project" && f.id === projectInfo.dir,
-                )
-              : false
-          }
-        />
-      )}
+  const virtualItems = projectsVirtualizer.getVirtualItems();
 
-      <SessionList
-        sessions={projectSessions}
-        selectedSession={selectedSession}
-        onSelectSession={onSelectSession}
-        onDeleteSession={onDeleteSession}
-        onConvertSession={onConvertSession}
-        onResumeSession={onResumeSession}
-        loading={loading}
-        getBadgeType={getBadgeType}
-        terminal={terminal}
-        piPath={piPath}
-        customCommand={customCommand}
-        resumeCommand={resumeCommand}
-        scrollParentRef={scrollParentRef}
-        favorites={favorites}
-        onToggleFavorite={onToggleFavorite}
-        showDirectory={false}
-      />
+  return (
+    <div>
+      <div className="px-3 py-2 text-[11px] text-muted-foreground border-b border-border/10">
+        {t("project.list.count", { count: projects.length })}
+      </div>
+      <div
+        className="relative w-full"
+        style={{ height: `${projectsVirtualizer.getTotalSize()}px` }}
+      >
+        {virtualItems.map((virtualRow) => {
+          const project = projects[virtualRow.index];
+          if (!project) return null;
+          const isFavorite = favorites.some(
+            (f) => f.type === "project" && f.id === project.dir,
+          );
+          return (
+            <div
+              key={project.dir}
+              data-index={virtualRow.index}
+              ref={projectsVirtualizer.measureElement}
+              className="px-3 py-2 hover:bg-background cursor-pointer motion-surface motion-color border-b border-border/10 group"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              <div className="flex items-start gap-2">
+                <div
+                  className="min-w-0 flex-1"
+                  onClick={() => onSelectProject?.(project.dir)}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <div className="p-0.5 rounded flex-shrink-0">
+                        {isFavorite ? (
+                          <Star className="h-4 w-4 flex-shrink-0 text-yellow-500 fill-current" />
+                        ) : (
+                          <FolderOpen className="h-4 w-4 flex-shrink-0 text-blue-400" />
+                        )}
+                      </div>
+                      <div className="text-[13px] sm:text-sm font-medium truncate leading-tight">
+                        {project.dirName}
+                      </div>
+                    </div>
+                    <div className="text-[10px] sm:text-[11px] text-muted-foreground flex-shrink-0 pt-0.5 whitespace-nowrap">
+                      {formatShortTime(
+                        new Date(project.lastModified).toISOString(),
+                        t,
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] sm:text-xs text-muted-foreground/80 truncate mb-2 font-mono">
+                    {formatDirectory(project.dir)}
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-muted-foreground tabular-nums font-medium">
+                    <span className="px-1.5 py-0.5 rounded bg-muted/40">
+                      {project.sessionCount} {t("project.list.sessions")}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-muted/40">
+                      {project.messageCount} {t("session.list.messages")}
+                    </span>
+                    {project.liveCount > 0 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 text-green-500">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                        </span>
+                        {project.liveCount}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {onToggleFavorite && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleFavorite({
+                        type: "project",
+                        id: project.dir,
+                        name: project.dirName,
+                        path: project.dir,
+                      });
+                    }}
+                    className={`p-1 rounded motion-color motion-press focus-ring flex-shrink-0 opacity-0 group-hover:opacity-100 ${
+                      isFavorite
+                        ? "text-yellow-400 opacity-100"
+                        : "text-muted-foreground hover:text-yellow-400"
+                    }`}
+                    title={
+                      isFavorite ? t("favorites.remove") : t("favorites.add")
+                    }
+                  >
+                    {/* <Star
+                      className={`h-3 w-3 ${isFavorite ? "fill-current" : ""}`}
+                    /> */}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

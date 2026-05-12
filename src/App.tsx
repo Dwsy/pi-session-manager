@@ -63,6 +63,7 @@ import AppSessionViewerPane from "./components/app/AppSessionViewerPane";
 import AppMobileFilterBar from "./components/app/AppMobileFilterBar";
 import AppSettingsPane from "./components/app/AppSettingsPane";
 import AppTerminalPane from "./components/app/AppTerminalPane";
+import { resolveDesktopMainContent } from "./components/app/resolveDesktopMainContent";
 import DeleteSessionPopover from "./components/dialogs/DeleteSessionPopover";
 import type { DeleteSessionRequestOptions } from "./components/dialogs/deleteSessionTypes";
 import { useWorkspaces, type KanbanWorkspace } from "./hooks/useWorkspaces";
@@ -198,7 +199,7 @@ function App() {
     : runtimeLiveSessionIds;
 
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "project" | "kanban">(
+  const [sidebarMode, setSidebarMode] = useState<"list" | "project" | "kanban">(
     () => {
       if (standaloneDatasetRuntime) {
         return "list";
@@ -276,7 +277,7 @@ function App() {
     setSelectedSession,
     selectedSession,
     sessions,
-    setViewMode: setViewMode as (mode: 'list' | 'project' | 'kanban') => void,
+    setViewMode: setSidebarMode as (mode: 'list' | 'project' | 'kanban') => void,
     setSelectedProject,
     setShowSettings,
     setShowTerminal,
@@ -586,19 +587,19 @@ function App() {
             },
           }),
       "cmd+l": () => {
-        setViewMode("list");
+        setSidebarMode("list");
         setSelectedProject(null);
         setShowFavorites(false);
         navigateToSessions();
       },
       "cmd+p": () => {
-        setViewMode("project");
+        setSidebarMode("project");
         setSelectedProject(null);
         setShowFavorites(false);
         navigateToSessions();
       },
       "cmd+b": () => {
-        setViewMode("kanban");
+        setSidebarMode("kanban");
         setSelectedSession(null);
         setShowFavorites(false);
         navigateToFeature('kanban');
@@ -687,7 +688,7 @@ function App() {
       selectedSession,
       setSelectedSession: selectSessionAndNavigate,
       setSelectedProject,
-      setViewMode: setViewMode as (mode: 'list' | 'project' | 'kanban') => void,
+      setViewMode: setSidebarMode as (mode: 'list' | 'project' | 'kanban') => void,
       closeCommandMenu: () => {},
       setPendingScrollEntryId,
       searchCurrentProjectOnly: false,
@@ -720,7 +721,7 @@ function App() {
     selectedProject,
     isMobile,
     mobileTab,
-    viewMode,
+    viewMode: sidebarMode,
     showFavorites,
     sidebarSearchQuery,
     filterTagIds,
@@ -927,18 +928,11 @@ function App() {
       sidebarLoadingMore={sidebarLoadingMore}
       onLoadMoreSidebarSessions={loadMoreSidebarSessions}
       filteredSessions={filteredSessions}
-      selectedSession={selectedSession}
-      onSelectSession={handleSelectSession}
       onSelectProject={setSelectedProject}
-      onDeleteSession={standaloneDatasetRuntime ? undefined : handleDeleteSession}
       loading={loading}
-      terminal={standaloneDatasetRuntime ? undefined : terminal}
-      piPath={standaloneDatasetRuntime ? undefined : piPath}
-      customCommand={standaloneDatasetRuntime ? undefined : customCommand}
-      resumeCommand={standaloneDatasetRuntime ? undefined : resumeCommand}
-      getBadgeType={getBadgeType}
       favorites={favorites}
       onToggleFavorite={toggleFavorite}
+      liveSessionIds={liveSessionIds}
     />
   );
 
@@ -982,7 +976,7 @@ function App() {
       setMobileTab("projects");
       return;
     }
-    setViewMode("project");
+    setSidebarMode("project");
     setShowFavorites(false);
   };
 
@@ -1112,7 +1106,7 @@ function App() {
     onSelectKanbanFilterProject: handleSelectKanbanFilterProject,
     onSelectFavoriteProject: handleSelectFavoriteProject,
   } = useDesktopSidebarActions({
-    setViewMode,
+    setViewMode: setSidebarMode,
     setSelectedProject,
     setSelectedSession,
     setShowFavorites,
@@ -1156,7 +1150,7 @@ function App() {
   }
 
   const handleSidebarShowDashboard = () => {
-    setViewMode("list");
+    setSidebarMode("list");
     setSelectedProject(null);
     setShowFavorites(false);
     setShowSettings(false);
@@ -1180,7 +1174,7 @@ function App() {
         void createTag(name, color, undefined, parentId);
       }}
       getDescendantIds={getDescendantIds}
-      viewMode={viewMode}
+      sidebarMode={sidebarMode}
       selectedProject={selectedProject}
       sortBy={sessionSortBy}
       sortOrder={sessionSortOrder}
@@ -1193,7 +1187,7 @@ function App() {
   const desktopSidebarContent = (
     <AppDesktopSidebarContent
       showFavorites={showFavorites}
-      viewMode={viewMode}
+      sidebarMode={sidebarMode}
       sessions={sessions}
       selectedProject={selectedProject}
       selectedSession={selectedSession}
@@ -1206,10 +1200,6 @@ function App() {
       loading={loading}
       loadingFavorites={loadingFavorites}
       favorites={favorites}
-      terminal={standaloneDatasetRuntime ? undefined : terminal}
-      piPath={standaloneDatasetRuntime ? undefined : piPath}
-      customCommand={standaloneDatasetRuntime ? undefined : customCommand}
-      resumeCommand={standaloneDatasetRuntime ? undefined : resumeCommand}
       getBadgeType={getBadgeType}
       listScrollRef={listScrollRef}
       sessionListCommonProps={runtimeSessionListCommonProps}
@@ -1218,7 +1208,6 @@ function App() {
       onSelectFavoriteProject={handleSelectFavoriteProject}
       onSelectSession={handleSelectSession}
       onSelectProject={setSelectedProject}
-      onDeleteSession={standaloneDatasetRuntime ? undefined : handleDeleteSession}
       onRemoveFavorite={removeFavorite}
       onToggleFavorite={toggleFavorite}
       liveSessionIds={liveSessionIds}
@@ -1239,15 +1228,15 @@ function App() {
     />
   );
 
-  // Desktop main content: session viewer > kanban > dashboard (fallback).
-  // viewMode controls sidebar content only, not main content.
-  function renderDesktopMainContent() {
-    if (selectedSession) return renderSessionViewer();
-    if (viewMode === "kanban") return renderKanban();
-    if (standaloneDatasetRuntime) return renderStandaloneDatasetOverview();
-    return renderDashboard();
-  }
-  const desktopMainContent = renderDesktopMainContent();
+  const desktopMainContent = resolveDesktopMainContent({
+    selectedSession,
+    sidebarMode,
+    standaloneDatasetRuntime,
+    renderSessionViewer,
+    renderKanban,
+    renderStandaloneDatasetOverview,
+    renderDashboard,
+  });
 
   const desktopTerminalPanel = standaloneDatasetRuntime ? null : (
     <AppTerminalPane
@@ -1311,7 +1300,7 @@ function App() {
         <AppDesktopSidebar
           isTauriRuntime={isTauri()}
           startDragging={startDragging}
-          viewMode={viewMode}
+          sidebarMode={sidebarMode}
           showFavorites={showFavorites}
           showDashboardButton={!standaloneDatasetRuntime}
           terminalEnabled={!standaloneDatasetRuntime && terminalConfig.enabled}

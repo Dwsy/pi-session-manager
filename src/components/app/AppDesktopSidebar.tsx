@@ -4,12 +4,12 @@ import { Columns3, LayoutDashboard, Search, Settings, Star, Terminal } from "luc
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
 
-export type AppDesktopSidebarViewMode = "list" | "project" | "kanban" | "pi-live";
+export type AppDesktopSidebarMode = "list" | "project" | "kanban" | "pi-live";
 
 export interface AppDesktopSidebarProps {
   isTauriRuntime: boolean;
   startDragging: () => void;
-  viewMode: AppDesktopSidebarViewMode;
+  sidebarMode: AppDesktopSidebarMode;
   showFavorites: boolean;
   showDashboardButton?: boolean;
   terminalEnabled: boolean;
@@ -32,7 +32,7 @@ export interface AppDesktopSidebarProps {
 function AppDesktopSidebar({
   isTauriRuntime,
   startDragging,
-  viewMode,
+  sidebarMode,
   showFavorites,
   showDashboardButton = true,
   terminalEnabled,
@@ -75,7 +75,7 @@ function AppDesktopSidebar({
             <KbdTooltip shortcut="Cmd+L" label={t("app.viewMode.list")}>
               <button
                 onClick={onSelectListView}
-                className={`p-1 rounded motion-color motion-press focus-ring ${viewMode === "list" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
+                className={`p-1 rounded motion-color motion-press focus-ring ${sidebarMode === "list" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
                 title={t("app.viewMode.list")}
               >
                 <svg
@@ -96,7 +96,7 @@ function AppDesktopSidebar({
             <KbdTooltip shortcut="Cmd+P" label={t("app.viewMode.project")}>
               <button
                 onClick={onSelectProjectView}
-                className={`p-1 rounded motion-color motion-press focus-ring ${viewMode === "project" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
+                className={`p-1 rounded motion-color motion-press focus-ring ${sidebarMode === "project" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
                 title={t("app.viewMode.project")}
               >
                 <svg
@@ -117,7 +117,7 @@ function AppDesktopSidebar({
             <KbdTooltip shortcut="Cmd+B" label={t("tags.kanban.title")}>
               <button
                 onClick={onSelectKanbanView}
-                className={`p-1 rounded motion-color motion-press focus-ring ${viewMode === "kanban" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
+                className={`p-1 rounded motion-color motion-press focus-ring ${sidebarMode === "kanban" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
                 title={t("tags.kanban.title")}
               >
                 <Columns3 className="h-3.5 w-3.5" />

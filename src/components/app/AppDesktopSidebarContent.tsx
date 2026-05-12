@@ -9,7 +9,7 @@ import SessionList from "@/components/session-list/SessionList";
 import SelectedProjectHeader from "@/components/project/SelectedProjectHeader";
 import WorkspacePanel from "@/components/kanban/WorkspacePanel";
 import type { FavoriteItem, SessionInfo } from "@/types";
-import type { AppDesktopSidebarViewMode } from "./AppDesktopSidebar";
+import type { AppDesktopSidebarMode } from "./AppDesktopSidebar";
 import type { KanbanWorkspace } from "@/hooks/useWorkspaces";
 
 type SessionListProps = ComponentProps<typeof SessionList>;
@@ -51,7 +51,7 @@ export type AppDesktopSidebarSessionListCommonProps = Pick<
 
 export interface AppDesktopSidebarContentProps {
   showFavorites: boolean;
-  viewMode: AppDesktopSidebarViewMode;
+  sidebarMode: AppDesktopSidebarMode;
   sessions: SessionInfo[];
   selectedProject: string | null;
   selectedSession: SessionInfo | null;
@@ -64,10 +64,6 @@ export interface AppDesktopSidebarContentProps {
   loading: boolean;
   loadingFavorites: boolean;
   favorites: FavoriteItem[];
-  terminal?: ProjectListProps["terminal"];
-  piPath?: ProjectListProps["piPath"];
-  customCommand?: ProjectListProps["customCommand"];
-  resumeCommand?: ProjectListProps["resumeCommand"];
   getBadgeType?: SessionListProps["getBadgeType"];
   listScrollRef: RefObject<HTMLDivElement>;
   sessionListCommonProps: AppDesktopSidebarSessionListCommonProps;
@@ -76,7 +72,6 @@ export interface AppDesktopSidebarContentProps {
   onSelectFavoriteProject: NonNullable<FavoritesPanelProps["onSelectProject"]>;
   onSelectSession: SessionListProps["onSelectSession"];
   onSelectProject: NonNullable<ProjectListProps["onSelectProject"]>;
-  onDeleteSession?: SessionListProps["onDeleteSession"];
   onRemoveFavorite: FavoritesPanelProps["onRemoveFavorite"];
   onToggleFavorite: NonNullable<ProjectListProps["onToggleFavorite"]>;
   liveSessionIds?: Set<string>;
@@ -92,7 +87,7 @@ export interface AppDesktopSidebarContentProps {
 
 function AppDesktopSidebarContent({
   showFavorites,
-  viewMode,
+  sidebarMode,
   sessions,
   selectedProject,
   selectedSession,
@@ -105,10 +100,6 @@ function AppDesktopSidebarContent({
   loading,
   loadingFavorites,
   favorites,
-  terminal,
-  piPath,
-  customCommand,
-  resumeCommand,
   getBadgeType,
   listScrollRef,
   sessionListCommonProps,
@@ -117,7 +108,6 @@ function AppDesktopSidebarContent({
   onSelectFavoriteProject,
   onSelectSession,
   onSelectProject,
-  onDeleteSession,
   onRemoveFavorite,
   onToggleFavorite,
   liveSessionIds,
@@ -141,7 +131,7 @@ function AppDesktopSidebarContent({
 
   return (
     <>
-      {!showFavorites && viewMode === "kanban" && (
+      {!showFavorites && sidebarMode === "kanban" && (
         <WorkspacePanel
           sessions={sessions}
           workspaceSessions={workspaceSessions}
@@ -168,7 +158,7 @@ function AppDesktopSidebarContent({
           loading={loadingFavorites}
           liveSessionIds={liveSessionIds}
         />
-      ) : viewMode === "kanban" ? null : viewMode === "project" &&
+      ) : sidebarMode === "kanban" ? null : sidebarMode === "project" &&
         selectedProject &&
         selectedProjectSummary ? (
         <div className="flex flex-col">
@@ -192,20 +182,11 @@ function AppDesktopSidebarContent({
             />
           </div>
         </div>
-      ) : viewMode === "project" ? (
+      ) : sidebarMode === "project" ? (
         <ProjectList
           sessions={filteredSessions}
-          selectedSession={selectedSession}
-          selectedProject={selectedProject}
-          onSelectSession={onSelectSession}
           onSelectProject={onSelectProject}
-          onDeleteSession={onDeleteSession}
           loading={loading}
-          terminal={terminal}
-          piPath={piPath}
-          customCommand={customCommand}
-          resumeCommand={resumeCommand}
-          getBadgeType={getBadgeType}
           scrollParentRef={listScrollRef}
           favorites={favorites}
           onToggleFavorite={onToggleFavorite}

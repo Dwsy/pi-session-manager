@@ -20,7 +20,7 @@ export interface AppDesktopSearchBarProps {
   onSourceFilterChange?: (slugs: string[]) => void;
   onCreateTag: (name: string, color: string, parentId?: string) => void;
   getDescendantIds: (tagId: string) => string[];
-  viewMode: AppDesktopSearchBarViewMode;
+  sidebarMode: AppDesktopSearchBarViewMode;
   selectedProject: string | null;
   sortBy: SessionSortBy;
   sortOrder: SessionSortOrder;
@@ -41,7 +41,7 @@ function AppDesktopSearchBar({
   onSourceFilterChange,
   onCreateTag,
   getDescendantIds,
-  viewMode,
+  sidebarMode,
   selectedProject,
   sortBy,
   sortOrder,
@@ -50,7 +50,7 @@ function AppDesktopSearchBar({
   onSelectModeTrigger,
 }: AppDesktopSearchBarProps) {
   const { t } = useTranslation();
-  const showSortSelect = viewMode === "list" || (viewMode === "project" && !!selectedProject);
+  const showSortSelect = sidebarMode === "list" || (sidebarMode === "project" && !!selectedProject);
 
   return (
     <div className="flex min-w-0 items-center gap-1.5">
@@ -67,7 +67,7 @@ function AppDesktopSearchBar({
         onCreateTag={onCreateTag}
         getDescendantIds={getDescendantIds}
         placeholder={
-          viewMode === "project" && !selectedProject
+          sidebarMode === "project" && !selectedProject
             ? t("common.searchProjectsPlaceholder")
             : undefined
         }

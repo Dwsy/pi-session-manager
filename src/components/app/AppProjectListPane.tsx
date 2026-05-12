@@ -53,19 +53,11 @@ export interface AppProjectListPaneProps {
   sidebarLoadingMore: boolean;
   onLoadMoreSidebarSessions: NonNullable<SessionListProps["onLoadMore"]>;
   filteredSessions: SessionInfo[];
-  selectedSession: SessionInfo | null;
-  onSelectSession: SessionListProps["onSelectSession"];
   onSelectProject: NonNullable<ProjectListProps["onSelectProject"]>;
-  onDeleteSession?: SessionListProps["onDeleteSession"];
-  onConvertSession?: SessionListProps["onConvertSession"];
   loading: boolean;
-  terminal?: ProjectListProps["terminal"];
-  piPath?: ProjectListProps["piPath"];
-  customCommand?: ProjectListProps["customCommand"];
-  resumeCommand?: ProjectListProps["resumeCommand"];
-  getBadgeType?: SessionListProps["getBadgeType"];
   favorites: NonNullable<ProjectListProps["favorites"]>;
   onToggleFavorite: NonNullable<ProjectListProps["onToggleFavorite"]>;
+  liveSessionIds?: Set<string>;
 }
 
 function AppProjectListPane({
@@ -83,19 +75,11 @@ function AppProjectListPane({
   sidebarLoadingMore,
   onLoadMoreSidebarSessions,
   filteredSessions,
-  selectedSession,
-  onSelectSession,
   onSelectProject,
-  onDeleteSession,
-  onConvertSession,
   loading,
-  terminal,
-  piPath,
-  customCommand,
-  resumeCommand,
-  getBadgeType,
   favorites,
   onToggleFavorite,
+  liveSessionIds,
 }: AppProjectListPaneProps) {
   return (
     <>
@@ -123,21 +107,12 @@ function AppProjectListPane({
         ) : (
           <ProjectList
             sessions={filteredSessions}
-            selectedSession={selectedSession}
-            selectedProject={selectedProject}
-            onSelectSession={onSelectSession}
             onSelectProject={onSelectProject}
-            onDeleteSession={onDeleteSession}
-            onConvertSession={onConvertSession}
             loading={loading}
-            terminal={terminal}
-            piPath={piPath}
-            customCommand={customCommand}
-            resumeCommand={resumeCommand}
-            getBadgeType={getBadgeType}
             scrollParentRef={projectScrollRef}
             favorites={favorites}
             onToggleFavorite={onToggleFavorite}
+            liveSessionIds={liveSessionIds}
           />
         )}
       </div>
