@@ -1,6 +1,5 @@
 import {
   forwardRef,
-  useEffect,
   useImperativeHandle,
   type Dispatch,
   type MutableRefObject,
@@ -8,22 +7,28 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
-import { ArrowDown, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import SessionHeader from "@/components/session-viewer/SessionHeader";
 import SessionScrollMarkers from "@/components/session-viewer/SessionScrollMarkers";
 import { useSessionView } from "@/contexts/SessionViewContext";
 import type { SessionSearchTarget } from "@/hooks/useSessionViewerInMessageSearch";
-import { useSessionViewerVirtualScroll } from "@/hooks/useSessionViewerVirtualScroll";
+import {
+  SESSION_MESSAGE_ITEM_GAP,
+  SESSION_PREVIEW_ITEM_GAP,
+  useSessionViewerVirtualScroll,
+} from "@/hooks/useSessionViewerVirtualScroll";
+import { useSessionViewerSearchHighlight } from "@/hooks/useSessionViewerSearchHighlight";
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
 import type { LegacySessionStats, SessionEntry } from "@/types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
+import NewMessagesButton from "./NewMessagesButton";
+import {
+  SessionMessagesEmptyState,
+  SessionMessagesErrorState,
+  SessionMessagesLoadingState,
+} from "./SessionMessagesStates";
 
-const MESSAGE_ITEM_GAP = 16;
-const PREVIEW_ITEM_GAP = 8;
-const SEARCH_MATCH_RETRY_COUNT = 8;
-const SEARCH_MATCH_RETRY_DELAY_MS = 50;
 
 export interface SessionViewerMessagesRef {
   scrollToTop: () => void;
@@ -47,7 +52,6 @@ export interface SessionViewerMessagesProps {
   streamingId: string | null;
   pendingScrollToBottomRef: MutableRefObject<boolean>;
   expandedToolIds: Set<string>;
-  toolsExpanded: boolean;
   sessionPath: string;
   isAtBottomRef: MutableRefObject<boolean>;
   onReachBottom?: () => void;
@@ -63,9 +67,7 @@ export interface SessionViewerMessagesProps {
   onPointerUp: (event: ReactPointerEvent) => void;
   onPointerLeave: (event: ReactPointerEvent) => void;
   isScrollMarkersFeatureEnabled: boolean;
-  isTimelineNavEnabled?: boolean;
   previewMode?: boolean;
-  openPosition?: 'top' | 'bottom';
 }
 
 const SessionViewerMessages = forwardRef<
@@ -103,9 +105,7 @@ const SessionViewerMessages = forwardRef<
   onPointerUp,
   onPointerLeave,
   isScrollMarkersFeatureEnabled,
-  isTimelineNavEnabled: _isTimelineNavEnabled = false,
   previewMode = false,
-  openPosition: _openPosition = 'top',
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
   const { ensureToolExpandedForSearch } = useSessionView();
@@ -135,78 +135,13 @@ const SessionViewerMessages = forwardRef<
 
   const virtualRows = rowVirtualizer.getVirtualItems();
 
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container) {
-      return;
-    }
-
-    const clearCurrentHighlight = () => {
-      container
-        .querySelectorAll<HTMLElement>(".search-highlight.current")
-        .forEach((element) => element.classList.remove("current"));
-    };
-
-    clearCurrentHighlight();
-
-    if (!searchQuery.trim() || !currentSearchTarget) {
-      return;
-    }
-
-    scrollToEntryId(currentSearchTarget.rowEntryId, "center");
-    if (currentSearchTarget.matchElementId !== currentSearchTarget.rowEntryId) {
-      ensureToolExpandedForSearch(currentSearchTarget.matchElementId);
-    }
-
-    let animationFrameId = 0;
-    let retryTimeoutId: number | null = null;
-    let retryCount = 0;
-
-    const tryActivateCurrentMatch = () => {
-      const entryElement = container.querySelector<HTMLElement>(
-        `#entry-${currentSearchTarget.matchElementId}`,
-      );
-      const highlights = entryElement?.querySelectorAll<HTMLElement>(
-        ".search-highlight",
-      );
-      const currentHighlight = highlights?.[
-        currentSearchTarget.occurrenceIndexInElement
-      ];
-
-      if (currentHighlight) {
-        clearCurrentHighlight();
-        currentHighlight.classList.add("current");
-        currentHighlight.scrollIntoView({
-          block: "center",
-          inline: "nearest",
-        });
-        return;
-      }
-
-      if (retryCount >= SEARCH_MATCH_RETRY_COUNT) {
-        return;
-      }
-
-      retryCount += 1;
-      retryTimeoutId = window.setTimeout(() => {
-        animationFrameId = requestAnimationFrame(tryActivateCurrentMatch);
-      }, SEARCH_MATCH_RETRY_DELAY_MS);
-    };
-
-    animationFrameId = requestAnimationFrame(tryActivateCurrentMatch);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      if (retryTimeoutId) {
-        window.clearTimeout(retryTimeoutId);
-      }
-    };
-  }, [
+  useSessionViewerSearchHighlight({
+    container: messagesContainerRef.current,
     searchQuery,
     currentSearchTarget,
     scrollToEntryId,
     ensureToolExpandedForSearch,
-  ]);
+  });
 
   // Expose methods
   useImperativeHandle(ref, () => ({
@@ -215,38 +150,24 @@ const SessionViewerMessages = forwardRef<
   }));
 
   if (loading && !showLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <SessionMessagesLoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-red-400">
-        <div className="text-center">
-          <p className="mb-2">{t("session.error")}</p>
-          <p className="text-sm text-muted-foreground">{error}</p>
-        </div>
-      </div>
-    );
+    return <SessionMessagesErrorState title={t("session.error")} error={error} />;
   }
 
   return (
     <div className="flex-1 relative min-h-0 overflow-hidden">
       {!isAtBottom && hasNewMessages && (
-        <button
+        <NewMessagesButton
           onClick={() => {
             scrollToBottom();
             setHasNewMessages(false);
           }}
-          className="absolute bottom-4 right-4 z-10 flex items-center gap-1 rounded-full bg-secondary hover:bg-secondary-hover text-xs text-foreground px-3 py-2 shadow-lg transition-colors"
           title={t("session.scrollToBottom", "Scroll to bottom")}
-        >
-          <ArrowDown className="h-3.5 w-3.5" />
-          {t("session.newMessages", "New messages")}
-        </button>
+          label={t("session.newMessages", "New messages")}
+        />
       )}
       <div
         className="h-full overflow-y-auto session-viewer"
@@ -282,8 +203,8 @@ const SessionViewerMessages = forwardRef<
                         virtualRow.index === renderableEntries.length - 1
                           ? 0
                           : previewMode
-                            ? PREVIEW_ITEM_GAP
-                            : MESSAGE_ITEM_GAP,
+                            ? SESSION_PREVIEW_ITEM_GAP
+                            : SESSION_MESSAGE_ITEM_GAP,
                     }}
                   >
                     <SessionEntryRenderer
@@ -298,7 +219,7 @@ const SessionViewerMessages = forwardRef<
               })}
             </div>
           ) : (
-            <div className="empty-state">{t("session.noMessages")}</div>
+            <SessionMessagesEmptyState label={t("session.noMessages")} />
           )}
         </div>
       </div>

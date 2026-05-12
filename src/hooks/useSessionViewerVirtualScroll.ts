@@ -12,12 +12,70 @@ import type { SessionEntry } from '@/types'
 
 type ScrollAlignment = 'auto' | 'center' | 'end' | 'start'
 
-const MESSAGE_ITEM_GAP = 16
-const PREVIEW_ITEM_GAP = 8
+export const SESSION_MESSAGE_ITEM_GAP = 16
+export const SESSION_PREVIEW_ITEM_GAP = 8
 const BOTTOM_THRESHOLD_PX = 8
 const HIGHLIGHT_DURATION_MS = 2000
 const HIGHLIGHT_RETRY_DELAY_MS = 50
 const ROW_OVERSCAN = 8
+
+function estimateSessionEntrySize(
+  entry: SessionEntry | undefined,
+  cachedHeight: number | undefined,
+  previewMode: boolean,
+): number {
+  if (!entry) return 140 + SESSION_MESSAGE_ITEM_GAP
+
+  // In preview mode, skip stale cache — content is stripped so cached heights
+  // from normal mode (including tool calls/thinking) are wildly inaccurate.
+  if (!previewMode && cachedHeight) return cachedHeight
+
+  let height: number
+  switch (entry.type) {
+    case 'message': {
+      const content = entry.message?.content ?? []
+      const role = entry.message?.role
+      if (previewMode) {
+        // In previewMode, tool calls are stripped from rendering —
+        // only count text content to match actual rendered height.
+        const textItems = content.filter((item) => item.type === 'text')
+        const textLength = textItems.reduce((sum, item) => sum + (item.text?.length ?? 0), 0)
+        const baseHeight = role === 'user' ? 48 : 40
+        const contentHeight = Math.ceil(textLength / 90) * 24
+        height = Math.min(baseHeight + contentHeight, 800)
+      } else {
+        // Normal mode: account for tool calls, thinking blocks, text
+        const textLength = content.reduce((sum, item) => {
+          if (item.type === 'text') return sum + (item.text?.length ?? 0)
+          if (item.type === 'toolCall') return sum + 80 // tool call name + params preview
+          if (item.type === 'thinking') return sum + (item.thinking?.length ?? 0) * 0.3
+          return sum
+        }, 0)
+        const hasTools = content.some((item) => item.type === 'toolCall')
+        const baseHeight = hasTools ? 140 : 100
+        const contentHeight = Math.ceil(textLength / 80) * 32
+        height = Math.min(baseHeight + contentHeight, 800)
+      }
+      break
+    }
+    case 'model_change':
+      height = 64
+      break
+    case 'compaction':
+      height = 180
+      break
+    case 'branch_summary':
+      height = 160
+      break
+    case 'custom_message':
+      height = 120
+      break
+    default:
+      height = 120
+      break
+  }
+  return height + (previewMode ? SESSION_PREVIEW_ITEM_GAP : SESSION_MESSAGE_ITEM_GAP)
+}
 
 export interface UseSessionViewerVirtualScrollOptions {
   renderableEntries: SessionEntry[]
@@ -82,60 +140,10 @@ export function useSessionViewerVirtualScroll({
   const estimateEntrySize = useCallback(
     (index: number) => {
       const entry = renderableEntries[index]
-      if (!entry) return 140 + MESSAGE_ITEM_GAP
-
-      // In preview mode, skip stale cache — content is stripped so cached heights
-      // from normal mode (including tool calls/thinking) are wildly inaccurate.
-      if (!previewMode) {
-        const cachedHeight = measuredHeightsRef.current.get(entry.id)
-        if (cachedHeight) return cachedHeight
-      }
-
-      let height: number
-      switch (entry.type) {
-        case 'message': {
-          const content = entry.message?.content ?? []
-          const role = entry.message?.role
-          if (previewMode) {
-            // In previewMode, tool calls are stripped from rendering —
-            // only count text content to match actual rendered height.
-            const textItems = content.filter((item) => item.type === 'text')
-            const textLength = textItems.reduce((sum, item) => sum + (item.text?.length ?? 0), 0)
-            const baseHeight = role === 'user' ? 48 : 40
-            const contentHeight = Math.ceil(textLength / 90) * 24
-            height = Math.min(baseHeight + contentHeight, 800)
-          } else {
-            // Normal mode: account for tool calls, thinking blocks, text
-            const textLength = content.reduce((sum, item) => {
-              if (item.type === 'text') return sum + (item.text?.length ?? 0)
-              if (item.type === 'toolCall') return sum + 80 // tool call name + params preview
-              if (item.type === 'thinking') return sum + (item.thinking?.length ?? 0) * 0.3
-              return sum
-            }, 0)
-            const hasTools = content.some((item) => item.type === 'toolCall')
-            const baseHeight = hasTools ? 140 : 100
-            const contentHeight = Math.ceil(textLength / 80) * 32
-            height = Math.min(baseHeight + contentHeight, 800)
-          }
-          break
-        }
-        case 'model_change':
-          height = 64
-          break
-        case 'compaction':
-          height = 180
-          break
-        case 'branch_summary':
-          height = 160
-          break
-        case 'custom_message':
-          height = 120
-          break
-        default:
-          height = 120
-          break
-      }
-      return height + (previewMode ? PREVIEW_ITEM_GAP : MESSAGE_ITEM_GAP)
+      const cachedHeight = entry
+        ? measuredHeightsRef.current.get(entry.id)
+        : undefined
+      return estimateSessionEntrySize(entry, cachedHeight, previewMode)
     },
     [renderableEntries, previewMode],
   )
