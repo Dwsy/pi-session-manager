@@ -18,7 +18,7 @@ import { pathToFileURL } from "node:url";
 import { matchesKey, getKeybindings } from "@earendil-works/pi-tui";
 
 // ── Module imports ───────────────────────────────────────────────────
-import { loadSessionsFromSqlite, loadSessionMessages } from "./lib/db.js";
+import { loadSessionsFromSqlite, loadSessionMessages, getLastInitError } from "./lib/db.js";
 import { searchSessions, buildSearchLines, buildSearchDetailLines } from "./lib/search.js";
 import { patchSessionListRender, buildPreviewLines } from "./lib/render.js";
 import { clampScroll, getTermHeight, getMaxVisible } from "./lib/utils.js";
@@ -76,7 +76,12 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
       const allSessions = loadSessionsFromSqlite();
 
       if (allSessions.length === 0) {
-        ctx.ui.notify("No sessions found in SQLite.", "warning");
+        const initErr = getLastInitError();
+        if (initErr) {
+          ctx.ui.notify(`SQLite load failed: ${initErr}`, "error");
+        } else {
+          ctx.ui.notify("No sessions found in SQLite database.", "warning");
+        }
         return;
       }
 

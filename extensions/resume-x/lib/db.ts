@@ -32,16 +32,26 @@ function getDbPath(): string {
   return path.join(homedir(), ".pi", "agent", "sessions", "sessions.db");
 }
 
+export type InitDbResult = "ok" | "not_found" | "error";
+let lastInitError: string | null = null;
+
+/** Get the last initDb error message (for diagnostics). */
+export function getLastInitError(): string | null {
+  return lastInitError;
+}
+
 function initDb(): boolean {
   if (db) return true;
   const dbPath = getDbPath();
-  if (!existsSync(dbPath)) return false;
+  if (!existsSync(dbPath)) { lastInitError = null; return false; }
   try {
     db = new Database(dbPath, { readonly: true });
     db.pragma("busy_timeout = 5000");
+    lastInitError = null;
     return true;
   } catch (e) {
     _crash("initDb", e);
+    lastInitError = e instanceof Error ? e.message : String(e);
     db = null;
     return false;
   }

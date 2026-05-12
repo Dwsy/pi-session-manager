@@ -12,5 +12,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0"
+  },
+  "scripts": {
+    "postinstall": "npm rebuild better-sqlite3"
   }
 }
