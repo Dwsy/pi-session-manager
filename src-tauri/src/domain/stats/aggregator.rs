@@ -160,7 +160,7 @@ fn process_session_data(
         let msg_count = details.user_messages + details.assistant_messages;
         let date = session_modified.format("%Y-%m-%d").to_string();
         *messages_by_date.entry(date.clone()).or_insert(0) += msg_count;
-        daily_stats.add_session(&date, project, msg_count, (details.input_tokens + details.output_tokens) as usize, details.total_cost());
+        daily_stats.add_session(&date, project, msg_count, (details.input_tokens + details.output_tokens + details.cache_read_tokens + details.cache_write_tokens) as usize, details.total_cost());
         add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, msg_count);
 
         return (details.user_messages, details.assistant_messages, details.input_tokens as usize, details.output_tokens as usize, details.cache_read_tokens as usize, details.cache_write_tokens as usize, details.input_cost + details.output_cost + details.cache_read_cost + details.cache_write_cost);
@@ -189,7 +189,7 @@ fn process_session_data(
         let msg_count = cached.user_messages + cached.assistant_messages;
         let date = session_modified.format("%Y-%m-%d").to_string();
         *messages_by_date.entry(date.clone()).or_insert(0) += msg_count;
-        daily_stats.add_session(&date, project, msg_count, cached.input_tokens + cached.output_tokens, cached.input_cost + cached.output_cost + cached.cache_read_cost + cached.cache_write_cost);
+        daily_stats.add_session(&date, project, msg_count, cached.input_tokens + cached.output_tokens + cached.cache_read_tokens + cached.cache_write_tokens, cached.input_cost + cached.output_cost + cached.cache_read_cost + cached.cache_write_cost);
         add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, msg_count);
 
         return (cached.user_messages, cached.assistant_messages, cached.input_tokens, cached.output_tokens, cached.cache_read_tokens, cached.cache_write_tokens, cached.input_cost + cached.output_cost + cached.cache_read_cost + cached.cache_write_cost);
@@ -269,6 +269,9 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
         total_cost += cost;
     }
 
+    // total_tokens includes cache tokens (providers charge for cached tokens too)
+    let total_tokens = total_input + total_output + total_cache_read + total_cache_write;
+
     let unique_session_dirs: Vec<PathBuf> = sessions.iter().filter_map(|s| PathBuf::from(&s.path).parent().map(|p| p.to_path_buf())).collect::<HashSet<_>>().into_iter().collect();
     let subagent_summary = crate::subagent::scan_subagent_artifacts(&unique_session_dirs, conn.as_ref());
 
@@ -277,14 +280,14 @@ pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionSta
     let heatmap_data = crate::domain::stats::heatmap::generate_heatmap_data(&messages_by_date, &daily_stats);
     let time_distribution = crate::domain::stats::heatmap::generate_time_distribution(&messages_by_hour);
 
-    log::trace!("Stats: {} user messages, {} assistant messages, {} total tokens", total_user_messages, total_assistant_messages, total_input + total_output);
+    log::trace!("Stats: {} user messages, {} assistant messages, {} total tokens", total_user_messages, total_assistant_messages, total_tokens);
 
     SessionStats {
         total_sessions,
         total_messages,
         user_messages: total_user_messages,
         assistant_messages: total_assistant_messages,
-        total_tokens: total_input + total_output,
+        total_tokens,
         sessions_by_project,
         sessions_by_model,
         sessions_by_provider,
