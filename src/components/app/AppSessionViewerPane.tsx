@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 
 import SessionViewer from "@/components/SessionViewer";
+import { useSettings } from "@/hooks/useSettings";
 
 export interface AppSessionViewerPaneProps extends Pick<
   ComponentProps<typeof SessionViewer>,
@@ -35,6 +36,9 @@ function AppSessionViewerPane({
   resumeCommand,
   initialEntryId,
 }: AppSessionViewerPaneProps) {
+  const { getSessionSetting } = useSettings();
+  const conversationModeEnabled = getSessionSetting("conversationModeEnabled") !== false;
+
   return (
     <SessionViewer
       session={session}
@@ -50,6 +54,7 @@ function AppSessionViewerPane({
       customCommand={customCommand}
       resumeCommand={resumeCommand}
       initialEntryId={initialEntryId}
+      previewVariant={conversationModeEnabled ? "conversation" : "none"}
     />
   );
 }

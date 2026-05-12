@@ -1049,6 +1049,23 @@ export default function SessionSettings({
 
             <SettingsToggleRow
               title={t(
+                "settings.session.conversationModeEnabled",
+                "Conversation mode",
+              )}
+              description={t(
+                "settings.session.conversationModeEnabledHelp",
+                "Group each user request with its final assistant response and fold intermediate thinking/tool steps in the main session view",
+              )}
+              checked={settings.session.conversationModeEnabled !== false}
+              onChange={(checked) =>
+                onUpdate("session", "conversationModeEnabled", checked)
+              }
+              className="items-start pt-4 border-t border-border/60"
+              searchKey="session-conversationModeEnabled"
+            />
+
+            <SettingsToggleRow
+              title={t(
                 "settings.session.collapseToolCalls",
                 "Collapse tool calls",
               )}

@@ -1,1 +1,1 @@
-export type SessionPreviewVariant = "compact" | "conversation";
+export type SessionPreviewVariant = "conversation" | "none";

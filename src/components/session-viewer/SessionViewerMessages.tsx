@@ -109,7 +109,7 @@ const SessionViewerMessages = forwardRef<
   onPointerLeave,
   isScrollMarkersFeatureEnabled,
   previewMode = false,
-  previewVariant = "compact",
+  previewVariant = "conversation",
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
   const { ensureToolExpandedForSearch } = useSessionView();
@@ -135,6 +135,7 @@ const SessionViewerMessages = forwardRef<
     isAtBottomRef,
     onReachBottom,
     previewMode,
+    handlesScrollTarget: previewVariant === "conversation",
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();
@@ -186,12 +187,14 @@ const SessionViewerMessages = forwardRef<
         />
         <div className="messages" ref={messagesWrapperRef}>
           {renderableEntries.length > 0 ? (
-            previewMode && previewVariant === "conversation" ? (
+            previewVariant === "conversation" ? (
               <ConversationPreviewMessages
                 entries={renderableEntries}
                 toolResultByCallId={toolResultByCallId}
                 searchQuery={searchQuery}
                 streamingId={streamingId}
+                scrollTargetId={scrollTargetId}
+                setScrollTargetId={setScrollTargetId}
               />
             ) : (
               <div

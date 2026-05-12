@@ -358,6 +358,7 @@ export default function SessionPreviewModal({
           <SessionViewer
             session={session}
             previewMode
+            previewVariant="conversation"
             slots={toolbarSlots}
             onExport={onExport}
             onConvert={onConvert}

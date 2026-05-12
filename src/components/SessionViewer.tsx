@@ -65,7 +65,7 @@ function SessionViewerContent({
   resumeCommand,
   initialEntryId,
   previewMode = false,
-  previewVariant = "compact",
+  previewVariant = "conversation",
   slots,
 }: SessionViewerProps) {
   const { t } = useTranslation();

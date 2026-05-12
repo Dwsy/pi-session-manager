@@ -243,6 +243,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     keywords: ["timeline", "navigation", "dots", "hover", "preview", "right"],
   },
   {
+    id: "session-conversationModeEnabled",
+    section: "session",
+    labelKey: "settings.session.conversationModeEnabled",
+    fallbackLabel: "Conversation mode",
+    extraKeys: ["settings.session.conversationModeEnabledHelp"],
+    keywords: ["conversation", "preview", "fold", "thinking", "tools", "assistant"],
+  },
+  {
     id: "session-collapseToolCalls",
     section: "session",
     labelKey: "settings.session.collapseToolCalls",

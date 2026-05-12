@@ -79,6 +79,7 @@ export interface AppSettings {
     autoRefresh: boolean;
     refreshInterval: number;
     defaultViewMode: "list" | "directory" | "project" | "kanban";
+    conversationModeEnabled: boolean;
     sourceMode: "local" | "dataset";
     activeDatasetId: string;
     activeDatasetIds: string[];
@@ -168,6 +169,7 @@ export const defaultSettings: AppSettings = {
     autoRefresh: true,
     refreshInterval: 30,
     defaultViewMode: "project",
+    conversationModeEnabled: true,
     sourceMode: "local",
     activeDatasetId: "",
     activeDatasetIds: [],

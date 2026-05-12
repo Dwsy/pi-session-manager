@@ -91,6 +91,8 @@ export interface UseSessionViewerVirtualScrollOptions {
   onReachBottom?: () => void
   /** Preview mode: strip tool calls from height estimation */
   previewMode?: boolean
+  /** External renderer handles scrollTargetId, e.g. conversation groups. */
+  handlesScrollTarget?: boolean
 }
 
 export interface UseSessionViewerVirtualScrollResult {
@@ -117,6 +119,7 @@ export function useSessionViewerVirtualScroll({
   isAtBottomRef: externalIsAtBottomRef,
   onReachBottom,
   previewMode = false,
+  handlesScrollTarget = false,
 }: UseSessionViewerVirtualScrollOptions): UseSessionViewerVirtualScrollResult {
   const [isAtBottom, setIsAtBottom] = useState(true)
 
@@ -267,6 +270,7 @@ export function useSessionViewerVirtualScroll({
   const scrollTargetTimeoutsRef = useRef<number[]>([])
 
   useEffect(() => {
+    if (handlesScrollTarget) return
     if (!scrollTargetId || !messagesContainerRef.current) return
     // If entry not yet in the virtualizer (data still loading), skip —
     // this effect will re-run when renderableEntries changes and
@@ -305,7 +309,7 @@ export function useSessionViewerVirtualScroll({
       }
       scrollTargetTimeoutsRef.current = []
     }
-  }, [scrollTargetId, scrollToEntryId, setScrollTargetId])
+  }, [handlesScrollTarget, scrollTargetId, scrollToEntryId, setScrollTargetId])
 
   useEffect(() => {
     const container = messagesContainerRef.current
