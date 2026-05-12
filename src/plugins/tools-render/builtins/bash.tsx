@@ -7,7 +7,7 @@ import { highlightSearchInHTML } from '@/utils/search'
 import CodeBlock from '@/components/ui/CodeBlock'
 
 /** Maximum height for tool output in pixels */
-const OUTPUT_MAX_HEIGHT = 300
+const OUTPUT_MAX_HEIGHT = 450
 
 /**
  * Bash tool execution renderer

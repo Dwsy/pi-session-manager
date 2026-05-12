@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import type { CSSProperties } from 'react'
 
 /** Maximum height for tool output in pixels */
-const OUTPUT_MAX_HEIGHT = 300
+const OUTPUT_MAX_HEIGHT = 450
 
 /**
  * Read tool execution renderer

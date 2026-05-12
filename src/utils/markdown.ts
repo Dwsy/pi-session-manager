@@ -19,18 +19,11 @@ renderer.code = function({ text, lang }: { text: string; lang?: string }): strin
     }
   }
 
-  // Calculate line count
-  const lines = text.split('\n')
-  const lineCount = lines.length
-
-  // Generate line numbers
-  const lineNumbers = Array.from({ length: lineCount }, (_, i) =>
-    `<div class="code-line-number">${i + 1}</div>`
-  ).join('')
-
-  // Return complete code block HTML
+  // Return complete code block HTML. Keep controls in the top-right overlay;
+  // line numbers are intentionally omitted for markdown content to avoid
+  // misalignment and wasted vertical space in chat messages.
   return `
-    <div class="code-block-wrapper">
+    <div class="code-block-wrapper markdown-code-block">
       <div class="code-block-header">
         ${language ? `<div class="code-language">${language}</div>` : '<div class="code-language">code</div>'}
         <button class="code-copy-button" data-code-copy="true" aria-label="Copy code">
@@ -41,7 +34,6 @@ renderer.code = function({ text, lang }: { text: string; lang?: string }): strin
         </button>
       </div>
       <div class="code-block-content">
-        <div class="code-line-numbers">${lineNumbers}</div>
         <pre class="code-block"><code class="hljs ${validLang}">${highlightedCode}</code></pre>
       </div>
     </div>

@@ -11,9 +11,6 @@ import { shortenPath } from '@/utils/format'
 import { getPathBasename } from '@/utils/path'
 import { highlightSearchInHTML } from '@/utils/search'
 
-/** Maximum height for tool output in pixels */
-const OUTPUT_MAX_HEIGHT = 300
-
 // Register custom diff viewer themes (light/dark) with transparent background
 let themesRegistered = false
 if (!themesRegistered) {
@@ -216,7 +213,7 @@ function EditExecution({
         <div className={`tool-diff-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
             {isExpanded && (
-              <div style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}>
+              <div>
                 {renderDiff()}
               </div>
             )}

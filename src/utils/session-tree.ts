@@ -548,6 +548,27 @@ export function getEntryDisplayText(entry: SessionEntry, label?: string): string
 
   const truncate = (value: string, maxLength = 100) =>
     value.length <= maxLength ? value : `${value.slice(0, maxLength)}...`;
+  const truncateMiddle = (value: string, maxLength = 80): string => {
+    if (value.length <= maxLength) return value;
+    const ellipsis = "…";
+    const headLength = Math.max(8, Math.floor((maxLength - ellipsis.length) * 0.35));
+    const tailLength = Math.max(12, maxLength - headLength - ellipsis.length);
+    return `${value.slice(0, headLength)}${ellipsis}${value.slice(-tailLength)}`;
+  };
+  const compactToolPath = (value: string): string => {
+    const normalized = value.replace(/\\/g, "/");
+    const marker = "/src/";
+    const markerIndex = normalized.indexOf(marker);
+    if (markerIndex >= 0) {
+      return `./${normalized.slice(markerIndex + marker.length)}`;
+    }
+
+    const parts = normalized.split("/").filter(Boolean);
+    if (normalized.startsWith("/") && parts.length > 4) {
+      return `./${parts.slice(-4).join("/")}`;
+    }
+    return value;
+  };
   const extractContent = (content: unknown): string => {
     if (typeof content === "string") {
       return content;
@@ -584,7 +605,10 @@ export function getEntryDisplayText(entry: SessionEntry, label?: string): string
           toolCall.arguments?.path || toolCall.arguments?.file_path || "",
         );
         const command = String(toolCall.arguments?.command || "");
-        return `${toolCall.name}: ${truncate(path || command, 50)}`;
+        const displayValue = path && ["read", "write", "edit"].includes(toolCall.name)
+          ? compactToolPath(path)
+          : path || command;
+        return `${toolCall.name}: ${truncateMiddle(displayValue, 80)}`;
       }
 
       const text = truncate(extractContent(entry.message.content));

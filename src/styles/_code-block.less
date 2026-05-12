@@ -4,6 +4,7 @@
 
 // Code Block Wrapper
 .code-block-wrapper {
+  position: relative;
   background: var(--bg-inset);
   border-radius: 8px;
   margin: 16px 0;
@@ -12,15 +13,38 @@
 
 // Code Block Header
 .code-block-header {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0;
   font-size: 11px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.code-block-wrapper:hover .code-block-header,
+.code-block-wrapper:focus-within .code-block-header {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .code-filename,
 .code-language {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  border: none;
+  background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(8px);
   font-size: 11px;
   color: var(--accent);
   font-weight: 500;
@@ -30,9 +54,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
+  min-height: 24px;
+  padding: 3px 7px;
   font-size: 11px;
-  background: transparent;
+  background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(8px);
   color: rgb(var(--color-muted-foreground));
   border: none;
   border-radius: 4px;
@@ -52,6 +79,61 @@
 
 .code-copy-text {
   font-family: inherit;
+}
+
+// Markdown-rendered code blocks use a compact overlay chrome. Tool-rendered
+// CodeBlock components keep the regular header/line-number layout above.
+.markdown-code-block {
+  position: relative;
+  margin: 10px 0;
+}
+
+.markdown-code-block .code-block-header {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.markdown-code-block:hover .code-block-header,
+.markdown-code-block:focus-within .code-block-header {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.markdown-code-block .code-language,
+.markdown-code-block .code-copy-button {
+  min-height: 24px;
+  border: none;
+  background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(8px);
+}
+
+.markdown-code-block .code-language {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 3px 7px;
+}
+
+.markdown-code-block .code-copy-button {
+  padding: 3px 7px;
+}
+
+.markdown-code-block .code-block-content {
+  display: block;
+}
+
+.markdown-code-block .code-block {
+  padding: 10px 12px;
 }
 
 // Code Block Content
