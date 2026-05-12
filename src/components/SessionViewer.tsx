@@ -27,6 +27,7 @@ import { getPlatformDefaults } from "./settings/types";
 import type { SessionInfo } from "@/types";
 import type { TerminalType } from "./settings/types";
 import type { SessionViewerToolbarSlots } from "./session-viewer/SessionViewerToolbarTypes";
+import type { SessionPreviewVariant } from "./session-viewer/previewTypes";
 
 interface SessionViewerProps {
   session: SessionInfo;
@@ -43,6 +44,7 @@ interface SessionViewerProps {
   resumeCommand?: string;
   initialEntryId?: string;
   previewMode?: boolean;
+  previewVariant?: SessionPreviewVariant;
   /** Slots for custom content injection into the toolbar */
   slots?: SessionViewerToolbarSlots;
 }
@@ -63,6 +65,7 @@ function SessionViewerContent({
   resumeCommand,
   initialEntryId,
   previewMode = false,
+  previewVariant = "compact",
   slots,
 }: SessionViewerProps) {
   const { t } = useTranslation();
@@ -297,6 +300,7 @@ function SessionViewerContent({
     <SessionViewerBody
       showToolExpandIndicator={showToolExpandIndicator}
       previewMode={previewMode}
+      previewVariant={previewVariant}
       isMobile={isMobile}
       session={session}
       entries={entries}

@@ -22,6 +22,8 @@ import { useSessionViewerSearchHighlight } from "@/hooks/useSessionViewerSearchH
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
 import type { LegacySessionStats, SessionEntry } from "@/types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
+import ConversationPreviewMessages from "./ConversationPreviewMessages";
+import type { SessionPreviewVariant } from "./previewTypes";
 import NewMessagesButton from "./NewMessagesButton";
 import {
   SessionMessagesEmptyState,
@@ -68,6 +70,7 @@ export interface SessionViewerMessagesProps {
   onPointerLeave: (event: ReactPointerEvent) => void;
   isScrollMarkersFeatureEnabled: boolean;
   previewMode?: boolean;
+  previewVariant?: SessionPreviewVariant;
 }
 
 const SessionViewerMessages = forwardRef<
@@ -106,6 +109,7 @@ const SessionViewerMessages = forwardRef<
   onPointerLeave,
   isScrollMarkersFeatureEnabled,
   previewMode = false,
+  previewVariant = "compact",
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
   const { ensureToolExpandedForSearch } = useSessionView();
@@ -182,42 +186,51 @@ const SessionViewerMessages = forwardRef<
         />
         <div className="messages" ref={messagesWrapperRef}>
           {renderableEntries.length > 0 ? (
-            <div
-              className="relative w-full"
-              style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
-            >
-              {virtualRows.map((virtualRow) => {
-                const entry = renderableEntries[virtualRow.index];
-                if (!entry) return null;
+            previewMode && previewVariant === "conversation" ? (
+              <ConversationPreviewMessages
+                entries={renderableEntries}
+                toolResultByCallId={toolResultByCallId}
+                searchQuery={searchQuery}
+                streamingId={streamingId}
+              />
+            ) : (
+              <div
+                className="relative w-full"
+                style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+              >
+                {virtualRows.map((virtualRow) => {
+                  const entry = renderableEntries[virtualRow.index];
+                  if (!entry) return null;
 
-                return (
-                  <div
-                    key={entry.id}
-                    data-index={virtualRow.index}
-                    data-entry-id={entry.id}
-                    ref={rowVirtualizer.measureElement}
-                    className="absolute left-0 top-0 w-full"
-                    style={{
-                      transform: `translateY(${virtualRow.start}px)`,
-                      paddingBottom:
-                        virtualRow.index === renderableEntries.length - 1
-                          ? 0
-                          : previewMode
-                            ? SESSION_PREVIEW_ITEM_GAP
-                            : SESSION_MESSAGE_ITEM_GAP,
-                    }}
-                  >
-                    <SessionEntryRenderer
-                      entry={entry}
-                      toolResultByCallId={toolResultByCallId}
-                      searchQuery={searchQuery}
-                      isStreaming={entry.id === streamingId}
-                      previewMode={previewMode}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+                  return (
+                    <div
+                      key={entry.id}
+                      data-index={virtualRow.index}
+                      data-entry-id={entry.id}
+                      ref={rowVirtualizer.measureElement}
+                      className="absolute left-0 top-0 w-full"
+                      style={{
+                        transform: `translateY(${virtualRow.start}px)`,
+                        paddingBottom:
+                          virtualRow.index === renderableEntries.length - 1
+                            ? 0
+                            : previewMode
+                              ? SESSION_PREVIEW_ITEM_GAP
+                              : SESSION_MESSAGE_ITEM_GAP,
+                      }}
+                    >
+                      <SessionEntryRenderer
+                        entry={entry}
+                        toolResultByCallId={toolResultByCallId}
+                        searchQuery={searchQuery}
+                        isStreaming={entry.id === streamingId}
+                        previewMode={previewMode}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )
           ) : (
             <SessionMessagesEmptyState label={t("session.noMessages")} />
           )}

@@ -19,6 +19,7 @@ import SessionViewerSearchBar, {
 import SessionViewerSidebar from "@/components/session-viewer/SessionViewerSidebar";
 import SessionViewerToolbar from "@/components/session-viewer/SessionViewerToolbar";
 import type { SessionViewerToolbarProps } from "@/components/session-viewer/SessionViewerToolbarTypes";
+import type { SessionPreviewVariant } from "@/components/session-viewer/previewTypes";
 import TraceView from "@/components/trace/TraceView";
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
 import type { SessionSearchTarget } from "@/hooks/useSessionViewerInMessageSearch";
@@ -84,6 +85,7 @@ export interface SessionViewerBodyPanelsProps {
 export interface SessionViewerBodyProps {
   showToolExpandIndicator: boolean;
   previewMode: boolean;
+  previewVariant: SessionPreviewVariant;
   isMobile: boolean;
   session: SessionInfo;
   entries: SessionEntry[];
@@ -102,6 +104,7 @@ export interface SessionViewerBodyProps {
 export default function SessionViewerBody({
   showToolExpandIndicator,
   previewMode,
+  previewVariant,
   isMobile,
   session,
   entries,
@@ -196,6 +199,7 @@ export default function SessionViewerBody({
               onPointerLeave={scrollMarkers.onPointerLeave}
               isScrollMarkersFeatureEnabled={previewMode ? false : scrollMarkers.scrollMarkersEnabled}
               previewMode={previewMode}
+              previewVariant={previewVariant}
             />
 
             {!previewMode && (

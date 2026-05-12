@@ -91,6 +91,7 @@ export default function SessionPreviewPanel({
           onBack={onClose}
           initialEntryId={targetEntryId || undefined}
           previewMode
+          previewVariant="conversation"
         />
       </div>
     </div>
