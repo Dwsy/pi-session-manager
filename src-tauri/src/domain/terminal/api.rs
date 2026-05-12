@@ -1,7 +1,6 @@
 //! Terminal launching public API
 use crate::domain::terminal::launch::try_launch_known_terminal;
 use crate::domain::terminal::utils::*;
-use crate::export;
 use std::path::Path;
 use std::process::Command;
 
@@ -115,27 +114,61 @@ pub async fn open_session_in_terminal_impl(path: String, cwd: String, terminal: 
     Err(format!("Failed to open external terminal. requested='{requested_terminal}', cwd='{}'. attempts: {}", resolved_cwd, attempts.join(" | ")))
 }
 
-/// Open session in browser
+/// Open session in browser via the built-in web server.
+///
+/// Reads the session ID from the JSONL header and the HTTP port from config,
+/// then opens `http://localhost:{port}/session/{id}` in the system browser.
 pub async fn open_session_in_browser_impl(path: String) -> Result<(), String> {
-    let temp_dir = std::env::temp_dir();
-    let session_id = std::path::Path::new(&path).file_stem().and_then(|s| s.to_str()).unwrap_or("session");
-    let temp_html_path = temp_dir.join(format!("pi_session_{session_id}.html"));
-    let temp_html_path_str = temp_html_path.to_string_lossy().to_string();
+    // 1. Extract session ID from JSONL header (first line)
+    let session_id = extract_session_id_from_file(&path)?;
 
-    export::export_session(&path, "html", &temp_html_path_str).await.map_err(|e| format!("Failed to export session: {e}"))?;
+    // 2. Read HTTP port from config (default 52131)
+    let http_port = read_http_port();
 
+    // 3. Build the URL (hash route: /#/sessions/{id})
+    let url = format!("http://localhost:{http_port}/#/sessions/{session_id}");
+    log::info!("[Browser] Opening session in browser: {url}");
+
+    // 4. Open in system browser
     let result = if cfg!(target_os = "macos") {
-        Command::new("open").arg(&temp_html_path_str).spawn()
+        Command::new("open").arg(&url).spawn()
     } else if cfg!(target_os = "linux") {
-        Command::new("xdg-open").arg(&temp_html_path_str).spawn()
+        Command::new("xdg-open").arg(&url).spawn()
     } else if cfg!(target_os = "windows") {
-        Command::new("cmd").args(["/C", "start", "", &temp_html_path_str]).spawn()
+        Command::new("cmd").args(["/C", "start", "", &url]).spawn()
     } else {
         return Err("Unsupported operating system".to_string());
     };
 
     result.map_err(|e| format!("Failed to open browser: {e}"))?;
     Ok(())
+}
+
+/// Extract session ID from the first line of a JSONL session file.
+fn extract_session_id_from_file(path: &str) -> Result<String, String> {
+    use std::io::{BufRead, BufReader};
+
+    let file = std::fs::File::open(path).map_err(|e| format!("Failed to open session file: {e}"))?;
+    let mut reader = BufReader::new(file);
+    let mut first_line = String::new();
+    reader.read_line(&mut first_line).map_err(|e| format!("Failed to read session header: {e}"))?;
+
+    let value: serde_json::Value = serde_json::from_str(first_line.trim())
+        .map_err(|e| format!("Invalid session header JSON: {e}"))?;
+
+    value.get("id")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .ok_or_else(|| "Session header missing 'id' field".to_string())
+}
+
+/// Read the HTTP port from unified config, defaulting to 52131.
+fn read_http_port() -> u16 {
+    crate::unified_config::read_section("server")
+        .ok()
+        .and_then(|v| v.get("http_port").and_then(|p| p.as_u64()))
+        .unwrap_or(52131) as u16
 }
 
 /// Open a file or directory in the system file manager.
