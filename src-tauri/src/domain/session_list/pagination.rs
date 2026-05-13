@@ -17,6 +17,7 @@ pub fn strip_session_list_payload(session: &SessionInfo) -> SessionInfo {
         last_message: session.last_message.clone(),
         last_message_role: session.last_message_role.clone(),
         parent_session_path: session.parent_session_path.clone(),
+        model: session.model.clone(),
     }
 }
 

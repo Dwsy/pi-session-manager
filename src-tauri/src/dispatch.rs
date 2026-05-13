@@ -845,6 +845,10 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         }
         "open_session_in_browser" => Err("open_session_in_browser is desktop-only".to_string()),
         "open_session_in_terminal" => Err("open_session_in_terminal is desktop-only".to_string()),
+        "list_available_terminals" => {
+            let terminals = crate::domain::terminal::utils::scan_available_terminals();
+            Ok(serde_json::json!(terminals))
+        }
         "toggle_devtools" => Err("toggle_devtools is not supported via WebSocket".to_string()),
 
         _ => Err(format!("Unknown command: {command}")),

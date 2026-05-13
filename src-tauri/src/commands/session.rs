@@ -159,6 +159,11 @@ pub async fn open_session_in_terminal(path: String, cwd: String, terminal: Optio
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
+pub fn list_available_terminals() -> Vec<String> {
+    crate::domain::terminal::utils::scan_available_terminals().into_iter().map(String::from).collect()
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn open_session_in_browser(path: String) -> Result<(), String> {
     super::session_open::open_session_in_browser_impl(path).await
 }
@@ -215,7 +220,8 @@ mod tests {
             last_message: String::new(),
             last_message_role: "assistant".to_string(),
             parent_session_path: None,
-        };
+            model: None,
+    };
         let codex_session = SessionInfo {
             path: "/Users/demo/.codex/sessions/2026/01/01/rollout-a.jsonl".to_string(),
             id: "codex-1".to_string(),
@@ -230,7 +236,8 @@ mod tests {
             last_message: String::new(),
             last_message_role: "assistant".to_string(),
             parent_session_path: None,
-        };
+            model: None,
+    };
 
         let stats = get_session_stats(vec![pi_session, codex_session]).await.expect("stats");
         assert_eq!(stats.total_sessions, 1);

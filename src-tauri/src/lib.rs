@@ -128,6 +128,7 @@ pub fn run() {
             get_lightweight_mode,
             set_lightweight_mode,
             open_session_in_terminal,
+            list_available_terminals,
             scan_skills,
             scan_prompts,
             get_skill_content,

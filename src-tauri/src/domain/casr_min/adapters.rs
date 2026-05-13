@@ -48,6 +48,7 @@ pub fn canonical_to_session_info(canonical: &CanonicalSession, path: &Path, modi
         last_message,
         last_message_role,
         parent_session_path: None,
+        model: None,
     }
 }
 

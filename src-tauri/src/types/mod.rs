@@ -20,6 +20,8 @@ pub struct SessionInfo {
     pub last_message_role: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_session_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 
 /// Incremental diff emitted by file_watcher after rescan
@@ -198,6 +200,7 @@ mod tests {
             last_message: "ok".to_string(),
             last_message_role: "assistant".to_string(),
             parent_session_path: None,
+            model: None,
         };
 
         let serialized = serde_json::to_value(&session).expect("should serialize");

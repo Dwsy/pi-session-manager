@@ -320,6 +320,26 @@ fn main() {
 
                 let window = builder.build()?;
 
+                // ── Lightweight mode: intercept window close → destroy to free memory ──
+                let window_handle = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        // Check lightweight mode setting
+                        let lightweight = pi_session_manager::settings_store::get::<bool>("lightweight_mode")
+                            .unwrap_or(None)
+                            .unwrap_or(false);
+
+                        if lightweight {
+                            // Prevent default close (which would exit the app)
+                            api.prevent_close();
+                            // Destroy window to free memory; tray will recreate on next show
+                            let _ = window_handle.destroy();
+                            log::debug!("Lightweight mode: window destroyed, app stays in tray");
+                        }
+                        // If not lightweight, allow default close (app exits)
+                    }
+                });
+
                 // Restore saved zoom level
                 tauri::async_runtime::spawn(async move {
                     match pi_session_manager::settings_store::get::<f64>("window_zoom_level") {
@@ -371,6 +391,7 @@ fn main() {
             pi_session_manager::get_lightweight_mode,
             pi_session_manager::set_lightweight_mode,
             pi_session_manager::open_session_in_terminal,
+            pi_session_manager::list_available_terminals,
             pi_session_manager::scan_skills,
             pi_session_manager::scan_prompts,
             pi_session_manager::get_skill_content,
@@ -457,6 +478,25 @@ fn main() {
             pi_session_manager::save_workspace,
             pi_session_manager::delete_workspace
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            match event {
+                // ── Prevent app exit when lightweight mode is active ──
+                // When all windows are destroyed (lightweight mode), Tauri tries to exit.
+                // We intercept ExitRequested and keep the app running in tray.
+                tauri::RunEvent::ExitRequested { api, .. } => {
+                    let lightweight = pi_session_manager::settings_store::get::<bool>("lightweight_mode")
+                        .unwrap_or(None)
+                        .unwrap_or(false);
+
+                    if lightweight {
+                        api.prevent_exit();
+                        log::debug!("Lightweight mode: prevented app exit, staying in tray");
+                    }
+                    // If not lightweight, allow default exit
+                }
+                _ => {}
+            }
+        });
 }
