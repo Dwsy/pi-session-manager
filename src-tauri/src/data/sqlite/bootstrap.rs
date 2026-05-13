@@ -1,6 +1,6 @@
 use super::deps::*;
 use super::legacy_fts::drop_sessions_fts_triggers;
-use super::message_index::{drop_message_entries_triggers, ensure_message_fts_schema};
+use super::message_index::ensure_message_fts_schema;
 use super::migrations::apply_migrations;
 use super::schema::{ensure_schema_version_table, get_current_version, LATEST_SCHEMA_VERSION};
 use std::collections::hash_map::DefaultHasher;
@@ -122,6 +122,20 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
 
         // Use execute_batch for PRAGMAs that may return result rows
         conn.execute_batch("PRAGMA cache_size = -262144; PRAGMA wal_autocheckpoint = 1000;").map_err(|e| format!("Failed to set cache_size/wal_autocheckpoint: {e}"))?; // 256MB cache, 4MB checkpoint threshold
+
+        // Memory-map DB file to reduce read() syscalls. 256MB covers hot pages;
+        // OS demand-pages the rest via page faults. Uses execute_batch because
+        // mmap_size returns the previous value when set.
+        conn.execute_batch("PRAGMA mmap_size = 268435456;").map_err(|e| format!("Failed to set mmap_size: {e}"))?;
+
+        // Store temporary tables/results in RAM. Eliminates disk temp files from
+        // FTS5 rebuild and ORDER BY/GROUP BY on large result sets.
+        conn.execute("PRAGMA temp_store = MEMORY;", []).map_err(|e| format!("Failed to set temp_store: {e}"))?;
+
+        // Limit WAL file to 6MB. wal_autocheckpoint=1000 pages × 4KB = ~4MB;
+        // 6MB gives headroom. After checkpoint, WAL is truncated to this size,
+        // preventing unbounded growth and large checkpoint IO bursts.
+        conn.execute_batch("PRAGMA journal_size_limit = 6144000;").map_err(|e| format!("Failed to set journal_size_limit: {e}"))?;
 
         // Enable foreign key constraints
         conn.execute("PRAGMA foreign_keys=ON;", []).map_err(|e| format!("Failed to enable foreign keys: {e}"))?;

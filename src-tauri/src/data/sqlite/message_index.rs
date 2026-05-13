@@ -436,14 +436,14 @@ pub fn ensure_message_fts_schema(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn drop_message_entries_triggers(conn: &Connection) -> Result<(), String> {
+pub fn drop_message_entries_triggers(conn: &Connection) -> Result<(), String> {
     conn.execute("DROP TRIGGER IF EXISTS message_entries_ai", []).map_err(|e| format!("Failed to drop trigger message_entries_ai: {e}"))?;
     conn.execute("DROP TRIGGER IF EXISTS message_entries_ad", []).map_err(|e| format!("Failed to drop trigger message_entries_ad: {e}"))?;
     conn.execute("DROP TRIGGER IF EXISTS message_entries_au", []).map_err(|e| format!("Failed to drop trigger message_entries_au: {e}"))?;
     Ok(())
 }
 
-fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
+pub fn create_message_entries_triggers(conn: &Connection) -> Result<(), String> {
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS message_entries_ai AFTER INSERT ON message_entries BEGIN
          INSERT INTO message_fts(rowid, session_path, role, source_type, search_text)
@@ -498,7 +498,7 @@ fn optimize_message_fts_index(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
-fn rebuild_message_fts_index(conn: &Connection) -> Result<(), String> {
+pub fn rebuild_message_fts_index(conn: &Connection) -> Result<(), String> {
     info!("[FTS] Rebuilding message_fts index from message_entries...");
     conn.execute("INSERT INTO message_fts(message_fts) VALUES('rebuild')", []).map_err(|e| format!("Failed to rebuild FTS index: {e}"))?;
     optimize_message_fts_index(conn)?;
@@ -710,6 +710,48 @@ fn insert_message_entries_for_path(conn: &Connection, session_path: &str) -> Res
     Ok(())
 }
 
+/// Self-contained bulk insert: drops triggers → delete+insert → rebuild FTS → recreate triggers.
+/// Do NOT call when triggers are already dropped (e.g. inside scanner bulk path) —
+/// use insert_message_entries_rows + rebuild at caller level instead.
+pub fn bulk_insert_message_entries_for_path(conn: &Connection, session_path: &str) -> Result<(), String> {
+    let start = std::time::Instant::now();
+    let include_thinking = load_include_thinking_in_search();
+    let entries = crate::domain::casr_min::bridge_ops::parse_session_entries_from_path(Path::new(session_path))?;
+    let rows = build_rows_from_session_entries(session_path, &entries, include_thinking);
+
+    // Drop triggers to avoid per-row FTS sync during bulk insert
+    drop_message_entries_triggers(conn)?;
+    delete_message_entries_for_session(conn, session_path)?;
+    insert_message_entries_rows(conn, &rows)?;
+    // Rebuild FTS index from content table (single pass, much faster than per-row triggers)
+    rebuild_message_fts_index(conn)?;
+    // Recreate triggers for ongoing incremental updates
+    create_message_entries_triggers(conn)?;
+
+    let elapsed = start.elapsed();
+    info!("[IO] bulk_insert_message_entries_for_path path={} entries={} rows={} elapsed={:?}", session_path, entries.len(), rows.len(), elapsed);
+    Ok(())
+}
+
+/// Self-contained bulk upsert: drops triggers → delete+insert → rebuild FTS → recreate triggers.
+/// Do NOT call when triggers are already dropped (e.g. inside scanner bulk path).
+pub fn bulk_upsert_message_entries(conn: &Connection, session_path: &str, entries: &[SessionEntry]) -> Result<(), String> {
+    if !message_entries_table_exists(conn)? {
+        return Ok(());
+    }
+    let include_thinking = load_include_thinking_in_search();
+    let rows = build_rows_from_session_entries(session_path, entries, include_thinking);
+
+    drop_message_entries_triggers(conn)?;
+    delete_message_entries_for_session(conn, session_path)?;
+    insert_message_entries_rows(conn, &rows)?;
+    rebuild_message_fts_index(conn)?;
+    create_message_entries_triggers(conn)?;
+
+    debug!("Bulk upserted {} message entry rows for session: {}", rows.len(), session_path);
+    Ok(())
+}
+
 pub fn insert_message_entries(conn: &Connection, session: &SessionInfo) -> Result<(), String> {
     if !message_entries_table_exists(conn)? {
         return Ok(());
@@ -784,42 +826,47 @@ pub fn update_labels_for_entries(conn: &Connection, session_path: &str, entries:
 /// Assumes JSONL append-only semantics: existing entries are never modified,
 /// only new entries are appended. If a session file is rewritten (e.g., via
 /// `pi session edit`), stale content may persist until a full rescan.
+/// Sync message entries: delete stale + insert new rows in message_entries.
+/// FTS sync depends on trigger state: if triggers exist, FTS is updated per-row;
+/// if triggers are dropped (bulk mode), caller must rebuild FTS after.
 pub fn sync_message_entries(conn: &Connection, session_path: &str, entries: &[SessionEntry]) -> Result<(), String> {
     if !message_entries_table_exists(conn)? {
         return Ok(());
     }
+    sync_message_entries_inner(conn, session_path, entries)
+}
 
+/// Alias for sync_message_entries. Use when caller has explicitly dropped FTS triggers
+/// and will rebuild FTS after all sessions are synced (scanner bulk path).
+pub fn bulk_sync_message_entries(conn: &Connection, session_path: &str, entries: &[SessionEntry]) -> Result<(), String> {
+    sync_message_entries(conn, session_path, entries)
+}
+
+/// Inner sync logic without FTS trigger management (used by both sync and bulk_sync)
+fn sync_message_entries_inner(conn: &Connection, session_path: &str, entries: &[SessionEntry]) -> Result<(), String> {
     let start = std::time::Instant::now();
     let _total_entries = entries.len();
 
-    // Get existing entry IDs for this session
     let existing_ids: std::collections::HashSet<String> = {
         let mut stmt = conn.prepare("SELECT id FROM message_entries WHERE session_path = ?").map_err(|e| format!("Failed to prepare existing ids query: {e}"))?;
         let rows = stmt.query_map(params![session_path], |row| row.get::<_, String>(0)).map_err(|e| format!("Failed to query existing ids: {e}"))?;
         rows.filter_map(|r| r.ok()).collect()
     };
 
-    // Build new rows
     let include_thinking = load_include_thinking_in_search();
     let new_rows = build_rows_from_session_entries(session_path, entries, include_thinking);
-
-    // Collect new row IDs
     let new_ids: std::collections::HashSet<&str> = new_rows.iter().map(|r| r.row_id.as_str()).collect();
 
-    // Delete entries that are no longer present
     let ids_to_delete: Vec<&String> = existing_ids.iter().filter(|id| !new_ids.contains(id.as_str())).collect();
     if !ids_to_delete.is_empty() {
-        // Batch delete in chunks
         for chunk in ids_to_delete.chunks(INSERT_CHUNK_SIZE) {
             let placeholders: Vec<String> = chunk.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
             let sql = format!("DELETE FROM message_entries WHERE id IN ({})", placeholders.join(", "));
             let params: Vec<&dyn rusqlite::ToSql> = chunk.iter().map(|id| *id as &dyn rusqlite::ToSql).collect();
             conn.execute(&sql, params.as_slice()).map_err(|e| format!("Failed to batch delete stale entries: {e}"))?;
         }
-        debug!("Deleted {} stale message entries for session: {}", ids_to_delete.len(), session_path);
     }
 
-    // Insert only new entries (INSERT OR REPLACE handles updates)
     let rows_to_insert: Vec<&MessageEntryRow> = new_rows.iter().filter(|r| !existing_ids.contains(&r.row_id)).collect();
     if !rows_to_insert.is_empty() {
         for chunk in rows_to_insert.chunks(INSERT_CHUNK_SIZE) {
@@ -830,9 +877,7 @@ pub fn sync_message_entries(conn: &Connection, session_path: &str, entries: &[Se
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-
             let sql = format!("INSERT OR REPLACE INTO message_entries (id, entry_id, session_path, role, source_type, content, search_text, timestamp) VALUES {values_sql}");
-
             let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(chunk.len() * 8);
             for row in chunk {
                 params.push(&row.row_id);
@@ -844,17 +889,15 @@ pub fn sync_message_entries(conn: &Connection, session_path: &str, entries: &[Se
                 params.push(&row.search_text);
                 params.push(&row.timestamp);
             }
-
             conn.execute(&sql, params.as_slice()).map_err(|e| format!("Failed to batch insert new entries: {e}"))?;
         }
-        debug!("Inserted {} new message entries for session: {}", rows_to_insert.len(), session_path);
     }
 
     let elapsed = start.elapsed();
     if ids_to_delete.is_empty() && rows_to_insert.is_empty() {
         debug!("No changes to message entries for session: {}", session_path);
     } else {
-        info!("[IO:sync_entries] session={} total_entries={} existing={} deleted={} inserted={} elapsed={:?}", session_path, _total_entries, existing_ids.len(), ids_to_delete.len(), rows_to_insert.len(), elapsed);
+        info!("[IO:sync_entries_inner] session={} total={} existing={} deleted={} inserted={} elapsed={:?}", session_path, _total_entries, existing_ids.len(), ids_to_delete.len(), rows_to_insert.len(), elapsed);
     }
 
     Ok(())

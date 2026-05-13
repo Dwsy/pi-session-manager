@@ -23,6 +23,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             14 => migration_14(conn)?,
             15 => migration_15(conn)?,
             16 => migration_16(conn)?,
+            17 => migration_17(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -320,6 +321,23 @@ fn migration_16(conn: &Connection) -> Result<(), String> {
     conn.execute("DELETE FROM scan_state", []).map_err(|e| format!("Migration 16 failed clearing scan_state: {e}"))?;
     // sessions last — it has FK references from other tables we just cleared
     conn.execute("DELETE FROM sessions", []).map_err(|e| format!("Migration 16 failed clearing sessions: {e}"))?;
+
+    Ok(())
+}
+
+/// Migration to version 17: add model column to sessions table.
+/// This stores the model identifier (e.g. "anthropic/claude-sonnet-4-20250514")
+/// extracted from the last message in each session.
+fn migration_17(conn: &Connection) -> Result<(), String> {
+    fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
+        let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})")).map_err(|e| format!("Failed to prepare PRAGMA table_info for {table}: {e}"))?;
+        let column_names: Vec<String> = stmt.query_map([], |row| row.get(1)).map_err(|e| format!("Failed to query columns for {table}: {e}"))?.collect::<Result<Vec<_>, _>>().map_err(|e| format!("Failed to collect columns for {table}: {e}"))?;
+        Ok(column_names.iter().any(|name| name == column))
+    }
+
+    if !column_exists(conn, "sessions", "model")? {
+        conn.execute("ALTER TABLE sessions ADD COLUMN model TEXT", []).map_err(|e| format!("Migration 17 failed adding model column: {e}"))?;
+    }
 
     Ok(())
 }

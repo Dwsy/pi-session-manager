@@ -105,6 +105,7 @@ pub fn preload_recent_sessions(conn: &Connection, count: usize) -> Result<Vec<Se
                 last_message: row.get(8).unwrap_or_default(),
                 last_message_role: row.get(9).unwrap_or_default(),
                 parent_session_path: row.get(10)?,
+                model: None,
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?
