@@ -99,7 +99,6 @@ export const settings = {
     // Terminal Options
     options: {
       auto: { name: "Auto", description: "Auto detect" },
-      vscode: { name: "VS Code", description: "Visual Studio Code terminal" },
       iterm2: { name: "iTerm2", description: "Recommended macOS terminal" },
       terminal: {
         name: "Terminal.app",
@@ -114,6 +113,15 @@ export const settings = {
       alacritty: { name: "Alacritty", description: "Alacritty terminal" },
       wezterm: { name: "WezTerm", description: "WezTerm terminal" },
       ghostty: { name: "Ghostty", description: "Ghostty terminal" },
+      warp: { name: "Warp", description: "Warp terminal" },
+      zed: { name: "Zed", description: "Zed editor" },
+      hyper: { name: "Hyper", description: "Hyper terminal" },
+      tabby: { name: "Tabby", description: "Tabby terminal" },
+      foot: { name: "Foot", description: "Wayland terminal" },
+      xdgTerminalExec: {
+        name: "xdg-terminal-exec",
+        description: "System default terminal",
+      },
       windowsTerminal: {
         name: "Windows Terminal",
         description: "Windows Terminal",

@@ -224,6 +224,8 @@ function App() {
       return [];
     }
   });
+  const [modelFilter, setModelFilter] = useState("");
+  const [dateRange, setDateRange] = useState<import("./types").DateRange | null>(null);
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
   const [sourceOptions, setSourceOptions] = useState<
     Array<{ slug: string; label: string }>
@@ -726,6 +728,8 @@ function App() {
     sidebarSearchQuery,
     filterTagIds,
     sourceFilterSlugs,
+    modelFilter,
+    dateRange,
     sessionTags,
     getDescendantIds,
     onSelectSession: handleSelectSession,
@@ -859,6 +863,16 @@ function App() {
 
   // ─── Shared content renderers ───
 
+  const modelOptions = useMemo(() => {
+    const models = new Set<string>();
+    for (const session of sessions) {
+      if (session.model) {
+        models.add(session.model);
+      }
+    }
+    return Array.from(models).sort();
+  }, [sessions]);
+
   const renderMobileFilterBar = (placeholder?: string, showSort = true) => (
     <AppMobileFilterBar
       searchQuery={sidebarSearchQuery}
@@ -870,6 +884,11 @@ function App() {
       sourceOptions={sourceOptions}
       selectedSourceSlugs={sourceFilterSlugs}
       onSourceFilterChange={setSourceFilterSlugs}
+      modelOptions={modelOptions}
+      selectedModel={modelFilter}
+      onModelFilterChange={setModelFilter}
+      dateRange={dateRange}
+      onDateRangeChange={setDateRange}
       onCreateTag={(name, color, parentId) => {
         void createTag(name, color, undefined, parentId);
       }}
@@ -1170,6 +1189,11 @@ function App() {
       sourceOptions={sourceOptions}
       selectedSourceSlugs={sourceFilterSlugs}
       onSourceFilterChange={setSourceFilterSlugs}
+      modelOptions={modelOptions}
+      selectedModel={modelFilter}
+      onModelFilterChange={setModelFilter}
+      dateRange={dateRange}
+      onDateRangeChange={setDateRange}
       onCreateTag={(name, color, parentId) => {
         void createTag(name, color, undefined, parentId);
       }}
@@ -1260,7 +1284,8 @@ function App() {
   // ═══════════════════════════════════
   // Scanning gate: show loading page while initial scan is in progress
   // ═══════════════════════════════════
-  if (showScanningPage && sessions.length === 0) {
+  const isFirstScanDone = !!localStorage.getItem("onboarding-completed");
+  if (showScanningPage && sessions.length === 0 && !isFirstScanDone) {
     return (
       <div className="flex flex-col h-screen-safe bg-background text-foreground items-center justify-center">
         <div className="flex flex-col items-center gap-6">

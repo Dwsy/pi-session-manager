@@ -49,7 +49,6 @@ export const settings = {
     options: {
       iterm2: { name: 'iTerm2', description: 'おすすめの macOS ターミナル' },
       terminal: { name: 'Terminal.app', description: 'macOS 標準ターミナル' },
-      vscode: { name: 'VS Code', description: 'Visual Studio Code ターミナル' },
       custom: { name: 'カスタム', description: 'カスタムコマンドを使用' },
     },
   },

@@ -6,6 +6,7 @@ import type {
 } from "@/components/settings/types";
 import {
   clearAllPersistedDatasetCaches,
+  deletePersistedDatasetCache,
   invalidateBrowserDatasetCache,
   listPersistedDatasetCaches,
 } from "@/browser-dataset";
@@ -276,8 +277,6 @@ export async function clearBrowserDatasetCache(
     return;
   }
 
-  const { deletePersistedDatasetCache } =
-    await import("@/browser-dataset/cache");
   await deletePersistedDatasetCache(datasetId);
   invalidateBrowserDatasetCache();
 }

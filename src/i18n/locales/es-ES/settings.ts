@@ -46,7 +46,6 @@ export const settings = {
     options: {
       iterm2: { name: 'iTerm2', description: 'Terminal recomendado para macOS' },
       terminal: { name: 'Terminal.app', description: 'Terminal integrado de macOS' },
-      vscode: { name: 'VS Code', description: 'Terminal de Visual Studio Code' },
       custom: { name: 'Personalizado', description: 'Usar comando personalizado' },
     },
   },
