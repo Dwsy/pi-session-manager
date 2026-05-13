@@ -11,7 +11,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+          shared-key: lint
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Rust fmt (desktop)
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Rust fmt (CLI)
+        working-directory: src-tauri-cli
+        run: cargo fmt --check
+
+      - name: Clippy (desktop)
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
+
+      - name: Clippy (CLI)
+        working-directory: src-tauri-cli
+        run: cargo clippy -- -D warnings
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
   check:
+    needs: lint
+
     strategy:
       fail-fast: false
       matrix:
