@@ -88,11 +88,14 @@ pub fn get_cached_file_modified_cached(conn: &Connection) -> std::collections::H
     // Try cache first
     if let Ok(guard) = CACHED_FILE_MODIFIED.read() {
         if let Some(ref cached) = *guard {
+            super::io_trace::trace_scan("cached_file_modified_hit", &format!("count={}", cached.len()));
             return cached.clone();
         }
     }
     // Cache miss: load from DB and populate cache
+    let start = Instant::now();
     let modified = sqlite::get_all_cached_file_modified(conn).unwrap_or_default();
+    super::io_trace::trace_db("get_all_cached_file_modified", "sessions", modified.len(), start.elapsed());
     if let Ok(mut guard) = CACHED_FILE_MODIFIED.write() {
         *guard = Some(modified.clone());
     }
@@ -113,11 +116,14 @@ pub fn get_scan_state_cached(conn: &Connection) -> std::collections::HashMap<Str
     // Try cache first
     if let Ok(guard) = SCAN_STATE_CACHE.read() {
         if let Some(ref cached) = *guard {
+            super::io_trace::trace_scan("scan_state_hit", &format!("count={}", cached.len()));
             return cached.clone();
         }
     }
     // Cache miss: load from DB and populate cache
+    let start = Instant::now();
     let states = sqlite::get_all_scan_state(conn).unwrap_or_default();
+    super::io_trace::trace_db("get_all_scan_state", "scan_state", states.len(), start.elapsed());
     if let Ok(mut guard) = SCAN_STATE_CACHE.write() {
         *guard = Some(states.clone());
     }
@@ -219,6 +225,7 @@ fn clone_session_for_list(session: &SessionInfo) -> SessionInfo {
         last_message: session.last_message.clone(),
         last_message_role: session.last_message_role.clone(),
         parent_session_path: session.parent_session_path.clone(),
+        model: session.model.clone(),
     }
 }
 
@@ -538,29 +545,105 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
 
         // Identify files that need parsing: new files or files whose scan_state metadata is stale
         let classify_started_at = Instant::now();
-        let files_to_parse: Vec<PathBuf> = files
-            .into_iter()
-            .filter(|path| {
-                let path_str = path.to_string_lossy();
-                if !db_paths.contains(path_str.as_ref()) {
-                    return true;
+        let mut files_to_parse: Vec<PathBuf> = Vec::new();
+        let mut stale_new_file = 0usize;
+        let mut stale_no_scan_state = 0usize;
+        let mut stale_metadata_error = 0usize;
+        let mut stale_backing_path = 0usize;
+        let mut stale_modified = 0usize;
+        let mut stale_size = 0usize;
+        let mut stale_status = 0usize;
+        let mut parse_candidate_bytes = 0u64;
+        let mut stale_samples: Vec<String> = Vec::new();
+
+        for path in files {
+            let path_str = path.to_string_lossy();
+            let reason = if !db_paths.contains(path_str.as_ref()) {
+                stale_new_file += 1;
+                Some("new")
+            } else {
+                match scan_state_by_path.get(path_str.as_ref()) {
+                    None => {
+                        stale_no_scan_state += 1;
+                        Some("no_scan_state")
+                    }
+                    Some(scan_state) => {
+                        let backing_path = crate::domain::session_bridge::backing_file_path(&path);
+                        match std::fs::metadata(&backing_path) {
+                            Err(_) => {
+                                stale_metadata_error += 1;
+                                Some("metadata_error")
+                            }
+                            Ok(metadata) => {
+                                let file_modified: chrono::DateTime<chrono::Utc> = DateTime::from(metadata.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH));
+                                let file_size = metadata.len();
+                                if scan_state.backing_path != backing_path.to_string_lossy() {
+                                    stale_backing_path += 1;
+                                    Some("backing_path")
+                                } else if scan_state.file_modified != file_modified {
+                                    stale_modified += 1;
+                                    Some("modified")
+                                } else if scan_state.file_size != file_size {
+                                    stale_size += 1;
+                                    Some("size")
+                                } else if scan_state.last_parse_status != "ok" {
+                                    stale_status += 1;
+                                    Some("status")
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+                    }
                 }
+            };
 
-                let Some(scan_state) = scan_state_by_path.get(path_str.as_ref()) else {
-                    return true;
-                };
-
-                let backing_path = crate::domain::session_bridge::backing_file_path(path);
-                let Ok(metadata) = std::fs::metadata(&backing_path) else {
-                    return true;
-                };
-                let file_modified: chrono::DateTime<chrono::Utc> = DateTime::from(metadata.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH));
-                let file_size = metadata.len();
-
-                scan_state.backing_path != backing_path.to_string_lossy() || scan_state.file_modified != file_modified || scan_state.file_size != file_size || scan_state.last_parse_status != "ok"
-            })
-            .collect();
+            if let Some(reason) = reason {
+                let backing_path = crate::domain::session_bridge::backing_file_path(&path);
+                let bytes = std::fs::metadata(&backing_path).map(|metadata| metadata.len()).unwrap_or(0);
+                parse_candidate_bytes = parse_candidate_bytes.saturating_add(bytes);
+                if stale_samples.len() < 12 {
+                    stale_samples.push(format!("{reason}:{}:{}B", path.display(), bytes));
+                }
+                files_to_parse.push(path);
+            }
+        }
         let classify_elapsed_ms = classify_started_at.elapsed().as_millis();
+
+        info!(
+            "[IO:classify] total={} cached={} parse={} parse_bytes={} new={} no_scan_state={} metadata_error={} backing_path={} modified={} size={} status={} elapsed={}ms samples={:?}",
+            total_files,
+            total_files - files_to_parse.len(),
+            files_to_parse.len(),
+            parse_candidate_bytes,
+            stale_new_file,
+            stale_no_scan_state,
+            stale_metadata_error,
+            stale_backing_path,
+            stale_modified,
+            stale_size,
+            stale_status,
+            classify_elapsed_ms,
+            stale_samples
+        );
+        super::io_trace::trace_scan(
+            "classify",
+            &format!(
+                "total={} cached={} parse={} parse_bytes={} new={} no_scan_state={} metadata_error={} backing_path={} modified={} size={} status={} elapsed={}ms",
+                total_files,
+                total_files - files_to_parse.len(),
+                files_to_parse.len(),
+                parse_candidate_bytes,
+                stale_new_file,
+                stale_no_scan_state,
+                stale_metadata_error,
+                stale_backing_path,
+                stale_modified,
+                stale_size,
+                stale_status,
+                classify_elapsed_ms
+            ),
+        );
 
         info!("Need to parse {} files ({} cached, {} to parse) [db_load={}ms classify={}ms]", total_files, total_files - files_to_parse.len(), files_to_parse.len(), db_load_elapsed_ms, classify_elapsed_ms);
 
@@ -576,36 +659,70 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
         let mut historical_upserts = 0usize;
         let mut realtime_buffered = 0usize;
 
+        // Separate realtime vs historical results for batched transaction writes
+        let mut realtime_results: Vec<_> = Vec::new();
+        let mut historical_results: Vec<_> = Vec::new();
         for result in parsed_results {
-            let info = result.info.clone();
             set_cached_entries(&result.path_str, result.entries.clone());
             if result.file_modified > realtime_cutoff {
-                // Realtime file: add to results, buffer for DB
-                write_buffer::buffer_session_write(&info, result.file_modified);
-                // Buffer full details (token/model/cost) from already-parsed entries
-                if !result.entries.is_empty() {
-                    let details = crate::core::parser::parse_session_details_from_entries(&result.entries);
-                    write_buffer::buffer_details_write(&result.path_str, result.file_modified, &details);
-                }
-                let _ = sqlite::upsert_scan_state_for_session(&conn, &info, result.file_modified, "ok");
-                realtime_buffered += 1;
+                write_buffer::buffer_session_write(&result.info, result.file_modified);
+                realtime_results.push(result);
             } else {
-                // Historical file: upsert to DB and warm details cache
-                if let Err(e) = sqlite::upsert_session(&mut conn, &info, result.file_modified, Some(&result.entries)) {
-                    error!("Failed to upsert historical session {}: {}", result.path_str, e);
-                    continue;
-                } else {
-                    // Populate session_details_cache from already-parsed entries
-                    if !result.entries.is_empty() {
-                        let details = crate::core::parser::parse_session_details_from_entries(&result.entries);
-                        let _ = sqlite::upsert_session_details_cache(&conn, &result.path_str, result.file_modified, &details);
-                    }
-                    let _ = sqlite::upsert_scan_state_for_session(&conn, &info, result.file_modified, "ok");
-                    historical_upserts += 1;
-                }
+                historical_results.push(result);
             }
-            updated_paths.insert(info.path.clone());
-            updated_sessions.push(info);
+        }
+
+        // Batch realtime SQLite writes in a single transaction (details_cache + scan_state)
+        if !realtime_results.is_empty() {
+            match conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate) {
+                Ok(tx) => {
+                    for result in &realtime_results {
+                        if !result.entries.is_empty() {
+                            let details = crate::core::parser::parse_session_details_from_entries(&result.entries);
+                            let _ = sqlite::upsert_session_details_cache_in_tx(&tx, &result.path_str, result.file_modified, &details);
+                        }
+                        let _ = sqlite::upsert_scan_state_for_session_in_tx(&tx, &result.info, result.file_modified, "ok");
+                    }
+                    if let Err(e) = tx.commit() {
+                        error!("Failed to commit realtime batch transaction: {e}");
+                    }
+                }
+                Err(e) => error!("Failed to begin realtime batch transaction: {e}"),
+            }
+            realtime_buffered = realtime_results.len();
+            for result in &realtime_results {
+                updated_paths.insert(result.info.path.clone());
+                updated_sessions.push(result.info.clone());
+            }
+        }
+
+        // Batch historical SQLite writes in a single transaction (session + details_cache + scan_state)
+        if !historical_results.is_empty() {
+            match conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate) {
+                Ok(tx) => {
+                    for result in &historical_results {
+                        if let Err(e) = sqlite::upsert_session_in_tx(&tx, &result.info, result.file_modified, Some(&result.entries)) {
+                            error!("Failed to upsert historical session {}: {}", result.path_str, e);
+                            continue;
+                        }
+                        if !result.entries.is_empty() {
+                            let details = crate::core::parser::parse_session_details_from_entries(&result.entries);
+                            let _ = sqlite::upsert_session_details_cache_in_tx(&tx, &result.path_str, result.file_modified, &details);
+                        }
+                        let _ = sqlite::upsert_scan_state_for_session_in_tx(&tx, &result.info, result.file_modified, "ok");
+                        historical_upserts += 1;
+                    }
+                    if let Err(e) = tx.commit() {
+                        error!("Failed to commit historical batch transaction: {e}");
+                    }
+                }
+                Err(e) => error!("Failed to begin historical batch transaction: {e}"),
+            }
+
+            for result in &historical_results {
+                updated_paths.insert(result.info.path.clone());
+                updated_sessions.push(result.info.clone());
+            }
         }
         let upsert_elapsed_ms = upsert_started_at.elapsed().as_millis();
 
@@ -666,7 +783,7 @@ pub fn parse_session_info(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>
     let file_size = fs::metadata(&backing).map(|m| m.len()).unwrap_or(0);
     let result = crate::domain::session_bridge::parse_session_info_from_path(path)?;
     let elapsed = start.elapsed();
-    super::io_trace::trace_file_read(&path.to_string_lossy(), file_size, elapsed);
+    super::io_trace::trace_scan("full_parse", &format!("path={} bytes={} entries={} elapsed={:?}", path.display(), file_size, result.1.len(), elapsed));
     info!("[IO:full_parse] path={} size={}bytes entries={} elapsed={:?}", path.display(), file_size, result.1.len(), elapsed);
     Ok(result)
 }
@@ -912,11 +1029,16 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
 
             crate::core::write_buffer::buffer_session_write(&info, file_modified);
 
-            // Buffer details from already-parsed entries (avoids re-reading file)
-            // For incremental case, details will be computed from DB on next stats request.
-            if new_trust == 3 && !entries.is_empty() {
+            // Update session_details_cache with cumulative data.
+            // For incremental reads, `entries` contains ALL entries (old cached + new appended),
+            // so parse_session_details_from_entries produces correct cumulative stats.
+            // Previously this wrote only-delta data to write_buffer via buffer_details_write,
+            // causing stats to undercount for active sessions.
+            if !entries.is_empty() {
                 let details = crate::core::parser::parse_session_details_from_entries(&entries);
-                write_buffer::buffer_details_write(&session_path_str, file_modified, &details);
+                if let Err(e) = sqlite::upsert_session_details_cache(&conn, &session_path_str, file_modified, &details) {
+                    warn!("Failed to update session_details_cache for {}: {}", session_path_str, e);
+                }
             }
 
             diff.updated.push(info.clone());
@@ -1117,13 +1239,14 @@ impl ScannerScheduler {
                 added += 1;
             }
 
-            // Buffer realtime files for stats
+            // Buffer realtime files for stats and update session_details_cache
             if file_modified > realtime_cutoff {
                 write_buffer::buffer_session_write(&result.info, file_modified);
-                if !result.entries.is_empty() {
-                    let details = crate::core::parser::parse_session_details_from_entries(&result.entries);
-                    write_buffer::buffer_details_write(path_str, file_modified, &details);
-                }
+            }
+            // Update session_details_cache for all parsed files (realtime + historical)
+            if !result.entries.is_empty() {
+                let details = crate::core::parser::parse_session_details_from_entries(&result.entries);
+                let _ = sqlite::upsert_session_details_cache(&conn, path_str, file_modified, &details);
             }
         }
 

@@ -124,7 +124,11 @@ fn detect_provider_from_path_or_content(path: &Path) -> Result<Option<ProviderKi
         return Ok(Some(provider));
     }
 
+    let start = std::time::Instant::now();
     let content = fs::read_to_string(path).map_err(|e| format!("Failed to read session file {}: {e}", path.display()))?;
+    let elapsed = start.elapsed();
+    crate::core::io_trace::trace_file_read(&path.to_string_lossy(), content.len() as u64, elapsed);
+    tracing::info!("[IO] detect_provider_from_path_or_content path={} bytes={} elapsed={:?}", path.display(), content.len(), elapsed);
     Ok(detect_provider(Some(path), &content))
 }
 

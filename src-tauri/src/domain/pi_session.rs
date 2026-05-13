@@ -71,6 +71,7 @@ pub fn parse_pi_session_info(path: &Path, file_modified: DateTime<Utc>) -> Resul
     let mut last_message = String::new();
     let mut last_message_role = String::new();
     let mut latest_message_activity = None;
+    let mut last_model = None;
 
     for raw_entry in &raw_entries {
         let RawPiEntry::Message { message, .. } = raw_entry else {
@@ -83,6 +84,10 @@ pub fn parse_pi_session_info(path: &Path, file_modified: DateTime<Utc>) -> Resul
 
         message_count += 1;
         latest_message_activity = Some(latest_message_activity.map(|current: DateTime<Utc>| current.max(raw_entry.timestamp())).unwrap_or_else(|| raw_entry.timestamp()));
+
+        if message.model.is_some() {
+            last_model = message.model.clone();
+        }
 
         let visible_text = visible_message_text(message);
         if visible_text.is_empty() {
@@ -116,13 +121,19 @@ pub fn parse_pi_session_info(path: &Path, file_modified: DateTime<Utc>) -> Resul
             last_message,
             last_message_role,
             parent_session_path: header.parent_session_path,
+            model: last_model,
         },
         entries,
     ))
 }
 
 pub fn parse_pi_session_entries(path: &Path) -> Result<Vec<SessionEntry>, String> {
+    let start = std::time::Instant::now();
+    let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
     let (_, raw_entries) = parse_pi_session(path)?;
+    let elapsed = start.elapsed();
+    crate::core::io_trace::trace_file_read(&path.to_string_lossy(), file_size, elapsed);
+    tracing::info!("[IO] parse_pi_session_entries path={} bytes={} entries={} elapsed={:?}", path.display(), file_size, raw_entries.len(), elapsed);
     Ok(raw_entries.iter().map(RawPiEntry::to_session_entry).collect())
 }
 
@@ -171,7 +182,7 @@ pub fn parse_pi_session_header_only(path: &Path, file_modified: DateTime<Utc>) -
 
     let metadata = std::fs::metadata(path).ok();
     let file_size = metadata.as_ref().map(|item| item.len()).unwrap_or(0);
-    let (last_message, last_message_role) = read_last_message_hint(path, file_size).unwrap_or_default();
+    let (last_message, last_message_role, model) = read_last_message_hint(path, file_size).unwrap_or_default();
 
     // Estimate message count from file size (rough: ~200 bytes per message).
     let estimated_message_count = (file_size / 200) as usize;
@@ -190,12 +201,13 @@ pub fn parse_pi_session_header_only(path: &Path, file_modified: DateTime<Utc>) -
         last_message,
         last_message_role,
         parent_session_path: header.parent_session_path,
+        model,
     })
 }
 
 const HEADER_ONLY_TAIL_PROBE_BYTES: u64 = 64 * 1024;
 
-fn read_last_message_hint(path: &Path, file_size: u64) -> Option<(String, String)> {
+fn read_last_message_hint(path: &Path, file_size: u64) -> Option<(String, String, Option<String>)> {
     if file_size == 0 {
         return None;
     }
@@ -227,7 +239,7 @@ fn read_last_message_hint(path: &Path, file_size: u64) -> Option<(String, String
     None
 }
 
-fn parse_message_hint(line: &str) -> Option<(String, String)> {
+fn parse_message_hint(line: &str) -> Option<(String, String, Option<String>)> {
     let value = serde_json::from_str::<Value>(line).ok()?;
     let message = value.get("message")?;
     let role = message.get("role").and_then(Value::as_str)?.to_string();
@@ -236,7 +248,8 @@ fn parse_message_hint(line: &str) -> Option<(String, String)> {
     }
 
     let text = message_text_hint(message)?;
-    Some((truncate_text(&text, 150), role))
+    let model = message.get("model").and_then(Value::as_str).map(String::from);
+    Some((truncate_text(&text, 150), role, model))
 }
 
 fn message_text_hint(message: &Value) -> Option<String> {

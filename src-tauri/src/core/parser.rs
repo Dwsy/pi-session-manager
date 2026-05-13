@@ -271,6 +271,43 @@ impl SessionDetails {
     pub fn total_messages(&self) -> usize {
         self.user_messages + self.assistant_messages + self.tool_results + self.custom_messages
     }
+
+    /// Merge delta details (from incremental rescan) into this cumulative instance.
+    /// Adds message counts, token totals, costs, and model_usage from `delta`.
+    pub fn merge_delta(&mut self, delta: &SessionDetails) {
+        self.user_messages += delta.user_messages;
+        self.assistant_messages += delta.assistant_messages;
+        self.tool_results += delta.tool_results;
+        self.custom_messages += delta.custom_messages;
+        self.input_tokens += delta.input_tokens;
+        self.output_tokens += delta.output_tokens;
+        self.cache_read_tokens += delta.cache_read_tokens;
+        self.cache_write_tokens += delta.cache_write_tokens;
+        self.input_cost += delta.input_cost;
+        self.output_cost += delta.output_cost;
+        self.cache_read_cost += delta.cache_read_cost;
+        self.cache_write_cost += delta.cache_write_cost;
+        for (model, usage) in &delta.model_usage {
+            let entry = self.model_usage.entry(model.clone()).or_default();
+            entry.messages += usage.messages;
+            entry.input_tokens += usage.input_tokens;
+            entry.output_tokens += usage.output_tokens;
+            entry.cache_read_tokens += usage.cache_read_tokens;
+            entry.cache_write_tokens += usage.cache_write_tokens;
+            entry.cost += usage.cost;
+        }
+        for model in &delta.models {
+            if !self.models.contains(model) {
+                self.models.push(model.clone());
+            }
+        }
+        if let Some(t) = delta.first_message_time {
+            self.first_message_time = Some(self.first_message_time.map_or(t, |existing| existing.min(t)));
+        }
+        if let Some(t) = delta.last_message_time {
+            self.last_message_time = Some(self.last_message_time.map_or(t, |existing| existing.max(t)));
+        }
+    }
 }
 
 #[cfg(test)]

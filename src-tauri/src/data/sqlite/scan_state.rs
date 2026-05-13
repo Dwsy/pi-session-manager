@@ -115,6 +115,24 @@ pub fn upsert_scan_state(conn: &Connection, path: &str, backing_path: &str, prov
     Ok(())
 }
 
+pub fn upsert_scan_state_in_tx(tx: &rusqlite::Transaction<'_>, path: &str, backing_path: &str, provider_slug: &str, file_modified: DateTime<Utc>, file_size: u64, last_parse_status: &str) -> Result<(), String> {
+    tx.execute(
+        "INSERT INTO scan_state (
+            path, backing_path, provider_slug, file_modified, file_size, last_scanned_at, last_parse_status, read_offset, append_trust_count
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+         ON CONFLICT(path) DO UPDATE SET
+            backing_path = excluded.backing_path,
+            provider_slug = excluded.provider_slug,
+            file_modified = excluded.file_modified,
+            file_size = excluded.file_size,
+            last_scanned_at = excluded.last_scanned_at,
+            last_parse_status = excluded.last_parse_status",
+        params![path, backing_path, provider_slug, file_modified.to_rfc3339(), i64::try_from(file_size).unwrap_or(i64::MAX), Utc::now().to_rfc3339(), last_parse_status, i64::try_from(file_size).unwrap_or(i64::MAX), 3i64,],
+    )
+    .map_err(|e| format!("Failed to upsert scan_state for {path}: {e}"))?;
+    Ok(())
+}
+
 pub fn update_scan_state_offset_and_trust(conn: &Connection, path: &str, read_offset: u64, append_trust_count: u32) -> Result<(), String> {
     conn.execute(
         "UPDATE scan_state SET
@@ -135,6 +153,15 @@ pub fn upsert_scan_state_for_session(conn: &Connection, session: &SessionInfo, f
     let provider_slug = crate::domain::session_bridge::source_from_path(path).map(|source| source.slug().replace('_', "-")).unwrap_or_else(|| "pi".to_string());
 
     upsert_scan_state(conn, &session.path, &backing_path.to_string_lossy(), &provider_slug, file_modified, file_size, last_parse_status)
+}
+
+pub fn upsert_scan_state_for_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInfo, file_modified: DateTime<Utc>, last_parse_status: &str) -> Result<(), String> {
+    let path = Path::new(&session.path);
+    let backing_path = crate::domain::session_bridge::backing_file_path(path);
+    let file_size = fs::metadata(&backing_path).map(|metadata| metadata.len()).unwrap_or(0);
+    let provider_slug = crate::domain::session_bridge::source_from_path(path).map(|source| source.slug().replace('_', "-")).unwrap_or_else(|| "pi".to_string());
+
+    upsert_scan_state_in_tx(tx, &session.path, &backing_path.to_string_lossy(), &provider_slug, file_modified, file_size, last_parse_status)
 }
 
 pub fn delete_scan_state(conn: &Connection, path: &str) -> Result<(), String> {
