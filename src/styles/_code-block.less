@@ -14,24 +14,30 @@
 // Code Block Header
 .code-block-header {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 8px;
+  right: 8px;
   z-index: 2;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
-  padding: 0;
+  gap: 1px;
+  padding: 2px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--bg-inset) 78%, transparent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(10px);
   font-size: 11px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease;
+  transform: translateY(-2px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 .code-block-wrapper:hover .code-block-header,
 .code-block-wrapper:focus-within .code-block-header {
   opacity: 1;
   pointer-events: auto;
+  transform: translateY(0);
 }
 
 .code-filename,
@@ -40,11 +46,11 @@
   align-items: center;
   min-height: 24px;
   padding: 3px 7px;
-  border-radius: 4px;
+  border-radius: 5px;
   border: none;
-  background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(8px);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
   font-size: 11px;
   color: var(--accent);
   font-weight: 500;
@@ -57,19 +63,19 @@
   min-height: 24px;
   padding: 3px 7px;
   font-size: 11px;
-  background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(8px);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
   color: rgb(var(--color-muted-foreground));
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .code-copy-button:hover {
   color: var(--text-secondary);
-  background: rgba(var(--accent-rgb), 0.1);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .code-copy-button svg {
@@ -89,17 +95,8 @@
 }
 
 .markdown-code-block .code-block-header {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
+  top: 8px;
+  right: 8px;
 }
 
 .markdown-code-block:hover .code-block-header,
@@ -112,9 +109,9 @@
 .markdown-code-block .code-copy-button {
   min-height: 24px;
   border: none;
-  background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(8px);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .markdown-code-block .code-language {
