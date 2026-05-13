@@ -143,5 +143,12 @@ export const dashboard = {
   more: 'More',
   insight: {
     searchPlaceholder: 'Search providers or models...',
+    range: {
+      '1d': '1 Day',
+      '7d': '7 Days',
+      '30d': '30 Days',
+      '1y': '1 Year',
+      'all': 'All Time',
+    },
   },
 } as const

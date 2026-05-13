@@ -102,5 +102,12 @@ export const dashboard = {
   more: '多',
   insight: {
     searchPlaceholder: '搜索提供商或模型...',
+    range: {
+      '1d': '1天',
+      '7d': '7天',
+      '30d': '30天',
+      '1y': '1年',
+      'all': '全部',
+    },
   },
 } as const
