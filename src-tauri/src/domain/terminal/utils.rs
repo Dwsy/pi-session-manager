@@ -54,39 +54,63 @@ pub fn scan_available_terminals() -> Vec<&'static str> {
             // macOS: check .app bundle first, then CLI
             "iterm2" => {
                 #[cfg(target_os = "macos")]
-                { macos_app_exists("iTerm") }
+                {
+                    macos_app_exists("iTerm")
+                }
                 #[cfg(not(target_os = "macos"))]
-                { false }
+                {
+                    false
+                }
             }
             "terminal" => {
                 #[cfg(target_os = "macos")]
-                { macos_app_exists("Terminal") }
+                {
+                    macos_app_exists("Terminal")
+                }
                 #[cfg(not(target_os = "macos"))]
-                { false }
+                {
+                    false
+                }
             }
             "warp" => {
                 #[cfg(target_os = "macos")]
-                { macos_app_exists("Warp") }
+                {
+                    macos_app_exists("Warp")
+                }
                 #[cfg(not(target_os = "macos"))]
-                { false }
+                {
+                    false
+                }
             }
             "zed" => {
                 #[cfg(target_os = "macos")]
-                { macos_app_exists("Zed") }
+                {
+                    macos_app_exists("Zed")
+                }
                 #[cfg(not(target_os = "macos"))]
-                { command_exists("zed") }
+                {
+                    command_exists("zed")
+                }
             }
             "hyper" => {
                 #[cfg(target_os = "macos")]
-                { macos_app_exists("Hyper") }
+                {
+                    macos_app_exists("Hyper")
+                }
                 #[cfg(not(target_os = "macos"))]
-                { false }
+                {
+                    false
+                }
             }
             "tabby" => {
                 #[cfg(target_os = "macos")]
-                { macos_app_exists("Tabby") }
+                {
+                    macos_app_exists("Tabby")
+                }
                 #[cfg(not(target_os = "macos"))]
-                { command_exists("tabby") }
+                {
+                    command_exists("tabby")
+                }
             }
             "tmux" => command_exists("tmux"),
             // CLI-based terminals

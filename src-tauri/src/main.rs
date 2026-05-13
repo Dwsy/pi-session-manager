@@ -1,8 +1,8 @@
 #![cfg(feature = "gui")]
 
-use tauri::{Listener, Manager};
 use pi_session_manager::cli_common::{self, CommonCliArgs};
 use pi_session_manager::resolve_window_dimensions;
+use tauri::{Listener, Manager};
 
 // Window dimension helpers are in lib.rs — used by both main and tray
 
@@ -52,11 +52,7 @@ fn parse_main_cli_args() -> Result<MainCliArgs, String> {
     let cli_mode = raw_args.iter().any(|arg| arg == "--cli" || arg == "--headless");
 
     // Filter out --cli/--headless for common parsing
-    let filtered: Vec<String> = raw_args
-        .iter()
-        .filter(|arg| arg.as_str() != "--cli" && arg.as_str() != "--headless")
-        .cloned()
-        .collect();
+    let filtered: Vec<String> = raw_args.iter().filter(|arg| arg.as_str() != "--cli" && arg.as_str() != "--headless").cloned().collect();
 
     let common = cli_common::parse_common_args(&filtered)?;
 
@@ -64,10 +60,7 @@ fn parse_main_cli_args() -> Result<MainCliArgs, String> {
     // If not in CLI mode, skip validation of port/bind/auth args
     if !cli_mode && !common.show_help {
         // In GUI mode, these args are ignored
-        return Ok(MainCliArgs {
-            common,
-            cli_mode: false,
-        });
+        return Ok(MainCliArgs { common, cli_mode: false });
     }
 
     Ok(MainCliArgs { common, cli_mode })
@@ -194,8 +187,7 @@ fn main() {
 
                         let mut conn = conn;
                         let flush_result = (|| -> Result<usize, String> {
-                            let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-                                .map_err(|e| format!("Failed to begin batch transaction: {e}"))?;
+                            let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|e| format!("Failed to begin batch transaction: {e}"))?;
 
                             let mut ok_count = 0;
                             for entry in &sessions {
@@ -242,8 +234,7 @@ fn main() {
                     match pi_session_manager::data::sqlite::init_db() {
                         Ok(mut conn) => {
                             let flush_result = (|| -> Result<usize, String> {
-                                let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-                                    .map_err(|e| format!("Failed to begin exit transaction: {e}"))?;
+                                let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|e| format!("Failed to begin exit transaction: {e}"))?;
 
                                 let mut ok_count = 0;
                                 for entry in &sessions {
@@ -303,14 +294,7 @@ fn main() {
                 };
                 let ((initial_width, initial_height), (min_width, min_height)) = resolve_window_dimensions(monitor.as_ref());
 
-                let builder = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into()))
-                    .title("Pi Session Manager")
-                    .inner_size(initial_width, initial_height)
-                    .min_inner_size(min_width, min_height)
-                    .center()
-                    .resizable(true)
-                    .fullscreen(false)
-                    .zoom_hotkeys_enabled(true);
+                let builder = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into())).title("Pi Session Manager").inner_size(initial_width, initial_height).min_inner_size(min_width, min_height).center().resizable(true).fullscreen(false).zoom_hotkeys_enabled(true);
 
                 #[cfg(target_os = "macos")]
                 let builder = builder.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
@@ -325,9 +309,7 @@ fn main() {
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                         // Check lightweight mode setting
-                        let lightweight = pi_session_manager::settings_store::get::<bool>("lightweight_mode")
-                            .unwrap_or(None)
-                            .unwrap_or(false);
+                        let lightweight = pi_session_manager::settings_store::get::<bool>("lightweight_mode").unwrap_or(None).unwrap_or(false);
 
                         if lightweight {
                             // Prevent default close (which would exit the app)
@@ -481,22 +463,17 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            match event {
-                // ── Prevent app exit when lightweight mode is active ──
-                // When all windows are destroyed (lightweight mode), Tauri tries to exit.
-                // We intercept ExitRequested and keep the app running in tray.
-                tauri::RunEvent::ExitRequested { api, .. } => {
-                    let lightweight = pi_session_manager::settings_store::get::<bool>("lightweight_mode")
-                        .unwrap_or(None)
-                        .unwrap_or(false);
+            // ── Prevent app exit when lightweight mode is active ──
+            // When all windows are destroyed (lightweight mode), Tauri tries to exit.
+            // We intercept ExitRequested and keep the app running in tray.
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                let lightweight = pi_session_manager::settings_store::get::<bool>("lightweight_mode").unwrap_or(None).unwrap_or(false);
 
-                    if lightweight {
-                        api.prevent_exit();
-                        log::debug!("Lightweight mode: prevented app exit, staying in tray");
-                    }
-                    // If not lightweight, allow default exit
+                if lightweight {
+                    api.prevent_exit();
+                    log::debug!("Lightweight mode: prevented app exit, staying in tray");
                 }
-                _ => {}
+                // If not lightweight, allow default exit
             }
         });
 }

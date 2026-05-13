@@ -153,22 +153,14 @@ fn extract_session_id_from_file(path: &str) -> Result<String, String> {
     let mut first_line = String::new();
     reader.read_line(&mut first_line).map_err(|e| format!("Failed to read session header: {e}"))?;
 
-    let value: serde_json::Value = serde_json::from_str(first_line.trim())
-        .map_err(|e| format!("Invalid session header JSON: {e}"))?;
+    let value: serde_json::Value = serde_json::from_str(first_line.trim()).map_err(|e| format!("Invalid session header JSON: {e}"))?;
 
-    value.get("id")
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
-        .map(String::from)
-        .ok_or_else(|| "Session header missing 'id' field".to_string())
+    value.get("id").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(String::from).ok_or_else(|| "Session header missing 'id' field".to_string())
 }
 
 /// Read the HTTP port from unified config, defaulting to 52131.
 fn read_http_port() -> u16 {
-    crate::unified_config::read_section("server")
-        .ok()
-        .and_then(|v| v.get("http_port").and_then(|p| p.as_u64()))
-        .unwrap_or(52131) as u16
+    crate::unified_config::read_section("server").ok().and_then(|v| v.get("http_port").and_then(|p| p.as_u64())).unwrap_or(52131) as u16
 }
 
 /// Open a file or directory in the system file manager.

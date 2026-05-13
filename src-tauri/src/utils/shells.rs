@@ -96,10 +96,7 @@ pub fn scan_shells() -> Vec<(String, String)> {
                     continue;
                 }
                 if Path::new(path).is_file() {
-                    let name = Path::new(path)
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("unknown");
+                    let name = Path::new(path).file_name().and_then(|n| n.to_str()).unwrap_or("unknown");
                     shells.push((name.to_string(), path.to_string()));
                 }
             }
@@ -111,10 +108,7 @@ pub fn scan_shells() -> Vec<(String, String)> {
     {
         if let Ok(current) = std::env::var("SHELL") {
             if !current.is_empty() && !shells.iter().any(|(_, p)| p == &current) && Path::new(&current).is_file() {
-                let name = Path::new(&current)
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("shell");
+                let name = Path::new(&current).file_name().and_then(|n| n.to_str()).unwrap_or("shell");
                 shells.insert(0, (name.to_string(), current));
             }
         }

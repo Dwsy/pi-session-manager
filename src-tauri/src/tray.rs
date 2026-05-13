@@ -15,23 +15,11 @@ const MENU_QUIT: &str = "quit";
 /// Menu items: Show Window / Open Web / Quit
 /// Left-click toggles window visibility.
 pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
-    let show_item = MenuItemBuilder::with_id(MENU_SHOW, "Show Window")
-        .build(app)
-        .map_err(|e| format!("Failed to create show menu item: {e}"))?;
-    let open_web_item = MenuItemBuilder::with_id(MENU_OPEN_WEB, "Open Web")
-        .build(app)
-        .map_err(|e| format!("Failed to create open_web menu item: {e}"))?;
-    let quit_item = MenuItemBuilder::with_id(MENU_QUIT, "Quit")
-        .build(app)
-        .map_err(|e| format!("Failed to create quit menu item: {e}"))?;
+    let show_item = MenuItemBuilder::with_id(MENU_SHOW, "Show Window").build(app).map_err(|e| format!("Failed to create show menu item: {e}"))?;
+    let open_web_item = MenuItemBuilder::with_id(MENU_OPEN_WEB, "Open Web").build(app).map_err(|e| format!("Failed to create open_web menu item: {e}"))?;
+    let quit_item = MenuItemBuilder::with_id(MENU_QUIT, "Quit").build(app).map_err(|e| format!("Failed to create quit menu item: {e}"))?;
 
-    let menu = MenuBuilder::new(app)
-        .item(&show_item)
-        .item(&open_web_item)
-        .separator()
-        .item(&quit_item)
-        .build()
-        .map_err(|e| format!("Failed to build tray menu: {e}"))?;
+    let menu = MenuBuilder::new(app).item(&show_item).item(&open_web_item).separator().item(&quit_item).build().map_err(|e| format!("Failed to build tray menu: {e}"))?;
 
     let icon = load_tray_icon()?;
 
@@ -57,12 +45,7 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
             }
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
                 let app = tray.app_handle();
                 show_or_create_window(app);
             }
@@ -101,23 +84,13 @@ pub fn show_or_create_window<R: Runtime>(app: &AppHandle<R>) {
 /// Create the main application window with proper sizing and platform styling.
 fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let monitor = app.primary_monitor().ok().flatten();
-    let ((w, h), (min_w, min_h)) =
-        crate::resolve_window_dimensions(monitor.as_ref());
+    let ((w, h), (min_w, min_h)) = crate::resolve_window_dimensions(monitor.as_ref());
 
-    let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-        .title("Pi Session Manager")
-        .inner_size(w, h)
-        .min_inner_size(min_w, min_h)
-        .center()
-        .resizable(true)
-        .fullscreen(false)
-        .zoom_hotkeys_enabled(true);
+    let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into())).title("Pi Session Manager").inner_size(w, h).min_inner_size(min_w, min_h).center().resizable(true).fullscreen(false).zoom_hotkeys_enabled(true);
 
     #[cfg(target_os = "macos")]
     {
-        builder = builder
-            .title_bar_style(tauri::TitleBarStyle::Overlay)
-            .hidden_title(true);
+        builder = builder.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -147,11 +120,17 @@ fn open_web<R: Runtime>(_app: &AppHandle<R>) {
     let port = crate::load_server_settings_sync().http_port;
     let url = format!("http://127.0.0.1:{port}");
     #[cfg(target_os = "macos")]
-    { let _ = std::process::Command::new("open").arg(&url).spawn(); }
+    {
+        let _ = std::process::Command::new("open").arg(&url).spawn();
+    }
     #[cfg(target_os = "linux")]
-    { let _ = std::process::Command::new("xdg-open").arg(&url).spawn(); }
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
+    }
     #[cfg(target_os = "windows")]
-    { let _ = std::process::Command::new("cmd").args(["/C", "start", &url]).spawn(); }
+    {
+        let _ = std::process::Command::new("cmd").args(["/C", "start", &url]).spawn();
+    }
 }
 
 fn quit_app<R: Runtime>(app: &AppHandle<R>) {

@@ -49,17 +49,11 @@ pub fn clamp_window_dimensions(available_width: f64, available_height: f64) -> (
 
 #[cfg(feature = "gui")]
 pub fn resolve_window_dimensions(monitor: Option<&tauri::Monitor>) -> ((f64, f64), (f64, f64)) {
-    monitor.map_or(
-        ((DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT), (DEFAULT_MIN_WINDOW_WIDTH, DEFAULT_MIN_WINDOW_HEIGHT)),
-        |monitor| {
-            let work_area = monitor.work_area();
-            let scale_factor = monitor.scale_factor();
-            clamp_window_dimensions(
-                f64::from(work_area.size.width) / scale_factor,
-                f64::from(work_area.size.height) / scale_factor,
-            )
-        },
-    )
+    monitor.map_or(((DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT), (DEFAULT_MIN_WINDOW_WIDTH, DEFAULT_MIN_WINDOW_HEIGHT)), |monitor| {
+        let work_area = monitor.work_area();
+        let scale_factor = monitor.scale_factor();
+        clamp_window_dimensions(f64::from(work_area.size.width) / scale_factor, f64::from(work_area.size.height) / scale_factor)
+    })
 }
 
 // Backward-compat re-exports

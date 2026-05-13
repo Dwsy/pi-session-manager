@@ -221,7 +221,7 @@ mod tests {
             last_message_role: "assistant".to_string(),
             parent_session_path: None,
             model: None,
-    };
+        };
         let codex_session = SessionInfo {
             path: "/Users/demo/.codex/sessions/2026/01/01/rollout-a.jsonl".to_string(),
             id: "codex-1".to_string(),
@@ -237,7 +237,7 @@ mod tests {
             last_message_role: "assistant".to_string(),
             parent_session_path: None,
             model: None,
-    };
+        };
 
         let stats = get_session_stats(vec![pi_session, codex_session]).await.expect("stats");
         assert_eq!(stats.total_sessions, 1);

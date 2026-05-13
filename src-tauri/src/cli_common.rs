@@ -17,9 +17,7 @@ pub struct CommonCliArgs {
 
 /// Parse a port value from a CLI argument string.
 pub fn parse_port_arg(value: &str, flag: &str) -> Result<u16, String> {
-    value
-        .parse::<u16>()
-        .map_err(|_| format!("Invalid value for {flag}: `{value}`"))
+    value.parse::<u16>().map_err(|_| format!("Invalid value for {flag}: `{value}`"))
 }
 
 /// Parse common CLI arguments from raw args iterator.
@@ -30,10 +28,7 @@ pub fn parse_port_arg(value: &str, flag: &str) -> Result<u16, String> {
 /// Unknown flags starting with `-` return an error.
 pub fn parse_common_args(raw_args: &[String]) -> Result<CommonCliArgs, String> {
     if raw_args.iter().any(|arg| arg == "-h" || arg == "--help") {
-        return Ok(CommonCliArgs {
-            show_help: true,
-            ..CommonCliArgs::default()
-        });
+        return Ok(CommonCliArgs { show_help: true, ..CommonCliArgs::default() });
     }
 
     let mut parsed = CommonCliArgs::default();
@@ -42,15 +37,11 @@ pub fn parse_common_args(raw_args: &[String]) -> Result<CommonCliArgs, String> {
     while let Some(arg) = iter.next() {
         match arg.as_str() {
             "-p" | "--port" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
+                let value = iter.next().ok_or_else(|| format!("Missing value for `{arg}`"))?;
                 parsed.http_port = Some(parse_port_arg(value, arg)?);
             }
             "-b" | "--bind" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| format!("Missing value for `{arg}`"))?;
+                let value = iter.next().ok_or_else(|| format!("Missing value for `{arg}`"))?;
                 if value.trim().is_empty() {
                     return Err(format!("Invalid value for `{arg}`: empty address"));
                 }
@@ -69,9 +60,7 @@ pub fn parse_common_args(raw_args: &[String]) -> Result<CommonCliArgs, String> {
                 parsed.auth_enabled = Some(false);
             }
             "--token" => {
-                let value = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for `--token`".to_string())?;
+                let value = iter.next().ok_or_else(|| "Missing value for `--token`".to_string())?;
                 let token = value.trim();
                 if token.is_empty() {
                     return Err("Invalid value for `--token`: empty token".to_string());
@@ -104,15 +93,7 @@ pub struct ServerConfig {
 
 impl Default for ServerConfig {
     fn default() -> Self {
-        Self {
-            ws_enabled: true,
-            http_enabled: true,
-            ws_port: 52131,
-            http_port: 52131,
-            bind_addr: "127.0.0.1".to_string(),
-            auth_enabled: true,
-            embedding_enabled: false,
-        }
+        Self { ws_enabled: true, http_enabled: true, ws_port: 52131, http_port: 52131, bind_addr: "127.0.0.1".to_string(), auth_enabled: true, embedding_enabled: false }
     }
 }
 
@@ -135,10 +116,7 @@ pub fn load_server_config() -> ServerConfig {
         http_enabled: value["http_enabled"].as_bool().unwrap_or(true),
         ws_port: value["ws_port"].as_u64().unwrap_or(52131) as u16,
         http_port: value["http_port"].as_u64().unwrap_or(52131) as u16,
-        bind_addr: value["bind_addr"]
-            .as_str()
-            .unwrap_or("127.0.0.1")
-            .to_string(),
+        bind_addr: value["bind_addr"].as_str().unwrap_or("127.0.0.1").to_string(),
         auth_enabled: value["auth_enabled"].as_bool().unwrap_or(true),
         embedding_enabled: value["embedding_enabled"].as_bool().unwrap_or(false),
     }
@@ -188,8 +166,7 @@ pub fn init_auth(runtime_token: &Option<String>, cli_mode: bool) -> bool {
 
 /// Get the default config file path.
 pub fn default_config_path() -> std::path::PathBuf {
-    crate::unified_config::config_file_path()
-        .unwrap_or_else(|_| std::env::temp_dir().join("config.json"))
+    crate::unified_config::config_file_path().unwrap_or_else(|_| std::env::temp_dir().join("config.json"))
 }
 
 #[cfg(test)]
@@ -277,12 +254,7 @@ mod tests {
     #[test]
     fn test_apply_server_overrides() {
         let mut cfg = ServerConfig::default();
-        let cli = CommonCliArgs {
-            http_port: Some(9090),
-            bind_addr: Some("0.0.0.0".to_string()),
-            auth_enabled: Some(false),
-            ..Default::default()
-        };
+        let cli = CommonCliArgs { http_port: Some(9090), bind_addr: Some("0.0.0.0".to_string()), auth_enabled: Some(false), ..Default::default() };
         apply_server_overrides(&mut cfg, &cli);
         assert_eq!(cfg.http_port, 9090);
         assert_eq!(cfg.bind_addr, "0.0.0.0");
