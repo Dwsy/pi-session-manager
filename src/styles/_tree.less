@@ -6,7 +6,8 @@
 .tree-container {
   flex: 1;
   overflow: auto;
-  padding: 8px 0;
+  padding: 0;
+  min-height: 0;
 }
 
 .tree-container::-webkit-scrollbar {
@@ -31,23 +32,26 @@
 
 // Tree Node
 .tree-node {
-  padding: 2px 8px;
-  margin: 1px 0;
+  padding: 0 8px;
+  margin: 0;
   cursor: pointer;
-  display: flex;
-  align-items: baseline;
+  display: grid;
+  grid-template-columns: auto 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
   font-size: 11px;
   line-height: 16px;
   white-space: nowrap;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: 0.01em;
-  border-radius: 4px;
+  border-left: 2px solid transparent;
 }
 
 .tree-node:has(.tree-content-user) {
-  align-items: flex-start;
+  align-items: center;
 }
 
 .tree-node:hover {
@@ -56,6 +60,15 @@
 
 .tree-node.active {
   background: rgba(var(--accent-rgb), 0.12);
+  border-left-color: var(--accent);
+}
+
+.tree-node.selected:not(.active) {
+  background: rgba(var(--color-secondary), 0.65);
+}
+
+.tree-node.in-path:not(.active) {
+  border-left-color: rgba(var(--accent-rgb), 0.28);
 }
 
 .tree-node.active .tree-content {
@@ -63,20 +76,115 @@
   color: var(--accent);
 }
 
-// Tree Prefix
-.tree-prefix {
-  color: var(--muted);
+// Tree Gutter
+.tree-gutter {
+  position: relative;
+  display: block;
+  align-self: stretch;
   flex-shrink: 0;
-  font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
-  white-space: pre;
-  opacity: 0.5;
+  min-width: 10px;
 }
 
-// Tree Marker
-.tree-marker {
+.tree-gutter-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(var(--color-muted-foreground), 0.18);
+}
+
+.tree-gutter-rail.visible {
+  background: rgba(var(--accent-rgb), 0.28);
+}
+
+.tree-gutter-rail.faded {
+  opacity: 0.35;
+}
+
+.tree-gutter-elbow {
+  position: absolute;
+  top: 50%;
+  height: 1px;
+  background: rgba(var(--color-muted-foreground), 0.22);
+}
+
+.tree-node.in-path .tree-gutter-elbow,
+.tree-node.active .tree-gutter-elbow {
+  background: rgba(var(--accent-rgb), 0.5);
+}
+
+// Sticky depth bar
+.tree-sticky-depth {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.12);
+  background: var(--bg-subtle);
   color: var(--accent);
+  font-size: 10px;
+  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+}
+
+// Sticky user message header
+.tree-user-sticky {
+  position: sticky;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-top: 1px solid rgba(var(--accent-rgb), 0.08);
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.12);
+  background: rgb(var(--color-card));
+}
+
+.tree-user-sticky-label,
+.tree-user-sticky-index {
+  color: var(--accent);
+  font-size: 10px;
+  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+}
+
+.tree-user-sticky-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+// Tree Marker (node dot)
+.tree-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--color-muted-foreground), 0.35);
+  background: transparent;
   flex-shrink: 0;
-  font-weight: 600;
+}
+
+.tree-marker.path {
+  border-color: rgba(var(--accent-rgb), 0.75);
+  background: rgba(var(--accent-rgb), 0.16);
+}
+
+.tree-marker.selected {
+  border-color: rgba(var(--accent-rgb), 0.55);
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+.tree-marker.current {
+  width: 10px;
+  height: 10px;
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 // Tree Toggle
@@ -94,21 +202,30 @@
   color: var(--accent);
 }
 
-// Tree Collapsed Hint
-.tree-collapsed-hint {
-  color: rgb(var(--color-muted-foreground));
-  font-size: 10px;
-  margin-left: 4px;
-  opacity: 0.6;
-}
-
 // Tree Content
 .tree-content {
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tree-node-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-kind {
+  color: rgb(var(--color-muted-foreground));
+  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+  font-size: 10px;
+  opacity: 0.7;
+  text-transform: lowercase;
 }
 
 // Tree Role Colors
@@ -138,8 +255,9 @@
   border-radius: 3px;
   font-size: 10px;
   font-weight: 600;
-  margin-right: 4px;
+  margin-right: 2px;
   vertical-align: baseline;
+  flex-shrink: 0;
 }
 
 // Tree State Colors
@@ -165,29 +283,61 @@
 
 // User Message Layout in Tree
 .tree-content-user {
-  display: flex;
-  flex-direction: column;
-  line-height: 14px;
-  gap: 1px;
-  white-space: normal;
-}
-
-.tree-user-label {
-  font-size: 10px;
-  font-weight: 600;
-  opacity: 0.7;
-}
-
-.tree-user-text {
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 16px;
   white-space: nowrap;
+}
+
+.tree-node-user {
+  background: rgba(var(--accent-rgb), 0.035);
+}
+
+// Tree Detail Pane
+.tree-detail-pane {
+  flex-shrink: 0;
+  min-height: 104px;
+  max-height: 148px;
+  padding: 8px 10px;
+  border-top: 1px solid rgba(var(--accent-rgb), 0.12);
+  background: var(--bg-inset);
+  overflow: auto;
+}
+
+.tree-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: rgb(var(--color-muted-foreground));
+  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+  font-size: 10px;
+}
+
+.tree-detail-meta span {
+  padding: 1px 5px;
+  border: 1px solid rgba(var(--accent-rgb), 0.12);
+  border-radius: 4px;
+}
+
+.tree-detail-body {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.tree-detail-empty {
+  color: rgb(var(--color-muted-foreground));
+  font-size: 11px;
 }
 
 // Tree Status Bar
 .tree-status {
-  padding: 8px 12px;
+  padding: 6px 12px;
   font-size: 10px;
   color: rgb(var(--color-muted-foreground));
   flex-shrink: 0;
@@ -197,19 +347,11 @@
 
 // Search Match in Tree
 .tree-node.search-match {
-  flex-wrap: wrap;
+  background: rgba(56, 189, 248, 0.08);
 }
 
-.tree-node.search-match .tree-prefix {
-  display: none;
-}
-
-.tree-node.search-match:hover {
-  background: rgba(56, 189, 248, 0.12);
-}
-
-.tree-node.search-match-current:hover {
-  background: rgba(34, 211, 238, 0.15);
+.tree-node.search-match-current {
+  background: rgba(34, 211, 238, 0.12);
 }
 
 // Highlight Effect
