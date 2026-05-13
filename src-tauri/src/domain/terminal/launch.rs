@@ -93,14 +93,72 @@ end tell"#,
             spawn_command(&mut command, "alacritty")?;
             Ok(true)
         }
-        "vscode" => {
-            if !command_exists("code") {
+        "warp" => {
+            if !macos_app_exists("Warp") {
                 return Ok(false);
             }
 
-            let mut command = Command::new("code");
-            command.arg("--new-window").arg(cwd);
-            spawn_command(&mut command, "VS Code")?;
+            // Warp CLI supports --cwd
+            if command_exists("warp") {
+                let mut command = Command::new("warp");
+                command.arg("--cwd").arg(cwd).arg("-e").arg("sh").arg("-lc").arg(&resume_cmd);
+                spawn_command(&mut command, "Warp")?;
+                return Ok(true);
+            }
+
+            // Fallback: open via macOS `open` command
+            let mut command = Command::new("open");
+            command.arg("-a").arg("Warp").arg("--args").arg("--cwd").arg(cwd);
+            spawn_command(&mut command, "Warp")?;
+            Ok(true)
+        }
+        "zed" => {
+            if !macos_app_exists("Zed") {
+                return Ok(false);
+            }
+
+            // Zed CLI can open directories directly
+            if command_exists("zed") {
+                let mut command = Command::new("zed");
+                command.arg("--new").arg(cwd);
+                spawn_command(&mut command, "Zed")?;
+                return Ok(true);
+            }
+
+            // Fallback: open via macOS `open` command
+            let mut command = Command::new("open");
+            command.arg("-a").arg("Zed").arg(cwd);
+            spawn_command(&mut command, "Zed")?;
+            Ok(true)
+        }
+        "hyper" => {
+            // Hyper uses `open -a` (no reliable CLI for command injection)
+            if !macos_app_exists("Hyper") {
+                return Ok(false);
+            }
+
+            let mut command = Command::new("open");
+            command.arg("-a").arg("Hyper").arg("--args").arg(cwd);
+            spawn_command(&mut command, "Hyper")?;
+            Ok(true)
+        }
+        "tabby" => {
+            if !macos_app_exists("Tabby") {
+                return Ok(false);
+            }
+
+            // Tabby has a CLI in some installations
+            if command_exists("tabby") {
+                let mut command = Command::new("tabby");
+                command.arg("--cwd").arg(cwd).arg("-e").arg("sh").arg("-lc").arg(&resume_cmd);
+                spawn_command(&mut command, "Tabby")?;
+                return Ok(true);
+            }
+
+            // Fallback: open via macOS `open` command
+            let mut command = Command::new("open");
+            command.arg("-a").arg("Tabby").arg("--args").arg(cwd);
+            spawn_command(&mut command, "Tabby")?;
             Ok(true)
         }
         "tmux" => {
@@ -200,16 +258,6 @@ pub fn try_launch_known_terminal_windows(terminal_id: &str, cwd: &str, path: &st
             Command::new("cmd").arg("/C").arg("start").arg("").arg("cmd").arg("/K").arg(&cmd_resume).spawn().map_err(|e| format!("Failed to launch cmd: {e}"))?;
             Ok(true)
         }
-        "vscode" => {
-            if !command_exists("code") {
-                return Ok(false);
-            }
-
-            let mut command = Command::new("code");
-            command.arg("--new-window").arg(cwd);
-            spawn_command(&mut command, "VS Code")?;
-            Ok(true)
-        }
         _ => Ok(false),
     }
 }
@@ -218,6 +266,15 @@ pub fn try_launch_known_terminal_windows(terminal_id: &str, cwd: &str, path: &st
 pub fn try_launch_known_terminal_linux(terminal_id: &str, cwd: &str, path: &str, pi_cmd: &str, resume_command: Option<&str>) -> Result<bool, String> {
     let resume_cmd = build_resume_command(cwd, path, pi_cmd, resume_command);
     match terminal_id {
+        "ghostty" => {
+            if !command_exists("ghostty") {
+                return Ok(false);
+            }
+            let mut command = Command::new("ghostty");
+            command.arg("--cwd").arg(cwd).arg("-e").arg("sh").arg("-lc").arg(&resume_cmd);
+            spawn_command(&mut command, "ghostty")?;
+            Ok(true)
+        }
         "gnome-terminal" => {
             if !command_exists("gnome-terminal") {
                 return Ok(false);
@@ -302,13 +359,21 @@ pub fn try_launch_known_terminal_linux(terminal_id: &str, cwd: &str, path: &str,
             Command::new("x-terminal-emulator").arg("-e").arg("bash").arg("-lc").arg(&resume_cmd).spawn().map_err(|e| format!("Failed to launch x-terminal-emulator: {e}"))?;
             Ok(true)
         }
-        "vscode" => {
-            if !command_exists("code") {
+        "xdg-terminal-exec" => {
+            if !command_exists("xdg-terminal-exec") {
                 return Ok(false);
             }
-            let mut command = Command::new("code");
-            command.arg("--new-window").arg(cwd);
-            spawn_command(&mut command, "VS Code")?;
+            Command::new("xdg-terminal-exec").arg("-e").arg("bash").arg("-lc").arg(&resume_cmd).spawn().map_err(|e| format!("Failed to launch xdg-terminal-exec: {e}"))?;
+            Ok(true)
+        }
+        "foot" => {
+            if !command_exists("foot") && !command_exists("footclient") {
+                return Ok(false);
+            }
+            let foot_bin = if command_exists("footclient") { "footclient" } else { "foot" };
+            let mut command = Command::new(foot_bin);
+            command.arg("--working-directory").arg(cwd).arg("sh").arg("-lc").arg(&resume_cmd);
+            spawn_command(&mut command, "foot")?;
             Ok(true)
         }
         _ => Ok(false),

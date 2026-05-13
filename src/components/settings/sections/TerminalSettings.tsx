@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { useAvailableTerminals } from "@/hooks/useAvailableTerminals";
 import {
   Monitor,
   Terminal,
@@ -39,6 +40,7 @@ export default function TerminalSettings({
   onUpdate,
 }: TerminalSettingsProps) {
   const { t } = useTranslation();
+  const availableTerminals = useAvailableTerminals();
   const [copiedExample, setCopiedExample] = useState<string | null>(null);
   const [showPlaceholders, setShowPlaceholders] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -61,11 +63,6 @@ export default function TerminalSettings({
           "settings.terminal.options.auto.description",
           "Auto detect",
         ),
-      },
-      {
-        id: "vscode",
-        name: t("settings.terminal.options.vscode.name"),
-        description: t("settings.terminal.options.vscode.description"),
       },
     ];
     switch (platform) {
@@ -99,6 +96,14 @@ export default function TerminalSettings({
         ];
       case "linux":
         return [
+          {
+            id: "ghostty",
+            name: "Ghostty",
+            description: t(
+              "settings.terminal.options.ghostty.description",
+              "Ghostty terminal",
+            ),
+          },
           {
             id: "gnome-terminal",
             name: "GNOME Terminal",
@@ -137,6 +142,22 @@ export default function TerminalSettings({
             description: t(
               "settings.terminal.options.wezterm.description",
               "WezTerm terminal",
+            ),
+          },
+          {
+            id: "foot",
+            name: "Foot",
+            description: t(
+              "settings.terminal.options.foot.description",
+              "Wayland terminal",
+            ),
+          },
+          {
+            id: "xdg-terminal-exec",
+            name: "xdg-terminal-exec",
+            description: t(
+              "settings.terminal.options.xdgTerminalExec.description",
+              "System default terminal",
             ),
           },
           ...common,
@@ -193,10 +214,50 @@ export default function TerminalSettings({
               "Ghostty terminal",
             ),
           },
+          {
+            id: "warp",
+            name: "Warp",
+            description: t(
+              "settings.terminal.options.warp.description",
+              "Warp terminal",
+            ),
+          },
+          {
+            id: "zed",
+            name: "Zed",
+            description: t(
+              "settings.terminal.options.zed.description",
+              "Zed editor",
+            ),
+          },
+          {
+            id: "hyper",
+            name: "Hyper",
+            description: t(
+              "settings.terminal.options.hyper.description",
+              "Hyper terminal",
+            ),
+          },
+          {
+            id: "tabby",
+            name: "Tabby",
+            description: t(
+              "settings.terminal.options.tabby.description",
+              "Tabby terminal",
+            ),
+          },
           ...common,
         ];
     }
   })();
+
+  // Filter to only show installed terminals ("auto" and "custom" always visible)
+  const filteredTerminals = useMemo(() => {
+    if (availableTerminals.length === 0) return platformTerminals;
+    return platformTerminals.filter(
+      (term) => term.id === "auto" || term.id === "custom" || availableTerminals.includes(term.id),
+    );
+  }, [platformTerminals, availableTerminals]);
 
   return (
     <div className="space-y-6">
@@ -339,7 +400,7 @@ export default function TerminalSettings({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-settings-search="terminal-defaultTerminal">
-              {platformTerminals.map((term) => (
+              {filteredTerminals.map((term) => (
                 <button
                   key={term.id}
                   onClick={() =>

@@ -81,5 +81,44 @@ pub fn scan_shells() -> Vec<(String, String)> {
             }
         }
     }
+
+    // Supplement with /etc/shells (catches Nix, Homebrew Linux, distro-specific paths)
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(content) = std::fs::read_to_string("/etc/shells") {
+            for line in content.lines() {
+                let path = line.trim();
+                if path.is_empty() || path.starts_with('#') {
+                    continue;
+                }
+                // Skip if already found
+                if shells.iter().any(|(_, p)| p == path) {
+                    continue;
+                }
+                if Path::new(path).is_file() {
+                    let name = Path::new(path)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown");
+                    shells.push((name.to_string(), path.to_string()));
+                }
+            }
+        }
+    }
+
+    // Also check $SHELL (current login shell, may not be in static list)
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(current) = std::env::var("SHELL") {
+            if !current.is_empty() && !shells.iter().any(|(_, p)| p == &current) && Path::new(&current).is_file() {
+                let name = Path::new(&current)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("shell");
+                shells.insert(0, (name.to_string(), current));
+            }
+        }
+    }
+
     shells
 }

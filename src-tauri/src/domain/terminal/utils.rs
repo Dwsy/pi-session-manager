@@ -41,37 +41,113 @@ pub fn build_windows_powershell_resume_command(cwd: &str, path: &str, pi_cmd: &s
     format!("Set-Location -LiteralPath '{}'; & '{}' --session '{}'", powershell_single_quote(cwd), powershell_single_quote(pi_cmd), powershell_single_quote(path))
 }
 
+/// Scan the system for installed terminal emulators.
+/// Returns a list of terminal IDs that are available on this machine.
+pub fn scan_available_terminals() -> Vec<&'static str> {
+    let mut available = Vec::new();
+
+    for &id in fallback_external_terminals() {
+        if id == "auto" {
+            continue;
+        }
+        let installed = match id {
+            // macOS: check .app bundle first, then CLI
+            "iterm2" => {
+                #[cfg(target_os = "macos")]
+                { macos_app_exists("iTerm") }
+                #[cfg(not(target_os = "macos"))]
+                { false }
+            }
+            "terminal" => {
+                #[cfg(target_os = "macos")]
+                { macos_app_exists("Terminal") }
+                #[cfg(not(target_os = "macos"))]
+                { false }
+            }
+            "warp" => {
+                #[cfg(target_os = "macos")]
+                { macos_app_exists("Warp") }
+                #[cfg(not(target_os = "macos"))]
+                { false }
+            }
+            "zed" => {
+                #[cfg(target_os = "macos")]
+                { macos_app_exists("Zed") }
+                #[cfg(not(target_os = "macos"))]
+                { command_exists("zed") }
+            }
+            "hyper" => {
+                #[cfg(target_os = "macos")]
+                { macos_app_exists("Hyper") }
+                #[cfg(not(target_os = "macos"))]
+                { false }
+            }
+            "tabby" => {
+                #[cfg(target_os = "macos")]
+                { macos_app_exists("Tabby") }
+                #[cfg(not(target_os = "macos"))]
+                { command_exists("tabby") }
+            }
+            "tmux" => command_exists("tmux"),
+            // CLI-based terminals
+            "ghostty" => command_exists("ghostty"),
+            "kitty" => command_exists("kitty"),
+            "alacritty" => command_exists("alacritty"),
+            "wezterm" => command_exists("wezterm"),
+            "foot" => command_exists("foot") || command_exists("footclient"),
+            "xdg-terminal-exec" => command_exists("xdg-terminal-exec"),
+            "gnome-terminal" => command_exists("gnome-terminal"),
+            "konsole" => command_exists("konsole"),
+            "xfce4-terminal" => command_exists("xfce4-terminal"),
+            "tilix" => command_exists("tilix"),
+            "mate-terminal" => command_exists("mate-terminal"),
+            "lxterminal" => command_exists("lxterminal"),
+            "xterm" => command_exists("xterm"),
+            "x-terminal-emulator" => command_exists("x-terminal-emulator"),
+            "powershell" => command_exists("powershell") || command_exists("pwsh"),
+            "cmd" => command_exists("cmd"),
+            "windows-terminal" => command_exists("wt"),
+            _ => false,
+        };
+        if installed {
+            available.push(id);
+        }
+    }
+
+    available
+}
+
 pub fn is_known_external_terminal(terminal_id: &str) -> bool {
     #[cfg(target_os = "macos")]
     {
-        matches!(terminal_id, "iterm2" | "terminal" | "vscode" | "wezterm" | "ghostty" | "kitty" | "alacritty" | "tmux")
+        matches!(terminal_id, "iterm2" | "terminal" | "zed" | "wezterm" | "ghostty" | "kitty" | "alacritty" | "tmux" | "warp" | "hyper" | "tabby")
     }
 
     #[cfg(target_os = "windows")]
     {
-        matches!(terminal_id, "powershell" | "cmd" | "windows-terminal" | "vscode")
+        matches!(terminal_id, "powershell" | "cmd" | "windows-terminal")
     }
 
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
     {
-        matches!(terminal_id, "gnome-terminal" | "konsole" | "xfce4-terminal" | "xterm" | "x-terminal-emulator" | "tilix" | "mate-terminal" | "lxterminal" | "vscode" | "kitty" | "alacritty" | "wezterm")
+        matches!(terminal_id, "gnome-terminal" | "konsole" | "xfce4-terminal" | "xterm" | "x-terminal-emulator" | "xdg-terminal-exec" | "tilix" | "mate-terminal" | "lxterminal" | "kitty" | "alacritty" | "wezterm" | "ghostty" | "foot")
     }
 }
 
 fn fallback_external_terminals() -> &'static [&'static str] {
     #[cfg(target_os = "macos")]
     {
-        &["ghostty", "terminal", "iterm2", "wezterm", "kitty", "alacritty", "vscode"]
+        &["ghostty", "terminal", "iterm2", "wezterm", "kitty", "alacritty", "warp", "zed", "hyper", "tabby"]
     }
 
     #[cfg(target_os = "windows")]
     {
-        &["windows-terminal", "powershell", "cmd", "vscode"]
+        &["windows-terminal", "powershell", "cmd"]
     }
 
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
     {
-        &["gnome-terminal", "konsole", "xfce4-terminal", "tilix", "kitty", "alacritty", "wezterm", "mate-terminal", "lxterminal", "xterm", "x-terminal-emulator", "vscode"]
+        &["ghostty", "gnome-terminal", "konsole", "xfce4-terminal", "tilix", "kitty", "alacritty", "wezterm", "foot", "mate-terminal", "lxterminal", "xterm", "x-terminal-emulator", "xdg-terminal-exec"]
     }
 }
 
