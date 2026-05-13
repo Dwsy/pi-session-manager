@@ -13,15 +13,46 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Calendar,
 } from "lucide-react";
-import type { SessionStats } from "@/types";
+import type { SessionInfo, SessionStats } from "@/types";
 import { getPathBasename } from "@/utils/path";
 import CompositionInput from "@/components/ui/CompositionInput";
+import { getRuntimeStats } from "@/runtime-data/sessionSource";
+
+type DateRange = "1d" | "7d" | "30d" | "1y" | "all";
+
+const DATE_RANGE_OPTIONS: { value: DateRange; label: string; labelKey: string }[] = [
+  { value: "1d", label: "1d", labelKey: "dashboard.insight.range.1d" },
+  { value: "7d", label: "7d", labelKey: "dashboard.insight.range.7d" },
+  { value: "30d", label: "30d", labelKey: "dashboard.insight.range.30d" },
+  { value: "1y", label: "1y", labelKey: "dashboard.insight.range.1y" },
+  { value: "all", label: "All", labelKey: "dashboard.insight.range.all" },
+];
+
+function getDateRangeMs(range: DateRange): number | null {
+  const day = 24 * 60 * 60 * 1000;
+  switch (range) {
+    case "1d": return day;
+    case "7d": return 7 * day;
+    case "30d": return 30 * day;
+    case "1y": return 365 * day;
+    case "all": return null;
+  }
+}
+
+function filterSessionsByDateRange(sessions: SessionInfo[], range: DateRange): SessionInfo[] {
+  const ms = getDateRangeMs(range);
+  if (ms === null) return sessions;
+  const cutoff = Date.now() - ms;
+  return sessions.filter((s) => new Date(s.modified).getTime() >= cutoff);
+}
 
 interface DashboardInsightModalProps {
   open: boolean;
   mode: "token_cost" | "model_projects";
   stats: SessionStats;
+  sessions?: SessionInfo[];
   selectedModel?: string | null;
   onClose: () => void;
 }
@@ -89,12 +120,54 @@ export default function DashboardInsightModal({
   open,
   mode,
   stats,
+  sessions = [],
   selectedModel,
   onClose,
 }: DashboardInsightModalProps) {
   const { t } = useTranslation();
+
+  // Date range filter
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [filteredStats, setFilteredStats] = useState<SessionStats | null>(null);
+  const [isFiltering, setIsFiltering] = useState(false);
+
+  useEffect(() => {
+    if (!open || sessions.length === 0 || dateRange === "all") {
+      setFilteredStats(null);
+      return;
+    }
+    let cancelled = false;
+    setIsFiltering(true);
+    const filtered = filterSessionsByDateRange(sessions, dateRange);
+    if (filtered.length === 0) {
+      setFilteredStats(null);
+      setIsFiltering(false);
+      return;
+    }
+    getRuntimeStats(filtered)
+      .then((result) => {
+        if (!cancelled) setFilteredStats(result);
+      })
+      .catch(() => {
+        if (!cancelled) setFilteredStats(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsFiltering(false);
+      });
+    return () => { cancelled = true; };
+  }, [open, sessions, dateRange]);
+
+  const displayStats = filteredStats ?? stats;
   const totalCostIncSubagents =
-    stats.token_details.total_cost + (stats.subagent_summary?.total_cost ?? 0);
+    displayStats.token_details.total_cost + (displayStats.subagent_summary?.total_cost ?? 0);
+
+  // Reset filter on open
+  useEffect(() => {
+    if (open) {
+      setDateRange("all");
+      setSearchQuery("");
+    }
+  }, [open]);
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -122,12 +195,12 @@ export default function DashboardInsightModal({
   // Get unique providers and models for suggestions
   const uniqueProviders = useMemo(() => {
     const providers = new Set<string>();
-    for (const fullModel of Object.keys(stats.token_details.tokens_by_model)) {
+    for (const fullModel of Object.keys(displayStats.token_details.tokens_by_model)) {
       const provider = fullModel.includes("/") ? fullModel.split("/")[0] : fullModel;
       providers.add(provider);
     }
     return Array.from(providers).sort();
-  }, [stats.token_details.tokens_by_model]);
+  }, [displayStats.token_details.tokens_by_model]);
 
   // Generate search suggestions
   const suggestions = useMemo(() => {
@@ -143,7 +216,7 @@ export default function DashboardInsightModal({
     }
 
     // Match models
-    for (const fullModel of Object.keys(stats.token_details.tokens_by_model)) {
+    for (const fullModel of Object.keys(displayStats.token_details.tokens_by_model)) {
       const model = fullModel.includes("/")
         ? fullModel.split("/").slice(1).join("/")
         : fullModel;
@@ -154,7 +227,7 @@ export default function DashboardInsightModal({
     }
 
     return results.slice(0, 8); // Limit to 8 suggestions
-  }, [searchQuery, uniqueProviders, stats.token_details.tokens_by_model]);
+  }, [searchQuery, uniqueProviders, displayStats.token_details.tokens_by_model]);
 
   // Handle search input change
   const handleSearchChange = useCallback((value: string) => {
@@ -228,7 +301,7 @@ export default function DashboardInsightModal({
     const groupMap = new Map<string, ProviderGroup>();
 
     for (const [fullModel, usage] of Object.entries(
-      stats.token_details.tokens_by_model,
+      displayStats.token_details.tokens_by_model,
     )) {
       const provider = fullModel.includes("/")
         ? fullModel.split("/")[0]
@@ -240,7 +313,7 @@ export default function DashboardInsightModal({
         provider,
         model,
         fullModel,
-        sessions: stats.sessions_by_model[fullModel] ?? 0,
+        sessions: displayStats.sessions_by_model[fullModel] ?? 0,
         messages: usage.messages,
         cost: usage.cost,
         input: usage.input,
@@ -274,7 +347,7 @@ export default function DashboardInsightModal({
     }
 
     return Array.from(groupMap.values());
-  }, [stats.token_details.tokens_by_model, stats.sessions_by_model]);
+  }, [displayStats.token_details.tokens_by_model, displayStats.sessions_by_model]);
 
   // Filter and sort provider groups
   const filteredAndSortedGroups = useMemo(() => {
@@ -401,12 +474,12 @@ export default function DashboardInsightModal({
   const modelProjects = useMemo(() => {
     if (!selectedModel) return [];
     return Object.entries(
-      stats.model_usage_by_project?.[selectedModel] ?? {},
+      displayStats.model_usage_by_project?.[selectedModel] ?? {},
     ).sort((a, b) => {
       if (b[1] !== a[1]) return b[1] - a[1];
       return a[0].localeCompare(b[0]);
     });
-  }, [selectedModel, stats.model_usage_by_project]);
+  }, [selectedModel, displayStats.model_usage_by_project]);
 
   // Toggle provider collapse
   const toggleProviderCollapse = useCallback((provider: string) => {
@@ -489,7 +562,7 @@ export default function DashboardInsightModal({
                 <MetricCard
                   icon={Coins}
                   label="Billable Tokens"
-                  value={formatTokens(stats.total_tokens)}
+                  value={formatTokens(displayStats.total_tokens)}
                   tone="text-info"
                 />
                 <MetricCard
@@ -501,12 +574,35 @@ export default function DashboardInsightModal({
                 <MetricCard
                   icon={WalletCards}
                   label="Providers / Models"
-                  value={`${formatNumber(providerGroups.length)} / ${formatNumber(Object.keys(stats.token_details.tokens_by_model).length)}`}
+                  value={`${formatNumber(providerGroups.length)} / ${formatNumber(Object.keys(displayStats.token_details.tokens_by_model).length)}`}
                   tone="text-warning"
                 />
               </div>
 
               {/* Search and Filter Bar */}
+              {/* Date Range Filter + Search Bar */}
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                <div className="flex items-center gap-1 bg-muted/20 rounded-lg p-0.5">
+                  {DATE_RANGE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setDateRange(opt.value)}
+                      className={`px-2 py-1 text-[11px] font-medium rounded-md motion-surface motion-color transition-colors ${
+                        dateRange === opt.value
+                          ? "bg-background text-foreground shadow-sm border border-border/30"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {t(opt.labelKey, opt.label)}
+                    </button>
+                  ))}
+                </div>
+                {isFiltering && (
+                  <span className="text-[10px] text-muted-foreground animate-pulse">filtering...</span>
+                )}
+              </div>
+
               <div className="relative">
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">

@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { ListFilter, Check, Plus, Search } from "lucide-react";
-import type { Tag as TagType, SessionTag } from "@/types";
+import { ListFilter, Check, Plus, Search, Calendar, ChevronRight, ArrowLeft } from "lucide-react";
+import type { Tag as TagType, SessionTag, DateRange } from "@/types";
 import CompositionInput from "@/components/ui/CompositionInput";
 import { AgentIcon } from "@/components/session-viewer/AgentIcon";
 
@@ -50,6 +50,24 @@ function LabelIcon({
   );
 }
 
+function isToday(range: DateRange): boolean {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return range.start.getTime() === startOfDay.getTime();
+}
+
+function isLast7Days(range: DateRange): boolean {
+  const now = new Date();
+  const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  return range.start.getTime() === start.getTime();
+}
+
+function isLast30Days(range: DateRange): boolean {
+  const now = new Date();
+  const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  return range.start.getTime() === start.getTime();
+}
+
 interface LabelFilterProps {
   tags: TagType[];
   sessionTags: SessionTag[];
@@ -58,6 +76,11 @@ interface LabelFilterProps {
   sourceOptions?: Array<{ slug: string; label: string }>;
   selectedSourceSlugs?: string[];
   onSourceFilterChange?: (slugs: string[]) => void;
+  modelOptions?: string[];
+  selectedModel?: string;
+  onModelFilterChange?: (model: string) => void;
+  dateRange?: DateRange | null;
+  onDateRangeChange?: (range: DateRange | null) => void;
   onCreateTag?: (name: string, color: string, parentId?: string) => void;
   getDescendantIds: (tagId: string) => string[];
 }
@@ -78,11 +101,17 @@ export default function LabelFilter({
   sourceOptions = [],
   selectedSourceSlugs = [],
   onSourceFilterChange,
+  modelOptions = [],
+  selectedModel,
+  onModelFilterChange,
+  dateRange,
+  onDateRangeChange,
   onCreateTag,
   getDescendantIds,
 }: LabelFilterProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [submenu, setSubmenu] = useState<"sources" | "models" | "dates" | "statuses" | "labels" | null>(null);
   const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -100,7 +129,11 @@ export default function LabelFilter({
     transformOrigin: "top left",
   });
 
-  const activeCount = filterTagIds.length + selectedSourceSlugs.length;
+  const activeCount =
+    filterTagIds.length +
+    selectedSourceSlugs.length +
+    (selectedModel ? 1 : 0) +
+    (dateRange ? 1 : 0);
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent | TouchEvent) => {
@@ -111,6 +144,7 @@ export default function LabelFilter({
         !triggerRef.current.contains(e.target as Node)
       ) {
         setOpen(false);
+        setSubmenu(null);
         setFilter("");
         setCreating(false);
         setNewName("");
@@ -129,16 +163,20 @@ export default function LabelFilter({
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setOpen(false);
-        setFilter("");
-        setCreating(false);
-        setNewName("");
-        setMenuReady(false);
+        if (submenu) {
+          setSubmenu(null);
+        } else {
+          setOpen(false);
+          setFilter("");
+          setCreating(false);
+          setNewName("");
+          setMenuReady(false);
+        }
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [open]);
+  }, [open, submenu]);
 
   useEffect(() => {
     if (!open) return;
@@ -382,7 +420,10 @@ export default function LabelFilter({
                   onClick={() => {
                     onFilterChange([]);
                     onSourceFilterChange?.([]);
+                    onModelFilterChange?.("");
+                    onDateRangeChange?.(null);
                     setFilter("");
+                    setSubmenu(null);
                   }}
                   className="text-[11px] text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
                 >
@@ -404,136 +445,284 @@ export default function LabelFilter({
               />
             </div>
 
-            {/* Grouped list */}
+            {/* Menu content */}
             <div className="min-h-0 flex-1 overflow-y-auto">
-              {onSourceFilterChange && sourceOptions.length > 0 && (
-                <div className="py-1 border-b border-border/50">
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                    {t("tags.filter.sources", "Sources")}
-                  </div>
-                  <div className="px-2 pb-2 space-y-1">
-                    {sourceOptions.map((source) => {
-                      const selected = selectedSourceSlugs.includes(
-                        source.slug,
-                      );
-                      return (
+              {submenu === null ? (
+                /* Main menu: category list */
+                <div className="py-1">
+                  {/* Sources */}
+                  {onSourceFilterChange && sourceOptions.length > 0 && (
+                    <button
+                      onClick={() => setSubmenu("sources")}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                    >
+                      <span className="flex-1 text-left">{t("tags.filter.sources", "Sources")}</span>
+                      {selectedSourceSlugs.length > 0 && (
+                        <span className="text-[11px] text-muted-foreground/60">{selectedSourceSlugs.length}</span>
+                      )}
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                    </button>
+                  )}
+                  {/* Models */}
+                  {onModelFilterChange && modelOptions.length > 0 && (
+                    <button
+                      onClick={() => setSubmenu("models")}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                    >
+                      <span className="flex-1 text-left">{t("tags.filter.models", "Models")}</span>
+                      {selectedModel && (
+                        <span className="text-[11px] text-muted-foreground/60 truncate max-w-[100px]">{selectedModel}</span>
+                      )}
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                    </button>
+                  )}
+                  {/* Date Range */}
+                  {onDateRangeChange && (
+                    <button
+                      onClick={() => setSubmenu("dates")}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                    >
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground/60" />
+                      <span className="flex-1 text-left">{t("tags.filter.dateRange", "Date Range")}</span>
+                      {dateRange && (
+                        <span className="text-[11px] text-muted-foreground/60">{t("tags.filter.active", "Active")}</span>
+                      )}
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                    </button>
+                  )}
+                  {/* Statuses */}
+                  {filteredStatuses.length > 0 && (
+                    <button
+                      onClick={() => setSubmenu("statuses")}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                    >
+                      <span className="flex-1 text-left">{t("tags.filter.statuses")}</span>
+                      {filterTagIds.some(id => filteredStatuses.some(s => s.tag.id === id)) && (
+                        <span className="text-[11px] text-muted-foreground/60">
+                          {filterTagIds.filter(id => filteredStatuses.some(s => s.tag.id === id)).length}
+                        </span>
+                      )}
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                    </button>
+                  )}
+                  {/* Labels */}
+                  <button
+                    onClick={() => setSubmenu("labels")}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                  >
+                    <span className="flex-1 text-left">{t("tags.filter.labels")}</span>
+                    {filterTagIds.some(id => filteredLabels.some(l => l.tag.id === id)) && (
+                      <span className="text-[11px] text-muted-foreground/60">
+                        {filterTagIds.filter(id => filteredLabels.some(l => l.tag.id === id)).length}
+                      </span>
+                    )}
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                  </button>
+                </div>
+              ) : (
+                /* Submenu: back button + items */
+                <>
+                  <button
+                    onClick={() => setSubmenu(null)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] motion-color motion-press focus-ring border-b border-border/50"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    <span>{t("tags.filter.back", "Back")}</span>
+                  </button>
+                  <div className="py-1">
+                    {submenu === "sources" && onSourceFilterChange && (
+                      <>
+                        {sourceOptions.map((source) => {
+                          const selected = selectedSourceSlugs.includes(source.slug);
+                          return (
+                            <button
+                              key={source.slug}
+                              onClick={() => {
+                                if (selected) {
+                                  onSourceFilterChange(selectedSourceSlugs.filter((slug) => slug !== source.slug));
+                                } else {
+                                  onSourceFilterChange([...new Set([...selectedSourceSlugs, source.slug])]);
+                                }
+                              }}
+                              className="flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                              style={{ width: "calc(100% - 8px)" }}
+                            >
+                              <AgentIcon source={source.slug} size={13} className="text-foreground/80 shrink-0" />
+                              <span className="flex-1 text-left">{source.label}</span>
+                              {selected && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
+                            </button>
+                          );
+                        })}
+                      </>
+                    )}
+                    {submenu === "models" && onModelFilterChange && (
+                      <>
                         <button
-                          key={source.slug}
+                          onClick={() => onModelFilterChange("")}
+                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                            !selectedModel ? "text-foreground" : "text-muted-foreground"
+                          }`}
+                          style={{ width: "calc(100% - 8px)" }}
+                        >
+                          <span className="flex-1 text-left">{t("tags.filter.allModels", "All models")}</span>
+                          {!selectedModel && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
+                        </button>
+                        {modelOptions.map((model) => (
+                          <button
+                            key={model}
+                            onClick={() => onModelFilterChange(model)}
+                            className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                              selectedModel === model ? "text-foreground" : "text-muted-foreground"
+                            }`}
+                            style={{ width: "calc(100% - 8px)" }}
+                          >
+                            <span className="flex-1 text-left truncate">{model}</span>
+                            {selectedModel === model && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    {submenu === "dates" && onDateRangeChange && (
+                      <>
+                        <button
+                          onClick={() => { onDateRangeChange(null); setSubmenu(null); }}
+                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                            !dateRange ? "text-foreground" : "text-muted-foreground"
+                          }`}
+                          style={{ width: "calc(100% - 8px)" }}
+                        >
+                          <Calendar className="h-3 w-3 shrink-0" />
+                          <span className="flex-1 text-left">{t("tags.filter.allTime", "All time")}</span>
+                          {!dateRange && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
+                        </button>
+                        <button
                           onClick={() => {
-                            if (selected) {
-                              onSourceFilterChange(
-                                selectedSourceSlugs.filter(
-                                  (slug) => slug !== source.slug,
-                                ),
-                              );
-                            } else {
-                              onSourceFilterChange([
-                                ...new Set([
-                                  ...selectedSourceSlugs,
-                                  source.slug,
-                                ]),
-                              ]);
-                            }
+                            const now = new Date();
+                            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            onDateRangeChange({ start, end: now });
+                            setSubmenu(null);
                           }}
-                          className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                            dateRange && isToday(dateRange) ? "text-foreground" : "text-muted-foreground"
+                          }`}
+                          style={{ width: "calc(100% - 8px)" }}
                         >
-                          <AgentIcon
-                            source={source.slug}
-                            size={13}
-                            className="text-foreground/80 shrink-0"
-                          />
-                          <span className="flex-1 text-left">
-                            {source.label}
-                          </span>
-                          {selected && (
-                            <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />
-                          )}
+                          <Calendar className="h-3 w-3 shrink-0" />
+                          <span className="flex-1 text-left">{t("tags.filter.today", "Today")}</span>
+                          {dateRange && isToday(dateRange) && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
                         </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Statuses */}
-              <div className="py-1">
-                <div className="px-3 pt-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                  {t("tags.filter.statuses")}
-                </div>
-                {filteredStatuses.length > 0 ? (
-                  filteredStatuses.map(renderItem)
-                ) : (
-                  <div className="px-3 py-1.5 text-[12px] text-muted-foreground/40">
-                    {t("tags.empty")}
-                  </div>
-                )}
-              </div>
-              {/* Labels */}
-              <div className="py-1">
-                <div className="px-3 pt-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                  {t("tags.filter.labels")}
-                </div>
-                {filteredLabels.length > 0 && filteredLabels.map(renderItem)}
-                {filteredLabels.length === 0 && !creating && (
-                  <div className="px-3 py-1.5 text-[12px] text-muted-foreground/40">
-                    {t("tags.empty")}
-                  </div>
-                )}
-                {onCreateTag && (
-                  <div className="mx-1 mt-0.5">
-                    {creating ? (
-                      <form
-                        className="flex items-center gap-1.5 px-2 py-1.5"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          if (newName.trim()) {
-                            onCreateTag(newName.trim(), "info");
-                            setNewName("");
-                            setCreating(false);
-                          }
-                        }}
-                      >
-                        <input
-                          ref={createInputRef}
-                          type="text"
-                          value={newName}
-                          onChange={(e) => setNewName(e.target.value)}
-                          onBlur={() => {
-                            if (!newName.trim()) setCreating(false);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Escape") {
-                              setCreating(false);
-                              setNewName("");
-                            }
-                          }}
-                          placeholder={t("tags.namePlaceholder")}
-                          className="flex-1 min-w-0 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground/50"
-                          autoFocus
-                        />
                         <button
-                          type="submit"
-                          disabled={!newName.trim()}
-                          className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-30 motion-color motion-press focus-ring"
+                          onClick={() => {
+                            const now = new Date();
+                            const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                            onDateRangeChange({ start, end: now });
+                            setSubmenu(null);
+                          }}
+                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                            dateRange && isLast7Days(dateRange) ? "text-foreground" : "text-muted-foreground"
+                          }`}
+                          style={{ width: "calc(100% - 8px)" }}
                         >
-                          {t("tags.add")}
+                          <Calendar className="h-3 w-3 shrink-0" />
+                          <span className="flex-1 text-left">{t("tags.filter.last7Days", "Last 7 days")}</span>
+                          {dateRange && isLast7Days(dateRange) && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
                         </button>
-                      </form>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setCreating(true);
-                          setTimeout(() => createInputRef.current?.focus(), 0);
-                        }}
-                        className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-[6px] text-[12px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
-                      >
-                        <Plus className="h-3 w-3" />
-                        {t("tags.createNew")}
-                      </button>
+                        <button
+                          onClick={() => {
+                            const now = new Date();
+                            const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                            onDateRangeChange({ start, end: now });
+                            setSubmenu(null);
+                          }}
+                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                            dateRange && isLast30Days(dateRange) ? "text-foreground" : "text-muted-foreground"
+                          }`}
+                          style={{ width: "calc(100% - 8px)" }}
+                        >
+                          <Calendar className="h-3 w-3 shrink-0" />
+                          <span className="flex-1 text-left">{t("tags.filter.last30Days", "Last 30 days")}</span>
+                          {dateRange && isLast30Days(dateRange) && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
+                        </button>
+                      </>
+                    )}
+                    {submenu === "statuses" && (
+                      <>
+                        {filteredStatuses.length > 0 ? (
+                          filteredStatuses.map(renderItem)
+                        ) : (
+                          <div className="px-3 py-1.5 text-[12px] text-muted-foreground/40">
+                            {t("tags.empty")}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {submenu === "labels" && (
+                      <>
+                        {filteredLabels.length > 0 && filteredLabels.map(renderItem)}
+                        {filteredLabels.length === 0 && !creating && (
+                          <div className="px-3 py-1.5 text-[12px] text-muted-foreground/40">
+                            {t("tags.empty")}
+                          </div>
+                        )}
+                        {onCreateTag && (
+                          <div className="mx-1 mt-0.5">
+                            {creating ? (
+                              <form
+                                className="flex items-center gap-1.5 px-2 py-1.5"
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  if (newName.trim()) {
+                                    onCreateTag(newName.trim(), "info");
+                                    setNewName("");
+                                    setCreating(false);
+                                  }
+                                }}
+                              >
+                                <input
+                                  ref={createInputRef}
+                                  type="text"
+                                  value={newName}
+                                  onChange={(e) => setNewName(e.target.value)}
+                                  onBlur={() => {
+                                    if (!newName.trim()) setCreating(false);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Escape") {
+                                      setCreating(false);
+                                      setNewName("");
+                                    }
+                                  }}
+                                  placeholder={t("tags.namePlaceholder")}
+                                  className="flex-1 min-w-0 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground/50"
+                                  autoFocus
+                                />
+                                <button
+                                  type="submit"
+                                  disabled={!newName.trim()}
+                                  className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-30 motion-color motion-press focus-ring"
+                                >
+                                  {t("tags.add")}
+                                </button>
+                              </form>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setCreating(true);
+                                  setTimeout(() => createInputRef.current?.focus(), 0);
+                                }}
+                                className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-[6px] text-[12px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                              >
+                                <Plus className="h-3 w-3" />
+                                {t("tags.createNew")}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
-                )}
-              </div>
+                </>
+              )}
             </div>
           </div>,
           document.body,

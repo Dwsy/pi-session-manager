@@ -5,6 +5,11 @@ import { parseQuotedQuery } from "./search";
 
 export type TimeRange = 'any' | '1h' | '24h' | '2d' | '7d' | '30d';
 
+export type DateRange = {
+  start: Date;
+  end: Date;
+};
+
 interface SessionSearchOptions {
   includeId?: boolean;
 }
@@ -18,6 +23,8 @@ interface FilterSessionsOptions {
   sessionTags?: SessionTag[];
   getDescendantIds?: (tagId: string) => string[];
   timeRange?: TimeRange;
+  modelFilter?: string;
+  dateRange?: DateRange;
 }
 
 function buildSearchableFields(
@@ -149,6 +156,8 @@ export function filterSessions({
   sessionTags = [],
   getDescendantIds = () => [],
   timeRange = 'any',
+  modelFilter,
+  dateRange,
 }: FilterSessionsOptions): SessionInfo[] {
   let result = sessions;
 
@@ -169,7 +178,18 @@ export function filterSessions({
     result = filterSessionsBySourceSlugs(result, sourceFilterSlugs);
   }
 
-  if (timeRange !== 'any') {
+  if (modelFilter) {
+    result = result.filter((session) => session.model === modelFilter);
+  }
+
+  if (dateRange) {
+    const startTime = dateRange.start.getTime();
+    const endTime = dateRange.end.getTime();
+    result = result.filter((session) => {
+      const modified = new Date(session.modified).getTime();
+      return modified >= startTime && modified <= endTime;
+    });
+  } else if (timeRange !== 'any') {
     const now = Date.now();
     const timeLimits: Record<TimeRange, number> = {
       'any': 0,

@@ -1,7 +1,7 @@
 import SearchFilterBar from "@/components/search/SearchFilterBar";
 import SessionSortSelect from "@/components/session-viewer/SessionSortSelect";
 import { CheckSquare2 } from "lucide-react";
-import type { SessionTag, Tag } from "@/types";
+import type { SessionTag, Tag, DateRange } from "@/types";
 import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
 import { useTranslation } from "react-i18next";
 
@@ -15,6 +15,11 @@ export interface AppMobileFilterBarProps {
   sourceOptions?: Array<{ slug: string; label: string }>;
   selectedSourceSlugs?: string[];
   onSourceFilterChange?: (slugs: string[]) => void;
+  modelOptions?: string[];
+  selectedModel?: string;
+  onModelFilterChange?: (model: string) => void;
+  dateRange?: DateRange | null;
+  onDateRangeChange?: (range: DateRange | null) => void;
   onCreateTag: (name: string, color: string, parentId?: string) => void;
   getDescendantIds: (tagId: string) => string[];
   placeholder?: string;
@@ -36,6 +41,11 @@ function AppMobileFilterBar({
   sourceOptions,
   selectedSourceSlugs,
   onSourceFilterChange,
+  modelOptions,
+  selectedModel,
+  onModelFilterChange,
+  dateRange,
+  onDateRangeChange,
   onCreateTag,
   getDescendantIds,
   placeholder,
@@ -60,6 +70,11 @@ function AppMobileFilterBar({
         sourceOptions={sourceOptions}
         selectedSourceSlugs={selectedSourceSlugs}
         onSourceFilterChange={onSourceFilterChange}
+        modelOptions={modelOptions}
+        selectedModel={selectedModel}
+        onModelFilterChange={onModelFilterChange}
+        dateRange={dateRange}
+        onDateRangeChange={onDateRangeChange}
         onCreateTag={onCreateTag}
         getDescendantIds={getDescendantIds}
         placeholder={placeholder}

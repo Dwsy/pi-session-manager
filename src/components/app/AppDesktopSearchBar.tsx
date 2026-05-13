@@ -3,7 +3,7 @@ import { CheckSquare2 } from "lucide-react";
 
 import SearchFilterBar from "@/components/search/SearchFilterBar";
 import SessionSortSelect from "@/components/session-viewer/SessionSortSelect";
-import type { SessionTag, Tag } from "@/types";
+import type { SessionTag, Tag, DateRange } from "@/types";
 import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
 
 export type AppDesktopSearchBarViewMode = "list" | "project" | "kanban";
@@ -18,6 +18,11 @@ export interface AppDesktopSearchBarProps {
   sourceOptions?: Array<{ slug: string; label: string }>;
   selectedSourceSlugs?: string[];
   onSourceFilterChange?: (slugs: string[]) => void;
+  modelOptions?: string[];
+  selectedModel?: string;
+  onModelFilterChange?: (model: string) => void;
+  dateRange?: DateRange | null;
+  onDateRangeChange?: (range: DateRange | null) => void;
   onCreateTag: (name: string, color: string, parentId?: string) => void;
   getDescendantIds: (tagId: string) => string[];
   sidebarMode: AppDesktopSearchBarViewMode;
@@ -39,6 +44,11 @@ function AppDesktopSearchBar({
   sourceOptions,
   selectedSourceSlugs,
   onSourceFilterChange,
+  modelOptions,
+  selectedModel,
+  onModelFilterChange,
+  dateRange,
+  onDateRangeChange,
   onCreateTag,
   getDescendantIds,
   sidebarMode,
@@ -64,6 +74,11 @@ function AppDesktopSearchBar({
         sourceOptions={sourceOptions}
         selectedSourceSlugs={selectedSourceSlugs}
         onSourceFilterChange={onSourceFilterChange}
+        modelOptions={modelOptions}
+        selectedModel={selectedModel}
+        onModelFilterChange={onModelFilterChange}
+        dateRange={dateRange}
+        onDateRangeChange={onDateRangeChange}
         onCreateTag={onCreateTag}
         getDescendantIds={getDescendantIds}
         placeholder={

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { AppDesktopSidebarSessionListCommonProps } from "@/components/app/AppDesktopSidebarContent";
 import type { MobileTab } from "@/components/app/AppMobileLayout";
 import type { TerminalType } from "@/components/settings/types";
-import type { FavoriteItem, SessionInfo, SessionTag, Tag } from "@/types";
+import type { FavoriteItem, SessionInfo, SessionTag, Tag, DateRange } from "@/types";
 import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
 import { filterSessions } from "@/utils/sessionFilters";
 import { getDirectoryName } from "@/utils/sessionDisplay";
@@ -28,6 +28,8 @@ export interface UseSidebarSessionsOptions {
   sidebarSearchQuery: string;
   filterTagIds: string[];
   sourceFilterSlugs?: string[];
+  modelFilter?: string;
+  dateRange?: DateRange | null;
   sessionTags: SessionTag[];
   getDescendantIds: (tagId: string) => string[];
   onSelectSession: (session: SessionInfo) => void;
@@ -87,6 +89,8 @@ export function useSidebarSessions({
   sidebarSearchQuery,
   filterTagIds,
   sourceFilterSlugs = [],
+  modelFilter,
+  dateRange,
   sessionTags,
   getDescendantIds,
   onSelectSession,
@@ -129,6 +133,8 @@ export function useSidebarSessions({
       searchQuery: sidebarSearchQuery,
       filterTagIds,
       sourceFilterSlugs,
+      modelFilter,
+      dateRange: dateRange ?? undefined,
       sessionTags,
       getDescendantIds,
     });
@@ -137,6 +143,8 @@ export function useSidebarSessions({
     sessionTags,
     filterTagIds,
     sourceFilterSlugs,
+    modelFilter,
+    dateRange,
     getDescendantIds,
     sidebarSearchQuery,
   ]);

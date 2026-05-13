@@ -4,9 +4,9 @@ import type { Dispatch, SetStateAction } from "react";
 import { type SessionTreeRef } from "@/components/session-tree/SessionTree";
 import { useResizableSidebar } from "@/hooks/useResizableSidebar";
 
-const SIDEBAR_MIN_WIDTH = 200;
-const SIDEBAR_MAX_WIDTH = 600;
-const SIDEBAR_DEFAULT_WIDTH = 400;
+const SIDEBAR_MIN_WIDTH = 280;
+const SIDEBAR_MAX_WIDTH = 720;
+const SIDEBAR_DEFAULT_WIDTH = 520;
 const SIDEBAR_WIDTH_KEY = "pi-session-manager-sidebar-width";
 
 export interface UseSessionViewerSidebarControllerOptions {

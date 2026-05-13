@@ -16,6 +16,12 @@ export interface SessionInfo {
   parent_session_path?: string
   isLive?: boolean
   pid?: number
+  model?: string
+}
+
+export interface DateRange {
+  start: Date
+  end: Date
 }
 
 export interface SessionsDiff {
