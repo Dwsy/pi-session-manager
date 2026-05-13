@@ -430,6 +430,7 @@ export default function Dashboard({
           open={Boolean(insightModalMode)}
           mode={insightModalMode}
           stats={displayStats}
+          sessions={sessions}
           selectedModel={selectedModel}
           onClose={closeInsightModal}
         />
