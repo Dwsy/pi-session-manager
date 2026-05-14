@@ -206,6 +206,12 @@ export const session = {
       name: '名称',
       size: '大小',
     },
+    order: {
+      desc: '降序',
+      asc: '升序',
+      switchToAsc: '切换到升序',
+      switchToDesc: '切换到降序',
+    },
   },
   newMessages: '有新消息',
 } as const

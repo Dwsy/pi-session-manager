@@ -53,4 +53,5 @@ export const common = {
   copied: '已复制到剪贴板',
   copyFailed: '复制失败',
   warning: '提示',
+  clearAll: '清除',
 } as const

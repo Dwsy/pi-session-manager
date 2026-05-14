@@ -45,6 +45,9 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Frontend build
+        run: npx vite build
+
       - name: Rust fmt (desktop)
         working-directory: src-tauri
         run: cargo fmt --check

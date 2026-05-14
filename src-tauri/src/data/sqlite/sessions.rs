@@ -55,43 +55,91 @@ pub fn upsert_session(conn: &mut Connection, session: &SessionInfo, file_modifie
 }
 
 pub fn upsert_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInfo, file_modified: DateTime<Utc>, entries: Option<&[SessionEntry]>) -> Result<(), String> {
-    let empty_search_text = "";
-    tx.execute(
-        "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, model, cached_at, access_count, last_accessed)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, 0, NULL)
-         ON CONFLICT(path) DO UPDATE SET
-            name = excluded.name,
-            modified = excluded.modified,
-            file_modified = excluded.file_modified,
-            message_count = excluded.message_count,
-            first_message = excluded.first_message,
-            user_messages_text = excluded.user_messages_text,
-            assistant_messages_text = excluded.assistant_messages_text,
-            last_message = excluded.last_message,
-            last_message_role = excluded.last_message_role,
-            parent_session_path = excluded.parent_session_path,
-            model = excluded.model,
-            cached_at = excluded.cached_at",
-        params![
-            &session.id,
-            &session.path,
-            &session.cwd,
-            &session.name,
-            &session.created.to_rfc3339(),
-            &session.modified.to_rfc3339(),
-            &file_modified.to_rfc3339(),
-            session.message_count as i64,
-            &session.first_message,
-            empty_search_text,
-            empty_search_text,
-            &session.last_message,
-            &session.last_message_role,
-            &session.parent_session_path,
-            &session.model,
-            &Utc::now().to_rfc3339(),
-        ],
-    )
-    .map_err(|e| format!("Failed to upsert session: {e}"))?;
+    if entries.is_some() {
+        // Full upsert: all columns (new session or full re-parse)
+        let empty_search_text = "";
+        tx.execute(
+            "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, model, cached_at, access_count, last_accessed)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, 0, NULL)
+             ON CONFLICT(path) DO UPDATE SET
+                name = excluded.name,
+                modified = excluded.modified,
+                file_modified = excluded.file_modified,
+                message_count = excluded.message_count,
+                first_message = excluded.first_message,
+                user_messages_text = excluded.user_messages_text,
+                assistant_messages_text = excluded.assistant_messages_text,
+                last_message = excluded.last_message,
+                last_message_role = excluded.last_message_role,
+                parent_session_path = excluded.parent_session_path,
+                model = excluded.model,
+                cached_at = excluded.cached_at",
+            params![
+                &session.id,
+                &session.path,
+                &session.cwd,
+                &session.name,
+                &session.created.to_rfc3339(),
+                &session.modified.to_rfc3339(),
+                &file_modified.to_rfc3339(),
+                session.message_count as i64,
+                &session.first_message,
+                empty_search_text,
+                empty_search_text,
+                &session.last_message,
+                &session.last_message_role,
+                &session.parent_session_path,
+                &session.model,
+                &Utc::now().to_rfc3339(),
+            ],
+        )
+        .map_err(|e| format!("Failed to upsert session: {e}"))?;
+    } else {
+        // Incremental update: only volatile fields that change when new messages arrive.
+        // Skips name, first_message, user/assistant_messages_text, parent_session_path, cwd.
+        let now = Utc::now().to_rfc3339();
+        let updated = tx
+            .execute(
+                "UPDATE sessions SET
+                modified = ?1,
+                file_modified = ?2,
+                message_count = ?3,
+                last_message = ?4,
+                last_message_role = ?5,
+                model = ?6,
+                cached_at = ?7
+             WHERE path = ?8",
+                params![&session.modified.to_rfc3339(), &file_modified.to_rfc3339(), session.message_count as i64, &session.last_message, &session.last_message_role, &session.model, &now, &session.path,],
+            )
+            .map_err(|e| format!("Failed to update session: {e}"))?;
+        // If the session doesn't exist yet (rare race), fall back to full insert
+        if updated == 0 {
+            let empty_search_text = "";
+            tx.execute(
+                "INSERT INTO sessions (id, path, cwd, name, created, modified, file_modified, message_count, first_message, user_messages_text, assistant_messages_text, last_message, last_message_role, parent_session_path, model, cached_at, access_count, last_accessed)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, 0, NULL)",
+                params![
+                    &session.id,
+                    &session.path,
+                    &session.cwd,
+                    &session.name,
+                    &session.created.to_rfc3339(),
+                    &session.modified.to_rfc3339(),
+                    &file_modified.to_rfc3339(),
+                    session.message_count as i64,
+                    &session.first_message,
+                    empty_search_text,
+                    empty_search_text,
+                    &session.last_message,
+                    &session.last_message_role,
+                    &session.parent_session_path,
+                    &session.model,
+                    &now,
+                ],
+            )
+            .map_err(|e| format!("Failed to insert session: {e}"))?;
+        }
+    }
 
     // Populate message_entries table if it exists (for per-message FTS)
     // Only sync when entries are provided. entries=None means caller already

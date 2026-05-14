@@ -214,7 +214,10 @@ pub fn run() {
             set_window_zoom_level,
             get_workspaces,
             save_workspace,
-            delete_workspace
+            delete_workspace,
+            check_version_downgrade,
+            backup_database,
+            reset_database
         ])
         .setup(|app| {
             let app_state = app_state::create_app_state(app.handle().clone());

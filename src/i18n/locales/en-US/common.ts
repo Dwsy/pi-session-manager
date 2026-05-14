@@ -54,4 +54,5 @@ export const common = {
   copied: 'Copied to clipboard',
   copyFailed: 'Copy failed',
   warning: 'Warning',
+  clearAll: 'Clear',
 } as const

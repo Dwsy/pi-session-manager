@@ -532,6 +532,22 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         }
 
         // ═══════════════════════════════════════════════════════════════
+        // Version Check
+        // ═══════════════════════════════════════════════════════════════
+        "check_version_downgrade" => {
+            let result = crate::check_version_downgrade().await?;
+            Ok(to_val(result, "serialize result")?)
+        }
+        "backup_database" => {
+            let result = crate::backup_database().await?;
+            Ok(serde_json::json!({ "path": result }))
+        }
+        "reset_database" => {
+            let result = crate::reset_database().await?;
+            Ok(serde_json::json!({ "message": result }))
+        }
+
+        // ═══════════════════════════════════════════════════════════════
         // Tags
         // ═══════════════════════════════════════════════════════════════
         "get_all_tags" => {

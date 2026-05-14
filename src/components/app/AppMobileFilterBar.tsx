@@ -1,5 +1,5 @@
 import SearchFilterBar from "@/components/search/SearchFilterBar";
-import SessionSortSelect from "@/components/session-viewer/SessionSortSelect";
+import ActiveFilterChips from "@/components/search/ActiveFilterChips";
 import { CheckSquare2 } from "lucide-react";
 import type { SessionTag, Tag, DateRange } from "@/types";
 import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
@@ -22,6 +22,8 @@ export interface AppMobileFilterBarProps {
   onDateRangeChange?: (range: DateRange | null) => void;
   onCreateTag: (name: string, color: string, parentId?: string) => void;
   getDescendantIds: (tagId: string) => string[];
+  totalCount?: number;
+  filteredCount?: number;
   placeholder?: string;
   sortBy: SessionSortBy;
   sortOrder: SessionSortOrder;
@@ -48,63 +50,77 @@ function AppMobileFilterBar({
   onDateRangeChange,
   onCreateTag,
   getDescendantIds,
+  totalCount,
+  filteredCount,
   placeholder,
   sortBy,
   sortOrder,
   onSortByChange,
   onSortOrderChange,
-  showSort = true,
   onSelectModeTrigger,
 }: AppMobileFilterBarProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="flex items-center gap-1.5 border-b border-border/50 px-3 py-1.5">
-      <SearchFilterBar
-        searchQuery={searchQuery}
-        onSearchChange={onSearchChange}
-        tags={tags}
-        sessionTags={sessionTags}
+    <div className="border-b border-border/50">
+      <div className="flex items-center gap-1.5 px-3 py-1.5">
+        <SearchFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={onSearchChange}
+          tags={tags}
+          sessionTags={sessionTags}
+          filterTagIds={filterTagIds}
+          onFilterChange={onFilterChange}
+          sourceOptions={sourceOptions}
+          selectedSourceSlugs={selectedSourceSlugs}
+          onSourceFilterChange={onSourceFilterChange}
+          modelOptions={modelOptions}
+          selectedModel={selectedModel}
+          onModelFilterChange={onModelFilterChange}
+          dateRange={dateRange}
+          onDateRangeChange={onDateRangeChange}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSortByChange={onSortByChange}
+          onSortOrderChange={onSortOrderChange}
+          onCreateTag={onCreateTag}
+          getDescendantIds={getDescendantIds}
+          placeholder={placeholder}
+          compact={true}
+          className="min-w-0 flex-1"
+        />
+        {onSelectModeTrigger && (
+          <button
+            type="button"
+            onClick={onSelectModeTrigger}
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-secondary/40 text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
+            aria-label={t("session.list.selectMode", { defaultValue: "Select mode" })}
+            title={t("session.list.selectMode", { defaultValue: "Select mode" })}
+          >
+            <CheckSquare2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      <ActiveFilterChips
         filterTagIds={filterTagIds}
-        onFilterChange={onFilterChange}
-        sourceOptions={sourceOptions}
-        selectedSourceSlugs={selectedSourceSlugs}
-        onSourceFilterChange={onSourceFilterChange}
-        modelOptions={modelOptions}
-        selectedModel={selectedModel}
-        onModelFilterChange={onModelFilterChange}
-        dateRange={dateRange}
-        onDateRangeChange={onDateRangeChange}
-        onCreateTag={onCreateTag}
-        getDescendantIds={getDescendantIds}
-        placeholder={placeholder}
-        compact={true}
-        className="min-w-0 flex-1"
+        tags={tags}
+        selectedSourceSlugs={selectedSourceSlugs || []}
+        sourceOptions={sourceOptions || []}
+        selectedModel={selectedModel || ""}
+        dateRange={dateRange || null}
+        totalCount={totalCount}
+        filteredCount={filteredCount}
+        onRemoveTag={(tagId) => onFilterChange(filterTagIds.filter((id) => id !== tagId))}
+        onRemoveSource={(slug) => onSourceFilterChange?.(selectedSourceSlugs?.filter((s) => s !== slug) || [])}
+        onRemoveModel={() => onModelFilterChange?.("")}
+        onRemoveDateRange={() => onDateRangeChange?.(null)}
+        onClearAll={() => {
+          onFilterChange([]);
+          onSourceFilterChange?.([]);
+          onModelFilterChange?.("");
+          onDateRangeChange?.(null);
+        }}
       />
-      {showSort && (
-        <>
-          <SessionSortSelect
-            value={sortBy}
-            order={sortOrder}
-            onChange={onSortByChange}
-            onOrderChange={onSortOrderChange}
-            compact
-            showValueLabel={false}
-            className="shrink-0"
-          />
-          {onSelectModeTrigger && (
-            <button
-              type="button"
-              onClick={onSelectModeTrigger}
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-secondary/40 text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
-              aria-label={t("session.list.selectMode", { defaultValue: "Select mode" })}
-              title={t("session.list.selectMode", { defaultValue: "Select mode" })}
-            >
-              <CheckSquare2 className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </>
-      )}
     </div>
   );
 }

@@ -2,9 +2,40 @@ use super::deps::*;
 use super::legacy_fts::drop_sessions_fts_triggers;
 use super::message_index::ensure_message_fts_schema;
 use super::migrations::apply_migrations;
-use super::schema::{ensure_schema_version_table, get_current_version, LATEST_SCHEMA_VERSION};
+use super::schema::{ensure_app_version_info_table, ensure_schema_version_table, get_app_version_info, get_current_version, set_app_version_info, LATEST_SCHEMA_VERSION};
+use rusqlite::OpenFlags;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+
+/// Compare two semver version strings.
+/// Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal.
+/// Handles versions like "0.6.0", "1.2.3", "0.6.0-beta.1"
+/// Only compares major.minor.patch, ignores prerelease suffix.
+fn compare_versions(v1: &str, v2: &str) -> i32 {
+    let parse_version = |v: &str| -> Vec<u32> {
+        // Strip v prefix and prerelease suffix
+        let normalized = v.trim().trim_start_matches('v');
+        // Split on '-' to remove prerelease, take first part
+        let core = normalized.split('-').next().unwrap_or(normalized);
+        core.split('.').filter_map(|part| part.parse::<u32>().ok()).collect()
+    };
+
+    let parts1 = parse_version(v1);
+    let parts2 = parse_version(v2);
+
+    let max_len = parts1.len().max(parts2.len());
+    for i in 0..max_len {
+        let p1 = parts1.get(i).copied().unwrap_or(0);
+        let p2 = parts2.get(i).copied().unwrap_or(0);
+        if p1 > p2 {
+            return 1;
+        }
+        if p1 < p2 {
+            return -1;
+        }
+    }
+    0
+}
 
 pub fn get_primary_db_path() -> Result<PathBuf, String> {
     // Allow explicit test override
@@ -312,11 +343,40 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         )
         .map_err(|e| format!("Failed to create message_entries table: {e}"))?;
 
+        // Ensure app_version_info table exists for version tracking
+        ensure_app_version_info_table(&conn)?;
+
+        // Check for version downgrade before applying migrations
+        // Key logic: if database schema version > current app's LATEST_SCHEMA_VERSION,
+        // it means the database was created by a newer version, and current version cannot handle it
+        let current_app_version = env!("CARGO_PKG_VERSION");
+        if let Some((stored_app_version, stored_schema_version, _)) = get_app_version_info(&conn)? {
+            // Only check schema version - this is the real compatibility indicator
+            if stored_schema_version > LATEST_SCHEMA_VERSION {
+                return Err(format!(
+                    "VERSION_DOWNGRADE: Database schema is v{} (from app v{}), \
+                     but current app (v{}) only supports up to v{}. \
+                     Downgrading may cause data loss or corruption. \
+                     Please backup your database and reset it before using an older version. \
+                     DB path: {}",
+                    stored_schema_version,
+                    stored_app_version,
+                    current_app_version,
+                    LATEST_SCHEMA_VERSION,
+                    db_path.display()
+                ));
+            }
+        }
+
         // Apply versioned schema migrations if needed
         let current_version = get_current_version(&conn)?;
         if current_version < LATEST_SCHEMA_VERSION {
             apply_migrations(&conn, current_version)?;
         }
+
+        // Update app version info after successful migrations
+        let now = Utc::now().to_rfc3339();
+        set_app_version_info(&conn, current_app_version, LATEST_SCHEMA_VERSION, &now)?;
 
         conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id)", []).map_err(|e| format!("Failed to create entry_id index on message_entries: {e}"))?;
 
@@ -342,6 +402,50 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             Err(error)
         }
     }
+}
+
+/// Check if the database was created with a newer app version (version downgrade).
+/// Returns Ok(None) if no downgrade detected, Ok(Some(info)) if downgrade detected.
+/// Key logic: if database schema version > current app's LATEST_SCHEMA_VERSION, it's a downgrade.
+pub fn check_version_downgrade(db_path: &Path) -> Result<Option<VersionDowngradeInfo>, String> {
+    if !db_path.exists() {
+        return Ok(None);
+    }
+
+    let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|e| format!("Failed to open database for version check: {e}"))?;
+
+    // Check if app_version_info table exists
+    let table_exists: bool = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='app_version_info'", [], |row| row.get::<_, i64>(0)).map(|count| count > 0).unwrap_or(false);
+
+    if !table_exists {
+        return Ok(None);
+    }
+
+    let current_app_version = env!("CARGO_PKG_VERSION");
+
+    match get_app_version_info(&conn) {
+        Ok(Some((stored_app_version, stored_schema_version, updated_at))) => {
+            // Only check schema version - this is the real compatibility indicator
+            if stored_schema_version > LATEST_SCHEMA_VERSION {
+                Ok(Some(VersionDowngradeInfo { stored_app_version, stored_schema_version, current_app_version: current_app_version.to_string(), max_supported_schema_version: LATEST_SCHEMA_VERSION, updated_at, db_path: db_path.display().to_string() }))
+            } else {
+                Ok(None)
+            }
+        }
+        Ok(None) => Ok(None),
+        Err(e) => Err(format!("Failed to read app version info: {e}")),
+    }
+}
+
+/// Information about a detected version downgrade.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct VersionDowngradeInfo {
+    pub stored_app_version: String,
+    pub stored_schema_version: i64,
+    pub current_app_version: String,
+    pub max_supported_schema_version: i64,
+    pub updated_at: String,
+    pub db_path: String,
 }
 
 #[cfg(test)]
@@ -385,5 +489,32 @@ mod tests {
         // Use Path instead of string contains for cross-platform compatibility
         assert!(db_path.components().any(|c| c.as_os_str() == "datasets") && db_path.components().any(|c| c.as_os_str() == "badlogicgames__pi-mono"), "Path should contain datasets/badlogicgames__pi-mono: {path_str}");
         assert!(db_path.ends_with("sessions.db"));
+    }
+
+    #[test]
+    fn test_compare_versions() {
+        // Test basic version comparison
+        assert_eq!(compare_versions("1.0.0", "1.0.0"), 0);
+        assert_eq!(compare_versions("1.0.0", "1.0.1"), -1);
+        assert_eq!(compare_versions("1.0.1", "1.0.0"), 1);
+
+        // Test major version differences
+        assert_eq!(compare_versions("2.0.0", "1.0.0"), 1);
+        assert_eq!(compare_versions("1.0.0", "2.0.0"), -1);
+
+        // Test minor version differences
+        assert_eq!(compare_versions("1.2.0", "1.1.0"), 1);
+        assert_eq!(compare_versions("1.1.0", "1.2.0"), -1);
+
+        // Test with v prefix
+        assert_eq!(compare_versions("v1.0.0", "1.0.0"), 0);
+
+        // Test with prerelease suffix (should be ignored)
+        assert_eq!(compare_versions("1.0.0-beta.1", "1.0.0"), 0);
+        assert_eq!(compare_versions("1.0.0", "1.0.0-beta.1"), 0);
+
+        // Test real-world versions
+        assert_eq!(compare_versions("0.6.0", "0.5.0"), 1);
+        assert_eq!(compare_versions("0.5.0", "0.6.0"), -1);
     }
 }

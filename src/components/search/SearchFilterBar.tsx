@@ -4,6 +4,7 @@ import { Search, X } from 'lucide-react'
 import LabelFilter from '@/components/tags/LabelFilter'
 import CompositionInput from '@/components/ui/CompositionInput'
 import type { Tag, SessionTag, DateRange } from '@/types'
+import type { SessionSortBy, SessionSortOrder } from '@/types/sessionSort'
 
 interface SearchFilterBarProps {
   searchQuery: string
@@ -20,6 +21,10 @@ interface SearchFilterBarProps {
   onModelFilterChange?: (model: string) => void
   dateRange?: DateRange | null
   onDateRangeChange?: (range: DateRange | null) => void
+  sortBy?: SessionSortBy
+  sortOrder?: SessionSortOrder
+  onSortByChange?: (sortBy: SessionSortBy) => void
+  onSortOrderChange?: (sortOrder: SessionSortOrder) => void
   onCreateTag?: (name: string, color: string, parentId?: string) => void
   getDescendantIds: (tagId: string) => string[]
   placeholder?: string
@@ -42,6 +47,10 @@ export default function SearchFilterBar({
   onModelFilterChange,
   dateRange,
   onDateRangeChange,
+  sortBy,
+  sortOrder,
+  onSortByChange,
+  onSortOrderChange,
   onCreateTag,
   getDescendantIds,
   placeholder,
@@ -121,7 +130,7 @@ export default function SearchFilterBar({
           </button>
         )}
       </div>
-      {(tags.length > 0 || modelOptions.length > 0 || onDateRangeChange) && (
+      {(tags.length > 0 || modelOptions.length > 0 || onDateRangeChange || onSortByChange) && (
         <LabelFilter
           tags={tags}
           sessionTags={sessionTags}
@@ -135,6 +144,10 @@ export default function SearchFilterBar({
           onModelFilterChange={onModelFilterChange}
           dateRange={dateRange}
           onDateRangeChange={onDateRangeChange}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSortByChange={onSortByChange}
+          onSortOrderChange={onSortOrderChange}
           onCreateTag={onCreateTag}
           getDescendantIds={getDescendantIds}
         />

@@ -206,6 +206,12 @@ export const session = {
       name: 'Name',
       size: 'Size',
     },
+    order: {
+      desc: 'Descending',
+      asc: 'Ascending',
+      switchToAsc: 'Switch to ascending',
+      switchToDesc: 'Switch to descending',
+    },
   },
   newMessages: 'New messages',
   userMessage: 'User message',

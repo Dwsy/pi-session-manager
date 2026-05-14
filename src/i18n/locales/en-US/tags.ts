@@ -52,6 +52,8 @@ export const tags = {
     dateRange: 'Date Range',
     allTime: 'All time',
     today: 'Today',
+    last24h: 'Last 24 hours',
+    last2Days: 'Last 2 days',
     last7Days: 'Last 7 days',
     last30Days: 'Last 30 days',
     active: 'Active',

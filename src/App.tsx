@@ -1,6 +1,15 @@
 import { useState, useMemo, useRef, useCallback, lazy, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
+import { VersionDowngradeDialog } from "./components/dialogs";
+type VersionDowngradeInfo = {
+  stored_app_version: string;
+  stored_schema_version: number;
+  current_app_version: string;
+  max_supported_schema_version: number;
+  updated_at: string;
+  db_path: string;
+};
 import { useRouteSync } from "./hooks/useRouteSync";
 import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -267,6 +276,25 @@ function App() {
     }
   });
   const [showTerminal, setShowTerminal] = useState(false);
+  const [versionDowngradeInfo, setVersionDowngradeInfo] = useState<VersionDowngradeInfo | null>(null);
+
+  // Check for version downgrade on app startup
+  useEffect(() => {
+    if (standaloneDatasetRuntime) return;
+
+    const checkVersion = async () => {
+      try {
+        const result = await invoke<{ has_downgrade: boolean; downgrade_info: VersionDowngradeInfo | null; current_app_version: string }>('check_version_downgrade');
+        if (result.has_downgrade && result.downgrade_info) {
+          setVersionDowngradeInfo(result.downgrade_info);
+        }
+      } catch (err) {
+        console.error('Failed to check version downgrade:', err);
+      }
+    };
+
+    checkVersion();
+  }, [standaloneDatasetRuntime]);
 
   const navigate = useNavigate();
 
@@ -893,6 +921,8 @@ function App() {
         void createTag(name, color, undefined, parentId);
       }}
       getDescendantIds={getDescendantIds}
+      totalCount={sessions.length}
+      filteredCount={filteredSessions.length}
       placeholder={placeholder}
       sortBy={sessionSortBy}
       sortOrder={sessionSortOrder}
@@ -1198,6 +1228,8 @@ function App() {
         void createTag(name, color, undefined, parentId);
       }}
       getDescendantIds={getDescendantIds}
+      totalCount={sessions.length}
+      filteredCount={filteredSessions.length}
       sidebarMode={sidebarMode}
       selectedProject={selectedProject}
       sortBy={sessionSortBy}
@@ -1321,6 +1353,21 @@ function App() {
   return (
     <div className="flex flex-col h-screen-safe bg-background text-foreground" {...(isVibrancyEnabled ? { 'data-sidebar-vibrancy': '' } : {})} >
       <ConnectionBanner />
+
+      {/* Version Downgrade Dialog */}
+      {versionDowngradeInfo && (
+        <VersionDowngradeDialog
+          downgradeInfo={versionDowngradeInfo}
+          currentVersion={versionDowngradeInfo.current_app_version}
+          onClose={() => setVersionDowngradeInfo(null)}
+          onResetComplete={() => {
+            setVersionDowngradeInfo(null);
+            // Reload the app after reset
+            window.location.reload();
+          }}
+        />
+      )}
+
       <div className="flex flex-1 min-h-0">
         <AppDesktopSidebar
           isTauriRuntime={isTauri()}

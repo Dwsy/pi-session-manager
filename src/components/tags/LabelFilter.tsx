@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { ListFilter, Check, Plus, Search, Calendar, ChevronRight, ArrowLeft } from "lucide-react";
+import { ListFilter, Check, Plus, Search, Calendar, ChevronRight, ArrowLeft, ArrowUpDown, ArrowDownWideNarrow, ArrowUpNarrowWide } from "lucide-react";
 import type { Tag as TagType, SessionTag, DateRange } from "@/types";
+import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
 import CompositionInput from "@/components/ui/CompositionInput";
 import { AgentIcon } from "@/components/session-viewer/AgentIcon";
 
@@ -56,6 +57,18 @@ function isToday(range: DateRange): boolean {
   return range.start.getTime() === startOfDay.getTime();
 }
 
+function isLast24h(range: DateRange): boolean {
+  const now = new Date();
+  const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  return Math.abs(range.start.getTime() - start.getTime()) < 60 * 1000;
+}
+
+function isLast2Days(range: DateRange): boolean {
+  const now = new Date();
+  const start = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+  return Math.abs(range.start.getTime() - start.getTime()) < 60 * 1000;
+}
+
 function isLast7Days(range: DateRange): boolean {
   const now = new Date();
   const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -67,6 +80,13 @@ function isLast30Days(range: DateRange): boolean {
   const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   return range.start.getTime() === start.getTime();
 }
+
+const SORT_OPTIONS: Array<{ value: SessionSortBy; labelKey: string; fallback: string }> = [
+  { value: "modified", labelKey: "session.sort.short.modified", fallback: "Modified" },
+  { value: "created", labelKey: "session.sort.short.created", fallback: "Created" },
+  { value: "name", labelKey: "session.sort.short.name", fallback: "Name" },
+  { value: "size", labelKey: "session.sort.short.size", fallback: "Size" },
+];
 
 interface LabelFilterProps {
   tags: TagType[];
@@ -81,6 +101,10 @@ interface LabelFilterProps {
   onModelFilterChange?: (model: string) => void;
   dateRange?: DateRange | null;
   onDateRangeChange?: (range: DateRange | null) => void;
+  sortBy?: SessionSortBy;
+  sortOrder?: SessionSortOrder;
+  onSortByChange?: (sortBy: SessionSortBy) => void;
+  onSortOrderChange?: (sortOrder: SessionSortOrder) => void;
   onCreateTag?: (name: string, color: string, parentId?: string) => void;
   getDescendantIds: (tagId: string) => string[];
 }
@@ -106,12 +130,16 @@ export default function LabelFilter({
   onModelFilterChange,
   dateRange,
   onDateRangeChange,
+  sortBy = "modified",
+  sortOrder = "desc",
+  onSortByChange,
+  onSortOrderChange,
   onCreateTag,
   getDescendantIds,
 }: LabelFilterProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [submenu, setSubmenu] = useState<"sources" | "models" | "dates" | "statuses" | "labels" | null>(null);
+  const [submenu, setSubmenu] = useState<"sources" | "models" | "dates" | "statuses" | "labels" | "sort" | null>(null);
   const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -375,23 +403,11 @@ export default function LabelFilter({
         }`}
       >
         <ListFilter className="h-3 w-3" />
-        {/* {activeCount > 0 ? (
-          <>
-            <span className="max-w-[120px] truncate">
-              {activeRootTags.length === 1
-                ? activeRootTags[0].name
-                : `${activeCount} ${t('tags.filter.title')}`}
-            </span>
-            <span
-              className="ml-0.5 p-0.5 rounded hover:bg-foreground/10"
-              onClick={(e) => { e.stopPropagation(); onFilterChange([]) }}
-            >
-              <X className="h-2.5 w-2.5" />
-            </span>
-          </>
-        ) : (
-          <span className="hidden">{t('tags.filter.title')}</span>
-        )} */}
+        {activeCount > 0 && (
+          <span className="text-[11px] font-medium tabular-nums">
+            {activeCount}
+          </span>
+        )}
       </button>
 
       {open &&
@@ -487,6 +503,25 @@ export default function LabelFilter({
                       {dateRange && (
                         <span className="text-[11px] text-muted-foreground/60">{t("tags.filter.active", "Active")}</span>
                       )}
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                    </button>
+                  )}
+                  {/* Sort */}
+                  {onSortByChange && (
+                    <button
+                      onClick={() => setSubmenu("sort")}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                    >
+                      <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/60" />
+                      <span className="flex-1 text-left">{t("session.sort.label", "Sort")}</span>
+                      <span className="text-[11px] text-muted-foreground/60 truncate max-w-[80px] flex items-center gap-0.5">
+                        {t(SORT_OPTIONS.find(o => o.value === sortBy)?.labelKey || "", { defaultValue: SORT_OPTIONS.find(o => o.value === sortBy)?.fallback || "" })}
+                        {sortOrder === "desc" ? (
+                          <ArrowDownWideNarrow className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpNarrowWide className="h-3 w-3" />
+                        )}
+                      </span>
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
                     </button>
                   )}
@@ -614,6 +649,38 @@ export default function LabelFilter({
                         <button
                           onClick={() => {
                             const now = new Date();
+                            const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                            onDateRangeChange({ start, end: now });
+                            setSubmenu(null);
+                          }}
+                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                            dateRange && isLast24h(dateRange) ? "text-foreground" : "text-muted-foreground"
+                          }`}
+                          style={{ width: "calc(100% - 8px)" }}
+                        >
+                          <Calendar className="h-3 w-3 shrink-0" />
+                          <span className="flex-1 text-left">{t("tags.filter.last24h", "Last 24 hours")}</span>
+                          {dateRange && isLast24h(dateRange) && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
+                        </button>
+                        <button
+                          onClick={() => {
+                            const now = new Date();
+                            const start = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+                            onDateRangeChange({ start, end: now });
+                            setSubmenu(null);
+                          }}
+                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                            dateRange && isLast2Days(dateRange) ? "text-foreground" : "text-muted-foreground"
+                          }`}
+                          style={{ width: "calc(100% - 8px)" }}
+                        >
+                          <Calendar className="h-3 w-3 shrink-0" />
+                          <span className="flex-1 text-left">{t("tags.filter.last2Days", "Last 2 days")}</span>
+                          {dateRange && isLast2Days(dateRange) && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
+                        </button>
+                        <button
+                          onClick={() => {
+                            const now = new Date();
                             const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
                             onDateRangeChange({ start, end: now });
                             setSubmenu(null);
@@ -643,6 +710,35 @@ export default function LabelFilter({
                           <span className="flex-1 text-left">{t("tags.filter.last30Days", "Last 30 days")}</span>
                           {dateRange && isLast30Days(dateRange) && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
                         </button>
+                      </>
+                    )}
+                    {submenu === "sort" && onSortByChange && (
+                      <>
+                        {SORT_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              if (sortBy === option.value) {
+                                onSortOrderChange?.(sortOrder === "desc" ? "asc" : "desc");
+                              } else {
+                                onSortByChange(option.value);
+                              }
+                            }}
+                            className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                              sortBy === option.value ? "text-foreground" : "text-muted-foreground"
+                            }`}
+                            style={{ width: "calc(100% - 8px)" }}
+                          >
+                            <span className="flex-1 text-left">{t(option.labelKey, { defaultValue: option.fallback })}</span>
+                            {sortBy === option.value && (
+                              sortOrder === "desc" ? (
+                                <ArrowDownWideNarrow className="h-3.5 w-3.5 shrink-0 text-foreground/60" />
+                              ) : (
+                                <ArrowUpNarrowWide className="h-3.5 w-3.5 shrink-0 text-foreground/60" />
+                              )
+                            )}
+                          </button>
+                        ))}
                       </>
                     )}
                     {submenu === "statuses" && (

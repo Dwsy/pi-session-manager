@@ -61,7 +61,16 @@ pub fn parse_session_info_from_path(path: &Path) -> Result<(SessionInfo, Vec<Ses
         return pi_session::parse_pi_session_info(path, modified);
     }
 
-    let (_, canonical) = read_canonical_session_from_path(path)?;
+    // Read file once and reuse content for provider detection + parsing.
+    // Previously detect_provider_from_path_or_content read the full file,
+    // then read_canonical_session_from_path read it again.
+    let start = std::time::Instant::now();
+    let content = fs::read_to_string(path).map_err(|e| format!("Failed to read session file {}: {e}", path.display()))?;
+    let elapsed = start.elapsed();
+    crate::core::io_trace::trace_file_read(&path.to_string_lossy(), content.len() as u64, elapsed);
+
+    let provider = detect_provider(Some(path), &content).ok_or_else(|| format!("Unsupported session format: {}", path.display()))?;
+    let canonical = provider.read_session_from_str(path, &content)?;
     let entries = adapters::canonical_to_session_entries(&canonical);
     let info = adapters::canonical_to_session_info(&canonical, path, modified);
     Ok((info, entries))

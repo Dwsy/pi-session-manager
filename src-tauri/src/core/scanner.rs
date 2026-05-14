@@ -957,6 +957,15 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             };
 
             let scan_state = sqlite::get_scan_state(&conn, &session_path_str).ok().flatten();
+
+            // Quick skip: if file mtime and size match last scan, nothing changed.
+            if let Some(ref state) = scan_state {
+                let current_size = fs::metadata(&backing).map(|m| m.len()).unwrap_or(0);
+                if state.file_modified == file_modified && state.file_size == current_size {
+                    continue;
+                }
+            }
+
             let trust = scan_state.as_ref().map(|s| s.append_trust_count).unwrap_or(0);
             let last_offset = scan_state.as_ref().map(|s| s.read_offset).unwrap_or(0);
 
@@ -1198,13 +1207,22 @@ impl ScannerScheduler {
                         all_entries.extend(new_entries.clone());
                         let info = incremental_update_session_info(&old_info, &new_entries, file_modified);
                         set_cached_entries(&path_str, all_entries.clone());
-                        let _ = sqlite::append_message_entries(&conn, &path_str, &new_entries);
-                        let _ = sqlite::update_labels_for_entries(&conn, &path_str, &all_entries);
-                        // Update sessions table (pass None to skip redundant sync_message_entries)
-                        let _ = sqlite::upsert_session(&mut conn, &info, file_modified, None);
+                        // Batch all incremental DB writes into a single transaction
+                        // to avoid per-op commit overhead (WAL checkpoint + FTS trigger cost).
+                        match conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate) {
+                            Ok(tx) => {
+                                let _ = sqlite::append_message_entries(&tx, &path_str, &new_entries);
+                                let _ = sqlite::update_labels_for_entries(&tx, &path_str, &all_entries);
+                                let _ = sqlite::upsert_session_in_tx(&tx, &info, file_modified, None);
+                                let trust = all_scan_states.get(&path_str).map(|s| s.append_trust_count).unwrap_or(3);
+                                let _ = sqlite::update_scan_state_offset_and_trust(&tx, &path_str, new_offset, trust.saturating_add(1));
+                                if let Err(e) = tx.commit() {
+                                    warn!("Failed to commit incremental update for {}: {}", path_str, e);
+                                }
+                            }
+                            Err(e) => warn!("Failed to begin incremental transaction for {}: {}", path_str, e),
+                        }
                         upsert_cached_session(info);
-                        let trust = all_scan_states.get(&path_str).map(|s| s.append_trust_count).unwrap_or(3);
-                        let _ = sqlite::update_scan_state_offset_and_trust(&conn, &path_str, new_offset, trust.saturating_add(1));
                         updated += 1;
                     } else {
                         // No cached entries/info, fall back to full parse
