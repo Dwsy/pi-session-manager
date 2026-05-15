@@ -38,7 +38,7 @@ fn test_empty_query_returns_empty_results() {
         last_message: "Hello world".to_string(),
         last_message_role: "user".to_string(),
         parent_session_path: None,
-        model: String::new(),
+        model: None,
     }];
 
     // Test empty query
@@ -77,7 +77,7 @@ fn test_single_word_search() {
         last_message: "Hello world, this is a test".to_string(),
         last_message_role: "user".to_string(),
         parent_session_path: None,
-        model: String::new(),
+        model: None,
     }];
 
     // Test matching word
@@ -118,7 +118,7 @@ fn test_multiple_word_search() {
         last_message: "Hello world, this is a test of search functionality".to_string(),
         last_message_role: "user".to_string(),
         parent_session_path: None,
-        model: String::new(),
+        model: None,
     }];
 
     // Test OR logic: any word matches should return results
@@ -158,7 +158,7 @@ fn test_name_search_mode() {
         last_message: "Some content here".to_string(),
         last_message_role: "user".to_string(),
         parent_session_path: None,
-        model: String::new(),
+        model: None,
     }];
 
     // Test searching by name
@@ -199,7 +199,7 @@ fn test_role_filter() {
         last_message: "User message with keyword Assistant message with keyword".to_string(),
         last_message_role: "user".to_string(),
         parent_session_path: None,
-        model: String::new(),
+        model: None,
     }];
 
     // Test user role filter
@@ -251,7 +251,7 @@ fn test_multiple_sessions() {
             last_message: "Session about Rust programming".to_string(),
             last_message_role: "user".to_string(),
             parent_session_path: None,
-            model: String::new(),
+            model: None,
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -267,7 +267,7 @@ fn test_multiple_sessions() {
             last_message: "Session about Python programming".to_string(),
             last_message_role: "user".to_string(),
             parent_session_path: None,
-            model: String::new(),
+            model: None,
         },
         SessionInfo {
             path: session3_path.clone(),
@@ -283,7 +283,7 @@ fn test_multiple_sessions() {
             last_message: "Session about JavaScript".to_string(),
             last_message_role: "user".to_string(),
             parent_session_path: None,
-            model: String::new(),
+            model: None,
         },
     ];
 
@@ -325,7 +325,7 @@ fn test_snippet_generation() {
         last_message: long_text[..150].to_string(),
         last_message_role: "user".to_string(),
         parent_session_path: None,
-        model: String::new(),
+        model: None,
     }];
 
     let results = search_sessions(&sessions, "keyword", SearchMode::Content, RoleFilter::All, true);
@@ -363,7 +363,7 @@ fn test_score_calculation() {
             last_message: "test test test".to_string(),
             last_message_role: "user".to_string(),
             parent_session_path: None,
-            model: String::new(),
+            model: None,
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -379,7 +379,7 @@ fn test_score_calculation() {
             last_message: "test".to_string(),
             last_message_role: "user".to_string(),
             parent_session_path: None,
-            model: String::new(),
+            model: None,
         },
     ];
 
@@ -413,7 +413,7 @@ fn test_thinking_content() {
         last_message: "This is thinking content with keyword".to_string(),
         last_message_role: "user".to_string(),
         parent_session_path: None,
-        model: String::new(),
+        model: None,
     }];
 
     // Test with include_tools = true (should search thinking content)
@@ -457,7 +457,7 @@ fn test_special_characters() {
         last_message: "Test with symbols: @#$%^&*()_+-=[]{}|;':\",./<>?".to_string(),
         last_message_role: "user".to_string(),
         parent_session_path: None,
-        model: String::new(),
+        model: None,
     }];
 
     // Test searching for text without special characters
@@ -493,7 +493,7 @@ fn test_unicode_search() {
         last_message: "这是一个中文测试".to_string(),
         last_message_role: "user".to_string(),
         parent_session_path: None,
-        model: String::new(),
+        model: None,
     }];
 
     // Test Chinese search
@@ -521,7 +521,7 @@ fn test_unicode_search() {
         last_message: "这里的默认识别系统语言是中文界面".to_string(),
         last_message_role: "user".to_string(),
         parent_session_path: None,
-        model: String::new(),
+        model: None,
     }];
 
     let results = search_sessions(&sessions, "默认系统中文", SearchMode::Content, RoleFilter::All, true);
@@ -556,7 +556,7 @@ fn test_quoted_phrase_content_search_requires_contiguous_match() {
             last_message: "foo something bar".to_string(),
             last_message_role: "user".to_string(),
             parent_session_path: None,
-            model: String::new(),
+            model: None,
         },
         SessionInfo {
             path: session_path_2,
@@ -572,7 +572,7 @@ fn test_quoted_phrase_content_search_requires_contiguous_match() {
             last_message: "prefix foo bar suffix".to_string(),
             last_message_role: "user".to_string(),
             parent_session_path: None,
-            model: String::new(),
+            model: None,
         },
     ];
 
@@ -609,7 +609,7 @@ fn test_quoted_phrase_name_search_requires_phrase_and_remainder_terms() {
             last_message: "contains baz".to_string(),
             last_message_role: "user".to_string(),
             parent_session_path: None,
-            model: String::new(),
+            model: None,
         },
         SessionInfo {
             path: session_path_2,
@@ -625,7 +625,7 @@ fn test_quoted_phrase_name_search_requires_phrase_and_remainder_terms() {
             last_message: "no additional term".to_string(),
             last_message_role: "user".to_string(),
             parent_session_path: None,
-            model: String::new(),
+            model: None,
         },
     ];
 

@@ -21,7 +21,7 @@ fn test_write_buffer_eviction() {
             last_message: "test".to_string(),
             last_message_role: "user".to_string(),
             parent_session_path: None,
-            model: String::new(),
+            model: None,
         }
     }
 
