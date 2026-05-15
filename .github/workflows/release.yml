@@ -160,7 +160,9 @@ jobs:
       - name: Fix CLI permissions
         run: |
           for f in cli-artifacts/pi-session-cli-*; do
-            [ -f "$f" ] && [[ ! "$f" =~ \.sha256$ ]] && [[ ! "$f" =~ \.exe$ ]] && chmod +x "$f"
+            if [ -f "$f" ] && [[ ! "$f" =~ \.sha256$ ]] && [[ ! "$f" =~ \.exe$ ]]; then
+              chmod +x "$f"
+            fi
           done
 
       - name: Download updater metadata
