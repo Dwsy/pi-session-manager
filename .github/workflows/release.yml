@@ -55,6 +55,8 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
           rustup target add ${{ matrix.target }}
+          rustup show
+          echo "$(rustc --print sysroot)/bin" >> $GITHUB_PATH
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
