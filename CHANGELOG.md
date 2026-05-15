@@ -2,6 +2,42 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
+## [0.6.1] - 2026-05-15
+
+### Added
+
+- **System tray & lightweight mode** — minimize-to-tray on close, lightweight mode toggle in Advanced Settings
+- **Session tree gutter layout** — enhanced SessionTree with gutter layout and detail pane
+- **Date range, model, and source filters** — LabelFilter now supports date range, model, and source type filtering
+- **Terminal launcher expansion** — added warp, zed, hyper, tabby, ghostty launch support
+- **Bulk insert/upsert** — SQLite bulk operations and FTS trigger management API
+- **IO tracing diagnostics** — scanner startup classify-reason diagnostics for IO analysis
+- **Conversation preview folding** — collapsible conversation preview in session viewer
+- **ThinkingBlock improvements** — collapsed state with brain icon for thinking content
+- **Conversation mode primary** — conversation mode is now the default view
+- **Tag filter submenu & dashboard i18n** — added tag filter submenu and dashboard translations (en/zh)
+- **Model field propagation** — session model field now flows through the full scan pipeline
+
+### Fixed
+
+- **Dashboard insight modal** — pass sessions prop to DashboardInsightModal
+- **Settings locale sync** — sync settings locale keys and minor frontend fixes
+- **Thinking toggle collapse** — make thinking toggle collapse blocks properly
+- **Terminal session open** — open session via local web route
+- **Stats cache tokens** — include cache tokens in totals
+- **resume-x SQLite error** — expose SQLite init error instead of misleading 'no session' message
+- **resume-x session switch** — prevent stale context access, use withSession callback
+- **CI pipeline** — fixed macOS rustup compatibility, release CLI permissions, lint gate ordering
+
+### Changed
+
+- **Code block styling** — frosted glass header overlay, refined tool path display
+- **Message layout** — split viewer controllers and message layout for cleaner architecture
+- **Sidebar responsibilities** — clarified project sidebar component boundaries
+- **pi-session-bridge** — restructured extension with src/ directory, reads port from config, supports 8-char session IDs
+- **Performance** — truncate message previews in list query to 200 chars for faster rendering
+- **Tech debt cleanup** — code quality improvements, cargo config for faster dev builds
+
 ## [Unreleased]
 
 ### Added
