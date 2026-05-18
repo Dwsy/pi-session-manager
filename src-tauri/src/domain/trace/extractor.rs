@@ -630,11 +630,7 @@ pub fn extract_inspect_data(session_path: &str) -> Result<InspectData, String> {
         match entry_type {
             "session_info" => {
                 if let Some(name) = value["name"].as_str() {
-                    name_history.push(NameHistoryEntry {
-                        id,
-                        timestamp,
-                        name: name.to_string(),
-                    });
+                    name_history.push(NameHistoryEntry { id, timestamp, name: name.to_string() });
                 }
             }
             "compaction" => {
@@ -649,12 +645,7 @@ pub fn extract_inspect_data(session_path: &str) -> Result<InspectData, String> {
                 });
             }
             "custom" => {
-                custom_entries.push(CustomEntry {
-                    id,
-                    timestamp,
-                    custom_type: value["customType"].as_str().unwrap_or("").to_string(),
-                    data: value.get("data").cloned(),
-                });
+                custom_entries.push(CustomEntry { id, timestamp, custom_type: value["customType"].as_str().unwrap_or("").to_string(), data: value.get("data").cloned() });
             }
             "message" => {
                 if let Some(msg) = value.get("message") {
@@ -663,12 +654,7 @@ pub fn extract_inspect_data(session_path: &str) -> Result<InspectData, String> {
                         let tool_name = msg["toolName"].as_str().unwrap_or("result").to_string();
                         let is_error = msg["isError"].as_bool().unwrap_or(false);
                         let content = msg.get("content").cloned().unwrap_or(Value::Null);
-                        tool_results.insert(tool_call_id, ToolResultDetail {
-                            tool_name,
-                            is_error,
-                            content,
-                            timestamp,
-                        });
+                        tool_results.insert(tool_call_id, ToolResultDetail { tool_name, is_error, content, timestamp });
                     }
                 }
             }
@@ -676,15 +662,7 @@ pub fn extract_inspect_data(session_path: &str) -> Result<InspectData, String> {
         }
     }
 
-    Ok(InspectData {
-        version,
-        parent_session,
-        name_history,
-        compaction_entries,
-        custom_entries,
-        tool_results,
-        total_raw_entries: lines.len(),
-    })
+    Ok(InspectData { version, parent_session, name_history, compaction_entries, custom_entries, tool_results, total_raw_entries: lines.len() })
 }
 
 #[cfg(test)]

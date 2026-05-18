@@ -48,9 +48,6 @@ export interface UseSessionsReturn {
     anchorRef?: React.RefObject<HTMLElement | null>,
     options?: DeleteSessionRequestOptions,
   ) => Promise<void>;
-  executeDeleteSessionsDirect: (
-    sessions: SessionInfo[],
-  ) => Promise<void>;
   pendingDeleteSession: PendingDeleteSession | null;
   confirmDeleteSession: () => Promise<void>;
   cancelDeleteSession: () => void;
