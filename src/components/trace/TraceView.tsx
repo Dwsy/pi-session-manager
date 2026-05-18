@@ -7,10 +7,18 @@ import {
   MessageSquare,
   Wrench,
   AlertTriangle,
+  Search,
+  ChevronRight,
+  FileText,
+  Edit3,
+  Minimize2,
+  Code,
+  AlertCircle,
 } from 'lucide-react';
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react';
 
 import { useSessionTrace } from '@/hooks/useSessionTrace';
+import { useInspectData } from '@/hooks/useInspectData';
 import { useTheme } from '@/hooks/useAppearance';
 import { parseMarkdown, renderCodeHtml } from '@/utils/markdown';
 import { LoopStrip } from './LoopStrip';
@@ -19,6 +27,7 @@ import type {
   TraceEvent,
   TraceEventType,
   TraceToolCall,
+  InspectData,
 } from '@/types/trace';
 import type { SessionInfo } from '@/types';
 
@@ -27,7 +36,7 @@ interface TraceViewProps {
   onClose: () => void;
 }
 
-type TraceTab = 'details' | 'analytics' | 'timeline';
+type TraceTab = 'details' | 'analytics' | 'timeline' | 'inspect';
 type InspectorTab = 'content' | 'result' | 'usage' | 'raw';
 
 const EVENT_COLORS: Record<TraceEventType, string> = {
@@ -152,6 +161,7 @@ export default function TraceView({ session, onClose }: TraceViewProps) {
   const { t } = useTranslation();
   useTheme();
   const { analytics, loading, error } = useSessionTrace(session.path);
+  const { data: inspectData, loading: inspectLoading } = useInspectData(session.path);
   const [activeTab, setActiveTab] = useState<TraceTab>('details');
   const [selectedEvent, setSelectedEvent] = useState<TraceEvent | null>(null);
 
@@ -171,6 +181,7 @@ export default function TraceView({ session, onClose }: TraceViewProps) {
     { key: 'details', label: t('trace.tab.details', 'Details') },
     { key: 'analytics', label: t('trace.tab.analytics', 'Analytics') },
     { key: 'timeline', label: t('trace.tab.timeline', 'Timeline') },
+    { key: 'inspect', label: t('trace.tab.inspect', 'Inspect') },
   ];
 
   if (loading) {
@@ -232,6 +243,15 @@ export default function TraceView({ session, onClose }: TraceViewProps) {
         {activeTab === 'analytics' && <AnalyticsTab analytics={analytics} />}
         {activeTab === 'timeline' && (
           <TimelineView analytics={analytics} selectedEvent={selectedEvent} onSelectEvent={setSelectedEvent} />
+        )}
+        {activeTab === 'inspect' && (
+          inspectData ? <InspectTab data={inspectData} /> : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-muted-foreground text-sm">
+                {inspectLoading ? t('trace.inspect.loading', 'Loading inspect data...') : t('trace.inspect.empty', 'No inspect data')}
+              </div>
+            </div>
+          )
         )}
       </div>
     </div>
@@ -577,7 +597,7 @@ function TimelineView({ analytics: a, selectedEvent, onSelectEvent }: { analytic
             return (
               <div
                 key={row.id}
-                className={cx('flex items-center gap-2 px-3 border-b border-border/40 cursor-pointer transition-colors', hoveredRow === idx && 'bg-foreground/[0.03]', isSelected && 'bg-secondary/60')}
+                className={cx('flex items-center gap-2 px-3 border-b border-border/40 transition-colors', hoveredRow === idx && 'bg-foreground/[0.03]', isSelected && 'bg-secondary/60')}
                 style={{ height: ROW_H }}
                 onMouseEnter={() => setHoveredRow(idx)}
                 onMouseLeave={() => setHoveredRow(null)}
@@ -899,6 +919,410 @@ function InspectorUsage({ event }: { event: TraceEvent }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Inspect Tab - Tree + Detail layout (pi-inspect style)
+// ═══════════════════════════════════════════════════════════════
+
+type InspectItemKind = 'header' | 'name' | 'compaction' | 'custom' | 'tool_result';
+
+interface InspectItem {
+  id: string;
+  kind: InspectItemKind;
+  label: string;
+  sublabel?: string;
+  timestamp?: string;
+  isError?: boolean;
+  data: unknown;
+}
+
+const KIND_LABELS: Record<InspectItemKind, string> = {
+  header: 'Session Header',
+  name: 'Session Names',
+  compaction: 'Compactions',
+  custom: 'Custom Entries',
+  tool_result: 'Tool Results',
+};
+
+function buildInspectItems(data: InspectData): InspectItem[] {
+  const items: InspectItem[] = [];
+
+  // Header
+  items.push({
+    id: 'header',
+    kind: 'header',
+    label: `v${data.version} · ${data.total_raw_entries} entries`,
+    data: { version: data.version, parent_session: data.parent_session, total_raw_entries: data.total_raw_entries },
+  });
+
+  // Names
+  for (const entry of data.name_history) {
+    items.push({
+      id: `name:${entry.id}`,
+      kind: 'name',
+      label: entry.name,
+      timestamp: entry.timestamp,
+      data: entry,
+    });
+  }
+
+  // Compactions
+  for (const entry of data.compaction_entries) {
+    items.push({
+      id: `compaction:${entry.id}`,
+      kind: 'compaction',
+      label: entry.summary?.slice(0, 60) || '(no summary)',
+      timestamp: entry.timestamp,
+      data: entry,
+    });
+  }
+
+  // Custom
+  for (const entry of data.custom_entries) {
+    items.push({
+      id: `custom:${entry.id}`,
+      kind: 'custom',
+      label: entry.custom_type,
+      timestamp: entry.timestamp,
+      data: entry,
+    });
+  }
+
+  // Tool results
+  for (const [callId, result] of Object.entries(data.tool_results)) {
+    items.push({
+      id: `tool:${callId}`,
+      kind: 'tool_result',
+      label: result.tool_name,
+      sublabel: callId.slice(0, 8),
+      timestamp: result.timestamp,
+      isError: result.is_error,
+      data: { callId, ...result },
+    });
+  }
+
+  return items;
+}
+
+function groupByKind(items: InspectItem[]): Map<InspectItemKind, InspectItem[]> {
+  const groups = new Map<InspectItemKind, InspectItem[]>();
+  for (const kind of Object.keys(KIND_LABELS) as InspectItemKind[]) {
+    groups.set(kind, []);
+  }
+  for (const item of items) {
+    groups.get(item.kind)?.push(item);
+  }
+  return groups;
+}
+
+function InspectTab({ data }: { data: InspectData }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<InspectItemKind>>(
+    new Set(['header', 'name', 'compaction', 'custom', 'tool_result'])
+  );
+  const [filter, setFilter] = useState('');
+
+  const allItems = useMemo(() => buildInspectItems(data), [data]);
+  const groups = useMemo(() => groupByKind(allItems), [allItems]);
+
+  const filteredItems = useMemo(() => {
+    if (!filter) return allItems;
+    const q = filter.toLowerCase();
+    return allItems.filter(item =>
+      item.label.toLowerCase().includes(q) ||
+      item.kind.toLowerCase().includes(q) ||
+      item.sublabel?.toLowerCase().includes(q)
+    );
+  }, [allItems, filter]);
+
+  const selectedItem = useMemo(() =>
+    allItems.find(item => item.id === selectedId) ?? null,
+    [allItems, selectedId]
+  );
+
+  const toggleGroup = (kind: InspectItemKind) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-background">
+      {/* Top Bar */}
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-card/50">
+        <div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/50">
+          <Search className="w-3.5 h-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            placeholder="Filter items..."
+            className="flex-1 bg-transparent border-none outline-none text-sm text-foreground placeholder:text-muted-foreground"
+          />
+        </div>
+        <span className="text-xs font-mono text-muted-foreground">
+          {filteredItems.length} / {allItems.length}
+        </span>
+      </div>
+
+      {/* Main Layout: Tree + Detail */}
+      <div className="flex-1 flex min-h-0">
+        {/* Tree Panel */}
+        <div className="w-64 shrink-0 border-r border-border overflow-auto bg-card/30">
+          {(['header', 'name', 'compaction', 'custom', 'tool_result'] as InspectItemKind[]).map(kind => {
+            const kindItems = groups.get(kind) ?? [];
+            const visibleItems = kindItems.filter(item => filteredItems.includes(item));
+            if (visibleItems.length === 0) return null;
+            const isExpanded = expandedGroups.has(kind);
+
+            return (
+              <div key={kind}>
+                {/* Group Header */}
+                <button
+                  onClick={() => toggleGroup(kind)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-secondary/50 transition-colors"
+                >
+                  <ChevronRight
+                    className="w-3 h-3 text-muted-foreground shrink-0"
+                    style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}
+                  />
+                  <InspectKindIcon kind={kind} />
+                  <span className="flex-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {KIND_LABELS[kind]}
+                  </span>
+                  <span className="text-[10px] font-mono text-muted-foreground/70">
+                    {visibleItems.length}
+                  </span>
+                </button>
+
+                {/* Group Items */}
+                {isExpanded && (
+                  <div>
+                    {visibleItems.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => setSelectedId(item.id)}
+                        className={cx(
+                          'w-full flex items-center gap-2 pl-8 pr-3 py-1.5 text-left transition-colors',
+                          selectedId === item.id
+                            ? 'bg-accent/15 text-accent'
+                            : 'text-muted-foreground hover:bg-secondary/30 hover:text-foreground'
+                        )}
+                      >
+                        <span className="flex-1 text-xs truncate">{item.label}</span>
+                        {item.isError && <InspectErrorBadge />}
+                        {item.sublabel && (
+                          <span className="text-[10px] font-mono text-muted-foreground/60">{item.sublabel}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Detail Panel */}
+        <div className="flex-1 overflow-auto bg-background">
+          {selectedItem ? (
+            <InspectDetail item={selectedItem} />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+              <Search className="w-10 h-10 mb-3 opacity-20" />
+              <span className="text-sm">Select an item to view details</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Kind Icon ─────────────────────────────────────────────────
+
+function InspectKindIcon({ kind }: { kind: InspectItemKind }) {
+  const cls = 'w-3.5 h-3.5 text-muted-foreground/70';
+  switch (kind) {
+    case 'header': return <FileText className={cls} />;
+    case 'name': return <Edit3 className={cls} />;
+    case 'compaction': return <Minimize2 className={cls} />;
+    case 'custom': return <Code className={cls} />;
+    case 'tool_result': return <Wrench className={cls} />;
+  }
+}
+
+function InspectErrorBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-destructive/15 text-destructive">
+      <AlertCircle className="w-2.5 h-2.5" />
+      ERR
+    </span>
+  );
+}
+
+// ── Detail Panel ───────────────────────────────────────────────
+
+function InspectDetail({ item }: { item: InspectItem }) {
+  return (
+    <div className="p-5">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-5 pb-4 border-b border-border">
+        <InspectKindIcon kind={item.kind} />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-foreground truncate">{item.label}</div>
+          {item.sublabel && (
+            <div className="text-xs font-mono text-muted-foreground">{item.sublabel}</div>
+          )}
+        </div>
+        {item.isError && <InspectErrorBadge />}
+        {item.timestamp && (
+          <span className="text-xs font-mono text-muted-foreground shrink-0">
+            {new Date(item.timestamp).toLocaleString()}
+          </span>
+        )}
+      </div>
+
+      {/* Content */}
+      <InspectDetailContent item={item} />
+    </div>
+  );
+}
+
+function InspectDetailContent({ item }: { item: InspectItem }) {
+  const data = item.data as any;
+
+  if (item.kind === 'header') {
+    return (
+      <div className="space-y-4">
+        <InspectField label="Version" value={data.version} />
+        <InspectField label="Total Entries" value={data.total_raw_entries} />
+        {data.parent_session && <InspectField label="Parent Session" value={data.parent_session} mono />}
+      </div>
+    );
+  }
+
+  if (item.kind === 'name') {
+    return (
+      <div className="space-y-4">
+        <InspectField label="Name" value={data.name} />
+        <InspectField label="Timestamp" value={new Date(data.timestamp).toLocaleString()} />
+      </div>
+    );
+  }
+
+  if (item.kind === 'compaction') {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {data.from_hook && (
+            <span className="text-[10px] px-2 py-1 rounded-full bg-warning/15 text-warning font-medium">hook</span>
+          )}
+          {data.tokens_before != null && (
+            <span className="text-[10px] px-2 py-1 rounded-full bg-secondary text-muted-foreground">
+              {formatTokens(data.tokens_before)} tokens before
+            </span>
+          )}
+        </div>
+        {data.first_kept_entry_id && <InspectField label="First Kept" value={data.first_kept_entry_id} mono />}
+        {data.summary && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Summary</div>
+            <HighlightedCode code={data.summary} language="markdown" />
+          </div>
+        )}
+        {data.details && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Details</div>
+            <HighlightedCode code={JSON.stringify(data.details, null, 2)} language="json" />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (item.kind === 'custom') {
+    return (
+      <div className="space-y-4">
+        <InspectField label="Custom Type" value={data.custom_type} />
+        {data.data != null && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Data</div>
+            <HighlightedCode
+              code={typeof data.data === 'string' ? data.data : JSON.stringify(data.data, null, 2)}
+              language={typeof data.data === 'string' ? 'text' : 'json'}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (item.kind === 'tool_result') {
+    return (
+      <div className="space-y-4">
+        <InspectField label="Tool Name" value={data.tool_name} />
+        <InspectField label="Call ID" value={data.callId} mono />
+        <InspectField label="Error" value={data.is_error ? 'Yes' : 'No'} />
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Content</div>
+          <HighlightedCode
+            code={typeof data.content === 'string' ? data.content : JSON.stringify(data.content, null, 2)}
+            language={typeof data.content === 'string' ? 'text' : 'json'}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function InspectField({ label, value, mono }: { label: string; value: string | number; mono?: boolean }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <span className="text-[10px] uppercase tracking-wider shrink-0 w-28 text-muted-foreground">{label}</span>
+      <span className={cx('text-sm text-foreground', mono && 'font-mono')} style={{ wordBreak: 'break-all' }}>{value}</span>
+    </div>
+  );
+}
+
+// ── Highlighted Code Block ─────────────────────────────────────
+
+function HighlightedCode({ code, language, maxHeight }: { code: string; language?: string; maxHeight?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      const pre = ref.current.querySelector('pre');
+      if (pre) {
+        const hljs = (window as any).hljs;
+        if (hljs && language && language !== 'text') {
+          const codeEl = pre.querySelector('code');
+          if (codeEl) {
+            codeEl.className = `hljs ${language}`;
+            hljs.highlightElement(codeEl);
+          }
+        }
+      }
+    }
+  }, [code, language]);
+
+  return (
+    <div
+      ref={ref}
+      className="rounded-lg overflow-hidden border border-border/50"
+      style={{ maxHeight: maxHeight || '24rem' }}
+    >
+      <pre className="overflow-auto p-3 text-xs font-mono leading-relaxed bg-muted/30 text-foreground">
+        <code>{code}</code>
+      </pre>
     </div>
   );
 }

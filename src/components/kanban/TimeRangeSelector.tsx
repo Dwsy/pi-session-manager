@@ -104,7 +104,7 @@ export default function TimeRangeSelector({ value, onChange, compact }: TimeRang
       <button
         ref={triggerRef}
         onClick={() => { calcPosition(); setOpen(o => !o) }}
-        className={`flex items-center gap-1 rounded-md border cursor-pointer motion-color motion-press focus-ring ${
+        className={`flex items-center gap-1 rounded-md border motion-color motion-press focus-ring ${
           compact ? 'h-7 px-2 text-[11px]' : 'h-8 px-2.5 text-[12px]'
         } ${
           open

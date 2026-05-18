@@ -6,6 +6,8 @@ mod favorites;
 mod model_config;
 mod models;
 #[cfg(feature = "gui")]
+mod notification;
+#[cfg(feature = "gui")]
 mod pi_live;
 pub mod search;
 mod session;
@@ -33,6 +35,8 @@ pub use favorites::*;
 pub use model_config::*;
 pub use models::*;
 #[cfg(feature = "gui")]
+pub use notification::*;
+#[cfg(feature = "gui")]
 pub use pi_live::*;
 pub use search::*;
 pub use session::*;
@@ -51,16 +55,12 @@ pub use workspaces::*;
 #[cfg(feature = "gui")]
 #[tauri::command]
 pub async fn toggle_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
-    #[cfg(debug_assertions)]
-    {
-        let _ = window;
-        Ok(())
-    }
-    #[cfg(not(debug_assertions))]
-    {
+    if window.is_devtools_open() {
         window.close_devtools();
-        Ok(())
+    } else {
+        window.open_devtools();
     }
+    Ok(())
 }
 
 #[cfg(feature = "gui")]

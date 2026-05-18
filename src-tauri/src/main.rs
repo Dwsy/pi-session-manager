@@ -116,6 +116,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
             let app_handle = app.handle().clone();
 
@@ -151,9 +152,10 @@ fn main() {
                 let http_state = app_state.clone();
                 let http_port = server_cfg.http_port;
                 let http_bind = server_cfg.bind_addr.clone();
-                let is_cli = cli_mode;
+                // serve_frontend: explicit config > auto (CLI: true, GUI: false)
+                let serve_frontend = server_cfg.serve_frontend.unwrap_or(cli_mode);
                 tauri::async_runtime::spawn(async move {
-                    if let Err(e) = pi_session_manager::server::http::init_http_adapter_with_options(http_state, &http_bind, http_port, is_cli).await {
+                    if let Err(e) = pi_session_manager::server::http::init_http_adapter_with_options(http_state, &http_bind, http_port, serve_frontend).await {
                         eprintln!("Failed to init HTTP adapter: {e}");
                     }
                 });
@@ -302,7 +304,31 @@ fn main() {
                 #[cfg(not(target_os = "macos"))]
                 let builder = builder.decorations(true);
 
-                let window = builder.build()?;
+                let window = builder.visible(false).build()?;
+
+                // ── Apply native window vibrancy ──
+                // Note: We apply vibrancy ONLY to sidebar area via CSS, not to the whole window
+                // to avoid popup/dialog transparency issues
+                #[cfg(target_os = "macos")]
+                {
+                    // Skip applying vibrancy to the whole window
+                    // The sidebar vibrancy is handled via CSS data-sidebar-vibrancy attribute
+                    log::info!("Skipping window-wide vibrancy to prevent popup transparency issues");
+                }
+
+                #[cfg(target_os = "windows")]
+                {
+                    use window_vibrancy::apply_mica;
+                    let _ = apply_mica(&window, None);
+                    log::debug!("Applied Windows Mica effect");
+                }
+
+                // Show window when frontend signals ready
+                let window_clone = window.clone();
+                app.listen("frontend://ready", move |_event| {
+                    let _ = window_clone.show();
+                    let _ = window_clone.set_focus();
+                });
 
                 // ── Lightweight mode: intercept window close → destroy to free memory ──
                 let window_handle = window.clone();
@@ -366,6 +392,7 @@ fn main() {
             pi_session_manager::get_session_stats,
             pi_session_manager::get_session_stats_light,
             pi_session_manager::get_session_trace_analytics,
+            pi_session_manager::get_session_inspect_data,
             pi_session_manager::get_day_stats,
             pi_session_manager::open_session_in_browser,
             pi_session_manager::open_path_in_system,
@@ -391,6 +418,7 @@ fn main() {
             pi_session_manager::is_favorite,
             pi_session_manager::toggle_favorite,
             pi_session_manager::toggle_devtools,
+            pi_session_manager::check_version_downgrade,
             pi_session_manager::load_app_settings,
             pi_session_manager::save_app_settings,
             pi_session_manager::reset_app_settings,
@@ -458,7 +486,20 @@ fn main() {
             pi_session_manager::restore_config_version,
             pi_session_manager::get_workspaces,
             pi_session_manager::save_workspace,
-            pi_session_manager::delete_workspace
+            pi_session_manager::delete_workspace,
+            pi_session_manager::send_notification,
+            pi_session_manager::backup_database,
+            pi_session_manager::reset_database,
+            pi_session_manager::check_version_downgrade,
+            pi_session_manager::clear_cache,
+            pi_session_manager::export_config_bundle,
+            pi_session_manager::import_config_bundle,
+            pi_session_manager::preview_config_bundle,
+            pi_session_manager::restore_import_backup,
+            pi_session_manager::fork_session,
+            pi_session_manager::get_session_trace_analytics,
+            pi_session_manager::get_session_inspect_data,
+            pi_session_manager::get_pi_agent_entries
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

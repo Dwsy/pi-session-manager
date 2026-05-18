@@ -128,3 +128,60 @@ pub struct BashCommandStat {
     pub command_prefix: String,
     pub count: usize,
 }
+
+/// Inspect data extracted from JSONL for detailed session analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InspectData {
+    // === Session Header ===
+    pub version: u32,
+    pub parent_session: Option<String>,
+
+    // === Session naming history ===
+    pub name_history: Vec<NameHistoryEntry>,
+
+    // === Compaction details ===
+    pub compaction_entries: Vec<CompactionEntry>,
+
+    // === Custom extension entries ===
+    pub custom_entries: Vec<CustomEntry>,
+
+    // === Full tool results (keyed by tool_call_id) ===
+    pub tool_results: HashMap<String, ToolResultDetail>,
+
+    // === Raw entry count ===
+    pub total_raw_entries: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NameHistoryEntry {
+    pub id: String,
+    pub timestamp: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompactionEntry {
+    pub id: String,
+    pub timestamp: String,
+    pub summary: Option<String>,
+    pub first_kept_entry_id: Option<String>,
+    pub tokens_before: Option<u64>,
+    pub details: Option<serde_json::Value>,
+    pub from_hook: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomEntry {
+    pub id: String,
+    pub timestamp: String,
+    pub custom_type: String,
+    pub data: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolResultDetail {
+    pub tool_name: String,
+    pub is_error: bool,
+    pub content: serde_json::Value,
+    pub timestamp: String,
+}

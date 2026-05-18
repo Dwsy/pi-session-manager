@@ -89,6 +89,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             scan_sessions,
@@ -115,6 +116,7 @@ pub fn run() {
             fork_session,
             get_session_stats,
             get_session_stats_light,
+            get_session_trace_analytics,
             get_day_stats,
             open_session_in_browser,
             open_path_in_system,
@@ -217,7 +219,10 @@ pub fn run() {
             delete_workspace,
             check_version_downgrade,
             backup_database,
-            reset_database
+            reset_database,
+            send_notification,
+            set_window_zoom_level,
+            get_pi_agent_entries
         ])
         .setup(|app| {
             let app_state = app_state::create_app_state(app.handle().clone());

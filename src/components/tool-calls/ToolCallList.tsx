@@ -1,6 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, Clock } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 
 import type { Content, SessionEntry } from '@/types'
 import { toolRenderRegistry } from '@/plugins/tools-render/registry'
@@ -17,7 +17,6 @@ import { ansiToMarkdown } from '@/utils/assistantContent'
 import {
   captureViewportAnchor,
   flattenProcessToolCalls,
-  formatToolCallDuration,
   restoreViewportAnchor,
   summarizeToolCalls,
   type ViewportAnchorSnapshot,
@@ -130,12 +129,7 @@ function ToolCallList({
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
         <span className="assistant-fold-stats">{summary.statsText || 'agent process'}</span>
-        {summary.totalDuration > 0 && (
-          <span className="assistant-fold-duration">
-            <Clock size={11} />
-            {formatToolCallDuration(summary.totalDuration)}
-          </span>
-        )}
+
       </button>
 
       {expanded && (

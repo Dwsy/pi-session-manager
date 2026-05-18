@@ -23,7 +23,7 @@ export default function Toggle({
 
   return (
     <label
-      className={`inline-flex items-center gap-3 cursor-pointer select-none ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      className={`inline-flex items-center gap-3 select-none ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
     >
       {label && (
         <span className="text-sm font-medium text-foreground">{label}</span>

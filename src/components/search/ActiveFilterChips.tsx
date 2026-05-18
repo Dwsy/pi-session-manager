@@ -116,7 +116,7 @@ export default function ActiveFilterChips({
     (selectedModel ? 1 : 0) +
     (dateRange ? 1 : 0);
 
-  if (chipCount === 0 && !totalCount) return null;
+  if (chipCount === 0) return null;
 
   return (
     <div className="flex items-center gap-1.5 px-3 py-1 min-h-0">

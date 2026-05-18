@@ -105,7 +105,7 @@ export default function RecentSessions({ sessions, title, limit = 5, onSessionSe
               <div
                 key={session.id}
                 onClick={() => onSessionSelect?.(session)}
-                className="group/item flex items-center gap-2 p-2 bg-background/60 rounded-lg border border-foreground/5 hover:bg-background/90 hover:border-info/20 motion-surface motion-color cursor-pointer relative overflow-hidden"
+                className="group/item flex items-center gap-2 p-2 bg-background/60 rounded-lg border border-foreground/5 hover:bg-background/90 hover:border-info/20 motion-surface motion-color relative overflow-hidden"
               >
                 {/* Hover glow effect */}
                 <div

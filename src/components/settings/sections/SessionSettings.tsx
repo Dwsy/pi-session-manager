@@ -904,7 +904,7 @@ export default function SessionSettings({
                         parseInt(e.target.value),
                       )
                     }
-                    className="flex-1 h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-info"
+                    className="flex-1 h-2 bg-secondary rounded-lg appearance-none accent-info"
                   />
                   <span className="w-16 text-right text-sm text-muted-foreground">
                     {settings.session.refreshInterval}s
@@ -966,7 +966,7 @@ export default function SessionSettings({
                         parseInt(e.target.value),
                       )
                     }
-                    className="flex-1 h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-info"
+                    className="flex-1 h-2 bg-secondary rounded-lg appearance-none accent-info"
                   />
                   <span className="w-8 text-right text-sm text-muted-foreground">
                     {settings.session.previewLines}

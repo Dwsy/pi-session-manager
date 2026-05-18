@@ -67,7 +67,7 @@ export default function FavoritesPanel({
               <div
                 key={favorite.id}
                 onClick={() => onSelectProject?.(favorite.path)}
-                className="group px-3 py-2 hover:bg-secondary cursor-pointer border-b border-border/50"
+                className="group px-3 py-2 hover:bg-secondary border-b border-border/50"
               >
                 <div className="flex items-center gap-2">
                   <FolderOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />
@@ -111,7 +111,7 @@ export default function FavoritesPanel({
               <div
                 key={favorite.id}
                 onClick={() => onSelectSession(session)}
-                className={`group px-3 py-2 cursor-pointer border-b border-border/50 ${
+                className={`group px-3 py-2 border-b border-border/50 ${
                   isSelected ? 'bg-info/10' : 'hover:bg-secondary'
                 }`}
               >

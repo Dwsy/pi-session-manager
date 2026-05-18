@@ -89,11 +89,14 @@ pub struct ServerConfig {
     pub auth_enabled: bool,
     #[serde(default)]
     pub embedding_enabled: bool,
+    /// Whether to serve frontend assets via HTTP. None = auto (CLI: true, GUI: false).
+    #[serde(default)]
+    pub serve_frontend: Option<bool>,
 }
 
 impl Default for ServerConfig {
     fn default() -> Self {
-        Self { ws_enabled: true, http_enabled: true, ws_port: 52131, http_port: 52131, bind_addr: "127.0.0.1".to_string(), auth_enabled: true, embedding_enabled: false }
+        Self { ws_enabled: true, http_enabled: true, ws_port: 52131, http_port: 52131, bind_addr: "127.0.0.1".to_string(), auth_enabled: true, embedding_enabled: false, serve_frontend: None }
     }
 }
 
@@ -119,6 +122,7 @@ pub fn load_server_config() -> ServerConfig {
         bind_addr: value["bind_addr"].as_str().unwrap_or("127.0.0.1").to_string(),
         auth_enabled: value["auth_enabled"].as_bool().unwrap_or(true),
         embedding_enabled: value["embedding_enabled"].as_bool().unwrap_or(false),
+        serve_frontend: value["serve_frontend"].as_bool(),
     }
 }
 

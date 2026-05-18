@@ -25,7 +25,7 @@ export const common = {
   unknown: '不明',
   deleteSession: 'セッションを削除',
   deleteSessions: 'セッションを削除',
-  confirmDelete: 'セッション「{name}」を削除しますか？',
+  confirmDelete: 'セッション「{{name}}」を削除しますか？',
   moreItems: 'ほか {{count}} 件',
   enabled: '有効',
   disabled: '無効',

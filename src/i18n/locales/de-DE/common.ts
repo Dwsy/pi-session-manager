@@ -25,7 +25,7 @@ export const common = {
   unknown: 'Unbekannt',
   deleteSession: 'Sitzung löschen',
   deleteSessions: 'Sitzungen löschen',
-  confirmDelete: 'Möchten Sie die Sitzung „{name}" wirklich löschen?',
+  confirmDelete: 'Möchten Sie die Sitzung „{{name}}" wirklich löschen?',
   moreItems: '+{{count}} weitere',
   enabled: 'Aktiviert',
   disabled: 'Deaktiviert',

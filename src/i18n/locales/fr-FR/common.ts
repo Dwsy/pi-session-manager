@@ -25,7 +25,7 @@ export const common = {
   unknown: 'Inconnu',
   deleteSession: 'Supprimer la session',
   deleteSessions: 'Supprimer les sessions',
-  confirmDelete: 'Êtes-vous sûr de vouloir supprimer la session « {name} » ?',
+  confirmDelete: 'Êtes-vous sûr de vouloir supprimer la session « {{name}} » ?',
   moreItems: '+{{count}} de plus',
   enabled: 'Activé',
   disabled: 'Désactivé',

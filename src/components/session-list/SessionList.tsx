@@ -31,6 +31,7 @@ import TagPicker from "@/components/tags/TagPicker";
 import SessionContextMenu from "@/components/session-viewer/SessionContextMenu";
 import SessionPreviewModal from "@/components/kanban/SessionPreviewModal";
 import type { DeleteSessionRequestOptions } from "@/components/dialogs/deleteSessionTypes";
+import DeleteConfirmButton from "@/components/ui/DeleteConfirmButton";
 import {
   formatShortSessionId,
   MIN_SESSION_ID_PREFIX_LENGTH,
@@ -816,7 +817,7 @@ export default function SessionList({
                             sessionId: session.id,
                           });
                         }}
-                        className={`relative px-3 py-2.5 cursor-pointer motion-surface motion-color group rounded-lg border ${
+                        className={`relative px-3 py-2.5 motion-surface motion-color group rounded-lg overflow-clip border ${
                           isSelected
                             ? isSelectionMode
                               ? "border-primary/60 bg-primary/10 shadow-[0_0_0_1px_rgba(59,130,246,0.22)] ring-1 ring-primary/30"
@@ -841,7 +842,7 @@ export default function SessionList({
                                 }}
                                 className={`mt-0.5 rounded-md p-1 motion-color motion-press focus-ring ${
                                   isSelected
-                                    ? "bg-primary/15 text-primary"
+                                    ? "bg-destructive/15 text-destructive"
                                     : "text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground"
                                 }`}
                                 aria-label={t("session.list.toggleSelection", {
@@ -869,7 +870,7 @@ export default function SessionList({
                                     </div>
                                   )}
                                   <h3
-                                    className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0 cursor-pointer"
+                                    className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0"
                                     onMouseEnter={(e) => {
                                       const rect = e.currentTarget.getBoundingClientRect();
                                       hoverTimerRef.current = setTimeout(() => {
@@ -964,7 +965,7 @@ export default function SessionList({
                             )}
 
                             {showDirectory && (
-                              <span className="text-[10px] text-muted-foreground/70 font-mono truncate min-w-0 ml-0.5">
+                              <span className="text-[10px] text-muted-foreground/70 font-mono truncate min-w-0 ml-0.5 group-hover:hidden">
                                 {formatDirectory(session.cwd) ||
                                   t("session.list.unknownDirectory")}
                               </span>
@@ -972,7 +973,7 @@ export default function SessionList({
                           </div>
 
                           <div
-                            className={`flex items-center gap-1 flex-shrink-0 ${isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"} motion-opacity`}
+                            className={`flex items-center gap-1 transition-all duration-200 ease-out ${isMobile ? "flex-shrink-0" : "w-0 opacity-0 group-hover:w-auto group-hover:opacity-100"}`}
                           >
                             {!isSelectionMode && onToggleFavorite && (
                               <button
@@ -1066,16 +1067,12 @@ export default function SessionList({
                               </button>
                             )}
                             {!isSelectionMode && onDeleteSession && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onDeleteSession(session, getDeleteRequestOptions(e));
+                              <DeleteConfirmButton
+                                onDelete={() => {
+                                  onDeleteSession(session, undefined);
                                 }}
-                                className="p-1 text-muted-foreground/60 hover:text-red-500 rounded motion-color motion-press focus-ring"
-                                title={t("common.deleteSession")}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
+                                size="sm"
+                              />
                             )}
                           </div>
                         </div>
@@ -1183,12 +1180,12 @@ export default function SessionList({
               : undefined
           }
           isFavorite={favoriteSessionIds.has(contextMenuSession.id)}
-          onDelete={
+          onDeleteDirect={
             onDeleteSession
-              ? (anchorPoint) => {
+              ? () => {
                   onDeleteSession(
                     contextMenuSession,
-                    getDeleteRequestOptions(anchorPoint),
+                    undefined,
                   );
                 }
               : undefined

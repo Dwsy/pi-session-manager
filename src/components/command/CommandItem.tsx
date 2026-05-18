@@ -16,7 +16,7 @@ export default function CommandItem({ result, plugin, onSelect }: CommandItemPro
       <Command.Item
         value={itemValue}
         onSelect={onSelect}
-        className="group px-3 py-2.5 rounded-lg cursor-pointer border border-transparent hover:bg-surface/70 hover:border-border/70 data-[selected=true]:bg-surface data-[selected=true]:border-border motion-surface motion-color"
+        className="group px-3 py-2.5 rounded-lg border border-transparent hover:bg-surface/70 hover:border-border/70 data-[selected=true]:bg-surface data-[selected=true]:border-border motion-surface motion-color"
       >
         {plugin.renderItem(result)}
       </Command.Item>
@@ -28,7 +28,7 @@ export default function CommandItem({ result, plugin, onSelect }: CommandItemPro
     <Command.Item
       value={itemValue}
       onSelect={onSelect}
-      className="group px-3 py-2.5 rounded-lg cursor-pointer border border-transparent hover:bg-surface/70 hover:border-border/70 data-[selected=true]:bg-surface data-[selected=true]:border-border motion-surface motion-color"
+      className="group px-3 py-2.5 rounded-lg border border-transparent hover:bg-surface/70 hover:border-border/70 data-[selected=true]:bg-surface data-[selected=true]:border-border motion-surface motion-color"
     >
       <div className="flex items-start gap-3">
         {/* Icon */}

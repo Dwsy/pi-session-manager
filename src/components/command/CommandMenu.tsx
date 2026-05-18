@@ -229,7 +229,7 @@ export default memo(function CommandMenu({
         </div>
 
         <div
-          className={`flex-1 h-full min-h-0 overflow-hidden bg-background transition-[width] duration-200 ease-in-out ${previewCollapsed ? "w-0" : "w-auto"}`}
+          className={`${previewCollapsed ? "flex-none w-0" : "flex-1 w-auto"} h-full min-h-0 overflow-hidden bg-background transition-[width] duration-200 ease-in-out`}
         >
           <SessionPreviewPanel
             result={selectedResult}
@@ -274,7 +274,7 @@ export default memo(function CommandMenu({
           disabled={!selectedResult}
           className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[12px] font-medium transition-all ${
             selectedResult
-              ? "border-foreground/10 bg-foreground text-background hover:opacity-90 cursor-pointer"
+              ? "border-foreground/10 bg-foreground text-background hover:opacity-90"
               : "border-border/60 text-muted-foreground/45 cursor-not-allowed bg-surface/30"
           }`}
         >

@@ -140,7 +140,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         )}
         searchKey="appearance-disableToolSuccessStyle"
       >
-        <label className="flex items-center gap-3 cursor-pointer">
+        <label className="flex items-center gap-3">
           <input
             type="checkbox"
             checked={settings.appearance.disableToolSuccessStyle}
@@ -163,7 +163,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
           )}
           searchKey="appearance-sidebarVibrancy"
         >
-          <label className="relative inline-flex items-center cursor-pointer">
+          <label className="relative inline-flex items-center">
             <input
               type="checkbox"
               checked={settings.appearance.sidebarVibrancy === 'on'}

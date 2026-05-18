@@ -677,7 +677,7 @@ export default function DashboardInsightModal({
                     <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/20">
                       <tr className="text-muted-foreground">
                         <th
-                          className="px-3 py-2 text-left font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          className="px-3 py-2 text-left font-medium hover:bg-muted/30 select-none"
                           onClick={() => handleSort("provider")}
                         >
                           <span className="inline-flex items-center gap-1">
@@ -686,7 +686,7 @@ export default function DashboardInsightModal({
                           </span>
                         </th>
                         <th
-                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          className="px-2 py-2 text-right font-medium hover:bg-muted/30 select-none"
                           onClick={() => handleSort("sessions")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
@@ -695,7 +695,7 @@ export default function DashboardInsightModal({
                           </span>
                         </th>
                         <th
-                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          className="px-2 py-2 text-right font-medium hover:bg-muted/30 select-none"
                           onClick={() => handleSort("messages")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
@@ -704,7 +704,7 @@ export default function DashboardInsightModal({
                           </span>
                         </th>
                         <th
-                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          className="px-2 py-2 text-right font-medium hover:bg-muted/30 select-none"
                           onClick={() => handleSort("cost")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
@@ -713,7 +713,7 @@ export default function DashboardInsightModal({
                           </span>
                         </th>
                         <th
-                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          className="px-2 py-2 text-right font-medium hover:bg-muted/30 select-none"
                           onClick={() => handleSort("tokens")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
@@ -722,7 +722,7 @@ export default function DashboardInsightModal({
                           </span>
                         </th>
                         <th
-                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          className="px-2 py-2 text-right font-medium hover:bg-muted/30 select-none"
                           onClick={() => handleSort("input")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
@@ -731,7 +731,7 @@ export default function DashboardInsightModal({
                           </span>
                         </th>
                         <th
-                          className="px-2 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          className="px-2 py-2 text-right font-medium hover:bg-muted/30 select-none"
                           onClick={() => handleSort("output")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
@@ -740,7 +740,7 @@ export default function DashboardInsightModal({
                           </span>
                         </th>
                         <th
-                          className="px-3 py-2 text-right font-medium cursor-pointer hover:bg-muted/30 select-none"
+                          className="px-3 py-2 text-right font-medium hover:bg-muted/30 select-none"
                           onClick={() => handleSort("cache")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
@@ -869,7 +869,7 @@ function FragmentGroup({
   return (
     <>
       <tr
-        className="bg-muted/20 text-foreground border-b border-border/10 cursor-pointer hover:bg-muted/30"
+        className="bg-muted/20 text-foreground border-b border-border/10 hover:bg-muted/30"
         onClick={onToggleCollapse}
       >
         <td className="px-3 py-2 font-medium">

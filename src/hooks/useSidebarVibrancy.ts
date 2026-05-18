@@ -1,7 +1,21 @@
-// Sidebar vibrancy — temporarily disabled, effect quality not satisfactory.
-// To re-enable: restore the settings UI in AppearanceSettings.tsx and
-// uncomment the implementation below.
+import { useState, useEffect, useCallback } from 'react';
+
+const VIBRANCY_STORAGE_KEY = 'sidebar_vibrancy_enabled';
 
 export function useSidebarVibrancy() {
-  return { isVibrancyEnabled: false, toggleVibrancy: () => {} };
+  const [isVibrancyEnabled, setIsVibrancyEnabled] = useState<boolean>(true); // Always default to true
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIBRANCY_STORAGE_KEY, JSON.stringify(isVibrancyEnabled));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [isVibrancyEnabled]);
+
+  const toggleVibrancy = useCallback(() => {
+    setIsVibrancyEnabled(prev => !prev);
+  }, []);
+
+  return { isVibrancyEnabled, toggleVibrancy };
 }

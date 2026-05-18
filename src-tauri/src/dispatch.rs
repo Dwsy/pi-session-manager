@@ -189,6 +189,11 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::domain::trace::extract_trace_analytics(&session_path)?;
             Ok(to_val(result, "serialize result")?)
         }
+        "get_session_inspect_data" => {
+            let session_path = extract(payload, "sessionPath").or_else(|_| extract(payload, "session_path"))?;
+            let result = crate::domain::trace::extract_inspect_data(&session_path)?;
+            Ok(to_val(result, "serialize result")?)
+        }
 
         // ═══════════════════════════════════════════════════════════════
         // Search

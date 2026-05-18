@@ -28,7 +28,7 @@ export const app = {
     exportSuccess: 'Export successful!',
   },
   confirm: {
-    deleteSession: 'Delete session "{name}"?',
+    deleteSession: 'Delete session "{{name}}"?',
     deleteSessions: 'Delete {{count}} selected sessions?',
     deleteIrreversible: 'This action cannot be undone.',
   },

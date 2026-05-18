@@ -1,9 +1,10 @@
-import { Brain, ChevronDown, ChevronRight, Code2, Terminal } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Brain, ChevronDown, ChevronRight, Code2, Eye, Terminal } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SessionEntry } from "@/types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
+import ToolCallReviewModal from "./ToolCallReviewModal";
 
 interface ConversationPreviewTurn {
   id: string;
@@ -175,43 +176,78 @@ function CollapsedProcessSummary({
   entries,
   expanded,
   onToggle,
+  toolResultByCallId,
 }: {
   entries: SessionEntry[];
   expanded: boolean;
   onToggle: () => void;
+  toolResultByCallId: Map<string, SessionEntry>;
 }) {
   const { t } = useTranslation();
+  const [showReviewModal, setShowReviewModal] = useState(false);
+
   if (entries.length === 0) return null;
 
   const summaryItems = getProcessSummaryItems(entries, t("session.preview.process", "process"));
 
+  const handleShowReview = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowReviewModal(true);
+  }, []);
+
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="w-full h-9 rounded-md border border-border/70 bg-secondary/35 hover:bg-secondary/55 px-3 text-left transition-colors overflow-hidden"
-      aria-expanded={expanded}
-    >
-      <div className="flex h-full items-center gap-2 text-xs text-muted-foreground">
-        <span className="inline-flex w-14 flex-shrink-0 items-center gap-1.5 font-medium text-foreground/80">
-          {expanded ? <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />}
-          <span className="inline-block w-9">
-            {expanded
-              ? t("session.preview.hide", "Hide")
-              : t("session.preview.show", "Show")}
-          </span>
-        </span>
-        <span className="flex min-w-0 flex-1 items-center gap-x-2 overflow-hidden whitespace-nowrap">
-          {summaryItems.map((item) => (
-            <span key={item.key} className="inline-flex flex-shrink-0 items-center gap-1 text-muted-foreground">
-              <InlineToolIcon kind={item.icon} />
-              <span>{item.label}</span>
-              {item.count > 1 && <span>×{item.count}</span>}
-            </span>
-          ))}
-        </span>
+    <>
+      <div className="relative w-full h-9 rounded-md border border-border/70 bg-secondary/35 hover:bg-secondary/55 transition-colors overflow-hidden">
+        <div className="flex h-full items-center">
+          {/* Main toggle button */}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="flex-1 h-full px-3 text-left"
+            aria-expanded={expanded}
+          >
+            <div className="flex h-full items-center gap-2 text-xs text-muted-foreground">
+              <span className="inline-flex w-14 flex-shrink-0 items-center gap-1.5 font-medium text-foreground/80">
+                {expanded ? <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />}
+                <span className="inline-block w-9">
+                  {expanded
+                    ? t("session.preview.hide", "Hide")
+                    : t("session.preview.show", "Show")}
+                </span>
+              </span>
+              <span className="flex min-w-0 flex-1 items-center gap-x-2 overflow-hidden whitespace-nowrap">
+                {summaryItems.map((item) => (
+                  <span key={item.key} className="inline-flex flex-shrink-0 items-center gap-1 text-muted-foreground">
+                    <InlineToolIcon kind={item.icon} />
+                    <span>{item.label}</span>
+                    {item.count > 1 && <span>×{item.count}</span>}
+                  </span>
+                ))}
+              </span>
+            </div>
+          </button>
+
+          {/* Review button */}
+          <button
+            type="button"
+            onClick={handleShowReview}
+            className="flex-shrink-0 h-full px-2.5 border-l border-border/50 hover:bg-accent/10 transition-colors group"
+            aria-label={t("session.preview.review", "Review tool calls")}
+            title={t("session.preview.review", "Review tool calls")}
+          >
+            <Eye className="h-3.5 w-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+          </button>
+        </div>
       </div>
-    </button>
+
+      {/* Review Modal */}
+      <ToolCallReviewModal
+        entries={entries}
+        toolResultByCallId={toolResultByCallId}
+        isOpen={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+      />
+    </>
   );
 }
 
@@ -244,6 +280,7 @@ function ConversationPreviewTurnView({
           entries={turn.processEntries}
           expanded={expanded}
           onToggle={onToggle}
+          toolResultByCallId={toolResultByCallId}
         />
       )}
 
@@ -254,6 +291,7 @@ function ConversationPreviewTurnView({
               entries={turn.processEntries}
               expanded={expanded}
               onToggle={onToggle}
+              toolResultByCallId={toolResultByCallId}
             />
           </div>
           {turn.processEntries.map((entry) => (

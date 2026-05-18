@@ -85,7 +85,7 @@ export default function DeleteSessionConfirmDialog({
   return (
     <div
       data-delete-session-dialog="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={(event) => {
         if (event.target === event.currentTarget && !isDeleting) {
           onCancel()
@@ -93,7 +93,7 @@ export default function DeleteSessionConfirmDialog({
       }}
     >
       <div
-        className={`rounded-xl border border-border/70 bg-background p-6 shadow-2xl ${isMobile ? 'w-[95vw]' : 'w-[30rem]'}`}
+        className={`rounded-xl border border-border/70 bg-card p-6 shadow-2xl ${isMobile ? 'w-[95vw]' : 'w-[30rem]'}`}
       >
         <div className="mb-3 flex items-start gap-3">
           <div className="mt-0.5 rounded-full bg-red-500/12 p-1.5 text-red-500">

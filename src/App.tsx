@@ -27,6 +27,8 @@ import { useSidebarVibrancy } from "./hooks/useSidebarVibrancy";
 import { useToolStyles } from "./hooks/useToolStyles";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useClipboard } from "./hooks/useClipboard";
+import { useKeepWarm } from "./hooks/useKeepWarm";
+import { useContextMenuOverride } from "./hooks/useContextMenuOverride";
 import { useAppBootstrap } from "./hooks/app/useAppBootstrap";
 import { useAppUiEffects } from "./hooks/app/useAppUiEffects";
 import { useUpdateChecker } from "./hooks/app/useUpdateChecker";
@@ -102,6 +104,8 @@ const GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY = [
   "cmd+,",
   "cmd+`",
   "cmd+shift+f",
+  "cmd+shift+i",
+  "f12",
 ];
 
 // Lazy load heavy components
@@ -123,6 +127,12 @@ const LoadingSpinner = () => (
 function App() {
   const { t } = useTranslation();
   const standaloneDatasetRuntime = isStandaloneDatasetRuntime();
+
+  // Keep WebView warm when hidden to prevent WebKit throttling
+  useKeepWarm(isTauri());
+
+  // Override WebKit context menu for native feel
+  useContextMenuOverride();
 
   // Delayed scanning page: only show if loading takes >500ms (avoids flash on fast DB loads)
   const [showScanningPage, setShowScanningPage] = useState(false);
@@ -370,6 +380,15 @@ function App() {
       patchSessions,
       onBuiltinTerminalDisabled: handleBuiltinTerminalDisabled,
     });
+
+  // Signal frontend ready to native shell (prevents white flash)
+  useEffect(() => {
+    if (isInitialized && isTauri()) {
+      import('@tauri-apps/api/event').then(({ emit }) => {
+        emit('frontend://ready');
+      });
+    }
+  }, [isInitialized]);
   const {
     favorites,
     loadingFavorites,
@@ -638,6 +657,16 @@ function App() {
       "cmd+`": () => {
         if (!standaloneDatasetRuntime && terminalConfig.enabled) {
           setShowTerminal((v) => !v);
+        }
+      },
+      "cmd+shift+i": async () => {
+        if (isTauri()) {
+          await invoke("toggle_devtools");
+        }
+      },
+      "f12": async () => {
+        if (isTauri()) {
+          await invoke("toggle_devtools");
         }
       },
       escape: () => {

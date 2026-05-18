@@ -52,7 +52,7 @@ function BashExecution({
   return (
     <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
       <div
-        className="tool-header tool-header-bash cursor-pointer select-none"
+        className="tool-header tool-header-bash select-none"
         onClick={toggleExpanded}
       >
         <span className="tool-expand-indicator">

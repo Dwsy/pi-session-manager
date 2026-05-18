@@ -309,7 +309,7 @@ function ToggleRow({ label, hint, checked, onChange }: {
         <span className="text-sm text-foreground">{label}</span>
         <p className="text-xs text-muted-foreground">{hint}</p>
       </div>
-      <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-3">
+      <label className="relative inline-flex items-center flex-shrink-0 ml-3">
         <input
           type="checkbox"
           checked={checked}

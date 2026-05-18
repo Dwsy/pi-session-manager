@@ -157,6 +157,11 @@ body:has([data-sidebar-vibrancy]) {
   background: transparent !important;
 }
 
+// Main div with bg-background must also be transparent
+[data-sidebar-vibrancy].bg-background {
+  background: transparent !important;
+}
+
 // Sidebar: fully transparent for native blur
 [data-sidebar-vibrancy] .w-80 {
   background: transparent !important;
@@ -171,7 +176,7 @@ body:has([data-sidebar-vibrancy]) {
 
 // Sidebar internal surfaces: semi-transparent
 [data-sidebar-vibrancy] .w-80 .bg-surface {
-  background: rgba(var(--color-card), 0.35) !important;
+  background: rgba(var(--color-card), 0.85) !important;
 }
 
 // Soften borders in vibrancy mode

@@ -18,23 +18,25 @@ const CONTENT_PREVIEW_MAX: usize = 200;
 const ARGS_PREVIEW_MAX: usize = 200;
 const CMD_PREFIX_MAX: usize = 80;
 
-pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalytics, String> {
-    let start = std::time::Instant::now();
+/// Read and parse session JSONL file, returning (content, lines, header)
+fn read_session_file(session_path: &str) -> Result<(String, Vec<String>, Value), String> {
     let content = std::fs::read_to_string(session_path).map_err(|e| format!("Failed to read session file: {e}"))?;
-    let elapsed = start.elapsed();
-    tracing::info!("[IO] trace::extract_trace_analytics path={} bytes={} elapsed={:?}", session_path, content.len(), elapsed);
-
-    let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+    let lines: Vec<String> = content.lines().filter(|l| !l.trim().is_empty()).map(|s| s.to_string()).collect();
     if lines.is_empty() {
         return Err("Session file is empty".to_string());
     }
-
-    // Parse header
-    let header: Value = serde_json::from_str(lines[0]).map_err(|e| format!("Failed to parse session header: {e}"))?;
-
+    let header: Value = serde_json::from_str(&lines[0]).map_err(|e| format!("Failed to parse session header: {e}"))?;
     if header["type"].as_str() != Some("session") {
         return Err("Missing session header".to_string());
     }
+    Ok((content, lines, header))
+}
+
+pub fn extract_trace_analytics(session_path: &str) -> Result<SessionTraceAnalytics, String> {
+    let start = std::time::Instant::now();
+    let (content, lines, header) = read_session_file(session_path)?;
+    let elapsed = start.elapsed();
+    tracing::info!("[IO] trace::extract_trace_analytics path={} bytes={} elapsed={:?}", session_path, content.len(), elapsed);
 
     let session_id = header["id"].as_str().unwrap_or("").to_string();
     let cwd = header["cwd"].as_str().unwrap_or("").to_string();
@@ -589,7 +591,7 @@ fn parse_tool_args(msg: &Value, tool_call_id: &str) -> Option<Value> {
     None
 }
 
-fn extract_session_name(lines: &[&str]) -> Option<String> {
+fn extract_session_name(lines: &[String]) -> Option<String> {
     // Walk backwards to find the latest session_info entry with a name
     for line in lines.iter().rev() {
         if let Ok(value) = serde_json::from_str::<Value>(line) {
@@ -601,6 +603,88 @@ fn extract_session_name(lines: &[&str]) -> Option<String> {
         }
     }
     None
+}
+
+/// Extract detailed inspect data from JSONL for deep session analysis
+pub fn extract_inspect_data(session_path: &str) -> Result<InspectData, String> {
+    let (_content, lines, header) = read_session_file(session_path)?;
+
+    let version = header["version"].as_u64().unwrap_or(1) as u32;
+    let parent_session = header["parentSession"].as_str().map(|s| s.to_string());
+
+    let mut name_history = Vec::new();
+    let mut compaction_entries = Vec::new();
+    let mut custom_entries = Vec::new();
+    let mut tool_results = std::collections::HashMap::new();
+
+    for line in &lines[1..] {
+        let value: Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let entry_type = value["type"].as_str().unwrap_or("");
+        let id = value["id"].as_str().unwrap_or("").to_string();
+        let timestamp = value["timestamp"].as_str().unwrap_or("").to_string();
+
+        match entry_type {
+            "session_info" => {
+                if let Some(name) = value["name"].as_str() {
+                    name_history.push(NameHistoryEntry {
+                        id,
+                        timestamp,
+                        name: name.to_string(),
+                    });
+                }
+            }
+            "compaction" => {
+                compaction_entries.push(CompactionEntry {
+                    id,
+                    timestamp,
+                    summary: value["summary"].as_str().map(|s| s.to_string()),
+                    first_kept_entry_id: value["firstKeptEntryId"].as_str().map(|s| s.to_string()),
+                    tokens_before: value["tokensBefore"].as_u64(),
+                    details: value.get("details").cloned(),
+                    from_hook: value["fromHook"].as_bool(),
+                });
+            }
+            "custom" => {
+                custom_entries.push(CustomEntry {
+                    id,
+                    timestamp,
+                    custom_type: value["customType"].as_str().unwrap_or("").to_string(),
+                    data: value.get("data").cloned(),
+                });
+            }
+            "message" => {
+                if let Some(msg) = value.get("message") {
+                    if msg["role"].as_str() == Some("toolResult") {
+                        let tool_call_id = msg["toolCallId"].as_str().unwrap_or("").to_string();
+                        let tool_name = msg["toolName"].as_str().unwrap_or("result").to_string();
+                        let is_error = msg["isError"].as_bool().unwrap_or(false);
+                        let content = msg.get("content").cloned().unwrap_or(Value::Null);
+                        tool_results.insert(tool_call_id, ToolResultDetail {
+                            tool_name,
+                            is_error,
+                            content,
+                            timestamp,
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(InspectData {
+        version,
+        parent_session,
+        name_history,
+        compaction_entries,
+        custom_entries,
+        tool_results,
+        total_raw_entries: lines.len(),
+    })
 }
 
 #[cfg(test)]

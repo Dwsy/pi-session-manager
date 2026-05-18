@@ -94,3 +94,45 @@ export interface SessionTraceAnalytics {
   tokens_by_model: Record<string, TraceTokens>;
   cost_by_model: Record<string, TraceCost>;
 }
+
+// === Inspect Data Types ===
+
+export interface NameHistoryEntry {
+  id: string;
+  timestamp: string;
+  name: string;
+}
+
+export interface CompactionEntry {
+  id: string;
+  timestamp: string;
+  summary: string | null;
+  first_kept_entry_id: string | null;
+  tokens_before: number | null;
+  details: unknown;
+  from_hook: boolean | null;
+}
+
+export interface CustomEntry {
+  id: string;
+  timestamp: string;
+  custom_type: string;
+  data: unknown;
+}
+
+export interface ToolResultDetail {
+  tool_name: string;
+  is_error: boolean;
+  content: unknown;
+  timestamp: string;
+}
+
+export interface InspectData {
+  version: number;
+  parent_session: string | null;
+  name_history: NameHistoryEntry[];
+  compaction_entries: CompactionEntry[];
+  custom_entries: CustomEntry[];
+  tool_results: Record<string, ToolResultDetail>;
+  total_raw_entries: number;
+}

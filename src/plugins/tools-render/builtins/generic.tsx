@@ -160,7 +160,7 @@ function GenericToolCall({
       id={`entry-${entryId}`}
     >
       <div
-        className={`tool-header ${hasArgs || hasOutput ? "cursor-pointer select-none" : ""}`}
+        className={`tool-header ${hasArgs || hasOutput ? "select-none" : ""}`}
         onClick={hasArgs || hasOutput ? toggleExpanded : undefined}
       >
         {(hasArgs || hasOutput) && (

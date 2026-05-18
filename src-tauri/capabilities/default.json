@@ -18,6 +18,7 @@
     "dialog:default",
     "core:webview:allow-set-webview-zoom",
     "updater:default",
-    "deep-link:default"
+    "deep-link:default",
+    "notification:default"
   ]
 }

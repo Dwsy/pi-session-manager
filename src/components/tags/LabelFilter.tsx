@@ -354,7 +354,7 @@ export default function LabelFilter({
       <button
         key={tag.id}
         onClick={() => handleToggle(tag.id)}
-        className="flex w-full cursor-pointer select-none items-center gap-2.5 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+        className="flex w-full select-none items-center gap-2.5 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
         style={{
           paddingLeft: `${8 + depth * 14}px`,
           width: "calc(100% - 8px)",

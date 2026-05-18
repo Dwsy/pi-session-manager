@@ -422,7 +422,7 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
               onDragOver={(e) => handleTabDragOver(e, tab.id)}
               onDragEnd={() => { setDragTabId(null); setDragOverTabId(null) }}
               onDrop={(e) => handleTabDrop(e, tab.id)}
-              className={`group flex items-center gap-1 px-2 py-1 text-[11px] cursor-pointer shrink-0 motion-color ${
+              className={`group flex items-center gap-1 px-2 py-1 text-[11px] shrink-0 motion-color ${
                 tab.id === activeTabId ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'
               } ${dragTabId === tab.id ? 'opacity-40' : ''} ${dragOverTabId === tab.id && dragTabId !== tab.id ? 'border-l-2 border-blue-400' : ''}`}
               onClick={() => setActiveTabId(tab.id)}

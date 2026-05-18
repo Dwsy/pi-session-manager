@@ -42,7 +42,7 @@ function WriteExecution({
   return (
     <div className={`tool-execution ${disableSuccessStyle ? '' : 'success'}`.trim()} id={`entry-${entryId}`}>
       <div
-        className="tool-header cursor-pointer select-none"
+        className="tool-header select-none"
         onClick={toggleExpanded}
       >
         <span className="tool-expand-indicator">

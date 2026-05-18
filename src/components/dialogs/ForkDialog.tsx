@@ -21,8 +21,8 @@ export default function ForkDialog({ session, onFork, onClose }: ForkDialogProps
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className={`bg-background border border-border rounded-lg p-6 ${isMobile ? 'w-[95vw]' : 'w-96'}`}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className={`bg-card border border-border rounded-lg p-6 ${isMobile ? 'w-[95vw]' : 'w-96'}`}>
         <div className="flex items-center gap-2 mb-2">
           <Copy className="h-5 w-5 text-primary" />
           <h3 className="text-lg font-semibold">{t('session.fork.title')}</h3>

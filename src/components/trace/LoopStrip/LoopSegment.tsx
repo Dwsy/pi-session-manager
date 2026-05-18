@@ -32,7 +32,7 @@ export default function LoopSegment({
   return (
     <div
       ref={ref}
-      className="flex flex-col gap-1 cursor-pointer select-none group"
+      className="flex flex-col gap-1 select-none group"
       style={{ width: `${widthPct}%`, minWidth: 0 }}
       onClick={() => onSelect(loop)}
       onMouseEnter={() => {

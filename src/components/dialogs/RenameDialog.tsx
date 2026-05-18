@@ -23,8 +23,8 @@ export default function RenameDialog({ session, onRename, onClose }: RenameDialo
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className={`bg-background border border-border rounded-lg p-6 ${isMobile ? 'w-[95vw]' : 'w-96'}`}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className={`bg-card border border-border rounded-lg p-6 ${isMobile ? 'w-[95vw]' : 'w-96'}`}>
         <div className="flex items-center gap-2 mb-4">
           <Pencil className="h-5 w-5 text-primary" />
           <h3 className="text-lg font-semibold">{t('session.rename.title')}</h3>

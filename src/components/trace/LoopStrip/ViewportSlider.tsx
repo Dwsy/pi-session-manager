@@ -89,7 +89,7 @@ export default function ViewportSlider({
       {/* Track background */}
       <div
         ref={trackRef}
-        className="absolute inset-0 rounded-full bg-muted/40 overflow-hidden cursor-pointer"
+        className="absolute inset-0 rounded-full bg-muted/40 overflow-hidden"
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}

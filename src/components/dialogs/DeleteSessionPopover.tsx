@@ -180,7 +180,7 @@ export default function DeleteSessionPopover({
       ref={popoverRef}
       data-delete-session-dialog="true"
       className={[
-        'fixed z-[10000] rounded-lg border border-border/70 bg-background shadow-2xl',
+        'fixed z-[10000] rounded-lg border border-border/70 bg-card shadow-2xl',
         isMobile ? 'inset-x-4 top-1/2 w-auto -translate-y-1/2' : 'w-[280px]',
       ].join(' ')}
       style={isMobile ? undefined : {

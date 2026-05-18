@@ -15,6 +15,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import * as os from 'os'; // Node.js built-in module
 
 // ── Helpers ──────────────────────────────────────────
 
@@ -37,6 +38,35 @@ function countToolCalls(ctx: ExtensionContext): number {
     }
   }
   return count;
+}
+
+/** Get system language code (e.g., 'zh', 'en', 'ja', 'ko') */
+function getSystemLanguage(): string {
+  try {
+    // Try LANG environment variable first (e.g., 'zh_CN.UTF-8')
+    const langEnv = process.env.LANG || process.env.LANGUAGE || process.env.LC_ALL;
+    if (langEnv) {
+      const lang = langEnv.split(/[-_.]/)[0]; // Extract first part before '-', '_', or '.'
+      return lang.toLowerCase();
+    }
+    // Fallback to 'en'
+    return 'en';
+  } catch {
+    return 'en'; // Fallback to English
+  }
+}
+
+/** Generate language instruction based on system language */
+function getLanguageInstruction(): string {
+  const lang = getSystemLanguage();
+  const supported: Record<string, string> = {
+    zh: 'Chinese',
+    ja: 'Japanese',
+    ko: 'Korean',
+    en: 'English',
+  };
+  const languageName = supported[lang] || 'English';
+  return `Please use ${languageName} to generate a concise, descriptive name that summarizes the main task or topic of this session.`;
 }
 
 // ── Extension ────────────────────────────────────────
@@ -100,8 +130,9 @@ export default function (pi: ExtensionAPI) {
           customType: "name-session",
           content:
             "[Reminder] This session has been going on for a while without a name. You have a session_rename tool available. " +
-            "Please call session_rename with a concise, descriptive name that summarizes the main task or topic of this session " +
-            '(e.g., "Fix auth bug", "Refactor DB layer", "Add search feature"). This helps with session organization and recall.',
+            "Please call session_rename with a concise, descriptive name that summarizes the main task or topic of this session. " +
+            getLanguageInstruction() +
+            ' This helps with session organization and recall. (e.g., "Fix auth bug", "Refactor DB layer", "Add search feature")',
           display: false,
         },
       };
@@ -113,7 +144,8 @@ export default function (pi: ExtensionAPI) {
         message: {
           customType: "name-session",
           content:
-            `[Reminder] This session is named "${sessionName}". If the conversation has shifted to a different topic, call session_rename to update it.`,
+            `[Reminder] This session is named "${sessionName}". If the conversation has shifted to a different topic, call session_rename to update it. ` +
+            getLanguageInstruction(),
           display: false,
         },
       };

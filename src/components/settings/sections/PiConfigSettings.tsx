@@ -936,7 +936,7 @@ function SettingRow({
             }
             onChange={(e) => onSave(def.key, e.target.value)}
             disabled={saving}
-            className="w-auto text-xs rounded-md px-2 py-1 focus:ring-1 focus:ring-info cursor-pointer"
+            className="w-auto text-xs rounded-md px-2 py-1 focus:ring-1 focus:ring-info"
           >
             {def.options.map((o) => (
               <option key={o} value={o}>
@@ -974,7 +974,7 @@ function SettingRow({
             value={current}
             onChange={(e) => onSave(def.key, e.target.value || null)}
             disabled={saving}
-            className="w-auto text-xs rounded-md px-2 py-1 focus:ring-1 focus:ring-info cursor-pointer max-w-[180px]"
+            className="w-auto text-xs rounded-md px-2 py-1 focus:ring-1 focus:ring-info max-w-[180px]"
           >
             <option value="">—</option>
             {allProviders.map((p) => (
@@ -1020,7 +1020,7 @@ function SettingRow({
             value={current}
             onChange={(e) => onSave(def.key, e.target.value || null)}
             disabled={saving}
-            className="w-auto text-xs rounded-md px-2 py-1 focus:ring-1 focus:ring-info cursor-pointer max-w-[220px]"
+            className="w-auto text-xs rounded-md px-2 py-1 focus:ring-1 focus:ring-info max-w-[220px]"
           >
             <option value="">—</option>
             {currentProvider && modelsByProvider.has(currentProvider)

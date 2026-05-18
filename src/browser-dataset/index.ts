@@ -22,6 +22,7 @@ export {
   readBrowserDatasetChunk,
 } from "./sessions";
 export { getBrowserDatasetTraceAnalytics } from "./trace";
+export { getBrowserDatasetInspectData } from "./inspect";
 export {
   fullTextSearchBrowserDataset,
   searchBrowserDatasetSessions,

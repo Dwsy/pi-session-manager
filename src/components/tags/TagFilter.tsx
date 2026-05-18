@@ -49,7 +49,7 @@ export default function TagFilter({ tags, sessionTags, filterTagIds, onFilterCha
         {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         {t('tags.filter.title')}
         {filterTagIds.length > 0 && (
-          <span className="ml-auto text-[9px] text-info cursor-pointer" onClick={(e) => { e.stopPropagation(); onFilterChange([]) }}>
+          <span className="ml-auto text-[9px] text-info" onClick={(e) => { e.stopPropagation(); onFilterChange([]) }}>
             {t('tags.filter.clearFilter')}
           </span>
         )}

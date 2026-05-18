@@ -48,7 +48,7 @@ export default function SettingsRadioCardGroup<T extends string>({
         return (
           <label
             key={option}
-            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer motion-surface motion-color focus-within:ring-1 focus-within:ring-info/30 ${
+            className={`flex items-center gap-3 p-3 rounded-lg border motion-surface motion-color focus-within:ring-1 focus-within:ring-info/30 ${
               active ? activeClassName : inactiveClassName
             } ${className}`}
           >

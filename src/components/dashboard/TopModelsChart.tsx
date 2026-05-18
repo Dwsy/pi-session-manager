@@ -88,7 +88,7 @@ export default function TopModelsChart({
               <button
                 type="button"
                 key={name}
-                className={`w-full flex items-center justify-between p-2 bg-background/60 rounded-lg border border-foreground/5 ${clickable ? 'hover:bg-background/90 hover:border-purple/25 motion-surface motion-color motion-press focus-ring cursor-pointer' : 'cursor-default'}`}
+                className={`w-full flex items-center justify-between p-2 bg-background/60 rounded-lg border border-foreground/5 ${clickable ? 'hover:bg-background/90 hover:border-purple/25 motion-surface motion-color motion-press focus-ring' : 'cursor-default'}`}
                 title={getFullModelName(name)}
                 onClick={() => onModelClick?.(name)}
                 disabled={!clickable}

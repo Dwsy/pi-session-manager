@@ -28,7 +28,7 @@ export const app = {
     exportSuccess: '导出成功！',
   },
   confirm: {
-    deleteSession: '确定要删除会话「{name}」吗？',
+    deleteSession: '确定要删除会话「{{name}}」吗？',
     deleteSessions: '确定要删除选中的 {{count}} 个会话吗？',
     deleteIrreversible: '此操作无法撤销。',
   },

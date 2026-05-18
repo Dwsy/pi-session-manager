@@ -41,7 +41,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
       onMouseLeave={() => setOpen(false)}
     >
       <span
-        className={`block h-4 w-4 rounded-full cursor-pointer ${value.startsWith('#') ? '' : getColorClass(value)}`}
+        className={`block h-4 w-4 rounded-full ${value.startsWith('#') ? '' : getColorClass(value)}`}
         style={getColorStyle(value)}
       />
       {open && (
@@ -142,7 +142,7 @@ function TagNodeContent({
         ) : (
           <>
             <ColorPicker value={tag.color} onChange={(c) => { onStartEdit(tag); onSetEditColor(c) }} />
-            <span className="flex-1 text-sm text-foreground cursor-pointer hover:text-info" onClick={() => onStartEdit(tag)}>{tag.name}</span>
+            <span className="flex-1 text-sm text-foreground hover:text-info" onClick={() => onStartEdit(tag)}>{tag.name}</span>
             <button onClick={() => onCreateChild(tag.id)} className="p-1 text-muted-foreground/40 hover:text-info opacity-0 group-hover:opacity-100 motion-color motion-opacity motion-press focus-ring" title={t('components.tagManager.addChild')}>
               <Plus className="h-3 w-3" />
             </button>

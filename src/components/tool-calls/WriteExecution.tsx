@@ -56,7 +56,7 @@ export default function WriteExecution({
   return (
     <div className="tool-execution success" id={`entry-${entryId}`}>
       <div
-        className="tool-header cursor-pointer select-none"
+        className="tool-header select-none"
         onClick={() => toggleToolExpanded(entryId)}
       >
         <span className="tool-expand-indicator">

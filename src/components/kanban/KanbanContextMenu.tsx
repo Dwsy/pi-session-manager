@@ -155,7 +155,7 @@ export default function KanbanContextMenu({
   if (showTagSubmenu) {
     return (
       <div
-        className="fixed z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] ui-enter-zoom"
+        className="fixed z-50 bg-card border border-border rounded-lg shadow-lg py-1 min-w-[180px] ui-enter-zoom"
         style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -206,7 +206,7 @@ export default function KanbanContextMenu({
 
   return (
     <div
-      className="fixed z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] ui-enter-zoom"
+      className="fixed z-50 bg-card border border-border rounded-lg shadow-lg py-1 min-w-[180px] ui-enter-zoom"
       style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
       onClick={(e) => e.stopPropagation()}
     >

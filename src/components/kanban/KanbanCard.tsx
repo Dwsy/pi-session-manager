@@ -65,7 +65,7 @@ function KanbanCardInner({
     getSessionSetting('showAgentIconInSessionBadge') !== false
 
   const cardClasses = [
-    'group relative rounded-md border p-2.5 cursor-pointer motion-surface motion-color',
+    'group relative rounded-md border p-2.5 motion-surface motion-color',
     'bg-card hover:border-border',
     isSelected ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20' : 'border-border/40',
     isDragging ? 'opacity-50 shadow-lg' : '',

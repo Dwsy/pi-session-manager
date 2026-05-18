@@ -78,7 +78,7 @@ export default function StatCard({ icon: Icon, label, value, color, change, tren
       <button
         type="button"
         onClick={onClick}
-        className={`glass-card glass-card-hover rounded-lg p-3 group cursor-pointer relative overflow-hidden w-full text-left motion-press focus-ring ${getGlowClass()}`}
+        className={`glass-card glass-card-hover rounded-lg p-3 group relative overflow-hidden w-full text-left motion-press focus-ring ${getGlowClass()}`}
       >
         {content}
       </button>

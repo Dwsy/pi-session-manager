@@ -8,5 +8,5 @@
 pub mod extractor;
 pub mod types;
 
-pub use extractor::extract_trace_analytics;
+pub use extractor::{extract_trace_analytics, extract_inspect_data};
 pub use types::*;

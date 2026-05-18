@@ -112,7 +112,7 @@ export default function ProductivityMetrics({ stats, title = 'Productivity Metri
           return (
             <div
               key={index}
-              className="bg-background rounded-lg p-3 hover:bg-surface motion-color group cursor-pointer"
+              className="bg-background rounded-lg p-3 hover:bg-surface motion-color group"
             >
               <div className="flex items-center justify-between mb-2">
                 <Icon className="h-4 w-4" style={{ color: metric.color }} />

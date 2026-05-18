@@ -52,7 +52,7 @@ function ReadExecution({
   return (
     <div className={`tool-execution ${disableSuccessStyle ? '' : 'success'}`.trim()} id={`entry-${entryId}`}>
       <div
-        className={`tool-header ${hasContent ? 'cursor-pointer select-none' : ''}`}
+        className={`tool-header ${hasContent ? 'select-none' : ''}`}
         onClick={hasContent ? toggleExpanded : undefined}
       >
         {hasContent && (

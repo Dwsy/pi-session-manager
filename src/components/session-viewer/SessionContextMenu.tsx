@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Terminal, Globe, Star, Trash2, Check, Copy, ArrowRightLeft } from 'lucide-react'
+import { Terminal, Globe, Star, Trash2, Check, Copy, ArrowRightLeft, X } from 'lucide-react'
 import type { Tag } from '@/types'
 import type { DeleteSessionAnchorPoint } from '@/components/dialogs/deleteSessionTypes'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
+
+const CONFIRM_TIMEOUT_MS = 3000
 
 interface SessionContextMenuProps {
   x: number
@@ -18,6 +20,7 @@ interface SessionContextMenuProps {
   onToggleFavorite?: () => void
   onCopyResume?: () => void
   onDelete?: (anchorPoint: DeleteSessionAnchorPoint) => void
+  onDeleteDirect?: () => void
   isFavorite?: boolean
   onClose: () => void
 }
@@ -25,10 +28,44 @@ interface SessionContextMenuProps {
 export default function SessionContextMenu({
   x, y, tags, sessionTagIds,
   onToggleTag, onOpenTerminal, onOpenBrowser,
-  onConvert, onToggleFavorite, onCopyResume, onDelete, isFavorite, onClose,
+  onConvert, onToggleFavorite, onCopyResume, onDelete, onDeleteDirect, isFavorite, onClose,
 }: SessionContextMenuProps) {
   const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
+  const [isDeleteConfirming, setIsDeleteConfirming] = useState(false)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const clearConfirmTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }, [])
+
+  const startConfirmTimeout = useCallback(() => {
+    clearConfirmTimeout()
+    timeoutRef.current = setTimeout(() => {
+      setIsDeleteConfirming(false)
+    }, CONFIRM_TIMEOUT_MS)
+  }, [clearConfirmTimeout])
+
+  useEffect(() => {
+    return () => clearConfirmTimeout()
+  }, [clearConfirmTimeout])
+
+  const handleDeleteClick = useCallback(() => {
+    if (isDeleteConfirming && onDeleteDirect) {
+      // Second click - execute delete
+      clearConfirmTimeout()
+      setIsDeleteConfirming(false)
+      onDeleteDirect()
+      onClose()
+    } else {
+      // First click - show confirm
+      setIsDeleteConfirming(true)
+      startConfirmTimeout()
+    }
+  }, [isDeleteConfirming, onDeleteDirect, clearConfirmTimeout, startConfirmTimeout, onClose])
 
   useEffect(() => {
     const handler = (e: MouseEvent | TouchEvent) => {
@@ -55,7 +92,7 @@ export default function SessionContextMenu({
   return (
     <div
       ref={ref}
-      className="fixed z-[9999] w-52 bg-surface border border-border rounded-lg shadow-xl overflow-hidden py-1"
+      className="fixed z-[9999] w-52 bg-card border border-border rounded-lg shadow-xl overflow-hidden py-1"
       style={{ left, top }}
     >
       {/* Tag submenu */}
@@ -116,23 +153,51 @@ export default function SessionContextMenu({
         </button>
       )}
 
-      {onDelete && (
+      {(onDelete || onDeleteDirect) && (
         <>
           <div className="border-t border-border/50 my-1" />
-          <button
-            onClick={(event) => {
-              const rect = event.currentTarget.getBoundingClientRect()
-              onDelete({
-                x: rect.left + rect.width / 2,
-                y: rect.bottom,
-              })
-              onClose()
-            }}
-            className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-red-500/10 motion-color motion-press focus-ring"
-          >
-            <Trash2 className="h-3.5 w-3.5 text-red-500" />
-            <span className="text-xs text-red-500">{t('tags.contextMenu.delete')}</span>
-          </button>
+          {isDeleteConfirming ? (
+            <div className="px-3 py-1.5">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDeleteClick}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded bg-red-600 px-2 py-1.5 text-[10px] text-white hover:bg-red-700 motion-color motion-press focus-ring"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  <span>{t('common.confirm', { defaultValue: 'Confirm?' })}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    clearConfirmTimeout()
+                    setIsDeleteConfirming(false)
+                  }}
+                  className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary motion-color motion-press focus-ring"
+                  title={t('common.cancel')}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={(event) => {
+                if (onDeleteDirect) {
+                  handleDeleteClick()
+                } else if (onDelete) {
+                  const rect = event.currentTarget.getBoundingClientRect()
+                  onDelete({
+                    x: rect.left + rect.width / 2,
+                    y: rect.bottom,
+                  })
+                  onClose()
+                }
+              }}
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-red-500/10 motion-color motion-press focus-ring"
+            >
+              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+              <span className="text-xs text-red-500">{t('tags.contextMenu.delete')}</span>
+            </button>
+          )}
         </>
       )}
     </div>
