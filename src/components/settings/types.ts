@@ -74,8 +74,6 @@ export interface AppSettings {
     codeBlockTheme: "github" | "monokai" | "dracula" | "one-dark";
     messageSpacing: "compact" | "comfortable" | "spacious";
     disableToolSuccessStyle: boolean;
-    /** macOS native translucent blur for sidebar */
-    sidebarVibrancy: "off" | "on";
   };
   language: {
     locale: string;
@@ -107,8 +105,6 @@ export interface AppSettings {
     scrollMarkersGuideSeen: boolean;
     /** Timeline navigation dots feature enabled */
     timelineNavEnabled: boolean;
-    /** Collapse tool calls into a single aggregated row */
-    collapseToolCalls: boolean;
   };
   search: {
     defaultSearchMode: "content" | "name";
@@ -165,7 +161,6 @@ export const defaultSettings: AppSettings = {
     codeBlockTheme: "github",
     messageSpacing: "comfortable",
     disableToolSuccessStyle: true,
-    sidebarVibrancy: "off",
   },
   language: {
     locale: getDefaultLocale(),
@@ -193,7 +188,6 @@ export const defaultSettings: AppSettings = {
     scrollMarkersEnabled: false,
     scrollMarkersGuideSeen: false,
     timelineNavEnabled: false,
-    collapseToolCalls: true,
   },
   search: {
     defaultSearchMode: "content",
@@ -220,23 +214,25 @@ export const defaultSettings: AppSettings = {
   },
 };
 
+export type SettingsArea = "preferences" | "config-center";
+
+export type SettingsSaveMode = "app-settings" | "inline" | "read-only";
+
 export type SettingsSection =
+  | "session-viewer"
+  | "search-export"
+  | "app-behavior"
+  | "data-sources"
+  | "pi-agent"
+  | "server-access"
+  | "backup-restore"
+  | "diagnostics-maintenance"
   | "terminal"
   | "appearance"
   | "language"
-  | "session"
-  | "external-sessions"
   | "tags"
-  | "search"
-  | "export"
-  | "updates"
-  | "pi-config"
-  | "pi-live"
   | "models"
-  | "shortcuts"
-  | "advanced"
-  | "api-test"
-  | "import-export";
+  | "shortcuts";
 
 export type SettingsProps<T extends keyof AppSettings> = {
   settings: AppSettings;

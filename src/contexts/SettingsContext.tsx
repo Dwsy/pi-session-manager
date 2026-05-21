@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useTranslation } from 'react-i18next'
 import type { AppSettings } from '@/components/settings/types'
 import { defaultSettings } from '@/components/settings/types'
-import { loadAppSettings, saveAppSettings } from '@/utils/settingsApi'
+import { getCachedSettings, loadAppSettings, saveAppSettings } from '@/utils/settingsApi'
 
 interface SettingsContextType {
   settings: AppSettings
@@ -27,7 +27,7 @@ interface SettingsProviderProps {
 
 export function SettingsProvider({ children }: SettingsProviderProps) {
   const { t } = useTranslation()
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings)
+  const [settings, setSettings] = useState<AppSettings>(() => getCachedSettings())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)

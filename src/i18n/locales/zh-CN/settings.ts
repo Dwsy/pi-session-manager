@@ -5,8 +5,18 @@ export const settings = {
   searchEmpty: "没有匹配的设置项",
   searchResults: "设置项",
   saved: "已保存",
+  inlineSaveHint: "此页面通过自身控件独立保存。",
+  readOnlyHint: "此页面仅供查看。",
   reset: "重置设置",
   confirmReset: "确定要重置所有设置吗？",
+  areas: {
+    preferences: "偏好设置",
+    configCenter: "配置中心",
+  },
+  areaDescriptions: {
+    preferences: "日常应用行为与浏览默认值",
+    configCenter: "Agent、服务、数据来源与维护工具",
+  },
   shortcuts: {
     title: "快捷键",
     description:
@@ -24,17 +34,73 @@ export const settings = {
     appearance: "外观",
     language: "语言",
     session: "会话",
+    sessionViewer: "会话浏览",
     externalSessions: "其他外部会话",
     tags: "标签",
     search: "搜索",
     export: "导出",
+    searchExport: "搜索与导出",
     updates: "更新",
+    appBehavior: "应用行为",
     piConfig: "Pi 配置",
+    piAgent: "Pi Agent",
     models: "模型",
     shortcuts: "快捷键",
     advanced: "高级",
+    dataSources: "数据来源",
+    serverAccess: "服务与访问",
+    backupRestore: "备份与恢复",
+    diagnosticsMaintenance: "诊断与维护",
     apiTest: "API 测试",
     importExport: "导入/导出",
+  },
+  groups: {
+    display: "显示",
+    viewing: "浏览",
+    productivity: "效率",
+    app: "应用",
+    sources: "来源",
+    agent: "Agent",
+    access: "访问",
+    maintenance: "维护",
+  },
+  sectionDescriptions: {
+    appearance: "主题、字体和消息密度",
+    language: "界面语言",
+    terminal: "内置终端和恢复命令行为",
+    sessionViewer: "会话列表、预览和导航默认值",
+    searchExport: "搜索匹配与导出默认值",
+    tags: "标签树与自动标签规则",
+    shortcuts: "键盘快捷键参考",
+    appBehavior: "窗口行为与更新频道",
+    dataSources: "本地路径、数据集和外部 Agent 会话",
+    piAgent: "Pi 资源、运行时设置和 Live 会话",
+    models: "Provider、模型和模型测试配置",
+    serverAccess: "HTTP、WebSocket 和 API Key 访问",
+    backupRestore: "配置导入、导出和恢复工具",
+    diagnosticsMaintenance: "缓存、调试与外部 API 诊断",
+  },
+  searchExport: {
+    searchTitle: "搜索默认值",
+    searchDescription: "控制会话搜索和高亮方式。",
+    exportTitle: "导出默认值",
+    exportDescription: "选择会话导出的默认格式与元数据。",
+  },
+  appBehavior: {
+    title: "应用行为",
+    description: "控制窗口行为和日常应用级默认值。",
+  },
+  dataSources: {
+    localTitle: "本地会话目录",
+  },
+  diagnostics: {
+    maintenanceTitle: "维护",
+    maintenanceDescription: "影响本地运行行为的缓存、调试和演示控制。",
+    actionsTitle: "维护操作",
+  },
+  piAgent: {
+    resourcesTitle: "Pi 资源与运行时设置",
+    resourcesDescription: "管理 Pi skills、prompts、extensions、themes 与 Pi settings.json。",
   },
   terminal: {
     // Resume Mode
@@ -132,9 +198,6 @@ export const settings = {
     disableToolSuccessStyleDesc:
       "禁用工具执行成功时的绿色背景和边框，使工具卡片更简洁",
     enabled: "已启用",
-    sidebarVibrancy: "侧边栏模糊",
-    sidebarVibrancyDesc:
-      "仅 macOS。为侧边栏应用原生半透明模糊效果。需要系统设置中开启「在窗口中允许使用壁纸色调」。",
   },
   language: {
     select: "选择语言",
@@ -277,8 +340,6 @@ export const settings = {
     scrollMarkersGuideSeenHelp: "首次打开会话时显示滚动标记的使用提示",
     timelineNavEnabled: "时间线导航",
     timelineNavEnabledHelp: "在右侧显示圆点时间线，hover 预览消息并快速跳转",
-    collapseToolCalls: "折叠工具调用",
-    collapseToolCallsHelp: "显示聚合的工具调用摘要，而非展开列表",
 
   },
   externalSessions: {

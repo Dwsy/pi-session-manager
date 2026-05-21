@@ -14,7 +14,12 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-import type { AppSettings, SettingsSection } from "./types";
+import type {
+  AppSettings,
+  SettingsArea,
+  SettingsSaveMode,
+  SettingsSection,
+} from "./types";
 import CompositionInput from "@/components/ui/CompositionInput";
 import { defaultSettings } from "./types";
 import { loadAppSettings, saveAppSettings } from "@/utils/settingsApi";
@@ -22,7 +27,10 @@ import { applyPiChatTheme, resolvePiThemeColorScheme } from "@/utils/piTheme";
 import { useSettings as useAppSettingsContext } from "@/hooks/useSettings";
 import {
   getAvailableSettingsGroups,
+  getAvailableSettingsAreas,
   getAvailableSettingsSections,
+  getSettingsAreaMeta,
+  getSettingsSectionMeta,
   renderSettingsSection,
 } from "./settingsRegistry";
 import { isStandaloneDatasetRuntime } from "@/browser-dataset";
@@ -37,10 +45,12 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const { t, i18n } = useTranslation();
   const { reloadSettings } = useAppSettingsContext();
   const standaloneDatasetRuntime = isStandaloneDatasetRuntime();
+  const settingsAreas = getAvailableSettingsAreas();
   const menuItems = getAvailableSettingsSections();
-  const menuGroups = getAvailableSettingsGroups();
+  const [activeArea, setActiveArea] = useState<SettingsArea>("preferences");
+  const menuGroups = getAvailableSettingsGroups(activeArea);
   const [activeSection, setActiveSection] =
-    useState<SettingsSection>("terminal");
+    useState<SettingsSection>("appearance");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SettingsSearchResult[]>([]);
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
@@ -50,15 +60,26 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [visible, setVisible] = useState(false);
   const isMobile = useIsMobile();
+  const activeSectionMeta = getSettingsSectionMeta(activeSection);
+  const activeSaveMode = activeSectionMeta?.saveMode ?? "app-settings";
+
+  const areaLabels = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const area of settingsAreas) {
+      map[area.id] = t(area.labelKey, area.fallbackLabel);
+    }
+    return map;
+  }, [settingsAreas, t]);
 
   // Build section labels map for search results
   const sectionLabels = useMemo(() => {
     const map: Record<string, string> = {};
     for (const item of menuItems) {
-      map[item.id] = t(item.labelKey, item.fallbackLabel);
+      const sectionLabel = t(item.labelKey, item.fallbackLabel);
+      map[item.id] = `${areaLabels[item.area] || item.area} / ${sectionLabel}`;
     }
     return map;
-  }, [menuItems, t]);
+  }, [areaLabels, menuItems, t]);
 
   // Run search when query changes
   useEffect(() => {
@@ -66,13 +87,20 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       setSearchResults([]);
       return;
     }
-    const results = searchSettings(searchQuery, t, sectionLabels);
+    const availableSections = new Set(menuItems.map((item) => item.id));
+    const results = searchSettings(searchQuery, t, sectionLabels).filter(
+      (result) => availableSections.has(result.item.section),
+    );
     setSearchResults(results);
-  }, [searchQuery, t, sectionLabels]);
+  }, [searchQuery, t, sectionLabels, menuItems]);
 
   // Navigate to a search result and scroll to the element
   const navigateToResult = useCallback(
     (result: SettingsSearchResult) => {
+      const section = getSettingsSectionMeta(result.item.section);
+      if (section) {
+        setActiveArea(section.area);
+      }
       setActiveSection(result.item.section);
       setSearchQuery("");
       setSearchResults([]);
@@ -82,7 +110,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       const tryScroll = () => {
         const el = document.querySelector(selector) as HTMLElement | null;
         if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.scrollIntoView({ block: "center" });
           // Flash highlight via inline style (avoids Tailwind purge issues)
           const prev = {
             outline: el.style.outline,
@@ -113,11 +141,22 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   }, [isOpen]);
 
   useEffect(() => {
-    if (menuItems.some((item) => item.id === activeSection)) {
+    if (settingsAreas.some((area) => area.id === activeArea)) {
       return;
     }
-    setActiveSection(menuItems[0]?.id || "appearance");
-  }, [activeSection, menuItems]);
+    setActiveArea(settingsAreas[0]?.id || "preferences");
+  }, [activeArea, settingsAreas]);
+
+  useEffect(() => {
+    if (menuItems.some((item) => item.id === activeSection)) {
+      const current = getSettingsSectionMeta(activeSection);
+      if (current?.area === activeArea) {
+        return;
+      }
+    }
+    const next = menuItems.find((item) => item.area === activeArea) || menuItems[0];
+    setActiveSection(next?.id || "appearance");
+  }, [activeArea, activeSection, menuItems]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -315,8 +354,11 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       >
         {isMobile ? (
           <MobileSettings
+            settingsAreas={settingsAreas}
             menuItems={menuItems}
             menuGroups={menuGroups}
+            activeArea={activeArea}
+            onAreaChange={setActiveArea}
             activeSection={activeSection}
             onSectionChange={setActiveSection}
             settings={settings}
@@ -328,13 +370,17 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             onReset={resetSettings}
             saving={saving}
             saved={saved}
+            activeSaveMode={activeSaveMode}
             canOpenConfigFolder={!standaloneDatasetRuntime}
           />
         ) : (
           <>
             <SettingsSidebar
+              settingsAreas={settingsAreas}
               menuItems={menuItems}
               menuGroups={menuGroups}
+              activeArea={activeArea}
+              onAreaChange={setActiveArea}
               activeSection={activeSection}
               onSectionChange={setActiveSection}
               onOpenConfigFolder={openConfigFolder}
@@ -355,6 +401,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               onSave={saveSettings}
               saving={saving}
               saved={saved}
+              saveMode={activeSaveMode}
             />
           </>
         )}
@@ -364,8 +411,11 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 }
 
 interface MobileSettingsProps {
+  settingsAreas: ReturnType<typeof getAvailableSettingsAreas>;
   menuItems: ReturnType<typeof getAvailableSettingsSections>;
   menuGroups: ReturnType<typeof getAvailableSettingsGroups>;
+  activeArea: SettingsArea;
+  onAreaChange: (area: SettingsArea) => void;
   activeSection: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
   settings: AppSettings;
@@ -381,12 +431,16 @@ interface MobileSettingsProps {
   onReset: () => void;
   saving: boolean;
   saved: boolean;
+  activeSaveMode: SettingsSaveMode;
   canOpenConfigFolder: boolean;
 }
 
 function MobileSettings({
+  settingsAreas,
   menuItems,
   menuGroups,
+  activeArea,
+  onAreaChange,
   activeSection,
   onSectionChange,
   settings,
@@ -398,6 +452,7 @@ function MobileSettings({
   onReset,
   saving,
   saved,
+  activeSaveMode,
   canOpenConfigFolder,
 }: MobileSettingsProps) {
   const { t } = useTranslation();
@@ -409,14 +464,23 @@ function MobileSettings({
 
   const mobileTrimmedQuery = mobileSearchQuery.trim().toLowerCase();
 
+  const mobileAreaLabels = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const area of settingsAreas) {
+      map[area.id] = t(area.labelKey, area.fallbackLabel);
+    }
+    return map;
+  }, [settingsAreas, t]);
+
   // Build section labels for mobile search
   const mobileSectionLabels = useMemo(() => {
     const map: Record<string, string> = {};
     for (const item of menuItems) {
-      map[item.id] = t(item.labelKey, item.fallbackLabel);
+      const sectionLabel = t(item.labelKey, item.fallbackLabel);
+      map[item.id] = `${mobileAreaLabels[item.area] || item.area} / ${sectionLabel}`;
     }
     return map;
-  }, [menuItems, t]);
+  }, [menuItems, mobileAreaLabels, t]);
 
   // Run mobile search
   useEffect(() => {
@@ -424,8 +488,13 @@ function MobileSettings({
       setMobileSearchResults([]);
       return;
     }
-    setMobileSearchResults(searchSettings(mobileSearchQuery, t, mobileSectionLabels));
-  }, [mobileSearchQuery, t, mobileSectionLabels]);
+    const availableSections = new Set(menuItems.map((item) => item.id));
+    setMobileSearchResults(
+      searchSettings(mobileSearchQuery, t, mobileSectionLabels).filter(
+        (result) => availableSections.has(result.item.section),
+      ),
+    );
+  }, [mobileSearchQuery, t, mobileSectionLabels, menuItems]);
 
   const filteredMobileGroups = useMemo(() => {
     if (!mobileTrimmedQuery || mobileSearchResults.length > 0) return menuGroups;
@@ -444,6 +513,10 @@ function MobileSettings({
   }, [menuGroups, menuItems, mobileTrimmedQuery, t, mobileSearchResults.length]);
 
   const handleMobileResultClick = (result: SettingsSearchResult) => {
+    const section = getSettingsSectionMeta(result.item.section);
+    if (section) {
+      onAreaChange(section.area);
+    }
     onSectionChange(result.item.section);
     setMobileSearchQuery("");
     setMobileSearchResults([]);
@@ -459,6 +532,13 @@ function MobileSettings({
     requestAnimationFrame(() => {
       requestAnimationFrame(() => setShowDetail(true));
     });
+  };
+
+  const handleAreaClick = (area: SettingsArea) => {
+    onAreaChange(area);
+    setMobileSearchQuery("");
+    setMobileSearchResults([]);
+    setShowDetail(false);
   };
 
   const handleBack = () => {
@@ -509,6 +589,21 @@ function MobileSettings({
           </div>
 
           <div className="px-4 pt-2 pb-1 flex-shrink-0">
+            <div className="mb-2 grid grid-cols-2 gap-1 rounded-lg bg-surface p-1">
+              {settingsAreas.map((area) => (
+                <button
+                  key={area.id}
+                  onClick={() => handleAreaClick(area.id)}
+                  className={`min-h-[36px] rounded-md px-3 text-xs font-medium motion-color motion-press focus-ring ${
+                    activeArea === area.id
+                      ? "bg-info text-white"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t(area.labelKey, area.fallbackLabel)}
+                </button>
+              ))}
+            </div>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60 pointer-events-none" />
               <CompositionInput
@@ -702,26 +797,47 @@ function MobileSettings({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm flex-shrink-0 safe-area-bottom">
-            <button
-              onClick={handleBack}
-              className="min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg motion-color motion-surface motion-press focus-ring flex items-center justify-center"
-            >
-              {t("common.cancel", "Cancel")}
-            </button>
-            <button
-              onClick={onSave}
-              disabled={saving}
-              className="flex items-center justify-center gap-2 min-h-[44px] px-4 bg-info hover:bg-info/80 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring disabled:opacity-50"
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : saved ? (
-                <Check className="h-4 w-4" />
-              ) : null}
-              {saved ? t("settings.saved", "Saved") : t("common.save", "Save")}
-            </button>
-          </div>
+          {activeSaveMode === "app-settings" ? (
+            <div className="grid grid-cols-2 gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm flex-shrink-0 safe-area-bottom">
+              <button
+                onClick={handleBack}
+                className="min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg motion-color motion-surface motion-press focus-ring flex items-center justify-center"
+              >
+                {t("common.cancel", "Cancel")}
+              </button>
+              <button
+                onClick={onSave}
+                disabled={saving}
+                className="flex items-center justify-center gap-2 min-h-[44px] px-4 bg-info hover:bg-info/80 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring disabled:opacity-50"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : saved ? (
+                  <Check className="h-4 w-4" />
+                ) : null}
+                {saved
+                  ? t("settings.saved", "Saved")
+                  : t("common.save", "Save")}
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm flex-shrink-0 safe-area-bottom">
+              <span className="min-w-0 text-xs text-muted-foreground">
+                {activeSaveMode === "inline"
+                  ? t(
+                      "settings.inlineSaveHint",
+                      "This page saves changes in its own controls.",
+                    )
+                  : t("settings.readOnlyHint", "This page is read-only.")}
+              </span>
+              <button
+                onClick={handleBack}
+                className="min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg motion-color motion-surface motion-press focus-ring flex items-center justify-center"
+              >
+                {t("common.back", "Back")}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -729,8 +845,11 @@ function MobileSettings({
 }
 
 interface SettingsSidebarProps {
+  settingsAreas: ReturnType<typeof getAvailableSettingsAreas>;
   menuItems: ReturnType<typeof getAvailableSettingsSections>;
   menuGroups: ReturnType<typeof getAvailableSettingsGroups>;
+  activeArea: SettingsArea;
+  onAreaChange: (area: SettingsArea) => void;
   activeSection: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
   onOpenConfigFolder: () => void;
@@ -743,8 +862,11 @@ interface SettingsSidebarProps {
 }
 
 function SettingsSidebar({
+  settingsAreas,
   menuItems,
   menuGroups,
+  activeArea,
+  onAreaChange,
   activeSection,
   onSectionChange,
   onOpenConfigFolder,
@@ -788,6 +910,21 @@ function SettingsSidebar({
       </div>
 
       <div className="px-3 pt-3 pb-1 flex-shrink-0">
+        <div className="mb-2 grid grid-cols-2 gap-1 rounded-lg bg-surface p-1">
+          {settingsAreas.map((area) => (
+            <button
+              key={area.id}
+              onClick={() => onAreaChange(area.id)}
+              className={`min-h-[36px] rounded-md px-3 text-xs font-medium motion-color motion-press focus-ring ${
+                activeArea === area.id
+                  ? "bg-info text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t(area.labelKey, area.fallbackLabel)}
+            </button>
+          ))}
+        </div>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60 pointer-events-none" />
           <CompositionInput
@@ -921,6 +1058,7 @@ interface SettingsContentProps {
   onSave: () => void;
   saving: boolean;
   saved: boolean;
+  saveMode: SettingsSaveMode;
 }
 
 function SettingsContent({
@@ -933,18 +1071,28 @@ function SettingsContent({
   onSave,
   saving,
   saved,
+  saveMode,
 }: SettingsContentProps) {
   const { t } = useTranslation();
+  const activeItem = menuItems.find((item) => item.id === activeSection);
+  const area = activeItem ? getSettingsAreaMeta(activeItem.area) : null;
 
   return (
     <div className="flex-1 flex flex-col bg-surface-dark/30">
       <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-background/50">
-        <h3 className="text-base font-semibold text-foreground tracking-tight">
-          {t(
-            menuItems.find((item) => item.id === activeSection)?.labelKey || "",
-            menuItems.find((item) => item.id === activeSection)?.fallbackLabel || "",
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            {area && <span>{t(area.labelKey, area.fallbackLabel)}</span>}
+          </div>
+          <h3 className="mt-1 text-base font-semibold text-foreground tracking-tight">
+            {t(activeItem?.labelKey || "", activeItem?.fallbackLabel || "")}
+          </h3>
+          {activeItem && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {t(activeItem.descriptionKey, activeItem.fallbackDescription)}
+            </p>
           )}
-        </h3>
+        </div>
         <button
           onClick={onClose}
           className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg motion-color motion-press focus-ring"
@@ -965,28 +1113,47 @@ function SettingsContent({
         )}
       </div>
 
-      <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border/80 bg-background/80">
-        <button
-          onClick={onClose}
-          className="px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg motion-color motion-press focus-ring"
-        >
-          {t("common.cancel", "Cancel")}
-        </button>
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring disabled:opacity-50 shadow-sm"
-        >
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : saved ? (
-            <Check className="h-4 w-4" />
-          ) : null}
-          {saved
-            ? t("settings.saved", "Saved")
-            : t("common.save", "Save Settings")}
-        </button>
-      </div>
+      {saveMode === "app-settings" ? (
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border/80 bg-background/80">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg motion-color motion-press focus-ring"
+          >
+            {t("common.cancel", "Cancel")}
+          </button>
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2.5 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring disabled:opacity-50 shadow-sm"
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : saved ? (
+              <Check className="h-4 w-4" />
+            ) : null}
+            {saved
+              ? t("settings.saved", "Saved")
+              : t("common.save", "Save Settings")}
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-border/80 bg-background/80">
+          <p className="min-w-0 text-xs text-muted-foreground">
+            {saveMode === "inline"
+              ? t(
+                  "settings.inlineSaveHint",
+                  "This page saves changes in its own controls.",
+                )
+              : t("settings.readOnlyHint", "This page is read-only.")}
+          </p>
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg motion-color motion-press focus-ring"
+          >
+            {t("common.close", "Close")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

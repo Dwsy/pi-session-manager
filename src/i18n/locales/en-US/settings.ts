@@ -5,8 +5,18 @@ export const settings = {
   searchEmpty: "No matching settings",
   searchResults: "Settings",
   saved: "Saved",
+  inlineSaveHint: "This page saves changes in its own controls.",
+  readOnlyHint: "This page is read-only.",
   reset: "Reset Settings",
   confirmReset: "Are you sure you want to reset all settings?",
+  areas: {
+    preferences: "Preferences",
+    configCenter: "Config Center",
+  },
+  areaDescriptions: {
+    preferences: "Everyday app behavior and viewing defaults",
+    configCenter: "Agent, server, data source and maintenance tools",
+  },
   shortcuts: {
     title: "Keyboard Shortcuts",
     description:
@@ -24,17 +34,75 @@ export const settings = {
     appearance: "Appearance",
     language: "Language",
     session: "Session",
+    sessionViewer: "Session Viewer",
     externalSessions: "External Sessions",
     tags: "Tags",
     search: "Search",
     export: "Export",
+    searchExport: "Search & Export",
     updates: "Updates",
+    appBehavior: "App Behavior",
     piConfig: "Pi Config",
+    piAgent: "Pi Agent",
     models: "Models",
     shortcuts: "Shortcuts",
     advanced: "Advanced",
+    dataSources: "Data Sources",
+    serverAccess: "Server & Access",
+    backupRestore: "Backup & Restore",
+    diagnosticsMaintenance: "Diagnostics & Maintenance",
     apiTest: "API Test",
     importExport: "Import/Export",
+  },
+  groups: {
+    display: "Display",
+    viewing: "Viewing",
+    productivity: "Productivity",
+    app: "App",
+    sources: "Sources",
+    agent: "Agent",
+    access: "Access",
+    maintenance: "Maintenance",
+  },
+  sectionDescriptions: {
+    appearance: "Theme, fonts and message density",
+    language: "Interface language",
+    terminal: "Built-in terminal and resume command behavior",
+    sessionViewer: "Session list, preview and navigation defaults",
+    searchExport: "Search matching and export defaults",
+    tags: "Label tree and automatic label rules",
+    shortcuts: "Keyboard shortcut reference",
+    appBehavior: "Window behavior and update channel",
+    dataSources: "Local paths, datasets and external agent sessions",
+    piAgent: "Pi resources, runtime settings and live sessions",
+    models: "Provider, model and model test configuration",
+    serverAccess: "HTTP, WebSocket and API key access",
+    backupRestore: "Configuration import, export and restore tools",
+    diagnosticsMaintenance: "Cache, debug and external API diagnostics",
+  },
+  searchExport: {
+    searchTitle: "Search defaults",
+    searchDescription: "Control how sessions are searched and highlighted.",
+    exportTitle: "Export defaults",
+    exportDescription: "Choose default formats and metadata for session export.",
+  },
+  appBehavior: {
+    title: "App behavior",
+    description: "Control window behavior and everyday app-level defaults.",
+  },
+  dataSources: {
+    localTitle: "Local session directories",
+  },
+  diagnostics: {
+    maintenanceTitle: "Maintenance",
+    maintenanceDescription:
+      "Cache, debug and demo controls that affect local runtime behavior.",
+    actionsTitle: "Maintenance actions",
+  },
+  piAgent: {
+    resourcesTitle: "Pi resources and runtime settings",
+    resourcesDescription:
+      "Manage Pi skills, prompts, extensions, themes and Pi settings.json.",
   },
   terminal: {
     // Resume Mode
@@ -160,9 +228,6 @@ export const settings = {
     disableToolSuccessStyleDesc:
       "Disable green background and border on successful tool execution for cleaner tool cards",
     enabled: "Enabled",
-    sidebarVibrancy: "Sidebar Blur",
-    sidebarVibrancyDesc:
-      "macOS only. Native translucent blur on sidebar. System Settings -> Desktop & Dock -> Allow wallpaper tinting in windows must be on.",
   },
   language: {
     select: "Select Language",
@@ -314,9 +379,6 @@ export const settings = {
     timelineNavEnabled: "Timeline navigation",
     timelineNavEnabledHelp:
       "Show a dot timeline on the right side for quick message jumping with hover preview",
-    collapseToolCalls: "Collapse tool calls",
-    collapseToolCallsHelp:
-      "Show aggregated tool call summary instead of expanded list",
 
   },
   externalSessions: {

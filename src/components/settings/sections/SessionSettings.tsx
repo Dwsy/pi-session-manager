@@ -25,6 +25,11 @@ import {
 import { isStandaloneDatasetRuntime } from "@/browser-dataset";
 
 type SessionInnerTab = "dataset" | "cache" | "general";
+type SessionSettingsMode = "viewer" | "data-sources";
+
+interface SessionSettingsSectionProps extends SessionSettingsProps {
+  mode?: SessionSettingsMode;
+}
 
 function formatBytes(value: number): string {
   if (!value) return "0 B";
@@ -57,16 +62,27 @@ function StatTile({ label, value }: { label: string; value: string | number }) {
 export default function SessionSettings({
   settings,
   onUpdate,
-}: SessionSettingsProps) {
+  mode = "viewer",
+}: SessionSettingsSectionProps) {
   const { t } = useTranslation();
   const standaloneDatasetRuntime = isStandaloneDatasetRuntime();
   const scrollMarkersEnabled =
     settings.session.scrollMarkersEnabled !== false &&
     settings.session.timelineNavEnabled === false;
   const timelineNavEnabled = settings.session.timelineNavEnabled === true;
-  const [activeTab, setActiveTab] = useState<SessionInnerTab>(
-    standaloneDatasetRuntime ? "dataset" : "general",
-  );
+  const tabItems = useMemo(() => {
+    if (mode === "viewer") {
+      return [{ id: "general" as const, label: "General" }];
+    }
+    if (standaloneDatasetRuntime) {
+      return [{ id: "dataset" as const, label: "Dataset" }];
+    }
+    return [
+      { id: "dataset" as const, label: "Dataset" },
+      { id: "cache" as const, label: "Cache" },
+    ];
+  }, [mode, standaloneDatasetRuntime]);
+  const [activeTab, setActiveTab] = useState<SessionInnerTab>(tabItems[0].id);
   const [datasets, setDatasets] = useState<DatasetInfo[]>([]);
   const [datasetSource, setDatasetSource] = useState("");
   const [importStatus, setImportStatus] = useState<DatasetImportStatus | null>(
@@ -90,6 +106,12 @@ export default function SessionSettings({
     () => datasets.filter((item) => activeDatasetIds.includes(item.id)),
     [activeDatasetIds, datasets],
   );
+
+  useEffect(() => {
+    if (!tabItems.some((item) => item.id === activeTab)) {
+      setActiveTab(tabItems[0].id);
+    }
+  }, [activeTab, tabItems]);
 
   useEffect(() => {
     let cancelled = false;
@@ -291,22 +313,13 @@ export default function SessionSettings({
 
   return (
     <div className="space-y-6">
-      <SettingsTabs
-        items={
-          standaloneDatasetRuntime
-            ? [
-                { id: "dataset", label: "Dataset" },
-                { id: "general", label: "General" },
-              ]
-            : [
-                { id: "general", label: "General" },
-                { id: "dataset", label: "Dataset" },
-                { id: "cache", label: "Cache" },
-              ]
-        }
-        active={activeTab}
-        onChange={setActiveTab}
-      />
+      {tabItems.length > 1 && (
+        <SettingsTabs
+          items={tabItems}
+          active={activeTab}
+          onChange={setActiveTab}
+        />
+      )}
 
       {activeTab === "dataset" && (
         <div className="space-y-6">
@@ -869,7 +882,7 @@ export default function SessionSettings({
       )}
 
       {activeTab === "general" && (
-        <SettingsCard title={t("settings.sections.session", "Session")}>
+        <SettingsCard title={t("settings.sections.sessionViewer", "Session Viewer")}>
           <div className="space-y-4">
             <SettingsToggleRow
               title={t("settings.session.autoRefresh", "Auto refresh")}
@@ -1064,22 +1077,6 @@ export default function SessionSettings({
               searchKey="session-conversationModeEnabled"
             />
 
-            <SettingsToggleRow
-              title={t(
-                "settings.session.collapseToolCalls",
-                "Collapse tool calls",
-              )}
-              description={t(
-                "settings.session.collapseToolCallsHelp",
-                "Show aggregated tool call summary instead of expanded list",
-              )}
-              checked={settings.session.collapseToolCalls}
-              onChange={(checked) =>
-                onUpdate("session", "collapseToolCalls", checked)
-              }
-              className="items-start pt-4 border-t border-border/60"
-              searchKey="session-collapseToolCalls"
-            />
 
             <SettingsField
               label={t(

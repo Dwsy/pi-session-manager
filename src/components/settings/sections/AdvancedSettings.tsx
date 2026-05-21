@@ -48,14 +48,55 @@ interface TokenInfo {
   last_used: string | null;
 }
 
+type AdvancedSettingsMode = "all" | "server-access";
+type AdvancedTab = "server" | "auth" | "storage";
+
+interface AdvancedSettingsSectionProps extends AdvancedSettingsProps {
+  mode?: AdvancedSettingsMode;
+}
+
 export default function AdvancedSettings({
   settings,
   onUpdate,
-}: AdvancedSettingsProps) {
+  mode = "all",
+}: AdvancedSettingsSectionProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<"server" | "auth" | "storage">(
-    "server",
-  );
+  const tabItems: Array<{
+    id: AdvancedTab;
+    label: string;
+    icon: React.ReactNode;
+  }> =
+    mode === "server-access"
+      ? [
+          {
+            id: "server",
+            label: t("settings.advanced.tabs.server", "Server"),
+            icon: <Server className="h-3.5 w-3.5" />,
+          },
+          {
+            id: "auth",
+            label: t("settings.advanced.tabs.auth", "Auth"),
+            icon: <Key className="h-3.5 w-3.5" />,
+          },
+        ]
+      : [
+          {
+            id: "server",
+            label: t("settings.advanced.tabs.server", "Server"),
+            icon: <Server className="h-3.5 w-3.5" />,
+          },
+          {
+            id: "auth",
+            label: t("settings.advanced.tabs.auth", "Auth"),
+            icon: <Key className="h-3.5 w-3.5" />,
+          },
+          {
+            id: "storage",
+            label: t("settings.advanced.tabs.storage", "Storage"),
+            icon: <FolderOpen className="h-3.5 w-3.5" />,
+          },
+        ];
+  const [activeTab, setActiveTab] = useState<AdvancedTab>("server");
   const [serverSettings, setServerSettings] = useState<ServerSettings | null>(
     null,
   );
@@ -87,6 +128,12 @@ export default function AdvancedSettings({
   useEffect(() => {
     loadApiKeys();
   }, [loadApiKeys]);
+
+  useEffect(() => {
+    if (!tabItems.some((item) => item.id === activeTab)) {
+      setActiveTab(tabItems[0].id);
+    }
+  }, [activeTab, tabItems]);
 
   // Lightweight mode (minimize-to-tray on close)
   const [lightweightMode, setLightweightMode] = useState(false);
@@ -220,27 +267,7 @@ export default function AdvancedSettings({
 
   return (
     <div className="space-y-6">
-      <SettingsTabs
-        items={[
-          {
-            id: "server",
-            label: t("settings.advanced.tabs.server", "Server"),
-            icon: <Server className="h-3.5 w-3.5" />,
-          },
-          {
-            id: "auth",
-            label: t("settings.advanced.tabs.auth", "Auth"),
-            icon: <Key className="h-3.5 w-3.5" />,
-          },
-          {
-            id: "storage",
-            label: t("settings.advanced.tabs.storage", "Storage"),
-            icon: <FolderOpen className="h-3.5 w-3.5" />,
-          },
-        ]}
-        active={activeTab}
-        onChange={setActiveTab}
-      />
+      <SettingsTabs items={tabItems} active={activeTab} onChange={setActiveTab} />
 
       {activeTab === "server" && serverSettings && (
         <SettingsCard
@@ -355,18 +382,20 @@ export default function AdvancedSettings({
               searchKey="advanced-auth"
             />
 
-            <SettingsToggleRow
-              title={t("settings.advanced.lightweightMode", "Lightweight mode")}
-              description={t(
-                "settings.advanced.lightweightModeDesc",
-                "When enabled, closing the window minimizes to system tray instead of quitting. Tray menu: Show / Open Web / Quit",
-              )}
-              checked={lightweightMode}
-              onChange={handleToggleLightweightMode}
-              className="items-start py-2 border-t border-border/60"
-              descriptionClassName="text-xs text-muted-foreground mt-0.5"
-              searchKey="advanced-lightweightMode"
-            />
+            {mode === "all" && (
+              <SettingsToggleRow
+                title={t("settings.advanced.lightweightMode", "Lightweight mode")}
+                description={t(
+                  "settings.advanced.lightweightModeDesc",
+                  "When enabled, closing the window minimizes to system tray instead of quitting. Tray menu: Show / Open Web / Quit",
+                )}
+                checked={lightweightMode}
+                onChange={handleToggleLightweightMode}
+                className="items-start py-2 border-t border-border/60"
+                descriptionClassName="text-xs text-muted-foreground mt-0.5"
+                searchKey="advanced-lightweightMode"
+              />
+            )}
 
             {serverDirty && (
               <div className="flex flex-wrap items-center gap-3 pt-2">

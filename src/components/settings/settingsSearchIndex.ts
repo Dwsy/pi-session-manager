@@ -156,7 +156,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   // ── Session ──
   {
     id: "session-autoRefresh",
-    section: "session",
+    section: "session-viewer",
     labelKey: "settings.session.autoRefresh",
     fallbackLabel: "Auto Refresh",
     extraKeys: ["settings.session.autoRefreshHelp"],
@@ -164,21 +164,21 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "session-refreshInterval",
-    section: "session",
+    section: "session-viewer",
     labelKey: "settings.session.refreshInterval",
     fallbackLabel: "Refresh Interval",
     keywords: ["refresh", "interval", "interval", "seconds", "polling"],
   },
   {
     id: "session-defaultViewMode",
-    section: "session",
+    section: "session-viewer",
     labelKey: "settings.session.defaultViewMode",
     fallbackLabel: "Default View Mode",
     keywords: ["view", "mode", "list", "directory", "project", "kanban"],
   },
   {
     id: "session-sourceMode",
-    section: "session",
+    section: "data-sources",
     labelKey: "settings.session.sourceMode",
     fallbackLabel: "Session source",
     extraKeys: ["settings.session.sourceModeHelp"],
@@ -186,7 +186,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "session-scanOtherAgentJsonl",
-    section: "session",
+    section: "data-sources",
     labelKey: "settings.session.scanOtherAgentJsonl",
     fallbackLabel: "Scan other agent JSONL",
     extraKeys: ["settings.session.scanOtherAgentJsonlHelp"],
@@ -194,7 +194,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "session-showMessagePreview",
-    section: "session",
+    section: "session-viewer",
     labelKey: "settings.session.showMessagePreview",
     fallbackLabel: "Show Message Preview",
     extraKeys: ["settings.session.showMessagePreviewHelp"],
@@ -202,14 +202,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "session-previewLines",
-    section: "session",
+    section: "session-viewer",
     labelKey: "settings.session.previewLines",
     fallbackLabel: "Preview Lines",
     keywords: ["preview", "lines", "message"],
   },
   {
     id: "session-colorizeToolCalls",
-    section: "session",
+    section: "session-viewer",
     labelKey: "settings.session.colorizeToolCalls",
     fallbackLabel: "Colorize Tool Calls",
     extraKeys: ["settings.session.colorizeToolCallsHelp"],
@@ -217,14 +217,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "session-openPosition",
-    section: "session",
+    section: "session-viewer",
     labelKey: "settings.session.openPosition",
     fallbackLabel: "Task navigation open position",
     keywords: ["open", "position", "top", "bottom", "navigation"],
   },
   {
     id: "session-cmdFBehavior",
-    section: "session",
+    section: "session-viewer",
     labelKey: "settings.session.cmdFBehavior",
     fallbackLabel: "In-session Cmd+F behavior",
     extraKeys: ["settings.session.cmdFBehaviorHelp"],
@@ -232,7 +232,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "session-scrollMarkersEnabled",
-    section: "session",
+    section: "session-viewer",
     labelKey: "settings.session.scrollMarkersEnabled",
     fallbackLabel: "Scroll markers",
     extraKeys: ["settings.session.scrollMarkersEnabledHelp"],
@@ -240,7 +240,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "session-timelineNavEnabled",
-    section: "session",
+    section: "session-viewer",
     labelKey: "settings.session.timelineNavEnabled",
     fallbackLabel: "Timeline navigation",
     extraKeys: ["settings.session.timelineNavEnabledHelp"],
@@ -248,25 +248,16 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "session-conversationModeEnabled",
-    section: "session",
+    section: "session-viewer",
     labelKey: "settings.session.conversationModeEnabled",
     fallbackLabel: "Conversation mode",
     extraKeys: ["settings.session.conversationModeEnabledHelp"],
     keywords: ["conversation", "preview", "fold", "thinking", "tools", "assistant"],
   },
-  {
-    id: "session-collapseToolCalls",
-    section: "session",
-    labelKey: "settings.session.collapseToolCalls",
-    fallbackLabel: "Collapse tool calls",
-    extraKeys: ["settings.session.collapseToolCallsHelp"],
-    keywords: ["collapse", "tool", "call", "aggregate", "summary"],
-  },
-
   // ── External Sessions ──
   {
     id: "external-sessions-includeInStats",
-    section: "external-sessions",
+    section: "data-sources",
     labelKey: "settings.externalSessions.includeInStats",
     fallbackLabel: "Include external sessions in statistics",
     extraKeys: ["settings.externalSessions.includeInStatsHelp"],
@@ -274,7 +265,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "external-sessions-includeInSearch",
-    section: "external-sessions",
+    section: "data-sources",
     labelKey: "settings.externalSessions.includeInSearch",
     fallbackLabel: "Include external sessions in search",
     extraKeys: ["settings.externalSessions.includeInSearchHelp"],
@@ -282,7 +273,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "external-sessions-showAgentIcon",
-    section: "external-sessions",
+    section: "data-sources",
     labelKey: "settings.externalSessions.showAgentIconInSessionBadge",
     fallbackLabel: "Show agent icon in SessionBadge",
     extraKeys: ["settings.externalSessions.showAgentIconInSessionBadgeHelp"],
@@ -290,7 +281,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "external-sessions-defaultResumeTarget",
-    section: "external-sessions",
+    section: "data-sources",
     labelKey: "settings.externalSessions.defaultExternalResumeTarget",
     fallbackLabel: "Default external resume target",
     extraKeys: ["settings.externalSessions.defaultExternalResumeTargetHelp"],
@@ -300,21 +291,21 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   // ── Search ──
   {
     id: "search-defaultMode",
-    section: "search",
+    section: "search-export",
     labelKey: "settings.search.defaultSearchMode",
     fallbackLabel: "Default Search Mode",
     keywords: ["search", "mode", "content", "name", "default"],
   },
   {
     id: "search-caseSensitive",
-    section: "search",
+    section: "search-export",
     labelKey: "settings.search.caseSensitive",
     fallbackLabel: "Case Sensitive",
     keywords: ["case", "sensitive", "upper", "lower"],
   },
   {
     id: "search-includeToolCalls",
-    section: "search",
+    section: "search-export",
     labelKey: "settings.search.includeToolCalls",
     fallbackLabel: "Include Tool Calls",
     extraKeys: ["settings.search.includeToolCallsHelp"],
@@ -322,7 +313,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "search-includeThinking",
-    section: "search",
+    section: "search-export",
     labelKey: "settings.search.includeThinkingInSearch",
     fallbackLabel: "Search thinking text",
     extraKeys: ["settings.search.includeThinkingInSearchHelp"],
@@ -330,7 +321,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "search-highlightMatches",
-    section: "search",
+    section: "search-export",
     labelKey: "settings.search.highlightMatches",
     fallbackLabel: "Highlight Matches",
     extraKeys: ["settings.search.highlightMatchesHelp"],
@@ -340,14 +331,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   // ── Export ──
   {
     id: "export-defaultFormat",
-    section: "export",
+    section: "search-export",
     labelKey: "settings.export.defaultFormat",
     fallbackLabel: "Default Export Format",
     keywords: ["export", "format", "default", "json", "markdown"],
   },
   {
     id: "export-includeMetadata",
-    section: "export",
+    section: "search-export",
     labelKey: "settings.export.includeMetadata",
     fallbackLabel: "Include Metadata",
     extraKeys: ["settings.export.includeMetadataHelp"],
@@ -355,7 +346,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "export-includeTimestamps",
-    section: "export",
+    section: "search-export",
     labelKey: "settings.export.includeTimestamps",
     fallbackLabel: "Include Timestamps",
     extraKeys: ["settings.export.includeTimestampsHelp"],
@@ -365,7 +356,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   // ── Update ──
   {
     id: "update-channel",
-    section: "updates",
+    section: "app-behavior",
     labelKey: "settings.update.channel.title",
     fallbackLabel: "Update Channel",
     extraKeys: ["settings.update.channel.description", "settings.update.channel.help"],
@@ -375,7 +366,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   // ── Pi Config ──
   {
     id: "pi-config",
-    section: "pi-config",
+    section: "pi-agent",
     labelKey: "settings.sections.piConfig",
     fallbackLabel: "Pi Config",
     keywords: ["pi", "config", "configuration", "agent", "settings"],
@@ -384,7 +375,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   // ── Pi Live ──
   {
     id: "pi-live",
-    section: "pi-live",
+    section: "pi-agent",
     labelKey: "settings.sections.piLive",
     fallbackLabel: "Pi Live",
     keywords: ["pi", "live", "realtime", "real-time", "registry"],
@@ -411,7 +402,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   // ── Advanced ──
   {
     id: "advanced-serverSection",
-    section: "advanced",
+    section: "server-access",
     labelKey: "settings.advanced.serverSection",
     fallbackLabel: "Server Settings",
     extraKeys: ["settings.advanced.serverSectionDesc"],
@@ -419,7 +410,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "advanced-bindAddr",
-    section: "advanced",
+    section: "server-access",
     labelKey: "settings.advanced.bindAddr",
     fallbackLabel: "Bind Address",
     extraKeys: ["settings.advanced.bindAddrHelp"],
@@ -427,21 +418,21 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "advanced-wsPort",
-    section: "advanced",
+    section: "server-access",
     labelKey: "settings.advanced.wsPort",
     fallbackLabel: "WebSocket Port",
     keywords: ["websocket", "port", "ws"],
   },
   {
     id: "advanced-httpPort",
-    section: "advanced",
+    section: "server-access",
     labelKey: "settings.advanced.httpPort",
     fallbackLabel: "HTTP Port",
     keywords: ["http", "port"],
   },
   {
     id: "advanced-auth",
-    section: "advanced",
+    section: "server-access",
     labelKey: "settings.advanced.auth",
     fallbackLabel: "Authentication",
     extraKeys: ["settings.advanced.authHelp"],
@@ -449,7 +440,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "advanced-apiKeys",
-    section: "advanced",
+    section: "server-access",
     labelKey: "settings.advanced.apiKeys",
     fallbackLabel: "API Keys",
     extraKeys: ["settings.advanced.apiKeysHelp"],
@@ -457,7 +448,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "advanced-sessionDir",
-    section: "advanced",
+    section: "data-sources",
     labelKey: "settings.advanced.sessionDir",
     fallbackLabel: "Session Directories",
     extraKeys: ["settings.advanced.sessionDirHelp"],
@@ -465,7 +456,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "advanced-lightweightMode",
-    section: "advanced",
+    section: "app-behavior",
     labelKey: "settings.advanced.lightweightMode",
     fallbackLabel: "Lightweight mode",
     extraKeys: ["settings.advanced.lightweightModeDesc"],
@@ -484,18 +475,18 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   // ── API Test ──
   {
     id: "api-test",
-    section: "api-test",
-    labelKey: "settings.sections.apiTest",
-    fallbackLabel: "API Test",
+    section: "diagnostics-maintenance",
+    labelKey: "settings.sections.diagnosticsMaintenance",
+    fallbackLabel: "Diagnostics & Maintenance",
     keywords: ["api", "test", "endpoint", "http", "debug"],
   },
 
   // ── Import/Export (Config Bundle) ──
   {
     id: "import-export",
-    section: "import-export",
-    labelKey: "settings.sections.importExport",
-    fallbackLabel: "Import/Export",
+    section: "backup-restore",
+    labelKey: "settings.sections.backupRestore",
+    fallbackLabel: "Backup & Restore",
     keywords: ["import", "export", "backup", "restore", "config", "bundle"],
   },
 ];
