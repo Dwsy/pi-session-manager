@@ -2,6 +2,14 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
+## [0.6.3] - 2026-05-21
+
+### Fixed
+
+- **WebView CPU usage** — fixed a SettingsPanel render loop that caused maximum update depth warnings and sustained WebContent CPU usage.
+- **Pi Live event pressure** — stopped high-frequency live update events from flooding the Tauri WebView bridge while preserving external WebSocket delivery.
+- **Pi Live sidebar state** — reused unchanged live session state references to avoid unnecessary React re-renders.
+
 ## [0.6.2] - 2026-05-21
 
 ### Added
