@@ -305,6 +305,7 @@ export async function getBrowserDatasetDayStats(
   const modelsUsed: Record<string, number> = {};
   const hourlyDistribution = Array.from({ length: 24 }, () => 0);
   const sessionsDetail: DaySession[] = [];
+  const dayTokens = emptyTokenAggregate();
 
   for (const session of daySessions) {
     const projectPath = session.info.cwd;
@@ -315,6 +316,10 @@ export async function getBrowserDatasetDayStats(
       sessionTokens.output +
       sessionTokens.cacheRead +
       sessionTokens.cacheWrite;
+    dayTokens.input += sessionTokens.input;
+    dayTokens.output += sessionTokens.output;
+    dayTokens.cacheRead += sessionTokens.cacheRead;
+    dayTokens.cacheWrite += sessionTokens.cacheWrite;
 
     if (!projectMap.has(projectPath)) {
       projectMap.set(projectPath, {
@@ -385,5 +390,13 @@ export async function getBrowserDatasetDayStats(
     sessions: sessionsDetail,
     hourly_distribution: hourlyDistribution,
     models_used: modelsUsed,
+    token_details: {
+      total_input: dayTokens.input,
+      total_output: dayTokens.output,
+      total_cache_read: dayTokens.cacheRead,
+      total_cache_write: dayTokens.cacheWrite,
+      total_cost: usageToCost(dayTokens),
+      tokens_by_model: {},
+    },
   };
 }

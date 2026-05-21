@@ -395,6 +395,10 @@ export function getDemoDayStatsFromStore(state: DemoStore, date: string, scopedS
 
   const totalMessages = daySessions.reduce((sum, session) => sum + session.message_count, 0)
   const totalTokens = daySessions.reduce((sum, session) => sum + (sessionTokenMap.get(session.path) || session.message_count * 180), 0)
+  const totalInput = Math.round(totalTokens * 0.45)
+  const totalOutput = Math.round(totalTokens * 0.35)
+  const totalCacheRead = Math.round(totalTokens * 0.15)
+  const totalCacheWrite = Math.max(0, totalTokens - totalInput - totalOutput - totalCacheRead)
 
   return {
     date,
@@ -406,5 +410,13 @@ export function getDemoDayStatsFromStore(state: DemoStore, date: string, scopedS
     sessions: sessionsDetail,
     hourly_distribution: hourlyDistribution,
     models_used: modelsUsed,
+    token_details: {
+      total_input: totalInput,
+      total_output: totalOutput,
+      total_cache_read: totalCacheRead,
+      total_cache_write: totalCacheWrite,
+      total_cost: totalTokens * 0.0000018,
+      tokens_by_model: {},
+    },
   }
 }

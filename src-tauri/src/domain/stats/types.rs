@@ -100,6 +100,7 @@ pub struct DayStats {
     pub sessions: Vec<DaySession>,
     pub hourly_distribution: Vec<usize>,
     pub models_used: HashMap<String, usize>,
+    pub token_details: TokenDetails,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

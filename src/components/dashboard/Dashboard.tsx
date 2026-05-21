@@ -25,6 +25,7 @@ import TopModelsChart from "./TopModelsChart";
 import TimeDistribution from "./TimeDistribution";
 import DashboardInsightModal from "./DashboardInsightModal";
 import TokenTrendChart from "./TokenTrendChart";
+import SessionPreviewModal from "@/components/kanban/SessionPreviewModal";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
 import {
   getRuntimeDayStats,
@@ -64,6 +65,7 @@ export default function Dashboard({
     "token_cost" | "model_projects" | null
   >(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null);
   const isLoadingRef = useRef(false);
   const hasLoadedOnce = useRef(false);
   const warmRetryDone = useRef(false);
@@ -191,14 +193,19 @@ export default function Dashboard({
   };
 
   const handleOpenSessionFromModal = (sessionPath: string) => {
-    if (!onSessionSelect) return;
     const targetSession = sessions.find(
       (session) => session.path === sessionPath,
     );
     if (targetSession) {
-      onSessionSelect(targetSession);
+      setPreviewSession(targetSession);
       handleCloseModal();
     }
+  };
+
+  const handleExpandPreviewSession = () => {
+    if (!previewSession || !onSessionSelect) return;
+    onSessionSelect(previewSession);
+    setPreviewSession(null);
   };
 
   const closeInsightModal = () => {
@@ -422,8 +429,16 @@ export default function Dashboard({
           loading={isLoadingDayStats}
           onFilterProject={handleFilterProjectFromModal}
           onOpenSession={handleOpenSessionFromModal}
+          tokenTrend={displayStats.heatmap_data}
         />
       )}
+
+      <SessionPreviewModal
+        session={previewSession}
+        isOpen={Boolean(previewSession)}
+        onClose={() => setPreviewSession(null)}
+        onExpand={handleExpandPreviewSession}
+      />
 
       {insightModalMode && (
         <DashboardInsightModal
