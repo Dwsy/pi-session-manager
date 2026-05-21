@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { listen } from '@/transport'
 import type { SessionsDiff } from '@/types'
-import { useNotification } from './useNotification'
 
 interface UseFileWatcherOptions {
   enabled?: boolean
@@ -21,7 +20,6 @@ export function useFileWatcher({
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const onDiffRef = useRef(onDiff)
   const pendingDiffRef = useRef<SessionsDiff>({ updated: [], removed: [] })
-  const { sendNotification } = useNotification()
 
   useEffect(() => {
     onDiffRef.current = onDiff
@@ -64,19 +62,6 @@ export function useFileWatcher({
             pendingDiffRef.current = { updated: [], removed: [] }
             if (merged.updated.length || merged.removed.length) {
               onDiffRef.current(merged)
-
-              // Send system notification for session changes
-              const updatedCount = merged.updated.length
-              const removedCount = merged.removed.length
-              if (updatedCount > 0 || removedCount > 0) {
-                const parts = []
-                if (updatedCount > 0) parts.push(`${updatedCount} updated`)
-                if (removedCount > 0) parts.push(`${removedCount} removed`)
-                sendNotification({
-                  title: 'Sessions Changed',
-                  body: parts.join(', '),
-                })
-              }
             }
             debounceTimerRef.current = null
           }, debounceMs)

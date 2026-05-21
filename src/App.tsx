@@ -23,7 +23,7 @@ import { useSessions } from "./hooks/useSessions";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useSessionActions } from "./hooks/useSessionActions";
 import { useAppearance } from "./hooks/useAppearance";
-import { useSidebarVibrancy } from "./hooks/useSidebarVibrancy";
+import { useSettings } from "./hooks/useSettings";
 import { useToolStyles } from "./hooks/useToolStyles";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useClipboard } from "./hooks/useClipboard";
@@ -119,17 +119,26 @@ const CommandPalette = lazy(() =>
 
 // Loading fallback
 const LoadingSpinner = () => (
-  <div className="flex items-center justify-center h-full">
-    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+  <div className="flex items-center justify-center h-full" role="status" aria-live="polite" aria-label="Loading">
+    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+    <span className="sr-only">Loading</span>
   </div>
 );
 
 function App() {
   const { t } = useTranslation();
   const standaloneDatasetRuntime = isStandaloneDatasetRuntime();
+  const isTauriRuntime = isTauri();
+  const appRuntime = isTauriRuntime
+    ? "tauri"
+    : standaloneDatasetRuntime
+      ? "dataset"
+      : import.meta.env.MODE === "demo"
+        ? "demo"
+        : "web";
 
   // Keep WebView warm when hidden to prevent WebKit throttling
-  useKeepWarm(isTauri());
+  useKeepWarm(isTauriRuntime);
 
   // Override WebKit context menu for native feel
   useContextMenuOverride();
@@ -137,6 +146,7 @@ function App() {
   // Delayed scanning page: only show if loading takes >500ms (avoids flash on fast DB loads)
   const [showScanningPage, setShowScanningPage] = useState(false);
   const loadingRef = useRef(true);
+  const frontendReadyEmittedRef = useRef(false);
 
   // Register tool render plugins
   useEffect(() => {
@@ -209,8 +219,8 @@ function App() {
     getDescendantIds,
     loadTags,
   } = useTags();
+  const { loading: settingsLoading } = useSettings();
   useAppearance();
-  const { isVibrancyEnabled } = useSidebarVibrancy();
   useToolStyles();
   const { liveSessionIds: runtimeLiveSessionIds } = usePiLive();
   const liveSessionIds = standaloneDatasetRuntime
@@ -383,12 +393,18 @@ function App() {
 
   // Signal frontend ready to native shell (prevents white flash)
   useEffect(() => {
-    if (isInitialized && isTauri()) {
+    if (
+      isInitialized &&
+      !settingsLoading &&
+      isTauri() &&
+      !frontendReadyEmittedRef.current
+    ) {
+      frontendReadyEmittedRef.current = true;
       import('@tauri-apps/api/event').then(({ emit }) => {
         emit('frontend://ready');
       });
     }
-  }, [isInitialized]);
+  }, [isInitialized, settingsLoading]);
   const {
     favorites,
     loadingFavorites,
@@ -1349,7 +1365,7 @@ function App() {
   if (showScanningPage && sessions.length === 0 && !isFirstScanDone) {
     return (
       <div className="flex flex-col h-screen-safe bg-background text-foreground items-center justify-center">
-        <div className="flex flex-col items-center gap-6">
+        <div className="flex flex-col items-center gap-6" role="status" aria-live="polite">
           {/* Logo with ambient glow */}
           <div className="relative">
             <div className="absolute inset-0 rounded-full bg-accent/20 blur-xl animate-pulse" />
@@ -1359,7 +1375,7 @@ function App() {
               className="relative w-16 h-16 rounded-2xl shadow-lg"
             />
             <div className="absolute -right-1 -bottom-1">
-              <Loader2 className="w-5 h-5 animate-spin text-accent" />
+              <Loader2 className="w-5 h-5 animate-spin text-accent" aria-hidden="true" />
             </div>
           </div>
           {/* Text */}
@@ -1380,7 +1396,10 @@ function App() {
   // Desktop layout: sidebar + content
   // ═══════════════════════════════════
   return (
-    <div className="flex flex-col h-screen-safe bg-background text-foreground" {...(isVibrancyEnabled ? { 'data-sidebar-vibrancy': '' } : {})} >
+    <div
+      className="app-shell flex flex-col h-screen-safe bg-background text-foreground"
+      data-runtime={appRuntime}
+    >
       <ConnectionBanner />
 
       {/* Version Downgrade Dialog */}
@@ -1399,7 +1418,7 @@ function App() {
 
       <div className="flex flex-1 min-h-0">
         <AppDesktopSidebar
-          isTauriRuntime={isTauri()}
+          isTauriRuntime={isTauriRuntime}
           startDragging={startDragging}
           sidebarMode={sidebarMode}
           showFavorites={showFavorites}
@@ -1420,7 +1439,7 @@ function App() {
         />
 
         <AppDesktopContent
-          isTauriRuntime={isTauri()}
+          isTauriRuntime={isTauriRuntime}
           showTerminal={showTerminal}
           terminalMaximized={terminalMaximized}
           mainContent={desktopMainContent}

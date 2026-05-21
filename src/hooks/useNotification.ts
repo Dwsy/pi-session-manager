@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from '@/transport';
 
 interface NotificationOptions {
   title: string;
@@ -9,6 +10,8 @@ interface NotificationOptions {
 
 export function useNotification() {
   const sendNotification = useCallback(async (options: NotificationOptions) => {
+    if (!isTauri()) return;
+
     try {
       await invoke('send_notification', {
         title: options.title,

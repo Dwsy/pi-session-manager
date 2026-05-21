@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { listen } from "@/transport";
 import { useTranslation } from "react-i18next";
+import { useNotification } from "@/hooks/useNotification";
 import type { SessionInfo, SessionsDiff } from "@/types";
 import type {
   DeleteSessionAnchorPoint,
@@ -32,6 +33,67 @@ interface DeleteSessionsResult {
   failed: Array<{ path: string; error: string }>;
 }
 
+interface SessionChangeNotifications {
+  newSessions: SessionInfo[];
+  renamedSessions: Array<{
+    before: string;
+    after: string;
+    path: string;
+  }>;
+}
+
+function normalizeSessionName(session: Pick<SessionInfo, "name">): string {
+  return (session.name || "").trim();
+}
+
+function getSessionDisplayName(session: SessionInfo, fallback: string): string {
+  const explicitName = normalizeSessionName(session);
+  if (explicitName) return explicitName;
+
+  const firstMessage = session.first_message?.trim();
+  if (firstMessage) return firstMessage;
+
+  const filename = session.path.split(/[/\\]/).pop()?.replace(/\.jsonl$/, "");
+  return filename?.trim() || session.id || fallback;
+}
+
+function getSessionChangeNotifications(
+  previousSessions: SessionInfo[],
+  diff: SessionsDiff,
+  fallbackName: string,
+): SessionChangeNotifications {
+  const previousByPath = new Map(
+    previousSessions.map((session) => [session.path, session]),
+  );
+  const previousById = new Map(
+    previousSessions.map((session) => [session.id, session]),
+  );
+  const newSessions: SessionInfo[] = [];
+  const renamedSessions: SessionChangeNotifications["renamedSessions"] = [];
+
+  for (const updated of diff.updated) {
+    const previous =
+      previousByPath.get(updated.path) || previousById.get(updated.id);
+
+    if (!previous) {
+      newSessions.push(updated);
+      continue;
+    }
+
+    const previousName = normalizeSessionName(previous);
+    const nextName = normalizeSessionName(updated);
+    if (previousName !== nextName) {
+      renamedSessions.push({
+        before: previousName || getSessionDisplayName(previous, fallbackName),
+        after: nextName || getSessionDisplayName(updated, fallbackName),
+        path: updated.path,
+      });
+    }
+  }
+
+  return { newSessions, renamedSessions };
+}
+
 export interface UseSessionsReturn {
   sessions: SessionInfo[];
   loading: boolean;
@@ -60,6 +122,7 @@ export interface UseSessionsReturn {
 
 export function useSessions(): UseSessionsReturn {
   const { t } = useTranslation();
+  const { sendNotification } = useNotification();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(
     null,
@@ -67,15 +130,83 @@ export function useSessions(): UseSessionsReturn {
   const [loading, setLoading] = useState(true);
   const [pendingDeleteSession, setPendingDeleteSession] =
     useState<PendingDeleteSession | null>(null);
+  const sessionsRef = useRef<SessionInfo[]>([]);
   const selectedSessionRef = useRef<SessionInfo | null>(null);
+
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
 
   useEffect(() => {
     selectedSessionRef.current = selectedSession;
   }, [selectedSession]);
 
+  const notifyNewSessions = useCallback(
+    (newSessions: SessionInfo[]) => {
+      if (getSessionRuntimeMode() !== "backend" || newSessions.length === 0) {
+        return;
+      }
+
+      const fallbackName = t("session.list.untitled", {
+        defaultValue: "Untitled Session",
+      });
+
+      if (newSessions.length === 1) {
+        const session = newSessions[0];
+        void sendNotification({
+          title: t("session.notifications.newSession", {
+            defaultValue: "New Session",
+          }),
+          body: getSessionDisplayName(session, fallbackName),
+          sessionPath: session.path,
+        });
+        return;
+      }
+
+      void sendNotification({
+        title: t("session.notifications.newSessions", {
+          defaultValue: "New Sessions",
+        }),
+        body: t("session.notifications.newSessionsBody", {
+          count: newSessions.length,
+          defaultValue: "{{count}} new sessions",
+        }),
+      });
+    },
+    [sendNotification, t],
+  );
+
+  const notifySessionRenamed = useCallback(
+    (before: string, after: string, sessionPath: string) => {
+      if (getSessionRuntimeMode() !== "backend" || before === after) {
+        return;
+      }
+
+      void sendNotification({
+        title: t("session.notifications.renamed", {
+          defaultValue: "Session Renamed",
+        }),
+        body: `${before} -> ${after}`,
+        sessionPath,
+      });
+    },
+    [sendNotification, t],
+  );
+
+  const notifySessionChanges = useCallback(
+    ({ newSessions, renamedSessions }: SessionChangeNotifications) => {
+      notifyNewSessions(newSessions);
+      for (const renamed of renamedSessions) {
+        notifySessionRenamed(renamed.before, renamed.after, renamed.path);
+      }
+    },
+    [notifyNewSessions, notifySessionRenamed],
+  );
+
   const loadSessions = useCallback(async () => {
     try {
       const loadedSessions: SessionInfo[] = await loadRuntimeSessions();
+      sessionsRef.current = loadedSessions;
       setSessions(loadedSessions);
 
       const currentSelection = selectedSessionRef.current;
@@ -141,6 +272,15 @@ export function useSessions(): UseSessionsReturn {
   }, [t]);
 
   const patchSessions = useCallback((diff: SessionsDiff) => {
+    const fallbackName = t("session.list.untitled", {
+      defaultValue: "Untitled Session",
+    });
+    const notificationEvents = getSessionChangeNotifications(
+      sessionsRef.current,
+      diff,
+      fallbackName,
+    );
+
     setSessions((prev) => {
       const removedSet = new Set(diff.removed);
       let changed =
@@ -170,11 +310,17 @@ export function useSessions(): UseSessionsReturn {
         }
       }
 
-      if (!changed) return prev;
+      if (!changed) {
+        sessionsRef.current = prev;
+        return prev;
+      }
 
       next.sort((a, b) => b.modified.localeCompare(a.modified));
+      sessionsRef.current = next;
       return next;
     });
+
+    notifySessionChanges(notificationEvents);
 
     // Update selected session if it was in the diff
     const currentSelection = selectedSessionRef.current;
@@ -191,7 +337,7 @@ export function useSessions(): UseSessionsReturn {
         }
       }
     }
-  }, []);
+  }, [notifySessionChanges, t]);
 
   const handleDeleteSessions = useCallback(
     async (
@@ -270,9 +416,13 @@ export function useSessions(): UseSessionsReturn {
       );
 
       if (deletedSessionIds.size > 0) {
-        setSessions((prev) =>
-          prev.filter((session) => !deletedSessionIds.has(session.id)),
-        );
+        setSessions((prev) => {
+          const next = prev.filter(
+            (session) => !deletedSessionIds.has(session.id),
+          );
+          sessionsRef.current = next;
+          return next;
+        });
       }
 
       if (result.failed.length > 0) {
@@ -318,9 +468,15 @@ export function useSessions(): UseSessionsReturn {
           return;
         }
 
+        const fallbackName = t("session.list.untitled", {
+          defaultValue: "Untitled Session",
+        });
+        const beforeName = getSessionDisplayName(session, fallbackName);
+        const afterName = newName.trim() || fallbackName;
         const updated = await renameRuntimeSessionItem(session.path, newName);
-        setSessions((prev) =>
-          prev.map((s) =>
+        const updatedPath = updated?.path || session.path;
+        setSessions((prev) => {
+          const next = prev.map((s) =>
             s.id === session.id
               ? {
                   ...s,
@@ -329,8 +485,10 @@ export function useSessions(): UseSessionsReturn {
                   path: updated?.path || s.path,
                 }
               : s,
-          ),
-        );
+          );
+          sessionsRef.current = next;
+          return next;
+        });
 
         if (selectedSession?.id === session.id) {
           setSelectedSession((prev) =>
@@ -344,12 +502,16 @@ export function useSessions(): UseSessionsReturn {
               : null,
           );
         }
+
+        if (normalizeSessionName(session) !== newName.trim()) {
+          notifySessionRenamed(beforeName, afterName, updatedPath);
+        }
       } catch (error) {
         console.error("Failed to rename session:", error);
         alert(t("app.errors.renameSession"));
       }
     },
-    [selectedSession, t],
+    [notifySessionRenamed, selectedSession, t],
   );
 
   const forkSession = useCallback(
@@ -378,8 +540,10 @@ export function useSessions(): UseSessionsReturn {
         setSessions((prev) => {
           const updated = [newSession, ...prev];
           updated.sort((a, b) => b.modified.localeCompare(a.modified));
+          sessionsRef.current = updated;
           return updated;
         });
+        notifyNewSessions([newSession]);
 
         return newSession;
       } catch (error) {
@@ -392,7 +556,7 @@ export function useSessions(): UseSessionsReturn {
         return null;
       }
     },
-    [t],
+    [notifyNewSessions, t],
   );
 
   useEffect(() => {
@@ -433,11 +597,13 @@ export function useSessions(): UseSessionsReturn {
         const sessionId = payload?.sessionId;
         if (!sessionId) return;
         // Just mark as not-live; no full rescan needed.
-        setSessions((prev) =>
-          prev.map((s) =>
+        setSessions((prev) => {
+          const next = prev.map((s) =>
             s.id === sessionId ? { ...s, isLive: false, pid: undefined } : s,
-          ),
-        );
+          );
+          sessionsRef.current = next;
+          return next;
+        });
       });
       unlisten = () => {
         if (u1) u1();

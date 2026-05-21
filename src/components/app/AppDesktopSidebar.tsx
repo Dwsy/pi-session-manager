@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { Columns3, LayoutDashboard, Search, Settings, Star, Terminal } from "lucide-react";
+import { Columns3, FolderOpen, LayoutDashboard, List, Search, Settings, Star, Terminal } from "lucide-react";
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
 
@@ -54,96 +54,110 @@ function AppDesktopSidebar({
   const { t } = useTranslation();
 
   return (
-    <div className="w-80 border-r border-border flex flex-col">
+    <div
+      className="app-desktop-sidebar w-80 border-r border-border flex flex-col"
+      role="navigation"
+      aria-label={t("app.sidebar.label", "Primary navigation")}
+    >
       <div
-        className={`${isTauriRuntime ? "h-8" : ""} border-b border-border flex items-center px-3 ${isTauriRuntime ? "py-0" : "py-1.5"} select-none`}
+        className={`app-desktop-sidebar__chrome ${isTauriRuntime ? "h-8" : ""} border-b border-border flex items-center px-3 ${isTauriRuntime ? "py-0" : "py-1.5"} select-none`}
         {...(isTauriRuntime
           ? { "data-tauri-drag-region": true, onMouseDown: startDragging }
           : {})}
       >
-        <div className="flex items-center gap-0.5 ml-auto no-drag">
+        <div
+          className="flex items-center gap-0.5 ml-auto no-drag"
+          role="toolbar"
+          aria-label={t("app.sidebar.toolbar", "App controls")}
+        >
           {showDashboardButton && (
             <button
+              type="button"
               onClick={onShowDashboard}
+              aria-label={t("dashboard.title")}
               className="p-1 rounded motion-color motion-press focus-ring mr-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
               title={t("dashboard.title")}
             >
-              <LayoutDashboard className="h-3.5 w-3.5" />
+              <LayoutDashboard className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           )}
-          <div className="flex items-center bg-surface rounded-lg p-0.5 mr-1">
+          <div
+            className="flex items-center bg-surface rounded-lg p-0.5 mr-1"
+            role="radiogroup"
+            aria-label={t("app.viewMode.label", "View mode")}
+          >
             <KbdTooltip shortcut="Cmd+L" label={t("app.viewMode.list")}>
               <button
+                type="button"
                 onClick={onSelectListView}
+                role="radio"
+                aria-checked={sidebarMode === "list" && !showFavorites}
+                aria-label={t("app.viewMode.list")}
                 className={`p-1 rounded motion-color motion-press focus-ring ${sidebarMode === "list" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
                 title={t("app.viewMode.list")}
               >
-                <svg
-                  className="h-3.5 w-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                  />
-                </svg>
+                <List className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </KbdTooltip>
             <KbdTooltip shortcut="Cmd+P" label={t("app.viewMode.project")}>
               <button
+                type="button"
                 onClick={onSelectProjectView}
+                role="radio"
+                aria-checked={sidebarMode === "project" && !showFavorites}
+                aria-label={t("app.viewMode.project")}
                 className={`p-1 rounded motion-color motion-press focus-ring ${sidebarMode === "project" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
                 title={t("app.viewMode.project")}
               >
-                <svg
-                  className="h-3.5 w-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                  />
-                </svg>
+                <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </KbdTooltip>
             <KbdTooltip shortcut="Cmd+B" label={t("tags.kanban.title")}>
               <button
+                type="button"
                 onClick={onSelectKanbanView}
+                role="radio"
+                aria-checked={sidebarMode === "kanban" && !showFavorites}
+                aria-label={t("tags.kanban.title")}
                 className={`p-1 rounded motion-color motion-press focus-ring ${sidebarMode === "kanban" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
                 title={t("tags.kanban.title")}
               >
-                <Columns3 className="h-3.5 w-3.5" />
+                <Columns3 className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </KbdTooltip>
           </div>
           <button
+            type="button"
             onClick={onToggleFavorites}
+            aria-label={showFavorites ? t("favorites.back") : t("favorites.title")}
+            aria-pressed={showFavorites}
             className={`p-1 rounded motion-color motion-press focus-ring ml-0.5 ${showFavorites ? "text-yellow-400 bg-secondary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
             title={showFavorites ? t("favorites.back") : t("favorites.title")}
           >
-            <Star className="h-3.5 w-3.5" />
+            <Star className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           <KbdTooltip shortcut="Cmd+K">
             <button
+              type="button"
               onClick={onOpenCommandPalette}
+              aria-label={t("app.shortcuts.searchAll", "Search all sessions")}
               className="p-1 rounded motion-color motion-press focus-ring ml-0.5 text-muted-foreground hover:text-foreground hover:bg-secondary group relative"
               title={t("app.shortcuts.searchAll", "Search all sessions") + " (Cmd+K)"}
             >
-              <Search className="h-3.5 w-3.5" />
+              <Search className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </KbdTooltip>
           {terminalEnabled && (
             <KbdTooltip shortcut="Ctrl+`">
               <button
+                type="button"
                 onClick={onToggleTerminal}
+                aria-label={
+                  showTerminal
+                    ? t("terminal.close", "Close terminal")
+                    : t("terminal.open", "Open terminal")
+                }
+                aria-pressed={showTerminal}
                 className={`p-1 rounded motion-color motion-press focus-ring ml-0.5 ${
                   showTerminal
                     ? "text-green-400 bg-secondary"
@@ -155,13 +169,15 @@ function AppDesktopSidebar({
                     : "Open terminal (Ctrl+`)"
                 }
               >
-                <Terminal className="h-3.5 w-3.5" />
+                <Terminal className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </KbdTooltip>
           )}
           <KbdTooltip shortcut="Cmd+,">
             <button
+              type="button"
               onClick={onOpenSettings}
+              aria-label={settingsLabel || t("settings.title")}
               className="p-1 rounded motion-color motion-press focus-ring ml-0.5 text-muted-foreground hover:text-foreground hover:bg-secondary"
               title={settingsLabel || t("settings.title")}
             >
@@ -172,10 +188,16 @@ function AppDesktopSidebar({
       </div>
 
       {!showFavorites && (
-        <div className="px-3 py-1.5 border-b border-border/50">{searchBar}</div>
+        <div className="app-desktop-sidebar__search px-3 py-1.5 border-b border-border/50">
+          {searchBar}
+        </div>
       )}
 
-      <div className="flex-1 overflow-y-auto" ref={listScrollRef}>
+      <div
+        className="app-desktop-sidebar__content flex-1 overflow-y-auto"
+        ref={listScrollRef}
+        aria-label={t("app.sidebar.content", "Sidebar content")}
+      >
         {content}
       </div>
     </div>
