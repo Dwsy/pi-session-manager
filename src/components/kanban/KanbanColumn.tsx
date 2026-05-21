@@ -1,7 +1,7 @@
 import { useRef, useMemo, useState, useLayoutEffect } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { useVirtualizer, measureElement as virtualMeasureElement } from '@tanstack/react-virtual'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo, Tag, FavoriteItem } from '@/types'
 import KanbanCard from './KanbanCard'
@@ -39,11 +39,12 @@ interface KanbanColumnProps {
   isMobile?: boolean
   liveSessionIds?: Set<string>
   hideProjectInfo?: boolean
+  isDropTarget?: boolean
 }
 
 // Threshold for enabling virtualization
 const VIRTUALIZATION_THRESHOLD = 50
-const ESTIMATED_CARD_HEIGHT = 80
+const ESTIMATED_CARD_HEIGHT = 88
 
 export default function KanbanColumn({
   id,
@@ -66,10 +67,14 @@ export default function KanbanColumn({
   isMobile,
   liveSessionIds,
   hideProjectInfo = false,
+  isDropTarget = false,
 }: KanbanColumnProps) {
   const { t } = useTranslation()
   const { copyText } = useClipboard()
-  const { setNodeRef, isOver } = useDroppable({ id })
+  const { setNodeRef, isOver } = useDroppable({
+    id,
+    data: { type: 'column' },
+  })
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Context menu state
@@ -102,12 +107,11 @@ export default function KanbanColumn({
     count: sessions.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ESTIMATED_CARD_HEIGHT,
+    getItemKey: (index) => sessions[index]?.id ?? index,
     overscan: 5,
     enabled: useVirtual,
-    measureElement: (element, entry, instance) => {
-      const height = virtualMeasureElement(element, entry, instance)
-      return height
-    },
+    measureElement: (element) =>
+      Math.ceil((element as HTMLElement).getBoundingClientRect().height) || ESTIMATED_CARD_HEIGHT,
   })
 
   // Reset size cache when sessions change so virtualizer re-measures
@@ -183,7 +187,7 @@ export default function KanbanColumn({
   }
 
   return (
-    <div className={`flex flex-col flex-shrink-0 h-full overflow-hidden ${isMobile ? 'w-full' : 'w-64 min-w-[256px]'}`}>
+    <div className={`flex flex-col flex-shrink-0 h-full min-h-0 overflow-hidden ${isMobile ? 'w-full' : 'w-64 min-w-[256px]'}`}>
       {/* Column Header - hidden on mobile (tabs handle this) */}
       {!isMobile && (
       <div className="flex items-center gap-2 px-3 py-2.5 mb-1">
@@ -219,7 +223,7 @@ export default function KanbanColumn({
         className={[
           'flex-1 min-h-0 rounded-lg border p-1.5 motion-color',
           'bg-muted/20 border-border/30',
-          isOver ? 'border-primary/50 bg-primary/5' : '',
+          isOver || isDropTarget ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/25' : '',
         ].filter(Boolean).join(' ')}
       >
         <div

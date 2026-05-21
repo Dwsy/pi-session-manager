@@ -38,7 +38,14 @@ function KanbanCardInner({
     setNodeRef,
     transform,
     transition,
-  } = useSortable({ id: session.id, disabled: isOverlay })
+    isDragging: sortableIsDragging,
+  } = useSortable({
+    id: session.id,
+    disabled: isOverlay,
+    data: { type: 'card' },
+  })
+
+  const dragging = isDragging || sortableIsDragging
 
   const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (cardRef.current) {
@@ -68,8 +75,8 @@ function KanbanCardInner({
     'group relative rounded-md border p-2.5 motion-surface motion-color',
     'bg-card hover:border-border',
     isSelected ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20' : 'border-border/40',
-    isDragging ? 'opacity-50 shadow-lg' : '',
-    isOverlay ? 'shadow-xl rotate-2 scale-105 mb-0' : '',
+    dragging ? 'opacity-40 border-primary/40 shadow-lg ring-1 ring-primary/20' : '',
+    isOverlay ? 'shadow-xl rotate-2 scale-105 mb-0 cursor-grabbing' : '',
   ].filter(Boolean).join(' ')
 
   return (
@@ -86,6 +93,7 @@ function KanbanCardInner({
       onClick={isOverlay ? undefined : handleClick}
       onContextMenu={onContextMenu}
       data-session-id={session.id}
+      data-dragging={dragging ? 'true' : undefined}
       {...(isOverlay ? {} : { ...attributes, ...listeners })}
     >
       {/* Header: Title + Tags */}

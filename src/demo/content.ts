@@ -27,10 +27,10 @@ const DEMO_READ_PREVIEW_IMAGE_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP8z8DwnwEIAQH/t7tM2QAAAABJRU5ErkJggg=='
 
 const DEMO_EDIT_DIFF = [
-  '  18 export default function ToolCallList({ toolCalls, toolResultByCallId }: ToolCallListProps) {',
+  '  18 export default function ToolCallRenderer({ toolCalls, toolResultByCallId }: ToolCallRendererProps) {',
   '  19   return (',
-  '- 20     <div className="tool-call-list compact">',
-  '+ 20     <div className="tool-call-list">',
+  '- 20     <div className="tool-call-renderer compact">',
+  '+ 20     <div className="tool-call-renderer">',
   '  21       {toolCalls.map((toolCall, index) => {',
   '  22         const name = toolCall.name || "unknown"',
   '  23         const args = toolCall.arguments || {}',

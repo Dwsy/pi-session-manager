@@ -1,9 +1,11 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Play, Terminal, Globe, Star, Trash2, Tag, X, Copy } from 'lucide-react'
 import type { SessionInfo, Tag as TagType, FavoriteItem } from '@/types'
 import type { DeleteSessionAnchorPoint } from '@/components/dialogs/deleteSessionTypes'
 import TagBadge from '@/components/tags/TagBadge'
+
+const CONFIRM_TIMEOUT_MS = 3000
 
 interface ContextMenuItem {
   id: string
@@ -49,6 +51,26 @@ export default function KanbanContextMenu({
   const { t } = useTranslation()
   const [adjustedPosition, setAdjustedPosition] = useState(position)
   const [showTagSubmenu, setShowTagSubmenu] = useState(false)
+  const [isDeleteConfirming, setIsDeleteConfirming] = useState(false)
+  const deleteConfirmTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const clearDeleteConfirmTimeout = useCallback(() => {
+    if (deleteConfirmTimeoutRef.current) {
+      clearTimeout(deleteConfirmTimeoutRef.current)
+      deleteConfirmTimeoutRef.current = null
+    }
+  }, [])
+
+  const startDeleteConfirmTimeout = useCallback(() => {
+    clearDeleteConfirmTimeout()
+    deleteConfirmTimeoutRef.current = setTimeout(() => {
+      setIsDeleteConfirming(false)
+    }, CONFIRM_TIMEOUT_MS)
+  }, [clearDeleteConfirmTimeout])
+
+  useEffect(() => {
+    return () => clearDeleteConfirmTimeout()
+  }, [clearDeleteConfirmTimeout])
 
   // Adjust position to keep menu within viewport
   useEffect(() => {
@@ -124,33 +146,16 @@ export default function KanbanContextMenu({
       onClick: onCopyResume,
     }] : []),
     { id: 'separator1', label: '', onClick: () => {} },
-    {
-      id: 'delete',
-      label: t('common.delete'),
-      icon: <Trash2 size={14} />,
-      danger: true,
-      onClick: () => {},
-    },
   ]
 
   const handleItemClick = useCallback((item: ContextMenuItem, e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
 
-    if (item.id === 'delete') {
-      const rect = e.currentTarget.getBoundingClientRect()
-      onDelete({
-        x: rect.left + rect.width / 2,
-        y: rect.bottom,
-      })
-      onClose()
-      return
-    }
-
     item.onClick()
     if (item.id !== 'tags') {
       onClose()
     }
-  }, [onClose, onDelete])
+  }, [onClose])
 
   if (showTagSubmenu) {
     return (
@@ -236,6 +241,51 @@ export default function KanbanContextMenu({
           </button>
         )
       })}
+      {isDeleteConfirming ? (
+        <div className="px-2 py-1">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(event) => {
+                event.stopPropagation()
+                const rect = event.currentTarget.getBoundingClientRect()
+                clearDeleteConfirmTimeout()
+                onDelete({
+                  x: rect.left + rect.width / 2,
+                  y: rect.bottom,
+                })
+                onClose()
+              }}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded bg-red-600 px-2 py-1.5 text-[10px] text-white hover:bg-red-700 motion-color focus-ring"
+            >
+              <Trash2 className="h-3 w-3" />
+              <span>{t('common.confirm', { defaultValue: 'Confirm?' })}</span>
+            </button>
+            <button
+              onClick={(event) => {
+                event.stopPropagation()
+                clearDeleteConfirmTimeout()
+                setIsDeleteConfirming(false)
+              }}
+              className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary motion-color focus-ring"
+              title={t('common.cancel')}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={(event) => {
+            event.stopPropagation()
+            setIsDeleteConfirming(true)
+            startDeleteConfirmTimeout()
+          }}
+          className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-red-500 hover:bg-red-500/10 motion-color focus-ring"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          <span className="flex-1 text-left text-xs">{t('common.delete')}</span>
+        </button>
+      )}
     </div>
   )
 }

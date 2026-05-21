@@ -64,6 +64,8 @@ function AppDesktopSearchBar({
   onSelectModeTrigger,
 }: AppDesktopSearchBarProps) {
   const { t } = useTranslation();
+  const hasVisibleSessionList =
+    sidebarMode === "list" || (sidebarMode === "project" && !!selectedProject);
 
   return (
     <div className="flex min-w-0 flex-col">
@@ -97,7 +99,7 @@ function AppDesktopSearchBar({
           compact
           className="flex-1"
         />
-        {onSelectModeTrigger && (
+        {onSelectModeTrigger && hasVisibleSessionList && (
           <button
             type="button"
             onClick={onSelectModeTrigger}

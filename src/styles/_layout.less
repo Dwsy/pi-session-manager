@@ -142,50 +142,19 @@
   padding: 12px;
 }
 
-// Sidebar Vibrancy Mode
-// When macOS native vibrancy is active, make the entire layer stack
-// transparent so NSVisualEffectView blur shows through the sidebar.
-// The main content area gets its own opaque background.
-
-// Root container: transparent so native effect penetrates
-[data-sidebar-vibrancy] {
-  background: transparent !important;
-}
-
-// Body must also be transparent — use :has() since body is the ancestor
-body:has([data-sidebar-vibrancy]) {
-  background: transparent !important;
-}
-
-// Main div with bg-background must also be transparent
-[data-sidebar-vibrancy].bg-background {
-  background: transparent !important;
-}
-
-// Sidebar: fully transparent for native blur
-[data-sidebar-vibrancy] .w-80 {
-  background: transparent !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-// Main content area: keep opaque background
-[data-sidebar-vibrancy] .flex-1.min-h-0 > :last-child {
+// App shell packages
+.app-shell {
   background: var(--body-bg);
 }
 
-// Sidebar internal surfaces: semi-transparent
-[data-sidebar-vibrancy] .w-80 .bg-surface {
-  background: rgba(var(--color-card), 0.85) !important;
+.app-desktop-sidebar {
+  background: rgb(var(--color-card));
 }
 
-// Soften borders in vibrancy mode
-[data-sidebar-vibrancy] .w-80 .border-b,
-[data-sidebar-vibrancy] .w-80 .border-r {
-  border-color: rgba(var(--border-rgb), 0.25) !important;
+.app-desktop-content {
+  background: var(--body-bg);
 }
 
-// Tauri drag region: transparent for vibrancy
-[data-sidebar-vibrancy] [data-tauri-drag-region] {
-  background: transparent !important;
+.app-desktop-content__main {
+  background: var(--body-bg);
 }

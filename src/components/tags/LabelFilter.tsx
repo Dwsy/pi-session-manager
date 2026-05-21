@@ -1,7 +1,22 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { ListFilter, Check, Plus, Search, Calendar, ChevronRight, ArrowLeft, ArrowUpDown, ArrowDownWideNarrow, ArrowUpNarrowWide } from "lucide-react";
+import {
+  ListFilter,
+  Check,
+  Plus,
+  Search,
+  Calendar,
+  ChevronRight,
+  ArrowLeft,
+  ArrowUpDown,
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
+  Folder,
+  Bot,
+  CircleDot,
+  Tags,
+} from "lucide-react";
 import type { Tag as TagType, SessionTag, DateRange } from "@/types";
 import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
 import CompositionInput from "@/components/ui/CompositionInput";
@@ -472,6 +487,7 @@ export default function LabelFilter({
                       onClick={() => setSubmenu("sources")}
                       className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
                     >
+                      <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                       <span className="flex-1 text-left">{t("tags.filter.sources", "Sources")}</span>
                       {selectedSourceSlugs.length > 0 && (
                         <span className="text-[11px] text-muted-foreground/60">{selectedSourceSlugs.length}</span>
@@ -485,6 +501,7 @@ export default function LabelFilter({
                       onClick={() => setSubmenu("models")}
                       className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
                     >
+                      <Bot className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                       <span className="flex-1 text-left">{t("tags.filter.models", "Models")}</span>
                       {selectedModel && (
                         <span className="text-[11px] text-muted-foreground/60 truncate max-w-[100px]">{selectedModel}</span>
@@ -498,7 +515,7 @@ export default function LabelFilter({
                       onClick={() => setSubmenu("dates")}
                       className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
                     >
-                      <Calendar className="h-3.5 w-3.5 text-muted-foreground/60" />
+                      <Calendar className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                       <span className="flex-1 text-left">{t("tags.filter.dateRange", "Date Range")}</span>
                       {dateRange && (
                         <span className="text-[11px] text-muted-foreground/60">{t("tags.filter.active", "Active")}</span>
@@ -512,7 +529,7 @@ export default function LabelFilter({
                       onClick={() => setSubmenu("sort")}
                       className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
                     >
-                      <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/60" />
+                      <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                       <span className="flex-1 text-left">{t("session.sort.label", "Sort")}</span>
                       <span className="text-[11px] text-muted-foreground/60 truncate max-w-[80px] flex items-center gap-0.5">
                         {t(SORT_OPTIONS.find(o => o.value === sortBy)?.labelKey || "", { defaultValue: SORT_OPTIONS.find(o => o.value === sortBy)?.fallback || "" })}
@@ -531,6 +548,7 @@ export default function LabelFilter({
                       onClick={() => setSubmenu("statuses")}
                       className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
                     >
+                      <CircleDot className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                       <span className="flex-1 text-left">{t("tags.filter.statuses")}</span>
                       {filterTagIds.some(id => filteredStatuses.some(s => s.tag.id === id)) && (
                         <span className="text-[11px] text-muted-foreground/60">
@@ -545,6 +563,7 @@ export default function LabelFilter({
                     onClick={() => setSubmenu("labels")}
                     className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
                   >
+                    <Tags className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                     <span className="flex-1 text-left">{t("tags.filter.labels")}</span>
                     {filterTagIds.some(id => filteredLabels.some(l => l.tag.id === id)) && (
                       <span className="text-[11px] text-muted-foreground/60">

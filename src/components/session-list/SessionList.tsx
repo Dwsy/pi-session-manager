@@ -380,6 +380,8 @@ export default function SessionList({
     getScrollElement: () => scrollParentRef?.current ?? null,
     estimateSize: () => ESTIMATED_ROW_HEIGHT,
     overscan: 4,
+    measureElement: (element) =>
+      (element as HTMLElement).offsetHeight || ESTIMATED_ROW_HEIGHT,
   });
 
   useEffect(() => {
@@ -425,6 +427,7 @@ export default function SessionList({
     sessions.length,
     showDirectory,
   ]);
+
   const virtualRows = rowVirtualizer.getVirtualItems();
 
   useLayoutEffect(() => {
@@ -600,11 +603,9 @@ export default function SessionList({
     if (!onDeleteSessions) {
       return;
     }
-    if (isSelectionMode) {
-      handleExitSelectionMode();
-      return;
+    if (!isSelectionMode) {
+      handleEnterSelectionMode();
     }
-    handleEnterSelectionMode();
   }, [
     handleExitSelectionMode,
     handleEnterSelectionMode,

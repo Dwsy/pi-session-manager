@@ -18,17 +18,22 @@ function AppDesktopContent({
   const hideMainContent = showTerminal && terminalMaximized;
 
   return (
-    <div className="flex-1 overflow-hidden flex flex-col relative">
+    <div
+      className="app-desktop-content flex-1 overflow-hidden flex flex-col relative"
+      role="main"
+      aria-label="Main workspace"
+    >
       {isTauriRuntime && !hideMainContent && (
         <div
           className="absolute top-0 left-0 right-0 h-8 z-10"
           data-tauri-drag-region
         />
       )}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="app-desktop-content__shell flex-1 overflow-hidden flex flex-col">
         <div
-          className="flex-1 overflow-hidden"
+          className="app-desktop-content__main flex-1 overflow-hidden"
           style={{ display: hideMainContent ? "none" : undefined }}
+          aria-hidden={hideMainContent || undefined}
         >
           {mainContent}
         </div>

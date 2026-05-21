@@ -5,10 +5,14 @@ import { Plus, Loader2 } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
+  MeasuringStrategy,
   PointerSensor,
   useSensor,
   useSensors,
   closestCorners,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
@@ -65,6 +69,11 @@ interface ColumnData {
 }
 
 const PREVIEW_CLICK_THROUGH_GUARD_MS = 120
+const DND_MEASURING = {
+  droppable: {
+    strategy: MeasuringStrategy.Always,
+  },
+}
 
 export default function KanbanBoard({
   sessions,
@@ -97,6 +106,7 @@ export default function KanbanBoard({
   const { t } = useTranslation()
   const isMobile = useIsMobile()
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeOverColumnId, setActiveOverColumnId] = useState<string | null>(null)
   const [mobileColIndex, setMobileColIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null)
@@ -183,6 +193,26 @@ export default function KanbanBoard({
     return cols
   }, [sortedTags, filteredSessions, sessionTags, sessionMap, filterTagIds])
 
+  const columnIds = useMemo(() => new Set(columns.map(col => col.id)), [columns])
+
+  const collisionDetection = useCallback<CollisionDetection>((args) => {
+    const withoutActive = (collisions: ReturnType<CollisionDetection>) =>
+      collisions.filter(collision => collision.id !== args.active.id)
+
+    const pointerCollisions = withoutActive(pointerWithin(args))
+    if (pointerCollisions.length > 0) {
+      return pointerCollisions
+    }
+
+    const rectCollisions = withoutActive(rectIntersection(args))
+    if (rectCollisions.length > 0) {
+      const cardCollisions = rectCollisions.filter(collision => !columnIds.has(String(collision.id)))
+      return cardCollisions.length > 0 ? cardCollisions : rectCollisions
+    }
+
+    return withoutActive(closestCorners(args))
+  }, [columnIds])
+
   // Get active session for drag overlay
   const activeSession = activeId ? sessionMap.get(activeId) : null
 
@@ -196,17 +226,26 @@ export default function KanbanBoard({
     return null
   }, [columns])
 
+  const resolveOverColumnId = useCallback((overId: string): string | null => {
+    const targetColumn = columns.find(c => c.id === overId)
+    if (targetColumn) return targetColumn.id
+    return findColumnForSession(overId)
+  }, [columns, findColumnForSession])
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string)
-  }, [])
+    setActiveOverColumnId(findColumnForSession(event.active.id as string))
+  }, [findColumnForSession])
 
-  const handleDragOver = useCallback((_event: DragOverEvent) => {
-    // Could add visual feedback here
-  }, [])
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const overId = event.over?.id
+    setActiveOverColumnId(overId ? resolveOverColumnId(overId as string) : null)
+  }, [resolveOverColumnId])
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
     setActiveId(null)
+    setActiveOverColumnId(null)
 
     if (!over) return
 
@@ -356,7 +395,8 @@ export default function KanbanBoard({
       {/* Board */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={collisionDetection}
+        measuring={DND_MEASURING}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
@@ -401,6 +441,7 @@ export default function KanbanBoard({
                     isMobile
                     liveSessionIds={liveSessionIds}
                     hideProjectInfo={!!projectFilter}
+                    isDropTarget={activeOverColumnId === columns[mobileColIndex].id && activeId !== null}
                 />
               )}
             </div>
@@ -408,9 +449,9 @@ export default function KanbanBoard({
         ) : (
           /* Desktop: horizontal scroll */
           <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-4">
-            <div className="kanban-board flex gap-3 h-full min-h-0">
+            <div className="kanban-board flex items-stretch gap-3 h-full min-h-0">
               {columns.map(col => (
-                <div key={col.id} className="kanban-column">
+                <div key={col.id} className="kanban-column h-full min-h-0">
                   <KanbanColumn
                     id={col.id}
                     tag={col.tag}
@@ -427,6 +468,7 @@ export default function KanbanBoard({
                     onCopyResumeSession={onCopyResumeSession}
                     liveSessionIds={liveSessionIds}
                     hideProjectInfo={!!projectFilter}
+                    isDropTarget={activeOverColumnId === col.id && activeId !== null}
                   />
                 </div>
               ))}
