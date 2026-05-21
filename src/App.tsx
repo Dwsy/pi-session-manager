@@ -27,7 +27,6 @@ import { useSettings } from "./hooks/useSettings";
 import { useToolStyles } from "./hooks/useToolStyles";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useClipboard } from "./hooks/useClipboard";
-import { useKeepWarm } from "./hooks/useKeepWarm";
 import { useContextMenuOverride } from "./hooks/useContextMenuOverride";
 import { useAppBootstrap } from "./hooks/app/useAppBootstrap";
 import { useAppUiEffects } from "./hooks/app/useAppUiEffects";
@@ -136,9 +135,6 @@ function App() {
       : import.meta.env.MODE === "demo"
         ? "demo"
         : "web";
-
-  // Keep WebView warm when hidden to prevent WebKit throttling
-  useKeepWarm(isTauriRuntime);
 
   // Override WebKit context menu for native feel
   useContextMenuOverride();
