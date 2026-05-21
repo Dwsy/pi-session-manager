@@ -82,10 +82,8 @@ function SessionViewerContent({
   const isMobile = useIsMobile();
   const { copyText } = useClipboard();
   const {
-    collapseToolCalls,
     cmdFBehavior,
     scrollMarkersEnabled,
-    toggleCollapseToolCalls,
   } = useSessionViewerSettingsState({ previewMode });
 
   const { liveSession, isLive } = useSessionViewerLiveState({
@@ -271,8 +269,6 @@ function SessionViewerContent({
     onToggleSidebar: handleToggleSidebar,
     onToggleThinking: toggleThinking,
     onToggleToolsExpanded: toggleToolsExpanded,
-    collapseToolCalls,
-    onToggleCollapseToolCalls: toggleCollapseToolCalls,
     onToggleScrollMarkers: toggleScrollMarkers,
     onOpenSearch: handleOpenSearch,
     onMobileMenuOpenChange: setShowMobileMenu,

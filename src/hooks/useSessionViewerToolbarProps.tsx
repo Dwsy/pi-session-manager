@@ -28,8 +28,6 @@ export interface UseSessionViewerToolbarPropsOptions {
   onToggleSidebar: () => void;
   onToggleThinking: () => void;
   onToggleToolsExpanded: () => void;
-  collapseToolCalls: boolean;
-  onToggleCollapseToolCalls: () => void;
   onToggleScrollMarkers: () => void;
   onOpenSearch: () => void;
   onMobileMenuOpenChange: Dispatch<SetStateAction<boolean>>;
@@ -71,8 +69,6 @@ export function useSessionViewerToolbarProps({
   onToggleSidebar,
   onToggleThinking,
   onToggleToolsExpanded,
-  collapseToolCalls,
-  onToggleCollapseToolCalls,
   onToggleScrollMarkers,
   onOpenSearch,
   onMobileMenuOpenChange,
@@ -114,8 +110,6 @@ export function useSessionViewerToolbarProps({
     onToggleSidebar,
     onToggleThinking,
     onToggleToolsExpanded,
-    collapseToolCalls,
-    onToggleCollapseToolCalls,
     onToggleScrollMarkers,
     onOpenSearch,
     onMobileMenuOpenChange,

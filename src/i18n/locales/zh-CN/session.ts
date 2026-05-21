@@ -213,5 +213,12 @@ export const session = {
       switchToDesc: '切换到降序',
     },
   },
+  preview: {
+    show: '展开',
+    hide: '收起',
+    process: '过程',
+    review: '审查工具调用',
+    reviewShort: '审查',
+  },
   newMessages: '有新消息',
 } as const

@@ -1,7 +1,6 @@
 import type { Content, SessionEntry } from '@/types'
 import MarkdownContent from '@/components/ui/MarkdownContent'
 import ThinkingBlock from './ThinkingBlock'
-import ToolCallList from '@/components/tool-calls/ToolCallList'
 import { useSessionView } from '@/contexts/SessionViewContext'
 import { useSettings } from '@/hooks/useSettings'
 import { toolRenderRegistry } from '@/plugins/tools-render/registry'
@@ -15,25 +14,11 @@ import { ansiToMarkdown } from '@/utils/assistantContent'
 import { memo, useMemo, useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 
-import {
-  buildAssistantProcessSteps,
-  shouldCollapseProcess,
-} from './assistantProcess'
-
 /**
  * Assistant Message Renderer
  *
- * Renders an assistant message with optional foldEntries (merged tool-only entries).
- *
- * Two rendering modes based on collapseToolCalls setting:
- *
- * COLLAPSED (default):
- *   - Shows ToolCallList with summary header
- *   - Click header to expand/collapse tool calls
- *
- * EXPANDED:
- *   - Shows each tool call directly without grouping
- *   - Uses plugin components for individual rendering
+ * Renders assistant text, thinking blocks, and direct tool-call entries.
+ * Conversation-level process folding is handled by ConversationPreviewMessages.
  */
 
 interface AssistantMessageProps {
@@ -45,8 +30,6 @@ interface AssistantMessageProps {
   searchQuery?: string
   isStreaming?: boolean
   previewMode?: boolean
-  /** Previous assistant entries (tools only, no text) merged into this message */
-  foldEntries?: SessionEntry[]
 }
 
 function AssistantMessage({
@@ -57,7 +40,6 @@ function AssistantMessage({
   searchQuery = '',
   isStreaming = false,
   previewMode = false,
-  foldEntries,
 }: AssistantMessageProps) {
   const { t } = useTranslation()
   const { showThinking } = useSessionView()
@@ -72,18 +54,6 @@ function AssistantMessage({
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : appearance.theme as 'light' | 'dark'
   const disableSuccessStyle = settings.appearance.disableToolSuccessStyle
-
-  // User preference: collapse tool calls into summary
-  const collapseEnabled = settings.session.collapseToolCalls !== false
-
-  // Build process steps from foldEntries + current content
-  const processSteps = useMemo(
-    () => buildAssistantProcessSteps(entryId, content, foldEntries),
-    [content, entryId, foldEntries],
-  )
-
-  // Decide rendering mode: collapsed summary vs expanded list
-  const collapsed = shouldCollapseProcess(processSteps, collapseEnabled)
 
   // Extract blocks for rendering
   const { thinkingBlocks, textBlocks } = useMemo(() => {
@@ -101,7 +71,7 @@ function AssistantMessage({
     }
   }, [content])
 
-  // Tool calls for expanded mode (direct rendering)
+  // Tool calls render directly; conversation-level folding owns grouped summaries.
   const toolCalls = useMemo(
     () => content.filter((item): item is Content & { type: 'toolCall' } => item.type === 'toolCall'),
     [content],
@@ -126,17 +96,8 @@ function AssistantMessage({
         <div className="message-timestamp">{formatDate(timestamp)}</div>
       )}
 
-      {/* Tool Calls */}
-      {collapsed && processSteps.length > 0 && (
-        <ToolCallList
-          processSteps={processSteps}
-          toolResultByCallId={toolResultByCallId}
-          searchQuery={searchQuery}
-        />
-      )}
-
-      {/* Direct tool call rendering (when not collapsed) */}
-      {!collapsed && toolCalls.length > 0 && (
+      {/* Tool call rendering */}
+      {toolCalls.length > 0 && (
         <div className="assistant-direct-tools">
           {toolCalls.map((toolCall, index) => (
             <DirectToolCall

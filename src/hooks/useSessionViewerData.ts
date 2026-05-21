@@ -846,7 +846,7 @@ export function useSessionViewerData({
               }
 
               // Additionally, if there is partialResult, create/update a toolResult entry
-              // so the ToolCallList can render the intermediate output.
+              // so tool renderers can render the intermediate output.
               if (raw.partialResult || raw.result) {
                 const resultData = raw.partialResult || raw.result;
                 const toolResultEntry: SessionEntry = {

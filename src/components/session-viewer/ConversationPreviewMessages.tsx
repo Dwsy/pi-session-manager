@@ -1,4 +1,11 @@
-import { Brain, ChevronDown, ChevronRight, Code2, Eye, Terminal } from "lucide-react";
+import {
+  Brain,
+  ChevronDown,
+  ChevronRight,
+  Code2,
+  ListFilter,
+  Terminal,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -8,7 +15,7 @@ import ToolCallReviewModal from "./ToolCallReviewModal";
 
 interface ConversationPreviewTurn {
   id: string;
-  userEntry: SessionEntry;
+  userEntry?: SessionEntry;
   processEntries: SessionEntry[];
   assistantEntry?: SessionEntry;
 }
@@ -22,8 +29,12 @@ export interface ConversationPreviewMessagesProps {
   setScrollTargetId: (entryId: string | null) => void;
 }
 
-function isUserMessage(entry: SessionEntry): boolean {
-  return entry.type === "message" && entry.message?.role === "user";
+function isPromptMessage(entry: SessionEntry): boolean {
+  const role = entry.message?.role;
+  return (
+    entry.type === "message" &&
+    (role === "user" || role === "developer" || role === "system")
+  );
 }
 
 function isAssistantMessage(entry: SessionEntry): boolean {
@@ -37,12 +48,14 @@ function hasAssistantText(entry: SessionEntry): boolean {
   );
 }
 
-function buildConversationPreviewTurns(entries: SessionEntry[]): ConversationPreviewTurn[] {
+export function buildConversationPreviewTurns(
+  entries: SessionEntry[],
+): ConversationPreviewTurn[] {
   const turns: ConversationPreviewTurn[] = [];
   let current: ConversationPreviewTurn | null = null;
 
   for (const entry of entries) {
-    if (isUserMessage(entry)) {
+    if (isPromptMessage(entry)) {
       if (current) turns.push(current);
       current = {
         id: entry.id,
@@ -53,7 +66,10 @@ function buildConversationPreviewTurns(entries: SessionEntry[]): ConversationPre
     }
 
     if (!current) {
-      continue;
+      current = {
+        id: entry.id,
+        processEntries: [],
+      };
     }
 
     if (hasAssistantText(entry)) {
@@ -107,7 +123,8 @@ function getToolIconKind(label: string): ProcessSummaryItem["icon"] {
 
 function getSummaryItemIconKind(key: string): ProcessSummaryItem["icon"] {
   if (key === "thinking") return "thinking";
-  if (key.startsWith("tool:")) return getToolIconKind(key.slice("tool:".length));
+  if (key.startsWith("tool:"))
+    return getToolIconKind(key.slice("tool:".length));
   return "process";
 }
 
@@ -119,37 +136,85 @@ function InlineToolIcon({ kind }: { kind: ProcessSummaryItem["icon"] }) {
 
   if (kind === "read") {
     return (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      <svg
+        className={className}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+        />
       </svg>
     );
   }
 
   if (kind === "write") {
     return (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+      <svg
+        className={className}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+        />
       </svg>
     );
   }
 
   if (kind === "edit") {
     return (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+      <svg
+        className={className}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+        />
       </svg>
     );
   }
 
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+      />
     </svg>
   );
 }
 
-function getProcessSummaryItems(entries: SessionEntry[], fallback: string): ProcessSummaryItem[] {
+function getProcessSummaryItems(
+  entries: SessionEntry[],
+  fallback: string,
+): ProcessSummaryItem[] {
   const counts = new Map<string, number>();
 
   for (const entry of entries) {
@@ -188,7 +253,10 @@ function CollapsedProcessSummary({
 
   if (entries.length === 0) return null;
 
-  const summaryItems = getProcessSummaryItems(entries, t("session.preview.process", "process"));
+  const summaryItems = getProcessSummaryItems(
+    entries,
+    t("session.preview.process", "process"),
+  );
 
   const handleShowReview = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -197,47 +265,50 @@ function CollapsedProcessSummary({
 
   return (
     <>
-      <div className="relative w-full h-9 rounded-md border border-border/70 bg-secondary/35 hover:bg-secondary/55 transition-colors overflow-hidden">
-        <div className="flex h-full items-center">
-          {/* Main toggle button */}
-          <button
-            type="button"
-            onClick={onToggle}
-            className="flex-1 h-full px-3 text-left"
-            aria-expanded={expanded}
-          >
-            <div className="flex h-full items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-flex w-14 flex-shrink-0 items-center gap-1.5 font-medium text-foreground/80">
-                {expanded ? <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />}
-                <span className="inline-block w-9">
-                  {expanded
-                    ? t("session.preview.hide", "Hide")
-                    : t("session.preview.show", "Show")}
-                </span>
+      <div className="group/process-summary relative flex h-9 w-full overflow-hidden rounded-sm border border-border/70 bg-secondary/30 transition-colors hover:bg-secondary/45">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-2 px-3 text-left text-xs text-muted-foreground focus-ring"
+          aria-expanded={expanded}
+        >
+          <span className="inline-flex w-14 flex-shrink-0 items-center gap-1.5 font-medium text-foreground/80">
+            {expanded ? (
+              <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+            )}
+            <span className="inline-block w-9">
+              {expanded
+                ? t("session.preview.hide", "Hide")
+                : t("session.preview.show", "Show")}
+            </span>
+          </span>
+          <span className="flex min-w-0 flex-1 items-center gap-x-2 overflow-hidden whitespace-nowrap">
+            {summaryItems.map((item) => (
+              <span
+                key={item.key}
+                className="inline-flex flex-shrink-0 items-center gap-1 text-muted-foreground"
+              >
+                <InlineToolIcon kind={item.icon} />
+                <span>{item.label}</span>
+                {item.count > 1 && <span>×{item.count}</span>}
               </span>
-              <span className="flex min-w-0 flex-1 items-center gap-x-2 overflow-hidden whitespace-nowrap">
-                {summaryItems.map((item) => (
-                  <span key={item.key} className="inline-flex flex-shrink-0 items-center gap-1 text-muted-foreground">
-                    <InlineToolIcon kind={item.icon} />
-                    <span>{item.label}</span>
-                    {item.count > 1 && <span>×{item.count}</span>}
-                  </span>
-                ))}
-              </span>
-            </div>
-          </button>
-
-          {/* Review button */}
-          <button
-            type="button"
-            onClick={handleShowReview}
-            className="flex-shrink-0 h-full px-2.5 border-l border-border/50 hover:bg-accent/10 transition-colors group"
-            aria-label={t("session.preview.review", "Review tool calls")}
-            title={t("session.preview.review", "Review tool calls")}
-          >
-            <Eye className="h-3.5 w-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
-          </button>
-        </div>
+            ))}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={handleShowReview}
+          className="inline-flex h-full flex-shrink-0 items-center gap-1.5 border-l border-border/55 px-2.5 text-[11px] font-medium text-muted-foreground motion-color focus-ring hover:bg-surface/60 hover:text-foreground"
+          aria-label={t("session.preview.review", "Review tool calls")}
+          title={t("session.preview.review", "Review tool calls")}
+        >
+          <ListFilter className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="hidden sm:inline">
+            {t("session.preview.reviewShort", "Review")}
+          </span>
+        </button>
       </div>
 
       {/* Review Modal */}
@@ -268,12 +339,14 @@ function ConversationPreviewTurnView({
 }) {
   return (
     <div className="space-y-2" data-entry-id={turn.id}>
-      <SessionEntryRenderer
-        entry={turn.userEntry}
-        toolResultByCallId={toolResultByCallId}
-        searchQuery={searchQuery}
-        previewMode
-      />
+      {turn.userEntry && (
+        <SessionEntryRenderer
+          entry={turn.userEntry}
+          toolResultByCallId={toolResultByCallId}
+          searchQuery={searchQuery}
+          previewMode
+        />
+      )}
 
       {!expanded && (
         <CollapsedProcessSummary
@@ -328,13 +401,21 @@ export default function ConversationPreviewMessages({
   scrollTargetId,
   setScrollTargetId,
 }: ConversationPreviewMessagesProps) {
-  const turns = useMemo(() => buildConversationPreviewTurns(entries), [entries]);
-  const [expandedTurnIds, setExpandedTurnIds] = useState<Set<string>>(new Set());
+  const turns = useMemo(
+    () => buildConversationPreviewTurns(entries),
+    [entries],
+  );
+  const [expandedTurnIds, setExpandedTurnIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   const targetTurnId = useMemo(() => {
     if (!scrollTargetId) return null;
     for (const turn of turns) {
-      if (turn.userEntry.id === scrollTargetId || turn.assistantEntry?.id === scrollTargetId) {
+      if (
+        turn.userEntry?.id === scrollTargetId ||
+        turn.assistantEntry?.id === scrollTargetId
+      ) {
         return turn.id;
       }
       if (turn.processEntries.some((entry) => entry.id === scrollTargetId)) {
@@ -356,8 +437,11 @@ export default function ConversationPreviewMessages({
 
     const rafId = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const target = document.getElementById(`entry-${scrollTargetId}`)
-          ?? document.querySelector(`[data-entry-id="${CSS.escape(scrollTargetId)}"]`);
+        const target =
+          document.getElementById(`entry-${scrollTargetId}`) ??
+          document.querySelector(
+            `[data-entry-id="${CSS.escape(scrollTargetId)}"]`,
+          );
         if (!target) return;
 
         target.scrollIntoView({ block: "center", inline: "nearest" });

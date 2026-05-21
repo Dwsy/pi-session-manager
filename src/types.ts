@@ -365,6 +365,7 @@ export interface DayStats {
   sessions: DaySession[]
   hourly_distribution: number[] // 24 hours
   models_used: Record<string, number>
+  token_details: TokenDetails
 }
 
 export interface TimeDistributionPoint {

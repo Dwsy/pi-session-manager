@@ -17,14 +17,20 @@ function stripPreviewAssistantContent(content: Content[]): Content[] {
   return content.filter((item) => item.type === "text");
 }
 
+function contentToText(content: Content[]): string {
+  return content
+    .filter((item) => item.type === "text" && typeof item.text === "string")
+    .map((item) => item.text?.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
 export interface SessionEntryRendererProps {
   entry: SessionEntry;
   toolResultByCallId?: Map<string, SessionEntry>;
   searchQuery?: string;
   isStreaming?: boolean;
   previewMode?: boolean;
-  /** Previous assistant entries (tools only, no text) to fold into this entry */
-  foldEntries?: SessionEntry[];
 }
 
 export function renderSessionEntry(
@@ -33,7 +39,6 @@ export function renderSessionEntry(
   searchQuery = "",
   isStreaming = false,
   previewMode = false,
-  foldEntries?: SessionEntry[],
 ): JSX.Element | null {
   switch (entry.type) {
     case "message": {
@@ -63,7 +68,17 @@ export function renderSessionEntry(
             searchQuery={searchQuery}
             isStreaming={isStreaming}
             previewMode={previewMode}
-            foldEntries={foldEntries}
+          />
+        );
+      }
+
+      if (role === "developer" || role === "system") {
+        return (
+          <CustomMessage
+            key={entry.id}
+            customType={role}
+            content={contentToText(entry.message.content)}
+            timestamp={entry.timestamp}
           />
         );
       }
@@ -148,16 +163,14 @@ export const SessionEntryRenderer = memo(
     searchQuery = "",
     isStreaming = false,
     previewMode = false,
-    foldEntries,
   }: SessionEntryRendererProps): JSX.Element | null {
-    return renderSessionEntry(entry, toolResultByCallId, searchQuery, isStreaming, previewMode, foldEntries);
+    return renderSessionEntry(entry, toolResultByCallId, searchQuery, isStreaming, previewMode);
   },
   (prev, next) =>
     prev.entry === next.entry &&
     prev.toolResultByCallId === next.toolResultByCallId &&
     prev.searchQuery === next.searchQuery &&
-    prev.previewMode === next.previewMode &&
-    prev.foldEntries === next.foldEntries,
+    prev.previewMode === next.previewMode,
 );
 
 export default SessionEntryRenderer;

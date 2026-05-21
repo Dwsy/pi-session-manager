@@ -52,7 +52,7 @@ function isRenderableMessageEntry(
   if (!isLive && pathEntryIds && !pathEntryIds.has(entry.id)) return false
 
   const role = entry.message?.role
-  return role === 'user' || role === 'assistant'
+  return role === 'user' || role === 'assistant' || role === 'developer' || role === 'system'
 }
 
 function isRenderableNonMessageEntry(

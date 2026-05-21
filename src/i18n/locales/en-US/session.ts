@@ -213,6 +213,13 @@ export const session = {
       switchToDesc: 'Switch to descending',
     },
   },
+  preview: {
+    show: 'Show',
+    hide: 'Hide',
+    process: 'process',
+    review: 'Review tool calls',
+    reviewShort: 'Review',
+  },
   newMessages: 'New messages',
   userMessage: 'User message',
 } as const

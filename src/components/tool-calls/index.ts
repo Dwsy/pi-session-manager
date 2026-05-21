@@ -1,7 +1,6 @@
 export { default as GenericToolCall } from './GenericToolCall'
 export { default as SubagentToolCall } from './SubagentToolCall'
 export { default as SubagentModal } from './SubagentModal'
-export { default as ToolCallList } from './ToolCallList'
 export { default as BashExecution } from './BashExecution'
 export { default as EditExecution } from './EditExecution'
 export { default as ReadExecution } from './ReadExecution'

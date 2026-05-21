@@ -52,6 +52,32 @@
     transition-timing-function: var(--motion-ease-standard);
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .motion-color,
+    .motion-opacity,
+    .motion-surface,
+    .motion-press,
+    .motion-width,
+    .motion-transform,
+    .motion-transform-opacity,
+    .glass-card-hover {
+      transition-duration: 1ms !important;
+      transition-delay: 0ms !important;
+    }
+
+    .motion-press:active,
+    .glass-card-hover:hover {
+      transform: none !important;
+    }
+
+    .ui-enter-fade,
+    .ui-enter-zoom,
+    .ui-exit-fade,
+    .ui-exit-zoom {
+      animation: none !important;
+    }
+  }
+
   // Focus Ring
   .focus-ring {
     outline: none;
@@ -105,6 +131,23 @@
     box-shadow:
       0 4px 24px rgba(var(--shadow-rgb), 0.2),
       0 1px 2px rgba(var(--highlight-rgb), 0.03) inset;
+  }
+
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass,
+    .glass-card {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .glass,
+    .glass-card {
+      background: rgb(var(--color-card));
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
   }
 
   .glass-card-hover {
