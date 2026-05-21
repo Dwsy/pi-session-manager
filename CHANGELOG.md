@@ -2,6 +2,27 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
+## [0.6.2] - 2026-05-21
+
+### Added
+
+- **Settings sections** — split settings into focused app behavior, data sources, diagnostics, Pi agent, and search/export sections.
+- **Dashboard day drilldown** — expanded heatmap day modal with richer daily stats and preview flow.
+- **Review modal tests** — added coverage for tool-call review and session viewer derived data behavior.
+
+### Changed
+
+- **Tool call review UI** — refined ToolCallReviewModal into a flatter IDE-style review surface with clearer diff and operation filtering.
+- **Conversation process rendering** — removed legacy tool-call folding paths in favor of inline expanded process entries.
+- **Kanban interactions** — tightened drag state, delete confirmation, and menu behavior.
+- **Session loading** — improved session refresh, pagination, and notification lifecycle handling.
+
+### Fixed
+
+- **Native feel cleanup** — removed ineffective sidebar vibrancy/accent hooks and updated related audit docs.
+- **Stats cache** — added cache token fields to day statistics and demo/runtime stats data.
+- **Release metadata** — synchronized package, Cargo, and Tauri versions for v0.6.2.
+
 ## [0.6.1] - 2026-05-15
 
 ### Added
