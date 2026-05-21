@@ -306,23 +306,6 @@ fn main() {
 
                 let window = builder.visible(false).build()?;
 
-                // ── Apply native window vibrancy ──
-                // Note: We apply vibrancy ONLY to sidebar area via CSS, not to the whole window
-                // to avoid popup/dialog transparency issues
-                #[cfg(target_os = "macos")]
-                {
-                    // Skip applying vibrancy to the whole window
-                    // The sidebar vibrancy is handled via CSS data-sidebar-vibrancy attribute
-                    log::info!("Skipping window-wide vibrancy to prevent popup transparency issues");
-                }
-
-                #[cfg(target_os = "windows")]
-                {
-                    use window_vibrancy::apply_mica;
-                    let _ = apply_mica(&window, None);
-                    log::debug!("Applied Windows Mica effect");
-                }
-
                 // Show window when frontend signals ready
                 let window_clone = window.clone();
                 app.listen("frontend://ready", move |_event| {

@@ -13,9 +13,133 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="format-detection" content="telephone=no" />
     <title>Pi Session Manager</title>
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("pi-session-manager-settings");
+          if (!raw) return;
+          var settings = JSON.parse(raw);
+          var theme = settings && settings.appearance && settings.appearance.theme;
+          if (theme !== "light" && theme !== "dark") return;
+
+          var root = document.documentElement;
+          root.dataset.startupTheme = theme;
+          root.style.colorScheme = theme;
+          root.classList.remove("theme-dark", "theme-light");
+          root.classList.add(theme === "light" ? "theme-light" : "theme-dark");
+
+          var themeColor = theme === "light" ? "#f8f9fa" : "#1a1b26";
+          var metas = document.querySelectorAll('meta[name="theme-color"]');
+          for (var index = 0; index < metas.length; index += 1) {
+            metas[index].setAttribute("content", themeColor);
+          }
+        } catch (error) {
+          // Keep the system fallback when cached settings are unavailable.
+        }
+      })();
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --startup-bg: #1a1b26;
+        --startup-logo-color: #f8fafc;
+        --startup-logo-shadow: rgba(0, 0, 0, 0.28);
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          color-scheme: light;
+          --startup-bg: #f8f9fa;
+          --startup-logo-color: #1a1b26;
+          --startup-logo-shadow: rgba(15, 23, 42, 0.14);
+        }
+      }
+
+      :root[data-startup-theme="light"] {
+        color-scheme: light;
+        --startup-bg: #f8f9fa;
+        --startup-logo-color: #1a1b26;
+        --startup-logo-shadow: rgba(15, 23, 42, 0.14);
+      }
+
+      :root[data-startup-theme="dark"] {
+        color-scheme: dark;
+        --startup-bg: #1a1b26;
+        --startup-logo-color: #f8fafc;
+        --startup-logo-shadow: rgba(0, 0, 0, 0.28);
+      }
+
+      html,
+      body,
+      #root {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--startup-bg);
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", "Noto Sans CJK SC", "Helvetica Neue", Arial,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+
+      .startup-logo-shell {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+        background: var(--startup-bg);
+      }
+
+      .startup-logo {
+        width: 96px;
+        height: 96px;
+        display: block;
+        color: var(--startup-logo-color);
+        filter: drop-shadow(0 18px 28px var(--startup-logo-shadow));
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .startup-logo {
+          animation: startup-logo-in 180ms ease-out both;
+        }
+      }
+
+      @keyframes startup-logo-in {
+        from {
+          opacity: 0;
+          transform: scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="startup-logo-shell" role="status" aria-label="Starting Pi Session Manager">
+        <svg
+          class="startup-logo"
+          aria-hidden="true"
+          viewBox="0 0 800 800"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            fill="currentColor"
+            fill-rule="evenodd"
+            d="M165.29 165.29H517.36V400H400V517.36H282.65V634.72H165.29ZM282.65 282.65V400H400V282.65Z"
+          />
+          <path fill="currentColor" d="M517.36 400H634.72V634.72H517.36Z" />
+        </svg>
+      </div>
+    </div>
     <div id="portal-root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

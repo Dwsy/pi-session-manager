@@ -2,7 +2,7 @@ use tauri::{
     image::Image,
     menu::{MenuBuilder, MenuItemBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Emitter, Listener, Manager, Runtime, WebviewUrl, WebviewWindowBuilder,
 };
 
 const TRAY_ID: &str = "main";
@@ -97,7 +97,13 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
         builder = builder.decorations(true);
     }
 
-    let window = builder.build().map_err(|e| format!("Build window: {e}"))?;
+    let window = builder.visible(false).build().map_err(|e| format!("Build window: {e}"))?;
+
+    let window_clone = window.clone();
+    app.listen("frontend://ready", move |_event| {
+        let _ = window_clone.show();
+        let _ = window_clone.set_focus();
+    });
 
     // Restore saved zoom level
     tauri::async_runtime::spawn(async move {

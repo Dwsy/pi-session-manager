@@ -84,13 +84,13 @@
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 31 | Platform material background | ✓ | **ADDED**: window-vibrancy (NSVisualEffectView + Mica) |
+| 31 | Platform material background | — | Removed by request; app uses opaque themed surfaces |
 | 32 | Dark mode follows system | ✓ | `prefers-color-scheme` support |
 | 33 | System accent color | ✗ | **FAIL**: Hardcoded teal accent |
 | 34 | System font | ✓ | `-apple-system, BlinkMacSystemFont, 'Segoe UI'` |
 | 35 | No CSS box-shadow for window | ✓ | OS draws window shadows |
 | 36 | No CSS border-radius for window | ✓ | OS draws window corners |
-| 37 | Translucency works | ✓ | Vibrancy enabled |
+| 37 | Translucency works | — | Removed by request; no runtime translucency target |
 | 38 | No `cursor: pointer` | ✓ | **FIXED** |
 | 39 | Animations honor reduced-motion | ✓ | `prefers-reduced-motion: reduce` |
 | 40 | No page transitions | ✓ | Direct view switching |
@@ -196,12 +196,12 @@
 
 ## Files Modified During This Audit
 
-1. `src-tauri/Cargo.toml` - Added window-vibrancy, tauri-plugin-notification
-2. `src-tauri/src/main.rs` - Applied vibrancy effects
+1. `src-tauri/Cargo.toml` - Removed direct window-vibrancy/cocoa dependencies; notification plugin remains
+2. `src-tauri/src/main.rs` - Removed native backdrop/vibrancy/Mica calls
 3. `src-tauri/src/lib.rs` - Registered notification plugin + command
 4. `src-tauri/src/commands/notification.rs` - New notification command
 5. `src-tauri/capabilities/default.json` - Added notification permission
-6. `src/hooks/useSidebarVibrancy.ts` - Restored vibrancy toggle
+6. `src/hooks/useSidebarVibrancy.ts` - Removed obsolete vibrancy toggle hook
 7. `src/hooks/useNotification.ts` - New notification hook
 8. `src/hooks/useFileWatcher.ts` - Integrated notifications
 9. `src/styles/*.less` - Removed cursor: pointer (28 files)
