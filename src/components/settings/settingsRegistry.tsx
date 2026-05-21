@@ -308,28 +308,22 @@ const STANDALONE_DATASET_SECTION_IDS: SettingsSection[] = [
   "data-sources",
 ];
 
-export function getAvailableSettingsAreas(): SettingsAreaMeta[] {
-  const sections = getAvailableSettingsSections();
+const STANDALONE_DATASET_SECTION_SET = new Set(STANDALONE_DATASET_SECTION_IDS);
+const STANDALONE_SETTINGS_SECTIONS = SETTINGS_SECTIONS.filter((item) =>
+  STANDALONE_DATASET_SECTION_SET.has(item.id),
+);
+
+function buildAvailableAreas(sections: SettingsSectionMeta[]): SettingsAreaMeta[] {
   return SETTINGS_AREAS.filter((area) =>
     sections.some((section) => section.area === area.id),
   );
 }
 
-export function getAvailableSettingsSections(): SettingsSectionMeta[] {
-  if (!isStandaloneDatasetRuntime()) {
-    return SETTINGS_SECTIONS;
-  }
-
-  const allowed = new Set(STANDALONE_DATASET_SECTION_IDS);
-  return SETTINGS_SECTIONS.filter((item) => allowed.has(item.id));
-}
-
-export function getAvailableSettingsGroups(
+function buildAvailableGroups(
+  sections: SettingsSectionMeta[],
   area?: SettingsArea,
 ): SettingsGroupMeta[] {
-  const available = new Set(
-    getAvailableSettingsSections().map((section) => section.id),
-  );
+  const available = new Set(sections.map((section) => section.id));
   return SETTINGS_GROUPS
     .filter((group) => !area || group.area === area)
     .map((group) => ({
@@ -337,6 +331,37 @@ export function getAvailableSettingsGroups(
       sections: group.sections.filter((section) => available.has(section)),
     }))
     .filter((group) => group.sections.length > 0);
+}
+
+const DEFAULT_SETTINGS_AREAS = buildAvailableAreas(SETTINGS_SECTIONS);
+const STANDALONE_SETTINGS_AREAS = buildAvailableAreas(STANDALONE_SETTINGS_SECTIONS);
+const DEFAULT_SETTINGS_GROUPS = buildAvailableGroups(SETTINGS_SECTIONS);
+const DEFAULT_PREFERENCES_GROUPS = buildAvailableGroups(SETTINGS_SECTIONS, "preferences");
+const DEFAULT_CONFIG_CENTER_GROUPS = buildAvailableGroups(SETTINGS_SECTIONS, "config-center");
+const STANDALONE_SETTINGS_GROUPS = buildAvailableGroups(STANDALONE_SETTINGS_SECTIONS);
+const STANDALONE_PREFERENCES_GROUPS = buildAvailableGroups(STANDALONE_SETTINGS_SECTIONS, "preferences");
+const STANDALONE_CONFIG_CENTER_GROUPS = buildAvailableGroups(STANDALONE_SETTINGS_SECTIONS, "config-center");
+
+export function getAvailableSettingsAreas(): SettingsAreaMeta[] {
+  return isStandaloneDatasetRuntime() ? STANDALONE_SETTINGS_AREAS : DEFAULT_SETTINGS_AREAS;
+}
+
+export function getAvailableSettingsSections(): SettingsSectionMeta[] {
+  return isStandaloneDatasetRuntime() ? STANDALONE_SETTINGS_SECTIONS : SETTINGS_SECTIONS;
+}
+
+export function getAvailableSettingsGroups(
+  area?: SettingsArea,
+): SettingsGroupMeta[] {
+  if (isStandaloneDatasetRuntime()) {
+    if (area === "preferences") return STANDALONE_PREFERENCES_GROUPS;
+    if (area === "config-center") return STANDALONE_CONFIG_CENTER_GROUPS;
+    return STANDALONE_SETTINGS_GROUPS;
+  }
+
+  if (area === "preferences") return DEFAULT_PREFERENCES_GROUPS;
+  if (area === "config-center") return DEFAULT_CONFIG_CENTER_GROUPS;
+  return DEFAULT_SETTINGS_GROUPS;
 }
 
 export function getSettingsAreaMeta(area: SettingsArea): SettingsAreaMeta {

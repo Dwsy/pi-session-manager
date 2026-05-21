@@ -24,6 +24,10 @@ fn is_pi_live_forward_event(event_type: &str) -> bool {
     matches!(event_type, "message_start" | "message_update" | "message_end" | "tool_execution_start" | "tool_execution_update" | "tool_execution_end" | "agent_start" | "agent_end" | "turn_start" | "turn_end" | "model_select" | "auto_compaction_start" | "auto_compaction_end" | "queue_update")
 }
 
+fn should_emit_pi_live_to_tauri(event_type: &str) -> bool {
+    matches!(event_type, "message_start" | "message_end" | "tool_execution_start" | "tool_execution_end" | "agent_start" | "agent_end" | "turn_start" | "turn_end" | "auto_compaction_start" | "auto_compaction_end" | "queue_update")
+}
+
 pub(crate) async fn handle_preflight() -> impl IntoResponse {
     (StatusCode::NO_CONTENT, cors_headers())
 }
@@ -144,7 +148,9 @@ async fn handle_ws_connection(socket: WebSocket, app_state: SharedAppState, pre_
                                         event: event_type.to_string(),
                                         payload: live_event.clone(),
                                     });
-                                    let _ = app_state.app_handle.emit(event_type, &live_event);
+                                    if should_emit_pi_live_to_tauri(event_type) {
+                                        let _ = app_state.app_handle.emit(event_type, &live_event);
+                                    }
                                     let _ = tx.send(AxumWsMsg::Text(r#"{"type":"ack"}"#.into())).await;
                                 }
                                 continue;

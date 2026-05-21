@@ -66,6 +66,150 @@ export interface UsePiLiveReturn {
   abort: (sessionId: string) => Promise<void>
 }
 
+type MatchSessionId = (candidate: string, target: string) => boolean
+
+const trackedChatEvents = new Set<PiLiveChatEventPayload['type']>([
+  'message_start',
+  'message_end',
+  'tool_execution_start',
+  'tool_execution_end',
+  'agent_start',
+  'agent_end',
+  'turn_start',
+  'turn_end',
+  'auto_compaction_start',
+  'auto_compaction_end',
+])
+
+function sameArray<T>(left?: T[], right?: T[]): boolean {
+  if (left === right) return true
+  if (!left || !right || left.length !== right.length) return false
+  return left.every((item, index) => item === right[index])
+}
+
+function sameModel(left?: PiLiveSession['model'], right?: PiLiveSession['model']): boolean {
+  return left === right || (
+    left?.provider === right?.provider &&
+    left?.id === right?.id &&
+    left?.name === right?.name
+  )
+}
+
+function sameContextUsage(left?: PiLiveSession['contextUsage'], right?: PiLiveSession['contextUsage']): boolean {
+  return left === right || (
+    left?.used === right?.used &&
+    left?.limit === right?.limit &&
+    left?.unit === right?.unit
+  )
+}
+
+function sameAvailableModels(left?: PiLiveSession['availableModels'], right?: PiLiveSession['availableModels']): boolean {
+  if (left === right) return true
+  if (!left || !right || left.length !== right.length) return false
+  return left.every((item, index) => sameModel(item, right[index]))
+}
+
+function sameTags(left?: PiLiveSession['tags'], right?: PiLiveSession['tags']): boolean {
+  if (left === right) return true
+  if (!left || !right || left.length !== right.length) return false
+  return left.every((item, index) => {
+    const other = right[index]
+    return item.id === other.id && item.name === other.name && item.color === other.color
+  })
+}
+
+function shouldUpdateSession(current: PiLiveSession, next: PiLiveSession): boolean {
+  return current.sessionId !== next.sessionId ||
+    current.sessionPath !== next.sessionPath ||
+    current.pid !== next.pid ||
+    current.cwd !== next.cwd ||
+    current.isStreaming !== next.isStreaming ||
+    current.entryCount !== next.entryCount ||
+    current.thinkingLevel !== next.thinkingLevel ||
+    current.pendingMessageCount !== next.pendingMessageCount ||
+    !sameModel(current.model, next.model) ||
+    !sameAvailableModels(current.availableModels, next.availableModels) ||
+    !sameContextUsage(current.contextUsage, next.contextUsage) ||
+    !sameArray(current.steeringQueue, next.steeringQueue) ||
+    !sameArray(current.followUpQueue, next.followUpQueue) ||
+    !sameTags(current.tags, next.tags)
+}
+
+export function upsertPiLiveSessionList(
+  prev: PiLiveSession[],
+  session: PiLiveSession,
+  matchesSessionId: MatchSessionId,
+): PiLiveSession[] {
+  const index = prev.findIndex((item) => matchesSessionId(item.sessionId, session.sessionId))
+  if (index === -1) {
+    return [session, ...prev]
+  }
+
+  const nextSession = { ...prev[index], ...session }
+  if (!shouldUpdateSession(prev[index], nextSession)) {
+    return prev
+  }
+
+  const next = [...prev]
+  next[index] = nextSession
+  return next
+}
+
+export function patchPiLiveSessionList(
+  prev: PiLiveSession[],
+  sessionId: string,
+  patch: Partial<PiLiveSession>,
+  matchesSessionId: MatchSessionId,
+): PiLiveSession[] {
+  let changed = false
+  const next = prev.map((item) => {
+    if (!matchesSessionId(item.sessionId, sessionId)) {
+      return item
+    }
+    const patched = { ...item, ...patch }
+    if (!shouldUpdateSession(item, patched)) {
+      return item
+    }
+    changed = true
+    return patched
+  })
+
+  return changed ? next : prev
+}
+
+export function applyPiLiveChatEvent(
+  prev: PiLiveSession[],
+  eventName: PiLiveChatEventPayload['type'],
+  sessionId: string,
+  matchesSessionId: MatchSessionId,
+): PiLiveSession[] {
+  if (!trackedChatEvents.has(eventName)) {
+    return prev
+  }
+
+  if (eventName === 'message_end' || eventName === 'tool_execution_end') {
+    let changed = false
+    const next = prev.map((session) => {
+      if (!matchesSessionId(session.sessionId, sessionId)) return session
+      changed = true
+      return {
+        ...session,
+        entryCount: session.entryCount + 1,
+        lastSeen: new Date().toISOString(),
+      }
+    })
+    return changed ? next : prev
+  }
+
+  const patch: Partial<PiLiveSession> = {}
+  if (eventName === 'agent_start') patch.isStreaming = true
+  if (eventName === 'agent_end') patch.isStreaming = false
+
+  return Object.keys(patch).length > 0
+    ? patchPiLiveSessionList(prev, sessionId, { ...patch, lastSeen: new Date().toISOString() }, matchesSessionId)
+    : prev
+}
+
 export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
   const { manual = false, refreshInterval = 30000 } = options
 
@@ -96,28 +240,11 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
   }, [])
 
   const upsertSession = useCallback((session: PiLiveSession) => {
-    setSessions((prev) => {
-      const index = prev.findIndex((item) => matchesSessionId(item.sessionId, session.sessionId))
-      if (index === -1) {
-        return [session, ...prev]
-      }
-      const next = [...prev]
-      next[index] = {
-        ...next[index],
-        ...session,
-      }
-      return next
-    })
+    setSessions((prev) => upsertPiLiveSessionList(prev, session, matchesSessionId))
   }, [matchesSessionId])
 
   const patchSession = useCallback((sessionId: string, patch: Partial<PiLiveSession>) => {
-    setSessions((prev) =>
-      prev.map((item) =>
-        matchesSessionId(item.sessionId, sessionId)
-          ? { ...item, ...patch }
-          : item,
-      ),
-    )
+    setSessions((prev) => patchPiLiveSessionList(prev, sessionId, patch, matchesSessionId))
   }, [matchesSessionId])
 
   const removeSession = useCallback((sessionId: string) => {
@@ -139,21 +266,25 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
     if (!isEnabled) return
     try {
       const result = await invoke<PiLiveSession[]>('get_pi_live_sessions')
-      setSessions((prev) =>
-        result.map((session) => {
-          const existing = prev.find((item) => matchesSessionId(item.sessionId, session.sessionId))
-          return existing
-            ? {
-                ...existing,
-                ...session,
-                availableModels: session.availableModels ?? existing.availableModels,
-                steeringQueue: session.steeringQueue ?? existing.steeringQueue,
-                followUpQueue: session.followUpQueue ?? existing.followUpQueue,
-                pendingMessageCount: session.pendingMessageCount ?? existing.pendingMessageCount,
-              }
-            : session
-        }),
-      )
+      setSessions((prev) => {
+        let next = prev
+        for (const session of result) {
+          next = upsertPiLiveSessionList(next, {
+            ...session,
+            availableModels: session.availableModels,
+            steeringQueue: session.steeringQueue,
+            followUpQueue: session.followUpQueue,
+            pendingMessageCount: session.pendingMessageCount,
+          }, matchesSessionId)
+        }
+        const existingOnly = next.filter((existing) =>
+          result.some((session) => matchesSessionId(existing.sessionId, session.sessionId)),
+        )
+        if (existingOnly.length === prev.length && existingOnly.every((session, index) => session === prev[index])) {
+          return prev
+        }
+        return existingOnly
+      })
       refreshCountRef.current++
     } catch {
       // Backend may not be ready
@@ -256,23 +387,7 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
 
       for (const eventName of liveEventNames) {
         listen<PiLiveChatEventPayload>(eventName, ({ payload }) => {
-          const nextPatch: Partial<PiLiveSession> = {
-            lastSeen: new Date().toISOString(),
-          }
-          if (eventName === 'agent_start') nextPatch.isStreaming = true
-          if (eventName === 'agent_end') nextPatch.isStreaming = false
-
-          setSessions((prev) =>
-            prev.map((session) =>
-              matchesSessionId(session.sessionId, payload.sessionId)
-                ? {
-                    ...session,
-                    ...nextPatch,
-                    entryCount: session.entryCount + 1,
-                  }
-                : session,
-            ),
-          )
+          setSessions((prev) => applyPiLiveChatEvent(prev, eventName, payload.sessionId, matchesSessionId))
         }).then(f => unsubs.push(f))
       }
     }

@@ -45,10 +45,19 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const { t, i18n } = useTranslation();
   const { reloadSettings } = useAppSettingsContext();
   const standaloneDatasetRuntime = isStandaloneDatasetRuntime();
-  const settingsAreas = getAvailableSettingsAreas();
-  const menuItems = getAvailableSettingsSections();
+  const settingsAreas = useMemo(
+    () => getAvailableSettingsAreas(),
+    [standaloneDatasetRuntime],
+  );
+  const menuItems = useMemo(
+    () => getAvailableSettingsSections(),
+    [standaloneDatasetRuntime],
+  );
   const [activeArea, setActiveArea] = useState<SettingsArea>("preferences");
-  const menuGroups = getAvailableSettingsGroups(activeArea);
+  const menuGroups = useMemo(
+    () => getAvailableSettingsGroups(activeArea),
+    [activeArea, standaloneDatasetRuntime],
+  );
   const [activeSection, setActiveSection] =
     useState<SettingsSection>("appearance");
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,7 +93,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   // Run search when query changes
   useEffect(() => {
     if (!searchQuery.trim()) {
-      setSearchResults([]);
+      setSearchResults((prev) => (prev.length === 0 ? prev : []));
       return;
     }
     const availableSections = new Set(menuItems.map((item) => item.id));

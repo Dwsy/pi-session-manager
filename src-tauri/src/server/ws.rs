@@ -45,6 +45,10 @@ fn is_pi_live_forward_event(event_type: &str) -> bool {
     matches!(event_type, "message_start" | "message_update" | "message_end" | "tool_execution_start" | "tool_execution_update" | "tool_execution_end" | "agent_start" | "agent_end" | "turn_start" | "turn_end" | "model_select" | "auto_compaction_start" | "auto_compaction_end" | "queue_update")
 }
 
+fn should_emit_pi_live_to_tauri(event_type: &str) -> bool {
+    matches!(event_type, "message_start" | "message_end" | "tool_execution_start" | "tool_execution_end" | "agent_start" | "agent_end" | "turn_start" | "turn_end" | "auto_compaction_start" | "auto_compaction_end" | "queue_update")
+}
+
 pub struct WsAdapter {
     app_state: SharedAppState,
     bind_addr: String,
@@ -181,7 +185,9 @@ impl WsAdapter {
                                             event: event_type.to_string(),
                                             payload: live_event.clone(),
                                         });
-                                        let _ = self.app_state.app_handle.emit(event_type, &live_event);
+                                        if should_emit_pi_live_to_tauri(event_type) {
+                                            let _ = self.app_state.app_handle.emit(event_type, &live_event);
+                                        }
                                         let _ = ws_sender.send(Message::Text(r#"{"type":"ack"}"#.to_string())).await;
                                     }
                                     continue;
