@@ -1,7 +1,6 @@
 import type { Content } from '@/types'
 import { useTranslation } from 'react-i18next'
-import { parseMarkdown } from '@/utils/markdown'
-import { highlightSearchInHTML } from '@/utils/search'
+import MarkdownContent from '@/components/ui/MarkdownContent'
 import { formatDate } from '@/utils/format'
 import { Copy, Check } from 'lucide-react'
 import { memo, useMemo, useState } from 'react'
@@ -34,14 +33,6 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
     () => textItems.map(c => c.text).join('\n'),
     [textItems],
   )
-
-  const html = useMemo(() => {
-    let parsed = parseMarkdown(text)
-    if (searchQuery) {
-      parsed = highlightSearchInHTML(parsed, searchQuery)
-    }
-    return parsed
-  }, [text, searchQuery])
 
   const handleCopy = async () => {
     try {
@@ -99,7 +90,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
 
       {text.trim() && (
         <>
-          <div className="markdown-content user-message-body" dangerouslySetInnerHTML={{ __html: html }} />
+          <MarkdownContent content={text} className="user-message-body" searchQuery={searchQuery} />
         </>
       )}
     </div>

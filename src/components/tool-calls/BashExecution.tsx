@@ -60,7 +60,7 @@ export default function BashExecution({
         </span>
         <pre className="bash-command-inline">
           <span className="bash-command-prefix" aria-hidden="true">$ </span>
-          <code className="hljs language-bash" dangerouslySetInnerHTML={{ __html: highlightedCommand }} />
+          <code className="shiki language-bash" dangerouslySetInnerHTML={{ __html: highlightedCommand }} />
         </pre>
         {exitCode !== undefined && exitCode !== null && (
           <span className="tool-meta" style={{ color: exitCode === 0 ? 'var(--success)' : 'var(--error)' }}>

@@ -2,24 +2,39 @@
  * Appearance settings component
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import SettingsField from '@/components/settings/SettingsField'
 import SettingsInput from '@/components/settings/SettingsInput'
 import SettingsOptionGroup from '@/components/settings/SettingsOptionGroup'
 import SettingsSelect from '@/components/settings/SettingsSelect'
-import { listUserPiThemes } from '@/utils/piTheme'
+import {
+  getBuiltInBase46Themes,
+  listUserPiThemes,
+  resolveThemePreview,
+  toBase46Selection,
+} from '@/utils/piTheme'
 import type { AppearanceSettingsProps } from '@/components/settings/types'
 
 export default function AppearanceSettings({ settings, onUpdate }: AppearanceSettingsProps) {
   const { t } = useTranslation()
   const [piThemes, setPiThemes] = useState<string[]>([])
+  const builtInThemes = useMemo(() => getBuiltInBase46Themes(), [])
+  const selectedPreview = useMemo(
+    () => resolveThemePreview(settings.appearance.customTheme),
+    [settings.appearance.customTheme]
+  )
 
   const handleThemeSelect = (theme: 'dark' | 'light' | 'system' | 'custom') => {
     onUpdate('appearance', 'theme', theme)
 
-    if (theme === 'custom' && settings.appearance.customTheme === 'app-default' && piThemes.length > 0) {
-      onUpdate('appearance', 'customTheme', piThemes[0])
+    if (theme === 'custom' && settings.appearance.customTheme === 'app-default') {
+      const firstBuiltInTheme = builtInThemes[0]
+      if (firstBuiltInTheme) {
+        onUpdate('appearance', 'customTheme', toBase46Selection(firstBuiltInTheme.id))
+      } else if (piThemes.length > 0) {
+        onUpdate('appearance', 'customTheme', piThemes[0])
+      }
     }
   }
 
@@ -58,23 +73,91 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
       {settings.appearance.theme === 'custom' && (
         <SettingsField
           label={t('settings.appearance.customTheme', 'Custom Theme Preset')}
-          description={t('settings.appearance.customThemeHelp', 'Uses theme files from ~/.pi/agent/themes')}
+          description={t('settings.appearance.customThemeHelp', 'Choose a built-in base46 theme or a theme file from ~/.pi/agent/themes')}
           searchKey="appearance-customTheme"
         >
-          <SettingsSelect
-            value={settings.appearance.customTheme}
-            onChange={(e) => onUpdate('appearance', 'customTheme', e.target.value)}
-          >
-            <option value="app-default">{t('settings.appearance.appDefaultTheme', 'App default')}</option>
-            {piThemes.length === 0 && (
-              <option value="" disabled>{t('settings.appearance.noCustomThemes', 'No custom themes found')}</option>
+          <div className="space-y-3">
+            <SettingsSelect
+              value={settings.appearance.customTheme}
+              onChange={(e) => onUpdate('appearance', 'customTheme', e.target.value)}
+            >
+              <option value="app-default">{t('settings.appearance.appDefaultTheme', 'App default')}</option>
+              <optgroup label={t('settings.appearance.builtInBase46Themes', 'Built-in base46 themes')}>
+                {builtInThemes.map((theme) => (
+                  <option key={theme.id} value={toBase46Selection(theme.id)}>
+                    {theme.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label={t('settings.appearance.userThemes', 'User themes')}>
+                {piThemes.length === 0 && (
+                  <option value="" disabled>{t('settings.appearance.noCustomThemes', 'No custom themes found')}</option>
+                )}
+                {piThemes.map((themeName) => (
+                  <option key={themeName} value={themeName}>
+                    {themeName}
+                  </option>
+                ))}
+              </optgroup>
+            </SettingsSelect>
+
+            {selectedPreview && (
+              <div
+                className="rounded-lg border p-3 shadow-sm"
+                style={{
+                  background: selectedPreview.colors.background,
+                  borderColor: selectedPreview.colors.border,
+                  color: selectedPreview.colors.text,
+                }}
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{selectedPreview.label}</div>
+                    <div className="text-[11px]" style={{ color: selectedPreview.colors.muted }}>
+                      {t('settings.appearance.base46Preview', 'base46 preview')}
+                    </div>
+                  </div>
+                  <div
+                    className="rounded-full border px-2 py-0.5 text-[10px] uppercase"
+                    style={{ borderColor: selectedPreview.colors.accent, color: selectedPreview.colors.accent }}
+                  >
+                    {selectedPreview.scheme}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+                  {[
+                    ['background', selectedPreview.colors.background],
+                    ['panel', selectedPreview.colors.panel],
+                    ['text', selectedPreview.colors.text],
+                    ['muted', selectedPreview.colors.muted],
+                    ['accent', selectedPreview.colors.accent],
+                    ['success', selectedPreview.colors.success],
+                    ['warning', selectedPreview.colors.warning],
+                    ['error', selectedPreview.colors.error],
+                  ].map(([name, color]) => (
+                    <div key={name} className="min-w-0">
+                      <div className="h-6 rounded-md border" style={{ background: color, borderColor: selectedPreview.colors.border }} />
+                      <div className="mt-1 truncate text-[10px]" style={{ color: selectedPreview.colors.muted }}>{name}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div
+                  className="mt-3 rounded-md border px-3 py-2 font-mono text-[11px]"
+                  style={{
+                    background: selectedPreview.colors.panel,
+                    borderColor: selectedPreview.colors.border,
+                    color: selectedPreview.colors.code,
+                  }}
+                >
+                  <span style={{ color: selectedPreview.colors.markdown }}># markdown</span>{' '}
+                  <span style={{ color: selectedPreview.colors.text }}>const theme = </span>
+                  <span style={{ color: selectedPreview.colors.success }}>'{selectedPreview.label}'</span>
+                </div>
+              </div>
             )}
-            {piThemes.map((themeName) => (
-              <option key={themeName} value={themeName}>
-                {themeName}
-              </option>
-            ))}
-          </SettingsSelect>
+          </div>
         </SettingsField>
       )}
 

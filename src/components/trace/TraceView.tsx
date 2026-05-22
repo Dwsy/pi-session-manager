@@ -785,7 +785,7 @@ function EventInspector({ event, onClose }: { event: TraceEvent; onClose: () => 
           {tab === 'usage' && <InspectorUsage event={event} />}
           {tab === 'raw' && (
             <div className="rounded-lg border border-border/60 bg-secondary/40 p-2 overflow-auto">
-              <pre className="text-[10px] whitespace-pre-wrap break-all font-mono leading-relaxed hljs" dangerouslySetInnerHTML={{ __html: renderCodeHtml(JSON.stringify(event, null, 2), 'json') }} />
+              <pre className="text-[10px] whitespace-pre-wrap break-all font-mono leading-relaxed shiki" dangerouslySetInnerHTML={{ __html: renderCodeHtml(JSON.stringify(event, null, 2), 'json') }} />
             </div>
           )}
         </div>
@@ -837,14 +837,14 @@ function InspectorContent({ event }: { event: TraceEvent }) {
                   ) : tc.arguments_raw ? (
                     <div className="rounded-lg border border-border/60 bg-background/70 overflow-auto max-h-[420px]">
                       <pre
-                        className="text-[11px] leading-relaxed font-mono p-3 hljs"
+                        className="text-[11px] leading-relaxed font-mono p-3 shiki"
                         dangerouslySetInnerHTML={{ __html: renderCodeHtml(tc.arguments_raw, 'json') }}
                       />
                     </div>
                   ) : tc.arguments_preview ? (
                     <div className="rounded-lg border border-border/60 bg-background/70 overflow-auto max-h-[420px]">
                       <pre
-                        className="text-[11px] leading-relaxed font-mono p-3 hljs"
+                        className="text-[11px] leading-relaxed font-mono p-3 shiki"
                         dangerouslySetInnerHTML={{ __html: renderCodeHtml(tc.arguments_preview, 'json') }}
                       />
                     </div>
@@ -1296,33 +1296,17 @@ function InspectField({ label, value, mono }: { label: string; value: string | n
 // ── Highlighted Code Block ─────────────────────────────────────
 
 function HighlightedCode({ code, language, maxHeight }: { code: string; language?: string; maxHeight?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (ref.current) {
-      const pre = ref.current.querySelector('pre');
-      if (pre) {
-        const hljs = (window as any).hljs;
-        if (hljs && language && language !== 'text') {
-          const codeEl = pre.querySelector('code');
-          if (codeEl) {
-            codeEl.className = `hljs ${language}`;
-            hljs.highlightElement(codeEl);
-          }
-        }
-      }
-    }
-  }, [code, language]);
+  const highlightedCode = useMemo(() => renderCodeHtml(code, language), [code, language]);
 
   return (
     <div
-      ref={ref}
       className="rounded-lg overflow-hidden border border-border/50"
       style={{ maxHeight: maxHeight || '24rem' }}
     >
-      <pre className="overflow-auto p-3 text-xs font-mono leading-relaxed bg-muted/30 text-foreground">
-        <code>{code}</code>
-      </pre>
+      <pre
+        className="overflow-auto p-3 text-xs font-mono leading-relaxed bg-muted/30 text-foreground shiki"
+        dangerouslySetInnerHTML={{ __html: highlightedCode }}
+      />
     </div>
   );
 }

@@ -102,7 +102,7 @@ function CodeBlock({
         )}
         <pre className="code-block">
           <code
-            className={`hljs ${resolvedLanguage || ''}`.trim()}
+            className={`shiki ${resolvedLanguage || ''}`.trim()}
             dangerouslySetInnerHTML={{ __html: highlightedCode }}
           />
         </pre>
