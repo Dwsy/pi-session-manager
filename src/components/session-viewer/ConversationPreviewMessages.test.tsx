@@ -1,11 +1,21 @@
 // @vitest-environment jsdom
 
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import type { ReactNode } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SessionViewProvider } from "@/contexts/SessionViewContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 import type { SessionEntry } from "@/types";
 import ConversationPreviewMessages, { buildConversationPreviewTurns } from "./ConversationPreviewMessages";
+
+function Providers({ children }: { children: ReactNode }) {
+  return (
+    <SettingsProvider>
+      <SessionViewProvider>{children}</SessionViewProvider>
+    </SettingsProvider>
+  );
+}
 
 function message(id: string, role: string, text: string): SessionEntry {
   return {
@@ -19,7 +29,31 @@ function message(id: string, role: string, text: string): SessionEntry {
   };
 }
 
+function toolCall(id: string, name: string): SessionEntry {
+  return {
+    type: "message",
+    id,
+    timestamp: "2026-05-19T00:00:00.000Z",
+    message: {
+      role: "assistant",
+      content: [{ type: "toolCall", id, name, args: {} }],
+    },
+  };
+}
+
 describe("buildConversationPreviewTurns", () => {
+  beforeEach(() => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+  });
   it("starts a visible turn from a developer message", () => {
     const turns = buildConversationPreviewTurns([
       message("dev-1", "developer", "Continue active goal"),
@@ -47,7 +81,7 @@ describe("buildConversationPreviewTurns", () => {
 
   it("renders a developer-starting conversation", () => {
     render(
-      <SessionViewProvider>
+      <Providers>
         <ConversationPreviewMessages
           entries={[message("dev-1", "developer", "Continue active goal")]}
           toolResultByCallId={new Map()}
@@ -56,9 +90,43 @@ describe("buildConversationPreviewTurns", () => {
           scrollTargetId={null}
           setScrollTargetId={() => {}}
         />
-      </SessionViewProvider>,
+      </Providers>,
     );
 
     expect(screen.getByText("Continue active goal")).toBeTruthy();
+  });
+
+  it("keeps hook order stable when process entries appear after an empty summary", () => {
+    const { rerender } = render(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={[message("user-1", "user", "Open file"), message("assistant-1", "assistant", "Done")]}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+        />
+      </Providers>,
+    );
+
+    rerender(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={[
+            message("user-1", "user", "Open file"),
+            toolCall("tool-1", "read"),
+            message("assistant-1", "assistant", "Done"),
+          ]}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+        />
+      </Providers>,
+    );
+
+    expect(screen.getByText("read")).toBeTruthy();
   });
 });

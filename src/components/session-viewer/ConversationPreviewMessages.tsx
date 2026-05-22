@@ -250,6 +250,10 @@ function CollapsedProcessSummary({
 }) {
   const { t } = useTranslation();
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const handleShowReview = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowReviewModal(true);
+  }, []);
 
   if (entries.length === 0) return null;
 
@@ -257,11 +261,6 @@ function CollapsedProcessSummary({
     entries,
     t("session.preview.process", "process"),
   );
-
-  const handleShowReview = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowReviewModal(true);
-  }, []);
 
   return (
     <>

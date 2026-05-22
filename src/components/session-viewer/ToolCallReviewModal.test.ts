@@ -1,12 +1,32 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { fireEvent, render, screen, waitFor, cleanup } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/hooks/useAppearance", () => ({
+  useTheme: () => ({ theme: "dark" }),
+}));
+
+beforeEach(() => {
+  window.matchMedia = vi.fn().mockReturnValue({ matches: true });
+  Object.assign(navigator, {
+    clipboard: {
+      writeText: vi.fn().mockResolvedValue(undefined),
+    },
+  });
+});
+
+afterEach(() => {
+  cleanup();
+});
 
 import type { SessionEntry } from "@/types";
+import ToolCallReviewModal from "./ToolCallReviewModal";
 import {
   DEFAULT_REVIEW_FILTER,
   extractFileOperations,
-} from "./ToolCallReviewModal";
+} from "./tool-review/model";
 
 function assistantToolEntry(content: NonNullable<SessionEntry["message"]>["content"]): SessionEntry {
   return {
@@ -19,6 +39,27 @@ function assistantToolEntry(content: NonNullable<SessionEntry["message"]>["conte
     },
   };
 }
+
+function renderModal({
+  entries,
+  toolResultByCallId = new Map(),
+  onClose = vi.fn(),
+}: {
+  entries: SessionEntry[];
+  toolResultByCallId?: Map<string, SessionEntry>;
+  onClose?: () => void;
+}) {
+  render(
+    createElement(ToolCallReviewModal, {
+      isOpen: true,
+      onClose,
+      entries,
+      toolResultByCallId,
+    }),
+  );
+  return { onClose };
+}
+
 
 describe("ToolCallReviewModal data model", () => {
   it("defaults to the full operation timeline", () => {
@@ -83,5 +124,292 @@ describe("ToolCallReviewModal data model", () => {
       "read",
     ]);
     expect(operations.map((operation) => operation.sequence)).toEqual([1, 2]);
+    expect(operations[0].filePath).toBe("pnpm build");
+    expect(operations[1].filePath).toBe("src/App.tsx");
+  });
+
+  it("extracts edit operations with resolved diff metrics", () => {
+    const operations = extractFileOperations(
+      [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-edit",
+            name: "edit",
+            arguments: {
+              file_path: "src/App.tsx",
+              old_string: "const value = 1;",
+              new_string: "const value = 2;",
+            },
+          },
+        ]),
+      ],
+      new Map(),
+    );
+
+    expect(operations[0]).toMatchObject({
+      toolName: "edit",
+      filePath: "src/App.tsx",
+      content: "const value = 2;",
+      preview: "const value = 2;",
+      metrics: {
+        additions: 0,
+        deletions: 0,
+        lines: 1,
+      },
+    });
+  });
+
+  it("extracts task operations with description fallback and output metrics", () => {
+    const operations = extractFileOperations(
+      [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-task",
+            name: "task",
+            arguments: { description: "review repository changes" },
+          },
+        ]),
+      ],
+      new Map(),
+    );
+
+    expect(operations[0]).toMatchObject({
+      sequence: 1,
+      toolName: "task",
+      filePath: "review repository changes",
+      preview: '{ "description": "review repository changes" }',
+      metrics: {
+        additions: 0,
+        deletions: 0,
+        lines: 0,
+      },
+    });
+  });
+
+  it("marks operations as errors when matching tool result failed", () => {
+    const toolResult: SessionEntry = {
+      type: "message",
+      id: "tool-result-1",
+      timestamp: "2026-05-19T10:00:02.000Z",
+      message: {
+        role: "tool",
+        toolCallId: "call-bash",
+        toolName: "bash",
+        isError: true,
+        content: [{ type: "text", text: "command failed" }],
+      },
+    };
+
+    const operations = extractFileOperations(
+      [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-bash",
+            name: "bash",
+            arguments: { command: "pnpm build" },
+          },
+        ]),
+      ],
+      new Map([["call-bash", toolResult]]),
+    );
+
+    expect(operations[0]).toMatchObject({
+      toolName: "bash",
+      output: "command failed",
+      isError: true,
+      metrics: {
+        lines: 1,
+      },
+    });
+  });
+});
+
+describe("ToolCallReviewModal UI behavior", () => {
+  it("renders the empty state", () => {
+    renderModal({ entries: [] });
+
+    expect(screen.getByText("No reviewable tool calls found")).toBeTruthy();
+  });
+
+  it("keeps error state and copy behavior", async () => {
+    const toolResult: SessionEntry = {
+      type: "message",
+      id: "tool-result-1",
+      timestamp: "2026-05-19T10:00:02.000Z",
+      message: {
+        role: "tool",
+        toolCallId: "call-bash",
+        toolName: "bash",
+        isError: true,
+        content: [{ type: "text", text: "command failed" }],
+      },
+    };
+
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-bash",
+            name: "bash",
+            arguments: { command: "pnpm build" },
+          },
+        ]),
+      ],
+      toolResultByCallId: new Map([["call-bash", toolResult]]),
+    });
+
+    expect(screen.getByText("Error")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Copy operation details" }));
+
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        "pnpm build\n\ncommand failed",
+      );
+    });
+  });
+
+  it("keeps Inspector and read output on the CodeBlock fallback path", async () => {
+    const toolResult: SessionEntry = {
+      type: "message",
+      id: "tool-result-read",
+      timestamp: "2026-05-19T10:00:02.000Z",
+      message: {
+        role: "tool",
+        toolCallId: "call-read",
+        toolName: "read",
+        content: [{ type: "text", text: "export const value = 42;" }],
+      },
+    };
+
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-read",
+            name: "read",
+            arguments: { path: "src/config.ts" },
+          },
+        ]),
+      ],
+      toolResultByCallId: new Map([["call-read", toolResult]]),
+    });
+
+    expect(await screen.findByText("Inspector")).toBeTruthy();
+    expect(document.body.textContent).toContain("export const value = 42;");
+  });
+
+  it("keeps generic task metadata on the CodeBlock fallback path", async () => {
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-task",
+            name: "task",
+            arguments: { description: "review repository changes" },
+          },
+        ]),
+      ],
+    });
+
+    expect(await screen.findByText("Task")).toBeTruthy();
+    expect(screen.getAllByText(/review repository changes/).length).toBeGreaterThan(0);
+  });
+
+  it("selects shell tree nodes and keeps the detail panel on that command", async () => {
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-read",
+            name: "read",
+            arguments: { path: "src/App.tsx" },
+          },
+          {
+            type: "toolCall",
+            id: "call-bash",
+            name: "bash",
+            arguments: { command: "pnpm build --filter api" },
+          },
+        ]),
+      ],
+    });
+
+    const shellNode = await screen.findByRole("button", {
+      name: /#2 pnpm build --filter api/,
+    });
+    fireEvent.click(shellNode);
+
+    expect(screen.getByText("Shell command")).toBeTruthy();
+    expect(screen.getByText("pnpm build --filter api")).toBeTruthy();
+  });
+
+  it("moves selection with ArrowDown and ArrowUp", async () => {
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-read-1",
+            name: "read",
+            arguments: { path: "src/App.tsx" },
+          },
+          {
+            type: "toolCall",
+            id: "call-read-2",
+            name: "read",
+            arguments: { path: "src/main/java/com/example/User.java" },
+          },
+        ]),
+      ],
+    });
+
+    await waitFor(() => expect(screen.getByText("src/App.tsx")).toBeTruthy());
+    fireEvent.keyDown(document, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getAllByText("User.java").length).toBeGreaterThan(0));
+    fireEvent.keyDown(document, { key: "ArrowUp" });
+    await waitFor(() => expect(screen.getByText("src/App.tsx")).toBeTruthy());
+  });
+});
+
+describe("ToolCallReviewModal keyboard handling", () => {
+  it("intercepts Escape before parent session hotkeys", async () => {
+    const onClose = vi.fn();
+    const parentHotkey = vi.fn();
+
+    document.addEventListener("keydown", parentHotkey);
+
+    try {
+      render(
+        createElement(ToolCallReviewModal, {
+          isOpen: true,
+          onClose,
+          entries: [
+            assistantToolEntry([
+              {
+                type: "toolCall",
+                id: "call-read",
+                name: "read",
+                arguments: { path: "src/App.tsx" },
+              },
+            ]),
+          ],
+          toolResultByCallId: new Map(),
+        }),
+      );
+
+      fireEvent.keyDown(document, { key: "Escape" });
+
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      expect(parentHotkey).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener("keydown", parentHotkey);
+    }
   });
 });

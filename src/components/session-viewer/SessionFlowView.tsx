@@ -14,7 +14,7 @@ import {
   Handle,
   Position,
 } from '@xyflow/react'
-import { User, Bot, Wrench, Settings, FileText, ZoomIn, ZoomOut, Maximize, LocateFixed, GitBranch, List } from 'lucide-react'
+import { User, Bot, Wrench, Settings, FileText, ZoomIn, ZoomOut, Maximize, LocateFixed, GitBranch, List, Network } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import type { SessionEntry } from '@/types'
 import { buildTree as buildSessionTree, isNoneParent, type TreeNodeData } from '@/utils/session-tree'
@@ -30,18 +30,31 @@ interface SessionFlowViewProps {
   onViewModeChange?: (mode: 'flow' | 'hierarchy') => void
 }
 
-const NODE_W = 200
-const NODE_H = 36
-const GAP_X = 40
-const GAP_Y = 16
+const NODE_W = 220
+const NODE_H = 42
+const GAP_X = 44
+const GAP_Y = 18
+
+type FlowRole = 'user' | 'assistant' | 'tool' | 'meta'
+
+interface FlowNodeData {
+  label: string
+  role: FlowRole
+  kind: string
+  detail: string
+  isActive: boolean
+  isInPath: boolean
+  skipped?: number
+  skippedSummary?: string
+}
 
 // --- Custom node ---
 const FlowNode = memo(({ data }: NodeProps) => {
-  const d = data as { label: string; role: string; isActive: boolean; isInPath: boolean; skipped?: number; skippedSummary?: string }
+  const d = data as unknown as FlowNodeData
 
   const roleClass = `flow-node flow-node-${d.role}${d.isActive ? ' flow-node-active' : ''}${d.isInPath ? ' flow-node-in-path' : ''}`
 
-  const iconMap: Record<string, React.ReactNode> = {
+  const iconMap: Record<FlowRole, React.ReactNode> = {
     user: <User size={12} />,
     assistant: <Bot size={12} />,
     tool: <Wrench size={12} />,
@@ -49,12 +62,15 @@ const FlowNode = memo(({ data }: NodeProps) => {
   }
 
   return (
-    <div className={roleClass} style={{ width: NODE_W, height: NODE_H }}>
+    <div className={roleClass} style={{ width: NODE_W, height: NODE_H }} title={`${d.kind} · ${d.detail || d.label}`}>
       <Handle type="target" position={Position.Top} style={{ opacity: 0, width: 1, height: 1 }} />
       <span className="flow-node-icon">{iconMap[d.role] || <FileText size={12} />}</span>
-      <span className="flow-node-label">{d.label}</span>
+      <span className="flow-node-main">
+        <span className="flow-node-label">{d.label}</span>
+        <span className="flow-node-kind">{d.kind}</span>
+      </span>
       {d.skipped != null && d.skipped > 0 && (
-        <span className="flow-node-skip">+{d.skipped}</span>
+        <span className="flow-node-skip" title={d.skippedSummary || `${d.skipped} compacted entries`}>+{d.skipped}</span>
       )}
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0, width: 1, height: 1 }} />
     </div>
@@ -65,7 +81,7 @@ FlowNode.displayName = 'FlowNode'
 const nodeTypes = { flow: FlowNode }
 
 // --- Helpers ---
-function getRole(entry: SessionEntry): string {
+function getRole(entry: SessionEntry): FlowRole {
   if (entry.type !== 'message') return 'meta'
   const role = entry.message?.role
   if (role === 'user') return 'user'
@@ -75,6 +91,21 @@ function getRole(entry: SessionEntry): string {
   }
   if (role === 'toolResult') return 'tool'
   return 'meta'
+}
+
+function getKind(entry: SessionEntry): string {
+  if (entry.type === 'message' && entry.message?.role) return `message.${entry.message.role}`
+  if (entry.type === 'label' && entry.targetId) return 'label.target'
+  if (entry.type === 'model_change') return 'event.model'
+  if (entry.type === 'thinking_level_change') return 'event.thinking'
+  return entry.type
+}
+
+function getDetail(entry: SessionEntry): string {
+  const parts = [`id ${entry.id.length > 12 ? `${entry.id.slice(0, 8)}...${entry.id.slice(-4)}` : entry.id}`]
+  if (entry.parentId) parts.push(`parent ${entry.parentId.length > 12 ? `${entry.parentId.slice(0, 8)}...${entry.parentId.slice(-4)}` : entry.parentId}`)
+  if (entry.targetId) parts.push(`target ${entry.targetId.length > 12 ? `${entry.targetId.slice(0, 8)}...${entry.targetId.slice(-4)}` : entry.targetId}`)
+  return parts.join(' · ')
 }
 
 function getLabel(entry: SessionEntry): string {
@@ -248,7 +279,7 @@ function layoutHierarchy(roots: TreeNodeData[], activePathIds: Set<string>, acti
       nodes.push({
         id: node.entry.id, type: 'flow',
         position: { x, y: depth * (NODE_H + GAP_Y) },
-        data: { label, role, isActive, isInPath },
+        data: { label, role, kind: getKind(node.entry), detail: getDetail(node.entry), isActive, isInPath } satisfies FlowNodeData,
       })
       return [x, x]
     }
@@ -269,7 +300,7 @@ function layoutHierarchy(roots: TreeNodeData[], activePathIds: Set<string>, acti
     nodes.push({
       id: node.entry.id, type: 'flow',
       position: { x: (minX + maxX) / 2, y: depth * (NODE_H + GAP_Y) },
-      data: { label, role, isActive, isInPath },
+      data: { label, role, kind: getKind(node.entry), detail: getDetail(node.entry), isActive, isInPath } satisfies FlowNodeData,
     })
     return [minX, maxX]
   }
@@ -295,7 +326,7 @@ function layoutTree(roots: CompactNode[], activePathIds: Set<string>, activeLeaf
       nodes.push({
         id: node.entry.id, type: 'flow',
         position: { x, y: depth * (NODE_H + GAP_Y) },
-        data: { label, role, isActive, isInPath, skipped: node.skipped },
+        data: { label, role, kind: getKind(node.entry), detail: getDetail(node.entry), isActive, isInPath, skipped: node.skipped, skippedSummary: node.skippedSummary } satisfies FlowNodeData,
       })
       return [x, x]
     }
@@ -319,7 +350,7 @@ function layoutTree(roots: CompactNode[], activePathIds: Set<string>, activeLeaf
     nodes.push({
       id: node.entry.id, type: 'flow',
       position: { x: (minX + maxX) / 2, y: depth * (NODE_H + GAP_Y) },
-      data: { label, role, isActive, isInPath, skipped: node.skipped },
+      data: { label, role, kind: getKind(node.entry), detail: getDetail(node.entry), isActive, isInPath, skipped: node.skipped, skippedSummary: node.skippedSummary } satisfies FlowNodeData,
     })
     return [minX, maxX]
   }
@@ -422,6 +453,23 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
   const { zoomIn, zoomOut, fitView, setCenter, getZoom } = useReactFlow()
   const fitViewDoneRef = useRef(false)
 
+  const flowStats = useMemo(() => {
+    const counts: Record<FlowRole, number> = { user: 0, assistant: 0, tool: 0, meta: 0 }
+    let activeNode: Node | null = null
+    let pathCount = 0
+
+    for (const node of nodes) {
+      const data = node.data as unknown as FlowNodeData
+      counts[data.role] += 1
+      if (data.isInPath) pathCount += 1
+      if (node.id === activeLeafId || data.isActive) activeNode = node
+    }
+
+    return { counts, activeNode, pathCount }
+  }, [activeLeafId, nodes])
+
+  const activeData = flowStats.activeNode?.data as unknown as FlowNodeData | undefined
+
   // Derive a stable key from node IDs to detect session changes
   const nodeKey = useMemo(() => nodes.map(n => n.id).join(','), [nodes])
 
@@ -447,7 +495,25 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
   }, [activeLeafId, nodes, fitView, setCenter, getZoom])
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div className="flow-shell">
+      <div className="flow-inspector">
+        <div className="flow-inspector-title">
+          <Network size={13} />
+          <span>{viewMode === 'flow' ? 'Compact flow' : 'Full hierarchy'}</span>
+        </div>
+        <div className="flow-inspector-stats">
+          <span>{nodes.length} nodes</span>
+          <span>{edges.length} links</span>
+          <span>{flowStats.pathCount} path</span>
+        </div>
+        {activeData ? (
+          <div className="flow-inspector-active">
+            <span className={`flow-legend-dot flow-legend-${activeData.role}`} />
+            <span className="flow-inspector-active-text">{activeData.label}</span>
+            <span className="flow-inspector-kind">{activeData.kind}</span>
+          </div>
+        ) : null}
+      </div>
       <div className="flow-toolbar">
         <button onClick={() => zoomIn({ duration: 200 })} title={t('components.sessionFlow.zoomIn')}><ZoomIn size={14} /></button>
         <button onClick={() => zoomOut({ duration: 200 })} title={t('components.sessionFlow.zoomOut')}><ZoomOut size={14} /></button>
@@ -461,6 +527,12 @@ function FlowInner({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, ac
             {viewMode === 'flow' ? <GitBranch size={14} /> : <List size={14} />}
           </button>
         )}
+      </div>
+      <div className="flow-legend" aria-hidden="true">
+        <span><span className="flow-legend-dot flow-legend-user" />User {flowStats.counts.user}</span>
+        <span><span className="flow-legend-dot flow-legend-assistant" />Assistant {flowStats.counts.assistant}</span>
+        <span><span className="flow-legend-dot flow-legend-tool" />Tool {flowStats.counts.tool}</span>
+        <span><span className="flow-legend-dot flow-legend-meta" />Meta {flowStats.counts.meta}</span>
       </div>
       <ReactFlow
         nodes={nodes} edges={edges}

@@ -109,6 +109,45 @@ function formatEntryTime(timestamp?: string): string {
   return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
 }
 
+function formatEntryId(id?: string): string {
+  if (!id) return "none";
+  return id.length > 12 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id;
+}
+
+function getEntryJsonlShape(entry: SessionEntry): string {
+  if (entry.type === "message" && entry.message?.role) {
+    return `message.${entry.message.role}`;
+  }
+  if (entry.type === "label" && entry.targetId) return "label.target";
+  if (entry.type === "model_change") return "event.model";
+  if (entry.type === "thinking_level_change") return "event.thinking";
+  return entry.type;
+}
+
+function getEntryRelationText(entry: SessionEntry): string {
+  const parts = [`id ${formatEntryId(entry.id)}`];
+  if (entry.parentId) parts.push(`parent ${formatEntryId(entry.parentId)}`);
+  if (entry.targetId) parts.push(`target ${formatEntryId(entry.targetId)}`);
+  return parts.join(" · ");
+}
+
+function getEntryPreviewTitle(entry: SessionEntry, label?: string): string {
+  if (label) return label;
+  const text = getEntryDisplayText(entry);
+  return text === "(empty)" ? getEntryKindLabel(entry) : text;
+}
+
+function getEntryPreviewHint(entry: SessionEntry): string {
+  if (entry.type === "message" && entry.message?.role === "toolResult") {
+    return "Tool result bound to prior tool call";
+  }
+  if (entry.type === "label") return "Label entry points at targetId while tree keeps raw parent order";
+  if (entry.type === "message") return "Pi Agent JSONL message entry";
+  if (entry.type === "branch_summary") return "Branch summary entry";
+  if (entry.type === "compaction") return "Compaction entry";
+  return "Pi Agent JSONL entry";
+}
+
 // ─── Tool color palette ───
 const KNOWN_TOOLS = new Set(["read", "edit", "write", "bash", "search", "web_fetch"]);
 const TOOL_PALETTE_SIZE = 8;
@@ -287,6 +326,27 @@ const SessionTree = memo(
         null,
       [activeLeafId, filteredNodes, selectedNodeId],
     );
+    const selectedVisibleIndex = useMemo(
+      () =>
+        selectedFlatNode
+          ? filteredNodes.findIndex(
+              (flatNode) =>
+                flatNode.node.entry.id === selectedFlatNode.node.entry.id,
+            ) + 1
+          : 0,
+      [filteredNodes, selectedFlatNode],
+    );
+    const contextFlatNode = useMemo(() => {
+      if (!filteredNodes.length) return null;
+      const selectedIndex = Math.max(0, selectedVisibleIndex - 1);
+      for (let index = selectedIndex; index >= 0; index -= 1) {
+        const entry = filteredNodes[index].node.entry;
+        if (entry.type === "message" && entry.message?.role === "user") {
+          return { flatNode: filteredNodes[index], index };
+        }
+      }
+      return null;
+    }, [filteredNodes, selectedVisibleIndex]);
 
     useEffect(() => {
       if (!selectedNodeId && activeLeafId) {
@@ -423,13 +483,25 @@ const SessionTree = memo(
             </Suspense>
           </div>
         ) : (
-          <div className="tree-container">
+          <>
+            {contextFlatNode ? (
+              <div className="tree-user-sticky">
+                <span className="tree-user-sticky-label">Thread context</span>
+                <span className="tree-user-sticky-text">
+                  {getEntryDisplayText(contextFlatNode.flatNode.node.entry)}
+                </span>
+                <span className="tree-user-sticky-index">
+                  {contextFlatNode.index + 1}/{filteredNodes.length}
+                </span>
+              </div>
+            ) : null}
             {stickyShift > 0 ? (
               <div className="tree-sticky-depth">
                 Sticky-left · depth {stickyShift + 1}+
               </div>
             ) : null}
-            {filteredNodes.map((flatNode, index) => {
+            <div className="tree-container">
+            {filteredNodes.map((flatNode) => {
               const entry = flatNode.node.entry;
               const label = flatNode.node.label;
               const isActive = entry.id === activeLeafId;
@@ -446,20 +518,6 @@ const SessionTree = memo(
 
               return (
                 <div key={entry.id}>
-                  {isUserMessage ? (
-                    <div
-                      className="tree-user-sticky"
-                      style={{ top: stickyShift > 0 ? 28 : 0 }}
-                    >
-                      <span className="tree-user-sticky-label">User</span>
-                      <span className="tree-user-sticky-text">
-                        {displayText}
-                      </span>
-                      <span className="tree-user-sticky-index">
-                        {index + 1}/{filteredNodes.length}
-                      </span>
-                    </div>
-                  ) : null}
                   <div
                     className={`tree-node ${isActive ? "active" : ""} ${isSelected ? "selected" : ""} ${isInPath ? "in-path" : ""} ${isSearchMatch ? "search-match" : ""} ${isCurrentMatch ? "search-match-current" : ""} ${isUserMessage ? "tree-node-user" : ""}`}
                     onClick={() => handleNodeClick(flatNode)}
@@ -486,35 +544,48 @@ const SessionTree = memo(
                 </div>
               );
             })}
-          </div>
+            </div>
+          </>
         )}
 
         <div className="tree-detail-pane">
-          {selectedFlatNode ? (
-            <>
-              <div className="tree-detail-meta">
-                <span>
-                  row{" "}
-                  {filteredNodes.findIndex(
-                    (node) =>
-                      node.node.entry.id === selectedFlatNode.node.entry.id,
-                  ) + 1}{" "}
-                  of {filteredNodes.length}
-                </span>
-                <span>depth {getDisplayIndent(selectedFlatNode) + 1}</span>
-                <span>{getEntryKind(selectedFlatNode.node.entry)}</span>
-                <span>
-                  {formatEntryTime(selectedFlatNode.node.entry.timestamp)}
-                </span>
-                {selectedFlatNode.node.entry.id === activeLeafId ? (
-                  <span>current</span>
-                ) : null}
-              </div>
-              <div className="tree-detail-body">
-                {getEntryDetailText(selectedFlatNode.node.entry)}
-              </div>
-            </>
-          ) : (
+          {selectedFlatNode ? (() => {
+            const selectedEntry = selectedFlatNode.node.entry;
+            const selectedLabel = selectedFlatNode.node.label;
+            const visibleIndex = selectedVisibleIndex;
+            const sourceIndex = entries.findIndex((entry) => entry.id === selectedEntry.id) + 1;
+            const isCurrent = selectedEntry.id === activeLeafId;
+
+            return (
+              <>
+                <div className="tree-detail-header">
+                  <div className="tree-detail-title">
+                    {getEntryPreviewTitle(selectedEntry, selectedLabel)}
+                  </div>
+                  <div className="tree-detail-badges">
+                    <span>JSONL</span>
+                    {isCurrent ? <span>current</span> : null}
+                  </div>
+                </div>
+                <div className="tree-detail-meta">
+                  <span>row {visibleIndex} of {filteredNodes.length}</span>
+                  {sourceIndex > 0 ? <span>source {sourceIndex} of {entries.length}</span> : null}
+                  <span>depth {getDisplayIndent(selectedFlatNode) + 1}</span>
+                  <span>{getEntryJsonlShape(selectedEntry)}</span>
+                  <span>{formatEntryTime(selectedEntry.timestamp)}</span>
+                </div>
+                <div className="tree-detail-relation">
+                  {getEntryRelationText(selectedEntry)}
+                </div>
+                <div className="tree-detail-body">
+                  {getEntryDetailText(selectedEntry, selectedLabel)}
+                </div>
+                <div className="tree-detail-hint">
+                  {getEntryPreviewHint(selectedEntry)}
+                </div>
+              </>
+            );
+          })() : (
             <div className="tree-detail-empty">No selection</div>
           )}
         </div>

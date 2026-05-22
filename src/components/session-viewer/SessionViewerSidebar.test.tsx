@@ -1,6 +1,7 @@
+// @vitest-environment jsdom
 import { createRef, forwardRef, type ComponentProps } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, cleanup } from '@testing-library/react';
 
 import SessionViewerSidebar from './SessionViewerSidebar';
 
@@ -56,6 +57,7 @@ function renderSidebar(overrides: Partial<ComponentProps<typeof SessionViewerSid
 
 describe('SessionViewerSidebar', () => {
   beforeEach(() => {
+    cleanup();
     vi.clearAllMocks();
   });
 
