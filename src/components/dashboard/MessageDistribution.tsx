@@ -5,9 +5,10 @@ import type { SessionStats } from '@/types'
 interface MessageDistributionProps {
   stats: SessionStats
   title?: string
+  onClick?: () => void
 }
 
-export default function MessageDistribution({ stats, title = 'Message Distribution' }: MessageDistributionProps) {
+export default function MessageDistribution({ stats, title = 'Message Distribution', onClick }: MessageDistributionProps) {
   const userPercent = stats.total_messages > 0
     ? (stats.user_messages / stats.total_messages) * 100
     : 0
@@ -17,57 +18,69 @@ export default function MessageDistribution({ stats, title = 'Message Distributi
 
   const totalMessages = stats.total_messages.toLocaleString()
 
+  const content = (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
+          <div className="p-1 rounded bg-info/10">
+            <MessageSquare className="h-3 w-3 text-info" />
+          </div>
+          {title}
+        </h3>
+        <div className="text-[10px] text-muted-foreground">
+          Total: <span className="text-foreground font-medium">{totalMessages}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-background/60 rounded-lg p-2.5 border border-foreground/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <div className="p-1 bg-info/20 rounded">
+              <User className="h-2.5 w-2.5 text-info" />
+            </div>
+            <span className="text-[10px] text-muted-foreground">User</span>
+          </div>
+          <div className="flex items-end justify-between">
+            <span className="text-lg font-bold text-gradient">{stats.user_messages.toLocaleString()}</span>
+            <span className="text-[10px] text-info">{userPercent.toFixed(0)}%</span>
+          </div>
+        </div>
+
+        <div className="bg-background/60 rounded-lg p-2.5 border border-foreground/5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <div className="p-1 bg-success/20 rounded">
+              <Bot className="h-2.5 w-2.5 text-success" />
+            </div>
+            <span className="text-[10px] text-muted-foreground">Assistant</span>
+          </div>
+          <div className="flex items-end justify-between">
+            <span className="text-lg font-bold text-gradient">{stats.assistant_messages.toLocaleString()}</span>
+            <span className="text-[10px] text-success">{assistantPercent.toFixed(0)}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-2.5 pt-2.5 border-t border-foreground/5 flex items-center justify-between">
+        <span className="text-[10px] text-muted-foreground">Ratio</span>
+        <span className="text-xs font-medium text-foreground bg-background/60 px-2 py-0.5 rounded">
+          1:{(stats.assistant_messages / Math.max(stats.user_messages, 1)).toFixed(1)}
+        </span>
+      </div>
+    </>
+  )
+
   return (
     <DashboardCardShell
-      className="rounded-lg p-3"
+      className={`rounded-lg p-3 ${onClick ? 'cursor-pointer focus-within:ring-2 focus-within:ring-info/30' : ''}`}
       overlayClassName="bg-gradient-to-br from-info/5 via-transparent to-success/5"
     >
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
-            <div className="p-1 rounded bg-info/10">
-              <MessageSquare className="h-3 w-3 text-info" />
-            </div>
-            {title}
-          </h3>
-          <div className="text-[10px] text-muted-foreground">
-            Total: <span className="text-foreground font-medium">{totalMessages}</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-background/60 rounded-lg p-2.5 border border-foreground/5">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="p-1 bg-info/20 rounded">
-                <User className="h-2.5 w-2.5 text-info" />
-              </div>
-              <span className="text-[10px] text-muted-foreground">User</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <span className="text-lg font-bold text-gradient">{stats.user_messages.toLocaleString()}</span>
-              <span className="text-[10px] text-info">{userPercent.toFixed(0)}%</span>
-            </div>
-          </div>
-
-          <div className="bg-background/60 rounded-lg p-2.5 border border-foreground/5">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="p-1 bg-success/20 rounded">
-                <Bot className="h-2.5 w-2.5 text-success" />
-              </div>
-              <span className="text-[10px] text-muted-foreground">Assistant</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <span className="text-lg font-bold text-gradient">{stats.assistant_messages.toLocaleString()}</span>
-              <span className="text-[10px] text-success">{assistantPercent.toFixed(0)}%</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-2.5 pt-2.5 border-t border-foreground/5 flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground">Ratio</span>
-          <span className="text-xs font-medium text-foreground bg-background/60 px-2 py-0.5 rounded">
-            1:{(stats.assistant_messages / Math.max(stats.user_messages, 1)).toFixed(1)}
-          </span>
-        </div>
+      {onClick ? (
+        <button type="button" onClick={onClick} className="w-full text-left">
+          {content}
+        </button>
+      ) : (
+        content
+      )}
     </DashboardCardShell>
   )
 }

@@ -11,6 +11,7 @@ import {
   Clock,
   ArrowUpRight,
   ChevronRight,
+  TrendingUp,
 } from 'lucide-react'
 import type { HeatmapPoint, DayStats } from '@/types'
 import { getPathBasename } from '@/utils/path'
@@ -33,6 +34,13 @@ const ACTIVITY_CONFIG = [
   { label: 'dashboard.activityLevels.high', color: '#46c492' },
   { label: 'dashboard.activityLevels.veryHigh', color: '#6eebb1' },
 ]
+
+const TOKEN_TREND_CHART = {
+  left: 4,
+  right: 96,
+  top: 8,
+  bottom: 42,
+}
 
 function formatCompactNumber(value: number): string {
   const abs = Math.abs(value)
@@ -168,6 +176,23 @@ export default function HeatmapDayModal({
   )
 
   const activeHours = hourlyData.filter((item) => item.count > 0).length
+  const hourlyMetricItems = [
+    {
+      label: t('dashboard.hourly.peakHour', 'Peak Hour'),
+      value: `${peakHour.hour.toString().padStart(2, '0')}:00`,
+      accent: metricColor(intensity(peakHour.count, maxHourly)),
+    },
+    {
+      label: t('dashboard.hourly.activeHours', 'Active Hours'),
+      value: activeHours.toString(),
+      accent: metricColor(activeHours / 24),
+    },
+    {
+      label: t('dashboard.hourly.peakMessages', 'Peak Messages'),
+      value: formatCompactNumber(peakHour.count),
+      accent: metricColor(intensity(peakHour.count, maxHourly)),
+    },
+  ]
 
   const daySummary = hasDetailedStats
     ? t(
@@ -213,6 +238,12 @@ export default function HeatmapDayModal({
   const modelTotal = modelRows.reduce((sum, [, count]) => sum + count, 0)
   const tokenDetails = stats.token_details
   const cacheTokens = tokenDetails.total_cache_read + tokenDetails.total_cache_write
+  const tokenBreakdownItems = [
+    { label: t('dashboard.heatmapModal.inputTokens', 'Input'), value: tokenDetails.total_input, color: 'rgb(59 130 246 / 0.92)' },
+    { label: t('dashboard.heatmapModal.outputTokens', 'Output'), value: tokenDetails.total_output, color: 'rgb(20 184 166 / 0.92)' },
+    { label: t('dashboard.heatmapModal.cacheTokens', 'Cache'), value: cacheTokens, color: 'rgb(139 92 246 / 0.88)' },
+  ]
+  const tokenBreakdownTotal = Math.max(tokenBreakdownItems.reduce((sum, item) => sum + item.value, 0), 1)
   const formatCost = (cost: number) => cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(2)}`
   const tokenTrendData = useMemo(() => {
     const source = tokenTrend && tokenTrend.length > 0
@@ -228,21 +259,31 @@ export default function HeatmapDayModal({
     return sorted.slice(start, end)
   }, [point, stats.total_tokens, tokenTrend])
   const maxTrendTokens = Math.max(...tokenTrendData.map((item) => item.total_tokens), 1)
+  const averageTrendTokens = Math.round(
+    tokenTrendData.reduce((sum, item) => sum + item.total_tokens, 0) / Math.max(tokenTrendData.length, 1),
+  )
   const tokenTrendPoints = useMemo(() => {
     const lastIndex = Math.max(tokenTrendData.length - 1, 1)
+    const chartWidth = TOKEN_TREND_CHART.right - TOKEN_TREND_CHART.left
+    const chartHeight = TOKEN_TREND_CHART.bottom - TOKEN_TREND_CHART.top
+
     return tokenTrendData.map((item, index) => {
-      const x = (index / lastIndex) * 100
-      const y = 44 - (item.total_tokens / maxTrendTokens) * 38
-      return { item, x, y }
+      const x = TOKEN_TREND_CHART.left + (index / lastIndex) * chartWidth
+      const y = TOKEN_TREND_CHART.bottom - (item.total_tokens / maxTrendTokens) * chartHeight
+      const parsed = parseISO(item.date)
+      const label = Number.isNaN(parsed.getTime()) ? item.date.slice(5) : format(parsed, 'MM/dd')
+      return { item, x, y, label }
     })
   }, [maxTrendTokens, tokenTrendData])
   const tokenTrendLine = tokenTrendPoints
     .map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`)
     .join(' ')
   const tokenTrendArea = tokenTrendPoints.length > 0
-    ? `0,48 ${tokenTrendLine} 100,48`
+    ? `${TOKEN_TREND_CHART.left},${TOKEN_TREND_CHART.bottom + 4} ${tokenTrendLine} ${TOKEN_TREND_CHART.right},${TOKEN_TREND_CHART.bottom + 4}`
     : ''
   const hoveredTrendPoint = tokenTrendPoints.find((trendPoint) => trendPoint.item.date === hoveredTrendDate)
+  const selectedTrendPoint = tokenTrendPoints.find((trendPoint) => trendPoint.item.date === point.date)
+  const averageTrendY = TOKEN_TREND_CHART.bottom - (averageTrendTokens / maxTrendTokens) * (TOKEN_TREND_CHART.bottom - TOKEN_TREND_CHART.top)
   const hiddenProjectCount = Math.max(0, stats.project_breakdown.length - topProjects.length)
   const cardMax = Math.max(
     stats.session_count,
@@ -280,8 +321,8 @@ export default function HeatmapDayModal({
         onClick={onClose}
       />
 
-      <div className="relative w-full sm:w-[92vw] max-w-[1440px] h-[92vh] sm:h-[88vh] overflow-hidden rounded-2xl border border-border/35 bg-background/95 shadow-[0_24px_64px_rgba(0,0,0,0.32)] ui-enter-fade ui-enter-zoom flex flex-col">
-        <div className="relative border-b border-border/20 px-4 py-2.5 sm:px-5">
+      <div className="relative w-full sm:w-[92vw] max-w-[1440px] h-[92vh] sm:h-[88vh] overflow-hidden rounded-xl border border-border/35 bg-background/95 shadow-[0_24px_64px_rgba(0,0,0,0.32)] ui-enter-fade ui-enter-zoom flex flex-col">
+        <div className="relative border-b border-border/20 px-4 py-3 sm:px-5 bg-card/25">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[1.28rem] leading-[1.08] font-semibold tracking-tight text-foreground truncate sm:text-[1.5rem]">
@@ -289,7 +330,7 @@ export default function HeatmapDayModal({
               </div>
 
               <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="truncate">{daySummary}</span>
+                <span className="min-w-0 max-w-full truncate">{daySummary}</span>
                 <Badge
                   tone={activityConfig.color}
                   label={t(activityConfig.label)}
@@ -313,7 +354,7 @@ export default function HeatmapDayModal({
           </div>
         </div>
 
-        <div className="relative flex-1 min-h-0 p-2.5 sm:p-4 grid grid-rows-[auto_1fr] gap-2.5 bg-gradient-to-b from-muted/8 to-transparent">
+        <div className="relative flex-1 min-h-0 p-2.5 sm:p-4 grid grid-rows-[auto_1fr] gap-3 bg-gradient-to-b from-muted/8 to-transparent">
           {loading ? (
             <div className="h-full rounded-xl border border-border/20 bg-muted/15 flex flex-col items-center justify-center gap-2">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -321,7 +362,7 @@ export default function HeatmapDayModal({
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5">
                 <StatCard
                   icon={Terminal}
                   label={t('dashboard.stats.sessions')}
@@ -356,137 +397,170 @@ export default function HeatmapDayModal({
                 />
               </div>
 
-              <div className="min-h-0 grid grid-cols-1 xl:grid-cols-12 xl:grid-rows-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-2.5">
-                <section className="xl:col-span-4 rounded-xl border bg-card/55 border-border/20 p-3.5 min-h-0 flex flex-col shadow-sm">
+              <div className="min-h-0 grid grid-cols-1 xl:grid-cols-12 xl:grid-rows-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-3">
+                <section className="xl:col-span-4 rounded-xl border bg-card/55 border-border/20 p-3.5 min-h-0 overflow-hidden flex flex-col shadow-sm">
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                       <Zap className="w-4 h-4 text-muted-foreground" />
-                      {t('dashboard.heatmapModal.tokenModelView', 'Tokens & models')}
+                      {t('dashboard.heatmapModal.modelStats', 'Model stats')}
                     </h3>
-                    <span className="text-xs text-muted-foreground tabular-nums">{formatCompactNumber(stats.total_tokens)}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{formatCompactNumber(modelRows.length)}</span>
                   </div>
 
-                  <div className="flex-1 min-h-0 grid grid-cols-2 gap-2">
-                    <div className="rounded-lg border border-border/15 bg-background/20 p-3">
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('dashboard.stats.tokens')}</div>
-                      <div className="mt-1 text-[1.65rem] leading-none font-semibold tracking-tight text-foreground tabular-nums">
-                        {formatCompactNumber(stats.total_tokens)}
-                      </div>
-                    </div>
-                    <div className="rounded-lg border border-border/15 bg-background/20 p-3">
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('dashboard.heatmapModal.modelStats', 'Model stats')}</div>
-                      <div className="mt-1 text-[1.65rem] leading-none font-semibold tracking-tight text-foreground tabular-nums">
-                        {formatCompactNumber(modelRows.length)}
-                      </div>
-                    </div>
-                    <MiniMetric
-                      label={t('dashboard.heatmapModal.inputTokens', 'Input')}
-                      value={formatCompactNumber(tokenDetails.total_input)}
-                      accent="#38bdf8"
-                    />
-                    <MiniMetric
-                      label={t('dashboard.heatmapModal.outputTokens', 'Output')}
-                      value={formatCompactNumber(tokenDetails.total_output)}
-                      accent="#a78bfa"
-                    />
-                    <MiniMetric
-                      label={t('dashboard.heatmapModal.cacheTokens', 'Cache')}
-                      value={formatCompactNumber(cacheTokens)}
-                      accent="#34d399"
-                    />
-                    <MiniMetric
-                      label={t('dashboard.heatmapModal.totalCost', 'Cost')}
-                      value={formatCost(tokenDetails.total_cost)}
-                      accent="#f59e0b"
-                    />
-                  </div>
-
-                  {modelRows.length > 0 && (
-                    <div className="mt-2 space-y-1 overflow-y-auto pr-1 max-h-[72px]">
-                      {modelRows.slice(0, 3).map(([model, count]) => {
+                  {modelRows.length > 0 ? (
+                    <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
+                      {modelRows.map(([model, count], index) => {
                         const percentage = modelTotal > 0 ? (count / modelTotal) * 100 : 0
                         const color = metricColor(percentage / 100)
                         return (
-                          <div key={model} className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                            <span className="w-20 truncate text-foreground">{model}</span>
-                            <div className="h-1 flex-1 rounded-full bg-muted/55 overflow-hidden">
+                          <div key={model} className="rounded-lg border border-border/15 bg-background/18 px-2.5 py-2">
+                            <div className="flex items-center justify-between gap-2 text-xs leading-tight">
+                              <div className="min-w-0 flex items-center gap-2">
+                                <span className="w-4 shrink-0 text-[10px] tabular-nums text-muted-foreground">{index + 1}</span>
+                                <span className="truncate font-medium text-foreground">{model}</span>
+                              </div>
+                              <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{count}</span>
+                            </div>
+                            <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted/45">
                               <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: color }} />
                             </div>
-                            <span className="w-5 text-right tabular-nums">{count}</span>
                           </div>
                         )
                       })}
                     </div>
+                  ) : (
+                    <EmptyHint text={t('dashboard.heatmapModal.modelsUnavailable', 'No model stats for this day')} />
                   )}
                 </section>
 
                 <section className="xl:col-span-4 rounded-xl border bg-card/55 border-border/20 p-3.5 min-h-0 flex flex-col shadow-sm">
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      {t('dashboard.heatmapModal.tokenTrend', 'Token trend')}
-                    </h3>
-                    <span className="text-xs text-muted-foreground tabular-nums">{tokenTrendData.length}d</span>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                        {t('dashboard.heatmapModal.tokenTrend', 'Token trend')}
+                      </h3>
+                      <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground tabular-nums">
+                        <span>{tokenTrendData.length}d</span>
+                        <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                        <span>{t('dashboard.heatmapModal.avgTokens', 'Avg')} {formatCompactNumber(averageTrendTokens)}</span>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right tabular-nums">
+                      <div className="text-[1.05rem] font-semibold leading-none text-foreground">
+                        {formatCompactNumber(selectedTrendPoint?.item.total_tokens ?? stats.total_tokens)}
+                      </div>
+                      <div className="mt-1 text-[10px] text-muted-foreground">
+                        {t('dashboard.heatmapModal.selectedDay', 'Selected')}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="relative flex-1 min-h-0 rounded-lg border border-border/15 bg-background/20 px-2 py-2">
-                    <svg className="h-full min-h-[92px] w-full overflow-visible" viewBox="0 0 100 54" preserveAspectRatio="none" role="img" aria-label={t('dashboard.heatmapModal.tokenTrend', 'Token trend')}>
+                  <div className="relative flex-1 min-h-0 rounded-lg border border-border/15 bg-background/18 px-3 py-2.5 overflow-hidden flex flex-col gap-2.5">
+                    <div className="h-1.5 flex overflow-hidden rounded-full bg-muted/35">
+                      {tokenBreakdownItems.map((item) => (
+                        <div
+                          key={item.label}
+                          className="h-full"
+                          style={{ width: `${(item.value / tokenBreakdownTotal) * 100}%`, backgroundColor: item.color }}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-x-5 gap-y-1.5 text-[10px] tabular-nums">
+                      {tokenBreakdownItems.map((item) => (
+                        <div key={item.label} className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+                            <span className="h-1 w-1 rounded-full" style={{ backgroundColor: item.color }} />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          <span className="font-semibold text-foreground">{formatCompactNumber(item.value)}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+                          <span className="h-1 w-1 rounded-full bg-warning/80" />
+                          <span className="truncate">{t('dashboard.heatmapModal.totalCost', 'Cost')}</span>
+                        </div>
+                        <span className="font-semibold text-foreground">{formatCost(tokenDetails.total_cost)}</span>
+                      </div>
+                      <div className="col-span-2 flex items-center justify-between gap-3 border-t border-border/10 pt-1 text-muted-foreground">
+                        <span>{t('dashboard.heatmapModal.cacheRead', '缓存读')} {formatCompactNumber(tokenDetails.total_cache_read)}</span>
+                        <span>{t('dashboard.heatmapModal.cacheWrite', '缓存写')} {formatCompactNumber(tokenDetails.total_cache_write)}</span>
+                        <span>{t('dashboard.heatmapModal.avgTokens', 'Avg')} {formatCompactNumber(averageTrendTokens)}</span>
+                      </div>
+                    </div>
+
+                    <div className="relative flex-1 min-h-[82px] border-t border-border/10 pt-1">
+                      <svg className="h-full w-full overflow-visible" viewBox="0 0 100 54" preserveAspectRatio="none" role="img" aria-label={t('dashboard.heatmapModal.tokenTrend', 'Token trend')}>
                       <defs>
-                        <linearGradient id="token-trend-stroke" x1="0" x2="1" y1="0" y2="0">
-                          <stop offset="0%" stopColor="#38bdf8" />
-                          <stop offset="55%" stopColor="#8b5cf6" />
-                          <stop offset="100%" stopColor="#34d399" />
-                        </linearGradient>
                         <linearGradient id="token-trend-fill" x1="0" x2="0" y1="0" y2="1">
-                          <stop offset="0%" stopColor="rgb(56 189 248 / 0.22)" />
-                          <stop offset="100%" stopColor="rgb(139 92 246 / 0.02)" />
+                          <stop offset="0%" stopColor="rgb(20 184 166 / 0.16)" />
+                          <stop offset="100%" stopColor="rgb(20 184 166 / 0.01)" />
                         </linearGradient>
                       </defs>
+                      {[TOKEN_TREND_CHART.top, averageTrendY, TOKEN_TREND_CHART.bottom].map((y, index) => (
+                        <line
+                          key={`${index}-${y}`}
+                          x1={TOKEN_TREND_CHART.left}
+                          x2={TOKEN_TREND_CHART.right}
+                          y1={y}
+                          y2={y}
+                          stroke={index === 1 ? 'rgb(20 184 166 / 0.24)' : 'rgb(var(--color-muted-foreground) / 0.11)'}
+                          strokeDasharray={index === 1 ? '3 3' : undefined}
+                          strokeWidth="1"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      ))}
                       {tokenTrendArea && (
                         <polygon points={tokenTrendArea} fill="url(#token-trend-fill)" />
                       )}
                       <polyline
                         points={tokenTrendLine}
                         fill="none"
-                        stroke="url(#token-trend-stroke)"
-                        strokeWidth="2.2"
+                        stroke="rgb(20 184 166 / 0.92)"
+                        strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         vectorEffect="non-scaling-stroke"
                       />
-                      {tokenTrendPoints.map(({ item, x, y }) => {
-                        const isSelectedDay = item.date === point.date
-                        const isHovered = item.date === hoveredTrendDate
-                        const parsed = parseISO(item.date)
-                        const dayLabel = Number.isNaN(parsed.getTime()) ? item.date.slice(5) : format(parsed, 'MM/dd')
-                        return (
-                          <circle
-                            key={item.date}
-                            cx={x}
-                            cy={y}
-                            r={isHovered ? 3.4 : isSelectedDay ? 2.8 : 2}
-                            className="cursor-pointer motion-surface"
-                            fill={isSelectedDay || isHovered ? '#38bdf8' : '#8b5cf6'}
-                            stroke="rgb(var(--color-background) / 0.96)"
-                            strokeWidth="1.2"
-                            vectorEffect="non-scaling-stroke"
-                            onMouseEnter={() => setHoveredTrendDate(item.date)}
-                            onMouseLeave={() => setHoveredTrendDate(null)}
-                          >
-                            <title>{`${dayLabel} · ${formatCompactNumber(item.total_tokens)} ${t('dashboard.heatmapModal.tokenUnit', 'tokens')}`}</title>
-                          </circle>
-                        )
-                      })}
-                    </svg>
+                      {selectedTrendPoint && (
+                        <line
+                          x1={selectedTrendPoint.x}
+                          x2={selectedTrendPoint.x}
+                          y1={TOKEN_TREND_CHART.top}
+                          y2={TOKEN_TREND_CHART.bottom + 3}
+                          stroke="rgb(var(--color-foreground) / 0.22)"
+                          strokeDasharray="3 3"
+                          strokeWidth="1"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      )}
+                      {tokenTrendPoints.map(({ item, x, y, label }) => (
+                        <circle
+                          key={item.date}
+                          cx={x}
+                          cy={y}
+                          r="4"
+                          className="cursor-pointer"
+                          fill="transparent"
+                          onMouseEnter={() => setHoveredTrendDate(item.date)}
+                          onMouseLeave={() => setHoveredTrendDate(null)}
+                        >
+                          <title>{`${label} · ${formatCompactNumber(item.total_tokens)} ${t('dashboard.heatmapModal.tokenUnit', 'tokens')}`}</title>
+                        </circle>
+                      ))}
+                      </svg>
+                    </div>
                     {hoveredTrendPoint && (
-                      <div className="pointer-events-none absolute right-2 top-2 rounded-md border border-border/30 bg-background/90 px-2 py-1 text-[10px] shadow-lg backdrop-blur tabular-nums">
-                        <div className="font-medium text-foreground">{format(parseISO(hoveredTrendPoint.item.date), 'MM/dd')}</div>
+                      <div className="pointer-events-none absolute right-2 top-2 rounded-md border border-border/25 bg-background/95 px-2 py-1 text-[10px] shadow-sm backdrop-blur tabular-nums">
+                        <div className="font-medium text-foreground">{hoveredTrendPoint.label}</div>
                         <div className="text-muted-foreground">{formatCompactNumber(hoveredTrendPoint.item.total_tokens)} {t('dashboard.heatmapModal.tokenUnit', 'tokens')}</div>
                       </div>
                     )}
-                    <div className="pointer-events-none absolute inset-x-2 bottom-1 flex justify-between text-[9px] text-muted-foreground tabular-nums">
-                      {tokenTrendData.length > 0 && <span>{format(parseISO(tokenTrendData[0].date), 'MM/dd')}</span>}
-                      {tokenTrendData.length > 1 && <span>{format(parseISO(tokenTrendData[tokenTrendData.length - 1].date), 'MM/dd')}</span>}
+                    <div className="pointer-events-none absolute inset-x-3 bottom-1.5 flex justify-between text-[9px] text-muted-foreground tabular-nums">
+                      {tokenTrendPoints.length > 0 && <span>{tokenTrendPoints[0].label}</span>}
+                      {tokenTrendPoints.length > 1 && <span>{tokenTrendPoints[tokenTrendPoints.length - 1].label}</span>}
                     </div>
                   </div>
                 </section>
@@ -511,21 +585,15 @@ export default function HeatmapDayModal({
                   {hasHourlyData ? (
                     <div className="flex-1 min-h-0 flex flex-col">
                       <div className="grid grid-cols-3 gap-2 mb-2">
-                        <MiniMetric
-                          label={t('dashboard.hourly.peakHour', 'Peak Hour')}
-                          value={`${peakHour.hour.toString().padStart(2, '0')}:00`}
-                          accent={metricColor(intensity(peakHour.count, maxHourly))}
-                        />
-                        <MiniMetric
-                          label={t('dashboard.hourly.activeHours', 'Active Hours')}
-                          value={activeHours.toString()}
-                          accent={metricColor(activeHours / 24)}
-                        />
-                        <MiniMetric
-                          label={t('dashboard.hourly.peakMessages', 'Peak Messages')}
-                          value={formatCompactNumber(peakHour.count)}
-                          accent={metricColor(intensity(peakHour.count, maxHourly))}
-                        />
+                        {hourlyMetricItems.map((item) => (
+                          <div key={item.label} className="rounded-lg border border-border/15 bg-background/14 px-2.5 py-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-1 h-1 rounded-full" style={{ backgroundColor: withAlpha(item.accent, 0.85) }} />
+                              <div className="text-[10px] text-muted-foreground uppercase tracking-wide truncate">{item.label}</div>
+                            </div>
+                            <div className="text-[0.92rem] font-semibold text-foreground tabular-nums mt-0.5 leading-tight">{item.value}</div>
+                          </div>
+                        ))}
                       </div>
 
                       <div className="grid gap-[3px] items-end flex-1 min-h-[58px] rounded-lg border border-border/15 bg-background/20 px-2 py-2" style={{ gridTemplateColumns: 'repeat(24, minmax(0, 1fr))' }}>
@@ -709,7 +777,7 @@ function StatCard({ icon: Icon, label, value, color, emphasis, onClick, hint }: 
   return (
     <button
       type="button"
-      className={`group rounded-xl border border-border/15 px-3 py-2 text-left w-full ${interactive ? 'bg-card/55 hover:bg-card/80 motion-surface motion-color focus-ring' : 'bg-card/45 cursor-default'}`}
+      className={`group rounded-lg border border-border/15 px-3 py-2.5 text-left w-full ${interactive ? 'bg-card/60 hover:bg-card/80 motion-surface motion-color focus-ring' : 'bg-card/45 cursor-default'}`}
       onClick={onClick}
       disabled={!interactive}
     >
@@ -753,18 +821,6 @@ function Badge({ tone, label, value }: { tone: string; label: string; value: str
       <span>{label}</span>
       <span className="tabular-nums text-muted-foreground">{value}</span>
     </span>
-  )
-}
-
-function MiniMetric({ label, value, accent }: { label: string; value: string; accent: string }) {
-  return (
-    <div className="rounded-lg border border-border/15 bg-background/18 px-2.5 py-2">
-      <div className="flex items-center gap-1.5">
-        <span className="w-1 h-1 rounded-full" style={{ backgroundColor: withAlpha(accent, 0.85) }} />
-        <div className="text-[10px] text-muted-foreground uppercase tracking-wide truncate">{label}</div>
-      </div>
-      <div className="text-[0.98rem] font-semibold text-foreground tabular-nums mt-1">{value}</div>
-    </div>
   )
 }
 

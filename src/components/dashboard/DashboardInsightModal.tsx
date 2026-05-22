@@ -2,10 +2,15 @@ import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
   X,
+  Activity,
+  BarChart3,
+  Bot,
   Coins,
   DollarSign,
   WalletCards,
   FolderGit2,
+  Clock,
+  MessageSquare,
   Sparkles,
   ChevronsDown,
   ChevronRight,
@@ -14,6 +19,8 @@ import {
   ArrowUp,
   ArrowDown,
   Calendar,
+  Target,
+  User,
 } from "lucide-react";
 import type { SessionInfo, SessionStats } from "@/types";
 import { getPathBasename } from "@/utils/path";
@@ -48,11 +55,19 @@ function filterSessionsByDateRange(sessions: SessionInfo[], range: DateRange): S
   return sessions.filter((s) => new Date(s.modified).getTime() >= cutoff);
 }
 
+export type DashboardInsightMode =
+  | "session_overview"
+  | "message_mix"
+  | "activity_rhythm"
+  | "token_cost"
+  | "model_projects";
+
 interface DashboardInsightModalProps {
   open: boolean;
-  mode: "token_cost" | "model_projects";
+  mode: DashboardInsightMode;
   stats: SessionStats;
   sessions?: SessionInfo[];
+  liveSessionIds?: Set<string>;
   selectedModel?: string | null;
   onClose: () => void;
 }
@@ -116,11 +131,74 @@ function formatModelName(name: string): string {
     .replace(/-latest$/, "");
 }
 
+function formatPercent(value: number): string {
+  if (!Number.isFinite(value)) return "-";
+  return `${Math.round(value)}%`;
+}
+
+function getHourLabel(hour: number): string {
+  if (hour === 0) return "12a";
+  if (hour < 12) return `${hour}a`;
+  if (hour === 12) return "12p";
+  return `${hour - 12}p`;
+}
+
+function getModalTitle(
+  mode: DashboardInsightModalProps["mode"],
+  selectedModel?: string | null,
+): string {
+  switch (mode) {
+    case "session_overview":
+      return "Session Overview";
+    case "message_mix":
+      return "Message Distribution Insight";
+    case "activity_rhythm":
+      return "Activity Rhythm Insight";
+    case "token_cost":
+      return "Token Usage & Cost Breakdown";
+    case "model_projects":
+      return `Model Usage by Project · ${selectedModel ? formatModelName(selectedModel) : "Unknown"}`;
+  }
+}
+
+function InsightRow({
+  label,
+  value,
+  hint,
+  percent,
+  tone = "bg-info",
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  percent: number;
+  tone?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border/20 bg-background/40 p-3">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="min-w-0">
+          <div className="text-sm text-foreground truncate">{label}</div>
+          {hint ? <div className="text-[10px] text-muted-foreground truncate">{hint}</div> : null}
+        </div>
+        <div className="text-sm font-semibold text-foreground tabular-nums">{value}</div>
+      </div>
+      <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
+        <div
+          className={`h-full rounded-full ${tone}`}
+          style={{ width: `${Math.max(0, Math.min(percent, 100))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardInsightModal({
   open,
   mode,
   stats,
   sessions = [],
+  liveSessionIds,
   selectedModel,
   onClose,
 }: DashboardInsightModalProps) {
@@ -481,6 +559,76 @@ export default function DashboardInsightModal({
     });
   }, [selectedModel, displayStats.model_usage_by_project]);
 
+  const sessionOverview = useMemo(() => {
+    const sortedSessions = [...sessions].sort(
+      (a, b) => b.message_count - a.message_count,
+    );
+    const topProjects = Object.entries(displayStats.sessions_by_project)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
+    const liveCount = sessions.filter(
+      (session) => session.isLive || (liveSessionIds?.has(session.id) ?? false),
+    ).length;
+    const medianSession = sortedSessions[Math.floor(sortedSessions.length / 2)];
+    const topSession = sortedSessions[0];
+
+    return {
+      topProjects,
+      liveCount,
+      medianMessages: medianSession?.message_count ?? 0,
+      topSession,
+      avgMessages: displayStats.average_messages_per_session,
+    };
+  }, [displayStats.average_messages_per_session, displayStats.sessions_by_project, sessions, liveSessionIds]);
+
+  const messageMix = useMemo(() => {
+    const userPercent = displayStats.total_messages > 0
+      ? (displayStats.user_messages / displayStats.total_messages) * 100
+      : 0;
+    const assistantPercent = displayStats.total_messages > 0
+      ? (displayStats.assistant_messages / displayStats.total_messages) * 100
+      : 0;
+    const ratio = displayStats.assistant_messages / Math.max(displayStats.user_messages, 1);
+    const topMessageDays = Object.entries(displayStats.messages_by_date)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 7);
+    return { userPercent, assistantPercent, ratio, topMessageDays };
+  }, [
+    displayStats.assistant_messages,
+    displayStats.messages_by_date,
+    displayStats.total_messages,
+    displayStats.user_messages,
+  ]);
+
+  const activityRhythm = useMemo(() => {
+    const activeDays = displayStats.heatmap_data.filter((point) => point.level > 0).length;
+    const streak = (() => {
+      let count = 0;
+      for (let i = displayStats.heatmap_data.length - 1; i >= 0; i -= 1) {
+        if (displayStats.heatmap_data[i].level > 0) count += 1;
+        else break;
+      }
+      return count;
+    })();
+    const peakHour = displayStats.time_distribution.length > 0
+      ? displayStats.time_distribution.reduce((max, point) =>
+          point.message_count > max.message_count ? point : max,
+        )
+      : { hour: 0, message_count: 0 };
+    const topHours = [...displayStats.time_distribution]
+      .filter((point) => point.message_count > 0)
+      .sort((a, b) => b.message_count - a.message_count)
+      .slice(0, 8);
+    const topWeekdays = Object.entries(displayStats.messages_by_day_of_week)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 7);
+    return { activeDays, streak, peakHour, topHours, topWeekdays };
+  }, [
+    displayStats.heatmap_data,
+    displayStats.messages_by_day_of_week,
+    displayStats.time_distribution,
+  ]);
+
   // Toggle provider collapse
   const toggleProviderCollapse = useCallback((provider: string) => {
     setCollapsedProviders((prev) => {
@@ -516,6 +664,144 @@ export default function DashboardInsightModal({
     );
   };
 
+  const renderSessionOverview = () => (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <MetricCard icon={BarChart3} label="Sessions" value={formatNumber(displayStats.total_sessions)} tone="text-info" />
+        <MetricCard icon={MessageSquare} label="Messages" value={formatNumber(displayStats.total_messages)} tone="text-success" />
+        <MetricCard icon={Target} label="Avg / Session" value={displayStats.average_messages_per_session.toFixed(1)} tone="text-warning" />
+        <MetricCard icon={Activity} label="Live Sessions" value={formatNumber(sessionOverview.liveCount)} tone="text-info" />
+      </div>
+
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+          <div className="text-xs font-medium text-foreground mb-3">Session concentration</div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-lg bg-background/45 border border-border/15 p-3">
+              <div className="text-muted-foreground mb-1">Median length</div>
+              <div className="text-lg font-semibold text-foreground tabular-nums">{formatNumber(sessionOverview.medianMessages)}</div>
+            </div>
+            <div className="rounded-lg bg-background/45 border border-border/15 p-3">
+              <div className="text-muted-foreground mb-1">Longest session</div>
+              <div className="text-lg font-semibold text-foreground tabular-nums">{formatNumber(sessionOverview.topSession?.message_count ?? 0)}</div>
+            </div>
+          </div>
+          {sessionOverview.topSession ? (
+            <div className="mt-3 rounded-lg border border-border/15 bg-background/35 p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Longest session path</div>
+              <div className="text-xs text-foreground truncate" title={sessionOverview.topSession.path}>{sessionOverview.topSession.path}</div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+          <div className="text-xs font-medium text-foreground mb-3">Top projects by sessions</div>
+          <div className="space-y-2">
+            {sessionOverview.topProjects.map(([projectPath, count]) => (
+              <InsightRow
+                key={projectPath}
+                label={getPathBasename(projectPath)}
+                value={`${count} sessions`}
+                hint={projectPath}
+                percent={(count / Math.max(sessionOverview.topProjects[0]?.[1] ?? 1, 1)) * 100}
+                tone="bg-info"
+              />
+            ))}
+            {sessionOverview.topProjects.length === 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-6">No project data.</div>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    </>
+  );
+
+  const renderMessageMix = () => (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <MetricCard icon={MessageSquare} label="Total Messages" value={formatNumber(displayStats.total_messages)} tone="text-info" />
+        <MetricCard icon={User} label="User Share" value={formatPercent(messageMix.userPercent)} tone="text-info" />
+        <MetricCard icon={Bot} label="Assistant Share" value={formatPercent(messageMix.assistantPercent)} tone="text-success" />
+        <MetricCard icon={Target} label="Assistant / User" value={`1:${messageMix.ratio.toFixed(1)}`} tone="text-warning" />
+      </div>
+
+      <section className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+        <div className="text-xs font-medium text-foreground mb-3">Role balance</div>
+        <div className="space-y-3">
+          <InsightRow label="User messages" value={formatNumber(displayStats.user_messages)} percent={messageMix.userPercent} tone="bg-info" />
+          <InsightRow label="Assistant messages" value={formatNumber(displayStats.assistant_messages)} percent={messageMix.assistantPercent} tone="bg-success" />
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+        <div className="text-xs font-medium text-foreground mb-3">Busiest message days</div>
+        <div className="space-y-2">
+          {messageMix.topMessageDays.map(([date, count]) => (
+            <InsightRow
+              key={date}
+              label={date}
+              value={`${formatNumber(count)} msgs`}
+              percent={(count / Math.max(messageMix.topMessageDays[0]?.[1] ?? 1, 1)) * 100}
+              tone="bg-warning"
+            />
+          ))}
+          {messageMix.topMessageDays.length === 0 ? (
+            <div className="text-sm text-muted-foreground text-center py-6">No message timeline data.</div>
+          ) : null}
+        </div>
+      </section>
+    </>
+  );
+
+  const renderActivityRhythm = () => (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <MetricCard icon={Calendar} label="Active Days" value={formatNumber(activityRhythm.activeDays)} tone="text-info" />
+        <MetricCard icon={Activity} label="Current Streak" value={`${activityRhythm.streak}d`} tone="text-success" />
+        <MetricCard icon={Clock} label="Peak Hour" value={getHourLabel(activityRhythm.peakHour.hour)} tone="text-warning" />
+        <MetricCard icon={MessageSquare} label="Peak Hour Msgs" value={formatNumber(activityRhythm.peakHour.message_count)} tone="text-info" />
+      </div>
+
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+          <div className="text-xs font-medium text-foreground mb-3">Top active hours</div>
+          <div className="space-y-2">
+            {activityRhythm.topHours.map((point) => (
+              <InsightRow
+                key={point.hour}
+                label={getHourLabel(point.hour)}
+                value={`${formatNumber(point.message_count)} msgs`}
+                percent={(point.message_count / Math.max(activityRhythm.topHours[0]?.message_count ?? 1, 1)) * 100}
+                tone="bg-warning"
+              />
+            ))}
+            {activityRhythm.topHours.length === 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-6">No hourly activity data.</div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+          <div className="text-xs font-medium text-foreground mb-3">Weekday rhythm</div>
+          <div className="space-y-2">
+            {activityRhythm.topWeekdays.map(([day, count]) => (
+              <InsightRow
+                key={day}
+                label={day}
+                value={`${formatNumber(count)} msgs`}
+                percent={(count / Math.max(activityRhythm.topWeekdays[0]?.[1] ?? 1, 1)) * 100}
+                tone="bg-success"
+              />
+            ))}
+            {activityRhythm.topWeekdays.length === 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-6">No weekday activity data.</div>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    </>
+  );
+
   if (!open) return null;
 
   return (
@@ -535,16 +821,9 @@ export default function DashboardInsightModal({
               <Sparkles className="w-3.5 h-3.5 text-warning" />
               Dashboard Insight
             </div>
-            {mode === "token_cost" ? (
-              <h3 className="text-lg font-semibold text-foreground">
-                Token Usage & Cost Breakdown
-              </h3>
-            ) : (
-              <h3 className="text-lg font-semibold text-foreground truncate">
-                Model Usage by Project ·{" "}
-                {selectedModel ? formatModelName(selectedModel) : "Unknown"}
-              </h3>
-            )}
+            <h3 className="text-lg font-semibold text-foreground truncate">
+              {getModalTitle(mode, selectedModel)}
+            </h3>
           </div>
           <button
             onClick={onClose}
@@ -556,7 +835,13 @@ export default function DashboardInsightModal({
         </div>
 
         <div className="p-5 space-y-4 max-h-[78vh] overflow-y-auto">
-          {mode === "token_cost" ? (
+          {mode === "session_overview" ? (
+            renderSessionOverview()
+          ) : mode === "message_mix" ? (
+            renderMessageMix()
+          ) : mode === "activity_rhythm" ? (
+            renderActivityRhythm()
+          ) : mode === "token_cost" ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <MetricCard
@@ -802,7 +1087,7 @@ export default function DashboardInsightModal({
                 </div>
               </section>
             </>
-          ) : (
+          ) : mode === "model_projects" ? (
             <>
               <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5 text-xs text-muted-foreground">
                 Shows which projects used this model, sorted by number of
@@ -850,7 +1135,7 @@ export default function DashboardInsightModal({
                 </div>
               )}
             </>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

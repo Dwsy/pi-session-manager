@@ -7,6 +7,7 @@ interface TimeDistributionProps {
   stats: SessionStats
   title?: string
   type?: 'hourly' | 'daily' | 'weekly'
+  onClick?: () => void
 }
 
 const HOUR_LABELS = [
@@ -22,6 +23,7 @@ export default function TimeDistribution({
   stats,
   title = 'Active Hours',
   type = 'hourly',
+  onClick,
 }: TimeDistributionProps) {
   const { t } = useTranslation()
   const renderHourly = () => {
@@ -100,29 +102,41 @@ export default function TimeDistribution({
     )
   }
 
+  const content = (
+    <>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
+          <div className="p-1 rounded bg-warning/10">
+            <Clock className="h-3 w-3 text-warning" />
+          </div>
+          {title}
+        </h3>
+      </div>
+
+      <div className="text-[9px] text-muted-foreground mb-2 px-1">
+        {type === 'hourly' && 'Your most active hours of the day'}
+        {type === 'weekly' && 'Your most active days of the week'}
+        {type === 'daily' && 'Daily activity distribution'}
+      </div>
+
+      {type === 'hourly' && renderHourly()}
+      {type === 'weekly' && renderWeekly()}
+      {type === 'daily' && <div className="text-center text-muted-foreground py-4 text-xs">{t('components.dashboard.dailyViewComingSoon')}</div>}
+    </>
+  )
+
   return (
     <DashboardCardShell
-      className="rounded-lg p-3"
+      className={`rounded-lg p-3 ${onClick ? 'cursor-pointer focus-within:ring-2 focus-within:ring-warning/30' : ''}`}
       overlayClassName="bg-gradient-to-br from-warning/5 via-transparent to-transparent"
     >
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
-            <div className="p-1 rounded bg-warning/10">
-              <Clock className="h-3 w-3 text-warning" />
-            </div>
-            {title}
-          </h3>
-        </div>
-
-        <div className="text-[9px] text-muted-foreground mb-2 px-1">
-          {type === 'hourly' && 'Your most active hours of the day'}
-          {type === 'weekly' && 'Your most active days of the week'}
-          {type === 'daily' && 'Daily activity distribution'}
-        </div>
-
-        {type === 'hourly' && renderHourly()}
-        {type === 'weekly' && renderWeekly()}
-        {type === 'daily' && <div className="text-center text-muted-foreground py-4 text-xs">{t('components.dashboard.dailyViewComingSoon')}</div>}
+      {onClick ? (
+        <button type="button" onClick={onClick} className="w-full text-left">
+          {content}
+        </button>
+      ) : (
+        content
+      )}
     </DashboardCardShell>
   )
 }

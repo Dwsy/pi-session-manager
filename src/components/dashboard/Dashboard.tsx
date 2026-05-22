@@ -24,6 +24,7 @@ import RecentSessions from "./RecentSessions";
 import TopModelsChart from "./TopModelsChart";
 import TimeDistribution from "./TimeDistribution";
 import DashboardInsightModal from "./DashboardInsightModal";
+import type { DashboardInsightMode } from "./DashboardInsightModal";
 import TokenTrendChart from "./TokenTrendChart";
 import SessionPreviewModal from "@/components/kanban/SessionPreviewModal";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
@@ -62,7 +63,7 @@ export default function Dashboard({
   const [dayStats, setDayStats] = useState<DayStats | undefined>(undefined);
   const [isLoadingDayStats, setIsLoadingDayStats] = useState(false);
   const [insightModalMode, setInsightModalMode] = useState<
-    "token_cost" | "model_projects" | null
+    DashboardInsightMode | null
   >(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null);
@@ -218,6 +219,21 @@ export default function Dashboard({
     setSelectedModel(null);
   };
 
+  const openSessionOverviewInsight = () => {
+    setInsightModalMode("session_overview");
+    setSelectedModel(null);
+  };
+
+  const openMessageMixInsight = () => {
+    setInsightModalMode("message_mix");
+    setSelectedModel(null);
+  };
+
+  const openActivityRhythmInsight = () => {
+    setInsightModalMode("activity_rhythm");
+    setSelectedModel(null);
+  };
+
   const openModelProjectsInsight = (model: string) => {
     setSelectedModel(model);
     setInsightModalMode("model_projects");
@@ -331,18 +347,21 @@ export default function Dashboard({
               label={t("components.displayStats.cards.sessions")}
               value={displayStats.total_sessions}
               color="#569cd6"
+              onClick={openSessionOverviewInsight}
             />
             <StatCard
               icon={Activity}
               label={t("components.displayStats.cards.messages")}
               value={displayStats.total_messages}
               color="#7ee787"
+              onClick={openMessageMixInsight}
             />
             <StatCard
               icon={Clock}
               label={t("components.displayStats.cards.avgPerSession")}
               value={displayStats.average_messages_per_session.toFixed(1)}
               color="#ffa657"
+              onClick={openActivityRhythmInsight}
             />
             <StatCard
               icon={Zap}
@@ -379,7 +398,10 @@ export default function Dashboard({
 
           {/* Message Distribution + Heatmap */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <MessageDistribution stats={displayStats} />
+            <MessageDistribution
+              stats={displayStats}
+              onClick={openMessageMixInsight}
+            />
             <ActivityHeatmap
               data={displayStats.heatmap_data}
               size="mini"
@@ -416,7 +438,11 @@ export default function Dashboard({
           />
 
           {/* Time Distribution */}
-          <TimeDistribution stats={displayStats} type="hourly" />
+          <TimeDistribution
+            stats={displayStats}
+            type="hourly"
+            onClick={openActivityRhythmInsight}
+          />
         </div>
       </div>
 
@@ -446,6 +472,7 @@ export default function Dashboard({
           mode={insightModalMode}
           stats={displayStats}
           sessions={sessions}
+          liveSessionIds={liveSessionIds}
           selectedModel={selectedModel}
           onClose={closeInsightModal}
         />
