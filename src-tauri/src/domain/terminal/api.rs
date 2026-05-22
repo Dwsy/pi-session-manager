@@ -1,7 +1,7 @@
 //! Terminal launching public API
 use crate::domain::terminal::launch::try_launch_known_terminal;
 use crate::domain::terminal::utils::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Try to launch a custom terminal template
@@ -114,6 +114,79 @@ pub async fn open_session_in_terminal_impl(path: String, cwd: String, terminal: 
     Err(format!("Failed to open external terminal. requested='{requested_terminal}', cwd='{}'. attempts: {}", resolved_cwd, attempts.join(" | ")))
 }
 
+pub async fn open_url_in_system_impl(url: String) -> Result<(), String> {
+    let normalized_url = url.trim().to_string();
+    let normalized_url_lower = normalized_url.to_lowercase();
+    if !normalized_url_lower.starts_with("http://") && !normalized_url_lower.starts_with("https://") {
+        return Err("Only http and https URLs can be opened".to_string());
+    }
+
+    open_system_target(&normalized_url).map(|_| ()).map_err(|e| format!("Failed to open URL in system browser: {e}"))
+}
+
+pub async fn open_path_with_default_app_impl(path: String) -> Result<(), String> {
+    let target = resolve_existing_open_target(&path)?;
+    let target_str = target.to_string_lossy().to_string();
+    open_system_target(&target_str).map(|_| ()).map_err(|e| format!("Failed to open path with default app: {e}"))
+}
+
+fn strip_editor_position_suffix(path: &str) -> Option<&str> {
+    let (without_last_suffix, last_suffix) = path.rsplit_once(':')?;
+    if last_suffix.is_empty() || !last_suffix.chars().all(|ch| ch.is_ascii_digit()) {
+        return None;
+    }
+
+    let candidate = without_last_suffix.rsplit_once(':').filter(|(_, suffix)| !suffix.is_empty() && suffix.chars().all(|ch| ch.is_ascii_digit())).map(|(prefix, _)| prefix).unwrap_or(without_last_suffix);
+
+    (!candidate.is_empty()).then_some(candidate)
+}
+
+fn resolve_existing_open_target(path: &str) -> Result<PathBuf, String> {
+    let target = Path::new(path);
+    if target.exists() {
+        return Ok(target.to_path_buf());
+    }
+
+    if let Some(candidate) = strip_editor_position_suffix(path) {
+        let target = Path::new(candidate);
+        if target.exists() {
+            return Ok(target.to_path_buf());
+        }
+    }
+
+    Err(format!("Path does not exist: {}", target.display()))
+}
+
+fn open_system_target(target: &str) -> std::io::Result<std::process::Child> {
+    if cfg!(target_os = "macos") {
+        Command::new("open").arg(target).spawn()
+    } else if cfg!(target_os = "linux") {
+        Command::new("xdg-open").arg(target).spawn()
+    } else if cfg!(target_os = "windows") {
+        Command::new("cmd").args(["/C", "start", "", target]).spawn()
+    } else {
+        Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "unsupported operating system"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_existing_open_target;
+    use std::fs;
+
+    #[test]
+    fn resolves_existing_path_with_editor_line_suffix() {
+        let path = std::env::temp_dir().join(format!("psm-open-path-line-{}.java", std::process::id()));
+        fs::write(&path, "class Example {}\n").expect("write temp source file");
+
+        let with_line = format!("{}:409", path.display());
+        let resolved = resolve_existing_open_target(&with_line).expect("line suffix should resolve to existing file");
+
+        fs::remove_file(&path).expect("remove temp source file");
+        assert_eq!(resolved, path);
+    }
+}
+
 /// Open session in browser via the built-in web server.
 ///
 /// Reads the session ID from the JSONL header and the HTTP port from config,
@@ -130,17 +203,7 @@ pub async fn open_session_in_browser_impl(path: String) -> Result<(), String> {
     log::info!("[Browser] Opening session in browser: {url}");
 
     // 4. Open in system browser
-    let result = if cfg!(target_os = "macos") {
-        Command::new("open").arg(&url).spawn()
-    } else if cfg!(target_os = "linux") {
-        Command::new("xdg-open").arg(&url).spawn()
-    } else if cfg!(target_os = "windows") {
-        Command::new("cmd").args(["/C", "start", "", &url]).spawn()
-    } else {
-        return Err("Unsupported operating system".to_string());
-    };
-
-    result.map_err(|e| format!("Failed to open browser: {e}"))?;
+    open_system_target(&url).map_err(|e| format!("Failed to open browser: {e}"))?;
     Ok(())
 }
 
@@ -165,7 +228,7 @@ fn read_http_port() -> u16 {
 
 /// Open a file or directory in the system file manager.
 pub async fn open_path_in_system_impl(path: String) -> Result<(), String> {
-    let target = Path::new(&path);
+    let target = resolve_existing_open_target(&path)?;
     let open_target = if target.is_file() { target.parent().map(Path::to_path_buf).unwrap_or_else(|| target.to_path_buf()) } else { target.to_path_buf() };
 
     if !open_target.exists() {
@@ -173,16 +236,6 @@ pub async fn open_path_in_system_impl(path: String) -> Result<(), String> {
     }
 
     let open_target_str = open_target.to_string_lossy().to_string();
-    let result = if cfg!(target_os = "macos") {
-        Command::new("open").arg(&open_target_str).spawn()
-    } else if cfg!(target_os = "linux") {
-        Command::new("xdg-open").arg(&open_target_str).spawn()
-    } else if cfg!(target_os = "windows") {
-        Command::new("cmd").args(["/C", "start", "", &open_target_str]).spawn()
-    } else {
-        return Err("Unsupported operating system".to_string());
-    };
-
-    result.map_err(|e| format!("Failed to open path in system file manager: {e}"))?;
+    open_system_target(&open_target_str).map_err(|e| format!("Failed to open path in system file manager: {e}"))?;
     Ok(())
 }
