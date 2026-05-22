@@ -150,6 +150,9 @@ export const backendSessionProvider: SessionProvider = {
   async getSessionByPath(path) {
     return invoke<SessionInfo>("get_session_by_path", { path });
   },
+  async getSessionById(id) {
+    return invoke<SessionInfo | null>("get_session_by_id", { id });
+  },
   async canResolveSession(path) {
     await invoke("read_session_file", { path });
     return true;

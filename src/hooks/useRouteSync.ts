@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { buildSessionUrl, buildFeatureUrl, parseRoute } from '../router/config';
+import { getRuntimeSessionById } from '../runtime-data/sessionSource';
 import type { SessionInfo } from '../types';
 import type { AppSidebarViewMode } from './app/useSidebarSessions';
 
@@ -45,8 +46,13 @@ export function useRouteSync({
             setSelectedSession(session);
           }
         } else if (!selectedSession && sessions.length > 0) {
-          // Deep-link to unknown session with nothing selected — redirect home
-          navigate('/', { replace: true });
+          void getRuntimeSessionById(parsed.sessionId).then((resolved) => {
+            if (resolved) {
+              setSelectedSession(resolved);
+            } else {
+              navigate('/', { replace: true });
+            }
+          }).catch(() => navigate('/', { replace: true }));
         }
         // else: session list not loaded yet, or selectedSession already set — wait
         break;

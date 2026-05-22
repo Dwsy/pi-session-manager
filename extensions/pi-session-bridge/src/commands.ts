@@ -7,7 +7,8 @@
  */
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import * as connMgr from "./connection-manager.js";
-import * as psm from "./psm-client.js";
+import * as kanbanStore from "./kanban-store.js";
+import { openPsmSession } from "./open-psm.js";
 import type { TagItem } from "./types.js";
 
 export type CommandHandler = (args: string, ctx: ExtensionContext) => Promise<void>;
@@ -45,14 +46,34 @@ function statusLines(): string[] {
 
 async function getTagsWithStatus(sid: string): Promise<{ tag: TagItem; assigned: boolean }[]> {
   const [allTags, allSessionTags] = await Promise.all([
-    psm.getAllTags(),
-    psm.getAllSessionTags(),
+    kanbanStore.getAllTags(),
+    kanbanStore.getAllSessionTags(),
   ]);
   const assignedIds = new Set(
     allSessionTags.filter((st) => st.session_id === sid).map((st) => st.tag_id),
   );
   return allTags.map((tag) => ({ tag, assigned: assignedIds.has(tag.id) }));
 }
+
+// ── /open-in-pms — Open current session in PSM ───────
+
+async function openInPsmCommand(args: string, ctx: ExtensionContext) {
+  const sid = connMgr.getSessionId();
+  if (!sid) {
+    ctx.ui.notify("No session", "error");
+    return;
+  }
+
+  try {
+    const result = await openPsmSession(sid, args);
+    ctx.ui.notify(result.mode === "cli" || result.mode === "web" ? "Opened PSM web session" : "Opened PSM desktop session", "info");
+  } catch (err) {
+    ctx.ui.notify(`Failed to open PSM: ${err}`, "error");
+  }
+}
+
+register("open-in-pms", "Open current session in Pi Session Manager", openInPsmCommand);
+register("open-in-psm", "Open current session in Pi Session Manager", openInPsmCommand);
 
 // ── /psm — Single-action panel ────────────────────────
 
@@ -113,10 +134,10 @@ register("psm", "PSM bridge panel", async (_args, ctx) => {
 
       try {
         if (entry.assigned) {
-          await psm.removeTagFromSession(sid, entry.tag.id);
+          await kanbanStore.removeTagFromSession(sid, entry.tag.id);
           ctx.ui.notify(`Removed: ${tagName}`, "info");
         } else {
-          await psm.moveSessionTag(sid, null, entry.tag.id, 0);
+          await kanbanStore.moveSessionTag(sid, null, entry.tag.id, 0);
           ctx.ui.notify(`Set: ${tagName}`, "info");
         }
         connMgr.notifyPsmTagChange(sid, []);
@@ -137,7 +158,7 @@ register("psm", "PSM bridge panel", async (_args, ctx) => {
     const ok = await ctx.ui.confirm("Clear Tags", `Remove ${assigned.length} tag(s)?`);
     if (ok) {
       for (const { tag } of assigned) {
-        await psm.removeTagFromSession(sid, tag.id);
+        await kanbanStore.removeTagFromSession(sid, tag.id);
       }
       connMgr.notifyPsmTagChange(sid, []);
       ctx.ui.notify(`Cleared ${assigned.length} tags`, "info");

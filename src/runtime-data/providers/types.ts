@@ -29,6 +29,7 @@ export interface SessionProvider {
   canForkSessions: boolean;
   loadSessions(): Promise<SessionInfo[]>;
   getSessionByPath(path: string): Promise<SessionInfo | null>;
+  getSessionById?(id: string): Promise<SessionInfo | null>;
   canResolveSession(path: string): Promise<boolean>;
   readSessionChunk(
     path: string,

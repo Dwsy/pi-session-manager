@@ -117,6 +117,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_deep_link::init())
         .setup(move |app| {
             let app_handle = app.handle().clone();
 
@@ -140,6 +141,15 @@ fn main() {
             // Initialize AppState and manage it
             let app_state = pi_session_manager::app_state::create_app_state(app_handle);
             app.manage(app_state.clone());
+            let deep_link_state = pi_session_manager::deep_link::DeepLinkState::new();
+
+            if !cli_mode {
+                let app_handle_dl = app.handle().clone();
+                let deep_link_listener_state = deep_link_state.clone();
+                app.listen("deep-link://new-url", move |event| {
+                    pi_session_manager::deep_link::handle_deep_link_payload(&app_handle_dl, &deep_link_listener_state, event.payload());
+                });
+            }
 
             // Initialize WebSocket adapter (single-port: HTTP /ws path)
             if server_cfg.ws_enabled {
@@ -308,9 +318,12 @@ fn main() {
 
                 // Show window when frontend signals ready
                 let window_clone = window.clone();
+                let app_handle_ready = app.handle().clone();
+                let deep_link_ready_state = deep_link_state.clone();
                 app.listen("frontend://ready", move |_event| {
                     let _ = window_clone.show();
                     let _ = window_clone.set_focus();
+                    pi_session_manager::deep_link::mark_frontend_ready(&app_handle_ready, &deep_link_ready_state);
                 });
 
                 // ── Lightweight mode: intercept window close → destroy to free memory ──
@@ -365,6 +378,7 @@ fn main() {
             pi_session_manager::list_supported_session_providers,
             pi_session_manager::convert_session_format,
             pi_session_manager::get_session_by_path,
+            pi_session_manager::get_session_by_id,
             pi_session_manager::search_sessions,
             pi_session_manager::search_sessions_fts,
             pi_session_manager::full_text_search,
@@ -377,6 +391,8 @@ fn main() {
             pi_session_manager::get_session_trace_analytics,
             pi_session_manager::get_session_inspect_data,
             pi_session_manager::get_day_stats,
+            pi_session_manager::open_url_in_system,
+            pi_session_manager::open_path_with_default_app,
             pi_session_manager::open_session_in_browser,
             pi_session_manager::open_path_in_system,
             pi_session_manager::restart_app,

@@ -33,37 +33,7 @@ export function useDeepLink({
       if (!url) return;
 
       try {
-        const parsed = new URL(url);
-        const routePath = parsed.pathname;
-
-        if (!routePath || routePath === '/') {
-          onNavigateRef.current('/');
-          return;
-        }
-
-        const parts = routePath.split('/').filter(Boolean);
-
-        // /sessions/:id
-        if (parts[0] === 'sessions' && parts[1]) {
-          onNavigateRef.current('/sessions/' + encodeURIComponent(decodeURIComponent(parts[1])));
-          return;
-        }
-
-        // /projects/:path
-        if (parts[0] === 'projects' && parts[1]) {
-          onNavigateRef.current('/projects/' + encodeURIComponent(decodeURIComponent(parts[1])));
-          return;
-        }
-
-        // Feature routes: /kanban, /dashboard, /settings, /terminal, /favorites
-        const FEATURES = new Set(['kanban', 'dashboard', 'settings', 'terminal', 'favorites']);
-        if (parts[0] && FEATURES.has(parts[0])) {
-          onNavigateRef.current('/' + parts[0]);
-          return;
-        }
-
-        // Unsupported route: redirect to home
-        onNavigateRef.current('/');
+        onNavigateRef.current(deepLinkUrlToRoute(url));
       } catch {
         onNavigateRef.current('/');
       }
@@ -75,4 +45,29 @@ export function useDeepLink({
       unlisten?.();
     };
   }, []);
+}
+
+export function deepLinkUrlToRoute(url: string): string {
+  const parsed = new URL(url);
+  const parts = [
+    ...(parsed.protocol === 'pi-session:' && parsed.hostname ? [parsed.hostname] : []),
+    ...parsed.pathname.split('/').filter(Boolean),
+  ];
+
+  if (parts.length === 0) return '/';
+
+  if (parts[0] === 'sessions' && parts[1]) {
+    return '/sessions/' + encodeURIComponent(decodeURIComponent(parts[1]));
+  }
+
+  if (parts[0] === 'projects' && parts[1]) {
+    return '/projects/' + encodeURIComponent(decodeURIComponent(parts[1]));
+  }
+
+  const FEATURES = new Set(['kanban', 'dashboard', 'settings', 'terminal', 'favorites']);
+  if (parts[0] && FEATURES.has(parts[0])) {
+    return '/' + parts[0];
+  }
+
+  return '/';
 }

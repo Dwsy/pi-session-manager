@@ -2,6 +2,8 @@ pub mod cli_common;
 pub mod commands;
 pub mod core;
 pub mod data;
+#[cfg(feature = "gui")]
+pub mod deep_link;
 pub mod domain;
 pub mod paths;
 pub mod server;
@@ -81,7 +83,7 @@ pub use server::ws as ws_adapter;
 #[cfg(feature = "gui")]
 use std::sync::Mutex;
 #[cfg(feature = "gui")]
-use tauri::{Emitter, Listener, Manager};
+use tauri::{Listener, Manager};
 
 #[cfg(feature = "gui")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -106,6 +108,7 @@ pub fn run() {
             list_supported_session_providers,
             convert_session_format,
             get_session_by_path,
+            get_session_by_id,
             search_sessions,
             search_sessions_fts,
             full_text_search,
@@ -118,6 +121,8 @@ pub fn run() {
             get_session_stats_light,
             get_session_trace_analytics,
             get_day_stats,
+            open_url_in_system,
+            open_path_with_default_app,
             open_session_in_browser,
             open_path_in_system,
             restart_app,
@@ -261,20 +266,12 @@ pub fn run() {
                 }
             });
 
-            // ── Deep link: forward pi-session:// URLs to frontend ──
+            let deep_link_state = crate::deep_link::DeepLinkState::new();
+
+            // ── Deep link: show window, then forward pi-session:// URLs to frontend ──
             let app_handle_dl = app.handle().clone();
             app.listen("deep-link://new-url", move |event| {
-                if let Ok(urls) = serde_json::from_str::<serde_json::Value>(event.payload()) {
-                    if let Some(arr) = urls.as_array() {
-                        for url_val in arr {
-                            if let Some(url_str) = url_val.as_str() {
-                                let _ = app_handle_dl.emit("deep-link://navigate", url_str.to_string());
-                            }
-                        }
-                    } else if let Some(url_str) = urls.as_str() {
-                        let _ = app_handle_dl.emit("deep-link://navigate", url_str.to_string());
-                    }
-                }
+                crate::deep_link::handle_deep_link_payload(&app_handle_dl, &deep_link_state, event.payload());
             });
 
             Ok(())

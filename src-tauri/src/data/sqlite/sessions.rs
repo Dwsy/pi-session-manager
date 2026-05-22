@@ -192,6 +192,42 @@ pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>,
     Ok(session)
 }
 
+pub fn get_session_by_id(conn: &Connection, id: &str) -> Result<Option<SessionInfo>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path, model
+         FROM sessions WHERE id = ? ORDER BY modified DESC LIMIT 1",
+        )
+        .map_err(|e| format!("Failed to prepare statement: {e}"))?;
+
+    let session = stmt
+        .query_row(params![id], |row| {
+            Ok(SessionInfo {
+                path: row.get(1)?,
+                id: row.get(0)?,
+                cwd: row.get(2)?,
+                name: row.get(3)?,
+                created: parse_timestamp(&row.get::<_, String>(4)?),
+                modified: parse_timestamp(&row.get::<_, String>(5)?),
+                message_count: row.get(6)?,
+                first_message: row.get(7)?,
+                user_messages_text: String::new(),
+                assistant_messages_text: String::new(),
+                last_message: row.get(8).unwrap_or_default(),
+                last_message_role: row.get(9).unwrap_or_default(),
+                parent_session_path: row.get(10)?,
+                model: row.get(11)?,
+            })
+        })
+        .ok();
+
+    if session.is_some() {
+        conn.execute("UPDATE sessions SET access_count = access_count + 1, last_accessed = ? WHERE id = ?", params![Utc::now().to_rfc3339(), id]).ok();
+    }
+
+    Ok(session)
+}
+
 pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
     let start = std::time::Instant::now();
     let mut stmt = conn

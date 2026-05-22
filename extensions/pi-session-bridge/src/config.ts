@@ -21,12 +21,31 @@ function readPsmPort(): number {
 
 const PSM_PORT = readPsmPort();
 
-export const WS_URL = process.env.PSM_URL || `ws://127.0.0.1:${PSM_PORT}/ws`;
 export const AUTH_TOKEN = process.env.PSM_TOKEN || "";
 
-const wsProtocol = WS_URL.startsWith("wss") ? "https" : "http";
-const wsHost = WS_URL.replace(/^wss?:\/\//, "").replace(/\/.*$/, "");
-export const HTTP_BASE = `${wsProtocol}://${wsHost}`;
+function resolveUrls(rawUrl: string): { wsUrl: string; httpBase: string } {
+  const url = new URL(rawUrl);
+  switch (url.protocol) {
+    case "ws:":
+    case "wss:": {
+      if (url.pathname === "/") url.pathname = "/ws";
+      const httpProtocol = url.protocol === "wss:" ? "https:" : "http:";
+      return { wsUrl: url.toString(), httpBase: `${httpProtocol}//${url.host}` };
+    }
+    case "http:":
+    case "https:": {
+      const wsProtocol = url.protocol === "https:" ? "wss:" : "ws:";
+      return { wsUrl: `${wsProtocol}//${url.host}/ws`, httpBase: `${url.protocol}//${url.host}` };
+    }
+    default:
+      throw new Error(`Unsupported PSM_URL protocol: ${url.protocol}`);
+  }
+}
+
+const resolvedUrls = resolveUrls(process.env.PSM_URL || `ws://127.0.0.1:${PSM_PORT}/ws`);
+
+export const WS_URL = resolvedUrls.wsUrl;
+export const HTTP_BASE = resolvedUrls.httpBase;
 
 // WebSocket keepalive / reconnect
 export const HB_INTERVAL = 15_000;

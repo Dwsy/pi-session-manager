@@ -4,10 +4,11 @@
  * session_search:  Full-text search across indexed sessions.
  * session_context: Fetch dialogue context from a specific session.
  * session_recall:  Search + retrieve surrounding context.
- * session_tag:     Tag management via PSM API.
+ * session_tag:     Tag management via PSM JSON files.
  */
 
 import * as psm from "./psm-client.js";
+import * as kanbanStore from "./kanban-store.js";
 import { getSessionId } from "./connection-manager.js";
 import { notifyPsmTagChange } from "./connection-manager.js";
 import type { FullTextSearchResponse, SessionEntry, SessionInfo, TagItem } from "./types.js";
@@ -86,6 +87,7 @@ export const sessionSearchTool = {
         match_mode: String(params.matchMode || "any"),
         page_size: Math.min(Math.max(Number(params.pageSize) || 8, 1), 20),
         sort_order: String(params.sortOrder || "relevance"),
+        source_filter: "content_only",
       });
 
       const hits = (fts.hits || []).filter(
@@ -280,8 +282,8 @@ export const sessionTagTool = {
   },
   async execute(_toolCallId: string, params: Record<string, unknown>) {
     const sid = getSessionId();
-    const allTags = await psm.getAllTags();
-    const allSessionTags = await psm.getAllSessionTags();
+    const allTags = await kanbanStore.getAllTags();
+    const allSessionTags = await kanbanStore.getAllSessionTags();
     const assignedIds = new Set(allSessionTags.filter((st) => st.session_id === sid).map((st) => st.tag_id));
     const currentTags = allTags.filter((t) => assignedIds.has(t.id));
 
@@ -300,12 +302,12 @@ export const sessionTagTool = {
       if (!tagName) return { content: [{ type: "text", text: "tag is required for set." }], isError: true };
       let target = findTag(tagName, allTags);
       if (!target) {
-        try { target = await psm.createTag(tagName, "info"); } catch (e) {
+        try { target = await kanbanStore.createTag(tagName, "info"); } catch (e) {
           return { content: [{ type: "text", text: `Failed: ${e}` }], isError: true };
         }
       }
       try {
-        await psm.moveSessionTag(sid, null, target.id, 0);
+        await kanbanStore.moveSessionTag(sid, null, target.id, 0);
         notifyPsmTagChange(sid, []);
         return { content: [{ type: "text", text: `Tag set: ${target.name}` }] };
       } catch (e) {
@@ -319,7 +321,7 @@ export const sessionTagTool = {
       const target = findTag(tagName, allTags);
       if (!target) return { content: [{ type: "text", text: `Tag not found: ${tagName}` }], isError: true };
       try {
-        await psm.removeTagFromSession(sid, target.id);
+        await kanbanStore.removeTagFromSession(sid, target.id);
         notifyPsmTagChange(sid, []);
         return { content: [{ type: "text", text: `Removed: ${target.name}` }] };
       } catch (e) {

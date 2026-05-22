@@ -550,6 +550,12 @@ pub(super) async fn get_session_by_path_impl(path: String) -> Result<Option<crat
     crate::data::sqlite::get_session(&conn, &path)
 }
 
+pub(super) async fn get_session_by_id_impl(id: String) -> Result<Option<crate::types::SessionInfo>, String> {
+    let config = config::load_config()?;
+    let conn = crate::data::sqlite::init_db_with_config(&config)?;
+    crate::data::sqlite::get_session_by_id(&conn, &id)
+}
+
 pub(super) async fn delete_sessions_impl(paths: Vec<String>) -> Result<super::session::DeleteSessionsResult, String> {
     let mut deleted_count = 0usize;
     let mut failed = Vec::new();

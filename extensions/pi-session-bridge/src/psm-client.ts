@@ -1,11 +1,11 @@
 /**
  * PSM HTTP Client — thin wrapper over fetch for PSM's POST /api dispatch.
  *
- * All PSM commands go through the unified dispatch table:
- *   POST /api  { command, payload }  →  { success, data, error }
+ * Search/session commands go through the unified dispatch table:
+ *   POST /api  { command, payload }  ->  { success, data, error }
  *
- * Tag operations delegate to PSM's SQLite-backed tag system.
- * No local database — PSM is the single source of truth.
+ * Kanban tag operations intentionally live in kanban-store.ts and read/write
+ * PSM JSON files directly, so they do not require the PSM HTTP server.
  */
 import { HTTP_BASE, AUTH_TOKEN } from "./config.js";
 import type {
@@ -13,8 +13,6 @@ import type {
   SessionInfo,
   SessionEntry,
   FullTextSearchResponse,
-  TagItem,
-  SessionTagItem,
 } from "./types.js";
 
 // ── HTTP primitives ──────────────────────────────────
@@ -30,7 +28,12 @@ async function request<T = unknown>(
   };
   if (AUTH_TOKEN) headers["Authorization"] = `Bearer ${AUTH_TOKEN}`;
 
-  const response = await fetch(url, { ...options, headers });
+  let response: Response;
+  try {
+    response = await fetch(url, { ...options, headers });
+  } catch (error) {
+    throw new Error(`Failed to reach PSM API at ${url}: ${error}`);
+  }
   if (!response.ok) {
     const text = await response.text().catch(() => "Unknown error");
     throw new Error(`HTTP ${response.status}: ${text}`);
@@ -68,6 +71,7 @@ export async function fullTextSearch(params: {
   match_mode?: string;
   page_size?: number;
   sort_order?: string;
+  source_filter?: string;
 }): Promise<FullTextSearchResponse> {
   return command<FullTextSearchResponse>("full_text_search", {
     role_filter: "all",
@@ -78,58 +82,4 @@ export async function fullTextSearch(params: {
     sort_order: "relevance",
     ...params,
   });
-}
-
-// ── Tag commands (PSM backend — no local SQLite) ──────
-
-export async function getAllTags(): Promise<TagItem[]> {
-  return command<TagItem[]>("get_all_tags");
-}
-
-export async function getAllSessionTags(): Promise<SessionTagItem[]> {
-  return command<SessionTagItem[]>("get_all_session_tags");
-}
-
-export async function createTag(
-  name: string,
-  color = "info",
-  icon?: string,
-  parentId?: string,
-): Promise<TagItem> {
-  return command<TagItem>("create_tag", { name, color, icon, parentId });
-}
-
-export async function updateTag(
-  id: string,
-  updates: Partial<Pick<TagItem, "name" | "color" | "icon" | "sort_order" | "parent_id">>,
-): Promise<void> {
-  await command("update_tag", { id, ...updates });
-}
-
-export async function deleteTag(id: string): Promise<void> {
-  await command("delete_tag", { id });
-}
-
-export async function assignTag(sessionId: string, tagId: string): Promise<void> {
-  await command("assign_tag", { sessionId, tagId });
-}
-
-export async function removeTagFromSession(
-  sessionId: string,
-  tagId: string,
-): Promise<void> {
-  await command("remove_tag_from_session", { sessionId, tagId });
-}
-
-export async function moveSessionTag(
-  sessionId: string,
-  fromTagId: string | null,
-  toTagId: string,
-  position = 0,
-): Promise<void> {
-  await command("move_session_tag", { sessionId, fromTagId, toTagId, position });
-}
-
-export async function reorderTags(tagIds: string[]): Promise<void> {
-  await command("reorder_tags", { tagIds });
 }

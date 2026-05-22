@@ -36,6 +36,12 @@ export async function getRuntimeSessionByPath(
   return resolveSessionProvider().getSessionByPath(path);
 }
 
+export async function getRuntimeSessionById(
+  id: string,
+): Promise<SessionInfo | null> {
+  return resolveSessionProvider().getSessionById?.(id) ?? null;
+}
+
 export async function canResolveRuntimeSession(path: string): Promise<boolean> {
   return resolveSessionProvider().canResolveSession(path);
 }

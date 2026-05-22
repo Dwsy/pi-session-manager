@@ -132,6 +132,21 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::get_session_by_path(path).await?;
             Ok(to_val(result, "serialize result")?)
         }
+        "get_session_by_id" => {
+            let id = extract(payload, "id")?;
+            let result = crate::get_session_by_id(id).await?;
+            Ok(to_val(result, "serialize result")?)
+        }
+        "open_url_in_system" => {
+            let url = extract(payload, "url")?;
+            crate::open_url_in_system(url).await?;
+            Ok(Value::Null)
+        }
+        "open_path_with_default_app" => {
+            let path = extract(payload, "path")?;
+            crate::open_path_with_default_app(path).await?;
+            Ok(Value::Null)
+        }
         "open_path_in_system" => {
             let path = extract(payload, "path")?;
             crate::open_path_in_system(path).await?;

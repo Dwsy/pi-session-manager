@@ -154,6 +154,16 @@ pub async fn get_day_stats(date: String, sessions: Vec<SessionInfo>) -> Result<s
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
+pub async fn open_url_in_system(url: String) -> Result<(), String> {
+    super::session_open::open_url_in_system_impl(url).await
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn open_path_with_default_app(path: String) -> Result<(), String> {
+    super::session_open::open_path_with_default_app_impl(path).await
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn open_session_in_terminal(path: String, cwd: String, terminal: Option<String>, pi_path: Option<String>, resume_command: Option<String>) -> Result<(), String> {
     super::session_open::open_session_in_terminal_impl(path, cwd, terminal, pi_path, resume_command).await
 }
@@ -196,6 +206,11 @@ pub async fn convert_session_format(path: String, target_format: String, dry_run
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_by_path(path: String) -> Result<Option<SessionInfo>, String> {
     super::session_file::get_session_by_path_impl(path).await
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn get_session_by_id(id: String) -> Result<Option<SessionInfo>, String> {
+    super::session_file::get_session_by_id_impl(id).await
 }
 
 #[cfg(test)]

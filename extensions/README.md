@@ -71,7 +71,7 @@ pi install npm:Dwsy/psm-bridge
 | `/psm-connect` / `/psm-disconnect` | 手动连接/断开 |
 | `/state` `/state-set` `/state-list` `/state-clear` | 标签管理 |
 | `/flow <action>` | 快速流转 |
-| `/open-in-psm` | 在 PSM 中打开当前会话 |
+| `/open-in-pms` / `/open-in-psm` | 在 PSM 中打开当前会话（`web` 参数强制网页） |
 | `/psm-config` | 配置管理 |
 
 ### 状态指示
