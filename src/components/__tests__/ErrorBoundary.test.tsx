@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @vitest-environment jsdom
+import { render, screen, cleanup } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ErrorBoundary } from '../ErrorBoundary'
 
 // Mock console.error to avoid noise in test output
@@ -9,6 +10,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  cleanup()
   console.error = originalConsoleError
 })
 

@@ -112,15 +112,14 @@
   background: rgba(var(--accent-rgb), 0.5);
 }
 
-// Sticky depth bar
+// Depth clipping bar
 .tree-sticky-depth {
-  position: sticky;
-  top: 0;
-  z-index: 3;
+  flex-shrink: 0;
   height: 28px;
   display: flex;
   align-items: center;
   padding: 0 10px;
+  border-top: 1px solid rgba(var(--accent-rgb), 0.08);
   border-bottom: 1px solid rgba(var(--accent-rgb), 0.12);
   background: var(--bg-subtle);
   color: var(--accent);
@@ -128,19 +127,19 @@
   font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
 }
 
-// Sticky user message header
+// Thread context bar
 .tree-user-sticky {
-  position: sticky;
-  z-index: 2;
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  min-height: 28px;
+  min-height: 30px;
   padding: 0 10px;
   border-top: 1px solid rgba(var(--accent-rgb), 0.08);
-  border-bottom: 1px solid rgba(var(--accent-rgb), 0.12);
-  background: rgb(var(--color-card));
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.16);
+  background: rgba(var(--color-surface-dark), 0.96);
+  box-shadow: 0 1px 0 rgba(var(--color-background), 0.8);
 }
 
 .tree-user-sticky-label,
@@ -148,6 +147,7 @@
   color: var(--accent);
   font-size: 10px;
   font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+  text-transform: uppercase;
 }
 
 .tree-user-sticky-text {
@@ -157,6 +157,7 @@
   white-space: nowrap;
   color: var(--text-secondary);
   font-size: 11px;
+  font-weight: 600;
 }
 
 // Tree Marker (node dot)
@@ -292,12 +293,45 @@
 // Tree Detail Pane
 .tree-detail-pane {
   flex-shrink: 0;
-  min-height: 104px;
-  max-height: 148px;
+  min-height: 132px;
+  max-height: 186px;
   padding: 8px 10px;
-  border-top: 1px solid rgba(var(--accent-rgb), 0.12);
-  background: var(--bg-inset);
+  border-top: 1px solid rgba(var(--accent-rgb), 0.14);
+  background: rgba(var(--color-surface-dark), 0.74);
   overflow: auto;
+}
+
+.tree-detail-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.tree-detail-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.tree-detail-badges {
+  display: flex;
+  gap: 5px;
+  color: var(--accent);
+  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+  font-size: 10px;
+}
+
+.tree-detail-badges span {
+  padding: 1px 5px;
+  border: 1px solid rgba(var(--accent-rgb), 0.22);
+  border-radius: 4px;
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .tree-detail-meta {
@@ -316,9 +350,24 @@
   border-radius: 4px;
 }
 
+.tree-detail-relation,
+.tree-detail-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(var(--color-muted-foreground));
+  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+  font-size: 10px;
+}
+
+.tree-detail-relation {
+  margin-bottom: 6px;
+}
+
 .tree-detail-body {
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  margin-bottom: 6px;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   white-space: pre-wrap;

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+// @vitest-environment jsdom
+import { describe, expect, it, afterEach } from 'vitest'
+import { fireEvent, render, screen, cleanup } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 
 import SearchFilterBar from '../search/SearchFilterBar'
@@ -30,13 +31,16 @@ function renderSearchFilterBar() {
 }
 
 describe('SearchFilterBar', () => {
+  afterEach(() => {
+    cleanup()
+  })
   it('focuses the sidebar search input on plain Cmd+F', () => {
     const { outsideButton, searchInput } = renderSearchFilterBar()
 
     outsideButton.focus()
     fireEvent.keyDown(document, { key: 'f', metaKey: true })
 
-    expect(searchInput).toHaveFocus()
+    expect(document.activeElement).toBe(searchInput)
   })
 
   it('does not hijack Cmd+Shift+F', () => {
@@ -45,7 +49,7 @@ describe('SearchFilterBar', () => {
     outsideButton.focus()
     fireEvent.keyDown(document, { key: 'f', metaKey: true, shiftKey: true })
 
-    expect(outsideButton).toHaveFocus()
-    expect(searchInput).not.toHaveFocus()
+    expect(document.activeElement).toBe(outsideButton)
+    expect(document.activeElement).not.toBe(searchInput)
   })
 })

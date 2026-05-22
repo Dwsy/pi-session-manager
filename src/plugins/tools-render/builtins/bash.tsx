@@ -61,7 +61,7 @@ function BashExecution({
         <pre className="bash-command-inline">
           <span className="bash-command-prefix" aria-hidden="true">$ </span>
           <code
-            className="hljs language-bash"
+            className="shiki language-bash"
             dangerouslySetInnerHTML={{ __html: highlightedCommand }}
           />
         </pre>

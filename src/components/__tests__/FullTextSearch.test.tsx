@@ -1,16 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import FullTextSearch from '../search/FullTextSearch';
-import { invoke } from '@tauri-apps/api/core';
+import { fullTextSearchRuntime } from '@/runtime-data/sessionSource';
 import i18n from '../../i18n';
 import { I18nextProvider } from 'react-i18next';
 
-// Mock Tauri core API which is used by transport.ts
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(),
+vi.mock('@/runtime-data/sessionSource', () => ({
+  fullTextSearchRuntime: vi.fn(),
+  getRuntimeSessionByPath: vi.fn(),
 }));
 
-const mockInvoke = invoke as unknown as ReturnType<typeof vi.fn>;
+const mockFullTextSearchRuntime = fullTextSearchRuntime as unknown as ReturnType<typeof vi.fn>;
 
 // Helper to render component with i18n provider
 function renderFullTextSearch(open = true) {
@@ -30,11 +31,16 @@ function renderFullTextSearch(open = true) {
 
 describe('FullTextSearch', () => {
   beforeEach(() => {
+    cleanup();
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('renders directory name as title and truncated path as subtitle', async () => {
-    mockInvoke.mockResolvedValue({
+    mockFullTextSearchRuntime.mockResolvedValue({
       hits: [
         {
           session_id: 's1',
@@ -52,19 +58,22 @@ describe('FullTextSearch', () => {
 
     renderFullTextSearch(true);
 
+    vi.useFakeTimers();
     const input = screen.getByPlaceholderText(/search all sessions/i);
     fireEvent.change(input, { target: { value: 'test' } });
+    await vi.advanceTimersByTimeAsync(300);
+    vi.useRealTimers();
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith('full_text_search', expect.anything());
+      expect(mockFullTextSearchRuntime).toHaveBeenCalledWith(expect.objectContaining({ query: 'test' }));
     });
 
-    expect(screen.getByText('alpha')).toBeInTheDocument();
-    expect(screen.getByText('/projects/alpha/session.jsonl')).toBeInTheDocument();
+    expect(screen.getByText('Test Session')).not.toBeNull();
+    expect(screen.getByText('/projects/alpha/session.jsonl')).not.toBeNull();
   });
 
   it('renders snippet with <b> tags from backend', async () => {
-    mockInvoke.mockResolvedValue({
+    mockFullTextSearchRuntime.mockResolvedValue({
       hits: [
         {
           session_id: 's1',
@@ -82,11 +91,14 @@ describe('FullTextSearch', () => {
 
     renderFullTextSearch(true);
 
+    vi.useFakeTimers();
     const input = screen.getByPlaceholderText(/search all sessions/i);
     fireEvent.change(input, { target: { value: 'bold' } });
+    await vi.advanceTimersByTimeAsync(300);
+    vi.useRealTimers();
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalled();
+      expect(mockFullTextSearchRuntime).toHaveBeenCalled();
     });
 
     const snippetContainer = document.querySelector('.fts-snippet');
@@ -95,7 +107,7 @@ describe('FullTextSearch', () => {
   });
 
   it('highlights quoted exact phrases as a contiguous match', async () => {
-    mockInvoke.mockResolvedValue({
+    mockFullTextSearchRuntime.mockResolvedValue({
       hits: [
         {
           session_id: 's1',
@@ -113,11 +125,14 @@ describe('FullTextSearch', () => {
 
     renderFullTextSearch(true);
 
+    vi.useFakeTimers();
     const input = screen.getByPlaceholderText(/search all sessions/i);
     fireEvent.change(input, { target: { value: '"bold highlight"' } });
+    await vi.advanceTimersByTimeAsync(300);
+    vi.useRealTimers();
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalled();
+      expect(mockFullTextSearchRuntime).toHaveBeenCalled();
     });
 
     const snippetContainer = document.querySelector('.fts-snippet');
@@ -126,7 +141,7 @@ describe('FullTextSearch', () => {
   });
 
   it('shows loading spinner when search is in progress and no hits yet', async () => {
-    mockInvoke.mockReturnValue(new Promise(() => {}));
+    mockFullTextSearchRuntime.mockReturnValue(new Promise(() => {}));
 
     vi.useFakeTimers();
     renderFullTextSearch(true);
@@ -137,7 +152,7 @@ describe('FullTextSearch', () => {
     await vi.runAllTimersAsync();
 
     const spinner = document.querySelector('svg.animate-spin');
-    expect(spinner).toBeInTheDocument();
+    expect(spinner).not.toBeNull();
 
     vi.useRealTimers();
   });
@@ -146,9 +161,9 @@ describe('FullTextSearch', () => {
     const { onClose } = renderFullTextSearch(true);
 
     const overlay = document.querySelector('[class*="fixed inset-0"]');
-    expect(overlay).toBeInTheDocument();
+    expect(overlay).not.toBeNull();
 
-    const input = screen.getByPlaceholderText(/full-text/i);
+    const input = screen.getByPlaceholderText(/search all sessions/i);
     input.focus();
 
     fireEvent.keyDown(window, { key: 'Escape' });

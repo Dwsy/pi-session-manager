@@ -1,5 +1,6 @@
+import { describe, expect, it } from 'vitest'
 import { SessionSearchPlugin } from '../SessionSearchPlugin'
-import type { SearchContext } from '../../plugins/types'
+import type { SearchContext } from '@/plugins/types'
 
 function createMockContext(overrides?: Partial<SearchContext>): SearchContext {
   return {

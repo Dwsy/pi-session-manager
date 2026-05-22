@@ -180,6 +180,7 @@ export const settings = {
       dark: "深色",
       light: "浅色",
       system: "跟随系统",
+      custom: "自定义",
     },
     fontSize: "字体大小",
     fontSizes: {
@@ -188,6 +189,15 @@ export const settings = {
       large: "大",
     },
     codeBlockTheme: "代码块主题",
+    fontFamily: "字体",
+    fontFamilyMono: "等宽字体",
+    customTheme: "自定义主题预设",
+    appDefaultTheme: "应用默认",
+    customThemeHelp: "选择内置 base46 主题，或使用 ~/.pi/agent/themes 中的主题文件",
+    builtInBase46Themes: "内置 base46 主题",
+    userThemes: "用户主题",
+    base46Preview: "base46 预览",
+    noCustomThemes: "~/.pi/agent/themes 中没有找到自定义主题",
     messageSpacing: "消息间距",
     spacing: {
       compact: "紧凑",

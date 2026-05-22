@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { type ComponentProps } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
@@ -66,10 +67,53 @@ afterEach(() => {
 });
 
 describe('SessionTree', () => {
+  it('shows sticky user context and rich selected-node preview', () => {
+    renderSessionTree({ activeLeafId: 'assistant-1' });
+
+    expect(screen.getByText('Thread context')).not.toBeNull();
+    expect(screen.getAllByText('Original user message').length).toBeGreaterThan(0);
+    expect(screen.getByText('JSONL')).not.toBeNull();
+    expect(screen.getByText('row 2 of 2')).not.toBeNull();
+    expect(screen.getByText('source 3 of 3')).not.toBeNull();
+    expect(screen.getByText('current')).not.toBeNull();
+    expect(screen.getAllByText('Assistant reply').length).toBeGreaterThan(0);
+  });
+
+  it('renders a single thread context bar for multi-turn trees', () => {
+    const multiTurnEntries: SessionEntry[] = [
+      ...BASE_ENTRIES,
+      {
+        type: 'message',
+        id: 'user-2',
+        parentId: 'assistant-1',
+        timestamp: '2026-04-09T10:03:00Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Second user message' }],
+        },
+      },
+      {
+        type: 'message',
+        id: 'assistant-2',
+        parentId: 'user-2',
+        timestamp: '2026-04-09T10:04:00Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Second assistant reply' }],
+        },
+      },
+    ];
+
+    renderSessionTree({ entries: multiTurnEntries, activeLeafId: 'assistant-2' });
+
+    expect(screen.getAllByText('Thread context')).toHaveLength(1);
+    expect(screen.getAllByText('Second user message').length).toBeGreaterThan(0);
+  });
+
   it('uses resolved labels on target nodes and includes them in tree search', () => {
     renderSessionTree();
 
-    expect(screen.getByText('Pinned node')).not.toBeNull();
+    expect(screen.getAllByText('Pinned node').length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByPlaceholderText(/search in session/i), {
       target: { value: 'Pinned' },
@@ -96,7 +140,7 @@ describe('SessionTree', () => {
       </I18nextProvider>,
     );
 
-    expect(screen.getByText('Pinned node')).not.toBeNull();
+    expect(screen.getAllByText('Pinned node').length).toBeGreaterThan(0);
   });
 
   it('shows only labeled target nodes when the labeled-only filter is active', () => {
@@ -104,7 +148,7 @@ describe('SessionTree', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Labeled' })[0]);
 
-    expect(screen.getByText('Pinned node')).not.toBeNull();
+    expect(screen.getAllByText('Pinned node').length).toBeGreaterThan(0);
     expect(screen.queryByText('Label: Raw label')).toBeNull();
   });
 

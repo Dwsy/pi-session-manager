@@ -216,7 +216,11 @@ export const settings = {
     fontFamilyMono: "Monospace Font Family",
     customTheme: "Custom Theme Preset",
     appDefaultTheme: "App default",
-    customThemeHelp: "Uses theme files from ~/.pi/agent/themes",
+    customThemeHelp:
+      "Choose a built-in base46 theme or a theme file from ~/.pi/agent/themes",
+    builtInBase46Themes: "Built-in base46 themes",
+    userThemes: "User themes",
+    base46Preview: "base46 preview",
     noCustomThemes: "No custom themes found in ~/.pi/agent/themes",
     messageSpacing: "Message Spacing",
     spacing: {

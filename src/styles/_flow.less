@@ -2,6 +2,71 @@
 // ========== Flow View ==========
 // =====================================================
 
+// Flow Shell
+.flow-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: rgb(var(--color-background));
+}
+
+.flow-inspector {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  width: min(300px, calc(100% - 112px));
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--color-border), 0.75);
+  border-radius: 6px;
+  background: rgba(var(--color-surface-dark), 0.88);
+  backdrop-filter: blur(10px);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.flow-inspector-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.flow-inspector-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+  color: rgb(var(--color-muted-foreground));
+  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+  font-size: 10px;
+}
+
+.flow-inspector-stats span,
+.flow-inspector-kind {
+  border: 1px solid rgba(var(--accent-rgb), 0.12);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.flow-inspector-active {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.flow-inspector-active-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
 // Flow Toolbar
 .flow-toolbar {
   position: absolute;
@@ -10,9 +75,10 @@
   z-index: 10;
   display: flex;
   gap: 2px;
-  background: rgb(var(--color-card));
-  border: 1px solid rgb(var(--color-border));
+  background: rgba(var(--color-surface-dark), 0.9);
+  border: 1px solid rgba(var(--color-border), 0.75);
   border-radius: 6px;
+  backdrop-filter: blur(10px);
   padding: 2px;
 }
 
@@ -26,23 +92,74 @@
   border-radius: 4px;
   background: transparent;
   color: rgb(var(--color-muted-foreground));
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .flow-toolbar button:hover {
   background: rgb(var(--color-secondary));
   color: rgb(var(--color-foreground));
+  border-color: rgba(var(--accent-rgb), 0.3);
+}
+
+.flow-legend {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: calc(100% - 160px);
+  padding: 5px 7px;
+  border: 1px solid rgba(var(--color-border), 0.6);
+  border-radius: 6px;
+  background: rgba(var(--color-surface-dark), 0.78);
+  backdrop-filter: blur(10px);
+  color: rgb(var(--color-muted-foreground));
+  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+  font-size: 10px;
+}
+
+.flow-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.flow-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgb(var(--color-muted-foreground));
+}
+
+.flow-legend-user {
+  background: var(--borderAccent, var(--accent));
+}
+
+.flow-legend-assistant {
+  background: var(--text, rgb(var(--color-foreground)));
+}
+
+.flow-legend-tool {
+  background: var(--toolTitle, var(--accent));
+}
+
+.flow-legend-meta {
+  background: var(--customMessageLabel, rgb(var(--color-purple)));
 }
 
 // Flow Nodes
 .flow-node {
   border-radius: 6px;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
+  column-gap: 7px;
   padding: 0 8px;
   overflow: hidden;
   font-size: 11px;
-  line-height: 1.3;
+  line-height: 1.25;
   background: rgb(var(--color-card));
   border: 1.5px solid rgb(var(--color-border));
   color: rgb(var(--color-muted-foreground));
@@ -89,17 +206,36 @@
   opacity: 0.8;
 }
 
+.flow-node-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
 .flow-node-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
+  min-width: 0;
+}
+
+.flow-node-kind {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(var(--color-muted-foreground));
+  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+  font-size: 9px;
 }
 
 .flow-node-skip {
   margin-left: 4px;
+  padding: 1px 4px;
+  border: 1px solid rgba(var(--accent-rgb), 0.16);
+  border-radius: 4px;
   font-size: 9px;
-  opacity: 0.5;
+  opacity: 0.75;
   flex-shrink: 0;
 }
 

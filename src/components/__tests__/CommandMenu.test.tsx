@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import { useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
@@ -221,13 +222,14 @@ describe('CommandMenu source filter wiring', () => {
     }))
   })
 
-  it('shows # autocomplete suggestions and applies the chosen source token', () => {
+  it('shows # autocomplete suggestions and applies the chosen source token', async () => {
     render(<CommandMenuHarness />)
 
     const input = screen.getAllByRole('textbox')[0] as HTMLInputElement
     fireEvent.change(input, { target: { value: '#la' } })
     fireEvent.click(screen.getByRole('button', { name: /#labels/i }))
 
+    await Promise.resolve()
     expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('#labels ')
     expect(screen.queryByRole('button', { name: /#labels/i })).toBeNull()
   })
