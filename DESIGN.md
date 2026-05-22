@@ -72,6 +72,22 @@ The primary theme. Deep space atmosphere with carefully chosen accent colors tha
 }
 ```
 
+### Base46 Theme Presets
+The app supports built-in base46-inspired presets through the same `custom` theme path used for Pi theme files. Built-in selections are stored as `base46:<id>` in `settings.appearance.customTheme`, while user theme files continue to use their existing `~/.pi/agent/themes/<name>.json` names.
+
+Current built-in presets live in `src/utils/base46Themes.ts` and include dark and light families: Tokyo Night, Catppuccin Mocha/Latte, Gruvbox Dark/Light, One Dark, Dracula, and Nord. Each preset starts from a base16 palette and maps into the app's semantic tokens rather than raw component colors:
+
+| Base46 role | App tokens |
+|-------------|------------|
+| `base00` | `background`, `bg`, `--color-background` |
+| `base01` / `base02` | `panel`, `panelAlt`, card/surface/popover tokens |
+| `base05` | `text`, `foreground`, primary text tokens |
+| `base03` / `base04` | `muted`, `dim`, borders and secondary text |
+| `base0D` / `base0C` / `base0E` | accent, info, code, links, list bullets |
+| `base0B` / `base0A` / `base08` | success, warning, error, diffs and tool states |
+
+Theme application still flows through `applyPiChatTheme()`: previous override variables are cleared, semantic CSS variables are applied, and `theme-dark` or `theme-light` is inferred from the theme background. The Appearance settings panel previews built-in base46 themes with surface, text, state, markdown, and code swatches before applying them.
+
 ### Light Mode
 Activated via `.theme-light` class. Maintains the same semantic structure with inverted luminance.
 

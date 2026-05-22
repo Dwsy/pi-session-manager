@@ -110,14 +110,22 @@ export default defineConfig(({ mode }) => {
       outDir: isDemoBuild ? 'dist-demo' : isDatasetBuild ? 'dist-dataset' : 'dist',
       rollupOptions: {
         output: {
-          manualChunks: {
-            'react-vendor': ['react', 'react-dom'],
-            'ui-vendor': ['lucide-react', 'cmdk', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
-            'flow-vendor': ['@xyflow/react'],
-            'terminal-vendor': ['@xterm/xterm', '@xterm/addon-fit'],
-            'chart-vendor': ['recharts'],
-            'markdown-vendor': ['marked', 'highlight.js', '@pierre/diffs'],
-            'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          manualChunks(id) {
+            const vendorChunks: Record<string, string[]> = {
+              'react-vendor': ['react', 'react-dom'],
+              'ui-vendor': ['lucide-react', 'cmdk', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+              'flow-vendor': ['@xyflow/react'],
+              'terminal-vendor': ['@xterm/xterm', '@xterm/addon-fit'],
+              'chart-vendor': ['recharts'],
+              'markdown-vendor': ['marked', '@shikijs/core', '@shikijs/engine-javascript', '@pierre/diffs'],
+              'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+            }
+
+            for (const [chunkName, packages] of Object.entries(vendorChunks)) {
+              if (packages.some((pkg) => id.includes(`/node_modules/${pkg}/`))) {
+                return chunkName
+              }
+            }
           },
         },
       },
