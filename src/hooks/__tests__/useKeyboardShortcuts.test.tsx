@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+// @vitest-environment jsdom
+import { fireEvent, render, screen, cleanup } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { useKeyboardShortcuts } from '../useKeyboardShortcuts'
 
@@ -57,6 +58,9 @@ function renderHarness(allowInTextEntry: string[] = []) {
 }
 
 describe('useKeyboardShortcuts', () => {
+  afterEach(() => {
+    cleanup()
+  })
   it('blocks command shortcuts from text inputs by default', () => {
     const { editor, onSettings, onSearchAll } = renderHarness()
 

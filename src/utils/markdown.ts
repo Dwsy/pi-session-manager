@@ -1,5 +1,181 @@
-import { marked } from 'marked'
-import hljs from 'highlight.js'
+import { marked, type Tokens } from 'marked'
+import { createHighlighterCoreSync } from '@shikijs/core'
+import { createJavaScriptRegexEngine } from '@shikijs/engine-javascript'
+import bash from '@shikijs/langs/bash'
+import c from '@shikijs/langs/c'
+import cmake from '@shikijs/langs/cmake'
+import cpp from '@shikijs/langs/cpp'
+import csharp from '@shikijs/langs/csharp'
+import css from '@shikijs/langs/css'
+import dockerfile from '@shikijs/langs/dockerfile'
+import go from '@shikijs/langs/go'
+import html from '@shikijs/langs/html'
+import ini from '@shikijs/langs/ini'
+import java from '@shikijs/langs/java'
+import javascript from '@shikijs/langs/javascript'
+import json from '@shikijs/langs/json'
+import jsx from '@shikijs/langs/jsx'
+import make from '@shikijs/langs/make'
+import markdown from '@shikijs/langs/markdown'
+import python from '@shikijs/langs/python'
+import rust from '@shikijs/langs/rust'
+import scss from '@shikijs/langs/scss'
+import shellscript from '@shikijs/langs/shellscript'
+import sql from '@shikijs/langs/sql'
+import svelte from '@shikijs/langs/svelte'
+import toml from '@shikijs/langs/toml'
+import tsx from '@shikijs/langs/tsx'
+import typescript from '@shikijs/langs/typescript'
+import vue from '@shikijs/langs/vue'
+import xml from '@shikijs/langs/xml'
+import yaml from '@shikijs/langs/yaml'
+import dracula from '@shikijs/themes/dracula'
+import githubDark from '@shikijs/themes/github-dark'
+import githubLight from '@shikijs/themes/github-light'
+import monokai from '@shikijs/themes/monokai'
+import oneDarkPro from '@shikijs/themes/one-dark-pro'
+import { classifyMarkdownLink, getMarkdownLinkConfirmationMessage } from './markdownLinkPolicy'
+
+type ShikiLanguage =
+  | 'bash'
+  | 'shellscript'
+  | 'typescript'
+  | 'tsx'
+  | 'javascript'
+  | 'jsx'
+  | 'python'
+  | 'rust'
+  | 'go'
+  | 'java'
+  | 'cpp'
+  | 'c'
+  | 'csharp'
+  | 'css'
+  | 'scss'
+  | 'html'
+  | 'xml'
+  | 'json'
+  | 'markdown'
+  | 'yaml'
+  | 'sql'
+  | 'dockerfile'
+  | 'make'
+  | 'cmake'
+  | 'toml'
+  | 'ini'
+  | 'vue'
+  | 'svelte'
+
+type ShikiTheme = 'one-dark-pro' | 'monokai' | 'dracula' | 'github-dark' | 'github-light'
+
+const shikiHighlighter = createHighlighterCoreSync({
+  themes: [oneDarkPro, monokai, dracula, githubDark, githubLight],
+  langs: [
+    typescript,
+    tsx,
+    javascript,
+    jsx,
+    python,
+    rust,
+    go,
+    java,
+    cpp,
+    c,
+    csharp,
+    css,
+    scss,
+    html,
+    xml,
+    json,
+    markdown,
+    yaml,
+    bash,
+    shellscript,
+    sql,
+    dockerfile,
+    make,
+    cmake,
+    toml,
+    ini,
+    vue,
+    svelte,
+  ],
+  engine: createJavaScriptRegexEngine(),
+})
+
+const shikiLanguageAliases: Record<string, ShikiLanguage> = {
+  bash: 'bash',
+  shell: 'shellscript',
+  sh: 'shellscript',
+  zsh: 'shellscript',
+  fish: 'shellscript',
+  ts: 'typescript',
+  tsx: 'tsx',
+  js: 'javascript',
+  jsx: 'jsx',
+  py: 'python',
+  rs: 'rust',
+  c: 'c',
+  h: 'c',
+  cpp: 'cpp',
+  cc: 'cpp',
+  cxx: 'cpp',
+  hpp: 'cpp',
+  cs: 'csharp',
+  md: 'markdown',
+  yml: 'yaml',
+  makefile: 'make',
+  docker: 'dockerfile',
+  dockerfile: 'dockerfile',
+}
+
+const loadedShikiLanguages = new Set<string>(shikiHighlighter.getLoadedLanguages())
+
+function normalizeShikiLanguage(language?: string): ShikiLanguage | undefined {
+  const rawLanguage = language?.trim().toLowerCase().replace(/^language-/, '')
+  if (!rawLanguage) {
+    return undefined
+  }
+
+  const normalized = shikiLanguageAliases[rawLanguage] ?? rawLanguage
+  return loadedShikiLanguages.has(normalized) ? normalized as ShikiLanguage : undefined
+}
+
+function getCurrentShikiTheme(): ShikiTheme {
+  if (typeof document === 'undefined') {
+    return 'one-dark-pro'
+  }
+
+  const codeTheme = document.documentElement.getAttribute('data-code-theme')
+  if (codeTheme === 'monokai' || codeTheme === 'dracula') {
+    return codeTheme
+  }
+  if (codeTheme === 'one-dark') {
+    return 'one-dark-pro'
+  }
+  return document.documentElement.classList.contains('theme-light') ? 'github-light' : 'github-dark'
+}
+
+function stripShikiPreCode(html: string): string {
+  const match = html.match(/^<pre[^>]*><code[^>]*>([\s\S]*)<\/code><\/pre>$/)
+  return match ? match[1] : html
+}
+
+function renderShikiCodeHtml(code: string, language?: string): string {
+  const lang = normalizeShikiLanguage(language)
+  if (!lang) {
+    return escapeHtml(code)
+  }
+
+  try {
+    return stripShikiPreCode(shikiHighlighter.codeToHtml(code, {
+      lang,
+      theme: getCurrentShikiTheme(),
+    }))
+  } catch {
+    return escapeHtml(code)
+  }
+}
 
 // Custom renderer
 const renderer = new marked.Renderer()
@@ -7,17 +183,8 @@ const renderer = new marked.Renderer()
 // Custom code block rendering
 renderer.code = function({ text, lang }: { text: string; lang?: string }): string {
   const language = lang || ''
-  const validLang = language && hljs.getLanguage(language) ? language : ''
-
-  // Highlight code
-  let highlightedCode = escapeHtml(text)
-  if (validLang) {
-    try {
-      highlightedCode = hljs.highlight(text, { language: validLang }).value
-    } catch {
-      highlightedCode = escapeHtml(text)
-    }
-  }
+  const validLang = normalizeShikiLanguage(language)
+  const highlightedCode = renderShikiCodeHtml(text, validLang)
 
   // Return complete code block HTML. Keep controls in the top-right overlay;
   // line numbers are intentionally omitted for markdown content to avoid
@@ -34,10 +201,22 @@ renderer.code = function({ text, lang }: { text: string; lang?: string }): strin
         </button>
       </div>
       <div class="code-block-content">
-        <pre class="code-block"><code class="hljs ${validLang}">${highlightedCode}</code></pre>
+        <pre class="code-block"><code class="shiki ${validLang || ''}">${highlightedCode}</code></pre>
       </div>
     </div>
   `
+}
+
+// Unsafe protocols never reach the DOM as active href values; click handling
+// performs the final open/confirm step in MarkdownContent.
+renderer.link = function({ href, title, tokens }: Tokens.Link): string {
+  const label = this.parser.parseInline(tokens)
+  const target = classifyMarkdownLink(href)
+  const safeHref = target.kind === 'anchor' ? href : '#'
+  const safeTitle = title || (target.kind === 'unsupported' ? getMarkdownLinkConfirmationMessage(target) : undefined)
+  const titleAttr = safeTitle ? ` title="${escapeHtml(safeTitle)}"` : ''
+  const rawHrefAttr = ` data-markdown-href="${escapeHtml(href)}"`
+  return `<a href="${escapeHtml(safeHref)}"${rawHrefAttr}${titleAttr}>${label}</a>`
 }
 
 // Configure marked
@@ -70,6 +249,7 @@ function estimateStringBytes(text: string): number {
 }
 
 function createMarkdownCacheKey(text: string): string {
+  const theme = getCurrentShikiTheme()
   let hash1 = 5381
   let hash2 = 52711
   for (let i = 0; i < text.length; i += 1) {
@@ -77,7 +257,7 @@ function createMarkdownCacheKey(text: string): string {
     hash1 = ((hash1 << 5) + hash1) ^ code
     hash2 = ((hash2 << 5) + hash2) ^ code
   }
-  return `${text.length}:${(hash1 >>> 0).toString(16)}:${(hash2 >>> 0).toString(16)}`
+  return `${theme}:${text.length}:${(hash1 >>> 0).toString(16)}:${(hash2 >>> 0).toString(16)}`
 }
 
 function estimateEntryBytes(cacheKey: string, html: string): number {
@@ -184,29 +364,11 @@ export function escapeHtml(text: string): string {
 }
 
 export function highlightCode(code: string, language?: string): string {
-  if (!language) {
-    return escapeHtml(code)
-  }
-  try {
-    return hljs.highlight(code, { language }).value
-  } catch {
-    return escapeHtml(code)
-  }
+  return renderShikiCodeHtml(code, language)
 }
 
 export function renderCodeHtml(code: string, language?: string): string {
-  try {
-    if (language) {
-      return hljs.highlight(code, { language }).value
-    }
-    return hljs.highlightAuto(code).value
-  } catch {
-    try {
-      return hljs.highlightAuto(code, []).value
-    } catch {
-      return escapeHtml(code)
-    }
-  }
+  return renderShikiCodeHtml(code, language)
 }
 
 export function getLanguageFromPath(filePath: string): string | undefined {

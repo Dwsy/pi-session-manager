@@ -41,6 +41,14 @@ export function useSessionViewerHotkeys({
         return
       }
 
+      const target = event.target
+      if (
+        target instanceof Element &&
+        target.closest('[data-tool-call-review-modal="true"]')
+      ) {
+        return
+      }
+
       const key = event.key.toLowerCase()
 
       // Cmd+Shift+F behavior depends on cmdFBehavior setting

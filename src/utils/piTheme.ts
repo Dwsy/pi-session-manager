@@ -1,5 +1,18 @@
 import { invoke } from '@/transport'
 import type { ResourceInfo } from '@/types'
+import {
+  getBuiltInBase46Theme,
+  isBuiltInBase46ThemeSelection,
+  toPiThemeFileFromBase46,
+} from './base46Themes'
+
+export {
+  getBuiltInBase46Themes,
+  isBuiltInBase46ThemeSelection,
+  resolveThemePreview,
+  toBase46Selection,
+  toPiThemeFileFromBase46,
+} from './base46Themes'
 
 interface PiThemeFile {
   name?: string
@@ -252,8 +265,14 @@ async function loadThemeFile(themeName: string): Promise<PiThemeFile | null> {
   }
 }
 
+function loadBuiltInBase46Theme(selection: string): PiThemeFile | null {
+  const theme = getBuiltInBase46Theme(selection)
+  return theme ? toPiThemeFileFromBase46(theme) : null
+}
+
 function resolveThemeName(selection: string): string | null {
   if (selection === APP_DEFAULT_THEME) return null
+  if (isBuiltInBase46ThemeSelection(selection)) return null
   const sanitized = sanitizeThemeName(selection)
   return sanitized || null
 }
@@ -276,6 +295,9 @@ export async function listUserPiThemes(): Promise<string[]> {
 
 export async function resolvePiThemeColorScheme(selection: string | undefined): Promise<'dark' | 'light' | null> {
   const normalized = (selection || APP_DEFAULT_THEME).trim() || APP_DEFAULT_THEME
+  const builtInTheme = loadBuiltInBase46Theme(normalized)
+  if (builtInTheme) return resolveThemeColorScheme(builtInTheme)
+
   const themeName = resolveThemeName(normalized)
   if (!themeName) return null
 
@@ -298,9 +320,10 @@ export async function applyPiChatTheme(selection: string | undefined) {
   const applyId = ++activeThemeApplyId
 
   const normalized = (selection || APP_DEFAULT_THEME).trim() || APP_DEFAULT_THEME
+  const builtInTheme = loadBuiltInBase46Theme(normalized)
   const themeName = resolveThemeName(normalized)
 
-  if (!themeName) {
+  if (!builtInTheme && !themeName) {
     // Not a custom theme, clear only CSS variable overrides but preserve theme class
     OVERRIDE_VARS.forEach((variable) => root.style.removeProperty(variable))
     root.removeAttribute('data-chat-theme')
@@ -308,7 +331,7 @@ export async function applyPiChatTheme(selection: string | undefined) {
     return
   }
 
-  const theme = await loadThemeFile(themeName)
+  const theme = builtInTheme ?? await loadThemeFile(themeName!)
   if (applyId !== activeThemeApplyId) return
 
   clearPiThemeOverrides()
@@ -412,5 +435,5 @@ export async function applyPiChatTheme(selection: string | undefined) {
     root.classList.add(resolvedScheme === 'dark' ? 'theme-dark' : 'theme-light')
   }
 
-  root.setAttribute('data-chat-theme', theme.name || themeName)
+  root.setAttribute('data-chat-theme', theme.name || themeName || normalized)
 }

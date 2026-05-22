@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type ChangeEvent, type CompositionEvent } from 'react'
+import { useState, useRef, useCallback, useEffect, type ChangeEvent, type CompositionEvent } from 'react'
 
 export interface UseCompositionInputReturn {
   /** Current input value (including composition characters during IME input) */
@@ -33,6 +33,12 @@ export function useCompositionInput(
   const [inputValue, setInputValue] = useState(initialValue)
   const [isComposing, setIsComposing] = useState(false)
   const composingRef = useRef(false)
+
+  useEffect(() => {
+    if (!composingRef.current) {
+      setInputValue(initialValue)
+    }
+  }, [initialValue])
 
   const handleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     // Update local display value so user sees the composition process
