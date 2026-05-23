@@ -45,6 +45,7 @@ function AppSessionViewerPane({
   const { getSessionSetting } = useSettings();
   const conversationModeEnabled = getSessionSetting("conversationModeEnabled") !== false;
   const [sideChatOpen, setSideChatOpen] = useState(false);
+  const [sideChatWidth, setSideChatWidth] = useState(380);
 
   const sessionToolbarSlot = (
     <>
@@ -79,6 +80,8 @@ function AppSessionViewerPane({
           <SessionSideChatPanel
             session={session}
             open={sideChatOpen}
+            width={sideChatWidth}
+            onWidthChange={setSideChatWidth}
             onClose={() => setSideChatOpen(false)}
           />
         ),
