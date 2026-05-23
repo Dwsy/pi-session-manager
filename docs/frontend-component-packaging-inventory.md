@@ -127,7 +127,7 @@ Model config subpackage: `sections/model-config/index.tsx`, `types.ts`, `useMode
 
 ### `tool-calls/`
 
-`BashExecution.tsx`, `EditExecution.tsx`, `GenericToolCall.tsx`, `ReadExecution.tsx`, `SubagentModal.tsx`, `SubagentToolCall.tsx`, `ToolCallList.tsx`, `WriteExecution.tsx`, `toolCallFolding.ts`, `index.ts`
+`BashExecution.tsx`, `EditExecution.tsx`, `GenericToolCall.tsx`, `ReadExecution.tsx`, `ToolCallList.tsx`, `WriteExecution.tsx`, `toolCallFolding.ts`, `index.ts`
 
 已有 barrel：`index.ts`。
 
@@ -148,7 +148,10 @@ Model config subpackage: `sections/model-config/index.tsx`, `types.ts`, `useMode
 | Package | Files |
 | --- | --- |
 | `plugins/tools-render/builtins/` | `bash.tsx`, `edit.tsx`, `generic.tsx`, `read.tsx`, `write.tsx`, `index.ts` |
-| `plugins/tools-render/extensions/` | `subagent.tsx`, `index.ts` |
+| `plugins/tools-render/extensions/` | `index.ts` (legacy no-op) |
+| `extensions/psm-ask-user-question-renderer/` | `index.tsx` |
+| `extensions/psm-loop-renderer/` | `index.tsx` |
+| `extensions/psm-subagent-renderer/` | `index.ts`, `SubagentToolRenderer.tsx`, `SubagentModal.tsx` |
 | `plugins/tools-render/utils/` | `resolveData.ts`, `searchSegments.ts`, `index.ts` |
 | `plugins/tools-render/` | `index.ts`, `registry.ts`, `types.ts` |
 

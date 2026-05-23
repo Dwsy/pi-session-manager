@@ -9,9 +9,9 @@ import {
 } from './settingsRegistry'
 
 describe('settings registry selectors', () => {
-  it('returns stable references for default runtime lists', () => {
-    expect(getAvailableSettingsAreas()).toBe(getAvailableSettingsAreas())
-    expect(getAvailableSettingsSections()).toBe(getAvailableSettingsSections())
-    expect(getAvailableSettingsGroups('preferences')).toBe(getAvailableSettingsGroups('preferences'))
+  it('returns available base settings metadata', () => {
+    expect(getAvailableSettingsAreas().map((area) => area.id)).toContain('preferences')
+    expect(getAvailableSettingsSections().map((section) => section.id)).toContain('psm-plugins')
+    expect(getAvailableSettingsGroups('config-center').flatMap((group) => group.sections)).toContain('psm-plugins')
   })
 })

@@ -225,6 +225,7 @@ export type SettingsSection =
   | "data-sources"
   | "pi-agent"
   | "psm-plugins"
+  | `psm-plugin:${string}`
   | "server-access"
   | "backup-restore"
   | "diagnostics-maintenance"

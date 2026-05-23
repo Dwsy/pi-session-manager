@@ -2,11 +2,13 @@ import type { ReactNode } from "react";
 import {
   Activity,
   Bot,
+  Brain,
   Database,
   Download,
   Globe,
   Keyboard,
   Palette,
+  MessageCircleQuestion,
   Puzzle,
   Search,
   Server,
@@ -31,6 +33,7 @@ import DiagnosticsMaintenanceSettings from "./sections/DiagnosticsMaintenanceSet
 import ModelSettings from "./sections/ModelSettings";
 import PiAgentSettings from "./sections/PiAgentSettings";
 import PsmPluginsSettings from "./sections/PsmPluginsSettings";
+import { psmPluginHost, type PsmPluginStatus } from "@/plugins/runtime-host";
 import SearchExportSettings from "./sections/SearchExportSettings";
 import SessionSettings from "./sections/SessionSettings";
 import ShortcutSettings from "./sections/ShortcutSettings";
@@ -82,6 +85,45 @@ export const SETTINGS_AREAS: SettingsAreaMeta[] = [
     fallbackDescription: "Agent, server, data source and maintenance tools",
   },
 ];
+
+export const PSM_PLUGIN_SECTION_PREFIX = "psm-plugin:";
+
+export function psmPluginSectionId(pluginId: string): SettingsSection {
+  return `${PSM_PLUGIN_SECTION_PREFIX}${pluginId}` as SettingsSection;
+}
+
+export function psmPluginIdFromSettingsSection(section: SettingsSection): string | null {
+  return section.startsWith(PSM_PLUGIN_SECTION_PREFIX)
+    ? section.slice(PSM_PLUGIN_SECTION_PREFIX.length)
+    : null;
+}
+
+function pluginSettingsSectionMeta(plugin: PsmPluginStatus): SettingsSectionMeta {
+  return {
+    id: psmPluginSectionId(plugin.id),
+    area: "config-center",
+    group: "agent",
+    icon: plugin.id.includes("sidechat")
+      ? <MessageCircleQuestion className="h-4 w-4" />
+      : <Brain className="h-4 w-4" />,
+    labelKey: `plugins.${plugin.id}.configuration.title`,
+    fallbackLabel: plugin.manifest?.configuration?.title ?? plugin.name,
+    descriptionKey: `plugins.${plugin.id}.configuration.description`,
+    fallbackDescription: plugin.manifest?.configuration?.description ?? plugin.name,
+    saveMode: "inline",
+  };
+}
+
+function getPluginSettingsSections(): SettingsSectionMeta[] {
+  return psmPluginHost
+    .listPlugins()
+    .filter((plugin) => (plugin.manifest?.configuration?.properties?.length ?? 0) > 0)
+    .map(pluginSettingsSectionMeta);
+}
+
+function getDefaultSettingsSections(): SettingsSectionMeta[] {
+  return [...SETTINGS_SECTIONS, ...getPluginSettingsSections()];
+}
 
 export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   {
@@ -337,44 +379,36 @@ function buildAvailableGroups(
   area?: SettingsArea,
 ): SettingsGroupMeta[] {
   const available = new Set(sections.map((section) => section.id));
+  const pluginSections = sections
+    .map((section) => section.id)
+    .filter((section) => section.startsWith(PSM_PLUGIN_SECTION_PREFIX));
+
   return SETTINGS_GROUPS
     .filter((group) => !area || group.area === area)
-    .map((group) => ({
-      ...group,
-      sections: group.sections.filter((section) => available.has(section)),
-    }))
+    .map((group) => {
+      const groupSections = group.sections.flatMap((section) =>
+        section === "psm-plugins" ? [section, ...pluginSections] : [section],
+      );
+      return {
+        ...group,
+        sections: groupSections.filter((section) => available.has(section)),
+      };
+    })
     .filter((group) => group.sections.length > 0);
 }
 
-const DEFAULT_SETTINGS_AREAS = buildAvailableAreas(SETTINGS_SECTIONS);
-const STANDALONE_SETTINGS_AREAS = buildAvailableAreas(STANDALONE_SETTINGS_SECTIONS);
-const DEFAULT_SETTINGS_GROUPS = buildAvailableGroups(SETTINGS_SECTIONS);
-const DEFAULT_PREFERENCES_GROUPS = buildAvailableGroups(SETTINGS_SECTIONS, "preferences");
-const DEFAULT_CONFIG_CENTER_GROUPS = buildAvailableGroups(SETTINGS_SECTIONS, "config-center");
-const STANDALONE_SETTINGS_GROUPS = buildAvailableGroups(STANDALONE_SETTINGS_SECTIONS);
-const STANDALONE_PREFERENCES_GROUPS = buildAvailableGroups(STANDALONE_SETTINGS_SECTIONS, "preferences");
-const STANDALONE_CONFIG_CENTER_GROUPS = buildAvailableGroups(STANDALONE_SETTINGS_SECTIONS, "config-center");
-
 export function getAvailableSettingsAreas(): SettingsAreaMeta[] {
-  return isStandaloneDatasetRuntime() ? STANDALONE_SETTINGS_AREAS : DEFAULT_SETTINGS_AREAS;
+  return buildAvailableAreas(isStandaloneDatasetRuntime() ? STANDALONE_SETTINGS_SECTIONS : getDefaultSettingsSections());
 }
 
 export function getAvailableSettingsSections(): SettingsSectionMeta[] {
-  return isStandaloneDatasetRuntime() ? STANDALONE_SETTINGS_SECTIONS : SETTINGS_SECTIONS;
+  return isStandaloneDatasetRuntime() ? STANDALONE_SETTINGS_SECTIONS : getDefaultSettingsSections();
 }
 
 export function getAvailableSettingsGroups(
   area?: SettingsArea,
 ): SettingsGroupMeta[] {
-  if (isStandaloneDatasetRuntime()) {
-    if (area === "preferences") return STANDALONE_PREFERENCES_GROUPS;
-    if (area === "config-center") return STANDALONE_CONFIG_CENTER_GROUPS;
-    return STANDALONE_SETTINGS_GROUPS;
-  }
-
-  if (area === "preferences") return DEFAULT_PREFERENCES_GROUPS;
-  if (area === "config-center") return DEFAULT_CONFIG_CENTER_GROUPS;
-  return DEFAULT_SETTINGS_GROUPS;
+  return buildAvailableGroups(getAvailableSettingsSections(), area);
 }
 
 export function getSettingsAreaMeta(area: SettingsArea): SettingsAreaMeta {
@@ -384,14 +418,14 @@ export function getSettingsAreaMeta(area: SettingsArea): SettingsAreaMeta {
 export function getSettingsSectionMeta(
   section: SettingsSection,
 ): SettingsSectionMeta | undefined {
-  return SETTINGS_SECTIONS.find((item) => item.id === section);
+  return getAvailableSettingsSections().find((item) => item.id === section);
 }
 
 export function findSettingsGroupBySection(
   section: SettingsSection,
 ): SettingsGroupMeta {
   return (
-    SETTINGS_GROUPS.find((group) => group.sections.includes(section)) ||
+    getAvailableSettingsGroups().find((group) => group.sections.includes(section)) ||
     SETTINGS_GROUPS[0]
   );
 }
@@ -405,6 +439,9 @@ export function renderSettingsSection(
     value: any,
   ) => void,
 ) {
+  const pluginId = psmPluginIdFromSettingsSection(activeSection);
+  if (pluginId) return <PsmPluginsSettings pluginId={pluginId} />;
+
   switch (activeSection) {
     case "appearance":
       return <AppearanceSettings settings={settings} onUpdate={onUpdate} />;

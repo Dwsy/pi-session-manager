@@ -31,6 +31,8 @@ export interface AppMobileLayoutProps {
   renderKanban: () => ReactNode;
   renderDashboard: () => ReactNode;
   renderSettings: () => ReactNode;
+  routeSessionPending?: boolean;
+  renderRouteSessionPending?: () => ReactNode;
   showDashboardTab?: boolean;
   settingsLabel?: string;
   settingsIcon?: ReactNode;
@@ -56,6 +58,8 @@ function AppMobileLayout({
   renderKanban,
   renderDashboard,
   renderSettings,
+  routeSessionPending = false,
+  renderRouteSessionPending,
   showDashboardTab = true,
   settingsLabel,
   settingsIcon,
@@ -101,22 +105,28 @@ function AppMobileLayout({
     return next;
   }, [settingsActionOnly, settingsIcon, settingsLabel, showDashboardTab, t]);
 
+  const showSessionLayer = !!selectedSession || routeSessionPending;
+
   return (
     <div className="relative flex flex-col h-screen-safe bg-background text-foreground safe-area-top">
       <ConnectionBanner />
 
-      {selectedSession && (
+      {showSessionLayer && (
         <div
           ref={mobileViewerRef}
           className="absolute inset-0 z-30 flex flex-col bg-background"
         >
-          <div className="flex-1 overflow-hidden">{renderSessionViewer()}</div>
+          <div className="flex-1 overflow-hidden">
+            {selectedSession
+              ? renderSessionViewer()
+              : renderRouteSessionPending?.()}
+          </div>
         </div>
       )}
 
       <div
         className="flex-1 overflow-hidden flex flex-col"
-        style={{ visibility: selectedSession ? "hidden" : "visible" }}
+        style={{ visibility: showSessionLayer ? "hidden" : "visible" }}
       >
         {mobileTab === "list" && renderSessionList()}
         {mobileTab === "projects" && renderProjectList()}
@@ -125,7 +135,7 @@ function AppMobileLayout({
         {!settingsActionOnly && mobileTab === "settings" && renderSettings()}
       </div>
 
-      {!selectedSession && (
+      {!showSessionLayer && (
         <nav className="flex-shrink-0 border-t border-border bg-background/95 backdrop-blur-sm flex items-center justify-around px-1 safe-area-bottom">
           {tabs.map((tab) => (
             <button

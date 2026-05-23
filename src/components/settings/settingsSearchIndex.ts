@@ -1,3 +1,5 @@
+import { psmPluginHost } from "@/plugins/runtime-host";
+import { psmPluginSectionId } from "./settingsRegistry";
 import type { SettingsSection } from "./types";
 
 export interface SettingsSearchItem {
@@ -16,8 +18,8 @@ export interface SettingsSearchItem {
 }
 
 /**
- * Complete index of all searchable settings.
- * Each entry maps to a specific setting control in the UI.
+ * Static index of core searchable settings.
+ * Plugin settings are derived at runtime from plugin manifests.
  * The `id` is used as `data-settings-search` for scroll targeting.
  */
 export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
@@ -492,7 +494,29 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
 ];
 
 /** Build a flat search index with pre-lowered text for fast matching */
-export function buildSearchText(
+export function pluginSearchId(pluginId: string, key: string) {
+  const slug = pluginId.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return `psm-plugin-${slug}-${key}`;
+}
+
+export function getSettingsSearchIndex(): SettingsSearchItem[] {
+  const pluginItems = psmPluginHost.listPlugins().flatMap((plugin) => {
+    const properties = plugin.manifest?.configuration?.properties ?? [];
+    return properties.map((property) => ({
+      id: pluginSearchId(plugin.id, property.key),
+      section: psmPluginSectionId(plugin.id),
+      labelKey: `plugins.${plugin.id}.settings.${property.key}.title`,
+      fallbackLabel: property.title,
+      extraKeys: property.description
+        ? [`plugins.${plugin.id}.settings.${property.key}.description`]
+        : undefined,
+      keywords: ["psm", "plugin", plugin.name, plugin.id, property.key],
+    }));
+  });
+  return [...SETTINGS_SEARCH_INDEX, ...pluginItems];
+}
+
+function buildSearchText(
   item: SettingsSearchItem,
   t: (key: string, fallback: string) => string,
 ): string {
@@ -526,7 +550,7 @@ export function searchSettings(
 
   const results: SettingsSearchResult[] = [];
 
-  for (const item of SETTINGS_SEARCH_INDEX) {
+  for (const item of getSettingsSearchIndex()) {
     if (results.length >= limit) break;
     const text = buildSearchText(item, t);
     const matched = terms.every((term) => text.includes(term));
