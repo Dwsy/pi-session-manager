@@ -364,6 +364,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            pi_session_manager::plugin_dispatch_command,
             pi_session_manager::scan_sessions,
             pi_session_manager::scan_sessions_paginated,
             pi_session_manager::read_session_file,

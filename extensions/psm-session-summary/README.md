@@ -2,7 +2,19 @@
 
 First proof-of-concept plugin for issue #36: generate AI session summaries and store them as generic PSM plugin records.
 
-This is a PSM plugin sample with pi-flavored construction. It is not a Pi runtime plugin package by itself. The shape mirrors Pi extension ergonomics: default factory, manifest, command/tool registration, and capability client calls.
+This is a PSM plugin sample with pi-flavored construction. It is not a Pi runtime plugin package by itself. The shape mirrors Pi extension ergonomics: manifest, default activation, command/tool registration, and capability client calls.
+
+The sample uses the PSM runtime SDK host context type:
+
+```ts
+import type { PsmPluginHostContext, PsmPluginManifest } from '../../src/plugins/runtime-sdk'
+```
+
+For a future npm package, that import should come from the published SDK package instead:
+
+```ts
+import type { PsmPluginHostContext, PsmPluginManifest } from '@psm/runtime-sdk'
+```
 
 ## Record
 
@@ -30,6 +42,18 @@ await psm.records.refreshSessionIntelligence({
   path: sessionPath,
   provider,
   model,
+})
+```
+
+When the sample is wired through `createPluginCapabilityClient(...)`, use a matching permission context:
+
+```ts
+createPluginCapabilityClient({
+  transport: appPsmTransport,
+  permissions: {
+    pluginId: 'builtin.session-summary',
+    permissions: ['records:read', 'records:write', 'model:invoke'],
+  },
 })
 ```
 

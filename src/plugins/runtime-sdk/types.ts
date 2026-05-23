@@ -8,6 +8,11 @@ export type PsmPermission =
   | 'sidechat:ask'
   | 'model:invoke'
 
+export interface PsmPermissionContext {
+  pluginId?: string
+  permissions?: PsmPermission[]
+}
+
 export interface PsmModelOption {
   provider: string
   model: string
@@ -30,16 +35,58 @@ export interface PsmRecordDeclaration {
   indexes?: PsmRecordIndexDeclaration[]
 }
 
+export type PsmPluginManifestVersion = 1
+
+export interface PsmPluginRuntimeCompatibility {
+  sdk: string
+  host?: string
+}
+
+export interface PsmPluginPackageBoundary {
+  name?: string
+  export?: string
+}
+
 export interface PsmPluginManifest {
+  manifestVersion?: PsmPluginManifestVersion
   id: string
   name: string
   version: string
+  runtime?: PsmPluginRuntimeCompatibility
+  package?: PsmPluginPackageBoundary
   permissions?: PsmPermission[]
   records?: PsmRecordDeclaration[]
 }
 
 export interface PsmTransport {
   invoke<T>(command: string, payload?: Record<string, unknown>): Promise<T>
+}
+
+export interface PsmPluginDisposable {
+  dispose(): void | Promise<void>
+}
+
+export interface PsmPluginToolRegistration {
+  description: string
+  run(args: Record<string, unknown>): Promise<unknown>
+}
+
+export interface PsmPluginHostContext {
+  manifest: PsmPluginManifest
+  psm: PsmCapabilityClient
+  permissions: PsmPermissionContext
+  registerCommand(name: string, handler: (args: Record<string, unknown>) => Promise<unknown>): void
+  registerTool(name: string, tool: PsmPluginToolRegistration): void
+}
+
+export type PsmPluginActivateResult = void | PsmPluginDisposable
+export type PsmPluginActivate = (ctx: PsmPluginHostContext) => PsmPluginActivateResult | Promise<PsmPluginActivateResult>
+
+export interface PsmPluginModule {
+  manifest: PsmPluginManifest
+  activate?: PsmPluginActivate
+  deactivate?: () => void | Promise<void>
+  default?: PsmPluginActivate
 }
 
 export interface DbPluginRecord {
@@ -268,4 +315,5 @@ export interface PsmCapabilityClient {
 
 export interface CreatePsmClientOptions {
   transport: PsmTransport
+  permissions?: PsmPermissionContext
 }

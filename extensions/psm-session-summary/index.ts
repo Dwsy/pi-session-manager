@@ -1,9 +1,14 @@
-import type { PsmCapabilityClient, PsmPluginManifest } from '../../src/plugins/runtime-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '../../src/plugins/runtime-sdk'
 
 export const manifest: PsmPluginManifest = {
+  manifestVersion: 1,
   id: 'builtin.session-summary',
   name: 'AI Session Summary',
   version: '0.1.0',
+  runtime: {
+    sdk: '^0.1.0',
+    host: '>=0.6.3',
+  },
   permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke'],
   records: [
     {
@@ -19,18 +24,12 @@ export const manifest: PsmPluginManifest = {
   ],
 }
 
-export interface PsmPluginContext {
-  psm: PsmCapabilityClient
-  registerCommand(name: string, handler: (args: Record<string, unknown>) => Promise<unknown>): void
-  registerTool(name: string, tool: { description: string; run(args: Record<string, unknown>): Promise<unknown> }): void
-}
-
 function readStringArg(args: Record<string, unknown>, key: string): string | undefined {
   const value = args[key]
   return typeof value === 'string' && value.trim() ? value : undefined
 }
 
-export default function sessionSummaryPlugin(ctx: PsmPluginContext) {
+export default function sessionSummaryPlugin(ctx: PsmPluginHostContext) {
   async function refresh(args: Record<string, unknown>) {
     const path = readStringArg(args, 'path') ?? readStringArg(args, 'sessionPath')
     if (!path) {

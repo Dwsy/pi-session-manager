@@ -6,7 +6,13 @@ import {
   appPsmTransport,
   createPluginCapabilityClient,
   type PluginRecord,
+  type PsmPermissionContext,
 } from '@/plugins/runtime-sdk'
+
+const PLUGIN_RECORD_SEARCH_PERMISSIONS: PsmPermissionContext = {
+  pluginId: 'builtin.plugin-record-search',
+  permissions: ['records:read'],
+}
 
 const SESSION_INTELLIGENCE_RECORD = 'session.intelligence'
 const MAX_RESULTS = 20
@@ -39,7 +45,10 @@ export class PluginRecordSearchPlugin extends BaseSearchPlugin {
   keywords = ['summary', 'intelligence', 'record', 'plugin', 'metadata']
   priority = 70
 
-  private readonly client = createPluginCapabilityClient({ transport: appPsmTransport })
+  private readonly client = createPluginCapabilityClient({
+    transport: appPsmTransport,
+    permissions: PLUGIN_RECORD_SEARCH_PERMISSIONS,
+  })
 
   get name(): string {
     return this.context?.t('plugins.pluginRecords.name', 'Plugin Records') || 'Plugin records'

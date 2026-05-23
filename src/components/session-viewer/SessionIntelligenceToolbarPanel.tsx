@@ -2,10 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Brain, CheckCircle2, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 
-import { appPsmTransport, createPluginCapabilityClient, type PluginRecord } from "@/plugins/runtime-sdk";
+import { appPsmTransport, createPluginCapabilityClient, type PluginRecord, type PsmPermissionContext } from "@/plugins/runtime-sdk";
 import type { SessionInfo } from "@/types";
 
 const SESSION_INTELLIGENCE_RECORD = "session.intelligence";
+const SESSION_INTELLIGENCE_PERMISSIONS: PsmPermissionContext = {
+  pluginId: "builtin.session-intelligence-toolbar",
+  permissions: ["records:read", "records:write", "model:invoke"],
+};
 
 interface SessionIntelligencePayload {
   summary?: string;
@@ -62,7 +66,7 @@ function formatUpdatedAt(record: PluginRecord | null, language?: string) {
 export default function SessionIntelligenceToolbarPanel({ session }: SessionIntelligenceToolbarPanelProps) {
   const { t, i18n } = useTranslation();
   const client = useMemo(
-    () => createPluginCapabilityClient({ transport: appPsmTransport }),
+    () => createPluginCapabilityClient({ transport: appPsmTransport, permissions: SESSION_INTELLIGENCE_PERMISSIONS }),
     [],
   );
   const [open, setOpen] = useState(false);

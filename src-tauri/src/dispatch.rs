@@ -7,11 +7,30 @@
 //! - `utils/` - shared utilities
 
 use serde_json::Value;
+use std::collections::HashSet;
 
 #[cfg(feature = "gui")]
 type DispatchAppState = crate::app_state::SharedAppState;
 #[cfg(not(feature = "gui"))]
 type DispatchAppState = ();
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum PluginPermission {
+    SessionsRead,
+    RecordsRead,
+    RecordsWrite,
+    SearchRead,
+    KanbanRead,
+    KanbanWrite,
+    SidechatAsk,
+    ModelInvoke,
+}
+
+#[derive(Debug, Clone, Default)]
+struct PluginPermissionContext {
+    plugin_id: Option<String>,
+    permissions: HashSet<PluginPermission>,
+}
 
 // Re-export for backward compatibility
 use crate::utils::payload::extract_optional_string;
@@ -30,6 +49,65 @@ fn unpack_pi_rpc_response(response: Value) -> Result<Value, String> {
     Ok(response.get("data").cloned().unwrap_or(Value::Null))
 }
 
+fn parse_plugin_permission(value: &str) -> Option<PluginPermission> {
+    match value {
+        "sessions:read" => Some(PluginPermission::SessionsRead),
+        "records:read" => Some(PluginPermission::RecordsRead),
+        "records:write" => Some(PluginPermission::RecordsWrite),
+        "search:read" => Some(PluginPermission::SearchRead),
+        "kanban:read" => Some(PluginPermission::KanbanRead),
+        "kanban:write" => Some(PluginPermission::KanbanWrite),
+        "sidechat:ask" => Some(PluginPermission::SidechatAsk),
+        "model:invoke" => Some(PluginPermission::ModelInvoke),
+        _ => None,
+    }
+}
+
+fn extract_plugin_permission_context(payload: &Value) -> PluginPermissionContext {
+    let Some(psm) = payload.get("__psm") else {
+        return PluginPermissionContext::default();
+    };
+
+    let plugin_id = psm.get("pluginId").and_then(|value| value.as_str()).map(str::to_string);
+    let permissions = psm.get("permissions").and_then(|value| value.as_array()).into_iter().flatten().filter_map(|value| value.as_str()).filter_map(parse_plugin_permission).collect::<HashSet<_>>();
+
+    PluginPermissionContext { plugin_id, permissions }
+}
+
+fn required_permissions_for_command(command: &str) -> &'static [PluginPermission] {
+    match command {
+        "scan_sessions" | "scan_sessions_paginated" | "get_session_entries" | "read_session_file_chunk" | "get_session_labels" => &[PluginPermission::SessionsRead],
+        "get_plugin_record" | "list_plugin_records_for_scope" | "search_plugin_records" => &[PluginPermission::RecordsRead],
+        "upsert_plugin_record" => &[PluginPermission::RecordsWrite],
+        "refresh_session_intelligence_record" => &[PluginPermission::RecordsWrite, PluginPermission::ModelInvoke],
+        "full_text_search" => &[PluginPermission::SearchRead],
+        "get_all_tags" | "get_all_session_tags" => &[PluginPermission::KanbanRead],
+        "create_tag" | "assign_tag" | "remove_tag_from_session" => &[PluginPermission::KanbanWrite],
+        "ask_session_sidechat" => &[PluginPermission::SidechatAsk],
+        "list_model_options_fast" => &[PluginPermission::ModelInvoke],
+        _ => &[],
+    }
+}
+
+fn enforce_plugin_permission(command: &str, payload: &Value) -> Result<(), String> {
+    let required = required_permissions_for_command(command);
+    if required.is_empty() {
+        return Ok(());
+    }
+
+    let ctx = extract_plugin_permission_context(payload);
+    if ctx.permissions.is_empty() && ctx.plugin_id.is_none() {
+        return Ok(());
+    }
+
+    if required.iter().all(|permission| ctx.permissions.contains(permission)) {
+        return Ok(());
+    }
+
+    let plugin_name = ctx.plugin_id.unwrap_or_else(|| "unknown-plugin".to_string());
+    Err(format!("Plugin permission denied: {plugin_name} cannot call {command}"))
+}
+
 /// Dispatch a command to the appropriate handler.
 /// GUI-only commands (terminal, save_session_paths with watcher) are handled
 /// by the caller in ws_adapter.rs.
@@ -44,6 +122,8 @@ pub async fn dispatch_with_state(app_state: &Option<crate::app_state::SharedAppS
 }
 
 async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payload: &Value) -> Result<Value, String> {
+    enforce_plugin_permission(command, payload)?;
+
     match command {
         // ═══════════════════════════════════════════════════════════════
         // Session scanning
@@ -993,6 +1073,47 @@ mod tests {
         )
         .await;
         assert!(result.is_ok(), "expected success with optional fields omitted, got {result:?}");
+    }
+
+    #[tokio::test]
+    async fn dispatch_allows_plugin_commands_with_declared_permission() {
+        let result = dispatch(
+            "scan_sessions_paginated",
+            &serde_json::json!({
+                "offset": 0,
+                "limit": 1,
+                "sortBy": "modified_desc",
+                "__psm": {
+                    "pluginId": "builtin.session-summary",
+                    "permissions": ["sessions:read"]
+                }
+            }),
+        )
+        .await;
+
+        assert!(result.is_ok(), "expected permissioned plugin scan to succeed, got {result:?}");
+    }
+
+    #[tokio::test]
+    async fn dispatch_rejects_plugin_commands_without_required_permission() {
+        let result = dispatch(
+            "scan_sessions_paginated",
+            &serde_json::json!({
+                "offset": 0,
+                "limit": 1,
+                "sortBy": "modified_desc",
+                "__psm": {
+                    "pluginId": "builtin.session-summary",
+                    "permissions": ["records:read"]
+                }
+            }),
+        )
+        .await;
+
+        assert!(result.is_err(), "expected permission denial");
+        let error = result.unwrap_err();
+        assert!(error.contains("Plugin permission denied"), "error should mention permission denial, got: {error}");
+        assert!(error.contains("scan_sessions_paginated"), "error should mention denied command, got: {error}");
     }
 
     #[cfg(not(feature = "gui"))]

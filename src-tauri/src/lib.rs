@@ -94,6 +94,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
+            plugin_dispatch_command,
             scan_sessions,
             scan_sessions_paginated,
             read_session_file,

@@ -58,6 +58,12 @@ pub use workspaces::*;
 
 #[cfg(feature = "gui")]
 #[tauri::command]
+pub async fn plugin_dispatch_command(state: tauri::State<'_, crate::app_state::SharedAppState>, command: String, payload: serde_json::Value) -> Result<serde_json::Value, String> {
+    crate::dispatch::dispatch_with_state(&Some(state.inner().clone()), &command, &payload).await
+}
+
+#[cfg(feature = "gui")]
+#[tauri::command]
 pub async fn toggle_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
     if window.is_devtools_open() {
         window.close_devtools();

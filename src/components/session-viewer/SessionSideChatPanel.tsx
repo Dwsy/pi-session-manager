@@ -16,6 +16,7 @@ import {
   appPsmTransport,
   createPluginCapabilityClient,
   type PsmModelOption,
+  type PsmPermissionContext,
   type PsmSideChatCitation,
 } from "@/plugins/runtime-sdk";
 import type { SessionInfo } from "@/types";
@@ -25,6 +26,10 @@ const DEFAULT_SNIPPET_LIMIT = 8;
 const SNIPPET_LIMIT_OPTIONS = [4, 6, 8, 10, 12] as const;
 const MIN_PANEL_WIDTH = 320;
 const MAX_PANEL_WIDTH = 640;
+const SESSION_SIDECHAT_PERMISSIONS: PsmPermissionContext = {
+  pluginId: "builtin.session-sidechat-panel",
+  permissions: ["sidechat:ask", "model:invoke"],
+};
 
 interface SessionSideChatPanelProps {
   session: SessionInfo;
@@ -91,7 +96,7 @@ export default function SessionSideChatPanel({
 }: SessionSideChatPanelProps) {
   const { t, i18n } = useTranslation();
   const client = useMemo(
-    () => createPluginCapabilityClient({ transport: appPsmTransport }),
+    () => createPluginCapabilityClient({ transport: appPsmTransport, permissions: SESSION_SIDECHAT_PERMISSIONS }),
     [],
   );
   const [question, setQuestion] = useState("");

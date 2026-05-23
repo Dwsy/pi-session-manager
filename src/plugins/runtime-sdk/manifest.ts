@@ -30,6 +30,8 @@ const SUPPORTED_INDEX_TYPES = new Set<PsmRecordIndexType>([
   'boolean',
 ])
 
+const SUPPORTED_MANIFEST_VERSIONS = new Set([1])
+
 export interface ManifestValidationResult {
   ok: boolean
   errors: string[]
@@ -57,6 +59,36 @@ export function validatePsmPluginManifest(input: unknown): ManifestValidationRes
   if (!isNonEmptyString(input.id)) errors.push('id is required')
   if (!isNonEmptyString(input.name)) errors.push('name is required')
   if (!isNonEmptyString(input.version)) errors.push('version is required')
+
+  if (input.manifestVersion !== undefined && !SUPPORTED_MANIFEST_VERSIONS.has(input.manifestVersion as number)) {
+    errors.push('manifestVersion is not supported')
+  }
+
+  if (input.runtime !== undefined) {
+    if (!isObject(input.runtime)) {
+      errors.push('runtime must be an object')
+    } else {
+      if (!isNonEmptyString(input.runtime.sdk)) {
+        errors.push('runtime.sdk is required')
+      }
+      if (input.runtime.host !== undefined && !isNonEmptyString(input.runtime.host)) {
+        errors.push('runtime.host must be a non-empty string')
+      }
+    }
+  }
+
+  if (input.package !== undefined) {
+    if (!isObject(input.package)) {
+      errors.push('package must be an object')
+    } else {
+      if (input.package.name !== undefined && !isNonEmptyString(input.package.name)) {
+        errors.push('package.name must be a non-empty string')
+      }
+      if (input.package.export !== undefined && !isNonEmptyString(input.package.export)) {
+        errors.push('package.export must be a non-empty string')
+      }
+    }
+  }
 
   const permissions = input.permissions
   if (permissions !== undefined) {

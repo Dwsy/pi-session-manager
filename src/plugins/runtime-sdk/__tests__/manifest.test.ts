@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createPluginCapabilityClient } from '../client'
 import { validatePsmPluginManifest } from '../manifest'
-import type { PsmPluginManifest, PsmTransport } from '../types'
+import type { PsmPermissionContext, PsmPluginManifest, PsmTransport } from '../types'
 
 describe('runtime-sdk manifest contract', () => {
   it('accepts pi-flavored PSM plugins with records declarations', () => {
@@ -28,11 +28,47 @@ describe('runtime-sdk manifest contract', () => {
     expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
   })
 
+  it('accepts npm-installable plugin metadata without requiring app internals', () => {
+    const manifest: PsmPluginManifest = {
+      manifestVersion: 1,
+      id: 'npm.example.session-summary',
+      name: 'Example Session Summary',
+      version: '1.0.0',
+      runtime: {
+        sdk: '^0.1.0',
+        host: '>=0.6.3',
+      },
+      package: {
+        name: '@example/psm-session-summary',
+        export: '.',
+      },
+      permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke'],
+      records: [
+        {
+          type: 'session.intelligence',
+          scope: 'session',
+          schemaVersion: 1,
+        },
+      ],
+    }
+
+    expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
+  })
+
   it('rejects plugin-host style manifests without stable identity or record schema', () => {
     const manifest = {
+      manifestVersion: 2,
       id: '',
       name: 'Bad',
       version: '0.1.0',
+      runtime: {
+        sdk: '',
+        host: '',
+      },
+      package: {
+        name: '',
+        export: '',
+      },
       permissions: ['records:delete'],
       records: [
         {
@@ -48,7 +84,12 @@ describe('runtime-sdk manifest contract', () => {
     const result = validatePsmPluginManifest(manifest)
 
     expect(result.ok).toBe(false)
+    expect(result.errors).toContain('manifestVersion is not supported')
     expect(result.errors).toContain('id is required')
+    expect(result.errors).toContain('runtime.sdk is required')
+    expect(result.errors).toContain('runtime.host must be a non-empty string')
+    expect(result.errors).toContain('package.name must be a non-empty string')
+    expect(result.errors).toContain('package.export must be a non-empty string')
     expect(result.errors).toContain('permissions[0] is not supported')
     expect(result.errors).toContain('records[0].type is required')
     expect(result.errors).toContain('records[0].scope is required')
@@ -60,6 +101,11 @@ describe('runtime-sdk manifest contract', () => {
 })
 
 describe('plugin capability client', () => {
+  const pluginPermissions: PsmPermissionContext = {
+    pluginId: 'builtin.session-summary',
+    permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+  }
+
   it('sends typed record RPC through the provided PSM transport', async () => {
     const calls: Array<{ command: string; payload?: unknown }> = []
     const transport: PsmTransport = {
@@ -86,7 +132,7 @@ describe('plugin capability client', () => {
       },
     }
 
-    const client = createPluginCapabilityClient({ transport })
+    const client = createPluginCapabilityClient({ transport, permissions: pluginPermissions })
     const result = await client.records.search({
       query: 'plugin',
       recordType: 'session.intelligence',
@@ -96,7 +142,16 @@ describe('plugin capability client', () => {
     expect(calls).toEqual([
       {
         command: 'search_plugin_records',
-        payload: { query: 'plugin', recordType: 'session.intelligence', pluginId: undefined, limit: 5 },
+        payload: {
+          query: 'plugin',
+          recordType: 'session.intelligence',
+          pluginId: undefined,
+          limit: 5,
+          __psm: {
+            pluginId: 'builtin.session-summary',
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+          },
+        },
       },
     ])
     expect(result[0].payload).toEqual({ summary: 'Build plugin records', status: 'active' })
@@ -124,7 +179,7 @@ describe('plugin capability client', () => {
       },
     }
 
-    const client = createPluginCapabilityClient({ transport })
+    const client = createPluginCapabilityClient({ transport, permissions: pluginPermissions })
     const result = await client.records.listForScope({
       scopeType: 'session',
       scopeId: '/repo/session.jsonl',
@@ -140,6 +195,10 @@ describe('plugin capability client', () => {
           scopeId: '/repo/session.jsonl',
           recordType: 'session.intelligence',
           limit: 1,
+          __psm: {
+            pluginId: 'builtin.session-summary',
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+          },
         },
       },
     ])
@@ -176,7 +235,7 @@ describe('plugin capability client', () => {
       },
     }
 
-    const client = createPluginCapabilityClient({ transport })
+    const client = createPluginCapabilityClient({ transport, permissions: pluginPermissions })
     await client.sessions.list({ offset: 0, limit: 10, projectFilter: '/repo', filterTagIds: ['tag-active'], sortBy: 'modified_desc' })
     await client.sessions.readFileChunk('/repo/session.jsonl', { offset: 0, maxBytes: 1024 })
     await client.sessions.getLabels('/repo/session.jsonl')
@@ -201,11 +260,15 @@ describe('plugin capability client', () => {
           filterTagIds: ['tag-active'],
           sourceFilterSlugs: undefined,
           sortBy: 'modified_desc',
+          __psm: {
+            pluginId: 'builtin.session-summary',
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+          },
         },
       },
-      { command: 'read_session_file_chunk', payload: { path: '/repo/session.jsonl', offset: 0, maxBytes: 1024 } },
-      { command: 'get_session_labels', payload: { path: '/repo/session.jsonl' } },
-      { command: 'open_session_in_browser', payload: { path: '/repo/session.jsonl' } },
+      { command: 'read_session_file_chunk', payload: { path: '/repo/session.jsonl', offset: 0, maxBytes: 1024, __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'get_session_labels', payload: { path: '/repo/session.jsonl', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'open_session_in_browser', payload: { path: '/repo/session.jsonl', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
       {
         command: 'full_text_search',
         payload: {
@@ -220,6 +283,10 @@ describe('plugin capability client', () => {
           sourceFilter: undefined,
           from: undefined,
           to: undefined,
+          __psm: {
+            pluginId: 'builtin.session-summary',
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+          },
         },
       },
       {
@@ -232,14 +299,18 @@ describe('plugin capability client', () => {
           model: 'gpt-5.5',
           thinkingLevel: 'high',
           limit: 8,
+          __psm: {
+            pluginId: 'builtin.session-summary',
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+          },
         },
       },
-      { command: 'list_model_options_fast', payload: undefined },
-      { command: 'get_all_tags', payload: undefined },
-      { command: 'create_tag', payload: { name: 'Active', color: '#22c55e', icon: undefined, parentId: undefined } },
-      { command: 'assign_tag', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active' } },
-      { command: 'remove_tag_from_session', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active' } },
-      { command: 'get_all_session_tags', payload: undefined },
+      { command: 'list_model_options_fast', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'get_all_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'create_tag', payload: { name: 'Active', color: '#22c55e', icon: undefined, parentId: undefined, __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'assign_tag', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'remove_tag_from_session', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'get_all_session_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
     ])
   })
 
@@ -263,7 +334,7 @@ describe('plugin capability client', () => {
       },
     }
 
-    const client = createPluginCapabilityClient({ transport })
+    const client = createPluginCapabilityClient({ transport, permissions: pluginPermissions })
     const result = await client.records.refreshSessionIntelligence({
       path: '/repo/session.jsonl',
       provider: 'local',
@@ -274,7 +345,16 @@ describe('plugin capability client', () => {
     expect(calls).toEqual([
       {
         command: 'refresh_session_intelligence_record',
-        payload: { path: '/repo/session.jsonl', provider: 'local', model: 'test-model', language: 'zh-CN' },
+        payload: {
+          path: '/repo/session.jsonl',
+          provider: 'local',
+          model: 'test-model',
+          language: 'zh-CN',
+          __psm: {
+            pluginId: 'builtin.session-summary',
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+          },
+        },
       },
     ])
     expect(result.payload).toEqual({ summary: 'AI generated summary', status: 'active' })

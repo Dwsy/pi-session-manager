@@ -78,22 +78,112 @@ The TypeScript runtime SDK exposes first-stage PSM capabilities:
 | `records` | `get`, `list`, `search`, `upsert`, `refreshSessionIntelligence` | `records:read`, `records:write` |
 | `search` | `fulltext`, `pluginRecords` | `search:read` |
 | `kanban` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` | `kanban:read`, `kanban:write` |
+| `sidechat` | `ask` | `sidechat:ask` |
+| `models` | `listOptions` | `model:invoke` |
 
 The SDK maps TypeScript camelCase inputs to backend-compatible snake_case payloads where needed.
+
+## Boundary Decision
+
+Stable plugin SDK surface:
+
+- `PsmPluginManifest`, including optional `manifestVersion`, `runtime`, and `package` metadata
+- `PsmPermission`
+- `PsmRecordDeclaration`
+- `PsmTransport`
+- `createPluginCapabilityClient(...)`
+- `PsmPluginHostContext`, `PsmPluginModule`, and activation/disposal types
+
+App-internal direct paths:
+
+- direct `invoke(...)` calls
+- app providers under `src/runtime-data/` and `src/utils/`
+- React components, hooks, stores, and layout internals
+- Rust command implementations and SQLite modules
+
+These app-internal paths are not plugin SDK. Do not migrate them just to make the app look more plugin-shaped. Migrate a caller only when it is intentionally acting as a PSM-hosted plugin or exercising the host boundary.
+
+Host responsibilities for npm-installable plugins:
+
+- discover installed packages from a PSM-managed plugin directory or lockfile
+- resolve the declared ESM export
+- validate the exported manifest
+- check manifest, SDK, and host compatibility
+- construct a permission context from the validated manifest
+- provide the transport and capability client
+- register plugin commands/tools/UI contributions
+- catch load and activation failures, unregister partial contributions, and keep the app running
+- call `dispose()` and/or `deactivate()` on reload/uninstall
+
+`appPsmTransport` is not part of the publishable SDK package. It is the current in-app host adapter, because it imports PSM frontend transport internals.
+
+## Permission Context And Enforcement
+
+PSM plugin-style callers can now attach an explicit permission envelope:
+
+```ts
+createPluginCapabilityClient({
+  transport: appPsmTransport,
+  permissions: {
+    pluginId: 'builtin.session-intelligence-toolbar',
+    permissions: ['records:read', 'records:write', 'model:invoke'],
+  },
+})
+```
+
+Each SDK call carries this payload fragment when permissions are supplied:
+
+```json
+{
+  "__psm": {
+    "pluginId": "builtin.session-intelligence-toolbar",
+    "permissions": ["records:read", "records:write", "model:invoke"]
+  }
+}
+```
+
+Backend enforcement happens in `src-tauri/src/dispatch.rs`.
+It is intentionally opt-in: only requests carrying `__psm` are checked.
+Legacy app-internal calls without `__psm` keep current behavior.
+
+Current command-to-permission mapping:
+
+| Command | Required permission(s) |
+|---|---|
+| `scan_sessions`, `scan_sessions_paginated`, `get_session_entries`, `read_session_file_chunk`, `get_session_labels` | `sessions:read` |
+| `get_plugin_record`, `list_plugin_records_for_scope`, `search_plugin_records` | `records:read` |
+| `upsert_plugin_record` | `records:write` |
+| `refresh_session_intelligence_record` | `records:write`, `model:invoke` |
+| `full_text_search` | `search:read` |
+| `get_all_tags`, `get_all_session_tags` | `kanban:read` |
+| `create_tag`, `assign_tag`, `remove_tag_from_session` | `kanban:write` |
+| `ask_session_sidechat` | `sidechat:ask` |
+| `list_model_options_fast` | `model:invoke` |
+
+Permission denial shape:
+
+```text
+Plugin permission denied: <pluginId|unknown-plugin> cannot call <command>
+```
 
 ## Developing A PSM Plugin
 
 Create plugin code under `extensions/<plugin-name>/` for samples or local experiments.
 
-Minimal shape:
+Minimal repo-local shape:
 
 ```ts
-import type { PsmCapabilityClient, PsmPluginManifest } from '../../src/plugins/runtime-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '../../src/plugins/runtime-sdk'
 
 export const manifest: PsmPluginManifest = {
+  manifestVersion: 1,
   id: 'builtin.session-summary',
   name: 'Session Summary',
   version: '0.1.0',
+  runtime: {
+    sdk: '^0.1.0',
+    host: '>=0.6.3',
+  },
   permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke'],
   records: [
     {
@@ -104,15 +194,14 @@ export const manifest: PsmPluginManifest = {
   ],
 }
 
-export default function createPlugin(psm: PsmCapabilityClient) {
-  return {
-    manifest,
-    commands: {
-      async refreshSessionSummary(path: string, provider?: string, model?: string) {
-        return psm.records.refreshSessionIntelligence({ path, provider, model })
-      },
-    },
-  }
+export default function activate(ctx: PsmPluginHostContext) {
+  ctx.registerCommand('session-summary.refresh', async (args) => {
+    return ctx.psm.records.refreshSessionIntelligence({
+      path: String(args.path),
+      provider: typeof args.provider === 'string' ? args.provider : undefined,
+      model: typeof args.model === 'string' ? args.model : undefined,
+    })
+  })
 }
 ```
 
@@ -120,9 +209,104 @@ Rules:
 
 - Use PSM capabilities, not direct DB or filesystem access.
 - Keep plugin state in `plugin_records` or future governed storage APIs.
-- Declare permissions in the manifest even if full backend enforcement is still a follow-up.
+- Declare permissions in the manifest and pass a matching `permissions` context when constructing a runtime capability client.
 - Keep searchable fields in `searchable_text` through Rust-side projection.
 - Do not hard-code model API keys in plugin code.
+
+## Npm-installable Plugin V1 Design
+
+The first npm-installable design keeps PSM plugins as PSM-hosted extensions, not Pi runtime plugins.
+
+### Package boundary
+
+Publishable SDK package:
+
+```text
+@psm/runtime-sdk
+```
+
+It exports the stable SDK types/client listed above and excludes `appPsmTransport`, React UI internals, app stores, Rust command modules, and SQLite code.
+
+Plugin package example:
+
+```json
+{
+  "name": "@example/psm-session-summary",
+  "version": "1.0.0",
+  "type": "module",
+  "peerDependencies": {
+    "@psm/runtime-sdk": "^0.1.0"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  }
+}
+```
+
+The plugin module exports `manifest` and either a default activation function or `activate(ctx)`.
+
+### Manifest and version compatibility
+
+Npm-installable plugins should declare:
+
+```ts
+export const manifest: PsmPluginManifest = {
+  manifestVersion: 1,
+  id: 'npm.example.session-summary',
+  name: 'Example Session Summary',
+  version: '1.0.0',
+  runtime: {
+    sdk: '^0.1.0',
+    host: '>=0.6.3',
+  },
+  package: {
+    name: '@example/psm-session-summary',
+    export: '.',
+  },
+  permissions: ['sessions:read', 'records:read'],
+}
+```
+
+The current manifest validator rejects unsupported manifest versions, unknown permissions, malformed record declarations, malformed runtime metadata, and malformed package metadata. Full semver range comparison and installed-package identity checks are loader responsibilities and remain deferred.
+
+### Loader lifecycle
+
+First-pass loader lifecycle:
+
+1. Discover installed package records from a PSM-managed plugin directory or lockfile.
+2. Resolve the package export to an ESM module.
+3. Read and validate `module.manifest`.
+4. Check `manifestVersion`, `runtime.sdk`, and `runtime.host`.
+5. Build `PsmPermissionContext` from `manifest.id` and `manifest.permissions`.
+6. Create a host-owned transport and `PsmCapabilityClient`.
+7. Build `PsmPluginHostContext`.
+8. Call `module.activate(ctx)` or `module.default(ctx)`.
+9. Store registrations and any returned `dispose()` handle.
+10. On reload/uninstall, unregister contributions, call `dispose()`, then call `deactivate()` if present.
+
+### Failure and isolation behavior
+
+V1 containment rules:
+
+- A failed package resolution disables only that plugin.
+- A failed manifest validation disables only that plugin.
+- Incompatible SDK/host metadata disables only that plugin.
+- Activation exceptions are caught and partial command/tool registrations are removed.
+- Plugin command/tool handler exceptions are returned as plugin command errors.
+- Permission failures are enforced by dispatch when the call carries `__psm`.
+- Npm-installed plugins must receive host-derived permission context; they should not construct their own elevated context.
+
+This does not provide a security sandbox. Remote update policy, signing, iframe/worker isolation, and other security hardening are deliberately outside this first pass.
+
+### Distribution and install model
+
+The first install model should be deterministic and local:
+
+- Resolve npm packages outside normal app startup.
+- Copy or snapshot plugin artifacts into a PSM-managed local plugin directory.
+- Store package name, version, export path, manifest id, and integrity metadata in a local registry/lockfile.
+- Load runtime plugins only from that managed registry.
+- Do not fetch arbitrary package code during normal startup.
 
 ## Backend Flow: Refresh Session Intelligence
 
@@ -221,7 +405,7 @@ cd src-tauri && cargo test --lib --quiet
 Expected current result:
 
 ```text
-99 passed
+103 passed
 ```
 
 ### Rust Lint
@@ -382,12 +566,16 @@ The POC currently has:
 - Generic plugin record substrate committed.
 - Expanded runtime SDK capability client committed.
 - AI session summary plugin POC committed.
+- Opt-in backend permission enforcement committed in `dispatch.rs`.
+- Tauri plugin-facing transport routed through `plugin_dispatch_command`.
+- Real runtime SDK entry points now pass explicit `pluginId` + `permissions` context.
 - Handoff archive committed at `docs/handoff/issue-36-plugin-poc-handoff.md`.
 - Focused Rust/TS verification passed.
 - Live `gpt-5.5` summary generation passed after local config JSON was repaired with user approval.
+- Full `cargo test --lib --quiet` currently passes again after test env isolation fix.
 
 Remaining natural follow-ups:
 
-- Add real backend permission enforcement for manifest permissions.
-- Add UI trigger or settings surface for refreshing session intelligence.
+- Decide and document which internal app paths should remain direct `invoke(...)` and which should converge on plugin-style capability boundaries.
 - Add plugin loader lifecycle if/when PSM needs dynamic external plugin loading.
+- Add broader capability tests if new plugin-facing commands are added beyond records/search/sidechat/models.
