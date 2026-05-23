@@ -103,6 +103,7 @@ pub async fn init_http_adapter_with_embedding(app_state: SharedAppState, bind_ad
         .route("/v1/plugin-records", get(plugin_records::v1_list_plugin_records).post(plugin_records::v1_upsert_plugin_record))
         .route("/v1/plugin-records/search", post(plugin_records::v1_search_plugin_records))
         .route("/v1/plugin-records/session-intelligence/refresh", post(plugin_records::v1_refresh_session_intelligence_record))
+        .route("/v1/session-sidechat/ask", post(plugin_records::v1_ask_session_sidechat))
         .route("/v1/plugin-records/{id}", get(plugin_records::v1_get_plugin_record))
         .route("/v1/search/fulltext", post(readonly_routes::v1_full_text_search))
         .route("/v1/memory/recall", post(readonly_routes::v1_memory_recall))
