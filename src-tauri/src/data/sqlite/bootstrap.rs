@@ -455,6 +455,7 @@ mod tests {
 
     #[test]
     fn uses_primary_db_for_local_mode() {
+        let _env_lock = crate::paths::test_env_lock().lock().expect("test env lock");
         // Ensure clean state - remove any leftover PPM_TEST_DB
         std::env::remove_var("PPM_TEST_DB");
 
@@ -465,6 +466,7 @@ mod tests {
 
     #[test]
     fn uses_dataset_db_for_dataset_mode() {
+        let _env_lock = crate::paths::test_env_lock().lock().expect("test env lock");
         // Ensure clean state - remove any leftover PPM_TEST_DB
         std::env::remove_var("PPM_TEST_DB");
 
