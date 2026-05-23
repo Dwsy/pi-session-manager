@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createPluginCapabilityClient } from '../client'
-import { validatePsmPluginManifest } from '../manifest'
+import { validatePsmPackageManifest, validatePsmPluginManifest } from '../manifest'
 import type { PsmPermissionContext, PsmPluginManifest, PsmTransport } from '../types'
 
 describe('runtime-sdk manifest contract', () => {
@@ -97,6 +97,23 @@ describe('runtime-sdk manifest contract', () => {
     expect(result.errors).toContain('records[0].indexes[0].name is required')
     expect(result.errors).toContain('records[0].indexes[0].path must be a JSON path')
     expect(result.errors).toContain('records[0].indexes[0].type is not supported')
+  })
+})
+
+describe('PSM package manifest contract', () => {
+  it('accepts package.json psm extensions entries', () => {
+    expect(validatePsmPackageManifest({
+      extensions: ['./dist/index.js', './dist/other.js'],
+    })).toEqual({ ok: true, errors: [] })
+  })
+
+  it('rejects invalid package.json psm extensions entries', () => {
+    const result = validatePsmPackageManifest({
+      extensions: ['./dist/index.js', ''],
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.errors).toContain('psm.extensions[1] must be a non-empty string')
   })
 })
 

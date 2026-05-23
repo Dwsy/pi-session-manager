@@ -224,6 +224,7 @@ export type SettingsSection =
   | "app-behavior"
   | "data-sources"
   | "pi-agent"
+  | "psm-plugins"
   | "server-access"
   | "backup-restore"
   | "diagnostics-maintenance"

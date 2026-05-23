@@ -1,5 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ExternalLink,
@@ -13,28 +12,35 @@ import {
 } from "lucide-react";
 
 import {
-  appPsmTransport,
-  createPluginCapabilityClient,
+  type PsmCapabilityClient,
   type PsmModelOption,
-  type PsmPermissionContext,
+  type PsmPluginI18nClient,
+  type PsmSessionReference,
   type PsmSideChatCitation,
-} from "@/plugins/runtime-sdk";
-import type { SessionInfo } from "@/types";
+} from "@pi-session-manager/plugin-sdk";
+import { sideChatStyles } from "./styles";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
-const DEFAULT_SNIPPET_LIMIT = 8;
 const SNIPPET_LIMIT_OPTIONS = [4, 6, 8, 10, 12] as const;
 const MIN_PANEL_WIDTH = 320;
 const MAX_PANEL_WIDTH = 640;
-const SESSION_SIDECHAT_PERMISSIONS: PsmPermissionContext = {
-  pluginId: "builtin.session-sidechat-panel",
-  permissions: ["sidechat:ask", "model:invoke"],
-};
+interface SideChatPluginSettings {
+  provider: string;
+  model: string;
+  thinkingLevel: string;
+  snippetLimit: number;
+  panelWidth: number;
+  optionsExpanded: boolean;
+  showQuickPrompts: boolean;
+}
 
 interface SessionSideChatPanelProps {
-  session: SessionInfo;
+  client: PsmCapabilityClient;
+  i18n: PsmPluginI18nClient;
+  session: PsmSessionReference;
   open: boolean;
   onClose: () => void;
+  settings: SideChatPluginSettings;
   width?: number;
   onWidthChange?: (width: number) => void;
 }
@@ -88,31 +94,30 @@ function providerModelLabel(option: PsmModelOption) {
 }
 
 export default function SessionSideChatPanel({
+  client,
+  i18n,
   session,
   open,
   onClose,
-  width = 380,
+  settings,
+  width = settings.panelWidth,
   onWidthChange,
 }: SessionSideChatPanelProps) {
-  const { t, i18n } = useTranslation();
-  const client = useMemo(
-    () => createPluginCapabilityClient({ transport: appPsmTransport, permissions: SESSION_SIDECHAT_PERMISSIONS }),
-    [],
-  );
+  const { t, language } = i18n;
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [citations, setCitations] = useState<PsmSideChatCitation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [optionsOpen, setOptionsOpen] = useState(true);
+  const [optionsOpen, setOptionsOpen] = useState(settings.optionsExpanded);
   const [models, setModels] = useState<PsmModelOption[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [options, setOptions] = useState<SideChatOptionsState>({
-    provider: "",
-    model: "",
-    thinkingLevel: "medium",
-    limit: DEFAULT_SNIPPET_LIMIT,
+    provider: settings.provider,
+    model: settings.model,
+    thinkingLevel: settings.thinkingLevel,
+    limit: settings.snippetLimit,
   });
   const resizeStartRef = useRef<{ x: number; width: number } | null>(null);
 
@@ -187,7 +192,7 @@ export default function SessionSideChatPanel({
       const response = await client.sidechat.ask({
         sessionPath: session.path,
         question: trimmedQuestion,
-        language: i18n.language,
+        language,
         provider: options.provider || undefined,
         model: options.model || undefined,
         thinkingLevel: options.thinkingLevel || undefined,
@@ -256,12 +261,12 @@ export default function SessionSideChatPanel({
 
   return (
     <aside
-      className="hidden h-full min-h-0 shrink-0 border-l border-border/70 bg-surface-dark/75 xl:flex xl:flex-col"
+      className={sideChatStyles.panel}
       style={{ width }}
     >
       <div
         onPointerDown={handleResizeStart}
-        className={`absolute -left-[3px] top-0 h-full w-[6px] cursor-ew-resize ${isResizing ? "bg-info/40" : "hover:bg-info/20"}`}
+        className={sideChatStyles.resizeHandle(isResizing)}
         role="separator"
         aria-orientation="vertical"
         aria-label={t("session.sideChat.resize", "Resize side chat panel")}
@@ -284,7 +289,7 @@ export default function SessionSideChatPanel({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/70 bg-secondary text-muted-foreground hover:bg-secondary-hover hover:text-foreground"
+          className={sideChatStyles.iconButton}
           aria-label={t("common.close", "Close")}
         >
           <X className="h-3.5 w-3.5" />
@@ -341,6 +346,7 @@ export default function SessionSideChatPanel({
             placeholder={t("session.sideChat.placeholder", "Ask about decisions, blockers, files, or next steps...")}
             className="min-h-[108px] w-full resize-none rounded-md border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/15"
           />
+          {settings.showQuickPrompts && (
           <div className="flex flex-wrap gap-1.5">
             {quickPrompts.map((prompt) => (
               <button
@@ -354,6 +360,7 @@ export default function SessionSideChatPanel({
               </button>
             ))}
           </div>
+          )}
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] text-muted-foreground">
               {t("session.sideChat.hint", "Uses search and snippets, not full-context injection.")}
@@ -416,7 +423,7 @@ export default function SessionSideChatPanel({
                 <div className="space-y-2">
                   {citations.map((citation, index) => {
                     const entryId = citationEntryId(citation);
-                    const createdAt = citationCreatedAt(citation, i18n.language);
+                    const createdAt = citationCreatedAt(citation, language);
                     return (
                       <article key={`${entryId ?? "citation"}-${index}`} className="rounded-md border border-border/60 bg-background/55 p-2.5">
                         <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">

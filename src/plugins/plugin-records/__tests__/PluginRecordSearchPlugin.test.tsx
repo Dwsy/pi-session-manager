@@ -8,8 +8,11 @@ const { mockSearchPluginRecords } = vi.hoisted(() => ({
   mockSearchPluginRecords: vi.fn(),
 }))
 
-vi.mock('@/plugins/runtime-sdk', () => ({
+vi.mock('@/plugins/runtime-host/appTransport', () => ({
   appPsmTransport: { invoke: vi.fn() },
+}))
+
+vi.mock('@pi-session-manager/plugin-sdk', () => ({
   createPluginCapabilityClient: () => ({
     records: {
       search: mockSearchPluginRecords,

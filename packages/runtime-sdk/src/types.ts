@@ -47,6 +47,42 @@ export interface PsmPluginPackageBoundary {
   export?: string
 }
 
+export interface PsmPackageManifest {
+  extensions?: string[]
+}
+
+export type PsmPluginSettingValue = string | number | boolean
+
+export interface PsmPluginSettingOption {
+  label: string
+  value: PsmPluginSettingValue
+}
+
+export interface PsmPluginSettingDefinition {
+  key: string
+  title: string
+  description?: string
+  type: 'string' | 'number' | 'boolean' | 'select'
+  default?: PsmPluginSettingValue
+  options?: PsmPluginSettingOption[]
+  min?: number
+  max?: number
+  step?: number
+}
+
+export interface PsmPluginConfiguration {
+  title?: string
+  description?: string
+  properties: PsmPluginSettingDefinition[]
+}
+
+export type PsmPluginI18nResources = Record<string, Record<string, unknown>>
+
+export interface PsmPluginI18nClient {
+  language: string
+  t(key: string, fallback: string, options?: Record<string, unknown>): string
+}
+
 export interface PsmPluginManifest {
   manifestVersion?: PsmPluginManifestVersion
   id: string
@@ -56,6 +92,8 @@ export interface PsmPluginManifest {
   package?: PsmPluginPackageBoundary
   permissions?: PsmPermission[]
   records?: PsmRecordDeclaration[]
+  configuration?: PsmPluginConfiguration
+  i18n?: PsmPluginI18nResources
 }
 
 export interface PsmTransport {
@@ -71,10 +109,53 @@ export interface PsmPluginToolRegistration {
   run(args: Record<string, unknown>): Promise<unknown>
 }
 
+export interface PsmSessionReference {
+  path: string
+  id?: string
+  name?: string
+  cwd?: string | null
+}
+
+export interface PsmSessionUiRenderProps {
+  session: PsmSessionReference
+  panelOpen?: boolean
+  togglePanel?: () => void
+  closePanel?: () => void
+  width?: number
+  onWidthChange?: (width: number) => void
+}
+
+export interface PsmSessionToolbarItemRegistration {
+  id: string
+  title: string
+  panelId?: string
+  render(props: PsmSessionUiRenderProps): unknown
+}
+
+export interface PsmSessionPanelRegistration {
+  id: string
+  title: string
+  side?: 'right'
+  render(props: PsmSessionUiRenderProps): unknown
+}
+
+export interface PsmPluginUiRegistry {
+  registerSessionToolbarItem(item: PsmSessionToolbarItemRegistration): void
+  registerSessionPanel(panel: PsmSessionPanelRegistration): void
+}
+
+export interface PsmPluginSettingsClient {
+  get<T extends PsmPluginSettingValue>(key: string, fallback: T): T
+  all(): Record<string, PsmPluginSettingValue>
+}
+
 export interface PsmPluginHostContext {
   manifest: PsmPluginManifest
   psm: PsmCapabilityClient
   permissions: PsmPermissionContext
+  settings: PsmPluginSettingsClient
+  i18n: PsmPluginI18nClient
+  ui: PsmPluginUiRegistry
   registerCommand(name: string, handler: (args: Record<string, unknown>) => Promise<unknown>): void
   registerTool(name: string, tool: PsmPluginToolRegistration): void
 }

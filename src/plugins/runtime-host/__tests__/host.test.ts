@@ -1,0 +1,399 @@
+import { describe, expect, it } from 'vitest'
+
+import { PsmPluginHost } from '../host'
+import type { PsmPluginLoadEntry, PsmPluginsConfig } from '../types'
+
+function config(plugins: PsmPluginsConfig['plugins'] = {}): PsmPluginsConfig {
+  return { version: 1, plugins }
+}
+
+function entry(id: string, activate = true): PsmPluginLoadEntry {
+  return {
+    source: 'builtin',
+    sourceId: `extensions/${id}`,
+    async load() {
+      return {
+        manifest: {
+          manifestVersion: 1,
+          id,
+          name: id,
+          version: '1.0.0',
+          permissions: ['records:read'],
+        },
+        activate: activate
+          ? (ctx: any) => {
+              ctx.registerCommand(`${id}.command`, async () => ({ ok: true, id }))
+              ctx.registerTool(`${id}_tool`, {
+                description: 'test tool',
+                run: async () => ({ ok: true, id }),
+              })
+            }
+          : undefined,
+      }
+    },
+  }
+}
+
+describe('PsmPluginHost', () => {
+  it('activates enabled plugins and exposes commands/tools', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [entry('builtin.test')],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(plugins[0]).toMatchObject({
+      id: 'builtin.test',
+      state: 'active',
+      enabled: true,
+      commands: ['builtin.test.command'],
+      tools: ['builtin.test_tool'],
+    })
+    expect(await host.executeCommand('builtin.test.command')).toEqual({ ok: true, id: 'builtin.test' })
+    expect(await host.runTool('builtin.test_tool')).toEqual({ ok: true, id: 'builtin.test' })
+  })
+
+  it('keeps disabled built-ins discovered without activating contributions', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [entry('builtin.disabled')],
+      services: {
+        loadConfig: async () => config({
+          'builtin.disabled': { enabled: false, source: 'builtin' },
+        }),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(plugins[0]).toMatchObject({
+      id: 'builtin.disabled',
+      state: 'disabled',
+      enabled: false,
+      commands: [],
+      tools: [],
+    })
+    expect(host.getCommandNames()).toEqual([])
+    expect(host.getToolNames()).toEqual([])
+  })
+
+  it('records invalid plugin modules as diagnostics', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/bad',
+          async load() {
+            return { manifest: { id: '', name: 'Bad', version: '1.0.0' } }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(plugins[0].state).toBe('error')
+    expect(plugins[0].diagnostics.map((diagnostic) => diagnostic.message).join('\n')).toContain('id is required')
+  })
+
+  it('keeps command/tool conflicts as warning diagnostics without failing activation', async () => {
+    function conflictingEntry(id: string): PsmPluginLoadEntry {
+      return {
+        source: 'builtin',
+        sourceId: `extensions/${id}`,
+        async load() {
+          return {
+            manifest: {
+              manifestVersion: 1,
+              id,
+              name: id,
+              version: '1.0.0',
+            },
+            activate: (ctx: any) => {
+              ctx.registerCommand('shared.command', async () => ({ id }))
+              ctx.registerTool('shared_tool', {
+                description: 'shared',
+                run: async () => ({ id }),
+              })
+            },
+          }
+        },
+      }
+    }
+
+    const host = new PsmPluginHost({
+      builtinEntries: [conflictingEntry('builtin.first'), conflictingEntry('builtin.second')],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const plugins = await host.reload()
+    const second = plugins.find((plugin) => plugin.id === 'builtin.second')
+
+    expect(second).toMatchObject({
+      state: 'active',
+      diagnostics: [
+        { level: 'warn', message: 'Command already registered: shared.command' },
+        { level: 'warn', message: 'Tool already registered: shared_tool' },
+      ],
+    })
+  })
+
+  it('passes plugin settings defaults and saved values into activation context and status', async () => {
+    let seenSettings: Record<string, unknown> = {}
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/settings-test',
+          async load() {
+            return {
+              manifest: {
+                manifestVersion: 1,
+                id: 'builtin.settings-test',
+                name: 'Settings Test',
+                version: '1.0.0',
+                configuration: {
+                  title: 'Settings Test',
+                  properties: [
+                    { key: 'thinkingLevel', title: 'Thinking level', type: 'select', default: 'medium' },
+                    { key: 'limit', title: 'Limit', type: 'number', default: 8 },
+                  ],
+                },
+              },
+              activate: (ctx: any) => {
+                seenSettings = ctx.settings.all()
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config({
+          'builtin.settings-test': {
+            enabled: true,
+            source: 'builtin',
+            settings: { limit: 12 },
+          },
+        }),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(seenSettings).toEqual({ thinkingLevel: 'medium', limit: 12 })
+    expect(plugins[0].settings).toEqual({ thinkingLevel: 'medium', limit: 12 })
+  })
+
+  it('merges plugin i18n resources and exposes injected t function', async () => {
+    let translated = ''
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/i18n-test',
+          async load() {
+            return {
+              manifest: {
+                manifestVersion: 1,
+                id: 'builtin.i18n-test',
+                name: 'I18n Test',
+                version: '1.0.0',
+                i18n: {
+                  'en-US': { pluginTest: { hello: 'Hello from plugin' } },
+                },
+              },
+              activate: (ctx: any) => {
+                translated = ctx.i18n.t('pluginTest.hello', 'Fallback')
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    await host.reload()
+
+    expect(translated).toBe('Hello from plugin')
+  })
+
+  it('registers session UI contributions and warns on duplicate UI ids', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/ui-first',
+          async load() {
+            return {
+              manifest: { manifestVersion: 1, id: 'builtin.ui.first', name: 'UI First', version: '1.0.0' },
+              activate: (ctx: any) => {
+                ctx.ui.registerSessionToolbarItem({ id: 'session.ask', title: 'Ask', render: () => 'ask' })
+                ctx.ui.registerSessionPanel({ id: 'session.ask.panel', title: 'Ask Panel', render: () => 'panel' })
+              },
+            }
+          },
+        },
+        {
+          source: 'builtin',
+          sourceId: 'extensions/ui-second',
+          async load() {
+            return {
+              manifest: { manifestVersion: 1, id: 'builtin.ui.second', name: 'UI Second', version: '1.0.0' },
+              activate: (ctx: any) => {
+                ctx.ui.registerSessionToolbarItem({ id: 'session.ask', title: 'Ask Duplicate', render: () => 'duplicate' })
+                ctx.ui.registerSessionPanel({ id: 'session.ask.panel', title: 'Ask Panel Duplicate', render: () => 'duplicate' })
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const plugins = await host.reload()
+    const second = plugins.find((plugin) => plugin.id === 'builtin.ui.second')
+
+    expect(host.listSessionToolbarItems()).toHaveLength(1)
+    expect(host.listSessionPanels()).toHaveLength(1)
+    expect(second).toMatchObject({
+      state: 'active',
+      diagnostics: [
+        { level: 'warn', message: 'Session toolbar item already registered: session.ask' },
+        { level: 'warn', message: 'Session panel already registered: session.ask.panel' },
+      ],
+    })
+  })
+
+  it('records UI render failures as warning diagnostics without marking the plugin error', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/ui-render-error',
+          async load() {
+            return {
+              manifest: { manifestVersion: 1, id: 'builtin.ui.render-error', name: 'UI Render Error', version: '1.0.0' },
+              activate: (ctx: any) => {
+                ctx.ui.registerSessionToolbarItem({ id: 'session.render-error', title: 'Bad UI', render: () => 'bad' })
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    await host.reload()
+    host.recordUiRenderError('builtin.ui.render-error', 'session.render-error', new Error('boom'))
+    const status = host.listPlugins()[0]
+
+    expect(status.state).toBe('active')
+    expect(status.diagnostics).toContainEqual({
+      level: 'warn',
+      message: 'UI contribution failed to render (session.render-error): boom',
+    })
+  })
+
+  it('notifies subscribers with fresh session UI contribution snapshots after reload', async () => {
+    let includeUi = false
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/ui-dynamic',
+          async load() {
+            return {
+              manifest: { manifestVersion: 1, id: 'builtin.ui.dynamic', name: 'UI Dynamic', version: '1.0.0' },
+              activate: (ctx: any) => {
+                if (!includeUi) return
+                ctx.ui.registerSessionToolbarItem({ id: 'session.dynamic', title: 'Dynamic', render: () => 'dynamic' })
+                ctx.ui.registerSessionPanel({ id: 'session.dynamic.panel', title: 'Dynamic Panel', render: () => 'panel' })
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+    const snapshots: Array<{ toolbarItems: number; panels: number }> = []
+    const unsubscribe = host.subscribe(() => {
+      const snapshot = host.getSessionUiSnapshot()
+      snapshots.push({ toolbarItems: snapshot.toolbarItems.length, panels: snapshot.panels.length })
+    })
+
+    await host.reload()
+    includeUi = true
+    await host.reload()
+    unsubscribe()
+
+    expect(snapshots).toEqual([
+      { toolbarItems: 0, panels: 0 },
+      { toolbarItems: 1, panels: 1 },
+    ])
+  })
+
+  it('loads npm entries through module source bundles', async () => {
+    const source = `
+      export const manifest = {
+        manifestVersion: 1,
+        id: 'npm.test',
+        name: 'NPM Test',
+        version: '1.0.0',
+        package: { name: '@acme/npm-test', export: './dist/index.js' },
+        permissions: ['records:read']
+      };
+      export function activate(ctx) {
+        ctx.registerCommand('npm.test.command', async () => 'ok');
+      }
+    `
+    const host = new PsmPluginHost({
+      builtinEntries: [],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [
+          {
+            packageName: '@acme/npm-test',
+            packageVersion: '1.0.0',
+            entryPath: '/tmp/npm-test/dist/index.js',
+            exportPath: './dist/index.js',
+          },
+        ],
+        readNpmModuleSource: async () => source,
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(plugins[0]).toMatchObject({
+      id: 'npm.test',
+      source: 'npm',
+      packageName: '@acme/npm-test',
+      commands: ['npm.test.command'],
+    })
+    expect(await host.executeCommand('npm.test.command')).toBe('ok')
+  })
+})

@@ -1,28 +1,10 @@
-import type { PsmPluginHostContext, PsmPluginManifest } from '../../src/plugins/runtime-sdk'
+import { createElement } from 'react'
+import type { PsmPluginHostContext } from '@pi-session-manager/plugin-sdk'
 
-export const manifest: PsmPluginManifest = {
-  manifestVersion: 1,
-  id: 'builtin.session-summary',
-  name: 'AI Session Summary',
-  version: '0.1.0',
-  runtime: {
-    sdk: '^0.1.0',
-    host: '>=0.6.3',
-  },
-  permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke'],
-  records: [
-    {
-      type: 'session.intelligence',
-      scope: 'session',
-      schemaVersion: 1,
-      searchable: ['summary', 'topics', 'status', 'unresolved_tasks'],
-      indexes: [
-        { name: 'status', path: '$.status', type: 'text' },
-        { name: 'generatedAt', path: '$.generated_at', type: 'datetime' },
-      ],
-    },
-  ],
-}
+import { manifest } from './manifest'
+import SessionIntelligenceToolbarPanel from './SessionIntelligenceToolbarPanel'
+
+export { manifest }
 
 function readStringArg(args: Record<string, unknown>, key: string): string | undefined {
   const value = args[key]
@@ -36,10 +18,14 @@ export default function sessionSummaryPlugin(ctx: PsmPluginHostContext) {
       throw new Error('path is required')
     }
 
+    const language = readStringArg(args, 'language') ?? ctx.settings.get('language', 'auto')
+    const provider = readStringArg(args, 'provider') ?? readStringArg(ctx.settings.all(), 'provider')
+    const model = readStringArg(args, 'model') ?? readStringArg(ctx.settings.all(), 'model')
     return ctx.psm.records.refreshSessionIntelligence({
       path,
-      provider: readStringArg(args, 'provider'),
-      model: readStringArg(args, 'model'),
+      provider,
+      model,
+      language: language === 'auto' ? undefined : language,
     })
   }
 
@@ -47,5 +33,24 @@ export default function sessionSummaryPlugin(ctx: PsmPluginHostContext) {
   ctx.registerTool('session_summary_refresh', {
     description: 'Generate an AI summary for a PSM session and persist it as a session.intelligence plugin record.',
     run: refresh,
+  })
+  ctx.ui.registerSessionToolbarItem({
+    id: 'builtin.session-summary.toolbar',
+    title: 'Session intelligence',
+    render: (props) => createElement(SessionIntelligenceToolbarPanel, {
+      client: ctx.psm,
+      i18n: ctx.i18n,
+      session: props.session,
+      settings: {
+        provider: ctx.settings.get('provider', ''),
+        model: ctx.settings.get('model', ''),
+        language: ctx.settings.get('language', 'auto'),
+        autoOpenAfterRefresh: ctx.settings.get('autoOpenAfterRefresh', true),
+        showMetadata: ctx.settings.get('showMetadata', true),
+        showTopics: ctx.settings.get('showTopics', true),
+        showNextSteps: ctx.settings.get('showNextSteps', true),
+        showUnresolved: ctx.settings.get('showUnresolved', true),
+      },
+    }),
   })
 }

@@ -1,0 +1,19 @@
+{
+  "name": "@example/psm-plugin-sidechat",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@pi-session-manager/plugin-sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^8.0.14"
+  },
+  "psm": {
+    "extensions": ["./dist/index.js"]
+  }
+}

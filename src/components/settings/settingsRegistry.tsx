@@ -7,6 +7,7 @@ import {
   Globe,
   Keyboard,
   Palette,
+  Puzzle,
   Search,
   Server,
   Settings2,
@@ -29,6 +30,7 @@ import DataSourcesSettings from "./sections/DataSourcesSettings";
 import DiagnosticsMaintenanceSettings from "./sections/DiagnosticsMaintenanceSettings";
 import ModelSettings from "./sections/ModelSettings";
 import PiAgentSettings from "./sections/PiAgentSettings";
+import PsmPluginsSettings from "./sections/PsmPluginsSettings";
 import SearchExportSettings from "./sections/SearchExportSettings";
 import SessionSettings from "./sections/SessionSettings";
 import ShortcutSettings from "./sections/ShortcutSettings";
@@ -204,6 +206,17 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     saveMode: "inline",
   },
   {
+    id: "psm-plugins",
+    area: "config-center",
+    group: "agent",
+    icon: <Puzzle className="h-4 w-4" />,
+    labelKey: "settings.sections.psmPlugins",
+    fallbackLabel: "PSM Plugins",
+    descriptionKey: "settings.sectionDescriptions.psmPlugins",
+    fallbackDescription: "Built-in and npm-installed PSM plugins",
+    saveMode: "inline",
+  },
+  {
     id: "server-access",
     area: "config-center",
     group: "access",
@@ -279,7 +292,7 @@ export const SETTINGS_GROUPS: SettingsGroupMeta[] = [
     area: "config-center",
     labelKey: "settings.groups.agent",
     fallbackLabel: "Agent",
-    sections: ["pi-agent", "models"],
+    sections: ["pi-agent", "models", "psm-plugins"],
   },
   {
     id: "access",
@@ -415,6 +428,8 @@ export function renderSettingsSection(
       return <PiAgentSettings settings={settings} onUpdate={onUpdate} />;
     case "models":
       return <ModelSettings />;
+    case "psm-plugins":
+      return <PsmPluginsSettings />;
     case "server-access":
       return (
         <AdvancedSettings

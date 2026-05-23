@@ -25,7 +25,8 @@
       "@contexts/*": ["./src/contexts/*"],
       "@plugins/*": ["./src/plugins/*"],
       "@demo/*": ["./src/demo/*"],
-      "@styles/*": ["./src/styles/*"]
+      "@styles/*": ["./src/styles/*"],
+      "@pi-session-manager/plugin-sdk": ["./packages/runtime-sdk/src/index.ts"]
     }
   },
   "include": ["src"],

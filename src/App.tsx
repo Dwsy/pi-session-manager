@@ -44,6 +44,7 @@ import StandaloneDatasetOverview from "./components/dataset/StandaloneDatasetOve
 import { useTags } from "./hooks/useTags";
 import type { SessionConvertTarget, SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
+import { initializePsmPluginHost } from "./plugins/runtime-host";
 import { invoke, isTauri } from "./transport";
 import { getCachedSettings } from "./utils/settingsApi";
 import { getSessionSourceSlug } from "./utils/session";
@@ -148,6 +149,9 @@ function App() {
   useEffect(() => {
     registerBuiltinToolPlugins();
     registerExtensionToolPlugins();
+    initializePsmPluginHost().catch((error) => {
+      console.error("[PSM plugins] Failed to initialize plugin host:", error);
+    });
   }, []);
   const isMobile = useIsMobile();
 

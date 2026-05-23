@@ -1,0 +1,56 @@
+import type { PsmPluginI18nResources } from '@pi-session-manager/plugin-sdk'
+
+export const sidechatI18n: PsmPluginI18nResources = {
+  'en-US': {
+    session: {
+      sideChat: {
+        title: 'Side chat',
+        shortLabel: 'Ask',
+        modelAuto: 'Auto',
+        snippets: 'snippets',
+        options: 'Options',
+        model: 'Model',
+        thinkingLevel: 'Thinking level',
+        snippetLimit: 'Snippet limit',
+        quickSummary: 'Summarize current goal and progress',
+        quickBlockers: 'What blockers remain?',
+        quickNextSteps: 'What should happen next?',
+        placeholder: 'Ask about decisions, blockers, files, or next steps...',
+        hint: 'Uses search and snippets, not full-context injection.',
+        ask: 'Ask',
+        emptyTitle: 'Ask this session',
+        empty: 'Ask a focused question. PSM will retrieve relevant parts of this session and cite them.',
+        loadingModels: 'Loading models...',
+        resize: 'Resize side chat panel',
+      },
+    },
+    common: { close: 'Close' },
+    components: { thinkingLevel: { off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'X High' } },
+  },
+  'zh-CN': {
+    session: {
+      sideChat: {
+        title: '会话侧聊',
+        shortLabel: '提问',
+        modelAuto: '自动',
+        snippets: '片段',
+        options: '选项',
+        model: '模型',
+        thinkingLevel: '思考强度',
+        snippetLimit: '片段数量',
+        quickSummary: '总结当前目标和进展',
+        quickBlockers: '还剩哪些阻塞？',
+        quickNextSteps: '下一步该做什么？',
+        placeholder: '询问决策、阻塞、文件或下一步...',
+        hint: '使用搜索和片段引用，不注入完整上下文。',
+        ask: '提问',
+        emptyTitle: '询问此会话',
+        empty: '提出一个聚焦问题。PSM 会检索相关会话片段并给出引用。',
+        loadingModels: '正在加载模型...',
+        resize: '调整侧聊面板宽度',
+      },
+    },
+    common: { close: '关闭' },
+    components: { thinkingLevel: { off: '关闭', minimal: '极低', low: '低', medium: '中', high: '高', xhigh: '极高' } },
+  },
+}

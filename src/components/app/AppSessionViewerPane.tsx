@@ -1,11 +1,9 @@
-import { useState } from "react";
+import { Fragment, useCallback, useState } from "react";
 import type { ComponentProps } from "react";
 
 import SessionViewer from "@/components/SessionViewer";
-import SessionIntelligenceToolbarPanel from "@/components/session-viewer/SessionIntelligenceToolbarPanel";
-import SessionSideChatPanel from "@/components/session-viewer/SessionSideChatPanel";
-import SessionSideChatToolbarPanel from "@/components/session-viewer/SessionSideChatToolbarPanel";
 import { useSettings } from "@/hooks/useSettings";
+import { PluginContributionBoundary, PluginContributionSlot, usePsmPluginSessionUi } from "@/plugins/runtime-host";
 
 export interface AppSessionViewerPaneProps extends Pick<
   ComponentProps<typeof SessionViewer>,
@@ -44,17 +42,57 @@ function AppSessionViewerPane({
 }: AppSessionViewerPaneProps) {
   const { getSessionSetting } = useSettings();
   const conversationModeEnabled = getSessionSetting("conversationModeEnabled") !== false;
-  const [sideChatOpen, setSideChatOpen] = useState(false);
-  const [sideChatWidth, setSideChatWidth] = useState(380);
+  const { toolbarItems, panels } = usePsmPluginSessionUi();
+  const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
+  const [panelWidths, setPanelWidths] = useState<Record<string, number>>({});
+
+  const togglePanel = useCallback((id: string) => {
+    setOpenPanels((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
+  const closePanel = useCallback((id: string) => {
+    setOpenPanels((prev) => ({ ...prev, [id]: false }));
+  }, []);
+
+  const setPanelWidth = useCallback((id: string, width: number) => {
+    setPanelWidths((prev) => ({ ...prev, [id]: width }));
+  }, []);
 
   const sessionToolbarSlot = (
     <>
       {slots?.right}
-      <SessionSideChatToolbarPanel
-        open={sideChatOpen}
-        onToggle={() => setSideChatOpen((value) => !value)}
-      />
-      <SessionIntelligenceToolbarPanel session={session} />
+      {toolbarItems.map((item) => {
+        const panelId = item.panelId;
+        return (
+          <Fragment key={item.id}>
+            <PluginContributionBoundary pluginId={item.pluginId} contributionId={item.id} title={item.title}>
+              <PluginContributionSlot render={() => item.render({
+                session,
+                panelOpen: panelId ? Boolean(openPanels[panelId]) : undefined,
+                togglePanel: panelId ? () => togglePanel(panelId) : undefined,
+              })} />
+            </PluginContributionBoundary>
+          </Fragment>
+        );
+      })}
+    </>
+  );
+
+  const rightPanelSlot = (
+    <>
+      {panels.filter((panel) => (panel.side ?? "right") === "right").map((panel) => (
+        <Fragment key={panel.id}>
+          <PluginContributionBoundary pluginId={panel.pluginId} contributionId={panel.id} title={panel.title}>
+            <PluginContributionSlot render={() => panel.render({
+              session,
+              panelOpen: Boolean(openPanels[panel.id]),
+              closePanel: () => closePanel(panel.id),
+              width: panelWidths[panel.id] ?? 380,
+              onWidthChange: (width) => setPanelWidth(panel.id, width),
+            })} />
+          </PluginContributionBoundary>
+        </Fragment>
+      ))}
     </>
   );
 
@@ -75,17 +113,7 @@ function AppSessionViewerPane({
       initialEntryId={initialEntryId}
       previewVariant={conversationModeEnabled ? "conversation" : "none"}
       slots={{ ...slots, right: sessionToolbarSlot }}
-      layoutSlots={{
-        right: (
-          <SessionSideChatPanel
-            session={session}
-            open={sideChatOpen}
-            width={sideChatWidth}
-            onWidthChange={setSideChatWidth}
-            onClose={() => setSideChatOpen(false)}
-          />
-        ),
-      }}
+      layoutSlots={{ right: rightPanelSlot }}
     />
   );
 }

@@ -22,9 +22,9 @@ const resources = {
  * Chinese systems automatically switch to Chinese; otherwise default to English
  */
 export function detectSystemLocale(): string {
-  const saved = localStorage.getItem('app-language')
+  const saved = typeof localStorage === 'undefined' ? null : localStorage.getItem('app-language')
   if (saved) return saved
-  const lang = navigator.language || 'en-US'
+  const lang = typeof navigator === 'undefined' ? 'en-US' : navigator.language || 'en-US'
   if (lang.startsWith('zh')) return 'zh-CN'
   if (lang.startsWith('ja')) return 'ja-JP'
   if (lang.startsWith('fr')) return 'fr-FR'

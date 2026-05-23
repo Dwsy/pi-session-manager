@@ -1,28 +1,28 @@
 import { Loader2, MessageCircleQuestion, PanelRightOpen } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import type { PsmPluginI18nClient } from "@pi-session-manager/plugin-sdk";
+
+import { sideChatStyles } from "./styles";
 
 interface SessionSideChatToolbarPanelProps {
+  i18n: PsmPluginI18nClient;
   open: boolean;
   loading?: boolean;
   onToggle: () => void;
 }
 
 export default function SessionSideChatToolbarPanel({
+  i18n,
   open,
   loading = false,
   onToggle,
 }: SessionSideChatToolbarPanelProps) {
-  const { t } = useTranslation();
+  const { t } = i18n;
 
   return (
     <button
       type="button"
       onClick={onToggle}
-      className={`inline-flex h-7 items-center gap-1.5 rounded-lg border px-2 text-xs transition-colors ${
-        open
-          ? "border-primary/35 bg-primary/12 text-foreground hover:bg-primary/16"
-          : "border-border/70 bg-secondary text-muted-foreground hover:bg-secondary-hover hover:text-foreground"
-      }`}
+      className={sideChatStyles.toolbarButton(open)}
       title={t("session.sideChat.title", "Side chat")}
       aria-label={t("session.sideChat.title", "Side chat")}
       aria-pressed={open}

@@ -1,6 +1,7 @@
 import type {
-  PsmPluginManifest,
+  PsmPackageManifest,
   PsmPermission,
+  PsmPluginManifest,
   PsmRecordIndexType,
   PsmRecordScope,
 } from './types'
@@ -167,4 +168,34 @@ export function assertPsmPluginManifest(input: unknown): PsmPluginManifest {
     throw new Error(`Invalid PSM plugin manifest: ${result.errors.join('; ')}`)
   }
   return input as PsmPluginManifest
+}
+
+export function validatePsmPackageManifest(input: unknown): ManifestValidationResult {
+  const errors: string[] = []
+
+  if (!isObject(input)) {
+    return { ok: false, errors: ['psm package manifest must be an object'] }
+  }
+
+  if (input.extensions !== undefined) {
+    if (!Array.isArray(input.extensions)) {
+      errors.push('psm.extensions must be an array')
+    } else {
+      input.extensions.forEach((entry, index) => {
+        if (!isNonEmptyString(entry)) {
+          errors.push(`psm.extensions[${index}] must be a non-empty string`)
+        }
+      })
+    }
+  }
+
+  return { ok: errors.length === 0, errors }
+}
+
+export function assertPsmPackageManifest(input: unknown): PsmPackageManifest {
+  const result = validatePsmPackageManifest(input)
+  if (!result.ok) {
+    throw new Error(`Invalid PSM package manifest: ${result.errors.join('; ')}`)
+  }
+  return input as PsmPackageManifest
 }

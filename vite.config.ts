@@ -141,6 +141,7 @@ export default defineConfig(({ mode }) => {
         '@plugins': path.resolve(__dirname, './src/plugins'),
         '@demo': path.resolve(__dirname, './src/demo'),
         '@styles': path.resolve(__dirname, './src/styles'),
+        '@pi-session-manager/plugin-sdk': path.resolve(__dirname, './packages/runtime-sdk/src/index.ts'),
       },
     },
     clearScreen: false,

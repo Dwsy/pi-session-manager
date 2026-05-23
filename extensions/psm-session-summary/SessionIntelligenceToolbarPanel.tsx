@@ -1,16 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useEffect, useState } from "react";
 import { Brain, CheckCircle2, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 
-import { appPsmTransport, createPluginCapabilityClient, type PluginRecord, type PsmPermissionContext } from "@/plugins/runtime-sdk";
-import type { SessionInfo } from "@/types";
+import { type PluginRecord, type PsmCapabilityClient, type PsmPluginI18nClient, type PsmSessionReference } from "@pi-session-manager/plugin-sdk";
+import { summaryStyles } from "./styles";
 
 const SESSION_INTELLIGENCE_RECORD = "session.intelligence";
-const SESSION_INTELLIGENCE_PERMISSIONS: PsmPermissionContext = {
-  pluginId: "builtin.session-intelligence-toolbar",
-  permissions: ["records:read", "records:write", "model:invoke"],
-};
-
 interface SessionIntelligencePayload {
   summary?: string;
   objective?: string;
@@ -32,8 +26,22 @@ interface SessionIntelligencePayload {
   generated_at?: string;
 }
 
+interface SessionSummaryPluginSettings {
+  provider: string;
+  model: string;
+  language: string;
+  autoOpenAfterRefresh: boolean;
+  showMetadata: boolean;
+  showTopics: boolean;
+  showNextSteps: boolean;
+  showUnresolved: boolean;
+}
+
 interface SessionIntelligenceToolbarPanelProps {
-  session: SessionInfo;
+  client: PsmCapabilityClient;
+  i18n: PsmPluginI18nClient;
+  session: PsmSessionReference;
+  settings: SessionSummaryPluginSettings;
 }
 
 function asPayload(record: PluginRecord | null): SessionIntelligencePayload | null {
@@ -63,12 +71,8 @@ function formatUpdatedAt(record: PluginRecord | null, language?: string) {
   }).format(date);
 }
 
-export default function SessionIntelligenceToolbarPanel({ session }: SessionIntelligenceToolbarPanelProps) {
-  const { t, i18n } = useTranslation();
-  const client = useMemo(
-    () => createPluginCapabilityClient({ transport: appPsmTransport, permissions: SESSION_INTELLIGENCE_PERMISSIONS }),
-    [],
-  );
+export default function SessionIntelligenceToolbarPanel({ client, i18n, session, settings }: SessionIntelligenceToolbarPanelProps) {
+  const { t, language } = i18n;
   const [open, setOpen] = useState(false);
   const [record, setRecord] = useState<PluginRecord | null>(null);
   const [loading, setLoading] = useState(false);
@@ -76,7 +80,7 @@ export default function SessionIntelligenceToolbarPanel({ session }: SessionInte
   const [error, setError] = useState<string | null>(null);
 
   const payload = asPayload(record);
-  const updatedAt = formatUpdatedAt(record, i18n.language);
+  const updatedAt = formatUpdatedAt(record, language);
   const topics = firstStringArray(payload?.topics);
   const nextSteps = firstStringArray(payload?.nextSteps);
   const unresolvedTasks = firstStringArray(payload?.unresolvedTasks, payload?.unresolved_tasks);
@@ -116,11 +120,13 @@ export default function SessionIntelligenceToolbarPanel({ session }: SessionInte
   const handleRefresh = async () => {
     setRefreshing(true);
     setError(null);
-    setOpen(true);
+    if (settings.autoOpenAfterRefresh) setOpen(true);
     try {
       const refreshed = await client.records.refreshSessionIntelligence({
         path: session.path,
-        language: i18n.language,
+        language: settings.language === "auto" ? language : settings.language,
+        provider: settings.provider || undefined,
+        model: settings.model || undefined,
       });
       setRecord(refreshed);
     } catch (err) {
@@ -140,11 +146,7 @@ export default function SessionIntelligenceToolbarPanel({ session }: SessionInte
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className={`inline-flex h-7 items-center gap-1.5 rounded-lg border px-2 text-xs transition-colors ${
-          hasPayload
-            ? "border-primary/35 bg-primary/12 text-foreground hover:bg-primary/16"
-            : "border-border/70 bg-secondary text-muted-foreground hover:bg-secondary-hover hover:text-foreground"
-        }`}
+        className={summaryStyles.toolbarButton(hasPayload)}
         title={t("session.intelligence.title", "Session intelligence")}
         aria-label={t("session.intelligence.title", "Session intelligence")}
         aria-expanded={open}
@@ -154,7 +156,7 @@ export default function SessionIntelligenceToolbarPanel({ session }: SessionInte
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(440px,calc(100vw-1.25rem))] overflow-hidden rounded-xl border border-border/70 bg-surface-dark/95 shadow-[0_18px_48px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+        <div className={summaryStyles.popover}>
           <div className="flex items-start justify-between gap-3 border-b border-border/70 bg-background/40 px-3 py-2.5">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -181,7 +183,7 @@ export default function SessionIntelligenceToolbarPanel({ session }: SessionInte
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border/70 bg-secondary text-muted-foreground hover:bg-secondary-hover hover:text-foreground"
+                className={summaryStyles.iconButton}
                 aria-label={t("common.close", "Close")}
               >
                 <X className="h-3.5 w-3.5" />
@@ -220,6 +222,7 @@ export default function SessionIntelligenceToolbarPanel({ session }: SessionInte
                   </section>
                 )}
 
+                {settings.showMetadata && (
                 <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
                   <div className="rounded-lg border border-border/60 bg-background/45 p-2">
                     <div className="text-muted-foreground">{t("session.intelligence.status", "Status")}</div>
@@ -244,8 +247,9 @@ export default function SessionIntelligenceToolbarPanel({ session }: SessionInte
                     </div>
                   )}
                 </div>
+                )}
 
-                {topics.length > 0 && (
+                {settings.showTopics && topics.length > 0 && (
                   <section>
                     <div className="mb-1.5 text-[11px] font-medium uppercase text-muted-foreground">
                       {t("session.intelligence.topics", "Topics")}
@@ -260,7 +264,7 @@ export default function SessionIntelligenceToolbarPanel({ session }: SessionInte
                   </section>
                 )}
 
-                {nextSteps.length > 0 && (
+                {settings.showNextSteps && nextSteps.length > 0 && (
                   <section className="rounded-lg border border-border/60 bg-background/45 p-3">
                     <div className="mb-1.5 text-[11px] font-medium uppercase text-muted-foreground">
                       {t("session.intelligence.nextSteps", "Next steps")}
@@ -271,7 +275,7 @@ export default function SessionIntelligenceToolbarPanel({ session }: SessionInte
                   </section>
                 )}
 
-                {unresolvedTasks.length > 0 && (
+                {settings.showUnresolved && unresolvedTasks.length > 0 && (
                   <section className="rounded-lg border border-warning/30 bg-warning/10 p-3">
                     <div className="mb-1.5 text-[11px] font-medium uppercase text-muted-foreground">
                       {t("session.intelligence.unresolved", "Unresolved")}

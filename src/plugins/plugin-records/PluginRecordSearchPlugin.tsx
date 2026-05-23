@@ -3,11 +3,11 @@ import { BaseSearchPlugin } from '@/plugins/base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '@/plugins/types'
 import type { SessionInfo } from '@/types'
 import {
-  appPsmTransport,
   createPluginCapabilityClient,
   type PluginRecord,
   type PsmPermissionContext,
-} from '@/plugins/runtime-sdk'
+} from '@pi-session-manager/plugin-sdk'
+import { appPsmTransport } from '@/plugins/runtime-host/appTransport'
 
 const PLUGIN_RECORD_SEARCH_PERMISSIONS: PsmPermissionContext = {
   pluginId: 'builtin.plugin-record-search',
