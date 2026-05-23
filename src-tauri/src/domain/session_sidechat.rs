@@ -1,3 +1,4 @@
+use crate::types::SessionEntry;
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -166,7 +167,37 @@ pub fn select_lexical_snippets(mut candidates: Vec<SidechatSnippet>, question: &
     }
 
     candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal).then_with(|| b.timestamp.cmp(&a.timestamp)));
-    candidates.into_iter().filter(|candidate| candidate.score > 0.0).take(limit.clamp(1, MAX_LIMIT)).map(with_truncated_content).collect()
+    let bounded_limit = limit.clamp(1, MAX_LIMIT);
+    let scored: Vec<SidechatSnippet> = candidates.iter().filter(|candidate| candidate.score > 0.0).take(bounded_limit).cloned().map(with_truncated_content).collect();
+    if !scored.is_empty() {
+        return scored;
+    }
+    candidates
+        .into_iter()
+        .take(bounded_limit)
+        .map(|mut snippet| {
+            snippet.source = "recent".to_string();
+            with_truncated_content(snippet)
+        })
+        .collect()
+}
+
+pub fn select_session_sidechat_snippets_from_entries(session_path: &str, entries: &[SessionEntry], question: &str, limit: usize) -> Vec<SidechatSnippet> {
+    let candidates: Vec<SidechatSnippet> = entries
+        .iter()
+        .filter_map(|entry| {
+            let message = entry.message.as_ref()?;
+            if !matches!(message.role.as_str(), "user" | "assistant") {
+                return None;
+            }
+            let content = message.content.iter().filter_map(|item| item.text.as_deref()).collect::<Vec<_>>().join("\n");
+            if content.trim().is_empty() || content.starts_with("[Tool:") || content.starts_with("[Tool Output]") {
+                return None;
+            }
+            Some(SidechatSnippet { entry_id: entry.id.clone(), session_path: session_path.to_string(), role: message.role.clone(), timestamp: entry.timestamp.to_rfc3339(), content, score: 0.0, source: "parsed".to_string() })
+        })
+        .collect();
+    select_lexical_snippets(candidates, question, limit)
 }
 
 pub fn build_sidechat_context(question: &str, snippets: &[SidechatSnippet]) -> String {
@@ -270,6 +301,40 @@ mod tests {
         assert_eq!(selected.len(), 1);
         assert_eq!(selected[0].entry_id, "2");
         assert!(selected[0].score > 0.0);
+    }
+
+    fn entry(id: &str, role: &str, text: &str) -> SessionEntry {
+        SessionEntry {
+            entry_type: "message".to_string(),
+            id: id.to_string(),
+            parent_id: None,
+            timestamp: chrono::DateTime::parse_from_rfc3339(&format!("2026-05-23T00:00:0{id}Z")).unwrap().with_timezone(&chrono::Utc),
+            message: Some(crate::types::Message { role: role.to_string(), content: vec![crate::types::Content { content_type: "text".to_string(), text: Some(text.to_string()) }], model: None, provider: None, usage: None }),
+            target_id: None,
+            label: None,
+            name: None,
+            provider: None,
+            model_id: None,
+        }
+    }
+
+    #[test]
+    fn lexical_selection_falls_back_to_recent_snippets_when_terms_do_not_match() {
+        let rows = vec![snippet("1", "Discussed plugin records."), snippet("2", "Reviewed session summary settings.")];
+        let selected = select_lexical_snippets(rows, "zzzz unmatched question", 2);
+
+        assert_eq!(selected.len(), 2);
+        assert_eq!(selected[0].entry_id, "2");
+    }
+
+    #[test]
+    fn parsed_entries_provide_context_when_index_has_no_hits() {
+        let entries = vec![entry("1", "user", "Initial question about plugin settings"), entry("2", "assistant", "Explained the sidechat configuration panel")];
+        let selected = select_session_sidechat_snippets_from_entries("/tmp/session.jsonl", &entries, "unmatched wording", 2);
+
+        assert_eq!(selected.len(), 2);
+        assert_eq!(selected[0].entry_id, "2");
+        assert_eq!(selected[0].source, "recent");
     }
 
     #[test]
