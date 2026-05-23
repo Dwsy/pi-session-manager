@@ -378,6 +378,11 @@ export default function SessionViewerToolbar({
                 </span>
               </button>
             </div>
+            {slots?.right && (
+              <div className="mt-1.5 flex items-center justify-end gap-1">
+                {slots.right}
+              </div>
+            )}
           </div>
         )}
       </div>

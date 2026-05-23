@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 
 import SessionViewer from "@/components/SessionViewer";
+import SessionIntelligenceToolbarPanel from "@/components/session-viewer/SessionIntelligenceToolbarPanel";
 import { useSettings } from "@/hooks/useSettings";
 
 export interface AppSessionViewerPaneProps extends Pick<
@@ -17,6 +18,7 @@ export interface AppSessionViewerPaneProps extends Pick<
   | "piPath"
   | "customCommand"
   | "resumeCommand"
+  | "slots"
   | "initialEntryId"
 > {
 }
@@ -35,9 +37,17 @@ function AppSessionViewerPane({
   customCommand,
   resumeCommand,
   initialEntryId,
+  slots,
 }: AppSessionViewerPaneProps) {
   const { getSessionSetting } = useSettings();
   const conversationModeEnabled = getSessionSetting("conversationModeEnabled") !== false;
+
+  const sessionIntelligenceSlot = (
+    <>
+      {slots?.right}
+      <SessionIntelligenceToolbarPanel session={session} />
+    </>
+  );
 
   return (
     <SessionViewer
@@ -55,6 +65,7 @@ function AppSessionViewerPane({
       resumeCommand={resumeCommand}
       initialEntryId={initialEntryId}
       previewVariant={conversationModeEnabled ? "conversation" : "none"}
+      slots={{ ...slots, right: sessionIntelligenceSlot }}
     />
   );
 }
