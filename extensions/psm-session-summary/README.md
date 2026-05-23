@@ -1,19 +1,13 @@
-# PSM Session Summary Plugin (POC)
+# PSM Session Summary Plugin
 
-First proof-of-concept plugin for issue #36: generate AI session summaries and store them as generic PSM plugin records.
+Built-in PSM plugin example: generate AI session summaries and store them as generic PSM plugin records.
 
 This is a PSM plugin sample with pi-flavored construction. It is not a Pi runtime plugin package by itself. The shape mirrors Pi extension ergonomics: manifest, default activation, command/tool registration, and capability client calls.
 
-The sample uses the PSM runtime SDK host context type:
+The sample uses the published PSM plugin SDK host context type:
 
 ```ts
-import type { PsmPluginHostContext, PsmPluginManifest } from '../../src/plugins/runtime-sdk'
-```
-
-For a future npm package, that import should come from the published SDK package instead:
-
-```ts
-import type { PsmPluginHostContext, PsmPluginManifest } from '@psm/runtime-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
 ```
 
 ## Record
@@ -35,6 +29,14 @@ The backend command uses normal PSM model configuration (`models.json`). Do not 
 
 ## Command
 
+The plugin registers:
+
+```text
+command       = session-summary.refresh
+tool          = session_summary_refresh
+toolbar item  = builtin.session-summary.toolbar
+```
+
 The sample command calls:
 
 ```ts
@@ -45,17 +47,18 @@ await psm.records.refreshSessionIntelligence({
 })
 ```
 
-When the sample is wired through `createPluginCapabilityClient(...)`, use a matching permission context:
+The toolbar UI is registered through `ctx.ui.registerSessionToolbarItem(...)` and rendered by the PSM runtime host.
 
-```ts
-createPluginCapabilityClient({
-  transport: appPsmTransport,
-  permissions: {
-    pluginId: 'builtin.session-summary',
-    permissions: ['records:read', 'records:write', 'model:invoke'],
-  },
-})
-```
+## UI Stack
+
+- UI implementation: TSX inside this plugin directory
+- Styling: Tailwind utility classes owned by `styles.ts`
+- Icons: `lucide-react`
+- Settings schema: `settings.ts` exposed through `manifest.configuration`
+- I18n resources: plain JSON in `i18n.ts`, merged by PSM and consumed through injected `ctx.i18n.t`
+- Manifest boundary: `manifest.ts`; `index.ts` only activates/registers contributions
+- Host contract: `ctx.ui.registerSessionToolbarItem(...)`
+- Capability access: injected `ctx.psm`; the UI does not import app transport directly
 
 Backend command:
 

@@ -14,12 +14,16 @@ Server (protocol) ← HTTP adapter, WebSocket adapter
 ```
 HTTP /api POST → handle_command → dispatch → commands → domain → data
 WS /ws → handle_connection → ws_dispatch → dispatch → commands → domain → data
-Tauri invoke() → #[tauri::command] (direct, no dispatch)
+Tauri invoke() → #[tauri::command] (direct for app-internal calls)
+Tauri appPsmTransport → plugin_dispatch_command → dispatch → commands → domain → data
 ```
 
 ## Protocol Entry Points
 
 ### Tauri IPC (GUI mode only)
+
+Normal app-internal calls still use direct `#[tauri::command]` handlers.
+Plugin-style capability calls now have a dispatch-backed entrypoint too.
 
 ```rust
 // commands/session.rs
@@ -29,6 +33,16 @@ pub async fn my_command(
     path: String,
 ) -> Result<MyResponse, String> {
     // Direct call, bypasses dispatch()
+}
+
+// commands/mod.rs
+#[tauri::command]
+pub async fn plugin_dispatch_command(
+    state: tauri::State<'_, SharedAppState>,
+    command: String,
+    payload: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    crate::dispatch::dispatch_with_state(&Some(state.inner().clone()), &command, &payload).await
 }
 ```
 
@@ -52,7 +66,7 @@ async fn handle_message(&self, msg: WsRequest) -> WsResponse {
 
 ## Key Insight: Single Dispatch Point
 
-**All HTTP and WS requests converge at `dispatch()`**:
+**All HTTP and WS requests converge at `dispatch()`**, and plugin-style Tauri capability calls can do the same via `plugin_dispatch_command`:
 
 ```rust
 // dispatch.rs

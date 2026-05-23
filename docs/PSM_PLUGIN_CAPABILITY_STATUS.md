@@ -7,11 +7,11 @@ Date: 2026-05-23
 This note is a short architecture snapshot for the current PSM plugin capability line:
 
 - generic `plugin_records`
-- `runtime-sdk`
+- `@pi-session-manager/plugin-sdk`
 - `session.intelligence`
 - `sidechat`
 - opt-in permission enforcement
-- future decoupling toward npm-installable plugins
+- npm-installable plugins with logic + UI contributions
 
 Use this document for review and for planning the next decoupling phase.
 
@@ -36,7 +36,7 @@ The current plugin-facing record substrate is:
 
 ### Runtime SDK
 
-`src/plugins/runtime-sdk/` now provides a stable TypeScript capability client for:
+`packages/runtime-sdk/` now provides a stable TypeScript capability client and UI contribution contract for:
 
 - `sessions`
 - `records`
@@ -45,7 +45,7 @@ The current plugin-facing record substrate is:
 - `sidechat`
 - `models`
 
-The client can attach an optional permission envelope:
+Plugins can register logic (`commands`, `tools`) and session UI (`toolbar items`, `right panels`). The client can also attach an optional permission envelope:
 
 ```ts
 createPluginCapabilityClient({
@@ -81,11 +81,11 @@ This is deliberate, so current application paths do not break while plugin-style
 
 ### Real runtime entry points already wired
 
-These runtime entry points now pass explicit permission context:
+These runtime entry points now pass explicit permission context or are registered through plugin UI contributions:
 
 - `src/plugins/plugin-records/PluginRecordSearchPlugin.tsx`
-- `src/components/session-viewer/SessionIntelligenceToolbarPanel.tsx`
-- `src/components/session-viewer/SessionSideChatPanel.tsx`
+- `extensions/psm-session-summary/index.ts`
+- `extensions/psm-sidechat/index.ts`
 
 ## Current Boundary
 
@@ -104,7 +104,7 @@ Stable enough to design against now:
 | `PsmRecordDeclaration` | Stable V1 record declaration format | Uses JSON text payloads and Rust-owned projection/indexing. |
 | `PsmTransport` | Stable interface | Plugins receive a host-provided transport; they should not import app-local transport modules. |
 | `createPluginCapabilityClient(...)` | Stable V1 client factory | Adds `__psm` only when the host/plugin supplies permission context. |
-| `PsmPluginHostContext` and activation types | First-pass host contract | Describes activation, command registration, tool registration, and disposal hooks for npm-installed plugins. |
+| `PsmPluginHostContext` and activation types | First-pass host contract | Describes activation, command/tool registration, session UI registration, and disposal hooks for npm-installed plugins. |
 
 Not part of the publishable SDK package:
 
@@ -191,7 +191,7 @@ The V1 design is intentionally local and reviewable. It does not introduce remot
 
 Publishable package shape:
 
-- `@psm/runtime-sdk`
+- `@pi-session-manager/plugin-sdk`
 - exports: manifest types, permission types, record declaration types, `PsmTransport`, `createPluginCapabilityClient`, and plugin activation/host context types
 - excludes: `appPsmTransport`, app stores, React components, Rust command modules, and local service providers
 
@@ -203,7 +203,7 @@ Plugin package shape:
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@psm/runtime-sdk": "^0.1.0"
+    "@pi-session-manager/plugin-sdk": "^0.1.0"
   },
   "exports": {
     ".": "./dist/index.js"
@@ -214,7 +214,7 @@ Plugin package shape:
 Plugin module shape:
 
 ```ts
-import type { PsmPluginHostContext, PsmPluginManifest } from '@psm/runtime-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
 
 export const manifest: PsmPluginManifest = {
   manifestVersion: 1,

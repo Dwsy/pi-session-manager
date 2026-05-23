@@ -1,12 +1,33 @@
 # Pi Session Manager Extensions
 
-Pi agent 扩展集合，为 `pi` CLI 提供会话管理能力。
+Pi agent 扩展与 PSM 插件示例集合。
 
-所有扩展遵循 [pi-package](https://github.com/mariozechner/pi-coding-agent) 规范，放在 `~/.pi/agent/extensions/` 下自动加载。
+PSM 插件文档见 [`docs/PSM_PLUGIN_SDK.md`](../docs/PSM_PLUGIN_SDK.md)。
+当前 PSM 内置插件放在 `extensions/psm-*` 下，启动时自动导入，可通过
+`~/.pi/pi-session-manager/plugins.json` 或设置页关闭。
+
+外部 npm PSM 插件安装到：
+
+```bash
+npm install --prefix ~/.pi/pi-session-manager/extensions/npm <package>
+```
+
+包内使用 `package.json` 的 `psm.extensions` 声明浏览器兼容 ESM 入口。
 
 ---
 
-## 插件总览
+## PSM 插件
+
+| 插件 | 用途 | 权限 |
+|------|------|------|
+| [psm-session-summary](./psm-session-summary/) | 智能总结，写入 `session.intelligence` record | `sessions:read`, `records:read`, `records:write`, `model:invoke` |
+| [psm-sidechat](./psm-sidechat/) | 会话问答命令/工具示例 | `sidechat:ask`, `model:invoke` |
+
+---
+
+## Pi Agent 插件总览
+
+以下扩展遵循 [pi-package](https://github.com/mariozechner/pi-coding-agent) 规范，放在 `~/.pi/agent/extensions/` 下自动加载。
 
 | 插件 | 用途 | 依赖 |
 |------|------|------|

@@ -9,7 +9,7 @@ This document explains how to develop, extend, and test the issue #36 proof of c
 The feature turns Pi Session Manager into a Rust-kernel + TypeScript plugin platform:
 
 - Rust owns sessions, SQLite, FTS, model calls, dispatch, HTTP, and persistence invariants.
-- TypeScript plugins call governed PSM capabilities through `src/plugins/runtime-sdk`.
+- TypeScript plugins call governed PSM capabilities through `@pi-session-manager/plugin-sdk`.
 - Plugin-owned facts are stored as generic `plugin_records`, not one table per feature.
 - The first record type is `session.intelligence`, produced by `builtin.session-summary`.
 
@@ -24,7 +24,7 @@ PSM plugins serve Pi Session Manager. They may use pi-flavored authoring pattern
 | Dispatch | `src-tauri/src/dispatch.rs` | Expose commands to WebSocket/HTTP-style dispatch |
 | HTTP API | `src-tauri/src/server/http/plugin_records.rs` | External API routes for records/search/refresh |
 | Summary domain | `src-tauri/src/domain/session_summary/mod.rs` | Build context, call model, convert result to plugin record |
-| TS SDK | `src/plugins/runtime-sdk/` | Capability client, manifest types, transport mapping |
+| TS SDK | `packages/runtime-sdk/` | Capability client, manifest types, logic/UI contribution types |
 | Search integration | `src/plugins/plugin-records/` | Search provider for `session.intelligence` records |
 | Sample plugin | `extensions/psm-session-summary/` | Pi-flavored PSM plugin proof of concept |
 
@@ -93,6 +93,7 @@ Stable plugin SDK surface:
 - `PsmTransport`
 - `createPluginCapabilityClient(...)`
 - `PsmPluginHostContext`, `PsmPluginModule`, and activation/disposal types
+- `ctx.ui.registerSessionToolbarItem(...)` and `ctx.ui.registerSessionPanel(...)`
 
 App-internal direct paths:
 
@@ -173,7 +174,7 @@ Create plugin code under `extensions/<plugin-name>/` for samples or local experi
 Minimal repo-local shape:
 
 ```ts
-import type { PsmPluginHostContext, PsmPluginManifest } from '../../src/plugins/runtime-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
 
 export const manifest: PsmPluginManifest = {
   manifestVersion: 1,
@@ -222,7 +223,7 @@ The first npm-installable design keeps PSM plugins as PSM-hosted extensions, not
 Publishable SDK package:
 
 ```text
-@psm/runtime-sdk
+@pi-session-manager/plugin-sdk
 ```
 
 It exports the stable SDK types/client listed above and excludes `appPsmTransport`, React UI internals, app stores, Rust command modules, and SQLite code.
@@ -235,7 +236,7 @@ Plugin package example:
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@psm/runtime-sdk": "^0.1.0"
+    "@pi-session-manager/plugin-sdk": "^0.1.0"
   },
   "exports": {
     ".": "./dist/index.js"
@@ -366,14 +367,14 @@ Run from repo root unless noted.
 
 ```bash
 npx vitest run \
-  src/plugins/runtime-sdk/__tests__/manifest.test.ts \
+  packages/runtime-sdk/src/__tests__/manifest.test.ts \
   src/plugins/plugin-records/__tests__/PluginRecordSearchPlugin.test.tsx
 ```
 
 Expected current result:
 
 ```text
-PASS 7 / FAIL 0
+PASS / FAIL 0
 ```
 
 ### TypeScript Type Check

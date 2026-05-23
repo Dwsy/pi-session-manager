@@ -1464,7 +1464,7 @@ Expected: FAIL because sample does not exist.
 Create `extensions/psm-session-summary/psm.plugin.ts`:
 
 ```ts
-import type { PsmPluginManifest } from "../../src/plugins/runtime-sdk/types";
+import type { PsmPluginManifest } from "@pi-session-manager/plugin-sdk";
 
 const manifest: PsmPluginManifest = {
   id: "builtin.session-summary",
