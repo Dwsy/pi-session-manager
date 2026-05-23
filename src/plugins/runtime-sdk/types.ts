@@ -3,6 +3,8 @@ export type PsmPermission =
   | 'records:read'
   | 'records:write'
   | 'search:read'
+  | 'kanban:read'
+  | 'kanban:write'
   | 'model:invoke'
 
 export type PsmRecordScope = 'session' | 'project' | 'global' | 'entry'
@@ -92,18 +94,123 @@ export interface PsmRecordsClient {
   upsert(params: PluginRecordUpsertParams): Promise<void>
 }
 
+export interface PsmSessionListParams {
+  offset?: number
+  limit?: number
+  searchQuery?: string
+  projectFilter?: string
+  filterTagIds?: string[]
+  sourceFilterSlugs?: string[]
+  sortBy?: string
+}
+
+export interface PsmPaginatedSessionsResult {
+  sessions: unknown[]
+  total: number
+  offset: number
+  limit: number
+  has_more?: boolean
+}
+
+export interface PsmSessionChunk {
+  content: string
+  next_offset: number
+  file_size: number
+  has_more: boolean
+}
+
+export interface PsmSessionReadChunkOptions {
+  offset?: number
+  maxBytes?: number
+}
+
+export interface PsmSessionOpenOptions {
+  target?: 'browser' | 'terminal'
+  cwd?: string
+  terminal?: string
+  piPath?: string
+  resumeCommand?: string
+}
+
 export interface PsmSessionsClient {
-  readEntries(sessionId: string, options?: { limit?: number }): Promise<unknown[]>
+  scan(): Promise<unknown[]>
+  list(params?: PsmSessionListParams): Promise<PsmPaginatedSessionsResult>
+  readEntries(sessionPath: string, options?: { limit?: number }): Promise<unknown[]>
+  readFileChunk(sessionPath: string, options?: PsmSessionReadChunkOptions): Promise<PsmSessionChunk>
+  getLabels(sessionPath: string): Promise<Record<string, string>>
+  open(sessionPath: string, options?: PsmSessionOpenOptions): Promise<void>
+}
+
+export interface PsmFullTextSearchParams {
+  query: string
+  roleFilter?: string
+  globPattern?: string
+  projectPath?: string
+  page?: number
+  pageSize?: number
+  matchMode?: string
+  sortOrder?: string
+  sourceFilter?: string
+  from?: string
+  to?: string
+}
+
+export interface PsmFullTextSearchResponse {
+  hits: unknown[]
+  total_hits: number
+  has_more: boolean
 }
 
 export interface PsmSearchClient {
+  fulltext(params: PsmFullTextSearchParams): Promise<PsmFullTextSearchResponse>
   pluginRecords(params: PluginRecordSearchParams): Promise<PluginRecord[]>
+}
+
+export interface PsmTag {
+  id: string
+  name: string
+  color: string
+  icon?: string | null
+  sortOrder?: number
+  sort_order?: number
+  isBuiltin?: boolean
+  is_builtin?: boolean
+  createdAt?: string
+  created_at?: string
+  parentId?: string | null
+  parent_id?: string | null
+}
+
+export interface PsmSessionTag {
+  sessionId?: string
+  session_id?: string
+  tagId?: string
+  tag_id?: string
+  position: number
+  assignedAt?: string
+  assigned_at?: string
+}
+
+export interface PsmCreateTagParams {
+  name: string
+  color: string
+  icon?: string
+  parentId?: string
+}
+
+export interface PsmKanbanClient {
+  listTags(): Promise<PsmTag[]>
+  createTag(params: PsmCreateTagParams): Promise<PsmTag>
+  assignTag(sessionId: string, tagId: string): Promise<void>
+  removeTag(sessionId: string, tagId: string): Promise<void>
+  listSessionTags(sessionId?: string): Promise<PsmSessionTag[]>
 }
 
 export interface PsmCapabilityClient {
   records: PsmRecordsClient
   sessions: PsmSessionsClient
   search: PsmSearchClient
+  kanban: PsmKanbanClient
 }
 
 export interface CreatePsmClientOptions {
