@@ -10,6 +10,9 @@ const SUPPORTED_PERMISSIONS = new Set<PsmPermission>([
   'records:read',
   'records:write',
   'search:read',
+  'kanban:read',
+  'kanban:write',
+  'sidechat:ask',
   'model:invoke',
 ])
 

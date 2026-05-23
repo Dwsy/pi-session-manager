@@ -2,6 +2,7 @@ import type { ComponentProps } from "react";
 
 import SessionViewer from "@/components/SessionViewer";
 import SessionIntelligenceToolbarPanel from "@/components/session-viewer/SessionIntelligenceToolbarPanel";
+import SessionSideChatToolbarPanel from "@/components/session-viewer/SessionSideChatToolbarPanel";
 import { useSettings } from "@/hooks/useSettings";
 
 export interface AppSessionViewerPaneProps extends Pick<
@@ -45,6 +46,7 @@ function AppSessionViewerPane({
   const sessionIntelligenceSlot = (
     <>
       {slots?.right}
+      <SessionSideChatToolbarPanel session={session} />
       <SessionIntelligenceToolbarPanel session={session} />
     </>
   );

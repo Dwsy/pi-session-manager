@@ -10,7 +10,7 @@ describe('runtime-sdk manifest contract', () => {
       id: 'builtin.session-summary',
       name: 'Session Summary',
       version: '0.1.0',
-      permissions: ['sessions:read', 'records:read', 'records:write'],
+      permissions: ['sessions:read', 'records:read', 'records:write', 'sidechat:ask'],
       records: [
         {
           type: 'session.intelligence',
@@ -179,6 +179,7 @@ describe('plugin capability client', () => {
     await client.sessions.getLabels('/repo/session.jsonl')
     await client.sessions.open('/repo/session.jsonl', { cwd: '/repo', target: 'browser' })
     await client.search.fulltext({ query: 'summary', roleFilter: 'all', page: 0, pageSize: 20, matchMode: 'smart', sortOrder: 'newest' })
+    await client.sidechat.ask({ sessionPath: '/repo/session.jsonl', question: 'What is blocked?', language: 'zh-CN', limit: 8 })
     await client.kanban.listTags()
     await client.kanban.createTag({ name: 'Active', color: '#22c55e' })
     await client.kanban.assignTag('/repo/session.jsonl', 'tag-active')
@@ -215,6 +216,15 @@ describe('plugin capability client', () => {
           sourceFilter: undefined,
           from: undefined,
           to: undefined,
+        },
+      },
+      {
+        command: 'ask_session_sidechat',
+        payload: {
+          sessionPath: '/repo/session.jsonl',
+          question: 'What is blocked?',
+          language: 'zh-CN',
+          limit: 8,
         },
       },
       { command: 'get_all_tags', payload: undefined },

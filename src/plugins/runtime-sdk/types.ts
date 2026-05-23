@@ -5,6 +5,7 @@ export type PsmPermission =
   | 'search:read'
   | 'kanban:read'
   | 'kanban:write'
+  | 'sidechat:ask'
   | 'model:invoke'
 
 export type PsmRecordScope = 'session' | 'project' | 'global' | 'entry'
@@ -212,10 +213,42 @@ export interface PsmKanbanClient {
   listSessionTags(sessionId?: string): Promise<PsmSessionTag[]>
 }
 
+export interface PsmSideChatCitation {
+  entryId?: string
+  entry_id?: string
+  role?: string
+  score?: number
+  snippet: string
+  source?: string
+  createdAt?: string
+  created_at?: string
+}
+
+export interface PsmSideChatResponse {
+  answer: string
+  citations: PsmSideChatCitation[]
+  query?: string
+  language?: string
+  model?: string
+  provider?: string
+}
+
+export interface PsmSideChatAskParams {
+  sessionPath: string
+  question: string
+  language?: string
+  limit?: number
+}
+
+export interface PsmSideChatClient {
+  ask(params: PsmSideChatAskParams): Promise<PsmSideChatResponse>
+}
+
 export interface PsmCapabilityClient {
   records: PsmRecordsClient
   sessions: PsmSessionsClient
   search: PsmSearchClient
+  sidechat: PsmSideChatClient
   kanban: PsmKanbanClient
 }
 
