@@ -48,3 +48,35 @@ pub struct DbSessionTag {
     pub position: i64,
     pub assigned_at: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DbPluginRecord {
+    pub id: String,
+    pub plugin_id: String,
+    pub scope_type: String,
+    pub scope_id: String,
+    pub record_type: String,
+    pub schema_version: i64,
+    pub payload_json: String,
+    pub searchable_text: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DbPluginRecordIndexValue {
+    pub record_id: String,
+    pub plugin_id: String,
+    pub record_type: String,
+    pub index_name: String,
+    pub value_text: Option<String>,
+    pub value_number: Option<f64>,
+    pub value_datetime: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PluginRecordSearchHit {
+    pub record: DbPluginRecord,
+    pub snippet: String,
+    pub rank: f64,
+}

@@ -14,6 +14,7 @@ use std::net::SocketAddr;
 mod common;
 #[cfg(feature = "gui")]
 mod embedding;
+mod plugin_records;
 mod readonly_routes;
 mod realtime;
 mod sessions;
@@ -99,6 +100,9 @@ pub async fn init_http_adapter_with_embedding(app_state: SharedAppState, bind_ad
         .route("/v1/sessions/{id}/snapshot", get(sessions::v1_session_snapshot))
         .route("/v1/sessions/{id}/checkout", post(sessions::v1_checkout_session))
         .route("/v1/sessions/{id}/milestones", post(sessions::v1_create_milestone).get(sessions::v1_list_milestones))
+        .route("/v1/plugin-records", get(plugin_records::v1_list_plugin_records).post(plugin_records::v1_upsert_plugin_record))
+        .route("/v1/plugin-records/search", post(plugin_records::v1_search_plugin_records))
+        .route("/v1/plugin-records/{id}", get(plugin_records::v1_get_plugin_record))
         .route("/v1/search/fulltext", post(readonly_routes::v1_full_text_search))
         .route("/v1/memory/recall", post(readonly_routes::v1_memory_recall))
         .route("/v1/memory/unified", post(readonly_routes::v1_memory_unified))

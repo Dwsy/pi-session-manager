@@ -24,6 +24,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             15 => migration_15(conn)?,
             16 => migration_16(conn)?,
             17 => migration_17(conn)?,
+            18 => migration_18(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -340,4 +341,10 @@ fn migration_17(conn: &Connection) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// Migration to version 18: add generic plugin record storage.
+/// Plugin records hold extension-defined JSON payloads with FTS and declared index projections.
+fn migration_18(conn: &Connection) -> Result<(), String> {
+    super::plugin_records::ensure_plugin_records_schema(conn)
 }
