@@ -1,6 +1,31 @@
 use pi_session_manager::data::sqlite::{get_plugin_record, list_plugin_records_for_scope, search_plugin_records, upsert_plugin_record, DbPluginRecord};
-use pi_session_manager::{config::Config, sqlite_cache};
+use pi_session_manager::domain::session_summary::{refresh_session_intelligence_record_from_summary, SessionSummaryResult};
+use pi_session_manager::{config::Config, sqlite_cache, Content, Message, SessionEntry};
 use tempfile::tempdir;
+
+fn text_entry(id: &str, role: &str, text: &str) -> SessionEntry {
+    SessionEntry {
+        entry_type: "message".to_string(),
+        id: id.to_string(),
+        parent_id: None,
+        timestamp: chrono::Utc::now(),
+        message: Some(Message {
+            role: role.to_string(),
+            content: vec![Content {
+                content_type: "text".to_string(),
+                text: Some(text.to_string()),
+            }],
+            model: None,
+            provider: None,
+            usage: None,
+        }),
+        target_id: None,
+        label: None,
+        name: None,
+        provider: None,
+        model_id: None,
+    }
+}
 
 fn init_test_db() -> rusqlite::Connection {
     let dir = tempdir().expect("tempdir");
@@ -81,4 +106,44 @@ fn plugin_records_reject_invalid_json_payload() {
 
     let error = upsert_plugin_record(&conn, &record, &[]).expect_err("invalid json rejected");
     assert!(error.contains("Invalid plugin record payload_json"));
+}
+
+#[test]
+fn refresh_session_intelligence_record_from_summary_persists_and_indexes_record() {
+    let conn = init_test_db();
+    let entries = vec![
+        text_entry("msg-1", "user", "Design a lightweight plugin API for Pi Session Manager."),
+        text_entry("msg-2", "assistant", "We will store plugin metadata in generic plugin_records."),
+    ];
+    let summary = SessionSummaryResult {
+        summary: "Designed a lightweight plugin API backed by plugin records.".to_string(),
+        topics: vec!["plugin-api".to_string(), "session-intelligence".to_string()],
+        status: "active".to_string(),
+        unresolved_tasks: vec!["Wire the command into plugin tooling.".to_string()],
+    };
+
+    let record = refresh_session_intelligence_record_from_summary(
+        &conn,
+        "/tmp/session-a.jsonl",
+        &entries,
+        summary,
+        "test-provider",
+        "test-model",
+    )
+    .expect("refresh record");
+
+    assert_eq!(record.plugin_id, "builtin.session-summary");
+    assert_eq!(record.record_type, "session.intelligence");
+    assert_eq!(record.scope_id, "/tmp/session-a.jsonl");
+    assert!(record.searchable_text.as_deref().unwrap_or_default().contains("plugin records"));
+    assert!(record.payload_json.contains("test-provider"));
+    assert!(record.payload_json.contains("test-model"));
+    assert!(record.payload_json.contains("message_count"));
+
+    let stored = get_plugin_record(&conn, &record.id).expect("get").expect("stored record");
+    assert_eq!(stored.payload_json, record.payload_json);
+
+    let hits = search_plugin_records(&conn, "plugin", Some("session.intelligence"), Some("builtin.session-summary"), 10).expect("search");
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].record.id, record.id);
 }

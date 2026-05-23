@@ -249,6 +249,13 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::search_plugin_records(query, record_type, plugin_id, limit).await?;
             Ok(to_val(result, "serialize plugin record search")?)
         }
+        "refresh_session_intelligence_record" => {
+            let path = extract(payload, "path").or_else(|_| extract(payload, "sessionPath")).or_else(|_| extract(payload, "session_path"))?;
+            let provider = extract_optional_string(payload, "provider");
+            let model = extract_optional_string(payload, "model");
+            let result = crate::refresh_session_intelligence_record(path, provider, model).await?;
+            Ok(to_val(result, "serialize refreshed session intelligence record")?)
+        }
         "upsert_plugin_record" => {
             let record = serde_json::from_value(payload.get("record").cloned().ok_or_else(|| "Missing field: record".to_string())?).map_err(|e| format!("Invalid plugin record: {e}"))?;
             let index_values = payload.get("index_values").or_else(|| payload.get("indexValues")).cloned().map(serde_json::from_value).transpose().map_err(|e| format!("Invalid plugin record index values: {e}"))?;

@@ -114,6 +114,7 @@ pub fn run() {
             get_plugin_record,
             list_plugin_records_for_scope,
             search_plugin_records,
+            refresh_session_intelligence_record,
             upsert_plugin_record,
             full_text_search,
             delete_session,

@@ -101,4 +101,40 @@ describe('plugin capability client', () => {
     ])
     expect(result[0].payload).toEqual({ summary: 'Build plugin records', status: 'active' })
   })
+
+  it('refreshes session intelligence records through the PSM transport', async () => {
+    const calls: Array<{ command: string; payload?: unknown }> = []
+    const transport: PsmTransport = {
+      invoke: async (command, payload) => {
+        calls.push({ command, payload })
+        return {
+          id: 'builtin.session-summary:/repo/session.jsonl',
+          plugin_id: 'builtin.session-summary',
+          scope_type: 'session',
+          scope_id: '/repo/session.jsonl',
+          record_type: 'session.intelligence',
+          schema_version: 1,
+          payload_json: '{"summary":"AI generated summary","status":"active"}',
+          searchable_text: 'AI generated summary',
+          created_at: '2026-05-23T00:00:00Z',
+          updated_at: '2026-05-23T00:00:00Z',
+        }
+      },
+    }
+
+    const client = createPluginCapabilityClient({ transport })
+    const result = await client.records.refreshSessionIntelligence({
+      path: '/repo/session.jsonl',
+      provider: 'local',
+      model: 'test-model',
+    })
+
+    expect(calls).toEqual([
+      {
+        command: 'refresh_session_intelligence_record',
+        payload: { path: '/repo/session.jsonl', provider: 'local', model: 'test-model' },
+      },
+    ])
+    expect(result.payload).toEqual({ summary: 'AI generated summary', status: 'active' })
+  })
 })

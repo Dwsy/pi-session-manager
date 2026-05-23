@@ -295,6 +295,10 @@ async fn call_anthropic_messages(base_url: &str, model: &str, api_key: &str, con
 
 /// Build a `session.intelligence` plugin record from the summary result.
 pub fn to_session_intelligence_record(session_path: &str, result: &SessionSummaryResult, provider: &str, model: &str) -> DbPluginRecord {
+    to_session_intelligence_record_with_message_count(session_path, result, provider, model, None)
+}
+
+pub fn to_session_intelligence_record_with_message_count(session_path: &str, result: &SessionSummaryResult, provider: &str, model: &str, message_count: Option<usize>) -> DbPluginRecord {
     let now = Utc::now().to_rfc3339();
     let payload = serde_json::json!({
         "summary": result.summary,
@@ -304,6 +308,7 @@ pub fn to_session_intelligence_record(session_path: &str, result: &SessionSummar
         "model_used": model,
         "provider_used": provider,
         "generated_at": now,
+        "message_count": message_count,
     });
     DbPluginRecord {
         id: format!("builtin.session-summary:{}", session_path),
@@ -317,4 +322,11 @@ pub fn to_session_intelligence_record(session_path: &str, result: &SessionSummar
         created_at: now.clone(),
         updated_at: now,
     }
+}
+
+pub fn refresh_session_intelligence_record_from_summary(conn: &rusqlite::Connection, session_path: &str, entries: &[crate::types::SessionEntry], summary: SessionSummaryResult, provider: &str, model: &str) -> Result<DbPluginRecord, String> {
+    let message_count = entries.iter().filter(|entry| entry.message.is_some()).count();
+    let record = to_session_intelligence_record_with_message_count(session_path, &summary, provider, model, Some(message_count));
+    crate::data::sqlite::upsert_plugin_record(conn, &record, &[])?;
+    Ok(record)
 }

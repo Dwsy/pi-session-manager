@@ -90,6 +90,11 @@ export interface PsmRecordsClient {
   search(params: PluginRecordSearchParams): Promise<PluginRecord[]>
   listForScope(params: PluginRecordListParams): Promise<PluginRecord[]>
   upsert(params: PluginRecordUpsertParams): Promise<void>
+  refreshSessionIntelligence(params: {
+    path: string
+    provider?: string
+    model?: string
+  }): Promise<PluginRecord>
 }
 
 export interface PsmSessionsClient {
