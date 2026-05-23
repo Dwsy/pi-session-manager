@@ -79,6 +79,10 @@ interface SessionCacheItem {
 const SESSION_CONTENT_CACHE = new Map<string, SessionCacheItem>();
 const MAX_CACHE_SIZE = 5;
 
+function hasMessageEntries(entries: SessionEntry[]): boolean {
+  return entries.some((entry) => entry.type === "message");
+}
+
 function cacheSessionContent(path: string, cacheItem: SessionCacheItem): void {
   if (SESSION_CONTENT_CACHE.size >= MAX_CACHE_SIZE) {
     const firstKey = SESSION_CONTENT_CACHE.keys().next().value;
@@ -350,11 +354,15 @@ export function useSessionViewerData({
             dbEntries = await getPreviewEntriesFromDB(sessionPath);
             if (cancelled) return;
 
-            setEntries(dbEntries);
-            setLineCount(dbEntries.length);
-            updateHasMoreHistory(false);
-            setActiveEntryId(getDefaultActiveEntryId(dbEntries));
-            pendingScrollToBottomRef.current = false;
+            if (hasMessageEntries(dbEntries)) {
+              setEntries(dbEntries);
+              setLineCount(dbEntries.length);
+              updateHasMoreHistory(false);
+              setActiveEntryId(getDefaultActiveEntryId(dbEntries));
+              pendingScrollToBottomRef.current = false;
+            } else {
+              dbEntries = null;
+            }
           } catch (dbError) {
             // Fallback to JSONL if DB read fails (e.g. message_entries not populated yet)
             console.warn("[useSessionViewerData] DB preview read failed, falling back to JSONL:", dbError);

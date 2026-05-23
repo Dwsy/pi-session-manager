@@ -61,23 +61,10 @@ export default memo(function CommandMenu({
   const { registry, search } = useSearchPlugins(context);
   const [activeTab, setActiveTab] = useState<TabType>("all");
 
-  // Collapsible preview panel - persisted to localStorage
-  const [previewCollapsed, setPreviewCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem("command-preview-collapsed") === "true";
-    } catch {
-      return false;
-    }
-  });
+  const [previewCollapsed, setPreviewCollapsed] = useState(false);
 
   const togglePreview = useCallback(() => {
-    setPreviewCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("command-preview-collapsed", String(next));
-      } catch {}
-      return next;
-    });
+    setPreviewCollapsed((prev) => !prev);
   }, []);
 
   useEffect(() => {
@@ -213,7 +200,9 @@ export default memo(function CommandMenu({
       </div>
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
-        <div className="w-[400px] flex-shrink-0 border-r border-border/70 flex flex-col h-full overflow-hidden bg-surface/[0.22]">
+        <div
+          className={`${previewCollapsed ? "flex-1 w-auto" : "w-[400px] flex-shrink-0"} border-r border-border/70 flex flex-col h-full overflow-hidden bg-surface/[0.22]`}
+        >
           <CommandResultList
             results={results}
             isSearching={isSearching}
@@ -227,16 +216,17 @@ export default memo(function CommandMenu({
             loadMore={loadMore}
           />
         </div>
-
         <div
           className={`${previewCollapsed ? "flex-none w-0" : "flex-1 w-auto"} h-full min-h-0 overflow-hidden bg-background transition-[width] duration-200 ease-in-out`}
         >
-          <SessionPreviewPanel
-            result={selectedResult}
-            context={context}
-            onClose={onClose}
-            onNavigate={handleSelect}
-          />
+          {!previewCollapsed && (
+            <SessionPreviewPanel
+              result={selectedResult}
+              context={context}
+              onClose={onClose}
+              onNavigate={handleSelect}
+            />
+          )}
         </div>
       </div>
 

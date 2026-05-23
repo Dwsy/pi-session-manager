@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { buildSessionUrl, buildFeatureUrl, parseRoute } from '../router/config';
 import { getRuntimeSessionById } from '../runtime-data/sessionSource';
@@ -9,6 +9,7 @@ interface RouteSyncOptions {
   setSelectedSession: (session: SessionInfo | null) => void;
   selectedSession: SessionInfo | null;
   sessions: SessionInfo[];
+  sessionsLoading: boolean;
   setViewMode: (mode: AppSidebarViewMode) => void;
   setSelectedProject: (project: string | null) => void;
   setShowSettings: (show: boolean) => void;
@@ -20,6 +21,7 @@ export function useRouteSync({
   setSelectedSession,
   selectedSession,
   sessions,
+  sessionsLoading,
   setViewMode,
   setSelectedProject,
   setShowSettings,
@@ -28,40 +30,55 @@ export function useRouteSync({
 }: RouteSyncOptions) {
   const navigate = useNavigate();
   const location = useLocation();
+  const parsedRoute = useMemo(
+    () => parseRoute(location.pathname),
+    [location.pathname],
+  );
+  const pendingSessionRoute =
+    parsedRoute.route === 'session' &&
+    selectedSession?.id !== parsedRoute.sessionId;
   const prevPathnameRef = useRef(location.pathname);
 
   // ─── URL → State (single source of truth) ─────────────
   // This effect syncs ALL app state from the URL.
   // No circular deps: we read selectedSession but only write when mismatch.
   useEffect(() => {
-    const parsed = parseRoute(location.pathname);
+    let cancelled = false;
     const routeChanged = prevPathnameRef.current !== location.pathname;
     prevPathnameRef.current = location.pathname;
 
-    switch (parsed.route) {
+    switch (parsedRoute.route) {
       case 'session': {
-        const session = sessions.find(s => s.id === parsed.sessionId);
+        const session = sessions.find(s => s.id === parsedRoute.sessionId);
         if (session) {
           if (selectedSession?.id !== session.id) {
             setSelectedSession(session);
           }
-        } else if (!selectedSession && sessions.length > 0) {
-          void getRuntimeSessionById(parsed.sessionId).then((resolved) => {
+        } else if (
+          !sessionsLoading &&
+          selectedSession?.id !== parsedRoute.sessionId
+        ) {
+          void getRuntimeSessionById(parsedRoute.sessionId).then((resolved) => {
+            if (cancelled) return;
             if (resolved) {
               setSelectedSession(resolved);
             } else {
               navigate('/', { replace: true });
             }
-          }).catch(() => navigate('/', { replace: true }));
+          }).catch(() => {
+            if (!cancelled) {
+              navigate('/', { replace: true });
+            }
+          });
         }
-        // else: session list not loaded yet, or selectedSession already set — wait
+        // else: session list still loading, or selectedSession already set — wait
         break;
       }
 
       case 'project': {
         // Sync project view
         setSelectedSession(null);
-        setSelectedProject(parsed.projectPath);
+        setSelectedProject(parsedRoute.projectPath);
         setViewMode('project');
         setShowFavorites(false);
         if (routeChanged) {
@@ -80,7 +97,7 @@ export function useRouteSync({
         setShowTerminal(false);
         setShowFavorites(false);
 
-        switch (parsed.feature) {
+        switch (parsedRoute.feature) {
           case 'kanban':
             setViewMode('kanban');
             break;
@@ -112,10 +129,13 @@ export function useRouteSync({
         break;
       }
     }
+    return () => {
+      cancelled = true;
+    };
     // selectedSession is intentionally NOT in deps to avoid circular updates.
     // We only read it to check if a sync is needed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, sessions, navigate]);
+  }, [location.pathname, parsedRoute, sessions, sessionsLoading, navigate]);
 
   // ─── Navigation helpers ───────────────────────────────────
   const navigateToSession = useCallback(
@@ -132,5 +152,6 @@ export function useRouteSync({
     navigateToSession,
     navigateToSessions,
     navigateToFeature,
+    pendingSessionRoute,
   };
 }

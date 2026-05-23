@@ -242,6 +242,15 @@ describe('CommandMenu source filter wiring', () => {
     expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('important')
   })
 
+  it('does not restore a persisted collapsed preview state', () => {
+    localStorage.setItem('command-preview-collapsed', 'true')
+
+    render(<CommandMenuHarness />)
+
+    expect(screen.getByTestId('session-preview-panel')).not.toBeNull()
+    localStorage.removeItem('command-preview-collapsed')
+  })
+
   it('renders Chinese search results correctly', async () => {
     mockSearch.mockResolvedValue([
       createMessageResult({

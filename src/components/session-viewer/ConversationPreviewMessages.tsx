@@ -366,9 +366,9 @@ function ConversationPreviewTurnView({
               toolResultByCallId={toolResultByCallId}
             />
           </div>
-          {turn.processEntries.map((entry) => (
+          {turn.processEntries.map((entry, index) => (
             <SessionEntryRenderer
-              key={entry.id}
+              key={`${entry.id}:${entry.type}:${index}`}
               entry={entry}
               toolResultByCallId={toolResultByCallId}
               searchQuery={searchQuery}

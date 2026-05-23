@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SessionViewProvider } from "@/contexts/SessionViewContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
@@ -42,6 +42,10 @@ function toolCall(id: string, name: string): SessionEntry {
 }
 
 describe("buildConversationPreviewTurns", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: false,
@@ -128,5 +132,38 @@ describe("buildConversationPreviewTurns", () => {
     );
 
     expect(screen.getByText("read")).toBeTruthy();
+  });
+
+  it("renders expanded process entries with duplicate entry ids without React key warnings", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    render(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={[
+            message("user-1", "user", "Open file"),
+            toolCall("3e57eea9", "read"),
+            toolCall("3e57eea9", "bash"),
+            message("assistant-1", "assistant", "Done"),
+          ]}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+        />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getByText("Show"));
+
+    const duplicateKeyWarning = consoleError.mock.calls.some((call) =>
+      call.some((arg) =>
+        String(arg).includes("Encountered two children with the same key"),
+      ),
+    );
+    consoleError.mockRestore();
+
+    expect(duplicateKeyWarning).toBe(false);
   });
 });

@@ -207,7 +207,7 @@ const SessionViewerMessages = forwardRef<
 
                   return (
                     <div
-                      key={entry.id}
+                      key={`${entry.id}:${entry.type}:${virtualRow.index}`}
                       data-index={virtualRow.index}
                       data-entry-id={entry.id}
                       ref={rowVirtualizer.measureElement}
