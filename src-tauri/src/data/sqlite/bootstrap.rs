@@ -387,6 +387,7 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         // Message-level FTS is the primary search path. Always reconcile it here so
         // legacy config flags cannot leave search_text / message_fts stale.
         ensure_message_fts_schema(&conn)?;
+        super::plugin_records::ensure_plugin_records_schema(&conn)?;
         // Legacy session-level FTS remains disabled regardless of config.
         let _ = drop_sessions_fts_triggers(&conn);
 

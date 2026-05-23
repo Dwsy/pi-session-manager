@@ -1,6 +1,6 @@
 //! Session Summary — AI-generated session metadata via LLM providers configured in models.json.
 
-use crate::data::sqlite::DbSessionSummary;
+use crate::data::sqlite::DbPluginRecord;
 use crate::domain::model_config::reader::read_models_config_internal;
 use crate::utils::string::join_url;
 use chrono::Utc;
@@ -64,20 +64,12 @@ pub fn build_summary_context(entries: &[crate::types::SessionEntry]) -> String {
 fn extract_text_content(message: &crate::types::Message) -> String {
     let mut parts = Vec::new();
     for content in &message.content {
-        match content {
-            crate::types::Content::Text { text } => {
-                // Truncate very long text blocks
-                if text.len() > 2000 {
-                    parts.push(format!("{}...[truncated]", &text[..2000]));
-                } else {
-                    parts.push(text.clone());
-                }
+        if let Some(text) = &content.text {
+            if text.len() > 2000 {
+                parts.push(format!("{}...[truncated]", &text[..2000]));
+            } else {
+                parts.push(text.clone());
             }
-            crate::types::Content::ToolResult { content, .. } => {
-                // Skip tool results for summary context
-                let _ = content;
-            }
-            _ => {}
         }
     }
     parts.join("\n")
@@ -85,15 +77,8 @@ fn extract_text_content(message: &crate::types::Message) -> String {
 
 /// Resolve provider config from models.json and pick a model.
 /// If provider/model not specified, picks the first available model from the first provider.
-fn resolve_provider_config(
-    config: &Value,
-    provider: Option<&str>,
-    model: Option<&str>,
-) -> Result<(String, String, String, String, String), String> {
-    let providers = config
-        .get("providers")
-        .and_then(|v| v.as_object())
-        .ok_or("Invalid models.json: missing providers object")?;
+fn resolve_provider_config(config: &Value, provider: Option<&str>, model: Option<&str>) -> Result<(String, String, String, String, String), String> {
+    let providers = config.get("providers").and_then(|v| v.as_object()).ok_or("Invalid models.json: missing providers object")?;
 
     if providers.is_empty() {
         return Err("No providers configured in models.json".to_string());
@@ -132,14 +117,7 @@ fn resolve_provider_config(
         m.to_string()
     } else {
         // Pick first model
-        provider_obj
-            .get("models")
-            .and_then(|v| v.as_array())
-            .and_then(|models| models.first())
-            .and_then(|m| m.get("id"))
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| format!("Provider `{provider_name}` has no models"))?
-            .to_string()
+        provider_obj.get("models").and_then(|v| v.as_array()).and_then(|models| models.first()).and_then(|m| m.get("id")).and_then(|v| v.as_str()).ok_or_else(|| format!("Provider `{provider_name}` has no models"))?.to_string()
     };
 
     Ok((provider_name, model_id, base_url, api, api_key))
@@ -157,11 +135,7 @@ fn resolve_env_value(raw: &str) -> String {
 }
 
 /// Call LLM to generate a session summary.
-pub async fn generate_session_summary(
-    context: &str,
-    provider: Option<&str>,
-    model: Option<&str>,
-) -> Result<(SessionSummaryResult, String, String), String> {
+pub async fn generate_session_summary(context: &str, provider: Option<&str>, model: Option<&str>) -> Result<(SessionSummaryResult, String, String), String> {
     let config = read_models_config_internal()?;
     let (provider_name, model_id, base_url, api, api_key) = resolve_provider_config(&config, provider, model)?;
 
@@ -211,28 +185,13 @@ fn truncate(s: &str, max: usize) -> &str {
 fn extract_response_text(api: &str, response_text: &str) -> Option<String> {
     let parsed: Value = serde_json::from_str(response_text).ok()?;
     match api {
-        "openai-completions" => parsed
-            .get("choices")
-            .and_then(|v| v.as_array())
-            .and_then(|c| c.first())
-            .and_then(|c| c.get("message"))
-            .and_then(|m| m.get("content"))
-            .and_then(|v| v.as_str())
-            .map(|s| s.trim().to_string()),
+        "openai-completions" => parsed.get("choices").and_then(|v| v.as_array()).and_then(|c| c.first()).and_then(|c| c.get("message")).and_then(|m| m.get("content")).and_then(|v| v.as_str()).map(|s| s.trim().to_string()),
         "openai-responses" => parsed
             .get("output_text")
             .and_then(|v| v.as_str())
             .map(|s| s.trim().to_string())
-            .or_else(|| {
-                parsed
-                    .get("output")
-                    .and_then(|v| v.as_array())
-                    .and_then(|items| items.iter().find_map(|item| item.get("content").and_then(|v| v.as_array()).and_then(|content| content.iter().find_map(|part| part.get("text").and_then(|v| v.as_str()).map(|s| s.trim().to_string())))))
-            }),
-        "anthropic-messages" => parsed
-            .get("content")
-            .and_then(|v| v.as_array())
-            .and_then(|items| items.iter().find_map(|item| item.get("text").and_then(|v| v.as_str()).map(|s| s.trim().to_string()))),
+            .or_else(|| parsed.get("output").and_then(|v| v.as_array()).and_then(|items| items.iter().find_map(|item| item.get("content").and_then(|v| v.as_array()).and_then(|content| content.iter().find_map(|part| part.get("text").and_then(|v| v.as_str()).map(|s| s.trim().to_string())))))),
+        "anthropic-messages" => parsed.get("content").and_then(|v| v.as_array()).and_then(|items| items.iter().find_map(|item| item.get("text").and_then(|v| v.as_str()).map(|s| s.trim().to_string()))),
         _ => None,
     }
 }
@@ -243,17 +202,11 @@ fn build_auth_headers(api_key: &str, auth_header: bool, api: &str) -> Result<Hea
 
     if !api_key.is_empty() {
         if api == "anthropic-messages" {
-            headers.insert(
-                HeaderName::from_static("x-api-key"),
-                HeaderValue::from_str(api_key).map_err(|e| format!("Invalid x-api-key: {e}"))?,
-            );
+            headers.insert(HeaderName::from_static("x-api-key"), HeaderValue::from_str(api_key).map_err(|e| format!("Invalid x-api-key: {e}"))?);
             headers.insert(HeaderName::from_static("anthropic-version"), HeaderValue::from_static("2023-06-01"));
         } else if auth_header {
             let bearer = format!("Bearer {api_key}");
-            headers.insert(
-                HeaderName::from_static("authorization"),
-                HeaderValue::from_str(&bearer).map_err(|e| format!("Invalid auth header: {e}"))?,
-            );
+            headers.insert(HeaderName::from_static("authorization"), HeaderValue::from_str(&bearer).map_err(|e| format!("Invalid auth header: {e}"))?);
         }
     }
 
@@ -275,18 +228,9 @@ async fn call_openai_completions(base_url: &str, model: &str, api_key: &str, con
         "temperature": 0.3,
     });
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
+    let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120)).build().map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
-    let resp = client
-        .post(&url)
-        .headers(headers)
-        .body(body.to_string())
-        .send()
-        .await
-        .map_err(|e| format!("LLM request failed: {e}"))?;
+    let resp = client.post(&url).headers(headers).body(body.to_string()).send().await.map_err(|e| format!("LLM request failed: {e}"))?;
 
     let status = resp.status();
     let text = resp.text().await.map_err(|e| format!("Failed to read LLM response: {e}"))?;
@@ -308,18 +252,9 @@ async fn call_openai_responses(base_url: &str, model: &str, api_key: &str, conte
         "max_output_tokens": 1024,
     });
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
+    let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120)).build().map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
-    let resp = client
-        .post(&url)
-        .headers(headers)
-        .body(body.to_string())
-        .send()
-        .await
-        .map_err(|e| format!("LLM request failed: {e}"))?;
+    let resp = client.post(&url).headers(headers).body(body.to_string()).send().await.map_err(|e| format!("LLM request failed: {e}"))?;
 
     let status = resp.status();
     let text = resp.text().await.map_err(|e| format!("Failed to read LLM response: {e}"))?;
@@ -344,18 +279,9 @@ async fn call_anthropic_messages(base_url: &str, model: &str, api_key: &str, con
         ],
     });
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
+    let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120)).build().map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
-    let resp = client
-        .post(&url)
-        .headers(headers)
-        .body(body.to_string())
-        .send()
-        .await
-        .map_err(|e| format!("LLM request failed: {e}"))?;
+    let resp = client.post(&url).headers(headers).body(body.to_string()).send().await.map_err(|e| format!("LLM request failed: {e}"))?;
 
     let status = resp.status();
     let text = resp.text().await.map_err(|e| format!("Failed to read LLM response: {e}"))?;
@@ -367,21 +293,28 @@ async fn call_anthropic_messages(base_url: &str, model: &str, api_key: &str, con
     Ok(text)
 }
 
-/// Build a DbSessionSummary from the result, ready for SQLite storage.
-pub fn to_db_summary(
-    session_path: &str,
-    result: &SessionSummaryResult,
-    provider: &str,
-    model: &str,
-) -> DbSessionSummary {
-    DbSessionSummary {
-        session_path: session_path.to_string(),
-        summary: result.summary.clone(),
-        topics: result.topics.clone(),
-        status: result.status.clone(),
-        unresolved_tasks: result.unresolved_tasks.clone(),
-        generated_at: Utc::now().to_rfc3339(),
-        model_used: Some(model.to_string()),
-        provider_used: Some(provider.to_string()),
+/// Build a `session.intelligence` plugin record from the summary result.
+pub fn to_session_intelligence_record(session_path: &str, result: &SessionSummaryResult, provider: &str, model: &str) -> DbPluginRecord {
+    let now = Utc::now().to_rfc3339();
+    let payload = serde_json::json!({
+        "summary": result.summary,
+        "topics": result.topics,
+        "status": result.status,
+        "unresolved_tasks": result.unresolved_tasks,
+        "model_used": model,
+        "provider_used": provider,
+        "generated_at": now,
+    });
+    DbPluginRecord {
+        id: format!("builtin.session-summary:{}", session_path),
+        plugin_id: "builtin.session-summary".to_string(),
+        scope_type: "session".to_string(),
+        scope_id: session_path.to_string(),
+        record_type: "session.intelligence".to_string(),
+        schema_version: 1,
+        payload_json: payload.to_string(),
+        searchable_text: Some(format!("{} {} {}", result.summary, result.topics.join(" "), result.unresolved_tasks.join(" "))),
+        created_at: now.clone(),
+        updated_at: now,
     }
 }

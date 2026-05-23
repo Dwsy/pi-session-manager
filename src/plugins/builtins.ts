@@ -1,5 +1,6 @@
 import { pluginRegistry } from './registry'
 import { MessageSearchPlugin } from './message/MessageSearchPlugin'
+import { PluginRecordSearchPlugin } from './plugin-records/PluginRecordSearchPlugin'
 import { ProjectSearchPlugin } from './project/ProjectSearchPlugin'
 import { SessionSearchPlugin } from './session/SessionSearchPlugin'
 
@@ -14,6 +15,7 @@ export function registerBuiltinPlugins() {
   // Always re-register on hot reload so plugin class updates are picked up
   if (import.meta.hot) {
     pluginRegistry.unregister('message-search')
+    pluginRegistry.unregister('plugin-record-search')
     pluginRegistry.unregister('project-search')
     pluginRegistry.unregister('session-search')
   } else if (registered) {
@@ -22,6 +24,7 @@ export function registerBuiltinPlugins() {
 
   try {
     pluginRegistry.register(new MessageSearchPlugin())
+    pluginRegistry.register(new PluginRecordSearchPlugin())
     pluginRegistry.register(new ProjectSearchPlugin())
     pluginRegistry.register(new SessionSearchPlugin())
 

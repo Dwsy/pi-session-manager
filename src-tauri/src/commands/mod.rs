@@ -9,6 +9,7 @@ mod models;
 mod notification;
 #[cfg(feature = "gui")]
 mod pi_live;
+mod plugin_records;
 pub mod search;
 mod session;
 // session_file is pub(super) to restrict direct access from outside commands/.
@@ -38,6 +39,7 @@ pub use models::*;
 pub use notification::*;
 #[cfg(feature = "gui")]
 pub use pi_live::*;
+pub use plugin_records::*;
 pub use search::*;
 pub use session::*;
 pub use session_file::*;

@@ -228,6 +228,33 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::search_sessions_fts(query, limit).await?;
             Ok(to_val(result, "serialize result")?)
         }
+        "get_plugin_record" => {
+            let id = extract(payload, "id")?;
+            let result = crate::get_plugin_record(id).await?;
+            Ok(to_val(result, "serialize plugin record")?)
+        }
+        "list_plugin_records_for_scope" => {
+            let scope_type = extract(payload, "scope_type").or_else(|_| extract(payload, "scopeType"))?;
+            let scope_id = extract(payload, "scope_id").or_else(|_| extract(payload, "scopeId"))?;
+            let record_type = extract_optional_string(payload, "record_type").or_else(|| extract_optional_string(payload, "recordType"));
+            let limit = payload.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+            let result = crate::list_plugin_records_for_scope(scope_type, scope_id, record_type, limit).await?;
+            Ok(to_val(result, "serialize plugin records")?)
+        }
+        "search_plugin_records" => {
+            let query = extract(payload, "query")?;
+            let record_type = extract_optional_string(payload, "record_type").or_else(|| extract_optional_string(payload, "recordType"));
+            let plugin_id = extract_optional_string(payload, "plugin_id").or_else(|| extract_optional_string(payload, "pluginId"));
+            let limit = payload.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+            let result = crate::search_plugin_records(query, record_type, plugin_id, limit).await?;
+            Ok(to_val(result, "serialize plugin record search")?)
+        }
+        "upsert_plugin_record" => {
+            let record = serde_json::from_value(payload.get("record").cloned().ok_or_else(|| "Missing field: record".to_string())?).map_err(|e| format!("Invalid plugin record: {e}"))?;
+            let index_values = payload.get("index_values").or_else(|| payload.get("indexValues")).cloned().map(serde_json::from_value).transpose().map_err(|e| format!("Invalid plugin record index values: {e}"))?;
+            crate::upsert_plugin_record(record, index_values).await?;
+            Ok(Value::Null)
+        }
         "full_text_search" => {
             let query = extract(payload, "query")?;
             let role_filter = extract(payload, "role_filter").or_else(|_| extract(payload, "roleFilter")).map_err(|_| "Missing required field: role_filter or roleFilter")?;
