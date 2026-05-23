@@ -24,6 +24,26 @@ export const sessionSummaryI18n: PsmPluginI18nResources = {
         empty: 'No AI summary has been generated for this session yet.',
       },
     },
+    plugins: {
+      builtin: {
+        'session-summary': {
+          configuration: {
+            title: 'AI Session Summary Settings',
+            description: 'Controls generation defaults and what the session intelligence side panel displays.',
+          },
+          settings: {
+            provider: { title: 'Default provider', description: 'Optional provider override. Leave empty for host auto selection.' },
+            model: { title: 'Default model', description: 'Optional model override. Leave empty for host auto selection.' },
+            language: { title: 'Summary language', options: { auto: 'Auto', 'en-US': 'English', 'zh-CN': 'Simplified Chinese', 'ja-JP': 'Japanese' } },
+            autoOpenAfterRefresh: { title: 'Open result after refresh' },
+            showMetadata: { title: 'Show metadata tiles' },
+            showTopics: { title: 'Show topics' },
+            showNextSteps: { title: 'Show next steps' },
+            showUnresolved: { title: 'Show unresolved tasks' },
+          },
+        },
+      },
+    },
     common: { close: 'Close' },
   },
   'zh-CN': {
@@ -47,6 +67,26 @@ export const sessionSummaryI18n: PsmPluginI18nResources = {
         nextSteps: '下一步',
         unresolved: '未解决',
         empty: '此会话尚未生成 AI 摘要。',
+      },
+    },
+    plugins: {
+      builtin: {
+        'session-summary': {
+          configuration: {
+            title: 'AI 会话摘要设置',
+            description: '控制摘要生成默认值，以及会话智能侧边栏显示哪些内容。',
+          },
+          settings: {
+            provider: { title: '默认供应商', description: '可选供应商覆盖。留空则由主程序自动选择。' },
+            model: { title: '默认模型', description: '可选模型覆盖。留空则由主程序自动选择。' },
+            language: { title: '摘要语言', options: { auto: '自动', 'en-US': '英语', 'zh-CN': '简体中文', 'ja-JP': '日语' } },
+            autoOpenAfterRefresh: { title: '刷新后打开结果' },
+            showMetadata: { title: '显示元数据卡片' },
+            showTopics: { title: '显示主题' },
+            showNextSteps: { title: '显示下一步' },
+            showUnresolved: { title: '显示未解决任务' },
+          },
+        },
       },
     },
     common: { close: '关闭' },

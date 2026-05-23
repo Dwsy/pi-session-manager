@@ -1,12 +1,66 @@
 # PSM Plugin SDK
 
+Related: [PSM Plugin SDK Capability Audit](./PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md)
+
 PSM plugins are browser-compatible ESM modules activated by Pi Session Manager.
 They are separate from Pi runtime plugins, but follow the same philosophy:
 manifest first, convention-based discovery, host-owned permissions, and explicit
 command/tool registration.
 
-External plugins are distributed and loaded from npm packages only. `builtin` is reserved
-for repo-local first-party plugins under `extensions/`; it is not an external plugin source.
+External plugins can be loaded from npm packages or explicit local `.js` / `.mjs`
+entry paths. `builtin` is reserved for repo-local first-party plugins under
+`extensions/`; it is not an external plugin source.
+
+## Architecture
+
+```text
++----------------------------- Pi Session Manager -----------------------------+
+|                                                                              |
+|  React App                                                                   |
+|     |                                                                        |
+|     v                                                                        |
+|  runtime-host                                                                |
+|     |                                                                        |
+|     | discovers builtin plugins from extensions/psm-*                         |
+|     | discovers npm plugins from ~/.pi/pi-session-manager/extensions/npm       |
+|     | discovers path plugins from plugins.json customPaths                    |
+|     v                                                                        |
+|  PsmPluginHost                                                               |
+|     |                                                                        |
+|     | validates manifest                                                     |
+|     | merges i18n resources                                                   |
+|     | builds settings client                                                  |
+|     | injects PsmPluginHostContext                                            |
+|     v                                                                        |
+|  Plugin activate(ctx)                                                        |
+|     |                                                                        |
+|     | registerCommand / registerTool                                          |
+|     | ctx.ui.registerSessionToolbarItem / registerSessionPanel                |
+|     | ctx.ui.registerToolRenderer                                             |
+|     | ctx.psm.sessions / records / search / sidechat / models / kanban        |
+|     v                                                                        |
+|  @pi-session-manager/plugin-sdk                                              |
+|     |                                                                        |
+|     | createPluginCapabilityClient                                            |
+|     | adds __psm permission context                                           |
+|     v                                                                        |
+|  appPsmTransport                                                             |
+|     |                                                                        |
+|     | Tauri GUI: plugin_dispatch_command                                      |
+|     | Web/server: normal app transport                                        |
+|     v                                                                        |
+|  dispatch.rs                                                                 |
+|     |                                                                        |
+|     | checks command permission when __psm exists                             |
+|     | routes to commands/domain/data                                          |
+|     v                                                                        |
+|  SQLite / Tantivy / session files / model providers / terminal adapters      |
+|                                                                              |
++------------------------------------------------------------------------------+
+```
+
+Only the SDK layer is public to plugin authors. The runtime host, app transport,
+Tauri commands, and desktop-private adapters remain owned by the PSM host.
 
 ## Module Contract
 
@@ -56,13 +110,14 @@ the runtime host, Tauri APIs, or desktop-private implementation.
 
 ## Source Policy
 
-PSM recognizes two plugin sources:
+PSM recognizes three plugin sources:
 
 - `builtin`: repo-local first-party plugins checked into this repository under `extensions/`.
 - `npm`: external plugins installed into the managed npm workspace.
+- `path`: explicit local `.js` or `.mjs` browser-compatible ESM entry files listed in `plugins.json`.
 
-External plugin authors must publish npm packages. PSM does not load external plugins from
-arbitrary local paths, URLs, git checkouts, `file:` dependencies, or raw TypeScript files.
+PSM does not load remote URLs, git checkouts, `file:` dependencies, or raw TypeScript files.
+Path plugins are for local development and private plugins; published plugins should use npm.
 
 ## NPM Package Shape
 
@@ -104,6 +159,21 @@ dependencies when they are used by UI contributions:
 Tailwind classes may be authored in TSX or plugin-owned `styles.ts` files. Published bundles
 must not depend on PSM app aliases such as `@/components`, `@/types`, or `@/plugins`.
 
+## Local Path Plugin Shape
+
+Path plugins point directly to a built browser-compatible ESM file:
+
+```text
+/absolute/path/to/my-psm-plugin/dist/index.mjs
+```
+
+The entry file must be `.js` or `.mjs`, stay under the host module size limit, and export the
+same `manifest` plus `activate` contract as npm plugins. Add or remove path plugins from
+Settings -> PSM Plugins, or edit `customPaths` in `plugins.json`.
+
+Path plugins are loaded from local disk only. They are not package-managed by PSM; rebuild the
+file yourself, then use Reload in Settings -> PSM Plugins.
+
 ## Configuration
 
 Plugin enablement is stored in:
@@ -117,6 +187,9 @@ Example:
 ```json
 {
   "version": 1,
+  "customPaths": [
+    "/absolute/path/to/my-psm-plugin/dist/index.mjs"
+  ],
   "plugins": {
     "builtin.session-summary": {
       "enabled": true,
@@ -126,6 +199,11 @@ Example:
       "enabled": false,
       "source": "npm",
       "packageName": "@example/psm-sidechat"
+    },
+    "path.example.local": {
+      "enabled": true,
+      "source": "path",
+      "entryPath": "/absolute/path/to/my-psm-plugin/dist/index.mjs"
     }
   }
 }
@@ -151,6 +229,31 @@ UI contributions:
 
 - `ctx.ui.registerSessionToolbarItem({ id, title, panelId?, render })`
 - `ctx.ui.registerSessionPanel({ id, title, side: 'right', render })`
+- `ctx.ui.registerToolRenderer({ id, name, match, component, ... })`
+
+Tool renderers customize how session tool calls are displayed. `match` may be an exact tool
+name, a `RegExp`, or a predicate over the raw tool call. `component` receives resolved tool
+data, search query, and the host-owned render context for expansion, clipboard, theme, mobile,
+and i18n state.
+
+```ts
+export function activate(ctx: PsmPluginHostContext) {
+  ctx.ui.registerToolRenderer({
+    id: 'acme-log-renderer',
+    name: 'Acme Log Renderer',
+    match: /^acme_/,
+    priority: 120,
+    component: ({ resolvedData, context }) => {
+      return context.isExpanded ? resolvedData.output : `${resolvedData.name} ready`
+    },
+    getSearchSegments: (_toolCall, data) => [data.name, data.output],
+  })
+}
+```
+
+Renderer IDs are global inside the host. First registration wins. A later duplicate keeps the
+plugin active but records a `warn` diagnostic. Registered renderers are removed when the host
+reloads plugins or when activation fails.
 
 Configuration contributions:
 
@@ -166,6 +269,8 @@ I18n contributions:
 
 Toolbar and panel `render(...)` receive the active session plus panel state helpers.
 First-party built-ins may return React nodes; npm bundles should stay browser-compatible ESM.
+Tool renderer components may also return React-compatible nodes, but published bundles must
+obtain React from their normal package/peer dependency boundary rather than importing PSM app internals.
 
 Every SDK call carries the plugin permission context when the plugin declares
 permissions. Backend permission checks are enforced through `plugin_dispatch_command`.
@@ -239,7 +344,7 @@ whether a plugin source changed before reload.
 
 ## Command And Tool Conflicts
 
-Command, tool, toolbar item, and panel IDs are global inside the PSM plugin host.
+Command, tool, tool renderer, toolbar item, and panel IDs are global inside the PSM plugin host.
 First registration wins. If a later plugin registers the same ID, the host keeps the
 original registration, adds a `warn` diagnostic to the later plugin, and keeps that
 later plugin `active` unless activation itself throws.

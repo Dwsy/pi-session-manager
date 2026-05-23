@@ -1,11 +1,18 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
+import { toolRenderRegistry } from '@/plugins/tools-render/registry'
+import { builtinPsmPluginEntries } from '../builtins'
 import { PsmPluginHost } from '../host'
 import type { PsmPluginLoadEntry, PsmPluginsConfig } from '../types'
 
 function config(plugins: PsmPluginsConfig['plugins'] = {}): PsmPluginsConfig {
   return { version: 1, plugins }
 }
+
+afterEach(() => {
+  toolRenderRegistry.unregister('test-renderer')
+  toolRenderRegistry.unregister('shared-renderer')
+})
 
 function entry(id: string, activate = true): PsmPluginLoadEntry {
   return {
@@ -35,6 +42,14 @@ function entry(id: string, activate = true): PsmPluginLoadEntry {
 }
 
 describe('PsmPluginHost', () => {
+  it('loads tool renderers as default builtin plugin entries', () => {
+    const sourceIds = builtinPsmPluginEntries.map((entry) => entry.sourceId)
+
+    expect(sourceIds).toContain('extensions/psm-ask-user-question-renderer')
+    expect(sourceIds).toContain('extensions/psm-loop-renderer')
+    expect(sourceIds).toContain('extensions/psm-subagent-renderer')
+  })
+
   it('activates enabled plugins and exposes commands/tools', async () => {
     const host = new PsmPluginHost({
       builtinEntries: [entry('builtin.test')],
@@ -282,6 +297,88 @@ describe('PsmPluginHost', () => {
     })
   })
 
+  it('registers tool renderers and removes them on reload', async () => {
+    let includeRenderer = true
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/tool-renderer',
+          async load() {
+            return {
+              manifest: { manifestVersion: 1, id: 'builtin.tool-renderer', name: 'Tool Renderer', version: '1.0.0' },
+              activate: (ctx: any) => {
+                if (!includeRenderer) return
+                ctx.ui.registerToolRenderer({
+                  id: 'test-renderer',
+                  name: 'Test Renderer',
+                  match: 'custom_tool',
+                  component: () => null,
+                })
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(plugins[0].toolRenderers).toEqual(['test-renderer'])
+    expect(host.getToolRendererIds()).toEqual(['test-renderer'])
+    expect(toolRenderRegistry.get('test-renderer')).toBeTruthy()
+
+    includeRenderer = false
+    await host.reload()
+
+    expect(host.getToolRendererIds()).toEqual([])
+    expect(toolRenderRegistry.get('test-renderer')).toBeUndefined()
+  })
+
+  it('keeps tool renderer conflicts as warning diagnostics', async () => {
+    function rendererEntry(id: string): PsmPluginLoadEntry {
+      return {
+        source: 'builtin',
+        sourceId: `extensions/${id}`,
+        async load() {
+          return {
+            manifest: { manifestVersion: 1, id, name: id, version: '1.0.0' },
+            activate: (ctx: any) => {
+              ctx.ui.registerToolRenderer({
+                id: 'shared-renderer',
+                name: 'Shared Renderer',
+                match: 'shared_tool',
+                component: () => null,
+              })
+            },
+          }
+        },
+      }
+    }
+
+    const host = new PsmPluginHost({
+      builtinEntries: [rendererEntry('builtin.renderer.first'), rendererEntry('builtin.renderer.second')],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const plugins = await host.reload()
+    const second = plugins.find((plugin) => plugin.id === 'builtin.renderer.second')
+
+    expect(second).toMatchObject({
+      state: 'active',
+      diagnostics: [
+        { level: 'warn', message: 'Tool renderer already registered: shared-renderer' },
+      ],
+    })
+  })
+
   it('records UI render failures as warning diagnostics without marking the plugin error', async () => {
     const host = new PsmPluginHost({
       builtinEntries: [
@@ -354,6 +451,44 @@ describe('PsmPluginHost', () => {
       { toolbarItems: 0, panels: 0 },
       { toolbarItems: 1, panels: 1 },
     ])
+  })
+
+  it('loads path entries through module source bundles', async () => {
+    const source = `
+      export const manifest = {
+        manifestVersion: 1,
+        id: 'path.test',
+        name: 'Path Test',
+        version: '1.0.0',
+        permissions: ['records:read']
+      };
+      export function activate(ctx) {
+        ctx.registerCommand('path.test.command', async () => 'ok');
+      }
+    `
+    const host = new PsmPluginHost({
+      builtinEntries: [],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+        listPathEntries: async () => [
+          {
+            entryPath: '/tmp/local-plugin.mjs',
+          },
+        ],
+        readPathModuleSource: async () => source,
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(plugins[0]).toMatchObject({
+      id: 'path.test',
+      source: 'path',
+      sourceId: '/tmp/local-plugin.mjs',
+      commands: ['path.test.command'],
+    })
+    expect(await host.executeCommand('path.test.command')).toBe('ok')
   })
 
   it('loads npm entries through module source bundles', async () => {

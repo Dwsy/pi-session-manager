@@ -21,6 +21,7 @@
 | **Add new UI component** | [DESIGN.md](DESIGN.md) → Component Patterns + [Frontend](agent-docs/02-frontend.md) |
 | **Search functionality** | [Backend](agent-docs/03-backend.md) → Data/search/ |
 | **Settings/config** | [Config](agent-docs/05-config.md) |
+| **PSM plugin SDK / extensions** | [Plugin SDK](docs/PSM_PLUGIN_SDK.md) + [Capability Audit](docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md) + [Extensions](extensions/README.md) |
 | **Build & test** | [Development](agent-docs/04-development.md) |
 | **Release** | [Development](agent-docs/04-development.md) → Release section |
 
@@ -36,6 +37,9 @@
 | [03-backend.md](agent-docs/03-backend.md) | Commands, Domain, Data, Server, **add command tutorial** |
 | [04-development.md](agent-docs/04-development.md) | Build, test, modify guide |
 | [05-config.md](agent-docs/05-config.md) | Paths, security, tech stack |
+| [PSM_PLUGIN_SDK.md](docs/PSM_PLUGIN_SDK.md) | Public PSM browser-plugin SDK contract |
+| [PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md](docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md) | SDK capability exposure and contract reuse audit |
+| [extensions/README.md](extensions/README.md) | PSM built-in plugins and Pi Agent extension overview |
 | [DESIGN.md](DESIGN.md) | Design system: colors, typography, components, motion, themes |
 
 ---

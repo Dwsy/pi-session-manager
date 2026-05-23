@@ -4,9 +4,10 @@ import type {
   PsmPluginToolRegistration,
   PsmSessionPanelRegistration,
   PsmSessionToolbarItemRegistration,
+  PsmToolRendererRegistration,
 } from '@pi-session-manager/plugin-sdk'
 
-export type PsmPluginSource = 'builtin' | 'npm'
+export type PsmPluginSource = 'builtin' | 'npm' | 'path'
 export type PsmPluginStatusState = 'active' | 'disabled' | 'error'
 export type PsmPluginDiagnosticLevel = 'info' | 'warn' | 'error'
 
@@ -14,12 +15,14 @@ export interface PsmPluginConfigEntry {
   enabled: boolean
   source?: PsmPluginSource | string
   packageName?: string | null
+  entryPath?: string | null
   settings?: Record<string, PsmPluginSettingValue>
 }
 
 export interface PsmPluginsConfig {
   version: number
   plugins: Record<string, PsmPluginConfigEntry>
+  customPaths?: string[]
 }
 
 export interface PsmNpmPluginEntry {
@@ -31,9 +34,16 @@ export interface PsmNpmPluginEntry {
   sourceHash?: string | null
 }
 
+export interface PsmPathPluginEntry {
+  entryPath: string
+  moduleModifiedMs?: number | null
+  sourceHash?: string | null
+}
+
 export interface PsmPluginPaths {
   configPath: string
   npmDir: string
+  customPaths: string[]
 }
 
 export interface PsmPluginNpmOperationResult {
@@ -65,11 +75,13 @@ export interface PsmPluginStatus {
   source: PsmPluginSource
   sourceId: string
   packageName?: string
+  entryPath?: string
   enabled: boolean
   state: PsmPluginStatusState
   manifest?: PsmPluginManifest
   commands: string[]
   tools: string[]
+  toolRenderers?: string[]
   diagnostics: PsmPluginDiagnostic[]
   settings?: Record<string, PsmPluginSettingValue>
   loadTimeMs?: number
@@ -86,6 +98,10 @@ export interface PsmSessionToolbarItemRuntimeRegistration extends PsmSessionTool
 }
 
 export interface PsmSessionPanelRuntimeRegistration extends PsmSessionPanelRegistration {
+  pluginId: string
+}
+
+export interface PsmToolRendererRuntimeRegistration extends PsmToolRendererRegistration {
   pluginId: string
 }
 

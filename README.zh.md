@@ -220,6 +220,9 @@ cd src-tauri && cargo test
 | [agent-docs/03-backend.md](agent-docs/03-backend.md) | 后端模块 + 命令教程 |
 | [agent-docs/04-development.md](agent-docs/04-development.md) | 构建与发布 |
 | [agent-docs/05-config.md](agent-docs/05-config.md) | 配置与安全 |
+| [docs/PSM_PLUGIN_SDK.md](docs/PSM_PLUGIN_SDK.md) | PSM 浏览器插件 SDK 公共契约 |
+| [docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md](docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md) | SDK 能力暴露与契约复用审计 |
+| [extensions/README.md](extensions/README.md) | PSM 内置插件与 Pi Agent 扩展总览 |
 | [DESIGN.md](DESIGN.md) | 设计系统 |
 
 ## 许可证

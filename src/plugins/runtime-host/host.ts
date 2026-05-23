@@ -9,22 +9,28 @@ import {
   type PsmPluginSettingValue,
   type PsmPluginSettingsClient,
   type PsmPluginToolRegistration,
+  type PsmToolRendererRegistration,
 } from '@pi-session-manager/plugin-sdk'
 
 import i18n from '@/i18n/config'
+import { toolRenderRegistry } from '@/plugins/tools-render/registry'
+import type { ToolRenderPlugin } from '@/plugins/tools-render/types'
 
 import { appPsmTransport } from './appTransport'
 
 import { builtinPsmPluginEntries } from './builtins'
 import {
   listNpmPsmPluginEntries,
+  listPathPsmPluginEntries,
   loadPsmPluginConfig,
   readNpmPsmPluginModuleSource,
+  readPathPsmPluginModuleSource,
 } from './service'
 import type {
   PsmPluginCommandHandler,
   PsmPluginConfigEntry,
   PsmPluginDiagnostic,
+  PsmPathPluginEntry,
   PsmPluginLoadEntry,
   PsmPluginSessionUiSnapshot,
   PsmPluginSource,
@@ -33,6 +39,7 @@ import type {
   PsmPluginsConfig,
   PsmSessionPanelRuntimeRegistration,
   PsmSessionToolbarItemRuntimeRegistration,
+  PsmToolRendererRuntimeRegistration,
 } from './types'
 
 interface ActivePlugin {
@@ -54,7 +61,9 @@ interface PsmPluginHostServices {
     moduleModifiedMs?: number | null
     sourceHash?: string | null
   }>>
+  listPathEntries(): Promise<PsmPathPluginEntry[]>
   readNpmModuleSource(entryPath: string): Promise<string>
+  readPathModuleSource(entryPath: string): Promise<string>
 }
 
 interface PsmPluginHostOptions {
@@ -65,7 +74,9 @@ interface PsmPluginHostOptions {
 const defaultServices: PsmPluginHostServices = {
   loadConfig: loadPsmPluginConfig,
   listNpmEntries: listNpmPsmPluginEntries,
+  listPathEntries: listPathPsmPluginEntries,
   readNpmModuleSource: readNpmPsmPluginModuleSource,
+  readPathModuleSource: readPathPsmPluginModuleSource,
 }
 
 function moduleFromUnknown(input: unknown): PsmPluginModule {
@@ -84,11 +95,13 @@ function configEntryFor(
   manifest: PsmPluginManifest,
   source: PsmPluginSource,
   packageName?: string,
+  entryPath?: string,
 ): PsmPluginConfigEntry {
   return {
     enabled: pluginEnabled(config, manifest),
     source: config.plugins[manifest.id]?.source ?? source,
     packageName: config.plugins[manifest.id]?.packageName ?? packageName ?? manifest.package?.name ?? null,
+    entryPath: config.plugins[manifest.id]?.entryPath ?? entryPath ?? null,
     settings: config.plugins[manifest.id]?.settings ?? {},
   }
 }
@@ -153,6 +166,32 @@ function metadataFor(entry: PsmPluginLoadEntry) {
   }
 }
 
+function sourceModuleLoadEntry(options: {
+  source: PsmPluginSource
+  sourceId: string
+  packageName?: string
+  packageVersion?: string | null
+  entryPath: string
+  moduleModifiedMs?: number | null
+  sourceHash?: string | null
+  readModuleSource(entryPath: string): Promise<string>
+}): PsmPluginLoadEntry {
+  return {
+    source: options.source,
+    sourceId: options.sourceId,
+    packageName: options.packageName,
+    packageVersion: options.packageVersion,
+    entryPath: options.entryPath,
+    moduleModifiedMs: options.moduleModifiedMs,
+    sourceHash: options.sourceHash,
+    async load() {
+      const source = await options.readModuleSource(options.entryPath)
+      const moduleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`
+      return import(/* @vite-ignore */ moduleUrl)
+    },
+  }
+}
+
 function npmEntryToLoadEntry(entry: {
   packageName: string
   packageVersion?: string | null
@@ -161,7 +200,7 @@ function npmEntryToLoadEntry(entry: {
   moduleModifiedMs?: number | null
   sourceHash?: string | null
 }, readModuleSource: (entryPath: string) => Promise<string>): PsmPluginLoadEntry {
-  return {
+  return sourceModuleLoadEntry({
     source: 'npm',
     sourceId: entry.entryPath,
     packageName: entry.packageName,
@@ -169,12 +208,19 @@ function npmEntryToLoadEntry(entry: {
     entryPath: entry.entryPath,
     moduleModifiedMs: entry.moduleModifiedMs,
     sourceHash: entry.sourceHash,
-    async load() {
-      const source = await readModuleSource(entry.entryPath)
-      const moduleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`
-      return import(/* @vite-ignore */ moduleUrl)
-    },
-  }
+    readModuleSource,
+  })
+}
+
+function pathEntryToLoadEntry(entry: PsmPathPluginEntry, readModuleSource: (entryPath: string) => Promise<string>): PsmPluginLoadEntry {
+  return sourceModuleLoadEntry({
+    source: 'path',
+    sourceId: entry.entryPath,
+    entryPath: entry.entryPath,
+    moduleModifiedMs: entry.moduleModifiedMs,
+    sourceHash: entry.sourceHash,
+    readModuleSource,
+  })
 }
 
 export class PsmPluginHost {
@@ -182,6 +228,7 @@ export class PsmPluginHost {
   private readonly services: PsmPluginHostServices
   private commands = new Map<string, { pluginId: string; handler: PsmPluginCommandHandler }>()
   private tools = new Map<string, PsmPluginToolRuntimeRegistration>()
+  private toolRenderers = new Map<string, PsmToolRendererRuntimeRegistration>()
   private sessionToolbarItems = new Map<string, PsmSessionToolbarItemRuntimeRegistration>()
   private sessionPanels = new Map<string, PsmSessionPanelRuntimeRegistration>()
   private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { toolbarItems: [], panels: [] }
@@ -219,6 +266,10 @@ export class PsmPluginHost {
 
   getToolNames(): string[] {
     return Array.from(this.tools.keys()).sort()
+  }
+
+  getToolRendererIds(): string[] {
+    return Array.from(this.toolRenderers.keys()).sort()
   }
 
   listSessionToolbarItems(): PsmSessionToolbarItemRuntimeRegistration[] {
@@ -261,6 +312,13 @@ export class PsmPluginHost {
     }
   }
 
+  private unregisterToolRenderers(ids: string[] = Array.from(this.toolRenderers.keys())) {
+    for (const id of ids) {
+      toolRenderRegistry.unregister(id)
+      this.toolRenderers.delete(id)
+    }
+  }
+
   private notify() {
     for (const listener of this.listeners) listener()
   }
@@ -279,6 +337,7 @@ export class PsmPluginHost {
 
   private async reloadInternal(): Promise<PsmPluginStatus[]> {
     await this.disposeAll()
+    this.unregisterToolRenderers()
     this.commands.clear()
     this.tools.clear()
     this.sessionToolbarItems.clear()
@@ -300,9 +359,24 @@ export class PsmPluginHost {
       })
       return []
     })
+    const pathEntries = await this.services.listPathEntries().catch((error) => {
+      this.statuses.set('path-discovery', {
+        id: 'path-discovery',
+        name: 'Path plugin discovery',
+        source: 'path',
+        sourceId: 'plugins.json customPaths',
+        enabled: false,
+        state: 'error',
+        commands: [],
+        tools: [],
+        diagnostics: [diagnostic('error', normalizeError(error))],
+      })
+      return []
+    })
     const entries = [
       ...this.builtinEntries,
       ...npmEntries.map((entry) => npmEntryToLoadEntry(entry, this.services.readNpmModuleSource)),
+      ...pathEntries.map((entry) => pathEntryToLoadEntry(entry, this.services.readPathModuleSource)),
     ]
 
     for (const entry of entries) {
@@ -359,7 +433,7 @@ export class PsmPluginHost {
     }
 
     mergePluginI18n(manifest)
-    const configEntry = configEntryFor(config, manifest, entry.source, entry.packageName)
+    const configEntry = configEntryFor(config, manifest, entry.source, entry.packageName, entry.entryPath)
     const settings = settingsFor(manifest, configEntry)
     if (!configEntry.enabled) {
       this.statuses.set(manifest.id, {
@@ -369,6 +443,7 @@ export class PsmPluginHost {
         source: entry.source,
         sourceId: entry.sourceId,
         packageName: configEntry.packageName ?? undefined,
+        entryPath: configEntry.entryPath ?? undefined,
         enabled: false,
         state: 'disabled',
         manifest,
@@ -384,6 +459,7 @@ export class PsmPluginHost {
 
     const commandNames: string[] = []
     const toolNames: string[] = []
+    const toolRendererIds: string[] = []
     const toolbarItemIds: string[] = []
     const panelIds: string[] = []
     const diagnostics: PsmPluginDiagnostic[] = []
@@ -414,6 +490,15 @@ export class PsmPluginHost {
           }
           this.sessionPanels.set(panel.id, { ...panel, pluginId: manifest.id, side: panel.side ?? 'right' })
           panelIds.push(panel.id)
+        },
+        registerToolRenderer: (renderer: PsmToolRendererRegistration) => {
+          if (this.toolRenderers.has(renderer.id) || toolRenderRegistry.get(renderer.id)) {
+            diagnostics.push(diagnostic('warn', `Tool renderer already registered: ${renderer.id}`))
+            return
+          }
+          this.toolRenderers.set(renderer.id, { ...renderer, pluginId: manifest.id })
+          toolRenderRegistry.register(renderer as unknown as ToolRenderPlugin)
+          toolRendererIds.push(renderer.id)
         },
       },
       registerCommand: (name, handler) => {
@@ -452,11 +537,13 @@ export class PsmPluginHost {
         source: entry.source,
         sourceId: entry.sourceId,
         packageName: configEntry.packageName ?? undefined,
+        entryPath: configEntry.entryPath ?? undefined,
         enabled: true,
         state: 'active',
         manifest,
         commands: commandNames,
         tools: toolNames,
+        toolRenderers: toolRendererIds,
         diagnostics,
         settings,
         loadTimeMs: Date.now() - startedAt,
@@ -465,6 +552,7 @@ export class PsmPluginHost {
     } catch (error) {
       for (const name of commandNames) this.commands.delete(name)
       for (const name of toolNames) this.tools.delete(name)
+      this.unregisterToolRenderers(toolRendererIds)
       for (const id of toolbarItemIds) this.sessionToolbarItems.delete(id)
       for (const id of panelIds) this.sessionPanels.delete(id)
       this.statuses.set(manifest.id, {
@@ -474,6 +562,7 @@ export class PsmPluginHost {
         source: entry.source,
         sourceId: entry.sourceId,
         packageName: configEntry.packageName ?? undefined,
+        entryPath: configEntry.entryPath ?? undefined,
         enabled: true,
         state: 'error',
         manifest,

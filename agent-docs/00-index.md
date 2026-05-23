@@ -16,6 +16,7 @@
 | Business logic | `src-tauri/src/domain/` |
 | Data layer | `src-tauri/src/data/` |
 | Protocol | `src-tauri/src/server/` |
+| PSM plugin SDK / extensions | `docs/PSM_PLUGIN_SDK.md`, `docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md`, `extensions/README.md` |
 | New command | `src-tauri/src/commands/` |
 
 ## Commands
@@ -34,3 +35,6 @@
 - [Backend](03-backend.md)
 - [Development](04-development.md)
 - [Config](05-config.md)
+- [PSM Plugin SDK](../docs/PSM_PLUGIN_SDK.md)
+- [PSM Plugin SDK Capability Audit](../docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md)
+- [Extensions Overview](../extensions/README.md)

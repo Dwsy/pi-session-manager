@@ -49,6 +49,7 @@ interface SessionViewerProps {
   slots?: SessionViewerToolbarSlots;
   /** Layout extension slots around the main session viewer body */
   layoutSlots?: SessionViewerLayoutSlots;
+  onActiveEntryIdChange?: (activeEntryId: string | null) => void;
 }
 
 
@@ -70,6 +71,7 @@ function SessionViewerContent({
   previewVariant = "conversation",
   slots,
   layoutSlots,
+  onActiveEntryIdChange,
 }: SessionViewerProps) {
   const { t } = useTranslation();
   const {
@@ -173,6 +175,10 @@ function SessionViewerContent({
     headerEntry,
     messageEntries,
   } = useSessionViewerDerivedData(entries, activeEntryId, isLive, previewMode);
+
+  useEffect(() => {
+    onActiveEntryIdChange?.(activeEntryId);
+  }, [activeEntryId, onActiveEntryIdChange]);
 
   const {
     isSearchOpen,

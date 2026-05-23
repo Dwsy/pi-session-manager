@@ -2,7 +2,7 @@ import type { PsmPluginConfiguration } from '@pi-session-manager/plugin-sdk'
 
 export const sessionSummaryConfiguration: PsmPluginConfiguration = {
   title: 'AI Session Summary Settings',
-  description: 'Controls generation defaults and what the toolbar popover displays.',
+  description: 'Controls generation defaults and what the session intelligence side panel displays.',
   properties: [
     { key: 'provider', title: 'Default provider', description: 'Optional provider override. Leave empty for host auto selection.', type: 'string', default: '' },
     { key: 'model', title: 'Default model', description: 'Optional model override. Leave empty for host auto selection.', type: 'string', default: '' },

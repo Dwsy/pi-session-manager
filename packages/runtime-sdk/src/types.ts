@@ -109,6 +109,80 @@ export interface PsmPluginToolRegistration {
   run(args: Record<string, unknown>): Promise<unknown>
 }
 
+export interface PsmToolCallContent {
+  type: 'toolCall'
+  id?: string
+  name?: string
+  arguments?: Record<string, unknown>
+}
+
+export interface PsmToolResultEntry {
+  type: string
+  id: string
+  timestamp?: string
+  message?: unknown
+  content?: unknown
+}
+
+export interface PsmToolRenderBaseData {
+  name: string
+  args: Record<string, unknown>
+  toolCallId: string
+  entryId: string
+  result?: PsmToolResultEntry
+  output: string
+  isError: boolean
+}
+
+export interface PsmToolResolvedData extends PsmToolRenderBaseData {
+  diff?: string
+  images?: Array<{ type: 'image'; mimeType: string; data: string }>
+}
+
+export interface PsmToolRenderContext {
+  isExpanded: boolean
+  toggleExpanded: () => void
+  ensureExpanded: () => void
+  theme: 'light' | 'dark'
+  isMobile: boolean
+  t: (key: string, options?: Record<string, unknown>) => string
+  copyToClipboard: (text: string) => Promise<void>
+  disableSuccessStyle: boolean
+}
+
+export interface PsmToolRenderProps<TData extends PsmToolRenderBaseData = PsmToolResolvedData> {
+  toolCall: PsmToolCallContent
+  resolvedData: TData
+  searchQuery?: string
+  context: PsmToolRenderContext
+}
+
+export type PsmToolRenderComponent<TData extends PsmToolRenderBaseData = PsmToolResolvedData> = (
+  props: PsmToolRenderProps<TData>,
+) => unknown
+
+export type PsmToolMatcher = string | RegExp | ((toolCall: PsmToolCallContent) => boolean)
+
+export interface PsmToolRendererRegistration<TData extends PsmToolRenderBaseData = PsmToolResolvedData> {
+  id: string
+  name: string
+  match: PsmToolMatcher
+  component: PsmToolRenderComponent<TData>
+  description?: string
+  priority?: number
+  resolveData?: (
+    toolCall: PsmToolCallContent,
+    index: number,
+    toolResultByCallId: Map<string, PsmToolResultEntry>,
+  ) => TData | null
+  getSearchSegments?: (toolCall: PsmToolCallContent, resolvedData: TData) => string[]
+  getPreview?: (toolCall: PsmToolCallContent, resolvedData: TData) => string
+  isEnabled?: () => boolean
+  styles?: string | Record<string, string | number>
+  onMount?: () => void
+  onUnmount?: () => void
+}
+
 export interface PsmSessionReference {
   path: string
   id?: string
@@ -118,6 +192,7 @@ export interface PsmSessionReference {
 
 export interface PsmSessionUiRenderProps {
   session: PsmSessionReference
+  activeEntryId?: string | null
   panelOpen?: boolean
   togglePanel?: () => void
   closePanel?: () => void
@@ -142,6 +217,7 @@ export interface PsmSessionPanelRegistration {
 export interface PsmPluginUiRegistry {
   registerSessionToolbarItem(item: PsmSessionToolbarItemRegistration): void
   registerSessionPanel(panel: PsmSessionPanelRegistration): void
+  registerToolRenderer(renderer: PsmToolRendererRegistration): void
 }
 
 export interface PsmPluginSettingsClient {

@@ -24,6 +24,25 @@ export const sidechatI18n: PsmPluginI18nResources = {
         resize: 'Resize side chat panel',
       },
     },
+    plugins: {
+      builtin: {
+        sidechat: {
+          configuration: {
+            title: 'Sidechat Settings',
+            description: 'Defaults used by the session sidechat panel and sidechat command.',
+          },
+          settings: {
+            provider: { title: 'Default provider', description: 'Optional provider override. Leave empty for host auto selection.' },
+            model: { title: 'Default model', description: 'Optional model override. Leave empty for host auto selection.' },
+            thinkingLevel: { title: 'Thinking level', options: { off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'X High' } },
+            snippetLimit: { title: 'Snippet limit', description: 'How many citations/snippets to retrieve for each answer.' },
+            panelWidth: { title: 'Panel width', description: 'Default right panel width in pixels.' },
+            optionsExpanded: { title: 'Show options by default' },
+            showQuickPrompts: { title: 'Show quick prompts' },
+          },
+        },
+      },
+    },
     common: { close: 'Close' },
     components: { thinkingLevel: { off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'X High' } },
   },
@@ -48,6 +67,25 @@ export const sidechatI18n: PsmPluginI18nResources = {
         empty: '提出一个聚焦问题。PSM 会检索相关会话片段并给出引用。',
         loadingModels: '正在加载模型...',
         resize: '调整侧聊面板宽度',
+      },
+    },
+    plugins: {
+      builtin: {
+        sidechat: {
+          configuration: {
+            title: '会话侧聊设置',
+            description: '控制会话侧聊面板和侧聊命令的默认行为。',
+          },
+          settings: {
+            provider: { title: '默认供应商', description: '可选供应商覆盖。留空则由主程序自动选择。' },
+            model: { title: '默认模型', description: '可选模型覆盖。留空则由主程序自动选择。' },
+            thinkingLevel: { title: '思考强度', options: { off: '关闭', minimal: '极低', low: '低', medium: '中', high: '高', xhigh: '极高' } },
+            snippetLimit: { title: '片段数量', description: '每次回答检索的引用/片段数量。' },
+            panelWidth: { title: '面板宽度', description: '右侧面板默认宽度（像素）。' },
+            optionsExpanded: { title: '默认展开选项' },
+            showQuickPrompts: { title: '显示快捷提示' },
+          },
+        },
       },
     },
     common: { close: '关闭' },

@@ -11,7 +11,7 @@ use tokio::time::{timeout, Duration};
 const PLUGINS_CONFIG_FILE: &str = "plugins.json";
 const NPM_EXTENSIONS_DIR: &str = "extensions/npm";
 const NPM_COMMAND_TIMEOUT_SECS: u64 = 300;
-const NPM_MODULE_SOURCE_LIMIT_BYTES: usize = 2 * 1024 * 1024;
+const PLUGIN_MODULE_SOURCE_LIMIT_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +22,8 @@ pub struct PsmPluginConfigEntry {
     pub source: String,
     #[serde(default)]
     pub package_name: Option<String>,
+    #[serde(default)]
+    pub entry_path: Option<String>,
     #[serde(default)]
     pub settings: BTreeMap<String, Value>,
 }
@@ -37,6 +39,8 @@ pub struct PsmPluginsConfig {
     pub version: u32,
     #[serde(default)]
     pub plugins: BTreeMap<String, PsmPluginConfigEntry>,
+    #[serde(default)]
+    pub custom_paths: Vec<String>,
 }
 
 fn default_config_version() -> u32 {
@@ -45,7 +49,7 @@ fn default_config_version() -> u32 {
 
 impl Default for PsmPluginsConfig {
     fn default() -> Self {
-        Self { version: 1, plugins: BTreeMap::new() }
+        Self { version: 1, plugins: BTreeMap::new(), custom_paths: Vec::new() }
     }
 }
 
@@ -62,9 +66,18 @@ pub struct PsmNpmPluginEntry {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct PsmPathPluginEntry {
+    pub entry_path: String,
+    pub module_modified_ms: Option<u64>,
+    pub source_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct PsmPluginPaths {
     pub config_path: String,
     pub npm_dir: String,
+    pub custom_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -144,10 +157,41 @@ fn psm_extension_exports(package_json: &Value) -> Vec<String> {
     package_json.get("psm").and_then(|psm| psm.get("extensions")).and_then(Value::as_array).map(|items| items.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default()
 }
 
-fn npm_module_metadata(path: &Path) -> (Option<u64>, Option<String>) {
+fn plugin_module_metadata(path: &Path) -> (Option<u64>, Option<String>) {
     let module_modified_ms = fs::metadata(path).ok().and_then(|metadata| metadata.modified().ok()).and_then(|modified| modified.duration_since(UNIX_EPOCH).ok()).and_then(|duration| u64::try_from(duration.as_millis()).ok());
     let source_hash = fs::read(path).ok().map(|content| format!("{:x}", Sha256::digest(&content)));
     (module_modified_ms, source_hash)
+}
+
+fn expand_home_path(raw: &str) -> Result<PathBuf, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("PSM plugin path is required".to_string());
+    }
+    if trimmed == "~" {
+        return crate::paths::home_dir();
+    }
+    if let Some(rest) = trimmed.strip_prefix("~/") {
+        return Ok(crate::paths::home_dir()?.join(rest));
+    }
+    Ok(PathBuf::from(trimmed))
+}
+
+fn ensure_plugin_module_file(path: &Path) -> Result<PathBuf, String> {
+    let path = path.canonicalize().map_err(|e| format!("Failed to resolve PSM plugin module: {e}"))?;
+    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or_default();
+    if !matches!(extension, "js" | "mjs") {
+        return Err("PSM plugin module must be a .js or .mjs file".to_string());
+    }
+    let length = fs::metadata(&path).map_err(|e| format!("Failed to inspect PSM plugin module: {e}"))?.len();
+    if length > PLUGIN_MODULE_SOURCE_LIMIT_BYTES as u64 {
+        return Err(format!("PSM plugin module exceeds {PLUGIN_MODULE_SOURCE_LIMIT_BYTES} bytes"));
+    }
+    Ok(path)
+}
+
+fn normalize_path_plugin_entry_path(entry_path: &str) -> Result<String, String> {
+    Ok(ensure_plugin_module_file(&expand_home_path(entry_path)?)?.to_string_lossy().to_string())
 }
 
 fn list_npm_entries_internal() -> Result<Vec<PsmNpmPluginEntry>, String> {
@@ -171,11 +215,24 @@ fn list_npm_entries_internal() -> Result<Vec<PsmNpmPluginEntry>, String> {
                 continue;
             }
             let entry_path = package_dir.join(&export_path);
-            let (module_modified_ms, source_hash) = npm_module_metadata(&entry_path);
+            let (module_modified_ms, source_hash) = plugin_module_metadata(&entry_path);
             entries.push(PsmNpmPluginEntry { package_name: package_name.to_string(), package_version: package_version.clone(), entry_path: entry_path.to_string_lossy().to_string(), export_path, module_modified_ms, source_hash });
         }
     }
 
+    Ok(entries)
+}
+
+fn list_path_entries_internal() -> Result<Vec<PsmPathPluginEntry>, String> {
+    let config = read_plugins_config()?;
+    let mut entries = Vec::new();
+    for entry_path in config.custom_paths {
+        let canonical = normalize_path_plugin_entry_path(&entry_path)?;
+        let path = PathBuf::from(&canonical);
+        let (module_modified_ms, source_hash) = plugin_module_metadata(&path);
+        entries.push(PsmPathPluginEntry { entry_path: canonical, module_modified_ms, source_hash });
+    }
+    entries.sort_by(|a, b| a.entry_path.cmp(&b.entry_path));
     Ok(entries)
 }
 
@@ -191,16 +248,7 @@ fn ensure_npm_child(path: &Path) -> Result<PathBuf, String> {
 }
 
 fn ensure_npm_module_file(path: &Path) -> Result<PathBuf, String> {
-    let path = ensure_npm_child(path)?;
-    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or_default();
-    if !matches!(extension, "js" | "mjs") {
-        return Err("PSM plugin module must be a .js or .mjs file".to_string());
-    }
-    let length = fs::metadata(&path).map_err(|e| format!("Failed to inspect PSM plugin module: {e}"))?.len();
-    if length > NPM_MODULE_SOURCE_LIMIT_BYTES as u64 {
-        return Err(format!("PSM plugin module exceeds {NPM_MODULE_SOURCE_LIMIT_BYTES} bytes"));
-    }
-    Ok(path)
+    ensure_plugin_module_file(&ensure_npm_child(path)?)
 }
 
 fn validate_npm_package_name(package_name: &str) -> Result<&str, String> {
@@ -250,6 +298,10 @@ fn remove_npm_plugin_config_entries(config: &mut PsmPluginsConfig, package_name:
     config.plugins.retain(|_, entry| entry.source != "npm" || entry.package_name.as_deref() != Some(package_name));
 }
 
+fn remove_path_plugin_config_entries(config: &mut PsmPluginsConfig, entry_path: &str) {
+    config.plugins.retain(|_, entry| entry.source != "path" || entry.entry_path.as_deref() != Some(entry_path));
+}
+
 async fn run_npm_command(command: &str, package_name: Option<&str>) -> Result<(String, String), String> {
     let npm_dir = npm_extensions_dir()?;
     fs::create_dir_all(&npm_dir).map_err(|e| format!("Failed to create PSM npm extensions dir: {e}"))?;
@@ -278,9 +330,9 @@ pub async fn load_psm_plugin_config() -> Result<PsmPluginsConfig, String> {
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn set_psm_plugin_enabled(plugin_id: String, enabled: bool, source: Option<String>, package_name: Option<String>) -> Result<PsmPluginsConfig, String> {
+pub async fn set_psm_plugin_enabled(plugin_id: String, enabled: bool, source: Option<String>, package_name: Option<String>, entry_path: Option<String>) -> Result<PsmPluginsConfig, String> {
     let mut config = read_plugins_config()?;
-    let entry = config.plugins.entry(plugin_id).or_insert_with(|| PsmPluginConfigEntry { enabled, source: source.clone().unwrap_or_default(), package_name: package_name.clone(), settings: BTreeMap::new() });
+    let entry = config.plugins.entry(plugin_id).or_insert_with(|| PsmPluginConfigEntry { enabled, source: source.clone().unwrap_or_default(), package_name: package_name.clone(), entry_path: entry_path.clone(), settings: BTreeMap::new() });
     entry.enabled = enabled;
     if let Some(source) = source {
         entry.source = source;
@@ -288,19 +340,25 @@ pub async fn set_psm_plugin_enabled(plugin_id: String, enabled: bool, source: Op
     if package_name.is_some() {
         entry.package_name = package_name;
     }
+    if entry_path.is_some() {
+        entry.entry_path = entry_path;
+    }
     write_plugins_config(&config)?;
     Ok(config)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn set_psm_plugin_settings(plugin_id: String, settings: BTreeMap<String, Value>, source: Option<String>, package_name: Option<String>) -> Result<PsmPluginsConfig, String> {
+pub async fn set_psm_plugin_settings(plugin_id: String, settings: BTreeMap<String, Value>, source: Option<String>, package_name: Option<String>, entry_path: Option<String>) -> Result<PsmPluginsConfig, String> {
     let mut config = read_plugins_config()?;
-    let entry = config.plugins.entry(plugin_id).or_insert_with(|| PsmPluginConfigEntry { enabled: true, source: source.clone().unwrap_or_default(), package_name: package_name.clone(), settings: BTreeMap::new() });
+    let entry = config.plugins.entry(plugin_id).or_insert_with(|| PsmPluginConfigEntry { enabled: true, source: source.clone().unwrap_or_default(), package_name: package_name.clone(), entry_path: entry_path.clone(), settings: BTreeMap::new() });
     if let Some(source) = source {
         entry.source = source;
     }
     if package_name.is_some() {
         entry.package_name = package_name;
+    }
+    if entry_path.is_some() {
+        entry.entry_path = entry_path;
     }
     entry.settings = settings;
     write_plugins_config(&config)?;
@@ -310,6 +368,33 @@ pub async fn set_psm_plugin_settings(plugin_id: String, settings: BTreeMap<Strin
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn list_npm_psm_plugin_entries() -> Result<Vec<PsmNpmPluginEntry>, String> {
     list_npm_entries_internal()
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn list_path_psm_plugin_entries() -> Result<Vec<PsmPathPluginEntry>, String> {
+    list_path_entries_internal()
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn add_path_psm_plugin(entry_path: String) -> Result<PsmPluginsConfig, String> {
+    let canonical = normalize_path_plugin_entry_path(&entry_path)?;
+    let mut config = read_plugins_config()?;
+    if !config.custom_paths.iter().any(|path| path == &canonical) {
+        config.custom_paths.push(canonical);
+        config.custom_paths.sort();
+    }
+    write_plugins_config(&config)?;
+    Ok(config)
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn remove_path_psm_plugin(entry_path: String) -> Result<PsmPluginsConfig, String> {
+    let canonical = normalize_path_plugin_entry_path(&entry_path)?;
+    let mut config = read_plugins_config()?;
+    config.custom_paths.retain(|path| path != &canonical);
+    remove_path_plugin_config_entries(&mut config, &canonical);
+    write_plugins_config(&config)?;
+    Ok(config)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -346,10 +431,17 @@ pub async fn read_npm_psm_plugin_module_source(entry_path: String) -> Result<Str
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
+pub async fn read_path_psm_plugin_module_source(entry_path: String) -> Result<String, String> {
+    let path = ensure_plugin_module_file(&expand_home_path(&entry_path)?)?;
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read PSM plugin module: {e}"))
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_psm_plugin_paths() -> Result<PsmPluginPaths, String> {
     let npm_dir = npm_extensions_dir()?;
     fs::create_dir_all(&npm_dir).map_err(|e| format!("Failed to create PSM npm extensions dir: {e}"))?;
-    Ok(PsmPluginPaths { config_path: plugins_config_path()?.to_string_lossy().to_string(), npm_dir: npm_dir.to_string_lossy().to_string() })
+    let config = read_plugins_config()?;
+    Ok(PsmPluginPaths { config_path: plugins_config_path()?.to_string_lossy().to_string(), npm_dir: npm_dir.to_string_lossy().to_string(), custom_paths: config.custom_paths })
 }
 
 #[cfg(test)]
@@ -401,7 +493,7 @@ mod tests {
 
         let mut config = read_plugins_config().unwrap();
         assert_eq!(config, PsmPluginsConfig::default());
-        config.plugins.insert("builtin.sidechat".to_string(), PsmPluginConfigEntry { enabled: false, source: "builtin".to_string(), package_name: None, settings: BTreeMap::new() });
+        config.plugins.insert("builtin.sidechat".to_string(), PsmPluginConfigEntry { enabled: false, source: "builtin".to_string(), package_name: None, entry_path: None, settings: BTreeMap::new() });
         write_plugins_config(&config).unwrap();
 
         let loaded = read_plugins_config().unwrap();
@@ -426,7 +518,7 @@ mod tests {
         let mut settings = BTreeMap::new();
         settings.insert("limit".to_string(), Value::from(12));
         settings.insert("thinkingLevel".to_string(), Value::from("high"));
-        let config = runtime.block_on(set_psm_plugin_settings("builtin.sidechat".to_string(), settings, Some("builtin".to_string()), None)).unwrap();
+        let config = runtime.block_on(set_psm_plugin_settings("builtin.sidechat".to_string(), settings, Some("builtin".to_string()), None, None)).unwrap();
 
         let entry = &config.plugins["builtin.sidechat"];
         assert!(entry.enabled);
@@ -455,9 +547,9 @@ mod tests {
     #[test]
     fn removes_uninstalled_npm_plugin_config_entries() {
         let mut config = PsmPluginsConfig::default();
-        config.plugins.insert("npm.sidechat".to_string(), PsmPluginConfigEntry { enabled: false, source: "npm".to_string(), package_name: Some("@acme/psm-sidechat".to_string()), settings: BTreeMap::new() });
-        config.plugins.insert("npm.other".to_string(), PsmPluginConfigEntry { enabled: true, source: "npm".to_string(), package_name: Some("@acme/other".to_string()), settings: BTreeMap::new() });
-        config.plugins.insert("builtin.sidechat".to_string(), PsmPluginConfigEntry { enabled: true, source: "builtin".to_string(), package_name: Some("@acme/psm-sidechat".to_string()), settings: BTreeMap::new() });
+        config.plugins.insert("npm.sidechat".to_string(), PsmPluginConfigEntry { enabled: false, source: "npm".to_string(), package_name: Some("@acme/psm-sidechat".to_string()), entry_path: None, settings: BTreeMap::new() });
+        config.plugins.insert("npm.other".to_string(), PsmPluginConfigEntry { enabled: true, source: "npm".to_string(), package_name: Some("@acme/other".to_string()), entry_path: None, settings: BTreeMap::new() });
+        config.plugins.insert("builtin.sidechat".to_string(), PsmPluginConfigEntry { enabled: true, source: "builtin".to_string(), package_name: Some("@acme/psm-sidechat".to_string()), entry_path: None, settings: BTreeMap::new() });
 
         remove_npm_plugin_config_entries(&mut config, "@acme/psm-sidechat");
 
@@ -479,7 +571,7 @@ mod tests {
         let big_path = package_dir.join("big.js");
         let outside_path = home.path().join("outside.js");
         fs::write(&txt_path, "export const manifest = {}; ").unwrap();
-        fs::write(&big_path, vec![b'a'; NPM_MODULE_SOURCE_LIMIT_BYTES + 1]).unwrap();
+        fs::write(&big_path, vec![b'a'; PLUGIN_MODULE_SOURCE_LIMIT_BYTES + 1]).unwrap();
         fs::write(&outside_path, "export const manifest = {}; ").unwrap();
 
         let runtime = tokio::runtime::Runtime::new().unwrap();
@@ -524,6 +616,73 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].package_name, "@acme/psm-reload");
         assert_eq!(entries[0].export_path, "./dist/index.mjs");
+
+        if let Some(old_home) = old_home {
+            env::set_var("HOME", old_home);
+        } else {
+            env::remove_var("HOME");
+        }
+    }
+
+    #[test]
+    fn adds_lists_and_removes_custom_path_plugin_entries() {
+        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let home = tempfile::tempdir().unwrap();
+        let old_home = env::var("HOME").ok();
+        env::set_var("HOME", home.path());
+
+        let plugin_dir = home.path().join("plugins");
+        fs::create_dir_all(&plugin_dir).unwrap();
+        let plugin_path = plugin_dir.join("local-plugin.mjs");
+        fs::write(&plugin_path, "export const manifest = { id: 'path.local', name: 'Local', version: '1.0.0' };").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let config = runtime.block_on(add_path_psm_plugin(plugin_path.to_string_lossy().to_string())).unwrap();
+        assert_eq!(config.custom_paths.len(), 1);
+
+        let duplicate = runtime.block_on(add_path_psm_plugin(plugin_path.to_string_lossy().to_string())).unwrap();
+        assert_eq!(duplicate.custom_paths.len(), 1);
+
+        let entries = runtime.block_on(list_path_psm_plugin_entries()).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].entry_path.ends_with("local-plugin.mjs"));
+        assert!(entries[0].module_modified_ms.is_some());
+        assert!(entries[0].source_hash.as_deref().is_some_and(|hash| hash.len() == 64));
+
+        let removed = runtime.block_on(remove_path_psm_plugin(plugin_path.to_string_lossy().to_string())).unwrap();
+        assert!(removed.custom_paths.is_empty());
+        assert!(runtime.block_on(list_path_psm_plugin_entries()).unwrap().is_empty());
+
+        if let Some(old_home) = old_home {
+            env::set_var("HOME", old_home);
+        } else {
+            env::remove_var("HOME");
+        }
+    }
+
+    #[test]
+    fn read_path_module_source_rejects_unsafe_files() {
+        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let home = tempfile::tempdir().unwrap();
+        let old_home = env::var("HOME").ok();
+        env::set_var("HOME", home.path());
+
+        let plugin_dir = home.path().join("plugins");
+        fs::create_dir_all(&plugin_dir).unwrap();
+        let safe_path = plugin_dir.join("safe.js");
+        let txt_path = plugin_dir.join("safe.txt");
+        let big_path = plugin_dir.join("big.mjs");
+        fs::write(&safe_path, "export const manifest = {}; ").unwrap();
+        fs::write(&txt_path, "export const manifest = {}; ").unwrap();
+        fs::write(&big_path, vec![b'a'; PLUGIN_MODULE_SOURCE_LIMIT_BYTES + 1]).unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        assert_eq!(runtime.block_on(read_path_psm_plugin_module_source(safe_path.to_string_lossy().to_string())).unwrap(), "export const manifest = {}; ");
+        let txt_err = runtime.block_on(read_path_psm_plugin_module_source(txt_path.to_string_lossy().to_string())).unwrap_err();
+        let big_err = runtime.block_on(read_path_psm_plugin_module_source(big_path.to_string_lossy().to_string())).unwrap_err();
+
+        assert!(txt_err.contains(".js or .mjs"));
+        assert!(big_err.contains("exceeds"));
 
         if let Some(old_home) = old_home {
             env::set_var("HOME", old_home);

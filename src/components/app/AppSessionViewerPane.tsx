@@ -43,20 +43,24 @@ function AppSessionViewerPane({
   const { getSessionSetting } = useSettings();
   const conversationModeEnabled = getSessionSetting("conversationModeEnabled") !== false;
   const { toolbarItems, panels } = usePsmPluginSessionUi();
-  const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
+  const [activePanelId, setActivePanelId] = useState<string | null>(null);
+  const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const [panelWidths, setPanelWidths] = useState<Record<string, number>>({});
 
   const togglePanel = useCallback((id: string) => {
-    setOpenPanels((prev) => ({ ...prev, [id]: !prev[id] }));
+    setActivePanelId((prev) => (prev === id ? null : id));
   }, []);
 
   const closePanel = useCallback((id: string) => {
-    setOpenPanels((prev) => ({ ...prev, [id]: false }));
+    setActivePanelId((prev) => (prev === id ? null : prev));
   }, []);
 
   const setPanelWidth = useCallback((id: string, width: number) => {
     setPanelWidths((prev) => ({ ...prev, [id]: width }));
   }, []);
+
+  const rightPanels = panels.filter((panel) => (panel.side ?? "right") === "right");
+  const activePanel = rightPanels.find((panel) => panel.id === activePanelId) ?? null;
 
   const sessionToolbarSlot = (
     <>
@@ -68,7 +72,8 @@ function AppSessionViewerPane({
             <PluginContributionBoundary pluginId={item.pluginId} contributionId={item.id} title={item.title}>
               <PluginContributionSlot render={() => item.render({
                 session,
-                panelOpen: panelId ? Boolean(openPanels[panelId]) : undefined,
+                activeEntryId,
+                panelOpen: panelId ? activePanelId === panelId : undefined,
                 togglePanel: panelId ? () => togglePanel(panelId) : undefined,
               })} />
             </PluginContributionBoundary>
@@ -78,23 +83,49 @@ function AppSessionViewerPane({
     </>
   );
 
-  const rightPanelSlot = (
-    <>
-      {panels.filter((panel) => (panel.side ?? "right") === "right").map((panel) => (
-        <Fragment key={panel.id}>
-          <PluginContributionBoundary pluginId={panel.pluginId} contributionId={panel.id} title={panel.title}>
-            <PluginContributionSlot render={() => panel.render({
-              session,
-              panelOpen: Boolean(openPanels[panel.id]),
-              closePanel: () => closePanel(panel.id),
-              width: panelWidths[panel.id] ?? 380,
-              onWidthChange: (width) => setPanelWidth(panel.id, width),
-            })} />
-          </PluginContributionBoundary>
-        </Fragment>
-      ))}
-    </>
-  );
+  const rightPanelSlot = activePanel ? (
+    <aside
+      className="hidden h-full min-h-0 shrink-0 border-l border-border/70 bg-surface-dark/65 xl:flex xl:flex-col"
+      style={{ width: panelWidths[activePanel.id] ?? 380 }}
+      data-no-window-drag
+    >
+      {rightPanels.length > 1 && (
+        <div className="relative z-10 flex items-center gap-1 border-b border-border/70 bg-background/20 px-2 py-2" data-no-window-drag>
+          {rightPanels.map((panel) => {
+            const active = panel.id === activePanel.id;
+            return (
+              <button
+                key={panel.id}
+                type="button"
+                onClick={() => setActivePanelId(panel.id)}
+                data-no-window-drag
+                className={[
+                  "inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors",
+                  active
+                    ? "border-primary/30 bg-primary/12 text-foreground"
+                    : "border-transparent bg-transparent text-muted-foreground hover:border-border/60 hover:bg-background/25 hover:text-foreground",
+                ].join(" ")}
+              >
+                {panel.title}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="min-h-0 flex-1 overflow-hidden" data-no-window-drag>
+        <PluginContributionBoundary pluginId={activePanel.pluginId} contributionId={activePanel.id} title={activePanel.title}>
+          <PluginContributionSlot render={() => activePanel.render({
+            session,
+            activeEntryId,
+            panelOpen: true,
+            closePanel: () => closePanel(activePanel.id),
+            width: panelWidths[activePanel.id] ?? 380,
+            onWidthChange: (width) => setPanelWidth(activePanel.id, width),
+          })} />
+        </PluginContributionBoundary>
+      </div>
+    </aside>
+  ) : null;
 
   return (
     <SessionViewer
@@ -114,6 +145,7 @@ function AppSessionViewerPane({
       previewVariant={conversationModeEnabled ? "conversation" : "none"}
       slots={{ ...slots, right: sessionToolbarSlot }}
       layoutSlots={{ right: rightPanelSlot }}
+      onActiveEntryIdChange={setActiveEntryId}
     />
   );
 }

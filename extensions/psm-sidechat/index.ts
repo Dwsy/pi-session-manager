@@ -48,7 +48,7 @@ export default function activate(ctx: PsmPluginHostContext) {
   })
   ctx.ui.registerSessionToolbarItem({
     id: 'builtin.sidechat.toolbar',
-    title: 'Side chat',
+    title: 'Chat',
     panelId: 'builtin.sidechat.panel',
     render: (props) => createElement(SessionSideChatToolbarButton, {
       i18n: ctx.i18n,
@@ -58,7 +58,7 @@ export default function activate(ctx: PsmPluginHostContext) {
   })
   ctx.ui.registerSessionPanel({
     id: 'builtin.sidechat.panel',
-    title: 'Side chat',
+    title: 'Chat',
     side: 'right',
     render: (props) => createElement(SessionSideChatPanel, {
       client: ctx.psm,

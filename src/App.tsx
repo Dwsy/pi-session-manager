@@ -1,3 +1,4 @@
+import * as ReactRuntime from "react";
 import { useState, useMemo, useRef, useCallback, lazy, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
@@ -34,17 +35,14 @@ import { useUpdateChecker } from "./hooks/app/useUpdateChecker";
 import { useDesktopSidebarActions } from "./hooks/app/useDesktopSidebarActions";
 import { useFavorites } from "./hooks/app/useFavorites";
 import { useSidebarSessions } from "./hooks/app/useSidebarSessions";
-import {
-  registerBuiltinToolPlugins,
-  registerExtensionToolPlugins,
-} from "./plugins/tools-render";
+import { registerBuiltinToolPlugins } from "./plugins/tools-render";
 import ConnectionBanner from "./components/ConnectionBanner";
 import UpdateNoticeToast from "./components/UpdateNoticeToast";
 import StandaloneDatasetOverview from "./components/dataset/StandaloneDatasetOverview";
 import { useTags } from "./hooks/useTags";
 import type { SessionConvertTarget, SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
-import { initializePsmPluginHost } from "./plugins/runtime-host";
+import { initializePsmPluginHost, psmPluginHost } from "./plugins/runtime-host";
 import { invoke, isTauri } from "./transport";
 import { getCachedSettings } from "./utils/settingsApi";
 import { getSessionSourceSlug } from "./utils/session";
@@ -88,6 +86,10 @@ import {
   DEFAULT_SESSION_SORT_BY,
   DEFAULT_SESSION_SORT_ORDER,
 } from "./types/sessionSort";
+
+if (!(globalThis as Record<string, unknown>).__PSM_HOST_REACT__) {
+  (globalThis as Record<string, unknown>).__PSM_HOST_REACT__ = ReactRuntime;
+}
 
 const startDragging = () => {
   if (isTauri()) {
@@ -142,16 +144,20 @@ function App() {
 
   // Delayed scanning page: only show if loading takes >500ms (avoids flash on fast DB loads)
   const [showScanningPage, setShowScanningPage] = useState(false);
+  const [, setPluginRenderVersion] = useState(0);
   const loadingRef = useRef(true);
   const frontendReadyEmittedRef = useRef(false);
 
-  // Register tool render plugins
+  // Register core tool renderers; extension renderers are loaded by the PSM plugin host.
   useEffect(() => {
+    const unsubscribe = psmPluginHost.subscribe(() => {
+      setPluginRenderVersion((version) => version + 1);
+    });
     registerBuiltinToolPlugins();
-    registerExtensionToolPlugins();
     initializePsmPluginHost().catch((error) => {
       console.error("[PSM plugins] Failed to initialize plugin host:", error);
     });
+    return unsubscribe;
   }, []);
   const isMobile = useIsMobile();
 
@@ -323,10 +329,12 @@ function App() {
     navigateToSession,
     navigateToSessions,
     navigateToFeature,
+    pendingSessionRoute,
   } = useRouteSync({
     setSelectedSession,
     selectedSession,
     sessions,
+    sessionsLoading: loading,
     setViewMode: setSidebarMode as (mode: 'list' | 'project' | 'kanban') => void,
     setSelectedProject,
     setShowSettings,
@@ -1231,6 +1239,8 @@ function App() {
               : renderDashboard
           }
           renderSettings={renderSettings}
+          routeSessionPending={pendingSessionRoute}
+          renderRouteSessionPending={LoadingSpinner}
           showDashboardTab={!standaloneDatasetRuntime}
           renderOverlays={renderOverlays}
         />
@@ -1329,15 +1339,17 @@ function App() {
     />
   );
 
-  const desktopMainContent = resolveDesktopMainContent({
-    selectedSession,
-    sidebarMode,
-    standaloneDatasetRuntime,
-    renderSessionViewer,
-    renderKanban,
-    renderStandaloneDatasetOverview,
-    renderDashboard,
-  });
+  const desktopMainContent = pendingSessionRoute
+    ? <LoadingSpinner />
+    : resolveDesktopMainContent({
+        selectedSession,
+        sidebarMode,
+        standaloneDatasetRuntime,
+        renderSessionViewer,
+        renderKanban,
+        renderStandaloneDatasetOverview,
+        renderDashboard,
+      });
 
   const desktopTerminalPanel = standaloneDatasetRuntime ? null : (
     <AppTerminalPane

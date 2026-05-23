@@ -290,6 +290,9 @@ See [agent-docs/03-backend.md](agent-docs/03-backend.md) for detailed tutorial.
 | [agent-docs/03-backend.md](agent-docs/03-backend.md) | Backend modules + command tutorial |
 | [agent-docs/04-development.md](agent-docs/04-development.md) | Build & release |
 | [agent-docs/05-config.md](agent-docs/05-config.md) | Config & security |
+| [docs/PSM_PLUGIN_SDK.md](docs/PSM_PLUGIN_SDK.md) | Public PSM browser-plugin SDK contract |
+| [docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md](docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md) | SDK capability exposure and contract reuse audit |
+| [extensions/README.md](extensions/README.md) | PSM built-in plugins and Pi Agent extension overview |
 | [DESIGN.md](DESIGN.md) | Design system (colors, typography, motion) |
 
 ## License

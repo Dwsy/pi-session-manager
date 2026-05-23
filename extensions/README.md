@@ -1,200 +1,235 @@
 # Pi Session Manager Extensions
 
-Pi agent 扩展与 PSM 插件示例集合。
+This directory contains Pi Agent extensions and PSM browser-plugin examples.
 
-PSM 插件文档见 [`docs/PSM_PLUGIN_SDK.md`](../docs/PSM_PLUGIN_SDK.md)。
-当前 PSM 内置插件放在 `extensions/psm-*` 下，启动时自动导入，可通过
-`~/.pi/pi-session-manager/plugins.json` 或设置页关闭。
+For the PSM plugin SDK, see [`docs/PSM_PLUGIN_SDK.md`](../docs/PSM_PLUGIN_SDK.md).
+For the current SDK capability audit and contract gaps, see [`docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md`](../docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md).
 
-外部 npm PSM 插件安装到：
+Built-in PSM plugins live under `extensions/psm-*`. They are discovered at startup and can be disabled through the Settings UI or `~/.pi/pi-session-manager/plugins.json`.
+
+External PSM plugins can be loaded in two ways:
+
+- install an npm package into the managed npm workspace
+- add an explicit local `.js` or `.mjs` entry path through Settings -> PSM Plugins
 
 ```bash
 npm install --prefix ~/.pi/pi-session-manager/extensions/npm <package>
 ```
 
-包内使用 `package.json` 的 `psm.extensions` 声明浏览器兼容 ESM 入口。
+A plugin package declares browser-compatible ESM entries through `package.json#psm.extensions`.
+A path plugin points directly to a built browser-compatible ESM file such as
+`/absolute/path/to/my-psm-plugin/dist/index.mjs`.
 
 ---
 
-## PSM 插件
+## PSM Plugins
 
-| 插件 | 用途 | 权限 |
-|------|------|------|
-| [psm-session-summary](./psm-session-summary/) | 智能总结，写入 `session.intelligence` record | `sessions:read`, `records:read`, `records:write`, `model:invoke` |
-| [psm-sidechat](./psm-sidechat/) | 会话问答命令/工具示例 | `sidechat:ask`, `model:invoke` |
+| Plugin | Purpose | Permissions |
+| --- | --- | --- |
+| [psm-session-summary](./psm-session-summary/) | Generates session intelligence and writes `session.intelligence` plugin records | `sessions:read`, `records:read`, `records:write`, `model:invoke` |
+| [psm-sidechat](./psm-sidechat/) | Session Q&A command/tool and toolbar panel example | `sidechat:ask`, `model:invoke` |
+
+### SDK Capability Notes
+
+The public SDK package is `@pi-session-manager/plugin-sdk`. It intentionally exposes only the stable browser-plugin contract:
+
+- manifest and package validation helpers
+- plugin host context and activation types
+- command/tool registration
+- session toolbar and right-panel UI contributions
+- plugin settings and i18n clients
+- the `ctx.psm` capability client for selected plugin-safe PSM operations
+
+It does not export the runtime host, app transport, Tauri APIs, npm plugin installation internals, or desktop-private implementation.
+
+Current `ctx.psm` namespaces:
+
+| Namespace | Methods |
+| --- | --- |
+| `records` | `search`, `listForScope`, `upsert`, `refreshSessionIntelligence` |
+| `sessions` | `scan`, `list`, `readEntries`, `readFileChunk`, `getLabels`, `open` |
+| `search` | `fulltext`, `pluginRecords` |
+| `sidechat` | `ask` |
+| `models` | `listOptions` |
+| `kanban` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` |
+
+The SDK is not intended to expose every backend dispatch command. Commands such as database reset, API key management, raw terminal I/O, app settings, devtools, and plugin installation remain host-internal or privileged.
 
 ---
 
-## Pi Agent 插件总览
+## Pi Agent Extensions Overview
 
-以下扩展遵循 [pi-package](https://github.com/mariozechner/pi-coding-agent) 规范，放在 `~/.pi/agent/extensions/` 下自动加载。
+The following extensions follow the Pi package convention and are loaded from `~/.pi/agent/extensions/`.
 
-| 插件 | 用途 | 依赖 |
-|------|------|------|
-| [pi-session-bridge](./pi-session-bridge/) | 会话同步、搜索、标签、上下文召回 | better-sqlite3 |
-| [resume-x](./resume-x/) | 增强版会话恢复，SQLite 快速路径 | better-sqlite3 |
-| [rename-nag](./rename-nag/) | 智能会话命名提醒 | — |
+| Extension | Purpose | Dependency |
+| --- | --- | --- |
+| [pi-session-bridge](./pi-session-bridge/) | Session sync, search, tags, and context recall | `better-sqlite3` |
+| [resume-x](./resume-x/) | Enhanced session resume with a SQLite fast path | `better-sqlite3` |
+| [rename-nag](./rename-nag/) | Smart session naming reminders | none |
 
-bridge 和 resume-x 共享同一个 SQLite 数据库 (`~/.pi/agent/sessions/sessions.db`)，各自独立加载，互不干扰。rename-nag 通过 Pi API 管理会话名称，不直接访问 SQLite。
+`pi-session-bridge` and `resume-x` share the same SQLite database at `~/.pi/agent/sessions/sessions.db`. They load independently and do not depend on each other. `rename-nag` manages session names through the Pi API and does not access SQLite directly.
 
-**包名差异**：bridge 使用旧版 `@mariozechner/pi-coding-agent`，resume-x 和 rename-nag 使用新版 `@earendil-works/pi-coding-agent`。
+Package API note: `pi-session-bridge` uses the older `@mariozechner/pi-coding-agent` package, while `resume-x` and `rename-nag` use the newer `@earendil-works/pi-coding-agent` / `@earendil-works/pi-tui` APIs injected by the Pi runtime.
 
 ---
 
 ## pi-session-bridge
 
-**桥接 Pi agent 与 Pi Session Manager 的核心插件。**
+**Core bridge between Pi Agent and Pi Session Manager.**
 
-功能：
-- **Live Mode** — WebSocket 实时同步会话事件到 PSM
-- **Search** — 通过 PSM HTTP API 全文搜索历史会话
-- **Tags** — SQLite 驱动的会话标签系统
-- **Context Recall** — 从历史会话中召回相关上下文
-- **Config** — `/psm-config` 命令管理桥接配置
+Features:
+
+- **Live Mode** — streams session events to PSM over WebSocket
+- **Search** — searches historical sessions through the PSM HTTP API
+- **Tags** — manages session tags through the shared SQLite database
+- **Context Recall** — retrieves relevant context from previous sessions
+- **Config** — exposes `/psm-config` for bridge configuration
 
 ```bash
-# 安装
+# Install
 pi install npm:Dwsy/psm-bridge
 
-# Live 模式
+# Live mode
 /psm-live on
 /psm-live off
 
-# 搜索
+# Search
 /session_search query="rust async traits"
 
-# 标签
-/state          # 查看当前标签
-/state-set wip  # 设置标签
-/flow start     # 快速流转
+# Tags
+/state           # show current tag
+/state-set wip   # set tag
+/flow start      # quick workflow transition
 
-# 上下文召回
+# Context recall
 /session_recall query="how to fix the bug"
 ```
 
-### 工具
+### Tools
 
-| Tool | 说明 |
-|------|------|
-| `session_search` | 全文搜索历史会话 |
-| `session_recall` | 搜索 + 召回上下文 |
-| `session_context` | 获取指定会话的消息 |
-| `session_tag` | 标签管理 (list/set/remove) |
+| Tool | Description |
+| --- | --- |
+| `session_search` | Full-text search over historical sessions |
+| `session_recall` | Search plus contextual recall |
+| `session_context` | Fetch messages around a target session hit |
+| `session_tag` | Manage tags (`list`, `set`, `remove`) |
 
-> 注：`session_rename` 工具已迁移至 [rename-nag](#rename-nag)。
+Note: `session_rename` has moved to [rename-nag](#rename-nag).
 
-### 命令
+### Commands
 
-| Command | 说明 |
-|---------|------|
-| `/psm` | 桥接状态 |
-| `/psm-live on/off` | 切换实时模式 |
-| `/psm-connect` / `/psm-disconnect` | 手动连接/断开 |
-| `/state` `/state-set` `/state-list` `/state-clear` | 标签管理 |
-| `/flow <action>` | 快速流转 |
-| `/open-in-pms` / `/open-in-psm` | 在 PSM 中打开当前会话（`web` 参数强制网页） |
-| `/psm-config` | 配置管理 |
+| Command | Description |
+| --- | --- |
+| `/psm` | Show bridge status |
+| `/psm-live on/off` | Toggle live mode |
+| `/psm-connect` / `/psm-disconnect` | Manually connect or disconnect |
+| `/state` `/state-set` `/state-list` `/state-clear` | Manage session tags |
+| `/flow <action>` | Quick workflow transition |
+| `/open-in-pms` / `/open-in-psm` | Open the current session in PSM. Pass `web` to force the web UI. |
+| `/psm-config` | Manage bridge configuration |
 
-### 状态指示
+### Status Indicator
 
-```
-[psm]         — 已连接
-[retry N]     — 重连中 (第 N 次)
-[timeout]     — 连接断开
-[psm: off]    — 实时模式关闭
+```text
+[psm]         - connected
+[retry N]     - reconnecting, attempt N
+[timeout]     - disconnected after timeout
+[psm: off]    - live mode disabled
 ```
 
 ---
 
 ## resume-x
 
-**增强版会话恢复，绕过磁盘扫描直接查 SQLite。**
+**Enhanced session resume that bypasses disk scanning and reads SQLite directly.**
 
-功能：
-- SQLite 快速路径（无需扫描磁盘文件）
-- 按 cwd 过滤当前项目的会话
-- 详情面板：模型、token 用量、费用
-- 消息预览：按 ← 浏览对话历史，→ 返回
-- Kanban 标签展示
+Features:
+
+- SQLite fast path without rescanning session files
+- cwd filtering for the current project
+- details panel with model, token usage, and cost
+- message preview with left/right navigation
+- Kanban tag display
 
 ```bash
-# 使用
+# Use
 /resume-x
 ```
 
-### 特性
+### Features
 
-| 特性 | 说明 |
-|------|------|
-| 快速加载 | 直接查 SQLite，跳过磁盘扫描 |
-| cwd 过滤 | 只显示当前项目目录的会话 |
-| 详情面板 | 模型名、input/output tokens、费用 |
-| 消息预览 | ← → 浏览完整对话 |
-| Kanban 标签 | 显示会话的看板标签 |
+| Feature | Description |
+| --- | --- |
+| Fast load | Reads SQLite directly and skips disk scanning |
+| cwd filter | Shows sessions from the current project directory |
+| Details panel | Displays model, input/output tokens, and cost |
+| Message preview | Browse conversation preview with left/right keys |
+| Kanban tags | Shows session Kanban tags |
 
 ---
 
 ## rename-nag
 
-**智能会话命名提醒 — 让 agent 主动为会话取名。**
+**Smart session naming reminder that nudges agents to name sessions.**
 
-功能：
-- 注册 `session_rename` 工具（从 bridge 迁移）
-- 追踪会话历史和对话轮次
-- 满足条件时注入隐藏消息 (`display: false`) 提醒 agent 命名
-- agent 调用 rename 后自动关闭提醒
+Features:
 
-### 触发条件
+- registers the `session_rename` tool, moved out of the bridge extension
+- tracks conversation entries and tool-call count
+- injects hidden reminders (`display: false`) when naming conditions are met
+- stops reminding after the agent renames the session
 
-| 轮次 | 条件 | 提醒内容 |
-|------|------|----------|
-| 首次 | 工具调用 > 6 + 未命名 | 完整提醒：说明可用工具 + 命名建议 |
-| 后续 | 每 40 次工具调用 (40, 80, 120...) + 已命名 | 提醒检查名称是否仍匹配当前话题，转向则更新 |
+### Trigger Conditions
 
-**"未命名"判定**：会话名为 NULL 或匹配默认时间戳格式 `YYYY-MM-DDTHH:MM:SS` 或 `YYYY-MM-DDTHH-MM-SS`。
+| Turn | Condition | Reminder |
+| --- | --- | --- |
+| First reminder | tool calls > 6 and session still unnamed | Full reminder with available tool and naming guidance |
+| Later reminders | every 40 tool calls (40, 80, 120...) after the session has a name | Ask the agent to check whether the name still matches the current topic |
 
-### 工作原理
+An unnamed session is one whose name is null or matches a default timestamp format such as `YYYY-MM-DDTHH:MM:SS` or `YYYY-MM-DDTHH-MM-SS`.
 
+### How It Works
+
+```text
+session_start (including resume)
+  -> scan existing entries and count tool calls
+  -> if already named or tool calls > 6, mark firstNagSent
+
+tool_call (any tool)
+  -> increment toolCallCount
+
+before_agent_start (each user message)
+  |- unnamed + toolCallCount > 6 + first reminder not sent -> full reminder
+  `- named + toolCallCount is a multiple of 40 -> topic-drift naming check
 ```
-session_start (含 resume)
-  → 扫描已有 entries 统计 toolCall 数量
-  → 若已命名或已 > 6 则标记 firstNagSent
 
-tool_call (任意工具)
-  → toolCallCount++
+### Tools
 
-before_agent_start (每次用户消息)
-  ├─ 未命名 + toolCallCount > 6 且首次 → 完整提醒
-  └─ 已命名 + toolCallCount 是 40 的倍数 → 提醒检查话题是否转向
-```
-
-### 工具
-
-| Tool | 说明 |
-|------|------|
-| `session_rename` | 重命名当前会话 |
+| Tool | Description |
+| --- | --- |
+| `session_rename` | Rename the current session |
 
 ---
 
-## 开发
+## Development
 
-### 安装到本地
+### Install Locally
 
 ```bash
-# 符号链接到 pi 扩展目录
+# Symlink into the Pi extension directory
 ln -sf $(pwd)/extensions/pi-session-bridge ~/.pi/agent/extensions/pi-session-bridge
 ln -sf $(pwd)/extensions/resume-x ~/.pi/agent/extensions/resume-x
 ln -sf $(pwd)/extensions/rename-nag ~/.pi/agent/extensions/rename-nag
 ```
 
-### 临时测试
+### Temporary Testing
 
 ```bash
 pi -e extensions/rename-nag/index.ts
 ```
 
-### 依赖
+### Dependencies
 
-- **better-sqlite3** (^12.9.0)：bridge 和 resume-x 用于 SQLite 访问，解析自项目根目录的 `node_modules`
-- **@mariozechner/pi-coding-agent**：bridge 使用的旧版 pi 扩展 API
-- **@earendil-works/pi-coding-agent** / **@earendil-works/pi-tui**：resume-x 和 rename-nag 使用的新版 pi 扩展 API，由 pi 运行时注入，无需声明
+- **better-sqlite3** (`^12.9.0`): used by `pi-session-bridge` and `resume-x` for SQLite access, resolved from the project root `node_modules`
+- **@mariozechner/pi-coding-agent**: older Pi extension API used by `pi-session-bridge`
+- **@earendil-works/pi-coding-agent** / **@earendil-works/pi-tui**: newer Pi extension APIs used by `resume-x` and `rename-nag`; injected by the Pi runtime and not declared by these packages
