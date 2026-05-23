@@ -8,6 +8,11 @@ export type PsmPermission =
   | 'sidechat:ask'
   | 'model:invoke'
 
+export interface PsmModelOption {
+  provider: string
+  model: string
+}
+
 export type PsmRecordScope = 'session' | 'project' | 'global' | 'entry'
 export type PsmRecordIndexType = 'text' | 'number' | 'datetime' | 'boolean'
 
@@ -238,6 +243,9 @@ export interface PsmSideChatAskParams {
   sessionPath: string
   question: string
   language?: string
+  provider?: string
+  model?: string
+  thinkingLevel?: string
   limit?: number
 }
 
@@ -245,11 +253,16 @@ export interface PsmSideChatClient {
   ask(params: PsmSideChatAskParams): Promise<PsmSideChatResponse>
 }
 
+export interface PsmModelsClient {
+  listOptions(): Promise<PsmModelOption[]>
+}
+
 export interface PsmCapabilityClient {
   records: PsmRecordsClient
   sessions: PsmSessionsClient
   search: PsmSearchClient
   sidechat: PsmSideChatClient
+  models: PsmModelsClient
   kanban: PsmKanbanClient
 }
 

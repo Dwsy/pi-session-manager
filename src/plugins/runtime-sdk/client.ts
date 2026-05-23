@@ -9,6 +9,7 @@ import type {
   PsmCapabilityClient,
   PsmCreateTagParams,
   PsmFullTextSearchParams,
+  PsmModelOption,
   PsmSessionListParams,
   PsmSessionOpenOptions,
   PsmSessionReadChunkOptions,
@@ -72,6 +73,9 @@ function toSideChatPayload(params: PsmSideChatAskParams) {
     path: params.sessionPath,
     question: params.question,
     language: params.language,
+    provider: params.provider,
+    model: params.model,
+    thinkingLevel: params.thinkingLevel,
     limit: params.limit,
   }
 }
@@ -183,6 +187,11 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
     sidechat: {
       ask(params) {
         return transport.invoke<PsmSideChatResponse>('ask_session_sidechat', toSideChatPayload(params))
+      },
+    },
+    models: {
+      listOptions() {
+        return transport.invoke<PsmModelOption[]>('list_model_options_fast')
       },
     },
     kanban: {

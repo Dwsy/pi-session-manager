@@ -1,28 +1,42 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   BotMessageSquare,
+  ChevronDown,
   ExternalLink,
   GripVertical,
   Loader2,
   MessageCircleQuestion,
   Search,
   Send,
+  Settings2,
   X,
 } from "lucide-react";
 
 import {
   appPsmTransport,
   createPluginCapabilityClient,
+  type PsmModelOption,
   type PsmSideChatCitation,
 } from "@/plugins/runtime-sdk";
 import type { SessionInfo } from "@/types";
+
+const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+const DEFAULT_SNIPPET_LIMIT = 8;
+const SNIPPET_LIMIT_OPTIONS = [4, 6, 8, 10, 12] as const;
 
 interface SessionSideChatPanelProps {
   session: SessionInfo;
   open: boolean;
   onClose: () => void;
   width?: number;
+}
+
+interface SideChatOptionsState {
+  provider: string;
+  model: string;
+  thinkingLevel: string;
+  limit: number;
 }
 
 function citationEntryId(citation: PsmSideChatCitation) {
@@ -42,6 +56,10 @@ function citationCreatedAt(citation: PsmSideChatCitation, language?: string) {
   }).format(date);
 }
 
+function providerModelLabel(option: PsmModelOption) {
+  return `${option.provider}/${option.model}`;
+}
+
 export default function SessionSideChatPanel({
   session,
   open,
@@ -58,8 +76,46 @@ export default function SessionSideChatPanel({
   const [citations, setCitations] = useState<PsmSideChatCitation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [models, setModels] = useState<PsmModelOption[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [options, setOptions] = useState<SideChatOptionsState>({
+    provider: "",
+    model: "",
+    thinkingLevel: "medium",
+    limit: DEFAULT_SNIPPET_LIMIT,
+  });
 
   const trimmedQuestion = question.trim();
+  const selectedModelLabel = options.provider && options.model
+    ? `${options.provider}/${options.model}`
+    : t("session.sideChat.modelAuto", "Auto")
+  const selectedThinkingLabel = t(`components.thinkingLevel.${options.thinkingLevel}`, options.thinkingLevel)
+  const selectedLimitLabel = `${options.limit}`
+
+  useEffect(() => {
+    if (!open || models.length > 0 || modelsLoading) return;
+
+    let cancelled = false;
+    setModelsLoading(true);
+    client.models
+      .listOptions()
+      .then((items) => {
+        if (cancelled) return;
+        setModels(items);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("[SessionSideChatPanel] Failed to load model options:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setModelsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client.models, models.length, modelsLoading, open]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -72,7 +128,10 @@ export default function SessionSideChatPanel({
         sessionPath: session.path,
         question: trimmedQuestion,
         language: i18n.language,
-        limit: 8,
+        provider: options.provider || undefined,
+        model: options.model || undefined,
+        thinkingLevel: options.thinkingLevel || undefined,
+        limit: options.limit,
       });
       setAnswer(response.answer);
       setCitations(response.citations ?? []);
@@ -117,7 +176,99 @@ export default function SessionSideChatPanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="border-b border-border/70 p-3">
+        <div className="border-b border-border/70 p-3 space-y-2.5">
+          <div className="rounded-lg border border-border/60 bg-background/45">
+            <button
+              type="button"
+              onClick={() => setOptionsOpen((value) => !value)}
+              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                  <Settings2 className="h-3.5 w-3.5 text-primary" />
+                  <span>{t("session.sideChat.options", "Options")}</span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+                  <span>{selectedModelLabel}</span>
+                  <span>·</span>
+                  <span>{selectedThinkingLabel}</span>
+                  <span>·</span>
+                  <span>{selectedLimitLabel} {t("session.sideChat.snippets", "snippets")}</span>
+                </div>
+              </div>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${optionsOpen ? "rotate-180" : ""}`} />
+            </button>
+            {optionsOpen && (
+              <div className="border-t border-border/60 px-3 py-3 space-y-3">
+                <label className="block space-y-1">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {t("session.sideChat.model", "Model")}
+                  </span>
+                  <select
+                    value={options.provider && options.model ? `${options.provider}::${options.model}` : ""}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (!value) {
+                        setOptions((prev) => ({ ...prev, provider: "", model: "" }));
+                        return;
+                      }
+                      const [provider, model] = value.split("::");
+                      setOptions((prev) => ({ ...prev, provider, model }));
+                    }}
+                    className="w-full rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground outline-none focus:border-primary/50"
+                  >
+                    <option value="">{t("session.sideChat.modelAuto", "Auto")}</option>
+                    {models.map((option) => (
+                      <option key={`${option.provider}::${option.model}`} value={`${option.provider}::${option.model}`}>
+                        {providerModelLabel(option)}
+                      </option>
+                    ))}
+                  </select>
+                  {modelsLoading && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>{t("session.sideChat.loadingModels", "Loading models...")}</span>
+                    </div>
+                  )}
+                </label>
+
+                <label className="block space-y-1">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {t("session.sideChat.thinkingLevel", "Thinking level")}
+                  </span>
+                  <select
+                    value={options.thinkingLevel}
+                    onChange={(event) => setOptions((prev) => ({ ...prev, thinkingLevel: event.target.value }))}
+                    className="w-full rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground outline-none focus:border-primary/50"
+                  >
+                    {THINKING_LEVELS.map((level) => (
+                      <option key={level} value={level}>
+                        {t(`components.thinkingLevel.${level}`, level)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block space-y-1">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {t("session.sideChat.snippetLimit", "Snippet limit")}
+                  </span>
+                  <select
+                    value={String(options.limit)}
+                    onChange={(event) => setOptions((prev) => ({ ...prev, limit: Number(event.target.value) }))}
+                    className="w-full rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground outline-none focus:border-primary/50"
+                  >
+                    {SNIPPET_LIMIT_OPTIONS.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-2">
             <textarea
               value={question}

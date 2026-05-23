@@ -49,6 +49,7 @@ pub(crate) struct AskSessionSidechatRequest {
     pub(crate) provider: Option<String>,
     pub(crate) model: Option<String>,
     pub(crate) language: Option<String>,
+    pub(crate) thinking_level: Option<String>,
     pub(crate) limit: Option<usize>,
 }
 
@@ -102,7 +103,7 @@ pub(crate) async fn v1_ask_session_sidechat(ConnectInfo(addr): ConnectInfo<Socke
         return unauthorized_response();
     }
 
-    match crate::ask_session_sidechat(req.path, req.question, req.provider, req.model, req.language, req.limit).await {
+    match crate::ask_session_sidechat(req.path, req.question, req.provider, req.model, req.language, req.thinking_level, req.limit).await {
         Ok(response) => json_success_response(response),
         Err(error) => json_error_response(StatusCode::BAD_REQUEST, error),
     }

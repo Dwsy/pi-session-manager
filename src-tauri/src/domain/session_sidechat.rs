@@ -42,13 +42,13 @@ pub struct SidechatSnippet {
     pub source: String,
 }
 
-pub async fn answer_session_sidechat_with_snippets(session_path: &str, question: &str, snippets: Vec<SidechatSnippet>, provider: Option<&str>, model: Option<&str>, language: Option<&str>) -> Result<SessionSidechatResponse, String> {
+pub async fn answer_session_sidechat_with_snippets(session_path: &str, question: &str, snippets: Vec<SidechatSnippet>, provider: Option<&str>, model: Option<&str>, language: Option<&str>, thinking_level: Option<&str>) -> Result<SessionSidechatResponse, String> {
     if snippets.is_empty() {
         return Err("No relevant indexed or parsed context found for this session".to_string());
     }
 
     let context = build_sidechat_context(question, &snippets);
-    let system_prompt = sidechat_system_prompt(language);
+    let system_prompt = sidechat_system_prompt(language, thinking_level);
     let (answer, provider_name, model_id) = crate::domain::session_summary::generate_model_text(&system_prompt, &context, provider, model).await?;
 
     let citations: Vec<SessionSidechatCitation> = snippets
@@ -187,10 +187,19 @@ pub fn build_sidechat_context(question: &str, snippets: &[SidechatSnippet]) -> S
     output
 }
 
-fn sidechat_system_prompt(language: Option<&str>) -> String {
+fn sidechat_system_prompt(language: Option<&str>, thinking_level: Option<&str>) -> String {
     let language_instruction = language.map(str::trim).filter(|value| !value.is_empty()).unwrap_or("the user's current UI language");
+    let thinking_instruction = match thinking_level.map(str::trim).filter(|value| !value.is_empty()) {
+        Some("off") => "Keep reasoning minimal and answer directly.",
+        Some("minimal") => "Use very light reasoning and keep the answer compact.",
+        Some("low") => "Use brief reasoning and prefer concise answers.",
+        Some("medium") => "Use balanced reasoning with concise but clear answers.",
+        Some("high") => "Use deeper reasoning, but stay grounded in the cited snippets.",
+        Some("xhigh") => "Use the deepest careful reasoning available, while staying strictly grounded in the cited snippets.",
+        Some(_) | None => "Use balanced reasoning with concise but clear answers.",
+    };
     format!(
-        "You answer questions about one Pi Session Manager session. Use only the provided snippets. If the snippets are insufficient, say that the available context is insufficient and explain what is missing. Cite snippets inline as [1], [2], etc. Answer in {language_instruction}. Do not invent facts outside the snippets."
+        "You answer questions about one Pi Session Manager session. Use only the provided snippets. If the snippets are insufficient, say that the available context is insufficient and explain what is missing. Cite snippets inline as [1], [2], etc. Answer in {language_instruction}. {thinking_instruction} Do not invent facts outside the snippets."
     )
 }
 

@@ -163,6 +163,9 @@ describe('plugin capability client', () => {
         if (command === 'get_all_tags') {
           return []
         }
+        if (command === 'list_model_options_fast') {
+          return [{ provider: 'openai', model: 'gpt-5.5' }]
+        }
         if (command === 'get_all_session_tags') {
           return [{ sessionId: '/repo/session.jsonl', tagId: 'tag-active', position: 0, assignedAt: '2026-05-23T00:00:00Z' }]
         }
@@ -179,7 +182,8 @@ describe('plugin capability client', () => {
     await client.sessions.getLabels('/repo/session.jsonl')
     await client.sessions.open('/repo/session.jsonl', { cwd: '/repo', target: 'browser' })
     await client.search.fulltext({ query: 'summary', roleFilter: 'all', page: 0, pageSize: 20, matchMode: 'smart', sortOrder: 'newest' })
-    await client.sidechat.ask({ sessionPath: '/repo/session.jsonl', question: 'What is blocked?', language: 'zh-CN', limit: 8 })
+    await client.sidechat.ask({ sessionPath: '/repo/session.jsonl', question: 'What is blocked?', language: 'zh-CN', provider: 'openai', model: 'gpt-5.5', thinkingLevel: 'high', limit: 8 })
+    await client.models.listOptions()
     await client.kanban.listTags()
     await client.kanban.createTag({ name: 'Active', color: '#22c55e' })
     await client.kanban.assignTag('/repo/session.jsonl', 'tag-active')
@@ -224,9 +228,13 @@ describe('plugin capability client', () => {
           path: '/repo/session.jsonl',
           question: 'What is blocked?',
           language: 'zh-CN',
+          provider: 'openai',
+          model: 'gpt-5.5',
+          thinkingLevel: 'high',
           limit: 8,
         },
       },
+      { command: 'list_model_options_fast', payload: undefined },
       { command: 'get_all_tags', payload: undefined },
       { command: 'create_tag', payload: { name: 'Active', color: '#22c55e', icon: undefined, parentId: undefined } },
       { command: 'assign_tag', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active' } },

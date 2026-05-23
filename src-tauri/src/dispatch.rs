@@ -263,8 +263,9 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let provider = extract_optional_string(payload, "provider");
             let model = extract_optional_string(payload, "model");
             let language = extract_optional_string(payload, "language").or_else(|| extract_optional_string(payload, "locale"));
+            let thinking_level = extract_optional_string(payload, "thinkingLevel").or_else(|| extract_optional_string(payload, "thinking_level"));
             let limit = payload.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
-            let result = crate::ask_session_sidechat(path, question, provider, model, language, limit).await?;
+            let result = crate::ask_session_sidechat(path, question, provider, model, language, thinking_level, limit).await?;
             Ok(to_val(result, "serialize session sidechat response")?)
         }
         "upsert_plugin_record" => {
