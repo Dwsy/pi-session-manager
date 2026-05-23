@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ExternalLink,
@@ -24,6 +24,7 @@ const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as 
 const SNIPPET_LIMIT_OPTIONS = [4, 6, 8, 10, 12] as const;
 const MIN_PANEL_WIDTH = 320;
 const MAX_PANEL_WIDTH = 640;
+
 interface SideChatPluginSettings {
   provider: string;
   model: string;
@@ -52,25 +53,13 @@ interface SideChatOptionsState {
   limit: number;
 }
 
-type SideChatOptionSchema =
-  | {
-      key: "model";
-      label: string;
-      type: "select";
-      value: string;
-      options: Array<{ value: string; label: string }>;
-      loading?: boolean;
-      onChange: (value: string) => void;
-    }
-  | {
-      key: "thinkingLevel" | "limit";
-      label: string;
-      type: "select";
-      value: string;
-      options: Array<{ value: string; label: string }>;
-      loading?: boolean;
-      onChange: (value: string) => void;
-    };
+interface OptionFieldProps {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+  status?: ReactNode;
+}
 
 function citationEntryId(citation: PsmSideChatCitation) {
   return citation.entryId ?? citation.entry_id;
@@ -93,6 +82,30 @@ function providerModelLabel(option: PsmModelOption) {
   return `${option.provider}/${option.model}`;
 }
 
+function optionField({ label, value, options, onChange, status }: OptionFieldProps) {
+  return (
+    <label className="block rounded-xl border border-border/70 bg-background/55 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          {label}
+        </span>
+        {status}
+      </div>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-lg border border-border/70 bg-background/80 px-2.5 py-2 text-sm text-foreground outline-none focus:border-primary/50"
+      >
+        {options.map((option) => (
+          <option key={`${label}-${option.value || "auto"}`} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export default function SessionSideChatPanel({
   client,
   i18n,
@@ -112,6 +125,8 @@ export default function SessionSideChatPanel({
   const [optionsOpen, setOptionsOpen] = useState(settings.optionsExpanded);
   const [models, setModels] = useState<PsmModelOption[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelLoadFailed, setModelLoadFailed] = useState(false);
+  const [requestedModels, setRequestedModels] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [options, setOptions] = useState<SideChatOptionsState>({
     provider: settings.provider,
@@ -126,31 +141,7 @@ export default function SessionSideChatPanel({
     ? `${options.provider}/${options.model}`
     : t("session.sideChat.modelAuto", "Auto");
   const selectedThinkingLabel = t(`components.thinkingLevel.${options.thinkingLevel}`, options.thinkingLevel);
-  const selectedLimitLabel = `${options.limit}`;
-
-  useEffect(() => {
-    if (!open || models.length > 0 || modelsLoading) return;
-
-    let cancelled = false;
-    setModelsLoading(true);
-    client.models
-      .listOptions()
-      .then((items) => {
-        if (cancelled) return;
-        setModels(items);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.error("[SessionSideChatPanel] Failed to load model options:", err);
-      })
-      .finally(() => {
-        if (!cancelled) setModelsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [client.models, models.length, modelsLoading, open]);
+  const selectedLimitLabel = `${options.limit} ${t("session.sideChat.snippets", "snippets")}`;
 
   useEffect(() => {
     if (!isResizing) return;
@@ -175,6 +166,38 @@ export default function SessionSideChatPanel({
       window.removeEventListener("pointerup", handlePointerUp);
     };
   }, [isResizing, onWidthChange]);
+
+  useEffect(() => {
+    if (!open || !optionsOpen || models.length > 0 || modelsLoading || requestedModels) return;
+
+    let cancelled = false;
+    setRequestedModels(true);
+    setModelsLoading(true);
+    setModelLoadFailed(false);
+
+    const timeoutMs = 5000;
+    const timeoutPromise = new Promise<PsmModelOption[]>((_, reject) => {
+      window.setTimeout(() => reject(new Error("model options request timed out")), timeoutMs);
+    });
+
+    Promise.race([client.models.listOptions(), timeoutPromise])
+      .then((items) => {
+        if (cancelled) return;
+        setModels(items);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setModelLoadFailed(true);
+        console.error("[SessionSideChatPanel] Failed to load model options:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setModelsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client.models, models.length, modelsLoading, open, optionsOpen, requestedModels]);
 
   const handleResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -213,57 +236,43 @@ export default function SessionSideChatPanel({
     t("session.sideChat.quickNextSteps", "What should happen next?"),
   ];
 
-  const optionSchemas: SideChatOptionSchema[] = [
-    {
-      key: "model",
-      label: t("session.sideChat.model", "Model"),
-      type: "select",
-      value: options.provider && options.model ? `${options.provider}::${options.model}` : "",
-      options: [
-        { value: "", label: t("session.sideChat.modelAuto", "Auto") },
-        ...models.map((option) => ({
-          value: `${option.provider}::${option.model}`,
-          label: providerModelLabel(option),
-        })),
-      ],
-      loading: modelsLoading,
-      onChange: (value) => {
-        if (!value) {
-          setOptions((prev) => ({ ...prev, provider: "", model: "" }));
-          return;
-        }
-        const [provider, model] = value.split("::");
-        setOptions((prev) => ({ ...prev, provider, model }));
-      },
-    },
-    {
-      key: "thinkingLevel",
-      label: t("session.sideChat.thinkingLevel", "Thinking level"),
-      type: "select",
-      value: options.thinkingLevel,
-      options: THINKING_LEVELS.map((level) => ({
-        value: level,
-        label: t(`components.thinkingLevel.${level}`, level),
+  const modelOptions = useMemo(
+    () => [
+      { value: "", label: t("session.sideChat.modelAuto", "Auto") },
+      ...models.map((option) => ({
+        value: `${option.provider}::${option.model}`,
+        label: providerModelLabel(option),
       })),
-      onChange: (value) => setOptions((prev) => ({ ...prev, thinkingLevel: value })),
-    },
-    {
-      key: "limit",
-      label: t("session.sideChat.snippetLimit", "Snippet limit"),
-      type: "select",
-      value: String(options.limit),
-      options: SNIPPET_LIMIT_OPTIONS.map((value) => ({ value: String(value), label: String(value) })),
-      onChange: (value) => setOptions((prev) => ({ ...prev, limit: Number(value) })),
-    },
-  ];
+    ],
+    [models, t],
+  );
+
+  const modelStatus = modelsLoading ? (
+    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+      <Loader2 className="h-3 w-3 animate-spin" />
+      {t("session.sideChat.loadingModelsShort", "Loading")}
+    </span>
+  ) : modelLoadFailed ? (
+    <button
+      type="button"
+      onClick={() => {
+        setRequestedModels(false);
+        setModelLoadFailed(false);
+      }}
+      className="text-[11px] text-warning hover:text-foreground"
+    >
+      {t("session.sideChat.retryLoadModels", "Retry")}
+    </button>
+  ) : models.length > 0 ? (
+    <span className="text-[11px] text-muted-foreground">
+      {t("session.sideChat.loadedModels", "{{count}} models", { count: models.length })}
+    </span>
+  ) : null;
 
   if (!open) return null;
 
   return (
-    <aside
-      className={sideChatStyles.panel}
-      style={{ width }}
-    >
+    <aside className={sideChatStyles.panel} style={{ width }}>
       <div
         onPointerDown={handleResizeStart}
         className={sideChatStyles.resizeHandle(isResizing)}
@@ -272,147 +281,118 @@ export default function SessionSideChatPanel({
         aria-label={t("session.sideChat.resize", "Resize side chat panel")}
       />
 
-      <div className="flex items-center justify-between gap-3 border-b border-border/70 bg-background/30 px-3 py-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-foreground/92">
-            <PanelsRightBottom className="h-3.5 w-3.5 text-primary" />
-            <span>{t("session.sideChat.title", "Side chat")}</span>
+      <div className="border-b border-border/70 bg-background/30 px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.12em] text-foreground/92">
+              <PanelsRightBottom className="h-3.5 w-3.5 text-primary" />
+              <span>{t("session.sideChat.title", "Side chat")}</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span className="rounded-full border border-border/70 bg-background/75 px-2 py-1 text-[11px] text-foreground">
+                {selectedModelLabel}
+              </span>
+              <span className="rounded-full border border-border/70 bg-background/75 px-2 py-1 text-[11px] text-foreground">
+                {selectedThinkingLabel}
+              </span>
+              <span className="rounded-full border border-border/70 bg-background/75 px-2 py-1 text-[11px] text-foreground">
+                {selectedLimitLabel}
+              </span>
+            </div>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span>{selectedModelLabel}</span>
-            <span>·</span>
-            <span>{selectedThinkingLabel}</span>
-            <span>·</span>
-            <span>{selectedLimitLabel} {t("session.sideChat.snippets", "snippets")}</span>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className={sideChatStyles.iconButton}
+            aria-label={t("common.close", "Close")}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className={sideChatStyles.iconButton}
-          aria-label={t("common.close", "Close")}
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
       </div>
 
-      <div className="border-b border-border/70 bg-background/20 px-3 py-2">
+      <div className="border-b border-border/70 bg-background/20 px-4 py-2.5">
         <button
           type="button"
           onClick={() => setOptionsOpen((value) => !value)}
-          className="flex w-full items-center justify-between gap-2 rounded-md border border-border/60 bg-background/45 px-2.5 py-2 text-left"
+          className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/50 px-3 py-2.5 text-left"
+          aria-label={t("session.sideChat.options", "Options")}
         >
-          <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-foreground">
-            <Settings2 className="h-3.5 w-3.5 text-primary" />
-            <span>{t("session.sideChat.options", "Options")}</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Settings2 className="h-3.5 w-3.5 text-primary" />
+              <span>{t("session.sideChat.options", "Options")}</span>
+            </div>
+            <div className="mt-1 truncate text-[11px] text-muted-foreground">
+              {selectedModelLabel} · {selectedThinkingLabel} · {selectedLimitLabel}
+            </div>
           </div>
-          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${optionsOpen ? "rotate-180" : ""}`} />
+          <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${optionsOpen ? "rotate-180" : ""}`} />
         </button>
+
         {optionsOpen && (
-          <div className="mt-2 grid gap-2">
-            {optionSchemas.map((schema) => (
-              <label key={schema.key} className="block space-y-1">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  {schema.label}
-                </span>
-                <select
-                  value={schema.value}
-                  onChange={(event) => schema.onChange(event.target.value)}
-                  className="w-full rounded-md border border-border/70 bg-background/70 px-2.5 py-2 text-sm text-foreground outline-none focus:border-primary/50"
-                >
-                  {schema.options.map((option) => (
-                    <option key={`${schema.key}-${option.value || "auto"}`} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                {schema.loading && (
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    <span>{t("session.sideChat.loadingModels", "Loading models...")}</span>
-                  </div>
-                )}
-              </label>
-            ))}
+          <div className="mt-2 grid gap-2 md:grid-cols-2">
+            {optionField({
+              label: t("session.sideChat.model", "Model"),
+              value: options.provider && options.model ? `${options.provider}::${options.model}` : "",
+              options: modelOptions,
+              status: modelStatus,
+              onChange: (value) => {
+                if (!value) {
+                  setOptions((prev) => ({ ...prev, provider: "", model: "" }));
+                  return;
+                }
+                const [provider, model] = value.split("::");
+                setOptions((prev) => ({ ...prev, provider, model }));
+              },
+            })}
+            {optionField({
+              label: t("session.sideChat.thinkingLevel", "Thinking level"),
+              value: options.thinkingLevel,
+              options: THINKING_LEVELS.map((level) => ({
+                value: level,
+                label: t(`components.thinkingLevel.${level}`, level),
+              })),
+              onChange: (value) => setOptions((prev) => ({ ...prev, thinkingLevel: value })),
+            })}
+            <div className="md:col-span-2">
+              {optionField({
+                label: t("session.sideChat.snippetLimit", "Snippet limit"),
+                value: String(options.limit),
+                options: SNIPPET_LIMIT_OPTIONS.map((value) => ({ value: String(value), label: String(value) })),
+                onChange: (value) => setOptions((prev) => ({ ...prev, limit: Number(value) })),
+              })}
+            </div>
           </div>
         )}
       </div>
 
-      <div className="border-b border-border/70 px-3 py-3 space-y-2">
-        <form onSubmit={handleSubmit} className="space-y-2">
-          <textarea
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            placeholder={t("session.sideChat.placeholder", "Ask about decisions, blockers, files, or next steps...")}
-            className="min-h-[108px] w-full resize-none rounded-md border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/15"
-          />
-          {settings.showQuickPrompts && (
-          <div className="flex flex-wrap gap-1.5">
-            {quickPrompts.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                onClick={() => setQuestion(prompt)}
-                className="rounded-md border border-border/60 bg-background/45 px-2 py-1 text-[11px] text-muted-foreground hover:bg-secondary hover:text-foreground"
-              >
-                <Sparkles className="mr-1 inline h-3 w-3" />
-                {prompt}
-              </button>
-            ))}
-          </div>
-          )}
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-muted-foreground">
-              {t("session.sideChat.hint", "Uses search and snippets, not full-context injection.")}
-            </span>
-            <button
-              type="submit"
-              disabled={!trimmedQuestion || loading}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/14 px-3 text-xs font-medium text-foreground hover:bg-primary/18 disabled:cursor-not-allowed disabled:opacity-55"
-            >
-              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              <span>{t("session.sideChat.ask", "Ask")}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-auto p-3">
+      <div className="min-h-0 flex-1 overflow-auto p-4">
         {error && (
-          <div className="rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <div className="mb-3 rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {error}
           </div>
         )}
 
-        {!answer && !error && !loading && (
-          <div className="rounded-md border border-border/60 bg-background/45 px-3 py-3 text-sm text-muted-foreground">
-            <div className="mb-2 flex items-center gap-2 text-foreground">
-              <MessageCircleQuestion className="h-4 w-4 text-primary" />
-              <span className="font-medium">{t("session.sideChat.emptyTitle", "Ask this session")}</span>
+        {loading ? (
+          <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-3 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>{t("session.sideChat.loading", "Searching session context...")}</span>
             </div>
-            <p>{t("session.sideChat.empty", "Ask a focused question. PSM will retrieve relevant parts of this session and cite them.")}</p>
           </div>
-        )}
-
-        {loading && (
-          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-background/60 px-3 py-3 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>{t("session.sideChat.loading", "Searching session context...")}</span>
-          </div>
-        )}
-
-        {answer && (
+        ) : answer ? (
           <div className="space-y-3">
-            <section className="rounded-md border border-border/60 bg-background/60 p-3">
-              <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <section className="rounded-xl border border-border/60 bg-background/65 p-4">
+              <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                 {t("session.sideChat.answer", "Answer")}
               </div>
               <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">{answer}</p>
             </section>
 
-            <section className="rounded-md border border-border/60 bg-background/45 p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <section className="rounded-xl border border-border/60 bg-background/50 p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                   {t("session.sideChat.citations", "Citations")}
                 </div>
                 <div className="text-[11px] text-muted-foreground">
@@ -425,21 +405,25 @@ export default function SessionSideChatPanel({
                     const entryId = citationEntryId(citation);
                     const createdAt = citationCreatedAt(citation, language);
                     return (
-                      <article key={`${entryId ?? "citation"}-${index}`} className="rounded-md border border-border/60 bg-background/55 p-2.5">
-                        <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <span className="rounded border border-border/60 bg-secondary px-1.5 py-0.5">
+                      <article key={`${entryId ?? "citation"}-${index}`} className="rounded-xl border border-border/60 bg-background/75 p-3">
+                        <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <span className="rounded-full border border-border/60 bg-secondary px-1.5 py-0.5">
                             {citation.role || t("session.sideChat.unknownRole", "context")}
                           </span>
-                          {typeof citation.score === "number" && <span>{Math.round(citation.score * 100) / 100}</span>}
+                          {typeof citation.score === "number" && (
+                            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/8 px-1.5 py-0.5 text-emerald-300">
+                              {citation.score.toFixed(2)}
+                            </span>
+                          )}
+                          {createdAt && <span>{createdAt}</span>}
                           {entryId && (
                             <span className="inline-flex min-w-0 items-center gap-1 truncate" title={entryId}>
                               <ExternalLink className="h-3 w-3 shrink-0" />
                               <span className="truncate">{entryId}</span>
                             </span>
                           )}
-                          {createdAt && <span>{createdAt}</span>}
                         </div>
-                        <p className="whitespace-pre-wrap text-xs leading-5 text-foreground/85">{citation.snippet}</p>
+                        <p className="whitespace-pre-wrap text-xs leading-5 text-foreground/90">{citation.snippet}</p>
                       </article>
                     );
                   })}
@@ -451,7 +435,61 @@ export default function SessionSideChatPanel({
               )}
             </section>
           </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-border/60 bg-background/50 p-4 text-sm text-muted-foreground">
+              <div className="mb-2 flex items-center gap-2 text-foreground">
+                <MessageCircleQuestion className="h-4 w-4 text-primary" />
+                <span className="font-medium">{t("session.sideChat.emptyTitle", "Ask this session")}</span>
+              </div>
+              <p>{t("session.sideChat.empty", "Ask a focused question. PSM will retrieve relevant parts of this session and cite them.")}</p>
+            </div>
+            {settings.showQuickPrompts && (
+              <div className="rounded-xl border border-border/60 bg-background/50 p-4">
+                <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("session.sideChat.quickPrompts", "Quick prompts")}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {quickPrompts.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => setQuestion(prompt)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-[12px] text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
+      </div>
+
+      <div className="border-t border-border/70 bg-background/25 px-4 py-3">
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <textarea
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            placeholder={t("session.sideChat.placeholder", "Ask about decisions, blockers, files, or next steps...")}
+            className="min-h-[116px] w-full resize-none rounded-2xl border border-border/70 bg-background/80 px-3.5 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/15"
+          />
+          <div className="flex items-end justify-between gap-3">
+            <span className="max-w-[70%] text-[11px] leading-5 text-muted-foreground">
+              {t("session.sideChat.hint", "Uses search and snippets, not full-context injection.")}
+            </span>
+            <button
+              type="submit"
+              disabled={!trimmedQuestion || loading}
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-primary/30 bg-primary/14 px-4 text-sm font-medium text-foreground hover:bg-primary/18 disabled:cursor-not-allowed disabled:opacity-55"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <span>{t("session.sideChat.ask", "Ask")}</span>
+            </button>
+          </div>
+        </form>
       </div>
     </aside>
   );

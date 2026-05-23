@@ -21,7 +21,7 @@ export default function activate(ctx: PsmPluginHostContext) {
   const defaultThinkingLevel = ctx.settings.get('thinkingLevel', 'medium')
   const defaultSnippetLimit = ctx.settings.get('snippetLimit', 8)
   const panelWidth = ctx.settings.get('panelWidth', 380)
-  const optionsExpanded = ctx.settings.get('optionsExpanded', true)
+  const optionsExpanded = ctx.settings.get('optionsExpanded', false)
   const showQuickPrompts = ctx.settings.get('showQuickPrompts', true)
 
   const ask = async (args: Record<string, unknown>) => {
