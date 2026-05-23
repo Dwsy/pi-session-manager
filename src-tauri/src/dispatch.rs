@@ -253,7 +253,8 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let path = extract(payload, "path").or_else(|_| extract(payload, "sessionPath")).or_else(|_| extract(payload, "session_path"))?;
             let provider = extract_optional_string(payload, "provider");
             let model = extract_optional_string(payload, "model");
-            let result = crate::refresh_session_intelligence_record(path, provider, model).await?;
+            let language = extract_optional_string(payload, "language").or_else(|| extract_optional_string(payload, "locale"));
+            let result = crate::refresh_session_intelligence_record(path, provider, model, language).await?;
             Ok(to_val(result, "serialize refreshed session intelligence record")?)
         }
         "upsert_plugin_record" => {

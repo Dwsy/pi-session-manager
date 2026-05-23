@@ -32,25 +32,25 @@ function toSessionListPayload(params: PsmSessionListParams = {}) {
   return {
     offset: params.offset,
     limit: params.limit,
-    search_query: params.searchQuery,
-    project_filter: params.projectFilter,
-    filter_tag_ids: params.filterTagIds,
-    source_filter_slugs: params.sourceFilterSlugs,
-    sort_by: params.sortBy,
+    searchQuery: params.searchQuery,
+    projectFilter: params.projectFilter,
+    filterTagIds: params.filterTagIds,
+    sourceFilterSlugs: params.sourceFilterSlugs,
+    sortBy: params.sortBy,
   }
 }
 
 function toFulltextPayload(params: PsmFullTextSearchParams) {
   return {
     query: params.query,
-    role_filter: params.roleFilter ?? 'all',
-    glob_pattern: params.globPattern,
-    project_path: params.projectPath,
+    roleFilter: params.roleFilter ?? 'all',
+    globPattern: params.globPattern,
+    projectPath: params.projectPath,
     page: params.page ?? 0,
-    page_size: params.pageSize ?? 20,
-    match_mode: params.matchMode,
-    sort_order: params.sortOrder,
-    source_filter: params.sourceFilter,
+    pageSize: params.pageSize ?? 20,
+    matchMode: params.matchMode,
+    sortOrder: params.sortOrder,
+    sourceFilter: params.sourceFilter,
     from: params.from,
     to: params.to,
   }
@@ -72,8 +72,8 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
     async search(params: PluginRecordSearchParams) {
       const hits = await transport.invoke<PluginRecordSearchHit[]>('search_plugin_records', {
         query: params.query,
-        record_type: params.recordType,
-        plugin_id: params.pluginId,
+        recordType: params.recordType,
+        pluginId: params.pluginId,
         limit: params.limit,
       })
       return hits.map((hit) => ({
@@ -84,9 +84,9 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
 
     async listForScope(params: PluginRecordListParams) {
       const records = await transport.invoke<DbPluginRecord[]>('list_plugin_records_for_scope', {
-        scope_type: params.scopeType,
-        scope_id: params.scopeId,
-        record_type: params.recordType,
+        scopeType: params.scopeType,
+        scopeId: params.scopeId,
+        recordType: params.recordType,
         limit: params.limit,
       })
       return records.map(parsePayload)
@@ -109,11 +109,12 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
       })
     },
 
-    async refreshSessionIntelligence(params: { path: string; provider?: string; model?: string }) {
+    async refreshSessionIntelligence(params: { path: string; provider?: string; model?: string; language?: string }) {
       const record = await transport.invoke<DbPluginRecord>('refresh_session_intelligence_record', {
         path: params.path,
         provider: params.provider,
         model: params.model,
+        language: params.language,
       })
       return parsePayload(record)
     },
@@ -151,8 +152,8 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
             path: sessionPath,
             cwd: openOptions.cwd ?? '',
             terminal: openOptions.terminal,
-            pi_path: openOptions.piPath,
-            resume_command: openOptions.resumeCommand,
+            piPath: openOptions.piPath,
+            resumeCommand: openOptions.resumeCommand,
           })
           return
         }

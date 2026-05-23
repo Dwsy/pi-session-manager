@@ -29,6 +29,13 @@ pub struct SessionSummaryResult {
     pub unresolved_tasks: Vec<String>,
 }
 
+fn summary_prompt_for_language(language: Option<&str>) -> String {
+    let Some(language) = language.map(str::trim).filter(|value| !value.is_empty()) else {
+        return SUMMARY_PROMPT.to_string();
+    };
+    format!("{SUMMARY_PROMPT}\n\nWrite all human-readable JSON string values in the user's current UI language: {language}. Keep JSON field names exactly as specified.")
+}
+
 /// Build a summary context string from session entries (user + assistant messages only).
 pub fn build_summary_context(entries: &[crate::types::SessionEntry]) -> String {
     let mut lines = Vec::new();
@@ -136,15 +143,21 @@ fn resolve_env_value(raw: &str) -> String {
 
 /// Call LLM to generate a session summary.
 pub async fn generate_session_summary(context: &str, provider: Option<&str>, model: Option<&str>) -> Result<(SessionSummaryResult, String, String), String> {
+    generate_session_summary_with_language(context, provider, model, None).await
+}
+
+/// Call LLM to generate a session summary in the requested UI language.
+pub async fn generate_session_summary_with_language(context: &str, provider: Option<&str>, model: Option<&str>, language: Option<&str>) -> Result<(SessionSummaryResult, String, String), String> {
     let config = read_models_config_internal()?;
     let (provider_name, model_id, base_url, api, api_key) = resolve_provider_config(&config, provider, model)?;
+    let prompt = summary_prompt_for_language(language);
 
     info!("Generating summary using provider={provider_name} model={model_id} api={api}");
 
     let response_text = match api.as_str() {
-        "openai-completions" => call_openai_completions(&base_url, &model_id, &api_key, context).await?,
-        "openai-responses" => call_openai_responses(&base_url, &model_id, &api_key, context).await?,
-        "anthropic-messages" => call_anthropic_messages(&base_url, &model_id, &api_key, context).await?,
+        "openai-completions" => call_openai_completions(&base_url, &model_id, &api_key, &prompt, context).await?,
+        "openai-responses" => call_openai_responses(&base_url, &model_id, &api_key, &prompt, context).await?,
+        "anthropic-messages" => call_anthropic_messages(&base_url, &model_id, &api_key, &prompt, context).await?,
         _ => return Err(format!("Unsupported API type for summary: {api}")),
     };
 
@@ -218,7 +231,7 @@ fn is_openai_reasoning_model(model: &str) -> bool {
     normalized.starts_with("o1") || normalized.starts_with("o3") || normalized.starts_with("o4") || normalized.starts_with("gpt-5")
 }
 
-fn build_openai_summary_attempts(model: &str, context: &str) -> Vec<(&'static str, Value)> {
+fn build_openai_summary_attempts(model: &str, system_prompt: &str, context: &str) -> Vec<(&'static str, Value)> {
     let max_completion_tokens = if is_openai_reasoning_model(model) { 2048 } else { 1024 };
     vec![
         (
@@ -226,7 +239,7 @@ fn build_openai_summary_attempts(model: &str, context: &str) -> Vec<(&'static st
             serde_json::json!({
                 "model": model,
                 "messages": [
-                    {"role": "system", "content": SUMMARY_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": context}
                 ],
                 "stream": false,
@@ -238,7 +251,7 @@ fn build_openai_summary_attempts(model: &str, context: &str) -> Vec<(&'static st
             serde_json::json!({
                 "model": model,
                 "messages": [
-                    {"role": "system", "content": SUMMARY_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": context}
                 ],
                 "stream": false,
@@ -249,11 +262,11 @@ fn build_openai_summary_attempts(model: &str, context: &str) -> Vec<(&'static st
     ]
 }
 
-async fn call_openai_completions(base_url: &str, model: &str, api_key: &str, context: &str) -> Result<String, String> {
+async fn call_openai_completions(base_url: &str, model: &str, api_key: &str, system_prompt: &str, context: &str) -> Result<String, String> {
     let url = join_url(base_url, "chat/completions");
     let headers = build_auth_headers(api_key, true, "openai-completions")?;
     let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120)).build().map_err(|e| format!("Failed to create HTTP client: {e}"))?;
-    let attempts = build_openai_summary_attempts(model, context);
+    let attempts = build_openai_summary_attempts(model, system_prompt, context);
     let attempt_count = attempts.len();
     let mut last_error = None;
 
@@ -277,13 +290,13 @@ async fn call_openai_completions(base_url: &str, model: &str, api_key: &str, con
     Err(last_error.unwrap_or_else(|| "No OpenAI completion attempt was generated".to_string()))
 }
 
-async fn call_openai_responses(base_url: &str, model: &str, api_key: &str, context: &str) -> Result<String, String> {
+async fn call_openai_responses(base_url: &str, model: &str, api_key: &str, system_prompt: &str, context: &str) -> Result<String, String> {
     let url = join_url(base_url, "responses");
     let headers = build_auth_headers(api_key, true, "openai-responses")?;
 
     let body = serde_json::json!({
         "model": model,
-        "input": format!("{}\n\n---\n\n{}", SUMMARY_PROMPT, context),
+        "input": format!("{}\n\n---\n\n{}", system_prompt, context),
         "max_output_tokens": 1024,
     });
 
@@ -301,14 +314,14 @@ async fn call_openai_responses(base_url: &str, model: &str, api_key: &str, conte
     Ok(text)
 }
 
-async fn call_anthropic_messages(base_url: &str, model: &str, api_key: &str, context: &str) -> Result<String, String> {
+async fn call_anthropic_messages(base_url: &str, model: &str, api_key: &str, system_prompt: &str, context: &str) -> Result<String, String> {
     let url = join_url(base_url, "messages");
     let headers = build_auth_headers(api_key, false, "anthropic-messages")?;
 
     let body = serde_json::json!({
         "model": model,
         "max_tokens": 1024,
-        "system": SUMMARY_PROMPT,
+        "system": system_prompt,
         "messages": [
             {"role": "user", "content": context}
         ],
@@ -340,10 +353,17 @@ pub fn to_session_intelligence_record_with_message_count(session_path: &str, res
         "topics": result.topics,
         "status": result.status,
         "unresolved_tasks": result.unresolved_tasks,
+        "unresolvedTasks": result.unresolved_tasks,
         "model_used": model,
+        "modelUsed": model,
+        "model": model,
         "provider_used": provider,
+        "providerUsed": provider,
+        "provider": provider,
         "generated_at": now,
+        "generatedAt": now,
         "message_count": message_count,
+        "messageCount": message_count,
     });
     DbPluginRecord {
         id: format!("builtin.session-summary:{}", session_path),

@@ -18,6 +18,7 @@ interface SessionIntelligencePayload {
   topics?: string[]
   nextSteps?: string[]
   unresolvedTasks?: string[]
+  unresolved_tasks?: string[]
 }
 
 function asSessionIntelligencePayload(payload: unknown): SessionIntelligencePayload {
@@ -81,8 +82,9 @@ export class PluginRecordSearchPlugin extends BaseSearchPlugin {
 
     const payload = asSessionIntelligencePayload(record.payload)
     const topics = normalizeTopics(payload.topics)
+    const unresolved = normalizeTopics(payload.unresolvedTasks ?? payload.unresolved_tasks)
     const title = payload.summary || payload.objective || session.name || session.first_message
-    const descriptionParts = [payload.status, topics.slice(0, 3).join(', ')]
+    const descriptionParts = [payload.status, topics.slice(0, 3).join(', '), unresolved.slice(0, 1).join(', ')]
       .filter((part): part is string => typeof part === 'string' && part.length > 0)
 
     return {

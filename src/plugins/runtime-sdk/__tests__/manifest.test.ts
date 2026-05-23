@@ -96,10 +96,54 @@ describe('plugin capability client', () => {
     expect(calls).toEqual([
       {
         command: 'search_plugin_records',
-        payload: { query: 'plugin', record_type: 'session.intelligence', plugin_id: undefined, limit: 5 },
+        payload: { query: 'plugin', recordType: 'session.intelligence', pluginId: undefined, limit: 5 },
       },
     ])
     expect(result[0].payload).toEqual({ summary: 'Build plugin records', status: 'active' })
+  })
+
+  it('lists plugin records with Tauri-compatible camelCase payload keys', async () => {
+    const calls: Array<{ command: string; payload?: unknown }> = []
+    const transport: PsmTransport = {
+      invoke: async (command, payload) => {
+        calls.push({ command, payload })
+        return [
+          {
+            id: 'record-1',
+            plugin_id: 'builtin.session-summary',
+            scope_type: 'session',
+            scope_id: '/repo/session.jsonl',
+            record_type: 'session.intelligence',
+            schema_version: 1,
+            payload_json: '{"summary":"Existing summary","status":"active"}',
+            searchable_text: 'Existing summary',
+            created_at: '2026-05-23T00:00:00Z',
+            updated_at: '2026-05-23T00:00:00Z',
+          },
+        ]
+      },
+    }
+
+    const client = createPluginCapabilityClient({ transport })
+    const result = await client.records.listForScope({
+      scopeType: 'session',
+      scopeId: '/repo/session.jsonl',
+      recordType: 'session.intelligence',
+      limit: 1,
+    })
+
+    expect(calls).toEqual([
+      {
+        command: 'list_plugin_records_for_scope',
+        payload: {
+          scopeType: 'session',
+          scopeId: '/repo/session.jsonl',
+          recordType: 'session.intelligence',
+          limit: 1,
+        },
+      },
+    ])
+    expect(result[0].payload).toEqual({ summary: 'Existing summary', status: 'active' })
   })
 
   it('sends session, search, and kanban commands with backend-compatible payloads', async () => {
@@ -147,11 +191,11 @@ describe('plugin capability client', () => {
         payload: {
           offset: 0,
           limit: 10,
-          search_query: undefined,
-          project_filter: '/repo',
-          filter_tag_ids: ['tag-active'],
-          source_filter_slugs: undefined,
-          sort_by: 'modified_desc',
+          searchQuery: undefined,
+          projectFilter: '/repo',
+          filterTagIds: ['tag-active'],
+          sourceFilterSlugs: undefined,
+          sortBy: 'modified_desc',
         },
       },
       { command: 'read_session_file_chunk', payload: { path: '/repo/session.jsonl', offset: 0, maxBytes: 1024 } },
@@ -161,14 +205,14 @@ describe('plugin capability client', () => {
         command: 'full_text_search',
         payload: {
           query: 'summary',
-          role_filter: 'all',
-          glob_pattern: undefined,
-          project_path: undefined,
+          roleFilter: 'all',
+          globPattern: undefined,
+          projectPath: undefined,
           page: 0,
-          page_size: 20,
-          match_mode: 'smart',
-          sort_order: 'newest',
-          source_filter: undefined,
+          pageSize: 20,
+          matchMode: 'smart',
+          sortOrder: 'newest',
+          sourceFilter: undefined,
           from: undefined,
           to: undefined,
         },
@@ -206,12 +250,13 @@ describe('plugin capability client', () => {
       path: '/repo/session.jsonl',
       provider: 'local',
       model: 'test-model',
+      language: 'zh-CN',
     })
 
     expect(calls).toEqual([
       {
         command: 'refresh_session_intelligence_record',
-        payload: { path: '/repo/session.jsonl', provider: 'local', model: 'test-model' },
+        payload: { path: '/repo/session.jsonl', provider: 'local', model: 'test-model', language: 'zh-CN' },
       },
     ])
     expect(result.payload).toEqual({ summary: 'AI generated summary', status: 'active' })

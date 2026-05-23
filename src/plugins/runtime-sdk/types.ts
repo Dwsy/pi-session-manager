@@ -96,6 +96,7 @@ export interface PsmRecordsClient {
     path: string
     provider?: string
     model?: string
+    language?: string
   }): Promise<PluginRecord>
 }
 

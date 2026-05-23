@@ -39,6 +39,7 @@ pub(crate) struct RefreshSessionIntelligenceRequest {
     pub(crate) path: String,
     pub(crate) provider: Option<String>,
     pub(crate) model: Option<String>,
+    pub(crate) language: Option<String>,
 }
 
 pub(crate) async fn v1_get_plugin_record(Path(id): Path<String>, ConnectInfo(addr): ConnectInfo<SocketAddr>, headers: HeaderMap, uri: Uri) -> Response {
@@ -80,7 +81,7 @@ pub(crate) async fn v1_refresh_session_intelligence_record(ConnectInfo(addr): Co
         return unauthorized_response();
     }
 
-    match crate::refresh_session_intelligence_record(req.path, req.provider, req.model).await {
+    match crate::refresh_session_intelligence_record(req.path, req.provider, req.model, req.language).await {
         Ok(record) => json_success_response(record),
         Err(error) => json_error_response(StatusCode::BAD_REQUEST, error),
     }
