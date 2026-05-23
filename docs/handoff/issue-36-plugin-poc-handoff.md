@@ -48,18 +48,18 @@ Passing:
 - Secret scan over repo-relevant paths
   - Result: no provided local API key persisted in repo changes
 
-Partial live verification:
+Live verification:
 
-- A verification subagent attempted real `generate_session_summary(context, Some("3838"), Some("gpt-5.5"))`.
-- It reached model config parsing, then stopped before network/model request because local `~/.pi/agent/models.json` is malformed:
-  - `Parse models.json: trailing comma at line 48 column 7`
+- After explicit user approval, local `~/.pi/agent/models.json` was backed up and minimally repaired for trailing commas.
+- Backup created at `~/.pi/agent/models.json.bak.20260523085428`.
+- A temporary Cargo program under `/tmp` called `generate_session_summary(context, Some("3838"), Some("gpt-5.5"))`.
+- Result: `LIVE_SUMMARY_OK` with provider `3838`, model `gpt-5.5`, status `active`, and expected plugin/session-intelligence topics.
 - No API key was printed, saved, or committed.
-- Verdict: code POC passes focused tests; live E2E is blocked by local models.json JSON syntax.
+- Verdict: issue #36 POC has passed focused tests and live AI summary generation.
 
 ## Important Constraints
 
 - Do not write or repeat the user's local API key.
-- Do not modify `~/.pi/agent/models.json` without explicit user approval.
 - Do not touch unrelated uncommitted UI changes.
 - Preserve PSM plugin boundary: PSM plugin, pi-flavored authoring style only.
 
@@ -75,7 +75,5 @@ Leave them alone unless user asks.
 
 ## Suggested Next Steps
 
-1. If user wants full live E2E, ask permission to fix local `~/.pi/agent/models.json` trailing comma or provide a temporary valid model config path/hook.
-2. Re-run live summary check after config is valid.
-3. Consider a small follow-up issue for real permission enforcement; current SDK/manifest declares permissions, but backend enforcement is not complete.
-4. Consider adding a UI trigger for `refresh_session_intelligence_record` if user wants the POC exposed beyond plugin sample/API.
+1. Consider a small follow-up issue for real permission enforcement; current SDK/manifest declares permissions, but backend enforcement is not complete.
+2. Consider adding a UI trigger for `refresh_session_intelligence_record` if user wants the POC exposed beyond plugin sample/API.
