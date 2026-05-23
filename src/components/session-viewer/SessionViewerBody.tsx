@@ -18,7 +18,7 @@ import SessionViewerSearchBar, {
 } from "@/components/session-viewer/SessionViewerSearchBar";
 import SessionViewerSidebar from "@/components/session-viewer/SessionViewerSidebar";
 import SessionViewerToolbar from "@/components/session-viewer/SessionViewerToolbar";
-import type { SessionViewerToolbarProps } from "@/components/session-viewer/SessionViewerToolbarTypes";
+import type { SessionViewerToolbarProps, SessionViewerLayoutSlots } from "@/components/session-viewer/SessionViewerToolbarTypes";
 import type { SessionPreviewVariant } from "@/components/session-viewer/previewTypes";
 import TraceView from "@/components/trace/TraceView";
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
@@ -90,6 +90,7 @@ export interface SessionViewerBodyProps {
   session: SessionInfo;
   entries: SessionEntry[];
   toolbarProps: SessionViewerToolbarProps;
+  layoutSlots?: SessionViewerLayoutSlots;
   forkedFromLabel: string;
   isSearchOpen: boolean;
   searchBarProps: SessionViewerSearchBarProps;
@@ -109,6 +110,7 @@ export default function SessionViewerBody({
   session,
   entries,
   toolbarProps,
+  layoutSlots,
   forkedFromLabel,
   isSearchOpen,
   searchBarProps,
@@ -147,70 +149,78 @@ export default function SessionViewerBody({
         className="flex-1 flex flex-col min-w-0 min-h-0"
         style={{ paddingLeft: sidebar.contentPaddingLeft }}
       >
-        <SessionViewerToolbar {...toolbarProps} />
+        {layoutSlots?.top}
+        <div className="flex min-h-0 flex-1 min-w-0">
+          {layoutSlots?.left}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <SessionViewerToolbar {...toolbarProps} />
 
-        {session.parent_session_path && (
-          <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border bg-secondary/30 flex items-center gap-1.5">
-            <span className="text-muted-foreground/60">↩️</span>
-            <span>{forkedFromLabel}:</span>
-            <span className="truncate max-w-[200px]" title={session.parent_session_path}>
-              {session.parent_session_path.split("/").pop()?.replace(/\.jsonl$/, "") || session.parent_session_path}
-            </span>
-          </div>
-        )}
-
-        {isSearchOpen && <SessionViewerSearchBar {...searchBarProps} />}
-
-        {panels.traceMode ? (
-          <TraceView session={session} onClose={panels.onCloseTraceMode} />
-        ) : (
-          <>
-            <SessionViewerMessages
-              ref={messages.messagesRef}
-              loading={messages.loading}
-              showLoading={messages.showLoading}
-              error={messages.error}
-              hasNewMessages={messages.hasNewMessages}
-              sessionId={messages.headerEntry?.id || session.id}
-              headerTimestamp={messages.headerEntry?.timestamp || session.created}
-              stats={messages.stats}
-              renderableEntries={messages.renderableEntries}
-              searchQuery={messages.searchQuery}
-              currentSearchTarget={messages.currentSearchTarget}
-              scrollTargetId={messages.scrollTargetId}
-              setScrollTargetId={messages.setScrollTargetId}
-              setHasNewMessages={messages.setHasNewMessages}
-              streamingId={messages.streamingId}
-              pendingScrollToBottomRef={messages.pendingScrollToBottomRef}
-              expandedToolIds={messages.expandedToolIds}
-              sessionPath={session.path}
-              isAtBottomRef={messages.sessionDataIsAtBottomRef}
-              onReachBottom={messages.onReachBottom}
-              toolResultByCallId={messages.toolResultByCallId}
-              showScrollMarkers={previewMode ? false : scrollMarkers.showScrollMarkers}
-              isMobile={isMobile}
-              scrollMarkers={scrollMarkers.scrollMarkers}
-              activeMarkerId={scrollMarkers.activeMarkerId}
-              markersPanelRef={scrollMarkers.markersPanelRef}
-              onMarkerClick={messages.setScrollTargetId}
-              onPointerDown={scrollMarkers.onPointerDown}
-              onPointerMove={scrollMarkers.onPointerMove}
-              onPointerUp={scrollMarkers.onPointerUp}
-              onPointerLeave={scrollMarkers.onPointerLeave}
-              isScrollMarkersFeatureEnabled={previewMode ? false : scrollMarkers.scrollMarkersEnabled}
-              previewMode={previewMode}
-              previewVariant={previewVariant}
-            />
-
-            {!previewMode && (
-              <ChatInput
-                sessionId={session.id}
-                isLive={isLive}
-                onSent={onChatSent}
-              />
+            {session.parent_session_path && (
+              <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border bg-secondary/30 flex items-center gap-1.5">
+                <span className="text-muted-foreground/60">↩️</span>
+                <span>{forkedFromLabel}:</span>
+                <span className="truncate max-w-[200px]" title={session.parent_session_path}>
+                  {session.parent_session_path.split("/").pop()?.replace(/\.jsonl$/, "") || session.parent_session_path}
+                </span>
+              </div>
             )}
-          </>
-        )}
+
+            {isSearchOpen && <SessionViewerSearchBar {...searchBarProps} />}
+
+            {panels.traceMode ? (
+              <TraceView session={session} onClose={panels.onCloseTraceMode} />
+            ) : (
+              <>
+                <SessionViewerMessages
+                  ref={messages.messagesRef}
+                  loading={messages.loading}
+                  showLoading={messages.showLoading}
+                  error={messages.error}
+                  hasNewMessages={messages.hasNewMessages}
+                  sessionId={messages.headerEntry?.id || session.id}
+                  headerTimestamp={messages.headerEntry?.timestamp || session.created}
+                  stats={messages.stats}
+                  renderableEntries={messages.renderableEntries}
+                  searchQuery={messages.searchQuery}
+                  currentSearchTarget={messages.currentSearchTarget}
+                  scrollTargetId={messages.scrollTargetId}
+                  setScrollTargetId={messages.setScrollTargetId}
+                  setHasNewMessages={messages.setHasNewMessages}
+                  streamingId={messages.streamingId}
+                  pendingScrollToBottomRef={messages.pendingScrollToBottomRef}
+                  expandedToolIds={messages.expandedToolIds}
+                  sessionPath={session.path}
+                  isAtBottomRef={messages.sessionDataIsAtBottomRef}
+                  onReachBottom={messages.onReachBottom}
+                  toolResultByCallId={messages.toolResultByCallId}
+                  showScrollMarkers={previewMode ? false : scrollMarkers.showScrollMarkers}
+                  isMobile={isMobile}
+                  scrollMarkers={scrollMarkers.scrollMarkers}
+                  activeMarkerId={scrollMarkers.activeMarkerId}
+                  markersPanelRef={scrollMarkers.markersPanelRef}
+                  onMarkerClick={messages.setScrollTargetId}
+                  onPointerDown={scrollMarkers.onPointerDown}
+                  onPointerMove={scrollMarkers.onPointerMove}
+                  onPointerUp={scrollMarkers.onPointerUp}
+                  onPointerLeave={scrollMarkers.onPointerLeave}
+                  isScrollMarkersFeatureEnabled={previewMode ? false : scrollMarkers.scrollMarkersEnabled}
+                  previewMode={previewMode}
+                  previewVariant={previewVariant}
+                />
+
+                {!previewMode && (
+                  <ChatInput
+                    sessionId={session.id}
+                    isLive={isLive}
+                    onSent={onChatSent}
+                  />
+                )}
+              </>
+            )}
+          </div>
+          {layoutSlots?.right}
+        </div>
+        {layoutSlots?.bottom}
       </div>
       {!previewMode && (
         <SystemPromptDialog

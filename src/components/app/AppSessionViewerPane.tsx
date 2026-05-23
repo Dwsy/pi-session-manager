@@ -1,7 +1,10 @@
+import { useState } from "react";
 import type { ComponentProps } from "react";
 
 import SessionViewer from "@/components/SessionViewer";
 import SessionIntelligenceToolbarPanel from "@/components/session-viewer/SessionIntelligenceToolbarPanel";
+import SessionSideChatPanel from "@/components/session-viewer/SessionSideChatPanel";
+import SessionSideChatToolbarPanel from "@/components/session-viewer/SessionSideChatToolbarPanel";
 import { useSettings } from "@/hooks/useSettings";
 
 export interface AppSessionViewerPaneProps extends Pick<
@@ -41,10 +44,15 @@ function AppSessionViewerPane({
 }: AppSessionViewerPaneProps) {
   const { getSessionSetting } = useSettings();
   const conversationModeEnabled = getSessionSetting("conversationModeEnabled") !== false;
+  const [sideChatOpen, setSideChatOpen] = useState(false);
 
-  const sessionIntelligenceSlot = (
+  const sessionToolbarSlot = (
     <>
       {slots?.right}
+      <SessionSideChatToolbarPanel
+        open={sideChatOpen}
+        onToggle={() => setSideChatOpen((value) => !value)}
+      />
       <SessionIntelligenceToolbarPanel session={session} />
     </>
   );
@@ -65,7 +73,16 @@ function AppSessionViewerPane({
       resumeCommand={resumeCommand}
       initialEntryId={initialEntryId}
       previewVariant={conversationModeEnabled ? "conversation" : "none"}
-      slots={{ ...slots, right: sessionIntelligenceSlot }}
+      slots={{ ...slots, right: sessionToolbarSlot }}
+      layoutSlots={{
+        right: (
+          <SessionSideChatPanel
+            session={session}
+            open={sideChatOpen}
+            onClose={() => setSideChatOpen(false)}
+          />
+        ),
+      }}
     />
   );
 }

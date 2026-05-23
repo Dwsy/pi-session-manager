@@ -26,7 +26,7 @@ import type { SessionViewerMessagesRef } from "./session-viewer/SessionViewerMes
 import { getPlatformDefaults } from "./settings/types";
 import type { SessionInfo } from "@/types";
 import type { TerminalType } from "./settings/types";
-import type { SessionViewerToolbarSlots } from "./session-viewer/SessionViewerToolbarTypes";
+import type { SessionViewerToolbarSlots, SessionViewerLayoutSlots } from "./session-viewer/SessionViewerToolbarTypes";
 import type { SessionPreviewVariant } from "./session-viewer/previewTypes";
 
 interface SessionViewerProps {
@@ -47,6 +47,8 @@ interface SessionViewerProps {
   previewVariant?: SessionPreviewVariant;
   /** Slots for custom content injection into the toolbar */
   slots?: SessionViewerToolbarSlots;
+  /** Layout extension slots around the main session viewer body */
+  layoutSlots?: SessionViewerLayoutSlots;
 }
 
 
@@ -67,6 +69,7 @@ function SessionViewerContent({
   previewMode = false,
   previewVariant = "conversation",
   slots,
+  layoutSlots,
 }: SessionViewerProps) {
   const { t } = useTranslation();
   const {
@@ -301,6 +304,7 @@ function SessionViewerContent({
       session={session}
       entries={entries}
       toolbarProps={toolbarProps}
+      layoutSlots={layoutSlots}
       forkedFromLabel={t("session.forkedFrom")}
       isSearchOpen={isSearchOpen}
       searchBarProps={searchBarProps}

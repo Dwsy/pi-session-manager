@@ -12,6 +12,8 @@ import type {
   PsmSessionListParams,
   PsmSessionOpenOptions,
   PsmSessionReadChunkOptions,
+  PsmSideChatAskParams,
+  PsmSideChatResponse,
 } from './types'
 
 function parsePayload(record: DbPluginRecord): PluginRecord {
@@ -62,6 +64,15 @@ function toCreateTagPayload(params: PsmCreateTagParams) {
     color: params.color,
     icon: params.icon,
     parentId: params.parentId,
+  }
+}
+
+function toSideChatPayload(params: PsmSideChatAskParams) {
+  return {
+    path: params.sessionPath,
+    question: params.question,
+    language: params.language,
+    limit: params.limit,
   }
 }
 
@@ -167,6 +178,11 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
       },
       pluginRecords(params) {
         return records.search(params)
+      },
+    },
+    sidechat: {
+      ask(params) {
+        return transport.invoke<PsmSideChatResponse>('ask_session_sidechat', toSideChatPayload(params))
       },
     },
     kanban: {

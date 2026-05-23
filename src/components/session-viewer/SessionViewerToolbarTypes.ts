@@ -8,6 +8,13 @@ export interface SessionViewerToolbarSlots {
   right?: ReactNode;
 }
 
+export interface SessionViewerLayoutSlots {
+  top?: ReactNode;
+  right?: ReactNode;
+  bottom?: ReactNode;
+  left?: ReactNode;
+}
+
 export interface SessionViewerToolbarProps {
   isMobile: boolean;
   title: string;
