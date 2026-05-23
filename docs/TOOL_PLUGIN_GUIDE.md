@@ -108,7 +108,9 @@ interface ToolRenderPlugin {
 | `builtin-read` | `read` | File read | Core |
 | `builtin-write` | `write` | File write | Core |
 | `builtin-edit` | `edit` | File edit with diff | Core |
-| `builtin-subagent` | `/^(Agent\|subagent)$/` | Subagent | Extension |
+| `builtin-ask-user-question-renderer` | `ask_user_question` | Structured user question rendering | PSM builtin plugin (`extensions/psm-ask-user-question-renderer`) |
+| `builtin-loop-renderer` | `submit_loop_plan`, `signal_loop_success` | Loop progress and plan rendering | PSM builtin plugin (`extensions/psm-loop-renderer`) |
+| `builtin-subagent` | `/^(Agent\|subagent)$/` | Subagent | PSM builtin plugin (`extensions/psm-subagent-renderer`) |
 | `builtin-generic` | `() => true` | Generic fallback | Core |
 
 ### 6. Unregister Plugins
@@ -141,9 +143,23 @@ src/plugins/tools/
 │   ├── write.tsx
 │   ├── edit.tsx
 │   └── generic.tsx       # Fallback
-└── extensions/           # Extension plugins (complex/third-party)
-    ├── index.ts          # Register: subagent
-    └── subagent.tsx      # Subagent (complex, separate maintenance)
+└── extensions/           # Legacy extension entrypoint
+    └── index.ts          # No-op; extension renderers now load through PSM plugins
+```
+
+Extension renderers now live in default-enabled PSM builtin plugins:
+
+```
+extensions/psm-ask-user-question-renderer/
+└── index.tsx                # ask_user_question renderer plugin
+
+extensions/psm-loop-renderer/
+└── index.tsx                # Loop tool renderer plugin
+
+extensions/psm-subagent-renderer/
+├── index.ts                 # PSM plugin manifest + activate(ctx)
+├── SubagentModal.tsx        # Subagent details modal
+└── SubagentToolRenderer.tsx # ctx.ui.registerToolRenderer payload
 ```
 
 ### Directory Layer Philosophy
@@ -151,11 +167,15 @@ src/plugins/tools/
 | Directory | Purpose | Plugins |
 |-----------|---------|---------|
 | `builtins/` | Core simple tools | bash, read, write, edit, generic |
-| `extensions/` | Complex/extended tools | subagent (with Modal, multi-format support) |
+| `extensions/` | Legacy no-op entrypoint | none |
+| `extensions/psm-ask-user-question-renderer/` | Default-enabled PSM builtin plugin | ask_user_question renderer |
+| `extensions/psm-loop-renderer/` | Default-enabled PSM builtin plugin | loop tool call renderer |
+| `extensions/psm-subagent-renderer/` | Default-enabled PSM builtin plugin | subagent (with Modal, multi-format support) |
 
 ### Why Separate Extensions?
 
 - **Subagent** is complex (includes Modal, supports multiple formats like @tintinweb)
+- It now loads as a default-enabled PSM builtin plugin instead of app startup direct registration
 - Extensions may have heavier dependencies
 - Allows independent versioning and maintenance
 - Clear boundary between core and advanced features

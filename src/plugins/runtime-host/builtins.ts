@@ -3,6 +3,21 @@ import type { PsmPluginLoadEntry } from './types'
 export const builtinPsmPluginEntries: PsmPluginLoadEntry[] = [
   {
     source: 'builtin',
+    sourceId: 'extensions/psm-ask-user-question-renderer',
+    load: () => import('../../../extensions/psm-ask-user-question-renderer/index'),
+  },
+  {
+    source: 'builtin',
+    sourceId: 'extensions/psm-loop-renderer',
+    load: () => import('../../../extensions/psm-loop-renderer/index'),
+  },
+  {
+    source: 'builtin',
+    sourceId: 'extensions/psm-subagent-renderer',
+    load: () => import('../../../extensions/psm-subagent-renderer/index'),
+  },
+  {
+    source: 'builtin',
     sourceId: 'extensions/psm-session-summary',
     load: () => import('../../../extensions/psm-session-summary/index'),
   },

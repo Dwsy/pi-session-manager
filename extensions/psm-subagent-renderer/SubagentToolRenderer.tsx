@@ -1,24 +1,32 @@
-import { useMemo, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useState } from 'react'
 import { Bot, Clock, Cpu, Wrench, AlertCircle, CheckCircle2, ChevronRight, Users, Link2, Loader2 } from 'lucide-react'
 import type { SubagentDetails, SubagentResult, TintinwebAgentDetails } from '@/types'
-import SubagentModal from './SubagentModal'
+import type {
+  PsmToolCallContent,
+  PsmToolRendererRegistration,
+  PsmToolRenderProps,
+  PsmToolResolvedData,
+} from '@pi-session-manager/plugin-sdk'
 import { escapeHtml } from '@/utils/markdown'
 import { highlightSearchInHTML } from '@/utils/search'
-import {
-  getSubagentResultErrorPreview,
-  getSubagentResultTaskPreview,
-} from '@/utils/toolCallDisplay'
-import '../utils/markdown'
+import SubagentModal from './SubagentModal'
 
-interface SubagentToolCallProps {
-  arguments?: Record<string, any>
-  details?: SubagentDetails | TintinwebAgentDetails
-  output?: string
-  entryId?: string
-  searchQuery?: string
+/** Maximum length for error preview text */
+const SUBAGENT_ERROR_PREVIEW_LIMIT = 80
+
+/** Maximum length for task preview text */
+const SUBAGENT_TASK_PREVIEW_LIMIT = 120
+
+type SubagentArgs = {
+  action?: string
+  agent?: string
+  task?: string
+  tasks?: Array<{ agent?: string; task?: string }>
 }
 
+/**
+ * Format duration in milliseconds to human readable string
+ */
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
@@ -27,36 +35,49 @@ function formatDuration(ms: number): string {
   return `${mins}m${secs}s`
 }
 
+/**
+ * Format token count with k/M suffix
+ */
 function formatTokens(n: number): string {
   if (n < 1000) return String(n)
   if (n < 1000000) return `${(n / 1000).toFixed(1)}k`
   return `${(n / 1000000).toFixed(2)}M`
 }
 
+/**
+ * Format turn count with optional max turns
+ */
 function formatTurns(n: number, maxTurns?: number): string {
   return maxTurns != null ? `⟳${n}≤${maxTurns}` : `⟳${n}`
 }
 
-/** exitCode === 0 is the ground truth for success; "terminated" is a normal exit signal */
+/**
+ * Check if subagent result is successful (exitCode === 0)
+ */
 function isResultOk(r: SubagentResult): boolean {
   return r.exitCode === 0
 }
 
-/** Type guard: check if details is @tintinweb format (single agent) */
+/**
+ * Type guard: check if details is @tintinweb format (single agent)
+ * @tintinweb format has 'status' and 'displayName', our format has 'mode' and 'results'
+ */
 function isTintinwebDetails(details?: SubagentDetails | TintinwebAgentDetails): details is TintinwebAgentDetails {
   if (!details) return false
-  // @tintinweb format has 'status' and 'displayName', our format has 'mode' and 'results'
   return 'status' in details && 'displayName' in details && !('mode' in details)
 }
 
+/**
+ * Get highlighted HTML for plain text (escapes and highlights)
+ */
 function getHighlightedPlainTextHtml(text: string, searchQuery: string): string {
   const escapedText = escapeHtml(text)
-  return searchQuery
-    ? highlightSearchInHTML(escapedText, searchQuery)
-    : escapedText
+  return searchQuery ? highlightSearchInHTML(escapedText, searchQuery) : escapedText
 }
 
-/** Render @tintinweb format single agent result */
+/**
+ * Card component for @tintinweb format subagent results
+ */
 function TintinwebResultCard({
   details,
   searchQuery,
@@ -66,31 +87,22 @@ function TintinwebResultCard({
   searchQuery: string
   onOpenDetails?: () => void
 }) {
-  const { t } = useTranslation()
   const isError = details.status === 'error' || details.status === 'aborted' || details.status === 'stopped'
   const isCompleted = details.status === 'completed' || details.status === 'steered'
   const ok = isCompleted && !isError
 
   return (
-    <button
-      className="subagent-result-card"
-      onClick={onOpenDetails}
-      title={t('components.subagent.clickToView', 'Click to view session details')}
-    >
+    <button className="subagent-result-card" onClick={onOpenDetails}>
       <div className="subagent-result-header">
         <span className={`subagent-status-dot ${ok ? 'success' : isError ? 'error' : 'warning'}`} />
         <span
           className="subagent-agent-name"
-          dangerouslySetInnerHTML={{
-            __html: getHighlightedPlainTextHtml(details.displayName, searchQuery),
-          }}
+          dangerouslySetInnerHTML={{ __html: getHighlightedPlainTextHtml(details.displayName, searchQuery) }}
         />
         {details.modelName && (
           <span
             className="subagent-model"
-            dangerouslySetInnerHTML={{
-              __html: getHighlightedPlainTextHtml(details.modelName, searchQuery),
-            }}
+            dangerouslySetInnerHTML={{ __html: getHighlightedPlainTextHtml(details.modelName, searchQuery) }}
           />
         )}
         <ChevronRight size={14} className="subagent-chevron" />
@@ -106,7 +118,7 @@ function TintinwebResultCard({
         {details.toolUses > 0 && (
           <span className="subagent-meta-item">
             <Wrench size={12} />
-            {details.toolUses} {t('components.subagent.toolUses', { count: details.toolUses, defaultValue: 'tool uses' })}
+            {details.toolUses}
           </span>
         )}
         {details.tokens && (
@@ -126,27 +138,22 @@ function TintinwebResultCard({
       {details.error && (
         <div className="subagent-error-hint">
           <AlertCircle size={12} />
-          <span
-            dangerouslySetInnerHTML={{
-              __html: getHighlightedPlainTextHtml(details.error, searchQuery),
-            }}
-          />
+          <span dangerouslySetInnerHTML={{ __html: getHighlightedPlainTextHtml(details.error, searchQuery) }} />
         </div>
       )}
 
       {details.activity && (
         <div className="subagent-task-preview">
-          <span
-            dangerouslySetInnerHTML={{
-              __html: getHighlightedPlainTextHtml(details.activity, searchQuery),
-            }}
-          />
+          <span dangerouslySetInnerHTML={{ __html: getHighlightedPlainTextHtml(details.activity, searchQuery) }} />
         </div>
       )}
     </button>
   )
 }
 
+/**
+ * Card component for our format subagent results
+ */
 function ResultCard({
   result,
   onClick,
@@ -156,32 +163,21 @@ function ResultCard({
   onClick: () => void
   searchQuery: string
 }) {
-  const { t } = useTranslation()
   const ok = isResultOk(result)
   const ps = result.progressSummary
-  const displayError = getSubagentResultErrorPreview(result)
-  const taskPreview = getSubagentResultTaskPreview(result)
 
   return (
-    <button
-      className="subagent-result-card"
-      onClick={onClick}
-      title={t('components.subagent.clickToView')}
-    >
+    <button className="subagent-result-card" onClick={onClick}>
       <div className="subagent-result-header">
         <span className={`subagent-status-dot ${ok ? 'success' : 'error'}`} />
         <span
           className="subagent-agent-name"
-          dangerouslySetInnerHTML={{
-            __html: getHighlightedPlainTextHtml(result.agent, searchQuery),
-          }}
+          dangerouslySetInnerHTML={{ __html: getHighlightedPlainTextHtml(result.agent, searchQuery) }}
         />
         {result.model && (
           <span
             className="subagent-model"
-            dangerouslySetInnerHTML={{
-              __html: getHighlightedPlainTextHtml(result.model, searchQuery),
-            }}
+            dangerouslySetInnerHTML={{ __html: getHighlightedPlainTextHtml(result.model, searchQuery) }}
           />
         )}
         <ChevronRight size={14} className="subagent-chevron" />
@@ -216,50 +212,38 @@ function ResultCard({
         </div>
       )}
 
-      {displayError && (
+      {result.error && (
         <div className="subagent-error-hint">
           <AlertCircle size={12} />
-          <span
-            dangerouslySetInnerHTML={{
-              __html: getHighlightedPlainTextHtml(displayError, searchQuery),
-            }}
-          />
+          <span>{result.error.slice(0, SUBAGENT_ERROR_PREVIEW_LIMIT)}</span>
         </div>
       )}
 
-      <div
-        className="subagent-task-preview"
-        dangerouslySetInnerHTML={{
-          __html: getHighlightedPlainTextHtml(taskPreview, searchQuery),
-        }}
-      />
+      <div className="subagent-task-preview">
+        {result.task.slice(0, SUBAGENT_TASK_PREVIEW_LIMIT)}
+      </div>
     </button>
   )
 }
 
-export default function SubagentToolCall({
-  arguments: args,
-  details,
-  output,
-  entryId,
-  searchQuery = '',
-}: SubagentToolCallProps) {
+/**
+ * Subagent tool renderer
+ * Supports both our format and @tintinweb/pi-subagents format
+ */
+function SubagentToolCall({
+  resolvedData,
+  searchQuery,
+}: PsmToolRenderProps) {
   const [modalResult, setModalResult] = useState<SubagentResult | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const highlightedOutput = useMemo(() => {
-    if (!output) {
-      return ''
-    }
 
-    const escapedOutput = escapeHtml(output)
-    return searchQuery
-      ? highlightSearchInHTML(escapedOutput, searchQuery)
-      : escapedOutput
-  }, [output, searchQuery])
+  const { args, result, output, entryId } = resolvedData
+  const subagentArgs = args as SubagentArgs
+  const resultMessage = result?.message as { details?: SubagentDetails | TintinwebAgentDetails } | undefined
+  const details = resultMessage?.details
 
-  // @tintinweb/pi-subagents format: single agent details
+  // @tintinweb format: single agent with status
   if (isTintinwebDetails(details)) {
-    // Build a SubagentResult for modal display
     const resultForModal: SubagentResult = {
       agent: details.subagentType,
       task: details.description,
@@ -279,15 +263,6 @@ export default function SubagentToolCall({
         tokens: parseInt(details.tokens.replace(/[^0-9.]/g, '')) || 0,
         durationMs: details.durationMs,
       },
-      artifactPaths: details.agentId ? {
-        inputPath: '',
-        outputPath: '',
-        // Try multiple path patterns for @tintinweb/pi-subagents compatibility
-        jsonlPath: `/tmp/pi-subagents-**/${details.agentId}.output`,
-        metadataPath: '',
-      } : undefined,
-      agentId: details.agentId,
-      // Use output text as messages for modal display
       messages: output ? [{ role: 'assistant', content: [{ type: 'text', text: output }] }] : [],
     }
 
@@ -312,7 +287,7 @@ export default function SubagentToolCall({
           <div className="subagent-results-grid">
             <TintinwebResultCard
               details={details}
-              searchQuery={searchQuery}
+              searchQuery={searchQuery || ''}
               onOpenDetails={() => {
                 setModalResult(resultForModal)
                 setModalOpen(true)
@@ -322,19 +297,16 @@ export default function SubagentToolCall({
         </div>
 
         {modalOpen && modalResult && (
-          <SubagentModal
-            result={modalResult}
-            onClose={() => setModalOpen(false)}
-          />
+          <SubagentModal result={modalResult} onClose={() => setModalOpen(false)} />
         )}
       </>
     )
   }
 
-  // Our format or management actions
+  // Management mode or pending state (no results yet)
   if (!details || details.mode === 'management' || !details.results?.length) {
-    const agentName = args?.agent || (args?.tasks?.[0]?.agent)
-    const taskText = args?.task || (args?.tasks?.[0]?.task) || ''
+    const agentName = subagentArgs.agent || subagentArgs.tasks?.[0]?.agent
+    const taskText = subagentArgs.task || subagentArgs.tasks?.[0]?.task || ''
     const isPending = !details && !output && agentName
 
     return (
@@ -344,13 +316,10 @@ export default function SubagentToolCall({
       >
         <div className="subagent-header">
           <div className="subagent-title">
-            {isPending
-              ? <Loader2 size={16} className="subagent-icon spinning" />
-              : <Bot size={16} />
-            }
+            {isPending ? <Loader2 size={16} className="subagent-icon spinning" /> : <Bot size={16} />}
             <span className="subagent-label">Subagent</span>
-            {args?.action && <span className="subagent-mode-badge">{args.action}</span>}
-            {agentName && !args?.action && <span className="subagent-mode-badge">{agentName}</span>}
+            {subagentArgs.action && <span className="subagent-mode-badge">{subagentArgs.action}</span>}
+            {agentName && !subagentArgs.action && <span className="subagent-mode-badge">{agentName}</span>}
           </div>
         </div>
         {isPending && taskText && (
@@ -359,15 +328,13 @@ export default function SubagentToolCall({
           </div>
         )}
         {output && (
-          <div
-            className="subagent-management-output whitespace-pre-wrap"
-            dangerouslySetInnerHTML={{ __html: highlightedOutput }}
-          />
+          <div className="subagent-management-output whitespace-pre-wrap">{output}</div>
         )}
       </div>
     )
   }
 
+  // Our format: multiple agents with mode (single/parallel/chain)
   const results = details.results
   const mode = details.mode
   const modeLabel = mode === 'parallel' ? 'Parallel' : mode === 'chain' ? 'Chain' : 'Single'
@@ -398,18 +365,53 @@ export default function SubagentToolCall({
               key={`${result.agent}-${i}`}
               result={result}
               onClick={() => setModalResult(result)}
-              searchQuery={searchQuery}
+              searchQuery={searchQuery || ''}
             />
           ))}
         </div>
       </div>
 
       {modalResult && modalOpen && (
-        <SubagentModal
-          result={modalResult}
-          onClose={() => setModalOpen(false)}
-        />
+        <SubagentModal result={modalResult} onClose={() => setModalOpen(false)} />
       )}
     </>
   )
+}
+
+/**
+ * Generate search segments for subagent tool
+ * Includes output and result metadata
+ */
+function getSubagentSearchSegments(_toolCall: PsmToolCallContent, resolvedData: PsmToolResolvedData): string[] {
+  const segments: string[] = []
+
+  if (resolvedData.output) {
+    segments.push(escapeHtml(resolvedData.output))
+  }
+
+  const resultMessage = resolvedData.result?.message as { details?: { results?: Array<{ agent: string; task: string }> } } | undefined
+  const details = resultMessage?.details
+  if (details?.results) {
+    details.results.forEach(r => {
+      segments.push(escapeHtml(r.agent))
+      segments.push(escapeHtml(r.task))
+    })
+  }
+
+  return segments
+}
+
+/** Subagent tool render plugin definition */
+export const subagentToolRenderer: PsmToolRendererRegistration = {
+  id: 'builtin-subagent',
+  name: 'Subagent',
+  match: /^(Agent|subagent)$/,  // Matches 'Agent' or 'subagent'
+  priority: 100,
+  component: SubagentToolCall,
+  getSearchSegments: getSubagentSearchSegments,
+  getPreview: (_toolCall, data) => {
+    const args = data.args as SubagentArgs
+    const agent = args.agent || 'Subagent'
+    return `${agent}: ${args.task?.slice(0, 50) || ''}`
+  },
 }
