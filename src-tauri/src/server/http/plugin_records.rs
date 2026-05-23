@@ -34,6 +34,13 @@ pub(crate) struct PluginRecordUpsertRequest {
     pub(crate) index_values: Vec<crate::data::sqlite::DbPluginRecordIndexValue>,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct RefreshSessionIntelligenceRequest {
+    pub(crate) path: String,
+    pub(crate) provider: Option<String>,
+    pub(crate) model: Option<String>,
+}
+
 pub(crate) async fn v1_get_plugin_record(Path(id): Path<String>, ConnectInfo(addr): ConnectInfo<SocketAddr>, headers: HeaderMap, uri: Uri) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
@@ -65,6 +72,17 @@ pub(crate) async fn v1_search_plugin_records(ConnectInfo(addr): ConnectInfo<Sock
     match crate::search_plugin_records(req.query, req.record_type, req.plugin_id, req.limit).await {
         Ok(records) => json_success_response(records),
         Err(error) => json_error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
+    }
+}
+
+pub(crate) async fn v1_refresh_session_intelligence_record(ConnectInfo(addr): ConnectInfo<SocketAddr>, headers: HeaderMap, uri: Uri, Json(req): Json<RefreshSessionIntelligenceRequest>) -> Response {
+    if !is_authorized(&addr.ip(), &headers, &uri) {
+        return unauthorized_response();
+    }
+
+    match crate::refresh_session_intelligence_record(req.path, req.provider, req.model).await {
+        Ok(record) => json_success_response(record),
+        Err(error) => json_error_response(StatusCode::BAD_REQUEST, error),
     }
 }
 

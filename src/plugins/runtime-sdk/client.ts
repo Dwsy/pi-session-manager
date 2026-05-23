@@ -108,6 +108,15 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
         },
       })
     },
+
+    async refreshSessionIntelligence(params: { path: string; provider?: string; model?: string }) {
+      const record = await transport.invoke<DbPluginRecord>('refresh_session_intelligence_record', {
+        path: params.path,
+        provider: params.provider,
+        model: params.model,
+      })
+      return parsePayload(record)
+    },
   }
 
   return {

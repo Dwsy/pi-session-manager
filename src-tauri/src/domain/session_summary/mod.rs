@@ -213,33 +213,68 @@ fn build_auth_headers(api_key: &str, auth_header: bool, api: &str) -> Result<Hea
     Ok(headers)
 }
 
+fn is_openai_reasoning_model(model: &str) -> bool {
+    let normalized = model.trim().to_ascii_lowercase();
+    normalized.starts_with("o1") || normalized.starts_with("o3") || normalized.starts_with("o4") || normalized.starts_with("gpt-5")
+}
+
+fn build_openai_summary_attempts(model: &str, context: &str) -> Vec<(&'static str, Value)> {
+    let max_completion_tokens = if is_openai_reasoning_model(model) { 2048 } else { 1024 };
+    vec![
+        (
+            "chat-completions:max_completion_tokens",
+            serde_json::json!({
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": SUMMARY_PROMPT},
+                    {"role": "user", "content": context}
+                ],
+                "stream": false,
+                "max_completion_tokens": max_completion_tokens,
+            }),
+        ),
+        (
+            "chat-completions:max_tokens",
+            serde_json::json!({
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": SUMMARY_PROMPT},
+                    {"role": "user", "content": context}
+                ],
+                "stream": false,
+                "max_tokens": 1024,
+                "temperature": 0.3,
+            }),
+        ),
+    ]
+}
+
 async fn call_openai_completions(base_url: &str, model: &str, api_key: &str, context: &str) -> Result<String, String> {
     let url = join_url(base_url, "chat/completions");
     let headers = build_auth_headers(api_key, true, "openai-completions")?;
-
-    let body = serde_json::json!({
-        "model": model,
-        "messages": [
-            {"role": "system", "content": SUMMARY_PROMPT},
-            {"role": "user", "content": context}
-        ],
-        "stream": false,
-        "max_tokens": 1024,
-        "temperature": 0.3,
-    });
-
     let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120)).build().map_err(|e| format!("Failed to create HTTP client: {e}"))?;
+    let attempts = build_openai_summary_attempts(model, context);
+    let attempt_count = attempts.len();
+    let mut last_error = None;
 
-    let resp = client.post(&url).headers(headers).body(body.to_string()).send().await.map_err(|e| format!("LLM request failed: {e}"))?;
+    for (index, (request_style, body)) in attempts.into_iter().enumerate() {
+        let resp = client.post(&url).headers(headers.clone()).body(body.to_string()).send().await.map_err(|e| format!("LLM request failed: {e}"))?;
+        let status = resp.status();
+        let text = resp.text().await.map_err(|e| format!("Failed to read LLM response: {e}"))?;
 
-    let status = resp.status();
-    let text = resp.text().await.map_err(|e| format!("Failed to read LLM response: {e}"))?;
+        if status.is_success() {
+            return Ok(text);
+        }
 
-    if !status.is_success() {
-        return Err(format!("LLM returned {status}: {}", truncate(&text, 500)));
+        let error = format!("LLM returned {status} using {request_style}: {}", truncate(&text, 500));
+        let should_retry = index + 1 < attempt_count && matches!(status.as_u16(), 400 | 404 | 422);
+        if !should_retry {
+            return Err(error);
+        }
+        last_error = Some(error);
     }
 
-    Ok(text)
+    Err(last_error.unwrap_or_else(|| "No OpenAI completion attempt was generated".to_string()))
 }
 
 async fn call_openai_responses(base_url: &str, model: &str, api_key: &str, context: &str) -> Result<String, String> {
@@ -295,6 +330,10 @@ async fn call_anthropic_messages(base_url: &str, model: &str, api_key: &str, con
 
 /// Build a `session.intelligence` plugin record from the summary result.
 pub fn to_session_intelligence_record(session_path: &str, result: &SessionSummaryResult, provider: &str, model: &str) -> DbPluginRecord {
+    to_session_intelligence_record_with_message_count(session_path, result, provider, model, None)
+}
+
+pub fn to_session_intelligence_record_with_message_count(session_path: &str, result: &SessionSummaryResult, provider: &str, model: &str, message_count: Option<usize>) -> DbPluginRecord {
     let now = Utc::now().to_rfc3339();
     let payload = serde_json::json!({
         "summary": result.summary,
@@ -304,6 +343,7 @@ pub fn to_session_intelligence_record(session_path: &str, result: &SessionSummar
         "model_used": model,
         "provider_used": provider,
         "generated_at": now,
+        "message_count": message_count,
     });
     DbPluginRecord {
         id: format!("builtin.session-summary:{}", session_path),
@@ -317,4 +357,11 @@ pub fn to_session_intelligence_record(session_path: &str, result: &SessionSummar
         created_at: now.clone(),
         updated_at: now,
     }
+}
+
+pub fn refresh_session_intelligence_record_from_summary(conn: &rusqlite::Connection, session_path: &str, entries: &[crate::types::SessionEntry], summary: SessionSummaryResult, provider: &str, model: &str) -> Result<DbPluginRecord, String> {
+    let message_count = entries.iter().filter(|entry| entry.message.is_some()).count();
+    let record = to_session_intelligence_record_with_message_count(session_path, &summary, provider, model, Some(message_count));
+    crate::data::sqlite::upsert_plugin_record(conn, &record, &[])?;
+    Ok(record)
 }
