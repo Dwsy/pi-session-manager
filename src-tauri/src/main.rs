@@ -385,6 +385,7 @@ fn main() {
             pi_session_manager::list_plugin_records_for_scope,
             pi_session_manager::search_plugin_records,
             pi_session_manager::refresh_session_intelligence_record,
+            pi_session_manager::ask_session_sidechat,
             pi_session_manager::upsert_plugin_record,
             pi_session_manager::full_text_search,
             pi_session_manager::delete_session,

@@ -209,6 +209,26 @@ fn extract_response_text(api: &str, response_text: &str) -> Option<String> {
     }
 }
 
+/// Call the configured model and return plain text without applying a domain-specific parser.
+///
+/// This keeps provider quirks centralized for adjacent session AI features such as sidechat.
+pub async fn generate_model_text(system_prompt: &str, user_context: &str, provider: Option<&str>, model: Option<&str>) -> Result<(String, String, String), String> {
+    let config = read_models_config_internal()?;
+    let (provider_name, model_id, base_url, api, api_key) = resolve_provider_config(&config, provider, model)?;
+
+    info!("Generating model text using provider={provider_name} model={model_id} api={api}");
+
+    let response_text = match api.as_str() {
+        "openai-completions" => call_openai_completions(&base_url, &model_id, &api_key, system_prompt, user_context).await?,
+        "openai-responses" => call_openai_responses(&base_url, &model_id, &api_key, system_prompt, user_context).await?,
+        "anthropic-messages" => call_anthropic_messages(&base_url, &model_id, &api_key, system_prompt, user_context).await?,
+        _ => return Err(format!("Unsupported API type for model text generation: {api}")),
+    };
+
+    let text = extract_response_text(&api, &response_text).ok_or_else(|| format!("Failed to extract text from {api} response: {}", truncate(&response_text, 500)))?;
+    Ok((text, provider_name, model_id))
+}
+
 fn build_auth_headers(api_key: &str, auth_header: bool, api: &str) -> Result<HeaderMap, String> {
     let mut headers = HeaderMap::new();
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));

@@ -257,6 +257,16 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::refresh_session_intelligence_record(path, provider, model, language).await?;
             Ok(to_val(result, "serialize refreshed session intelligence record")?)
         }
+        "ask_session_sidechat" => {
+            let path = extract(payload, "path").or_else(|_| extract(payload, "sessionPath")).or_else(|_| extract(payload, "session_path"))?;
+            let question = extract(payload, "question")?;
+            let provider = extract_optional_string(payload, "provider");
+            let model = extract_optional_string(payload, "model");
+            let language = extract_optional_string(payload, "language").or_else(|| extract_optional_string(payload, "locale"));
+            let limit = payload.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+            let result = crate::ask_session_sidechat(path, question, provider, model, language, limit).await?;
+            Ok(to_val(result, "serialize session sidechat response")?)
+        }
         "upsert_plugin_record" => {
             let record = serde_json::from_value(payload.get("record").cloned().ok_or_else(|| "Missing field: record".to_string())?).map_err(|e| format!("Invalid plugin record: {e}"))?;
             let index_values = payload.get("index_values").or_else(|| payload.get("indexValues")).cloned().map(serde_json::from_value).transpose().map_err(|e| format!("Invalid plugin record index values: {e}"))?;
