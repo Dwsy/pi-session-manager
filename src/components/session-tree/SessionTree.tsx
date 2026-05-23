@@ -359,7 +359,8 @@ const SessionTree = memo(
       (entryId: string) => {
         if (!onNodeClick) return;
         const targetId = resolveScrollTarget(entryId);
-        onNodeClick(findNewestLeafFn(targetId), targetId);
+        const leafId = targetId === entryId ? entryId : findNewestLeafFn(entryId);
+        onNodeClick(leafId, targetId);
       },
       [findNewestLeafFn, onNodeClick, resolveScrollTarget],
     );

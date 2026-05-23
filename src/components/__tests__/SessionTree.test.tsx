@@ -160,6 +160,54 @@ describe('SessionTree', () => {
     expect(onNodeClick).toHaveBeenCalledWith('assistant-1', 'user-1');
   });
 
+  it('does not jump to the newest descendant when clicking an earlier branch node', () => {
+    const branchedEntries: SessionEntry[] = [
+      {
+        type: 'message',
+        id: 'root-user',
+        timestamp: '2026-04-09T10:00:00Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Root prompt' }],
+        },
+      },
+      {
+        type: 'message',
+        id: 'branch-a-assistant',
+        parentId: 'root-user',
+        timestamp: '2026-04-09T10:01:00Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Original branch reply' }],
+        },
+      },
+      {
+        type: 'message',
+        id: 'branch-b-assistant',
+        parentId: 'root-user',
+        timestamp: '2026-04-09T10:02:00Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Newer branch reply' }],
+        },
+      },
+    ];
+    const { onNodeClick } = renderSessionTree({
+      entries: branchedEntries,
+      activeLeafId: 'branch-a-assistant',
+      resolvedLabelsByTargetId: {},
+    });
+
+    const rootTreeText = screen
+      .getAllByText('Root prompt')
+      .find((element) => element.classList.contains('tree-node-text'));
+
+    expect(rootTreeText).toBeTruthy();
+    fireEvent.click(rootTreeText!.closest('.tree-node')!);
+
+    expect(onNodeClick).toHaveBeenCalledWith('root-user', 'root-user');
+  });
+
   it('preserves nodes that depend on raw label entries in the tree topology', () => {
     renderSessionTree({ filter: 'all' });
 

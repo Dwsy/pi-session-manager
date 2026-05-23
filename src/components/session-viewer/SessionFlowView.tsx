@@ -17,7 +17,7 @@ import {
 import { User, Bot, Wrench, Settings, FileText, ZoomIn, ZoomOut, Maximize, LocateFixed, GitBranch, List, Network } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import type { SessionEntry } from '@/types'
-import { buildTree as buildSessionTree, isNoneParent, type TreeNodeData } from '@/utils/session-tree'
+import { buildTree as buildSessionTree, type TreeNodeData } from '@/utils/session-tree'
 
 type FilterMode = 'default' | 'no-tools' | 'user-only' | 'labeled-only' | 'all' | `tool-${string}`
 
@@ -399,29 +399,10 @@ function SessionFlowView({ entries, activeLeafId, onNodeClick, filter = 'default
     setEdges(layoutEdges)
   }, [layoutNodes, layoutEdges, setNodes, setEdges])
 
-  const findNewestLeaf = useCallback((nodeId: string): string => {
-    const byId = new Map<string, SessionEntry>()
-    const childrenMap = new Map<string, SessionEntry[]>()
-    for (const e of entries) { byId.set(e.id, e); childrenMap.set(e.id, []) }
-    for (const e of entries) {
-      const pid = e.parentId
-      const ep = isNoneParent(pid) ? null : pid
-      if (ep && byId.has(ep)) childrenMap.get(ep)!.push(e)
-    }
-    let current = nodeId
-    while (true) {
-      const children = childrenMap.get(current) || []
-      if (children.length === 0) break
-      current = children[children.length - 1].id
-    }
-    return current
-  }, [entries])
-
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     if (!onNodeClick) return
-    const leafId = findNewestLeaf(node.id)
-    onNodeClick(leafId, node.id)
-  }, [onNodeClick, findNewestLeaf])
+    onNodeClick(node.id, node.id)
+  }, [onNodeClick])
 
   return (
     <ReactFlowProvider>
