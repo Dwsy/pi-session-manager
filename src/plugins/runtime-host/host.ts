@@ -37,8 +37,10 @@ import type {
   PsmPluginStatus,
   PsmPluginToolRuntimeRegistration,
   PsmPluginsConfig,
+  PsmSessionMainViewRuntimeRegistration,
   PsmSessionPanelRuntimeRegistration,
   PsmSessionToolbarItemRuntimeRegistration,
+  PsmSessionTreeViewRuntimeRegistration,
   PsmToolRendererRuntimeRegistration,
 } from './types'
 
@@ -231,7 +233,9 @@ export class PsmPluginHost {
   private toolRenderers = new Map<string, PsmToolRendererRuntimeRegistration>()
   private sessionToolbarItems = new Map<string, PsmSessionToolbarItemRuntimeRegistration>()
   private sessionPanels = new Map<string, PsmSessionPanelRuntimeRegistration>()
-  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { toolbarItems: [], panels: [] }
+  private sessionTreeViews = new Map<string, PsmSessionTreeViewRuntimeRegistration>()
+  private sessionMainViews = new Map<string, PsmSessionMainViewRuntimeRegistration>()
+  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
   private listeners = new Set<() => void>()
   private activePlugins = new Map<string, ActivePlugin>()
   private statuses = new Map<string, PsmPluginStatus>()
@@ -280,6 +284,14 @@ export class PsmPluginHost {
     return Array.from(this.sessionPanels.values()).sort((a, b) => a.id.localeCompare(b.id))
   }
 
+  listSessionTreeViews(): PsmSessionTreeViewRuntimeRegistration[] {
+    return Array.from(this.sessionTreeViews.values()).sort((a, b) => a.id.localeCompare(b.id))
+  }
+
+  listSessionMainViews(): PsmSessionMainViewRuntimeRegistration[] {
+    return Array.from(this.sessionMainViews.values()).sort((a, b) => a.id.localeCompare(b.id))
+  }
+
   getSessionUiSnapshot(): PsmPluginSessionUiSnapshot {
     return this.sessionUiSnapshot
   }
@@ -309,6 +321,8 @@ export class PsmPluginHost {
     this.sessionUiSnapshot = {
       toolbarItems: this.listSessionToolbarItems(),
       panels: this.listSessionPanels(),
+      treeViews: this.listSessionTreeViews(),
+      mainViews: this.listSessionMainViews(),
     }
   }
 
@@ -342,6 +356,8 @@ export class PsmPluginHost {
     this.tools.clear()
     this.sessionToolbarItems.clear()
     this.sessionPanels.clear()
+    this.sessionTreeViews.clear()
+    this.sessionMainViews.clear()
     this.statuses.clear()
 
     const config = await this.services.loadConfig()
@@ -462,6 +478,8 @@ export class PsmPluginHost {
     const toolRendererIds: string[] = []
     const toolbarItemIds: string[] = []
     const panelIds: string[] = []
+    const treeViewIds: string[] = []
+    const mainViewIds: string[] = []
     const diagnostics: PsmPluginDiagnostic[] = []
     const permissions = {
       pluginId: manifest.id,
@@ -490,6 +508,22 @@ export class PsmPluginHost {
           }
           this.sessionPanels.set(panel.id, { ...panel, pluginId: manifest.id, side: panel.side ?? 'right' })
           panelIds.push(panel.id)
+        },
+        registerSessionTreeView: (view) => {
+          if (this.sessionTreeViews.has(view.id)) {
+            diagnostics.push(diagnostic('warn', `Session tree view already registered: ${view.id}`))
+            return
+          }
+          this.sessionTreeViews.set(view.id, { ...view, pluginId: manifest.id })
+          treeViewIds.push(view.id)
+        },
+        registerSessionMainView: (view) => {
+          if (this.sessionMainViews.has(view.id)) {
+            diagnostics.push(diagnostic('warn', `Session main view already registered: ${view.id}`))
+            return
+          }
+          this.sessionMainViews.set(view.id, { ...view, pluginId: manifest.id })
+          mainViewIds.push(view.id)
         },
         registerToolRenderer: (renderer: PsmToolRendererRegistration) => {
           if (this.toolRenderers.has(renderer.id) || toolRenderRegistry.get(renderer.id)) {
@@ -555,6 +589,8 @@ export class PsmPluginHost {
       this.unregisterToolRenderers(toolRendererIds)
       for (const id of toolbarItemIds) this.sessionToolbarItems.delete(id)
       for (const id of panelIds) this.sessionPanels.delete(id)
+      for (const id of treeViewIds) this.sessionTreeViews.delete(id)
+      for (const id of mainViewIds) this.sessionMainViews.delete(id)
       this.statuses.set(manifest.id, {
         id: manifest.id,
         name: manifest.name,

@@ -42,8 +42,9 @@ function AppSessionViewerPane({
 }: AppSessionViewerPaneProps) {
   const { getSessionSetting } = useSettings();
   const conversationModeEnabled = getSessionSetting("conversationModeEnabled") !== false;
-  const { toolbarItems, panels } = usePsmPluginSessionUi();
+  const { toolbarItems, panels, treeViews, mainViews = [] } = usePsmPluginSessionUi();
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
+  const [activeMainViewId, setActiveMainViewId] = useState<string | null>(null);
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const [panelWidths, setPanelWidths] = useState<Record<string, number>>({});
 
@@ -55,18 +56,28 @@ function AppSessionViewerPane({
     setActivePanelId((prev) => (prev === id ? null : prev));
   }, []);
 
+  const toggleMainView = useCallback((id: string) => {
+    setActiveMainViewId((prev) => (prev === id ? null : id));
+  }, []);
+
+  const closeMainView = useCallback((id: string) => {
+    setActiveMainViewId((prev) => (prev === id ? null : prev));
+  }, []);
+
   const setPanelWidth = useCallback((id: string, width: number) => {
     setPanelWidths((prev) => ({ ...prev, [id]: width }));
   }, []);
 
   const rightPanels = panels.filter((panel) => (panel.side ?? "right") === "right");
   const activePanel = rightPanels.find((panel) => panel.id === activePanelId) ?? null;
+  const activeMainView = mainViews.find((view) => view.id === activeMainViewId) ?? null;
 
   const sessionToolbarSlot = (
     <>
       {slots?.right}
       {toolbarItems.map((item) => {
         const panelId = item.panelId;
+        const mainViewId = item.mainViewId;
         return (
           <Fragment key={item.id}>
             <PluginContributionBoundary pluginId={item.pluginId} contributionId={item.id} title={item.title}>
@@ -75,6 +86,8 @@ function AppSessionViewerPane({
                 activeEntryId,
                 panelOpen: panelId ? activePanelId === panelId : undefined,
                 togglePanel: panelId ? () => togglePanel(panelId) : undefined,
+                mainViewOpen: mainViewId ? activeMainViewId === mainViewId : undefined,
+                toggleMainView: mainViewId ? () => toggleMainView(mainViewId) : undefined,
               })} />
             </PluginContributionBoundary>
           </Fragment>
@@ -127,6 +140,17 @@ function AppSessionViewerPane({
     </aside>
   ) : null;
 
+  const mainViewSlot = activeMainView ? (
+    <PluginContributionBoundary pluginId={activeMainView.pluginId} contributionId={activeMainView.id} title={activeMainView.title}>
+      <PluginContributionSlot render={() => activeMainView.render({
+        session,
+        activeEntryId,
+        mainViewOpen: true,
+        closeMainView: () => closeMainView(activeMainView.id),
+      })} />
+    </PluginContributionBoundary>
+  ) : null;
+
   return (
     <SessionViewer
       session={session}
@@ -145,6 +169,8 @@ function AppSessionViewerPane({
       previewVariant={conversationModeEnabled ? "conversation" : "none"}
       slots={{ ...slots, right: sessionToolbarSlot }}
       layoutSlots={{ right: rightPanelSlot }}
+      mainViewSlot={mainViewSlot}
+      pluginTreeViews={treeViews}
       onActiveEntryIdChange={setActiveEntryId}
     />
   );

@@ -27,7 +27,8 @@ A path plugin points directly to a built browser-compatible ESM file such as
 | Plugin | Purpose | Permissions |
 | --- | --- | --- |
 | [psm-session-summary](./psm-session-summary/) | Generates session intelligence and writes `session.intelligence` plugin records | `sessions:read`, `records:read`, `records:write`, `model:invoke` |
-| [psm-sidechat](./psm-sidechat/) | Session Q&A command/tool and toolbar panel example | `sidechat:ask`, `model:invoke` |
+| [psm-sidechat](./psm-sidechat/) | Session Q&A command/tool and toolbar panel example | `sessions:read`, `model:invoke`, `records:read`, `records:write` |
+| [psm-trace](./psm-trace/) | Session trace analytics main view parsed in the plugin runtime | `sessions:read` |
 
 ### SDK Capability Notes
 
@@ -36,7 +37,7 @@ The public SDK package is `@pi-session-manager/plugin-sdk`. It intentionally exp
 - manifest and package validation helpers
 - plugin host context and activation types
 - command/tool registration
-- session toolbar and right-panel UI contributions
+- session toolbar, main-view, and right-panel UI contributions
 - plugin settings and i18n clients
 - the `ctx.psm` capability client for selected plugin-safe PSM operations
 

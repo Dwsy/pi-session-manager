@@ -23,7 +23,17 @@ export const builtinPsmPluginEntries: PsmPluginLoadEntry[] = [
   },
   {
     source: 'builtin',
+    sourceId: 'extensions/psm-session-graph',
+    load: () => import('../../../extensions/psm-session-graph/index'),
+  },
+  {
+    source: 'builtin',
     sourceId: 'extensions/psm-sidechat',
     load: () => import('../../../extensions/psm-sidechat/index'),
+  },
+  {
+    source: 'builtin',
+    sourceId: 'extensions/psm-trace',
+    load: () => import('../../../extensions/psm-trace/index'),
   },
 ]

@@ -27,7 +27,7 @@ It exposes these public groups:
 | Validation | `validatePsmPluginManifest`, `assertPsmPluginManifest`, `validatePsmPackageManifest`, `assertPsmPackageManifest` |
 | Host context | `manifest`, `psm`, `permissions`, `settings`, `i18n`, `ui`, `registerCommand`, `registerTool` |
 | Capability client | `createPluginCapabilityClient(options)` |
-| UI contributions | session toolbar item, session right panel |
+| UI contributions | session toolbar item, session main view, session right panel |
 | Settings | `manifest.configuration`, `ctx.settings.get(...)`, `ctx.settings.all()` |
 | I18n | `manifest.i18n`, `ctx.i18n.t(...)`, `ctx.i18n.language` |
 
@@ -97,7 +97,6 @@ Current permissions:
 | `search:read` | full-text search |
 | `kanban:read` | read tags and session tags |
 | `kanban:write` | create/assign/remove tags |
-| `sidechat:ask` | ask session sidechat |
 | `model:invoke` | invoke model-backed operations or list model options |
 
 This is the right foundation, but it should be expanded into a declarative capability table that records command name, permission, exposure level, request type, and response type.

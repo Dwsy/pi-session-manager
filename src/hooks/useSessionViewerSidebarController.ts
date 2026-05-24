@@ -12,7 +12,7 @@ const SIDEBAR_WIDTH_KEY = "pi-session-manager-sidebar-width";
 export interface UseSessionViewerSidebarControllerOptions {
   isMobile: boolean;
   previewMode: boolean;
-  traceMode: boolean;
+  mainViewOpen: boolean;
   setShowMobileMenu: Dispatch<SetStateAction<boolean>>;
   setActiveEntryId: Dispatch<SetStateAction<string | null>>;
   setScrollTargetId: Dispatch<SetStateAction<string | null>>;
@@ -21,7 +21,7 @@ export interface UseSessionViewerSidebarControllerOptions {
 export function useSessionViewerSidebarController({
   isMobile,
   previewMode,
-  traceMode,
+  mainViewOpen,
   setShowMobileMenu,
   setActiveEntryId,
   setScrollTargetId,
@@ -61,7 +61,7 @@ export function useSessionViewerSidebarController({
   );
 
   const contentPaddingLeft =
-    !previewMode && !traceMode && showSidebar && !isMobile
+    !previewMode && !mainViewOpen && showSidebar && !isMobile
       ? `${sidebarWidth}px`
       : 0;
 

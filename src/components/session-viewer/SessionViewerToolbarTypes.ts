@@ -34,8 +34,6 @@ export interface SessionViewerToolbarProps {
   onToggleThinking: () => void;
   onToggleToolsExpanded: () => void;
   onToggleScrollMarkers?: () => void;
-  onToggleTraceMode?: () => void;
-  traceModeActive?: boolean;
   onOpenSearch: () => void;
   onMobileMenuOpenChange: (open: boolean) => void;
   onOpenSystemPromptDialog: () => void;

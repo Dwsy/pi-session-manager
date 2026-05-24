@@ -80,7 +80,7 @@ export const manifest: PsmPluginManifest = {
     name: '@example/psm-sidechat',
     export: './dist/index.js'
   },
-  permissions: ['sidechat:ask']
+  permissions: ['sessions:read', 'model:invoke']
 }
 
 export function activate(ctx: PsmPluginHostContext) {
@@ -227,7 +227,8 @@ Logic contributions:
 
 UI contributions:
 
-- `ctx.ui.registerSessionToolbarItem({ id, title, panelId?, render })`
+- `ctx.ui.registerSessionToolbarItem({ id, title, panelId?, mainViewId?, render })`
+- `ctx.ui.registerSessionMainView({ id, title, render })`
 - `ctx.ui.registerSessionPanel({ id, title, side: 'right', render })`
 - `ctx.ui.registerToolRenderer({ id, name, match, component, ... })`
 
@@ -291,6 +292,8 @@ export const manifest = {
   configuration: {
     title: 'Sidechat Settings',
     properties: [
+      { key: 'provider', title: 'Default provider', type: 'model-provider', default: '', modelKey: 'model' },
+      { key: 'model', title: 'Default model', type: 'model-id', default: '', providerKey: 'provider' },
       { key: 'thinkingLevel', title: 'Thinking level', type: 'select', default: 'medium', options: [
         { label: 'Medium', value: 'medium' },
         { label: 'High', value: 'high' },
@@ -302,9 +305,11 @@ export const manifest = {
 }
 ```
 
-Supported field types are `string`, `number`, `boolean`, and `select`. Plugins should read
-settings through `ctx.settings.get(...)` during activation and pass normalized values into
-commands/UI components.
+Supported field types are `string`, `number`, `boolean`, `select`, `model-provider`, and
+`model-id`. Model fields are rendered from the host model configuration; use `modelKey` and
+`providerKey` to keep the provider/model pair in sync. Plugins should read settings through
+`ctx.settings.get(...)` during activation and pass normalized values into commands/UI
+components.
 
 ## Plugin I18n Resources
 

@@ -19,7 +19,6 @@ import {
   Pencil,
   Play,
   Search,
-  Workflow,
 } from "lucide-react";
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
@@ -41,8 +40,6 @@ export default function SessionViewerToolbar({
   isSearchOpen,
   previewMode = false,
   slots,
-  onToggleTraceMode,
-  traceModeActive = false,
   onBack,
   onToggleSidebar,
   onToggleThinking,
@@ -226,21 +223,6 @@ export default function SessionViewerToolbar({
                   >
                     <Bot className="h-3.5 w-3.5" />
                   </button>
-                  {onToggleTraceMode && (
-                    <button
-                      onClick={onToggleTraceMode}
-                      className={`p-1.5 text-xs rounded border transition-colors ${
-                        traceModeActive
-                          ? "border-primary/40 bg-primary/14 text-primary"
-                          : "border-border/70 bg-secondary hover:bg-secondary-hover text-muted-foreground hover:text-foreground"
-                      }`}
-                      title={t("trace.toggle", "Trace mode")}
-                      aria-label={t("trace.toggle", "Trace mode")}
-                      aria-pressed={traceModeActive}
-                    >
-                      <Workflow className="h-3.5 w-3.5" />
-                    </button>
-                  )}
                 </>
               )}
               <button

@@ -22,7 +22,6 @@ enum PluginPermission {
     SearchRead,
     KanbanRead,
     KanbanWrite,
-    SidechatAsk,
     ModelInvoke,
 }
 
@@ -57,7 +56,6 @@ fn parse_plugin_permission(value: &str) -> Option<PluginPermission> {
         "search:read" => Some(PluginPermission::SearchRead),
         "kanban:read" => Some(PluginPermission::KanbanRead),
         "kanban:write" => Some(PluginPermission::KanbanWrite),
-        "sidechat:ask" => Some(PluginPermission::SidechatAsk),
         "model:invoke" => Some(PluginPermission::ModelInvoke),
         _ => None,
     }
@@ -83,7 +81,7 @@ fn required_permissions_for_command(command: &str) -> &'static [PluginPermission
         "full_text_search" => &[PluginPermission::SearchRead],
         "get_all_tags" | "get_all_session_tags" => &[PluginPermission::KanbanRead],
         "create_tag" | "assign_tag" | "remove_tag_from_session" => &[PluginPermission::KanbanWrite],
-        "ask_session_sidechat" => &[PluginPermission::SidechatAsk],
+        "invoke_model_text" | "invoke_model_text_stream" => &[PluginPermission::ModelInvoke],
         "list_model_options_fast" => &[PluginPermission::ModelInvoke],
         _ => &[],
     }
@@ -279,17 +277,6 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::stats::calculate_stats_from_inputs(&sessions);
             Ok(to_val(result, "serialize result")?)
         }
-        "get_session_trace_analytics" => {
-            let session_path = extract(payload, "sessionPath").or_else(|_| extract(payload, "session_path"))?;
-            let result = crate::domain::trace::extract_trace_analytics(&session_path)?;
-            Ok(to_val(result, "serialize result")?)
-        }
-        "get_session_inspect_data" => {
-            let session_path = extract(payload, "sessionPath").or_else(|_| extract(payload, "session_path"))?;
-            let result = crate::domain::trace::extract_inspect_data(&session_path)?;
-            Ok(to_val(result, "serialize result")?)
-        }
-
         // ═══════════════════════════════════════════════════════════════
         // Search
         // ═══════════════════════════════════════════════════════════════
@@ -336,17 +323,6 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let language = extract_optional_string(payload, "language").or_else(|| extract_optional_string(payload, "locale"));
             let result = crate::refresh_session_intelligence_record(path, provider, model, language).await?;
             Ok(to_val(result, "serialize refreshed session intelligence record")?)
-        }
-        "ask_session_sidechat" => {
-            let path = extract(payload, "path").or_else(|_| extract(payload, "sessionPath")).or_else(|_| extract(payload, "session_path"))?;
-            let question = extract(payload, "question")?;
-            let provider = extract_optional_string(payload, "provider");
-            let model = extract_optional_string(payload, "model");
-            let language = extract_optional_string(payload, "language").or_else(|| extract_optional_string(payload, "locale"));
-            let thinking_level = extract_optional_string(payload, "thinkingLevel").or_else(|| extract_optional_string(payload, "thinking_level"));
-            let limit = payload.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
-            let result = crate::ask_session_sidechat(path, question, provider, model, language, thinking_level, limit).await?;
-            Ok(to_val(result, "serialize session sidechat response")?)
         }
         "upsert_plugin_record" => {
             let record = serde_json::from_value(payload.get("record").cloned().ok_or_else(|| "Missing field: record".to_string())?).map_err(|e| format!("Invalid plugin record: {e}"))?;
@@ -552,6 +528,82 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         }
 
         // ═══════════════════════════════════════════════════════════════
+        // PSM plugin config / lifecycle
+        // ═══════════════════════════════════════════════════════════════
+        "load_psm_plugin_config" => {
+            let result = crate::load_psm_plugin_config().await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "set_psm_plugin_enabled" => {
+            let plugin_id = extract(payload, "pluginId")?;
+            let enabled = payload.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+            let source = extract_optional_string(payload, "source");
+            let package_name = extract_optional_string(payload, "packageName");
+            let entry_path = extract_optional_string(payload, "entryPath");
+            let result = crate::set_psm_plugin_enabled(plugin_id, enabled, source, package_name, entry_path).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "set_psm_plugin_settings" => {
+            let plugin_id = extract(payload, "pluginId")?;
+            let settings = serde_json::from_value(payload.get("settings").cloned().unwrap_or(Value::Object(Default::default()))).map_err(|e| format!("Invalid settings: {e}"))?;
+            let source = extract_optional_string(payload, "source");
+            let package_name = extract_optional_string(payload, "packageName");
+            let entry_path = extract_optional_string(payload, "entryPath");
+            let result = crate::set_psm_plugin_settings(plugin_id, settings, source, package_name, entry_path).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "list_npm_psm_plugin_entries" => {
+            let result = crate::list_npm_psm_plugin_entries().await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "list_path_psm_plugin_entries" => {
+            let result = crate::list_path_psm_plugin_entries().await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "add_path_psm_plugin" => {
+            let entry_path = extract(payload, "entryPath")?;
+            let result = crate::add_path_psm_plugin(entry_path).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "remove_path_psm_plugin" => {
+            let entry_path = extract(payload, "entryPath")?;
+            let result = crate::remove_path_psm_plugin(entry_path).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "install_psm_plugin" => {
+            let package_name = extract(payload, "packageName")?;
+            let result = crate::install_psm_plugin(package_name).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "uninstall_psm_plugin" => {
+            let package_name = extract(payload, "packageName")?;
+            let result = crate::uninstall_psm_plugin(package_name).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "update_psm_plugins" => {
+            let result = crate::update_psm_plugins().await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "reload_psm_plugins" => {
+            let result = crate::reload_psm_plugins().await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "read_npm_psm_plugin_module_source" => {
+            let entry_path = extract(payload, "entryPath")?;
+            let result = crate::read_npm_psm_plugin_module_source(entry_path).await?;
+            Ok(Value::String(result))
+        }
+        "read_path_psm_plugin_module_source" => {
+            let entry_path = extract(payload, "entryPath")?;
+            let result = crate::read_path_psm_plugin_module_source(entry_path).await?;
+            Ok(Value::String(result))
+        }
+        "get_psm_plugin_paths" => {
+            let result = crate::get_psm_plugin_paths().await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+
+        // ═══════════════════════════════════════════════════════════════
         // Config versions
         // ═══════════════════════════════════════════════════════════════
         "list_config_versions" => {
@@ -658,6 +710,33 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::test_models_batch(models, prompt).await?;
             Ok(to_val(result, "serialize result")?)
         }
+        "invoke_model_text" => {
+            let system_prompt = extract_optional_string(payload, "systemPrompt").or_else(|| extract_optional_string(payload, "system_prompt")).ok_or_else(|| "Missing field: systemPrompt".to_string())?;
+            let prompt = extract(payload, "prompt")?;
+            let provider = extract_optional_string(payload, "provider");
+            let model = extract_optional_string(payload, "model");
+            let reasoning = extract_optional_string(payload, "reasoning").or_else(|| extract_optional_string(payload, "thinkingLevel")).or_else(|| extract_optional_string(payload, "thinking_level"));
+            let result = crate::invoke_model_text(system_prompt, prompt, provider, model, reasoning).await?;
+            Ok(to_val(result, "serialize result")?)
+        }
+        "invoke_model_text_stream" => {
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or_else(|| "Streaming model text requires GUI app state".to_string())?.clone();
+                let request_id = extract_optional_string(payload, "requestId").or_else(|| extract_optional_string(payload, "request_id")).ok_or_else(|| "Missing field: requestId".to_string())?;
+                let system_prompt = extract_optional_string(payload, "systemPrompt").or_else(|| extract_optional_string(payload, "system_prompt")).ok_or_else(|| "Missing field: systemPrompt".to_string())?;
+                let prompt = extract(payload, "prompt")?;
+                let provider = extract_optional_string(payload, "provider");
+                let model = extract_optional_string(payload, "model");
+                let reasoning = extract_optional_string(payload, "reasoning").or_else(|| extract_optional_string(payload, "thinkingLevel")).or_else(|| extract_optional_string(payload, "thinking_level"));
+                let result = crate::invoke_model_text_stream(state, request_id, system_prompt, prompt, provider, model, reasoning).await?;
+                Ok(to_val(result, "serialize result")?)
+            }
+            #[cfg(not(feature = "gui"))]
+            {
+                Err("Streaming model text requires GUI app state".to_string())
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════
         // Workspaces
@@ -683,6 +762,11 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         "check_version_downgrade" => {
             let result = crate::check_version_downgrade().await?;
             Ok(to_val(result, "serialize result")?)
+        }
+        "allow_version_downgrade" => {
+            let allow = payload.get("allow").and_then(|value| value.as_bool()).unwrap_or(false);
+            crate::allow_version_downgrade(allow).await?;
+            Ok(Value::Null)
         }
         "backup_database" => {
             let result = crate::backup_database().await?;
@@ -1077,21 +1161,15 @@ mod tests {
 
     #[tokio::test]
     async fn dispatch_allows_plugin_commands_with_declared_permission() {
-        let result = dispatch(
-            "scan_sessions_paginated",
-            &serde_json::json!({
-                "offset": 0,
-                "limit": 1,
-                "sortBy": "modified_desc",
-                "__psm": {
-                    "pluginId": "builtin.session-summary",
-                    "permissions": ["sessions:read"]
-                }
-            }),
-        )
-        .await;
+        let payload = serde_json::json!({
+            "__psm": {
+                "pluginId": "builtin.session-summary",
+                "permissions": ["sessions:read"]
+            }
+        });
+        let result = enforce_plugin_permission("scan_sessions_paginated", &payload);
 
-        assert!(result.is_ok(), "expected permissioned plugin scan to succeed, got {result:?}");
+        assert!(result.is_ok(), "expected permissioned plugin scan to pass permission checks, got {result:?}");
     }
 
     #[tokio::test]

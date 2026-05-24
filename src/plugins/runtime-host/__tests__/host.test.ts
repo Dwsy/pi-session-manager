@@ -1,4 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/transport', () => ({
+  invoke: vi.fn().mockResolvedValue([]),
+  isTauri: () => false,
+}))
 
 import { toolRenderRegistry } from '@/plugins/tools-render/registry'
 import { builtinPsmPluginEntries } from '../builtins'
@@ -48,6 +53,7 @@ describe('PsmPluginHost', () => {
     expect(sourceIds).toContain('extensions/psm-ask-user-question-renderer')
     expect(sourceIds).toContain('extensions/psm-loop-renderer')
     expect(sourceIds).toContain('extensions/psm-subagent-renderer')
+    expect(sourceIds).toContain('extensions/psm-session-graph')
   })
 
   it('activates enabled plugins and exposes commands/tools', async () => {
@@ -436,10 +442,14 @@ describe('PsmPluginHost', () => {
         listNpmEntries: async () => [],
       },
     })
-    const snapshots: Array<{ toolbarItems: number; panels: number }> = []
+    const snapshots: Array<{ toolbarItems: number; panels: number; treeViews: number }> = []
     const unsubscribe = host.subscribe(() => {
       const snapshot = host.getSessionUiSnapshot()
-      snapshots.push({ toolbarItems: snapshot.toolbarItems.length, panels: snapshot.panels.length })
+      snapshots.push({
+        toolbarItems: snapshot.toolbarItems.length,
+        panels: snapshot.panels.length,
+        treeViews: snapshot.treeViews.length,
+      })
     })
 
     await host.reload()
@@ -448,8 +458,97 @@ describe('PsmPluginHost', () => {
     unsubscribe()
 
     expect(snapshots).toEqual([
-      { toolbarItems: 0, panels: 0 },
-      { toolbarItems: 1, panels: 1 },
+      { toolbarItems: 0, panels: 0, treeViews: 0 },
+      { toolbarItems: 1, panels: 1, treeViews: 0 },
+    ])
+  })
+
+  it('registers session tree view contributions in the UI snapshot', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/tree-view',
+          async load() {
+            return {
+              manifest: { manifestVersion: 1, id: 'builtin.tree.view', name: 'Tree View', version: '1.0.0' },
+              activate: (ctx: any) => {
+                ctx.ui.registerSessionTreeView({
+                  id: 'builtin.tree.flow',
+                  title: 'Flow',
+                  icon: 'Network',
+                  render: () => 'flow',
+                })
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    await host.reload()
+
+    expect(host.getSessionUiSnapshot().treeViews).toMatchObject([
+      {
+        id: 'builtin.tree.flow',
+        title: 'Flow',
+        icon: 'Network',
+        pluginId: 'builtin.tree.view',
+      },
+    ])
+  })
+
+  it('registers session main view contributions in the UI snapshot', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/trace',
+          async load() {
+            return {
+              manifest: { manifestVersion: 1, id: 'builtin.trace', name: 'Trace', version: '1.0.0' },
+              activate: (ctx: any) => {
+                ctx.ui.registerSessionToolbarItem({
+                  id: 'builtin.trace.toolbar',
+                  title: 'Trace',
+                  mainViewId: 'builtin.trace.main',
+                  render: () => 'trace-button',
+                })
+                ctx.ui.registerSessionMainView({
+                  id: 'builtin.trace.main',
+                  title: 'Trace',
+                  render: () => 'trace',
+                })
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    await host.reload()
+
+    expect(host.getSessionUiSnapshot().toolbarItems).toMatchObject([
+      {
+        id: 'builtin.trace.toolbar',
+        mainViewId: 'builtin.trace.main',
+        pluginId: 'builtin.trace',
+      },
+    ])
+    expect(host.getSessionUiSnapshot().mainViews).toMatchObject([
+      {
+        id: 'builtin.trace.main',
+        title: 'Trace',
+        pluginId: 'builtin.trace',
+      },
     ])
   })
 

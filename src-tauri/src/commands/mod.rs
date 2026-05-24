@@ -20,13 +20,11 @@ mod session;
 pub(super) mod session_file;
 mod session_list;
 mod session_open;
-mod session_sidechat;
 mod settings;
 mod skills;
 mod tags;
 #[cfg(feature = "gui")]
 pub mod terminal;
-mod trace;
 mod version_check;
 mod workspaces;
 
@@ -48,13 +46,11 @@ pub use session::*;
 pub use session_file::*;
 pub use session_list::*;
 pub use session_open::*;
-pub use session_sidechat::*;
 pub use settings::*;
 pub use skills::*;
 pub use tags::*;
 #[cfg(feature = "gui")]
 pub use terminal::*;
-pub use trace::*;
 pub use version_check::*;
 pub use workspaces::*;
 

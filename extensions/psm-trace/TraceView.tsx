@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   X,
   Clock,
@@ -17,11 +16,12 @@ import {
 } from 'lucide-react';
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react';
 
-import { useSessionTrace } from '@/hooks/useSessionTrace';
-import { useInspectData } from '@/hooks/useInspectData';
 import { useTheme } from '@/hooks/useAppearance';
 import { parseMarkdown, renderCodeHtml } from '@/utils/markdown';
 import { LoopStrip } from './LoopStrip';
+import { loadInspectData } from './inspectData';
+import { loadTraceAnalytics, type TraceSessionReference } from './traceData';
+import type { PsmCapabilityClient, PsmPluginI18nClient } from '@pi-session-manager/plugin-sdk';
 import type {
   SessionTraceAnalytics,
   TraceEvent,
@@ -29,11 +29,65 @@ import type {
   TraceToolCall,
   InspectData,
 } from '@/types/trace';
-import type { SessionInfo } from '@/types';
 
 interface TraceViewProps {
-  session: SessionInfo;
+  client: PsmCapabilityClient;
+  i18n: PsmPluginI18nClient;
+  session: TraceSessionReference;
   onClose: () => void;
+}
+
+function useTracePluginData(client: PsmCapabilityClient, session: TraceSessionReference) {
+  const [analytics, setAnalytics] = useState<SessionTraceAnalytics | null>(null);
+  const [inspectData, setInspectData] = useState<InspectData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [inspectLoading, setInspectLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setAnalytics(null);
+
+    loadTraceAnalytics(client, session)
+      .then((data) => {
+        if (!cancelled) setAnalytics(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client, session.path]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setInspectLoading(true);
+    setInspectData(null);
+
+    loadInspectData(client, session.path)
+      .then((data) => {
+        if (!cancelled) setInspectData(data);
+      })
+      .catch((err) => {
+        if (!cancelled) console.error('[psm-trace] Failed to load inspect data:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setInspectLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client, session.path]);
+
+  return { analytics, inspectData, loading, inspectLoading, error };
 }
 
 type TraceTab = 'details' | 'analytics' | 'timeline' | 'inspect';
@@ -157,11 +211,10 @@ function useEventGroups(events: TraceEvent[]) {
   }, [events]);
 }
 
-export default function TraceView({ session, onClose }: TraceViewProps) {
-  const { t } = useTranslation();
+export default function TraceView({ client, i18n, session, onClose }: TraceViewProps) {
+  const t = i18n.t;
   useTheme();
-  const { analytics, loading, error } = useSessionTrace(session.path);
-  const { data: inspectData, loading: inspectLoading } = useInspectData(session.path);
+  const { analytics, inspectData, loading, inspectLoading, error } = useTracePluginData(client, session);
   const [activeTab, setActiveTab] = useState<TraceTab>('details');
   const [selectedEvent, setSelectedEvent] = useState<TraceEvent | null>(null);
 

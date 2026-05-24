@@ -5,7 +5,6 @@ export type PsmPermission =
   | 'search:read'
   | 'kanban:read'
   | 'kanban:write'
-  | 'sidechat:ask'
   | 'model:invoke'
 
 export interface PsmPermissionContext {
@@ -62,12 +61,14 @@ export interface PsmPluginSettingDefinition {
   key: string
   title: string
   description?: string
-  type: 'string' | 'number' | 'boolean' | 'select'
+  type: 'string' | 'number' | 'boolean' | 'select' | 'model-provider' | 'model-id'
   default?: PsmPluginSettingValue
   options?: PsmPluginSettingOption[]
   min?: number
   max?: number
   step?: number
+  providerKey?: string
+  modelKey?: string
 }
 
 export interface PsmPluginConfiguration {
@@ -98,6 +99,14 @@ export interface PsmPluginManifest {
 
 export interface PsmTransport {
   invoke<T>(command: string, payload?: Record<string, unknown>): Promise<T>
+  stream?<TEvent, TResult>(
+    command: string,
+    payload: Record<string, unknown> | undefined,
+    handlers: {
+      onEvent?: (event: TEvent) => void
+      onError?: (error: string) => void
+    },
+  ): Promise<TResult> | undefined
 }
 
 export interface PsmPluginDisposable {
@@ -196,14 +205,53 @@ export interface PsmSessionUiRenderProps {
   panelOpen?: boolean
   togglePanel?: () => void
   closePanel?: () => void
+  mainViewOpen?: boolean
+  toggleMainView?: () => void
+  closeMainView?: () => void
   width?: number
   onWidthChange?: (width: number) => void
+}
+
+export interface PsmSessionJsonlEntry {
+  type: string
+  id: string
+  parentId?: string
+  timestamp?: string
+  message?: unknown
+  provider?: string
+  modelId?: string
+  thinkingLevel?: string
+  tokensBefore?: number
+  summary?: string
+  display?: boolean
+  customType?: string
+  content?: unknown
+  name?: string
+  label?: string
+  targetId?: string
+  [key: string]: unknown
+}
+
+export interface PsmSessionTreeViewRenderProps extends PsmSessionUiRenderProps {
+  entries: PsmSessionJsonlEntry[]
+  labelsByTargetId: Record<string, string>
+  filter: string
+  closeView: () => void
+  onNavigate?: (leafId: string, targetId: string) => void
+}
+
+export interface PsmSessionTreeViewRegistration {
+  id: string
+  title: string
+  icon?: string
+  render(props: PsmSessionTreeViewRenderProps): unknown
 }
 
 export interface PsmSessionToolbarItemRegistration {
   id: string
   title: string
   panelId?: string
+  mainViewId?: string
   render(props: PsmSessionUiRenderProps): unknown
 }
 
@@ -214,9 +262,17 @@ export interface PsmSessionPanelRegistration {
   render(props: PsmSessionUiRenderProps): unknown
 }
 
+export interface PsmSessionMainViewRegistration {
+  id: string
+  title: string
+  render(props: PsmSessionUiRenderProps): unknown
+}
+
 export interface PsmPluginUiRegistry {
   registerSessionToolbarItem(item: PsmSessionToolbarItemRegistration): void
   registerSessionPanel(panel: PsmSessionPanelRegistration): void
+  registerSessionTreeView(view: PsmSessionTreeViewRegistration): void
+  registerSessionMainView(view: PsmSessionMainViewRegistration): void
   registerToolRenderer(renderer: PsmToolRendererRegistration): void
 }
 
@@ -453,8 +509,50 @@ export interface PsmSideChatAskParams {
   limit?: number
 }
 
+export interface PsmAiTextParams {
+  systemPrompt: string
+  prompt: string
+  provider?: string
+  model?: string
+  reasoning?: string
+}
+
+export interface PsmAiTextResponse {
+  text: string
+  provider?: string
+  model?: string
+}
+
+export type PsmAiTextStreamEvent =
+  | { type: 'delta'; delta: string }
+  | { type: 'done'; response: PsmAiTextResponse }
+  | { type: 'error'; error: string }
+
+export interface PsmAiTextStreamHandlers {
+  onDelta?: (delta: string) => void
+  onDone?: (response: PsmAiTextResponse) => void
+  onError?: (error: string) => void
+}
+
+export interface PsmAiClient {
+  generateText(params: PsmAiTextParams): Promise<PsmAiTextResponse>
+  streamText(params: PsmAiTextParams, handlers?: PsmAiTextStreamHandlers): Promise<PsmAiTextResponse>
+}
+
+export type PsmSideChatStreamEvent =
+  | { type: 'delta'; delta: string }
+  | { type: 'done'; response: PsmSideChatResponse }
+  | { type: 'error'; error: string }
+
+export interface PsmSideChatStreamHandlers {
+  onDelta?: (delta: string) => void
+  onDone?: (response: PsmSideChatResponse) => void
+  onError?: (error: string) => void
+}
+
 export interface PsmSideChatClient {
   ask(params: PsmSideChatAskParams): Promise<PsmSideChatResponse>
+  askStream(params: PsmSideChatAskParams, handlers?: PsmSideChatStreamHandlers): Promise<PsmSideChatResponse>
 }
 
 export interface PsmModelsClient {
@@ -465,6 +563,7 @@ export interface PsmCapabilityClient {
   records: PsmRecordsClient
   sessions: PsmSessionsClient
   search: PsmSearchClient
+  ai: PsmAiClient
   sidechat: PsmSideChatClient
   models: PsmModelsClient
   kanban: PsmKanbanClient

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -24,6 +25,7 @@ import { useSessionViewerSidebarController } from "@/hooks/useSessionViewerSideb
 import SessionViewerBody from "./session-viewer/SessionViewerBody";
 import type { SessionViewerMessagesRef } from "./session-viewer/SessionViewerMessages";
 import { getPlatformDefaults } from "./settings/types";
+import type { PsmSessionTreeViewRuntimeRegistration } from "@/plugins/runtime-host/types";
 import type { SessionInfo } from "@/types";
 import type { TerminalType } from "./settings/types";
 import type { SessionViewerToolbarSlots, SessionViewerLayoutSlots } from "./session-viewer/SessionViewerToolbarTypes";
@@ -49,6 +51,8 @@ interface SessionViewerProps {
   slots?: SessionViewerToolbarSlots;
   /** Layout extension slots around the main session viewer body */
   layoutSlots?: SessionViewerLayoutSlots;
+  mainViewSlot?: ReactNode;
+  pluginTreeViews?: PsmSessionTreeViewRuntimeRegistration[];
   onActiveEntryIdChange?: (activeEntryId: string | null) => void;
 }
 
@@ -71,6 +75,8 @@ function SessionViewerContent({
   previewVariant = "conversation",
   slots,
   layoutSlots,
+  mainViewSlot,
+  pluginTreeViews,
   onActiveEntryIdChange,
 }: SessionViewerProps) {
   const { t } = useTranslation();
@@ -99,12 +105,10 @@ function SessionViewerContent({
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const {
     showSystemPromptDialog,
-    traceMode,
     openSystemPromptDialog,
     closeSystemPromptDialog,
-    toggleTraceMode,
-    closeTraceMode,
   } = useSessionViewerPanelController();
+  const hasMainView = Boolean(mainViewSlot);
 
   const sessionDataIsAtBottomRef = useRef(true);
   const messagesRef = useRef<SessionViewerMessagesRef>(null);
@@ -162,7 +166,7 @@ function SessionViewerContent({
   } = useSessionViewerSidebarController({
     isMobile,
     previewMode,
-    traceMode,
+    mainViewOpen: hasMainView,
     setShowMobileMenu,
     setActiveEntryId,
     setScrollTargetId,
@@ -284,8 +288,6 @@ function SessionViewerContent({
     onOpenSystemPromptDialog: openSystemPromptDialog,
     onScrollToTop: handleScrollToTop,
     onScrollToBottom: handleScrollToBottom,
-    onToggleTraceMode: toggleTraceMode,
-    traceMode,
     onRename,
     onFork,
     onExport,
@@ -311,6 +313,7 @@ function SessionViewerContent({
       entries={entries}
       toolbarProps={toolbarProps}
       layoutSlots={layoutSlots}
+      mainViewSlot={mainViewSlot}
       forkedFromLabel={t("session.forkedFrom")}
       isSearchOpen={isSearchOpen}
       searchBarProps={searchBarProps}
@@ -319,6 +322,7 @@ function SessionViewerContent({
         sidebarWidth,
         isResizing,
         activeEntryId,
+        pluginViews: pluginTreeViews,
         onCloseSidebar: () => setShowSidebar(false),
         onNodeClick: handleTreeNodeClick,
         onResizeMouseDown: handleMouseDown,
@@ -362,8 +366,6 @@ function SessionViewerContent({
         scrollMarkersEnabled,
       }}
       panels={{
-        traceMode,
-        onCloseTraceMode: closeTraceMode,
         showSystemPromptDialog,
         onCloseSystemPromptDialog: closeSystemPromptDialog,
       }}

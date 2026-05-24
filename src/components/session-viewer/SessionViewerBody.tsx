@@ -3,6 +3,7 @@ import type {
   MouseEventHandler,
   MutableRefObject,
   PointerEvent as ReactPointerEvent,
+  ReactNode,
   RefObject,
   SetStateAction,
 } from "react";
@@ -20,8 +21,8 @@ import SessionViewerSidebar from "@/components/session-viewer/SessionViewerSideb
 import SessionViewerToolbar from "@/components/session-viewer/SessionViewerToolbar";
 import type { SessionViewerToolbarProps, SessionViewerLayoutSlots } from "@/components/session-viewer/SessionViewerToolbarTypes";
 import type { SessionPreviewVariant } from "@/components/session-viewer/previewTypes";
-import TraceView from "@/components/trace/TraceView";
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
+import type { PsmSessionTreeViewRuntimeRegistration } from "@/plugins/runtime-host/types";
 import type { SessionSearchTarget } from "@/hooks/useSessionViewerInMessageSearch";
 import type { LegacySessionStats, SessionEntry, SessionInfo } from "@/types";
 
@@ -30,6 +31,7 @@ export interface SessionViewerBodySidebarProps {
   sidebarWidth: number;
   isResizing: boolean;
   activeEntryId: string | null;
+  pluginViews?: PsmSessionTreeViewRuntimeRegistration[];
   onCloseSidebar: () => void;
   onNodeClick: (leafId: string, targetId: string) => void;
   onResizeMouseDown: MouseEventHandler<HTMLDivElement>;
@@ -76,8 +78,6 @@ export interface SessionViewerBodyScrollMarkersProps {
 }
 
 export interface SessionViewerBodyPanelsProps {
-  traceMode: boolean;
-  onCloseTraceMode: () => void;
   showSystemPromptDialog: boolean;
   onCloseSystemPromptDialog: () => void;
 }
@@ -91,6 +91,7 @@ export interface SessionViewerBodyProps {
   entries: SessionEntry[];
   toolbarProps: SessionViewerToolbarProps;
   layoutSlots?: SessionViewerLayoutSlots;
+  mainViewSlot?: ReactNode;
   forkedFromLabel: string;
   isSearchOpen: boolean;
   searchBarProps: SessionViewerSearchBarProps;
@@ -111,6 +112,7 @@ export default function SessionViewerBody({
   entries,
   toolbarProps,
   layoutSlots,
+  mainViewSlot,
   forkedFromLabel,
   isSearchOpen,
   searchBarProps,
@@ -121,36 +123,40 @@ export default function SessionViewerBody({
   isLive,
   onChatSent,
 }: SessionViewerBodyProps) {
+  const shouldRenderSidebar = !previewMode && !mainViewSlot && sidebar.showSidebar;
+  const sidebarNode = shouldRenderSidebar ? (
+    <SessionViewerSidebar
+      showSidebar={sidebar.showSidebar}
+      isMobile={isMobile}
+      placement={isMobile ? "overlay" : "embedded"}
+      sidebarWidth={sidebar.sidebarWidth}
+      isResizing={sidebar.isResizing}
+      entries={entries}
+      sessionPath={session.path}
+      pluginViews={sidebar.pluginViews}
+      activeEntryId={sidebar.activeEntryId}
+      onCloseSidebar={sidebar.onCloseSidebar}
+      onNodeClick={sidebar.onNodeClick}
+      onResizeMouseDown={sidebar.onResizeMouseDown}
+      treeRef={sidebar.treeRef}
+      sidebarRef={sidebar.sidebarRef}
+      resizeHandleRef={sidebar.resizeHandleRef}
+      outlineTitle={sidebar.outlineTitle}
+      hideSidebarTitle={sidebar.hideSidebarTitle}
+    />
+  ) : null;
+
   return (
     <div
       className={`h-full flex relative ${showToolExpandIndicator ? "" : "tool-expand-indicators-hidden"} ${previewMode ? "session-viewer-preview" : ""}`}
     >
-      {!previewMode && !panels.traceMode && (
-        <SessionViewerSidebar
-          showSidebar={sidebar.showSidebar}
-          isMobile={isMobile}
-          sidebarWidth={sidebar.sidebarWidth}
-          isResizing={sidebar.isResizing}
-          entries={entries}
-          sessionPath={session.path}
-          activeEntryId={sidebar.activeEntryId}
-          onCloseSidebar={sidebar.onCloseSidebar}
-          onNodeClick={sidebar.onNodeClick}
-          onResizeMouseDown={sidebar.onResizeMouseDown}
-          treeRef={sidebar.treeRef}
-          sidebarRef={sidebar.sidebarRef}
-          resizeHandleRef={sidebar.resizeHandleRef}
-          outlineTitle={sidebar.outlineTitle}
-          hideSidebarTitle={sidebar.hideSidebarTitle}
-        />
-      )}
+      {isMobile ? sidebarNode : null}
 
-      <div
-        className="flex-1 flex flex-col min-w-0 min-h-0"
-        style={{ paddingLeft: sidebar.contentPaddingLeft }}
-      >
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+
         {layoutSlots?.top}
         <div className="flex min-h-0 flex-1 min-w-0">
+          {!isMobile ? sidebarNode : null}
           {layoutSlots?.left}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <SessionViewerToolbar {...toolbarProps} />
@@ -167,8 +173,8 @@ export default function SessionViewerBody({
 
             {isSearchOpen && <SessionViewerSearchBar {...searchBarProps} />}
 
-            {panels.traceMode ? (
-              <TraceView session={session} onClose={panels.onCloseTraceMode} />
+            {mainViewSlot ? (
+              mainViewSlot
             ) : (
               <>
                 <SessionViewerMessages

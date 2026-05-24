@@ -1,9 +1,11 @@
 import type {
   PsmPluginManifest,
   PsmPluginSettingValue,
+  PsmSessionMainViewRegistration,
   PsmPluginToolRegistration,
   PsmSessionPanelRegistration,
   PsmSessionToolbarItemRegistration,
+  PsmSessionTreeViewRegistration,
   PsmToolRendererRegistration,
 } from '@pi-session-manager/plugin-sdk'
 
@@ -101,6 +103,14 @@ export interface PsmSessionPanelRuntimeRegistration extends PsmSessionPanelRegis
   pluginId: string
 }
 
+export interface PsmSessionTreeViewRuntimeRegistration extends PsmSessionTreeViewRegistration {
+  pluginId: string
+}
+
+export interface PsmSessionMainViewRuntimeRegistration extends PsmSessionMainViewRegistration {
+  pluginId: string
+}
+
 export interface PsmToolRendererRuntimeRegistration extends PsmToolRendererRegistration {
   pluginId: string
 }
@@ -108,6 +118,8 @@ export interface PsmToolRendererRuntimeRegistration extends PsmToolRendererRegis
 export interface PsmPluginSessionUiSnapshot {
   toolbarItems: PsmSessionToolbarItemRuntimeRegistration[]
   panels: PsmSessionPanelRuntimeRegistration[]
+  treeViews: PsmSessionTreeViewRuntimeRegistration[]
+  mainViews: PsmSessionMainViewRuntimeRegistration[]
 }
 
 export type PsmPluginCommandHandler = (args: Record<string, unknown>) => Promise<unknown>

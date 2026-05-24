@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const panelRenderSpy = vi.fn()
+const mainViewRenderSpy = vi.fn()
 
 vi.mock('@/hooks/useSettings', () => ({
   useSettings: () => ({
@@ -27,6 +28,17 @@ vi.mock('@/plugins/runtime-host', () => ({
           </button>
         ),
       },
+      {
+        id: 'test.main.toolbar',
+        pluginId: 'test.plugin',
+        title: 'Test Main',
+        mainViewId: 'test.main',
+        render: (props: any) => (
+          <button type="button" onClick={props.toggleMainView} data-testid="plugin-main-toggle">
+            main
+          </button>
+        ),
+      },
     ],
     panels: [
       {
@@ -40,15 +52,28 @@ vi.mock('@/plugins/runtime-host', () => ({
         },
       },
     ],
+    treeViews: [],
+    mainViews: [
+      {
+        id: 'test.main',
+        pluginId: 'test.plugin',
+        title: 'Main',
+        render: (props: any) => {
+          mainViewRenderSpy(props)
+          return <div data-testid="plugin-main-view">{props.activeEntryId ?? 'none'}</div>
+        },
+      },
+    ],
   }),
 }))
 
 vi.mock('@/components/SessionViewer', () => ({
-  default: ({ slots, layoutSlots, onActiveEntryIdChange }: any) => {
+  default: ({ slots, layoutSlots, mainViewSlot, onActiveEntryIdChange }: any) => {
     onActiveEntryIdChange?.('entry-42')
     return (
       <div>
         {slots?.right}
+        {mainViewSlot}
         {layoutSlots?.right}
       </div>
     )
@@ -56,6 +81,10 @@ vi.mock('@/components/SessionViewer', () => ({
 }))
 
 import AppSessionViewerPane from './AppSessionViewerPane'
+
+afterEach(() => {
+  cleanup()
+})
 
 describe('AppSessionViewerPane', () => {
   it('passes activeEntryId into plugin session panel render props', async () => {
@@ -87,6 +116,39 @@ describe('AppSessionViewerPane', () => {
       expect.objectContaining({
         activeEntryId: 'entry-42',
         panelOpen: true,
+      }),
+    )
+  })
+
+  it('opens plugin session main view from toolbar item', async () => {
+    mainViewRenderSpy.mockClear()
+
+    render(
+      <AppSessionViewerPane
+        session={{
+          id: 'session-1',
+          path: '/tmp/session.jsonl',
+          cwd: '/tmp',
+          created: '2026-05-23T00:00:00Z',
+          modified: '2026-05-23T00:00:00Z',
+          message_count: 0,
+          first_message: '',
+          last_message: '',
+          last_message_role: 'assistant',
+          model: 'claude-4',
+        }}
+        onExport={() => {}}
+        slots={{}}
+      />,
+    )
+
+    fireEvent.click(await screen.findByTestId('plugin-main-toggle'))
+
+    expect((await screen.findByTestId('plugin-main-view')).textContent).toBe('entry-42')
+    expect(mainViewRenderSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeEntryId: 'entry-42',
+        mainViewOpen: true,
       }),
     )
   })

@@ -34,8 +34,6 @@ export interface UseSessionViewerToolbarPropsOptions {
   onOpenSystemPromptDialog: () => void;
   onScrollToTop: () => void;
   onScrollToBottom: () => void;
-  onToggleTraceMode: () => void;
-  traceMode: boolean;
   onRename?: () => void;
   onFork?: () => void;
   onExport: () => void;
@@ -75,8 +73,6 @@ export function useSessionViewerToolbarProps({
   onOpenSystemPromptDialog,
   onScrollToTop,
   onScrollToBottom,
-  onToggleTraceMode,
-  traceMode,
   onRename,
   onFork,
   onExport,
@@ -116,8 +112,6 @@ export function useSessionViewerToolbarProps({
     onOpenSystemPromptDialog,
     onScrollToTop,
     onScrollToBottom,
-    onToggleTraceMode: previewMode ? undefined : onToggleTraceMode,
-    traceModeActive: traceMode,
     onRename,
     onFork,
     onExport,
