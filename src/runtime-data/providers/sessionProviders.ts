@@ -28,6 +28,7 @@ import {
   getBrowserDatasetDayStats,
   getBrowserDatasetSessionByPath,
   getBrowserDatasetSessionLabels,
+  getBrowserDatasetSessionList,
   getBrowserDatasetSessions,
   getBrowserDatasetStats,
   readBrowserDatasetChunk,
@@ -319,6 +320,7 @@ export const browserSessionProvider: SessionProvider = {
   canRenameSessions: false,
   canForkSessions: false,
   loadSessions: async () => getBrowserDatasetSessions(),
+  loadSessionList: async () => getBrowserDatasetSessionList(),
   getSessionByPath: async (path) => getBrowserDatasetSessionByPath(path),
   canResolveSession: async (path) =>
     Boolean(await getBrowserDatasetSessionByPath(path)),

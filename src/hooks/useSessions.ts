@@ -17,7 +17,7 @@ import {
   forkRuntimeSessionItem,
   getRuntimeSessionOperationCapability,
   getSessionRuntimeMode,
-  loadRuntimeSessions,
+  loadRuntimeSessionList,
   renameRuntimeSessionItem,
 } from "@/runtime-data/sessionSource";
 
@@ -132,6 +132,7 @@ export function useSessions(): UseSessionsReturn {
     useState<PendingDeleteSession | null>(null);
   const sessionsRef = useRef<SessionInfo[]>([]);
   const selectedSessionRef = useRef<SessionInfo | null>(null);
+  const loadRequestIdRef = useRef(0);
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -204,8 +205,19 @@ export function useSessions(): UseSessionsReturn {
   );
 
   const loadSessions = useCallback(async () => {
+    const requestId = ++loadRequestIdRef.current;
+    const isCurrentRequest = () => requestId === loadRequestIdRef.current;
+    let shouldKeepLoading = false;
+
     try {
-      const loadedSessions: SessionInfo[] = await loadRuntimeSessions();
+      const loadedSessionList = await loadRuntimeSessionList();
+      const loadedSessions: SessionInfo[] = loadedSessionList.sessions;
+      shouldKeepLoading =
+        !loadedSessionList.isComplete && loadedSessions.length === 0;
+      if (!isCurrentRequest()) {
+        return;
+      }
+
       sessionsRef.current = loadedSessions;
       setSessions(loadedSessions);
 
@@ -249,12 +261,18 @@ export function useSessions(): UseSessionsReturn {
               const readable = await canResolveRuntimeSession(
                 currentSelection.path,
               );
+              if (!isCurrentRequest()) {
+                return;
+              }
               if (readable && runtimeMode !== "backend") {
                 setSelectedSession(currentSelection);
               }
               // Selected session file still readable but not in scan results, keeping selection
             }
           } catch (error) {
+            if (!isCurrentRequest()) {
+              return;
+            }
             console.warn(
               "[useSessions] Selected session file not readable, clearing selection:",
               error,
@@ -264,10 +282,15 @@ export function useSessions(): UseSessionsReturn {
         }
       }
     } catch (error) {
+      if (!isCurrentRequest()) {
+        return;
+      }
       console.error("[useSessions] Failed to load sessions:", error);
       // Don't alert on mobile — connection errors are common on first load
     } finally {
-      setLoading(false);
+      if (isCurrentRequest()) {
+        setLoading(shouldKeepLoading);
+      }
     }
   }, [t]);
 

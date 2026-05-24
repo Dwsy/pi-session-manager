@@ -25,16 +25,48 @@ function emptyTokenAggregate(): TokenAggregate {
   };
 }
 
-function addUsage(target: TokenAggregate, usage: any): void {
-  if (!usage) return;
-  target.input += Number(usage.input || 0);
-  target.output += Number(usage.output || 0);
-  target.cacheRead += Number(usage.cacheRead || 0);
-  target.cacheWrite += Number(usage.cacheWrite || 0);
+function readUsageNumber(usage: any, keys: string[]): number {
+  if (!usage) return 0;
+  for (const key of keys) {
+    const value = usage[key];
+    if (value !== undefined && value !== null) {
+      return Number(value) || 0;
+    }
+  }
+  return 0;
 }
 
-function usageToCost(_usage: TokenAggregate): number {
-  return 0;
+function addUsage(target: TokenAggregate, usage: any): void {
+  if (!usage) return;
+  target.input += readUsageNumber(usage, ["input", "input_tokens", "inputTokens"]);
+  target.output += readUsageNumber(usage, ["output", "output_tokens", "outputTokens"]);
+  target.cacheRead += readUsageNumber(usage, [
+    "cacheRead",
+    "cache_read",
+    "cache_read_tokens",
+    "cacheReadTokens",
+  ]);
+  target.cacheWrite += readUsageNumber(usage, [
+    "cacheWrite",
+    "cache_write",
+    "cache_creation_input_tokens",
+    "cache_write_tokens",
+    "cacheWriteTokens",
+  ]);
+}
+
+function usageToCost(usage: any): number {
+  if (!usage?.cost) return 0;
+  if (typeof usage.cost === "number") {
+    return Number(usage.cost) || 0;
+  }
+  return (
+    readUsageNumber(usage.cost, ["total"]) ||
+    readUsageNumber(usage.cost, ["input", "input_cost"]) +
+      readUsageNumber(usage.cost, ["output", "output_cost"]) +
+      readUsageNumber(usage.cost, ["cacheRead", "cache_read", "cache_read_cost"]) +
+      readUsageNumber(usage.cost, ["cacheWrite", "cache_write", "cache_write_cost"])
+  );
 }
 
 function getSessionTokenAggregate(entries: any[]): TokenAggregate {
@@ -45,6 +77,15 @@ function getSessionTokenAggregate(entries: any[]): TokenAggregate {
     addUsage(total, entry.message?.usage);
   }
   return total;
+}
+
+function getSessionCost(entries: any[]): number {
+  return entries.reduce((sum, entry) => {
+    if (entry.type !== "message" || entry.message?.role !== "assistant") {
+      return sum;
+    }
+    return sum + usageToCost(entry.message?.usage);
+  }, 0);
 }
 
 function getSessionModels(entries: any[]): Set<string> {
@@ -108,27 +149,7 @@ export async function getBrowserDatasetStats(
       sessionTokens.output +
       sessionTokens.cacheRead +
       sessionTokens.cacheWrite;
-    const sessionTotalCost = usageToCost(sessionTokens);
-
-    for (const model of sessionModels.size
-      ? sessionModels
-      : new Set(["unknown"])) {
-      if (!tokenByModel[model]) {
-        tokenByModel[model] = {
-          messages: 0,
-          input: 0,
-          output: 0,
-          cache_read: 0,
-          cache_write: 0,
-          cost: 0,
-        };
-      }
-      tokenByModel[model].input += sessionTokens.input;
-      tokenByModel[model].output += sessionTokens.output;
-      tokenByModel[model].cache_read += sessionTokens.cacheRead;
-      tokenByModel[model].cache_write += sessionTokens.cacheWrite;
-      tokenByModel[model].cost += usageToCost(sessionTokens);
-    }
+    const sessionTotalCost = getSessionCost(session.entries);
 
     const msgCount = session.info.message_count;
     totalMessages += msgCount;
@@ -143,9 +164,24 @@ export async function getBrowserDatasetStats(
 
       if (role === "assistant") {
         const model = entry.message.model || "unknown";
-        if (tokenByModel[model]) {
-          tokenByModel[model].messages += 1;
+        if (!tokenByModel[model]) {
+          tokenByModel[model] = {
+            messages: 0,
+            input: 0,
+            output: 0,
+            cache_read: 0,
+            cache_write: 0,
+            cost: 0,
+          };
         }
+        const usage = emptyTokenAggregate();
+        addUsage(usage, entry.message.usage);
+        tokenByModel[model].messages += 1;
+        tokenByModel[model].input += usage.input;
+        tokenByModel[model].output += usage.output;
+        tokenByModel[model].cache_read += usage.cacheRead;
+        tokenByModel[model].cache_write += usage.cacheWrite;
+        tokenByModel[model].cost += usageToCost(entry.message.usage);
       }
     }
 
@@ -306,6 +342,7 @@ export async function getBrowserDatasetDayStats(
   const hourlyDistribution = Array.from({ length: 24 }, () => 0);
   const sessionsDetail: DaySession[] = [];
   const dayTokens = emptyTokenAggregate();
+  let dayCost = 0;
 
   for (const session of daySessions) {
     const projectPath = session.info.cwd;
@@ -320,6 +357,7 @@ export async function getBrowserDatasetDayStats(
     dayTokens.output += sessionTokens.output;
     dayTokens.cacheRead += sessionTokens.cacheRead;
     dayTokens.cacheWrite += sessionTokens.cacheWrite;
+    dayCost += getSessionCost(session.entries);
 
     if (!projectMap.has(projectPath)) {
       projectMap.set(projectPath, {
@@ -395,7 +433,7 @@ export async function getBrowserDatasetDayStats(
       total_output: dayTokens.output,
       total_cache_read: dayTokens.cacheRead,
       total_cache_write: dayTokens.cacheWrite,
-      total_cost: usageToCost(dayTokens),
+      total_cost: dayCost,
       tokens_by_model: {},
     },
   };

@@ -16,6 +16,7 @@ export {
   listPersistedDatasetCaches,
 } from "./cache";
 export {
+  getBrowserDatasetSessionList,
   getBrowserDatasetSessionByPath,
   getBrowserDatasetSessionLabels,
   getBrowserDatasetSessions,

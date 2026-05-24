@@ -18,6 +18,7 @@ import {
   resolveSessionProvider,
   supportsRuntimeSessionEvents,
 } from "./providers";
+import type { RuntimeSessionListResponse } from "./providers";
 import { getRuntimeMode, type RuntimeMode } from "./runtimeMode";
 
 export type SessionRuntimeMode = RuntimeMode;
@@ -26,8 +27,21 @@ export function getSessionRuntimeMode(): SessionRuntimeMode {
   return getRuntimeMode();
 }
 
+export async function loadRuntimeSessionList(): Promise<
+  RuntimeSessionListResponse
+> {
+  const provider = resolveSessionProvider();
+  if (provider.loadSessionList) {
+    return provider.loadSessionList();
+  }
+  return {
+    sessions: await provider.loadSessions(),
+    isComplete: true,
+  };
+}
+
 export async function loadRuntimeSessions(): Promise<SessionInfo[]> {
-  return resolveSessionProvider().loadSessions();
+  return (await loadRuntimeSessionList()).sessions;
 }
 
 export async function getRuntimeSessionByPath(

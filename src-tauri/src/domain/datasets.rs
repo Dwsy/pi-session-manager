@@ -185,6 +185,14 @@ fn dataset_file_url(source: &ParsedDatasetSource, relative_path: &str) -> String
     format!("https://huggingface.co/datasets/{}/resolve/{}/{}?download=true", source.repo_id, source.revision, relative_path)
 }
 
+fn is_dataset_session_jsonl(path: &str) -> bool {
+    Path::new(path)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .is_some_and(|filename| filename != "manifest.jsonl")
+        && path.ends_with(".jsonl")
+}
+
 fn remove_existing_dataset_artifacts(slug: &str) -> Result<(), String> {
     let sessions_dir = dataset_sessions_dir(slug)?;
     if sessions_dir.exists() {
@@ -308,7 +316,10 @@ async fn run_dataset_import(task_id: String, source: ParsedDatasetSource) -> Res
 
     let client = reqwest::Client::builder().user_agent("pi-session-manager/0.5").build().map_err(|e| format!("Failed to create HTTP client: {e}"))?;
     let tree = fetch_dataset_tree(&client, &source).await?;
-    let jsonl_files: Vec<HuggingFaceTreeEntry> = tree.into_iter().filter(|entry| entry.entry_type == "file" && entry.path.ends_with(".jsonl")).collect();
+    let jsonl_files: Vec<HuggingFaceTreeEntry> = tree
+        .into_iter()
+        .filter(|entry| entry.entry_type == "file" && is_dataset_session_jsonl(&entry.path))
+        .collect();
 
     if jsonl_files.is_empty() {
         return Err("No JSONL files found in dataset".to_string());
@@ -391,16 +402,19 @@ pub fn save_session_source_internal(mode: String, active_dataset_id: Option<Stri
         _ => SessionSourceMode::Local,
     };
 
-    let mut normalized_ids = active_dataset_ids.unwrap_or_default().into_iter().map(|value| value.trim().to_string()).filter(|value| !value.is_empty()).collect::<Vec<_>>();
+    let mut normalized_ids = Vec::new();
+    for value in active_dataset_ids.unwrap_or_default() {
+        let normalized = value.trim().to_string();
+        if !normalized.is_empty() && !normalized_ids.contains(&normalized) {
+            normalized_ids.push(normalized);
+        }
+    }
 
     if normalized_ids.is_empty() {
         if let Some(value) = active_dataset_id.map(|value| value.trim().to_string()).filter(|value| !value.is_empty()) {
             normalized_ids.push(value);
         }
     }
-
-    normalized_ids.sort();
-    normalized_ids.dedup();
 
     config.active_dataset_id = normalized_ids.first().cloned();
     config.active_dataset_ids = normalized_ids;
@@ -425,5 +439,14 @@ mod tests {
         let parsed = parse_dataset_source("badlogicgames/pi-mono").expect("parsed");
         assert_eq!(parsed.repo_id, "badlogicgames/pi-mono");
         assert_eq!(parsed.source_url, "https://huggingface.co/datasets/badlogicgames/pi-mono");
+    }
+
+    #[test]
+    fn excludes_dataset_manifest_from_session_jsonl_files() {
+        assert!(is_dataset_session_jsonl("2026-01-16T02-31-35Z_session.jsonl"));
+        assert!(is_dataset_session_jsonl("nested/session.jsonl"));
+        assert!(!is_dataset_session_jsonl("manifest.jsonl"));
+        assert!(!is_dataset_session_jsonl("nested/manifest.jsonl"));
+        assert!(!is_dataset_session_jsonl("README.md"));
     }
 }

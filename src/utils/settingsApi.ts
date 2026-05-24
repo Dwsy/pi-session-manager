@@ -6,6 +6,7 @@ import { isStandaloneDatasetRuntime } from "@/browser-dataset";
 import { saveSessionSource } from "@/utils/datasetApi";
 
 const CACHE_KEY = "pi-session-manager-settings";
+const BROWSER_DATASET_REFRESHED_EVENT = "browser-dataset:refreshed";
 
 let memoryCache: AppSettings | null = null;
 let lastPersistedSettingsSignature: string | null = null;
@@ -35,6 +36,28 @@ function buildBackendSyncState(settings: AppSettings): BackendSyncState {
     scanOtherAgentJsonl: settings.session.scanOtherAgentJsonl !== false,
     externalSessionProviders: settings.session.externalSessionProviders || [],
   };
+}
+
+function datasetSelectionSignature(settings: AppSettings): string {
+  return toSignature({
+    sourceMode: settings.session.sourceMode,
+    activeDatasetId: settings.session.activeDatasetId || "",
+    activeDatasetIds: settings.session.activeDatasetIds || [],
+  });
+}
+
+function notifyBrowserDatasetSelectionChanged(settings: AppSettings): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(BROWSER_DATASET_REFRESHED_EVENT, {
+      detail: {
+        reason: "selection-change",
+        datasetId: settings.session.activeDatasetId || "",
+        datasetIds: settings.session.activeDatasetIds || [],
+        refreshedAt: Date.now(),
+      },
+    }),
+  );
 }
 
 function markBackendStateLoaded(settings: AppSettings) {
@@ -221,7 +244,14 @@ export async function loadAppSettings(): Promise<AppSettings> {
 
 export async function saveAppSettings(settings: AppSettings): Promise<void> {
   if (isNoBackendRuntime()) {
+    const previousSettings = getCachedSettings();
+    const datasetSelectionChanged =
+      datasetSelectionSignature(previousSettings) !==
+      datasetSelectionSignature(settings);
     writeCache(settings);
+    if (isStandaloneDatasetRuntime() && datasetSelectionChanged) {
+      notifyBrowserDatasetSelectionChanged(settings);
+    }
     return;
   }
 

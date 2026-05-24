@@ -310,7 +310,8 @@ export function useSidebarSessions({
   return {
     filteredSessions,
     sidebarSessions: pagedSidebarSessions,
-    sidebarLoading: shouldEnablePagedSidebar ? pagedSidebarLoading : loading,
+    sidebarLoading:
+      loading || (shouldEnablePagedSidebar ? pagedSidebarLoading : false),
     sidebarLoadingMore: pagedSidebarLoadingMore,
     sidebarHasMore: pagedSidebarHasMore,
     loadMoreSidebarSessions,

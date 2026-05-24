@@ -5,6 +5,7 @@ import type { AppSettings } from '@/components/settings/types'
 const invokeMock = vi.fn()
 const saveSessionSourceMock = vi.fn()
 const isTauriMock = vi.fn(() => true)
+const isStandaloneDatasetRuntimeMock = vi.fn(() => false)
 
 const storage = new Map<string, string>()
 const localStorageMock = {
@@ -34,16 +35,26 @@ vi.mock('@/utils/datasetApi', () => ({
   saveSessionSource: (...args: unknown[]) => saveSessionSourceMock(...args),
 }))
 
+vi.mock('@/browser-dataset', () => ({
+  isStandaloneDatasetRuntime: () => isStandaloneDatasetRuntimeMock(),
+}))
+
 describe('saveAppSettings', () => {
   beforeEach(() => {
     vi.resetModules()
     invokeMock.mockReset()
     saveSessionSourceMock.mockReset()
+    isStandaloneDatasetRuntimeMock.mockReset()
     isTauriMock.mockReset()
     isTauriMock.mockReturnValue(true)
+    isStandaloneDatasetRuntimeMock.mockReturnValue(false)
     invokeMock.mockResolvedValue(undefined)
     saveSessionSourceMock.mockResolvedValue(undefined)
     localStorage.clear()
+    Object.defineProperty(globalThis, 'window', {
+      value: undefined,
+      configurable: true,
+    })
   })
 
   it('skips heavy sync commands when settings are unchanged', async () => {
@@ -126,5 +137,40 @@ describe('saveAppSettings', () => {
       'save_external_session_providers',
     ])
     expect(saveSessionSourceMock).not.toHaveBeenCalled()
+  })
+
+  it('notifies standalone dataset runtime when dataset selection changes', async () => {
+    const dispatchEventMock = vi.fn()
+    Object.defineProperty(globalThis, 'window', {
+      value: {
+        dispatchEvent: dispatchEventMock,
+      },
+      configurable: true,
+    })
+    isTauriMock.mockReturnValue(false)
+    isStandaloneDatasetRuntimeMock.mockReturnValue(true)
+
+    const { saveAppSettings, getCachedSettings } = await import('./settingsApi')
+    const defaults = getCachedSettings()
+    const settings: AppSettings = {
+      ...defaults,
+      session: {
+        ...defaults.session,
+        sourceMode: 'dataset',
+        activeDatasetId: 'owner/a',
+        activeDatasetIds: ['owner/a'],
+      },
+    }
+
+    await saveAppSettings(settings)
+
+    expect(dispatchEventMock).toHaveBeenCalledTimes(1)
+    const event = dispatchEventMock.mock.calls[0][0] as CustomEvent
+    expect(event.type).toBe('browser-dataset:refreshed')
+    expect(event.detail).toMatchObject({
+      reason: 'selection-change',
+      datasetId: 'owner/a',
+      datasetIds: ['owner/a'],
+    })
   })
 })

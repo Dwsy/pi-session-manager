@@ -78,6 +78,7 @@ import type { DeleteSessionRequestOptions } from "./components/dialogs/deleteSes
 import { useWorkspaces, type KanbanWorkspace } from "./hooks/useWorkspaces";
 import WorkspaceEditor from "./components/kanban/WorkspaceEditor";
 import {
+  BROWSER_DATASET_REFRESHED_EVENT,
   DEFAULT_STANDALONE_DATASET_ID,
   getActiveDatasetId,
   isStandaloneDatasetRuntime,
@@ -278,11 +279,9 @@ function App() {
   const [showForkDialog, setShowForkDialog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
-  const [standaloneDatasetId] = useState(() =>
-    standaloneDatasetRuntime
-      ? getActiveDatasetId() || DEFAULT_STANDALONE_DATASET_ID
-      : "",
-  );
+  const standaloneDatasetId = standaloneDatasetRuntime
+    ? getActiveDatasetId() || DEFAULT_STANDALONE_DATASET_ID
+    : "";
   const [sessionSortBy, setSessionSortBy] = useState(DEFAULT_SESSION_SORT_BY);
   const [sessionSortOrder, setSessionSortOrder] = useState(
     DEFAULT_SESSION_SORT_ORDER,
@@ -303,6 +302,39 @@ function App() {
   });
   const [showTerminal, setShowTerminal] = useState(false);
   const [versionDowngradeInfo, setVersionDowngradeInfo] = useState<VersionDowngradeInfo | null>(null);
+
+  useEffect(() => {
+    if (!standaloneDatasetRuntime || typeof window === "undefined") return;
+
+    const handleDatasetSelectionChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ reason?: string }>).detail;
+      if (detail?.reason !== "selection-change") return;
+
+      setSelectedSession(null);
+      setSelectedProject(null);
+      setFilterTagIds([]);
+      setSourceFilterSlugs([]);
+      setModelFilter("");
+      setDateRange(null);
+      setSidebarSearchQuery("");
+      setShowFavorites(false);
+      setSidebarMode("list");
+      if (isMobile) {
+        setMobileTab("list");
+      }
+    };
+
+    window.addEventListener(
+      BROWSER_DATASET_REFRESHED_EVENT,
+      handleDatasetSelectionChange,
+    );
+    return () => {
+      window.removeEventListener(
+        BROWSER_DATASET_REFRESHED_EVENT,
+        handleDatasetSelectionChange,
+      );
+    };
+  }, [isMobile, setSelectedSession, standaloneDatasetRuntime]);
 
   // Check for version downgrade on app startup
   useEffect(() => {
@@ -1101,6 +1133,7 @@ function App() {
           : filteredSessions
       }
       selectedProject={selectedProject}
+      loading={loading}
       onManageDatasets={() => setShowSettings(true)}
       onSessionSelect={handleSelectSession}
       onProjectSelect={handleDatasetOverviewProjectSelect}

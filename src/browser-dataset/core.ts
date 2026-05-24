@@ -2,7 +2,6 @@ import type { SessionEntry, SessionInfo } from "@/types";
 import { isTauri } from "@/transport";
 import { getCachedSettings } from "@/utils/settingsApi";
 import {
-  deletePersistedDatasetCache,
   isPersistedDatasetCacheFresh,
   readPersistedDatasetCache,
   writePersistedDatasetCache,
@@ -23,13 +22,14 @@ export interface RemoteDatasetCache {
   datasetId: string;
   sessions: RemoteDatasetSession[];
   sessionByPath: Map<string, RemoteDatasetSession>;
+  isComplete: boolean;
 }
 
 let datasetCachePromise: Promise<RemoteDatasetCache> | null = null;
 let datasetCacheKey = "";
 let backgroundRefreshPromise: Promise<void> | null = null;
 let backgroundRefreshKey = "";
-const DATASET_REVISION = "main";
+const DATASET_REVISION = "main-v2";
 const INITIAL_DATASET_FILE_BATCH = 24;
 const BACKGROUND_DATASET_FILE_BATCH = 24;
 export const BROWSER_DATASET_REFRESHED_EVENT = "browser-dataset:refreshed";
@@ -112,6 +112,7 @@ export function extractTextFromMessageContent(content: any[] | undefined): {
 function buildDatasetCache(
   datasetId: string,
   sessions: RemoteDatasetSession[],
+  isComplete = true,
 ): RemoteDatasetCache {
   const sortedSessions = [...sessions].sort(
     (left, right) =>
@@ -124,12 +125,13 @@ function buildDatasetCache(
     sessionByPath: new Map(
       sortedSessions.map((session) => [session.path, session]),
     ),
+    isComplete,
   };
 }
 
 function serializeDatasetCache(
   cache: RemoteDatasetCache,
-  isComplete = true,
+  isComplete = cache.isComplete,
 ): PersistedDatasetCacheRecord {
   return {
     datasetId: cache.datasetId,
@@ -160,13 +162,22 @@ function deserializeDatasetCache(
       entries: session.entries,
     }),
   );
-  return buildDatasetCache(record.datasetId, sessions);
+  return buildDatasetCache(
+    record.datasetId,
+    sessions,
+    record.isComplete !== false,
+  );
 }
 
 function sortDatasetFilesNewestFirst(
   files: Array<{ path: string; type: string; size?: number }>,
 ): Array<{ path: string; type: string; size?: number }> {
   return [...files].sort((left, right) => right.path.localeCompare(left.path));
+}
+
+function isBrowserDatasetSessionFilePath(path: string): boolean {
+  const filename = path.split("/").pop() || path;
+  return filename !== "manifest.jsonl" && path.endsWith(".jsonl");
 }
 
 function mergeDatasetSessions(
@@ -223,7 +234,8 @@ async function fetchDatasetTree(
 
   return sortDatasetFilesNewestFirst(
     tree.filter(
-      (item) => item.type === "file" && item.path.endsWith(".jsonl"),
+      (item) =>
+        item.type === "file" && isBrowserDatasetSessionFilePath(item.path),
     ),
   );
 }
@@ -254,14 +266,30 @@ async function fetchInitialDatasetCacheFromNetwork(
   const jsonlFiles = await fetchDatasetTree(datasetId);
   const initialFiles = jsonlFiles.slice(0, INITIAL_DATASET_FILE_BATCH);
   const sessions = await fetchDatasetSessionsForFiles(datasetId, initialFiles);
+  const isComplete = initialFiles.length >= jsonlFiles.length;
 
   return {
-    cache: buildDatasetCache(datasetId, sessions),
-    isComplete: initialFiles.length >= jsonlFiles.length,
+    cache: buildDatasetCache(datasetId, sessions, isComplete),
+    isComplete,
   };
 }
 
-function parseSessionContent(
+function asNonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function normalizeTimestamp(value: unknown): string | null {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return null;
+  }
+
+  const timestamp = value.trim();
+  return Number.isNaN(Date.parse(timestamp)) ? null : timestamp;
+}
+
+export function parseSessionContent(
   datasetId: string,
   relativePath: string,
   content: string,
@@ -276,15 +304,26 @@ function parseSessionContent(
     return null;
   }
 
+  if (header?.type !== "session") {
+    return null;
+  }
+
+  const headerId = asNonEmptyString(header.id);
+  const headerCwd = asNonEmptyString(header.cwd);
+  const created = normalizeTimestamp(header.timestamp);
+  if (!headerId || !headerCwd || !created) {
+    return null;
+  }
+
   const entries: SessionEntry[] = [];
-  let name: string | undefined;
+  let name: string | undefined = asNonEmptyString(header.name) || undefined;
   let messageCount = 0;
   let firstMessage = "";
   let lastMessage = "";
   let lastMessageRole = "assistant";
-  const allMessages: string[] = [];
   const userMessages: string[] = [];
   const assistantMessages: string[] = [];
+  let modified = created;
 
   for (const line of lines) {
     try {
@@ -292,6 +331,11 @@ function parseSessionContent(
       entries.push(entry);
 
       const anyEntry = entry as any;
+      const entryTimestamp = normalizeTimestamp(anyEntry.timestamp);
+      if (entryTimestamp && entryTimestamp.localeCompare(modified) > 0) {
+        modified = entryTimestamp;
+      }
+
       if (entry.type === "session_info" && typeof anyEntry.name === "string") {
         name = anyEntry.name.trim() || name;
       }
@@ -308,7 +352,6 @@ function parseSessionContent(
       if (!mergedText) continue;
 
       messageCount += 1;
-      allMessages.push(mergedText);
       if (role === "user") {
         userMessages.push(mergedText);
         if (!firstMessage) {
@@ -324,8 +367,6 @@ function parseSessionContent(
     }
   }
 
-  const created = header?.timestamp || new Date().toISOString();
-  const modified = created;
   const path = virtualPath(datasetId, relativePath);
 
   return {
@@ -336,14 +377,8 @@ function parseSessionContent(
     entries,
     info: {
       path,
-      id:
-        header?.id ||
-        relativePath
-          .replace(/\.jsonl$/i, "")
-          .split("/")
-          .pop() ||
-        relativePath,
-      cwd: header?.cwd || `/${datasetId}`,
+      id: headerId,
+      cwd: headerCwd,
       name,
       created,
       modified,
@@ -353,7 +388,7 @@ function parseSessionContent(
       assistant_messages_text: assistantMessages.join("\n"),
       last_message: lastMessage,
       last_message_role: lastMessageRole,
-      parent_session_path: header?.parentSession,
+      parent_session_path: asNonEmptyString(header.parentSession) || undefined,
     },
   };
 }
@@ -426,25 +461,19 @@ export async function loadDatasetCache(): Promise<RemoteDatasetCache> {
           left.info.path.localeCompare(right.info.path),
       );
 
-    return {
+    return buildDatasetCache(
       datasetId,
-      sessions: combinedSessions,
-      sessionByPath: new Map(
-        combinedSessions.map((session) => [session.path, session]),
-      ),
-    };
+      combinedSessions,
+      singleCaches.every((cache) => cache.isComplete),
+    );
   })();
 
   return datasetCachePromise;
 }
 
 export function invalidateBrowserDatasetCache(): void {
-  const previousKey = datasetCacheKey;
   datasetCacheKey = "";
   datasetCachePromise = null;
-  if (previousKey) {
-    void deletePersistedDatasetCache(previousKey);
-  }
 }
 
 function dispatchDatasetRefreshed(datasetId: string): void {
@@ -503,16 +532,24 @@ function scheduleBackgroundRefresh(
           datasetId,
           batch,
         );
-        if (fetchedSessions.length === 0) {
-          continue;
-        }
 
-        workingCache = buildDatasetCache(
-          datasetId,
-          mergeDatasetSessions(workingCache.sessions, fetchedSessions),
-        );
         const isComplete =
           index + BACKGROUND_DATASET_FILE_BATCH >= remainingFiles.length;
+        if (fetchedSessions.length > 0) {
+          workingCache = buildDatasetCache(
+            datasetId,
+            mergeDatasetSessions(workingCache.sessions, fetchedSessions),
+            isComplete,
+          );
+        } else if (isComplete) {
+          workingCache = buildDatasetCache(
+            datasetId,
+            workingCache.sessions,
+            true,
+          );
+        } else {
+          continue;
+        }
         await writePersistedDatasetCache(
           serializeDatasetCache(workingCache, isComplete),
         );

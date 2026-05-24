@@ -21,6 +21,11 @@ export interface RuntimePaginatedSessionsResponse {
   has_more: boolean;
 }
 
+export interface RuntimeSessionListResponse {
+  sessions: SessionInfo[];
+  isComplete: boolean;
+}
+
 export interface SessionProvider {
   mode: RuntimeMode;
   supportsLiveEvents: boolean;
@@ -28,6 +33,7 @@ export interface SessionProvider {
   canRenameSessions: boolean;
   canForkSessions: boolean;
   loadSessions(): Promise<SessionInfo[]>;
+  loadSessionList?(): Promise<RuntimeSessionListResponse>;
   getSessionByPath(path: string): Promise<SessionInfo | null>;
   getSessionById?(id: string): Promise<SessionInfo | null>;
   canResolveSession(path: string): Promise<boolean>;

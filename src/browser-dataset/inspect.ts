@@ -12,7 +12,8 @@ export async function getBrowserDatasetInspectData(
   sessionPath: string
 ): Promise<InspectData> {
   const dataset = await loadDatasetCache();
-  const entries: SessionEntry[] = (dataset.sessions as any)[sessionPath];
+  const session = dataset.sessionByPath.get(sessionPath);
+  const entries: SessionEntry[] | undefined = session?.entries;
   if (!entries?.length) {
     throw new Error(`No session data found for path: ${sessionPath}`);
   }

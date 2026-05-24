@@ -1,6 +1,7 @@
 export type {
   FavoritesProvider,
   RuntimePaginatedSessionsResponse,
+  RuntimeSessionListResponse,
   SessionProvider,
   TagsProvider,
 } from "./types";

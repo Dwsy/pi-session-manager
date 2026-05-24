@@ -8,12 +8,14 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Skeleton } from "@/components/ui/Skeleton";
 import type { SessionInfo } from "@/types";
 
 interface StandaloneDatasetOverviewProps {
   currentDatasetId: string;
   sessions: SessionInfo[];
   selectedProject?: string | null;
+  loading?: boolean;
   onManageDatasets: () => void;
   onSessionSelect?: (session: SessionInfo) => void;
   onProjectSelect?: (projectPath: string) => void;
@@ -27,6 +29,7 @@ export default function StandaloneDatasetOverview({
   currentDatasetId,
   sessions,
   selectedProject,
+  loading = false,
   onManageDatasets,
   onSessionSelect,
   onProjectSelect,
@@ -77,6 +80,94 @@ export default function StandaloneDatasetOverview({
   const averageMessages =
     sessions.length > 0 ? (totalMessages / sessions.length).toFixed(1) : "0.0";
   const latestTimestamp = recentSessions[0]?.modified;
+
+  if (loading) {
+    return (
+      <div className="h-full overflow-y-auto p-3 md:p-4">
+        <div className="mx-auto max-w-7xl">
+          <div className="rounded-3xl border border-border/70 bg-gradient-to-br from-background via-background to-secondary/30 p-4 md:p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-xs text-muted-foreground">
+                  <Database className="h-3.5 w-3.5" />
+                  {t("settings.session.standaloneDataset.badge", "Dataset")}
+                </div>
+                <h1 className="mt-3 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+                  {datasetName}
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                  {selectedProject
+                    ? t(
+                        "settings.session.standaloneDataset.filteredProject",
+                        "Filtered by project: {{project}}",
+                        { project: selectedProject },
+                      )
+                    : currentDatasetId}
+                </p>
+              </div>
+              <button
+                onClick={onManageDatasets}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-info/40 bg-info/10 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-info/15"
+              >
+                <Sparkles className="h-4 w-4" />
+                {t(
+                  "settings.session.standaloneDataset.manageAction",
+                  "Manage datasets",
+                )}
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="rounded-2xl border border-border/60 bg-background/70 p-4"
+                >
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="mt-3 h-8 w-16" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-12">
+            <section className="min-w-0 rounded-3xl border border-border/70 bg-background/80 p-5 xl:col-span-8">
+              <Skeleton className="h-5 w-36" />
+              <Skeleton className="mt-2 h-3 w-64 max-w-full" />
+              <div className="mt-4 space-y-2">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3"
+                  >
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="mt-2 h-3 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="min-w-0 space-y-3 xl:col-span-4">
+              <div className="min-w-0 rounded-3xl border border-border/70 bg-background/80 p-5">
+                <Skeleton className="h-5 w-28" />
+                <div className="mt-4 space-y-2">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3"
+                    >
+                      <Skeleton className="h-4 w-1/2" />
+                      <Skeleton className="mt-2 h-3 w-2/3" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto p-3 md:p-4">

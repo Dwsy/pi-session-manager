@@ -1,9 +1,23 @@
 import type { SessionChunk, SessionInfo } from "@/types";
 import { loadDatasetCache } from "./core";
 
-export async function getBrowserDatasetSessions(): Promise<SessionInfo[]> {
+export interface BrowserDatasetSessionList {
+  sessions: SessionInfo[];
+  isComplete: boolean;
+}
+
+export async function getBrowserDatasetSessionList(): Promise<
+  BrowserDatasetSessionList
+> {
   const cache = await loadDatasetCache();
-  return cache.sessions.map((session) => ({ ...session.info }));
+  return {
+    sessions: cache.sessions.map((session) => ({ ...session.info })),
+    isComplete: cache.isComplete,
+  };
+}
+
+export async function getBrowserDatasetSessions(): Promise<SessionInfo[]> {
+  return (await getBrowserDatasetSessionList()).sessions;
 }
 
 export async function getBrowserDatasetSessionByPath(
