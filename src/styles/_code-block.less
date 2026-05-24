@@ -226,3 +226,46 @@
 .code-block-scrollable .code-block {
   overflow: visible;
 }
+
+// Tool Call Review embeds code as native inspector/editor panes; remove the
+// article-style margins and rounded grey block inside those split views.
+.tool-review-code-surface {
+  .code-block-wrapper {
+    margin: 0;
+    border-radius: 0;
+    background: var(--bg-inset);
+  }
+
+  .code-block-content {
+    scrollbar-color: rgba(var(--accent-rgb), 0.28) transparent;
+  }
+
+  .code-line-numbers {
+    background: rgb(var(--color-surface-dark) / 0.38);
+    border-right: 1px solid rgb(var(--color-border) / 0.32);
+  }
+
+  .code-line-number {
+    color: rgb(var(--color-muted-foreground) / 0.82);
+  }
+
+  .code-block {
+    font-size: 11px;
+  }
+}
+
+.tool-review-inspector-code {
+  .code-block-wrapper {
+    border: 1px solid rgb(var(--color-border) / 0.34);
+    border-radius: 6px;
+    background: rgb(var(--color-background) / 0.68);
+  }
+
+  .code-block {
+    padding: 10px;
+  }
+
+  .code-line-numbers {
+    display: none;
+  }
+}

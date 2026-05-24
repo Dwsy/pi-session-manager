@@ -11,6 +11,7 @@ import {
   FileEdit,
   FilePlus,
   FileText,
+  Files,
   Search,
   Terminal,
   Wrench,
@@ -114,41 +115,137 @@ const TOOL_CONFIG: Record<
 
 const FILTER_OPTIONS: Array<{
   id: ReviewFilter;
+  icon: typeof FileText;
   labelKey: string;
   fallbackLabel: string;
   predicate: (operation: FileOperation) => boolean;
 }> = [
   {
-    id: "changes",
-    labelKey: "components.toolCallReview.filters.changes",
-    fallbackLabel: "Changes",
-    predicate: isChangeOperation,
-  },
-  {
     id: "all",
+    icon: Wrench,
     labelKey: "components.toolCallReview.filters.all",
     fallbackLabel: "All",
     predicate: () => true,
   },
   {
+    id: "changes",
+    icon: FileEdit,
+    labelKey: "components.toolCallReview.filters.changes",
+    fallbackLabel: "Changes",
+    predicate: isChangeOperation,
+  },
+  {
     id: "reads",
+    icon: FileText,
     labelKey: "components.toolCallReview.filters.reads",
     fallbackLabel: "Reads",
     predicate: (operation) => operation.toolName === "read",
   },
   {
-    id: "shell",
-    labelKey: "components.toolCallReview.filters.shell",
-    fallbackLabel: "Shell",
-    predicate: (operation) => operation.toolName === "bash",
-  },
-  {
     id: "errors",
+    icon: AlertTriangle,
     labelKey: "components.toolCallReview.filters.errors",
     fallbackLabel: "Errors",
     predicate: (operation) => operation.isError,
   },
 ];
+
+type ReviewMode = "files" | "shell";
+
+const REVIEW_MODE_OPTIONS: Array<{
+  id: ReviewMode;
+  icon: typeof FileText;
+  labelKey: string;
+  fallbackLabel: string;
+  predicate: (operation: FileOperation) => boolean;
+}> = [
+  {
+    id: "files",
+    icon: Files,
+    labelKey: "components.toolCallReview.modes.files",
+    fallbackLabel: "Files",
+    predicate: (operation) => operation.toolName !== "bash",
+  },
+  {
+    id: "shell",
+    icon: Terminal,
+    labelKey: "components.toolCallReview.modes.shell",
+    fallbackLabel: "Shell",
+    predicate: (operation) => operation.toolName === "bash",
+  },
+];
+
+const REVIEW_CODE_VIEW_STYLE = {
+  "--diffs-light-bg": "rgb(var(--color-background))",
+  "--diffs-dark-bg": "rgb(var(--color-background))",
+  "--diffs-light": "rgb(var(--color-foreground))",
+  "--diffs-dark": "rgb(var(--color-foreground))",
+  "--diffs-bg-context-override": "var(--bg-inset)",
+  "--diffs-bg-context-gutter-override": "rgb(var(--color-surface-dark) / 0.52)",
+  "--diffs-bg-separator-override": "rgb(var(--color-surface-dark) / 0.72)",
+  "--diffs-bg-buffer-override": "rgb(var(--color-surface-dark) / 0.42)",
+  "--diffs-fg-number-override": "rgb(var(--color-muted-foreground))",
+  "--diffs-font-family": "var(--font-family-mono)",
+  "--diffs-header-font-family": "var(--font-family)",
+  "--diffs-font-size": "11px",
+  "--diffs-line-height": "20px",
+  "--diffs-gap-block": "4px",
+  "--diffs-gap-inline": "8px",
+  "--diffs-scrollbar-gutter-override": "6px",
+} as CSSProperties;
+
+const REVIEW_CODE_VIEW_UNSAFE_CSS = `
+  :host {
+    border: 0;
+    background: var(--diffs-bg);
+  }
+
+  [data-diffs-header='default'] {
+    min-height: 34px;
+    padding-inline: 10px;
+    border-block: 0 1px solid rgb(var(--color-border) / 0.32);
+    background: var(--diffs-bg-context);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  [data-header-content] {
+    min-width: 0;
+  }
+
+  [data-header-content] [data-title],
+  [data-header-content] [data-prev-name] {
+    direction: ltr;
+  }
+
+  [data-diffs-header='default'] [data-metadata] {
+    font-family: var(--diffs-font-family);
+    font-size: 10px;
+  }
+
+  [data-code] {
+    padding-block: 6px;
+  }
+
+  [data-line],
+  [data-column-number],
+  [data-no-newline] {
+    padding-inline: 0.85ch;
+  }
+
+  [data-column-number] {
+    padding-left: 1.25ch;
+  }
+
+  [data-separator='line-info'] {
+    margin-block: 3px;
+  }
+
+  [data-separator-content],
+  [data-expand-button] {
+    border-radius: 4px;
+  }
+`;
 
 function getToolConfig(toolName: string) {
   return TOOL_CONFIG[toolName] || TOOL_CONFIG.default;
@@ -191,12 +288,12 @@ function SummaryItem({
           : "text-foreground";
 
   return (
-    <div className="border-b border-border/55 px-2.5 py-1.5">
-      <div className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
+    <div className="min-w-0 px-2.5 py-2">
+      <div className="truncate text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
         {t(label, fallbackLabel)}
       </div>
       <div
-        className={`mt-0.5 font-mono text-[13px] font-semibold tabular-nums ${valueClass}`}
+        className={`mt-0.5 font-mono text-[12px] font-semibold leading-none tabular-nums ${valueClass}`}
       >
         {value}
       </div>
@@ -217,12 +314,13 @@ function FilterBar({
 
   return (
     <div
-      className="grid grid-cols-5 border-b border-border/70 bg-background"
+      className="flex flex-shrink-0 gap-0.5"
       role="radiogroup"
       aria-label={t("components.toolCallReview.filterLabel", "Review filter")}
     >
       {FILTER_OPTIONS.map((option) => {
         const active = activeFilter === option.id;
+        const Icon = option.icon;
         return (
           <button
             key={option.id}
@@ -230,16 +328,68 @@ function FilterBar({
             onClick={() => onChange(option.id)}
             role="radio"
             aria-checked={active}
-            className={`min-w-0 border-r border-border/35 px-2 py-1.5 text-[11px] font-medium motion-color focus-ring last:border-r-0 ${
+            title={`${t(option.labelKey, option.fallbackLabel)} (${counts[option.id]})`}
+            className={`group flex h-8 min-w-10 items-center justify-center gap-1 rounded-[5px] border px-1.5 text-[11px] font-medium motion-surface focus-ring ${
               active
-                ? "bg-accent/10 text-foreground"
+                ? "border-border/70 bg-background text-foreground shadow-[0_1px_2px_rgba(var(--shadow-rgb),0.16)]"
+                : "border-transparent text-muted-foreground hover:bg-background/55 hover:text-foreground"
+            }`}
+          >
+            <Icon
+              className={`h-3.5 w-3.5 flex-shrink-0 ${active ? "text-[var(--accent)]" : "text-muted-foreground/70 group-hover:text-foreground"}`}
+              aria-hidden="true"
+            />
+            <span className="sr-only">
+              {t(option.labelKey, option.fallbackLabel)}
+            </span>
+            <span className="min-w-[1.2em] text-center font-mono text-[10px] leading-none tabular-nums opacity-80">
+              {counts[option.id]}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReviewModeSwitch({
+  activeMode,
+  counts,
+  onChange,
+}: {
+  activeMode: ReviewMode;
+  counts: Record<ReviewMode, number>;
+  onChange: (mode: ReviewMode) => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="flex min-w-0 flex-1 gap-0.5 rounded-[6px] border border-border/40 bg-background/50 p-0.5"
+      role="radiogroup"
+      aria-label={t("components.toolCallReview.modeLabel", "Review mode")}
+    >
+      {REVIEW_MODE_OPTIONS.map((option) => {
+        const active = activeMode === option.id;
+        const Icon = option.icon;
+        const label = t(option.labelKey, option.fallbackLabel);
+
+        return (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => onChange(option.id)}
+            role="radio"
+            aria-checked={active}
+            className={`flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[5px] px-2 text-[11px] font-medium motion-surface focus-ring ${
+              active
+                ? "bg-surface text-foreground shadow-[0_1px_2px_rgba(var(--shadow-rgb),0.14)]"
                 : "text-muted-foreground hover:bg-surface/55 hover:text-foreground"
             }`}
           >
-            <span className="block truncate">
-              {t(option.labelKey, option.fallbackLabel)}
-            </span>
-            <span className="block text-[10px] tabular-nums opacity-70">
+            <Icon className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+            <span className="truncate">{label}</span>
+            <span className="font-mono text-[10px] tabular-nums opacity-75">
               {counts[option.id]}
             </span>
           </button>
@@ -261,11 +411,13 @@ function InspectorRow({
   const { t } = useTranslation();
 
   return (
-    <div className="border-b border-border/55 px-3 py-2.5">
-      <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="border-b border-border/35 px-3 py-2.5">
+      <div className="text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
         {t(label, fallbackLabel)}
       </div>
-      <div className="mt-1 break-words text-xs text-foreground">{value}</div>
+      <div className="mt-1 break-words font-mono text-[11px] leading-5 text-foreground">
+        {value}
+      </div>
     </div>
   );
 }
@@ -284,11 +436,11 @@ function DetailMetric({
   const { t } = useTranslation();
 
   return (
-    <div className="border-b border-border/55 px-3 py-2">
-      <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="min-w-0 border-b border-r border-border/35 px-3 py-2 last:border-r-0 [&:nth-child(2n)]:border-r-0">
+      <div className="truncate text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
         {t(label, fallbackLabel)}
       </div>
-      <div className={`mt-1 text-sm font-semibold tabular-nums ${className}`}>
+      <div className={`mt-1 font-mono text-[13px] font-semibold tabular-nums ${className}`}>
         {value}
       </div>
     </div>
@@ -316,9 +468,9 @@ function ReviewStatusStrip({
         : t("components.toolCallReview.noImpact", "No line impact");
 
   return (
-    <div className="grid gap-2 border-y border-border/60 bg-surface/30 p-2 md:grid-cols-[minmax(0,1fr)_auto]">
+    <div className="grid gap-2 border-y border-border/40 bg-[rgb(var(--color-surface-dark)/0.46)] px-3 py-2 md:grid-cols-[minmax(0,1fr)_auto]">
       <div className="min-w-0 px-1 py-1">
-        <div className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
+        <div className="text-[8px] uppercase tracking-[0.16em] text-muted-foreground">
           {t("components.toolCallReview.target", "Target")}
         </div>
         <div className="mt-1 truncate font-mono text-xs text-foreground">
@@ -326,16 +478,16 @@ function ReviewStatusStrip({
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-[auto_auto]">
-        <div className={`border px-3 py-2 ${status.className}`}>
-          <div className="text-[9px] uppercase tracking-[0.14em] opacity-75">
+        <div className={`rounded-[5px] border px-3 py-2 ${status.className}`}>
+          <div className="text-[8px] uppercase tracking-[0.14em] opacity-75">
             {t("components.toolCallReview.statusLabel", "Status")}
           </div>
           <div className="mt-1 whitespace-nowrap text-xs font-semibold">
             {t(status.labelKey, status.fallbackLabel)}
           </div>
         </div>
-        <div className="border border-border/50 bg-background/40 px-3 py-2">
-          <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
+        <div className="rounded-[5px] border border-border/40 bg-background/45 px-3 py-2">
+          <div className="text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
             {t("components.toolCallReview.impact", "Impact")}
           </div>
           <div className="mt-1 whitespace-nowrap font-mono text-xs font-semibold text-foreground">
@@ -423,7 +575,7 @@ function DetailPanel({
       className="flex min-w-0 flex-1 flex-col bg-background"
       style={getReviewAccentStyle(operation.toolName)}
     >
-      <div className="relative flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-border/70 bg-surface/30 px-3 py-1.5">
+      <div className="relative flex min-h-[50px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.58)] px-3 py-1.5">
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-px opacity-80"
           style={{
@@ -440,11 +592,11 @@ function DetailPanel({
             <span className="truncate text-[13px] font-semibold text-foreground">
               {getOperationTitle(operation)}
             </span>
-            <span className="border border-border/50 bg-background/45 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+            <span className="rounded-[4px] border border-border/40 bg-background/45 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
               {t(config.labelKey, config.fallbackLabel)}
             </span>
             {operation.isError && (
-              <span className="inline-flex items-center gap-1 border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-destructive">
+              <span className="inline-flex items-center gap-1 rounded-[4px] border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-destructive">
                 <AlertTriangle className="h-3 w-3" aria-hidden="true" />
                 {t("components.toolCallReview.error", "Error")}
               </span>
@@ -461,7 +613,7 @@ function DetailPanel({
             "components.toolCallReview.copyOperation",
             "Copy operation details",
           )}
-          className="inline-flex items-center gap-1.5 border border-border/60 bg-background/70 px-2.5 py-1.5 text-xs text-muted-foreground motion-color focus-ring hover:border-border-hover hover:bg-surface hover:text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-[5px] border border-border/45 bg-background/60 px-2.5 py-1.5 text-xs text-muted-foreground motion-surface focus-ring hover:border-border-hover hover:bg-surface hover:text-foreground"
         >
           {copied ? (
             <Check className="h-3.5 w-3.5" aria-hidden="true" />
@@ -476,7 +628,7 @@ function DetailPanel({
 
       <div className="flex min-h-0 flex-1">
         <div className="custom-scrollbar min-w-0 flex-1 overflow-auto">
-          <div className="space-y-3 bg-background p-3">
+          <div className="space-y-2 bg-[rgb(var(--color-surface-dark)/0.24)] p-2.5">
             {isChangeOperation(operation) && (
               <ReviewStatusStrip
                 operation={operation}
@@ -485,38 +637,14 @@ function DetailPanel({
               />
             )}
 
-            <div className="grid grid-cols-2 border-y border-border/60 sm:grid-cols-4">
-              <DetailMetric
-                label="components.toolCallReview.sequence"
-                fallbackLabel="Sequence"
-                value={`#${operation.sequence}`}
-              />
-              <DetailMetric
-                label="components.toolCallReview.size"
-                fallbackLabel="Size"
-                value={formatBytes(operation.metrics.bytes)}
-              />
-              <DetailMetric
-                label="components.toolCallReview.additions"
-                fallbackLabel="Additions"
-                value={`+${operation.metrics.additions}`}
-                className="text-success"
-              />
-              <DetailMetric
-                label="components.toolCallReview.deletions"
-                fallbackLabel="Deletions"
-                value={`-${operation.metrics.deletions}`}
-                className="text-destructive"
-              />
-            </div>
-
             {isChangeOperation(operation) && hasCodeViewOutput ? (
-              <div className="min-h-[620px] overflow-hidden border border-border/70 bg-background">
+              <div className="min-h-[620px] overflow-hidden border border-border/45 bg-background shadow-[inset_0_1px_0_rgb(var(--highlight-rgb)/0.04)]">
                 <CodeView
                   ref={codeViewRef}
                   key={codeViewItems.map((item) => item.id).join(":")}
                   items={codeViewItems}
                   className="h-[min(960px,calc(94dvh-168px))] min-h-[620px] bg-background"
+                  style={REVIEW_CODE_VIEW_STYLE}
                   options={{
                     theme: { dark: "pierre-dark", light: "pierre-light" },
                     themeType,
@@ -533,13 +661,14 @@ function DetailPanel({
                       paddingBottom: 12,
                       gap: 8,
                     },
+                    unsafeCSS: REVIEW_CODE_VIEW_UNSAFE_CSS,
                   }}
                 />
               </div>
             ) : operation.toolName === "bash" ? (
               <div className="space-y-3">
-                <div className="overflow-hidden border border-border/70 bg-background">
-                  <div className="flex items-center gap-2 border-b border-border/45 bg-background/25 px-3 py-2 text-xs font-medium text-foreground">
+                <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
+                  <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2 text-xs font-medium text-foreground">
                     <Terminal className="h-3.5 w-3.5" aria-hidden="true" />
                     {t("components.bashExecution.command", "Command")}
                   </div>
@@ -551,8 +680,8 @@ function DetailPanel({
                   />
                 </div>
                 {operation.output && (
-                  <div className="overflow-hidden border border-border/70 bg-background">
-                    <div className="flex items-center gap-2 border-b border-border/45 bg-background/25 px-3 py-2 text-xs font-medium text-foreground">
+                  <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
+                    <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2 text-xs font-medium text-foreground">
                       <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
                       {operation.isError
                         ? t(
@@ -571,7 +700,7 @@ function DetailPanel({
                 )}
               </div>
             ) : operation.diff ? (
-              <div className="overflow-hidden border border-border/70 bg-background">
+              <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
                 <CodeBlock
                   code={operation.diff}
                   language="diff"
@@ -580,7 +709,7 @@ function DetailPanel({
                 />
               </div>
             ) : operation.content ? (
-              <div className="overflow-hidden border border-border/70 bg-background">
+              <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
                 <CodeBlock
                   code={operation.content}
                   language={language}
@@ -589,7 +718,7 @@ function DetailPanel({
                 />
               </div>
             ) : operation.output ? (
-              <div className="overflow-hidden border border-border/70 bg-background">
+              <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
                 <CodeBlock
                   code={operation.output}
                   language={language || "text"}
@@ -598,7 +727,7 @@ function DetailPanel({
                 />
               </div>
             ) : (
-              <div className="border border-border/70 bg-background p-6 text-center text-sm text-muted-foreground">
+              <div className="border border-border/45 bg-background p-6 text-center text-sm text-muted-foreground">
                 {t(
                   "components.toolCallReview.noRenderableOutput",
                   "No renderable output was captured for this operation.",
@@ -607,7 +736,7 @@ function DetailPanel({
             )}
 
             {!hasPrimaryOutput && (
-              <div className="border border-border/70 bg-background">
+              <div className="tool-review-code-surface border border-border/45 bg-background">
                 <CodeBlock
                   code={argsText}
                   language="json"
@@ -619,13 +748,37 @@ function DetailPanel({
           </div>
         </div>
 
-        <aside className="hidden w-56 flex-shrink-0 flex-col border-l border-border/70 bg-surface/25 xl:flex">
-          <div className="flex items-center gap-2 border-b border-border/70 bg-surface/35 px-3 py-2 text-xs font-semibold text-foreground">
+        <aside className="hidden w-64 flex-shrink-0 flex-col border-l border-border/55 bg-[rgb(var(--color-surface-dark)/0.46)] xl:flex">
+          <div className="flex min-h-[38px] items-center gap-2 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.64)] px-3 py-2 text-xs font-semibold text-foreground">
             <Braces
               className="h-3.5 w-3.5 text-muted-foreground"
               aria-hidden="true"
             />
             {t("components.toolCallReview.inspector", "Inspector")}
+          </div>
+          <div className="grid grid-cols-2 border-b border-border/45 bg-background/35">
+            <DetailMetric
+              label="components.toolCallReview.sequence"
+              fallbackLabel="Sequence"
+              value={`#${operation.sequence}`}
+            />
+            <DetailMetric
+              label="components.toolCallReview.size"
+              fallbackLabel="Size"
+              value={formatBytes(operation.metrics.bytes)}
+            />
+            <DetailMetric
+              label="components.toolCallReview.additions"
+              fallbackLabel="Additions"
+              value={`+${operation.metrics.additions}`}
+              className="text-success"
+            />
+            <DetailMetric
+              label="components.toolCallReview.deletions"
+              fallbackLabel="Deletions"
+              value={`-${operation.metrics.deletions}`}
+              className="text-destructive"
+            />
           </div>
           <InspectorRow
             label="components.toolCallReview.entry"
@@ -633,39 +786,15 @@ function DetailPanel({
             value={operation.entryId}
           />
           <InspectorRow
-            label="components.toolCallReview.sequence"
-            fallbackLabel="Sequence"
-            value={`#${operation.sequence}`}
-          />
-          <InspectorRow
             label="components.toolCallReview.time"
             fallbackLabel="Time"
             value={formatTimestamp(operation.timestamp) || "-"}
           />
-          <InspectorRow
-            label="components.toolCallReview.size"
-            fallbackLabel="Size"
-            value={formatBytes(operation.metrics.bytes)}
-          />
-          {operation.metrics.additions > 0 && (
-            <InspectorRow
-              label="components.toolCallReview.additions"
-              fallbackLabel="Additions"
-              value={`+${operation.metrics.additions}`}
-            />
-          )}
-          {operation.metrics.deletions > 0 && (
-            <InspectorRow
-              label="components.toolCallReview.deletions"
-              fallbackLabel="Deletions"
-              value={`-${operation.metrics.deletions}`}
-            />
-          )}
-          <div className="min-h-0 flex-1 overflow-hidden border-t border-border/70 bg-background/55">
-            <div className="border-b border-border/40 px-3 py-2 text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
+          <div className="min-h-0 flex-1 overflow-hidden border-t border-border/45 bg-background/45">
+            <div className="border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.34)] px-3 py-2 text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
               {t("components.toolCall.arguments", "Arguments")}
             </div>
-            <div className="custom-scrollbar max-h-full overflow-auto">
+            <div className="tool-review-code-surface tool-review-inspector-code custom-scrollbar max-h-full overflow-auto p-2">
               <CodeBlock
                 code={argsText}
                 language="json"
@@ -689,26 +818,44 @@ export default function ToolCallReviewModal({
   const { t } = useTranslation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>(DEFAULT_REVIEW_FILTER);
+  const [activeMode, setActiveMode] = useState<ReviewMode>("files");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const allOperations = useMemo(
     () => extractFileOperations(entries, toolResultByCallId),
     [entries, toolResultByCallId],
   );
-  const filterCounts = useMemo(() => {
-    return FILTER_OPTIONS.reduce(
+  const modeCounts = useMemo(() => {
+    return REVIEW_MODE_OPTIONS.reduce(
       (acc, option) => {
         acc[option.id] = allOperations.filter(option.predicate).length;
         return acc;
       },
-      {} as Record<ReviewFilter, number>,
+      { files: 0, shell: 0 } as Record<ReviewMode, number>,
     );
   }, [allOperations]);
+  const resolvedMode =
+    activeMode === "files" && modeCounts.files === 0 && modeCounts.shell > 0
+      ? "shell"
+      : activeMode;
+  const modeOperations = useMemo(() => {
+    const option = REVIEW_MODE_OPTIONS.find((item) => item.id === resolvedMode);
+    return option ? allOperations.filter(option.predicate) : allOperations;
+  }, [allOperations, resolvedMode]);
+  const filterCounts = useMemo(() => {
+    return FILTER_OPTIONS.reduce(
+      (acc, option) => {
+        acc[option.id] = modeOperations.filter(option.predicate).length;
+        return acc;
+      },
+      {} as Record<ReviewFilter, number>,
+    );
+  }, [modeOperations]);
 
   const filteredOperations = useMemo(() => {
     const option = FILTER_OPTIONS.find((item) => item.id === activeFilter);
-    return option ? allOperations.filter(option.predicate) : allOperations;
-  }, [activeFilter, allOperations]);
+    return option ? modeOperations.filter(option.predicate) : modeOperations;
+  }, [activeFilter, modeOperations]);
 
   const treeModel = useMemo(
     () => buildReviewTreeModel(filteredOperations),
@@ -753,14 +900,10 @@ export default function ToolCallReviewModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    if (
-      activeFilter === "changes" &&
-      filterCounts.changes === 0 &&
-      allOperations.length > 0
-    ) {
+    if (filterCounts[activeFilter] === 0 && modeOperations.length > 0) {
       setActiveFilter("all");
     }
-  }, [activeFilter, allOperations.length, filterCounts.changes, isOpen]);
+  }, [activeFilter, filterCounts, isOpen, modeOperations.length]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -840,47 +983,33 @@ export default function ToolCallReviewModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/55 p-2 backdrop-blur-xl"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/45 p-2 backdrop-blur-md ui-enter-fade"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
       <div
-        className="relative flex h-[min(1200px,94dvh)] w-[min(1960px,96vw)] max-h-[calc(100dvh-16px)] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-sm border border-border/80 bg-background text-foreground shadow-none"
+        className="relative flex h-[min(1200px,94dvh)] w-[min(1960px,96vw)] max-h-[calc(100dvh-16px)] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-[10px] border border-border/70 bg-background text-foreground shadow-[0_24px_80px_-36px_rgba(var(--shadow-rgb),0.72),0_0_0_1px_rgba(var(--highlight-rgb),0.04)] ui-enter-fade ui-enter-zoom"
         role="dialog"
         data-tool-call-review-modal="true"
         aria-modal="true"
         aria-labelledby="tool-call-review-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="relative flex min-h-[38px] flex-shrink-0 items-center gap-2 border-b border-border/80 bg-surface/35 px-3 py-1.5">
-          <div className="min-w-0 flex-1">
+        <div className="relative flex min-h-[36px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.66)] px-3 py-1">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <h2
               id="tool-call-review-title"
-              className="text-[13px] font-semibold text-foreground"
+              className="truncate text-[13px] font-semibold text-foreground"
             >
               {t("components.toolCallReview.title", "Tool Call Review")}
             </h2>
-            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] text-muted-foreground">
-              <span>
-                {t("components.toolCallReview.operationCount", "{{count}} operations", {
-                  count: allOperations.length,
-                })}
-              </span>
-              <span>
-                {t("components.toolCallReview.entryCount", "{{count}} entries", {
-                  count: entries.length,
-                })}
-              </span>
-              <span>
-                {totals.changes} {t("components.toolCallReview.summary.changes", "Changes")}
-              </span>
-            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="relative p-1.5 text-muted-foreground motion-color focus-ring hover:bg-surface hover:text-foreground"
+            className="relative rounded-[5px] p-1.5 text-muted-foreground motion-surface focus-ring hover:bg-surface hover:text-foreground"
             aria-label={t("common.close", "Close")}
           >
             <X className="h-4 w-4" />
@@ -906,15 +1035,20 @@ export default function ToolCallReviewModal({
           </div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-            <aside className="flex min-h-[260px] flex-shrink-0 flex-col border-b border-border/80 bg-background md:w-[320px] md:border-b-0 md:border-r">
-              <div className="border-b border-border/70 bg-background">
+            <aside className="flex min-h-[260px] flex-shrink-0 flex-col border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.42)] ui-enter-fade md:w-[360px] md:border-b-0 md:border-r xl:w-[400px]">
+              <div className="flex items-center gap-1.5 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.55)] p-1.5">
+                <ReviewModeSwitch
+                  activeMode={resolvedMode}
+                  counts={modeCounts}
+                  onChange={setActiveMode}
+                />
                 <FilterBar
                   activeFilter={activeFilter}
                   counts={filterCounts}
                   onChange={setActiveFilter}
                 />
               </div>
-              <div className="min-h-0 flex-1 bg-background">
+              <div className="min-h-0 flex-1 bg-[rgb(var(--color-surface-dark)/0.34)]">
                 {filteredOperations.length === 0 ? (
                   <div className="flex h-full items-center justify-center px-5 py-8 text-center">
                     <div>
@@ -942,7 +1076,7 @@ export default function ToolCallReviewModal({
                   />
                 )}
               </div>
-              <div className="grid grid-cols-4 border-t border-border/70 bg-surface/25 divide-x divide-border/45">
+              <div className="grid grid-cols-4 divide-x divide-border/35 border-t border-border/45 bg-[rgb(var(--color-surface-dark)/0.62)]">
                 <SummaryItem
                   label="components.toolCallReview.summary.changes"
                   fallbackLabel="Changes"

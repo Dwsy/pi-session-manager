@@ -60,6 +60,36 @@ function renderModal({
   return { onClose };
 }
 
+async function findFileTreeButtonByText(pattern: RegExp) {
+  let match: HTMLButtonElement | undefined;
+
+  await waitFor(() => {
+    const treeHost = document.querySelector("file-tree-container");
+    const buttons = Array.from(
+      treeHost?.shadowRoot?.querySelectorAll("button") ?? [],
+    ).filter((button): button is HTMLButtonElement => button instanceof HTMLButtonElement);
+
+    match = buttons.find((button) => {
+      const text = `${button.textContent ?? ""} ${button.dataset.itemPath ?? ""}`;
+      return pattern.test(text);
+    });
+    expect(match).toBeTruthy();
+  });
+
+  return match!;
+}
+
+async function getFileTreeShadowRoot() {
+  let shadowRoot: ShadowRoot | null | undefined;
+
+  await waitFor(() => {
+    shadowRoot = document.querySelector("file-tree-container")?.shadowRoot;
+    expect(shadowRoot).toBeTruthy();
+  });
+
+  return shadowRoot!;
+}
+
 
 describe("ToolCallReviewModal data model", () => {
   it("defaults to the full operation timeline", () => {
@@ -341,13 +371,70 @@ describe("ToolCallReviewModal UI behavior", () => {
       ],
     });
 
-    const shellNode = await screen.findByRole("button", {
-      name: /#2 pnpm build --filter api/,
+    expect(screen.getByRole("radio", { name: /Files\s*1/ }).getAttribute("aria-checked")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("radio", { name: /All\s*1/ })).toBeTruthy();
+    expect(await screen.findByText("src/App.tsx")).toBeTruthy();
+    expect(screen.queryByText("Shell command")).toBeNull();
+    expect(document.body.textContent).not.toContain("pnpm build --filter api");
+
+    const defaultShadowRoot = await getFileTreeShadowRoot();
+    await waitFor(() => {
+      expect(defaultShadowRoot.textContent).not.toContain("pnpm build --filter api");
     });
+
+    fireEvent.click(screen.getByRole("radio", { name: /Shell\s*1/ }));
+
+    const shellNode = await findFileTreeButtonByText(/#2 pnpm build --filter api/);
     fireEvent.click(shellNode);
 
     expect(screen.getByText("Shell command")).toBeTruthy();
     expect(screen.getByText("pnpm build --filter api")).toBeTruthy();
+  });
+
+  it("renders Pierre file tree icons and keeps metrics in the Inspector", async () => {
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-read-app",
+            name: "read",
+            arguments: {
+              path: "src/App.tsx",
+            },
+          },
+          {
+            type: "toolCall",
+            id: "call-read",
+            name: "read",
+            arguments: { path: "package.json" },
+          },
+          {
+            type: "toolCall",
+            id: "call-bash",
+            name: "bash",
+            arguments: { command: "pnpm test" },
+          },
+        ]),
+      ],
+    });
+
+    const shadowRoot = await getFileTreeShadowRoot();
+    const iconTokens = Array.from(
+      shadowRoot.querySelectorAll("[data-icon-token]"),
+    ).map((element) => element.getAttribute("data-icon-token"));
+
+    expect(iconTokens).toContain("react");
+    expect(iconTokens).toContain("json");
+    expect(document.querySelector(".code-block-header")).toBeNull();
+
+    const inspector = screen.getByText("Inspector").closest("aside");
+    expect(inspector?.textContent).toContain("Sequence");
+    expect(inspector?.textContent).toContain("Size");
+    expect(inspector?.textContent).toContain("Additions");
+    expect(inspector?.textContent).toContain("Deletions");
   });
 
   it("moves selection with ArrowDown and ArrowUp", async () => {
