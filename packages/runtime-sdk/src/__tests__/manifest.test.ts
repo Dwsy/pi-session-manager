@@ -10,7 +10,7 @@ describe('runtime-sdk manifest contract', () => {
       id: 'builtin.session-summary',
       name: 'Session Summary',
       version: '0.1.0',
-      permissions: ['sessions:read', 'records:read', 'records:write', 'sidechat:ask'],
+      permissions: ['sessions:read', 'records:read', 'records:write'],
       records: [
         {
           type: 'session.intelligence',
@@ -120,7 +120,7 @@ describe('PSM package manifest contract', () => {
 describe('plugin capability client', () => {
   const pluginPermissions: PsmPermissionContext = {
     pluginId: 'builtin.session-summary',
-    permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+    permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
   }
 
   it('sends typed record RPC through the provided PSM transport', async () => {
@@ -166,7 +166,7 @@ describe('plugin capability client', () => {
           limit: 5,
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
           },
         },
       },
@@ -214,7 +214,7 @@ describe('plugin capability client', () => {
           limit: 1,
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
           },
         },
       },
@@ -232,6 +232,21 @@ describe('plugin capability client', () => {
         }
         if (command === 'read_session_file_chunk') {
           return { content: 'chunk', next_offset: 5, file_size: 5, has_more: false }
+        }
+        if (command === 'get_session_entries') {
+          return [
+            {
+              id: 'entry-1',
+              timestamp: '2026-05-24T00:00:00Z',
+              message: {
+                role: 'assistant',
+                content: [{ type: 'text', text: 'The current blocker is model routing.' }],
+              },
+            },
+          ]
+        }
+        if (command === 'invoke_model_text') {
+          return { text: 'The current blocker is model routing.', provider: 'openai', model: 'gpt-5.5' }
         }
         if (command === 'full_text_search') {
           return { hits: [], total_hits: 0, has_more: false }
@@ -279,13 +294,13 @@ describe('plugin capability client', () => {
           sortBy: 'modified_desc',
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
           },
         },
       },
-      { command: 'read_session_file_chunk', payload: { path: '/repo/session.jsonl', offset: 0, maxBytes: 1024, __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'get_session_labels', payload: { path: '/repo/session.jsonl', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'open_session_in_browser', payload: { path: '/repo/session.jsonl', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'read_session_file_chunk', payload: { path: '/repo/session.jsonl', offset: 0, maxBytes: 1024, __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'get_session_labels', payload: { path: '/repo/session.jsonl', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'open_session_in_browser', payload: { path: '/repo/session.jsonl', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
       {
         command: 'full_text_search',
         payload: {
@@ -302,32 +317,40 @@ describe('plugin capability client', () => {
           to: undefined,
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
           },
         },
       },
       {
-        command: 'ask_session_sidechat',
+        command: 'get_session_entries',
         payload: {
           path: '/repo/session.jsonl',
-          question: 'What is blocked?',
-          language: 'zh-CN',
-          provider: 'openai',
-          model: 'gpt-5.5',
-          thinkingLevel: 'high',
-          limit: 8,
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
           },
         },
       },
-      { command: 'list_model_options_fast', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'get_all_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'create_tag', payload: { name: 'Active', color: '#22c55e', icon: undefined, parentId: undefined, __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'assign_tag', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'remove_tag_from_session', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'get_all_session_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      {
+        command: 'invoke_model_text',
+        payload: {
+          systemPrompt: expect.stringContaining('zh-CN'),
+          prompt: expect.stringContaining('model routing'),
+          provider: 'openai',
+          model: 'gpt-5.5',
+          reasoning: 'high',
+          __psm: {
+            pluginId: 'builtin.session-summary',
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+          },
+        },
+      },
+      { command: 'list_model_options_fast', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'get_all_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'create_tag', payload: { name: 'Active', color: '#22c55e', icon: undefined, parentId: undefined, __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'assign_tag', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'remove_tag_from_session', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'get_all_session_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
     ])
   })
 
@@ -369,11 +392,128 @@ describe('plugin capability client', () => {
           language: 'zh-CN',
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'sidechat:ask', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
           },
         },
       },
     ])
     expect(result.payload).toEqual({ summary: 'AI generated summary', status: 'active' })
+  })
+
+  it('composes sidechat streaming from session reads and generic AI stream', async () => {
+    const calls: Array<{ command: string; payload?: unknown }> = []
+    const streamCalls: Array<{ command: string; payload?: unknown }> = []
+    const transport: PsmTransport = {
+      invoke: async (command, payload) => {
+        calls.push({ command, payload })
+        if (command === 'get_session_entries') {
+          return [
+            {
+              id: 'entry-1',
+              timestamp: '2026-05-24T00:00:00Z',
+              message: {
+                role: 'assistant',
+                content: [{ type: 'text', text: 'This session is about sidechat streaming.' }],
+              },
+            },
+          ]
+        }
+        throw new Error(`unexpected invoke: ${command}`)
+      },
+      stream: async (command, payload, handlers) => {
+        streamCalls.push({ command, payload })
+        handlers.onEvent?.({ type: 'delta', delta: 'hello' })
+        handlers.onEvent?.({ type: 'done', response: { text: 'hello', provider: 'local', model: 'test' } })
+        return { text: 'hello', provider: 'local', model: 'test' }
+      },
+    }
+
+    const deltas: string[] = []
+    const client = createPluginCapabilityClient({ transport, permissions: pluginPermissions })
+    const response = await client.sidechat.askStream(
+      { sessionPath: '/repo/session.jsonl', question: 'Summarize', language: 'zh-CN', thinkingLevel: 'high' },
+      { onDelta: (delta) => deltas.push(delta) },
+    )
+
+    expect(deltas).toEqual(['hello'])
+    expect(response.answer).toBe('hello')
+    expect(response.citations).toHaveLength(1)
+    expect(calls).toEqual([
+      {
+        command: 'get_session_entries',
+        payload: {
+          path: '/repo/session.jsonl',
+          __psm: {
+            pluginId: 'builtin.session-summary',
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+          },
+        },
+      },
+    ])
+    expect(streamCalls).toEqual([
+      {
+        command: 'invoke_model_text_stream',
+        payload: {
+          systemPrompt: expect.stringContaining('zh-CN'),
+          prompt: expect.stringContaining('sidechat streaming'),
+          provider: undefined,
+          model: undefined,
+          reasoning: 'high',
+          __psm: {
+            pluginId: 'builtin.session-summary',
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+          },
+        },
+      },
+    ])
+  })
+
+  it('falls back to generic non-stream AI when the host lacks generic AI stream dispatch', async () => {
+    const calls: Array<{ command: string; payload?: unknown }> = []
+    const streamCalls: Array<{ command: string; payload?: unknown }> = []
+    const transport: PsmTransport = {
+      invoke: async (command, payload) => {
+        calls.push({ command, payload })
+        if (command === 'get_session_entries') {
+          return [
+            {
+              id: 'entry-1',
+              timestamp: '2026-05-24T00:00:00Z',
+              message: {
+                role: 'assistant',
+                content: [{ type: 'text', text: 'This session is about stream fallback.' }],
+              },
+            },
+          ]
+        }
+        if (command === 'invoke_model_text') {
+          return { text: 'fallback answer', provider: 'local', model: 'test' }
+        }
+        throw new Error(`unexpected invoke: ${command}`)
+      },
+      stream: async (command, payload) => {
+        streamCalls.push({ command, payload })
+        throw new Error('Unknown command: invoke_model_text_stream')
+      },
+    }
+
+    const deltas: string[] = []
+    const client = createPluginCapabilityClient({ transport, permissions: pluginPermissions })
+    const response = await client.sidechat.askStream(
+      { sessionPath: '/repo/session.jsonl', question: 'Summarize', language: 'zh-CN' },
+      { onDelta: (delta) => deltas.push(delta) },
+    )
+
+    expect(response.answer).toBe('fallback answer')
+    expect(deltas).toEqual(['fallback answer'])
+    expect(streamCalls).toEqual([
+      {
+        command: 'invoke_model_text_stream',
+        payload: expect.objectContaining({
+          prompt: expect.stringContaining('stream fallback'),
+        }),
+      },
+    ])
+    expect(calls.map((call) => call.command)).toEqual(['get_session_entries', 'invoke_model_text'])
   })
 })

@@ -4,12 +4,13 @@ import { invoke } from "@/transport";
 import type { ModelOption } from "@/types";
 
 /** Hook: progressive model loading (fast from config, then full from CLI) */
-export function useModelOptions() {
+export function useModelOptions(enabled = true) {
   const [models, setModels] = useState<ModelOption[]>([]);
   const [loading, setLoading] = useState(false);
   const loadedFull = useRef(false);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     setLoading(true);
 
@@ -36,7 +37,7 @@ export function useModelOptions() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   const providers = useMemo(
     () => [...new Set(models.map((m) => m.provider))].sort(),

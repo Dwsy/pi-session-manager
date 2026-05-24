@@ -4,8 +4,8 @@ export const sidechatConfiguration: PsmPluginConfiguration = {
   title: 'Sidechat Settings',
   description: 'Defaults used by the session sidechat panel and sidechat command.',
   properties: [
-    { key: 'provider', title: 'Default provider', description: 'Optional provider override. Leave empty for host auto selection.', type: 'string', default: '' },
-    { key: 'model', title: 'Default model', description: 'Optional model override. Leave empty for host auto selection.', type: 'string', default: '' },
+    { key: 'provider', title: 'Default provider', description: 'Optional provider override. Leave empty for host auto selection.', type: 'model-provider', default: '', modelKey: 'model' },
+    { key: 'model', title: 'Default model', description: 'Optional model override. Leave empty for host auto selection.', type: 'model-id', default: '', providerKey: 'provider' },
     {
       key: 'thinkingLevel',
       title: 'Thinking level',

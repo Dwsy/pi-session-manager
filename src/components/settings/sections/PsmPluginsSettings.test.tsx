@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   removePathPsmPlugin: vi.fn(),
   uninstallPsmPlugin: vi.fn(),
   updatePsmPlugins: vi.fn(),
+  invoke: vi.fn(),
 }))
 
 vi.mock('@/plugins/runtime-host', () => ({
@@ -25,6 +26,10 @@ vi.mock('@/plugins/runtime-host', () => ({
   removePathPsmPlugin: mocks.removePathPsmPlugin,
   uninstallPsmPlugin: mocks.uninstallPsmPlugin,
   updatePsmPlugins: mocks.updatePsmPlugins,
+}))
+
+vi.mock('@/transport', () => ({
+  invoke: mocks.invoke,
 }))
 
 import PsmPluginsSettings from './PsmPluginsSettings'
@@ -41,6 +46,8 @@ const builtinPlugin = {
   tools: [],
   diagnostics: [],
   settings: {
+    provider: 'openai',
+    model: 'gpt-4o',
     thinkingLevel: 'medium',
     limit: 8,
   },
@@ -52,6 +59,20 @@ const builtinPlugin = {
     configuration: {
       title: 'Sidechat Settings',
       properties: [
+        {
+          key: 'provider',
+          title: 'Default provider',
+          type: 'model-provider',
+          default: '',
+          modelKey: 'model',
+        },
+        {
+          key: 'model',
+          title: 'Default model',
+          type: 'model-id',
+          default: '',
+          providerKey: 'provider',
+        },
         {
           key: 'thinkingLevel',
           title: 'Thinking level',
@@ -114,6 +135,7 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
     mocks.removePathPsmPlugin.mockReset()
     mocks.uninstallPsmPlugin.mockReset()
     mocks.updatePsmPlugins.mockReset()
+    mocks.invoke.mockReset()
 
     mocks.getPsmPluginPaths.mockResolvedValue({
       configPath: '/Users/test/.pi/pi-session-manager/plugins.json',
@@ -126,6 +148,15 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
     mocks.uninstallPsmPlugin.mockResolvedValue({ entries: [], stdout: '', stderr: '' })
     mocks.updatePsmPlugins.mockResolvedValue({ entries: [], stdout: '', stderr: '' })
     mocks.setPsmPluginSettings.mockResolvedValue({ version: 1, plugins: {} })
+    mocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'list_model_options_fast' || command === 'list_model_options_full') {
+        return [
+          { provider: 'openai', model: 'gpt-4o' },
+          { provider: 'anthropic', model: 'claude-sonnet-4-5' },
+        ]
+      }
+      return null
+    })
   })
 
   afterEach(() => {
@@ -166,7 +197,7 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
 
   it('renders per-plugin configuration and persists setting updates', async () => {
     mocks.reload.mockResolvedValueOnce([builtinPlugin, npmPlugin]).mockResolvedValueOnce([
-      { ...builtinPlugin, settings: { thinkingLevel: 'high', limit: 8 } },
+      { ...builtinPlugin, settings: { provider: 'openai', model: 'gpt-4o', thinkingLevel: 'high', limit: 8 } },
       npmPlugin,
     ])
 
@@ -177,7 +208,34 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
 
     await waitFor(() => expect(mocks.setPsmPluginSettings).toHaveBeenCalledWith({
       pluginId: 'builtin.sidechat',
-      settings: { thinkingLevel: 'high', limit: 8 },
+      settings: { provider: 'openai', model: 'gpt-4o', thinkingLevel: 'high', limit: 8 },
+      source: 'builtin',
+      packageName: null,
+      entryPath: null,
+    }))
+  })
+
+  it('renders model settings as provider and model selectors', async () => {
+    mocks.reload.mockResolvedValueOnce([builtinPlugin, npmPlugin]).mockResolvedValueOnce([
+      { ...builtinPlugin, settings: { provider: 'anthropic', model: '', thinkingLevel: 'medium', limit: 8 } },
+      npmPlugin,
+    ])
+
+    render(<PsmPluginsSettings pluginId="builtin.sidechat" />)
+
+    const provider = await screen.findByLabelText('Default provider')
+    const model = await screen.findByLabelText('Default model')
+
+    expect(provider.tagName).toBe('SELECT')
+    expect(model.tagName).toBe('SELECT')
+    expect((provider as HTMLSelectElement).value).toBe('openai')
+    expect((model as HTMLSelectElement).value).toBe('gpt-4o')
+
+    fireEvent.change(provider, { target: { value: 'anthropic' } })
+
+    await waitFor(() => expect(mocks.setPsmPluginSettings).toHaveBeenCalledWith({
+      pluginId: 'builtin.sidechat',
+      settings: { provider: 'anthropic', model: '', thinkingLevel: 'medium', limit: 8 },
       source: 'builtin',
       packageName: null,
       entryPath: null,

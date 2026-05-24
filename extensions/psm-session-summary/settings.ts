@@ -4,8 +4,8 @@ export const sessionSummaryConfiguration: PsmPluginConfiguration = {
   title: 'AI Session Summary Settings',
   description: 'Controls generation defaults and what the session intelligence side panel displays.',
   properties: [
-    { key: 'provider', title: 'Default provider', description: 'Optional provider override. Leave empty for host auto selection.', type: 'string', default: '' },
-    { key: 'model', title: 'Default model', description: 'Optional model override. Leave empty for host auto selection.', type: 'string', default: '' },
+    { key: 'provider', title: 'Default provider', description: 'Optional provider override. Leave empty for host auto selection.', type: 'model-provider', default: '', modelKey: 'model' },
+    { key: 'model', title: 'Default model', description: 'Optional model override. Leave empty for host auto selection.', type: 'model-id', default: '', providerKey: 'provider' },
     {
       key: 'language',
       title: 'Summary language',

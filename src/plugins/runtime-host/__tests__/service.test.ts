@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
+  httpInvoke: vi.fn(),
   isTauri: vi.fn(),
 }))
 
@@ -10,6 +11,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 }))
 
 vi.mock('@/transport', () => ({
+  invoke: mocks.httpInvoke,
   isTauri: mocks.isTauri,
 }))
 
@@ -17,6 +19,7 @@ import {
   addPathPsmPlugin,
   installPsmPlugin,
   listPathPsmPluginEntries,
+  loadPsmPluginConfig,
   readPathPsmPluginModuleSource,
   reloadPsmPlugins,
   removePathPsmPlugin,
@@ -27,6 +30,7 @@ import {
 describe('runtime-host service plugin lifecycle commands', () => {
   beforeEach(() => {
     mocks.invoke.mockReset()
+    mocks.httpInvoke.mockReset()
     mocks.isTauri.mockReset()
   })
 
@@ -45,8 +49,8 @@ describe('runtime-host service plugin lifecycle commands', () => {
     expect(mocks.invoke).toHaveBeenNthCalledWith(2, 'uninstall_psm_plugin', {
       packageName: '@acme/psm-sidechat',
     })
-    expect(mocks.invoke).toHaveBeenNthCalledWith(3, 'update_psm_plugins')
-    expect(mocks.invoke).toHaveBeenNthCalledWith(4, 'reload_psm_plugins')
+    expect(mocks.invoke).toHaveBeenNthCalledWith(3, 'update_psm_plugins', undefined)
+    expect(mocks.invoke).toHaveBeenNthCalledWith(4, 'reload_psm_plugins', undefined)
   })
 
   it('maps path plugin calls to Tauri commands with camelCase payloads', async () => {
@@ -58,7 +62,7 @@ describe('runtime-host service plugin lifecycle commands', () => {
     await removePathPsmPlugin('/tmp/local-plugin.mjs')
     await readPathPsmPluginModuleSource('/tmp/local-plugin.mjs')
 
-    expect(mocks.invoke).toHaveBeenNthCalledWith(1, 'list_path_psm_plugin_entries')
+    expect(mocks.invoke).toHaveBeenNthCalledWith(1, 'list_path_psm_plugin_entries', undefined)
     expect(mocks.invoke).toHaveBeenNthCalledWith(2, 'add_path_psm_plugin', {
       entryPath: '/tmp/local-plugin.mjs',
     })
@@ -70,17 +74,26 @@ describe('runtime-host service plugin lifecycle commands', () => {
     })
   })
 
-  it('keeps non-Tauri fallback safe for web/demo runtime', async () => {
+  it('uses HTTP invoke for web runtime plugin config and path plugin calls', async () => {
     mocks.isTauri.mockReturnValue(false)
+    mocks.httpInvoke
+      .mockResolvedValueOnce({ version: 1, plugins: { 'path.local': { enabled: true } }, customPaths: ['/tmp/local-plugin.mjs'] })
+      .mockResolvedValueOnce([{ entryPath: '/tmp/local-plugin.mjs' }])
+      .mockResolvedValueOnce({ version: 1, plugins: {}, customPaths: ['/tmp/local-plugin.mjs'] })
+      .mockResolvedValueOnce({ version: 1, plugins: {}, customPaths: [] })
+      .mockResolvedValueOnce('export default {}')
 
-    await expect(installPsmPlugin('@acme/psm-sidechat')).resolves.toMatchObject({ entries: [] })
-    await expect(uninstallPsmPlugin('@acme/psm-sidechat')).resolves.toMatchObject({ entries: [] })
-    await expect(updatePsmPlugins()).resolves.toMatchObject({ entries: [] })
-    await expect(reloadPsmPlugins()).resolves.toEqual([])
-    await expect(listPathPsmPluginEntries()).resolves.toEqual([])
+    await expect(loadPsmPluginConfig()).resolves.toMatchObject({ customPaths: ['/tmp/local-plugin.mjs'] })
+    await expect(listPathPsmPluginEntries()).resolves.toEqual([{ entryPath: '/tmp/local-plugin.mjs' }])
     await expect(addPathPsmPlugin('/tmp/local-plugin.mjs')).resolves.toMatchObject({ customPaths: ['/tmp/local-plugin.mjs'] })
     await expect(removePathPsmPlugin('/tmp/local-plugin.mjs')).resolves.toMatchObject({ customPaths: [] })
-    await expect(readPathPsmPluginModuleSource('/tmp/local-plugin.mjs')).rejects.toThrow('Path PSM plugins are only available in the Tauri runtime')
+    await expect(readPathPsmPluginModuleSource('/tmp/local-plugin.mjs')).resolves.toBe('export default {}')
+
+    expect(mocks.httpInvoke).toHaveBeenNthCalledWith(1, 'load_psm_plugin_config', undefined)
+    expect(mocks.httpInvoke).toHaveBeenNthCalledWith(2, 'list_path_psm_plugin_entries', undefined)
+    expect(mocks.httpInvoke).toHaveBeenNthCalledWith(3, 'add_path_psm_plugin', { entryPath: '/tmp/local-plugin.mjs' })
+    expect(mocks.httpInvoke).toHaveBeenNthCalledWith(4, 'remove_path_psm_plugin', { entryPath: '/tmp/local-plugin.mjs' })
+    expect(mocks.httpInvoke).toHaveBeenNthCalledWith(5, 'read_path_psm_plugin_module_source', { entryPath: '/tmp/local-plugin.mjs' })
     expect(mocks.invoke).not.toHaveBeenCalled()
   })
 })

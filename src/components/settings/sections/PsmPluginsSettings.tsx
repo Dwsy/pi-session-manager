@@ -28,6 +28,7 @@ import {
   type PsmPluginStatus,
 } from "@/plugins/runtime-host";
 import type { PsmPluginSettingDefinition, PsmPluginSettingValue } from "@pi-session-manager/plugin-sdk";
+import { useModelOptions } from "./pi-config/useModelOptions";
 
 interface PsmPluginsSettingsProps {
   pluginId?: string;
@@ -62,6 +63,12 @@ function settingValue(plugin: PsmPluginStatus, definition: PsmPluginSettingDefin
   return value === undefined ? (definition.default ?? "") : value;
 }
 
+function settingValueByKey(plugin: PsmPluginStatus, key: string): PsmPluginSettingValue {
+  const definition = plugin.manifest?.configuration?.properties?.find((property) => property.key === key);
+  const value = plugin.settings?.[key];
+  return value === undefined ? (definition?.default ?? "") : value;
+}
+
 function coerceNumber(value: string, definition: PsmPluginSettingDefinition) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return definition.default ?? 0;
@@ -92,6 +99,8 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
     [plugins],
   );
   const selectedPlugin = pluginId ? visiblePlugins.find((plugin) => plugin.id === pluginId) : null;
+  const needsModelOptions = selectedPlugin?.manifest?.configuration?.properties?.some((definition) => definition.type === "model-provider" || definition.type === "model-id") ?? false;
+  const modelData = useModelOptions(needsModelOptions);
 
   const reload = async () => {
     setLoading(true);
@@ -202,6 +211,30 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
     });
   };
 
+  const updateModelProviderSetting = async (plugin: PsmPluginStatus, definition: PsmPluginSettingDefinition, provider: string) => {
+    const modelKey = definition.modelKey ?? "model";
+    const currentModel = String(settingValueByKey(plugin, modelKey) ?? "");
+    const providerModels = provider ? (modelData.modelsByProvider.get(provider) ?? []) : [];
+    const nextModel = provider && currentModel && providerModels.includes(currentModel) ? currentModel : "";
+
+    await updatePluginSettings(plugin, {
+      ...(plugin.settings ?? {}),
+      [definition.key]: provider,
+      [modelKey]: nextModel,
+    });
+  };
+
+  const updateModelIdSetting = async (plugin: PsmPluginStatus, definition: PsmPluginSettingDefinition, rawValue: string) => {
+    const providerKey = definition.providerKey ?? "provider";
+    const parsed = rawValue.includes("::") ? rawValue.split("::", 2) : null;
+
+    await updatePluginSettings(plugin, {
+      ...(plugin.settings ?? {}),
+      ...(parsed ? { [providerKey]: parsed[0] } : {}),
+      [definition.key]: parsed ? parsed[1] : rawValue,
+    });
+  };
+
   const removePlugin = async (plugin: PsmPluginStatus) => {
     if (plugin.source === "npm" && !plugin.packageName) return;
     if (plugin.source === "path" && !(plugin.entryPath || plugin.sourceId)) return;
@@ -296,6 +329,7 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
       ? t(`${base}.settings.${definition.key}.description`, definition.description)
       : "";
     const disabled = updatingId === `settings:${plugin.id}`;
+    const autoLabel = t("settings.psmPlugins.modelAuto", "Auto");
 
     return (
       <div
@@ -308,7 +342,68 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
           {description && <div className="mt-1 text-xs leading-5 text-muted-foreground">{description}</div>}
         </label>
         <div className="min-w-0">
-          {definition.type === "select" ? (
+          {definition.type === "model-provider" ? (
+            <select
+              id={fieldId}
+              value={String(value)}
+              disabled={disabled}
+              onChange={(event) => void updateModelProviderSetting(plugin, definition, event.target.value)}
+              className="h-9 w-full rounded-md border border-border bg-background/70 px-2.5 text-sm text-foreground outline-none focus:border-info disabled:opacity-60"
+            >
+              <option value="">{autoLabel}</option>
+              {String(value) && !modelData.providers.includes(String(value)) ? (
+                <option value={String(value)}>{String(value)}</option>
+              ) : null}
+              {modelData.providers.map((provider) => (
+                <option key={`${definition.key}-${provider}`} value={provider}>
+                  {provider}
+                </option>
+              ))}
+            </select>
+          ) : definition.type === "model-id" ? (
+            <select
+              id={fieldId}
+              value={String(value)}
+              disabled={disabled}
+              onChange={(event) => void updateModelIdSetting(plugin, definition, event.target.value)}
+              className="h-9 w-full rounded-md border border-border bg-background/70 px-2.5 text-sm text-foreground outline-none focus:border-info disabled:opacity-60"
+            >
+              <option value="">{autoLabel}</option>
+              {(() => {
+                const providerKey = definition.providerKey ?? "provider";
+                const provider = String(settingValueByKey(plugin, providerKey) ?? "");
+                const current = String(value);
+                const providerModels = provider ? (modelData.modelsByProvider.get(provider) ?? []) : [];
+                const modelOptions = provider
+                  ? providerModels
+                  : modelData.providers.flatMap((item) => (modelData.modelsByProvider.get(item) ?? []).map((model) => `${item}::${model}`));
+                const currentValueInOptions = provider
+                  ? providerModels.includes(current)
+                  : modelOptions.some((option) => option.endsWith(`::${current}`));
+
+                return (
+                  <>
+                    {current && !currentValueInOptions ? <option value={current}>{current}</option> : null}
+                    {provider
+                      ? providerModels.map((model) => (
+                        <option key={`${definition.key}-${provider}-${model}`} value={model}>
+                          {model}
+                        </option>
+                      ))
+                      : modelData.providers.map((item) => (
+                        <optgroup key={`${definition.key}-${item}`} label={item}>
+                          {(modelData.modelsByProvider.get(item) ?? []).map((model) => (
+                            <option key={`${definition.key}-${item}-${model}`} value={`${item}::${model}`}>
+                              {model}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                  </>
+                );
+              })()}
+            </select>
+          ) : definition.type === "select" ? (
             <select
               id={fieldId}
               value={String(value)}
