@@ -214,7 +214,7 @@ export default function SessionIntelligenceToolbarPanel({
               type="button"
               onClick={handleRefresh}
               disabled={refreshing}
-              className="inline-flex h-9 items-center gap-2 rounded-xl border border-primary/30 bg-primary/12 px-3 text-sm text-foreground hover:bg-primary/16 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-primary/30 bg-primary/12 px-3 text-sm text-foreground hover:bg-primary/16 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               <span>{actionLabel}</span>
@@ -254,7 +254,7 @@ export default function SessionIntelligenceToolbarPanel({
             </section>
 
             {settings.showMetadata && (
-              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-xl border border-border/60 bg-background/45 p-3">
                   <div className="text-muted-foreground">{t("session.intelligence.status", "Status")}</div>
                   <div className="mt-1 truncate text-foreground">{payload.status || "unknown"}</div>
@@ -274,7 +274,7 @@ export default function SessionIntelligenceToolbarPanel({
                 {(provider || model) && (
                   <div className="rounded-xl border border-border/60 bg-background/45 p-3">
                     <div className="text-muted-foreground">{t("session.intelligence.model", "Model")}</div>
-                    <div className="mt-1 truncate text-foreground" title={[provider, model].filter(Boolean).join(" / ")}>
+                    <div className="mt-1 break-words text-foreground" title={[provider, model].filter(Boolean).join(" / ")}>
                       {[provider, model].filter(Boolean).join(" / ")}
                     </div>
                   </div>
@@ -352,7 +352,7 @@ export default function SessionIntelligenceToolbarPanel({
                 type="button"
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="mt-4 inline-flex h-9 items-center gap-2 rounded-xl border border-primary/35 bg-primary/12 px-3 text-sm text-foreground hover:bg-primary/16 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-4 inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-primary/35 bg-primary/12 px-3 text-sm text-foreground hover:bg-primary/16 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 {t("session.intelligence.generate", "Generate")}
