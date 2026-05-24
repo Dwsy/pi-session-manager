@@ -77,7 +77,8 @@ The TypeScript runtime SDK exposes first-stage PSM capabilities:
 | `sessions` | `scan`, `list`, `readEntries`, `readFileChunk`, `getLabels`, `open` | `sessions:read` |
 | `records` | `get`, `list`, `search`, `upsert`, `refreshSessionIntelligence` | `records:read`, `records:write` |
 | `search` | `fulltext`, `pluginRecords` | `search:read` |
-| `kanban` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` | `kanban:read`, `kanban:write` |
+| `tags` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` | `tags:read`, `tags:write` |
+| `events` | `subscribe` | `events:read` |
 | `sidechat` | `ask` | `sessions:read`, `model:invoke` |
 | `models` | `listOptions` | `model:invoke` |
 
@@ -93,6 +94,7 @@ Stable plugin SDK surface:
 - `PsmTransport`
 - `createPluginCapabilityClient(...)`
 - `PsmPluginHostContext`, `PsmPluginModule`, and activation/disposal types
+- `PsmPluginEventsClient` and event envelope types
 - `ctx.ui.registerSessionToolbarItem(...)`, `ctx.ui.registerSessionMainView(...)`, and `ctx.ui.registerSessionPanel(...)`
 
 App-internal direct paths:
@@ -156,8 +158,8 @@ Current command-to-permission mapping:
 | `upsert_plugin_record` | `records:write` |
 | `refresh_session_intelligence_record` | `records:write`, `model:invoke` |
 | `full_text_search` | `search:read` |
-| `get_all_tags`, `get_all_session_tags` | `kanban:read` |
-| `create_tag`, `assign_tag`, `remove_tag_from_session` | `kanban:write` |
+| `get_all_tags`, `get_all_session_tags` | `tags:read` |
+| `create_tag`, `assign_tag`, `remove_tag_from_session` | `tags:write` |
 | `list_model_options_fast` | `model:invoke` |
 
 Permission denial shape:

@@ -5,30 +5,38 @@ import {
   CheckCircle2,
   CircleOff,
   Download,
+  ExternalLink,
   FilePlus2,
   Package,
   RefreshCw,
+  Search,
   SlidersHorizontal,
   Trash2,
+  X,
 } from "lucide-react";
 
 import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
+import ModelSelector, { type RPCModel } from "@/components/ModelSelector";
 import {
   addPathPsmPlugin,
   getPsmPluginPaths,
   installPsmPlugin,
   psmPluginHost,
   removePathPsmPlugin,
+  searchPsmPluginMarket,
   setPsmPluginEnabled,
   setPsmPluginSettings,
   uninstallPsmPlugin,
   updatePsmPlugins,
+  type PsmPluginMarketEntry,
   type PsmPluginPaths,
   type PsmPluginStatus,
 } from "@/plugins/runtime-host";
 import type { PsmPluginSettingDefinition, PsmPluginSettingValue } from "@pi-session-manager/plugin-sdk";
+import { SETTINGS_NAVIGATE_EVENT } from "../navigation";
 import { useModelOptions } from "./pi-config/useModelOptions";
+import { usePiSettingsFull } from "./pi-config/usePiSettingsFull";
 
 interface PsmPluginsSettingsProps {
   pluginId?: string;
@@ -77,9 +85,29 @@ function coerceNumber(value: string, definition: PsmPluginSettingDefinition) {
   return Math.min(max, Math.max(min, parsed));
 }
 
+function formatWeeklyDownloads(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "--";
+  return new Intl.NumberFormat(undefined, {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+function formatPublishedDate(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps) {
   const { t } = useTranslation();
   const [plugins, setPlugins] = useState<PsmPluginStatus[]>([]);
+  const [draftSettingsByPluginId, setDraftSettingsByPluginId] = useState<Record<string, Record<string, PsmPluginSettingValue>>>({});
   const [paths, setPaths] = useState<PsmPluginPaths | null>(null);
   const [loading, setLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -87,11 +115,17 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
   const [pathAction, setPathAction] = useState<string | null>(null);
   const [packageNameInput, setPackageNameInput] = useState("");
   const [pathInput, setPathInput] = useState("");
+  const [marketQueryInput, setMarketQueryInput] = useState("psm plugin");
+  const [marketResults, setMarketResults] = useState<PsmPluginMarketEntry[]>([]);
+  const [marketTotal, setMarketTotal] = useState(0);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [marketError, setMarketError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const installPrefix = paths?.npmDir ?? "~/.pi/pi-session-manager/extensions/npm";
   const trimmedPackageName = packageNameInput.trim();
   const trimmedPath = pathInput.trim();
+  const trimmedMarketQuery = marketQueryInput.trim();
   const npmBusy = loading || npmAction !== null;
   const pathBusy = loading || pathAction !== null;
   const visiblePlugins = useMemo(
@@ -101,6 +135,44 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
   const selectedPlugin = pluginId ? visiblePlugins.find((plugin) => plugin.id === pluginId) : null;
   const needsModelOptions = selectedPlugin?.manifest?.configuration?.properties?.some((definition) => definition.type === "model-provider" || definition.type === "model-id") ?? false;
   const modelData = useModelOptions(needsModelOptions);
+  const piSettings = usePiSettingsFull(needsModelOptions);
+  const modelSelectorOptions = useMemo<RPCModel[]>(() => modelData.providers.flatMap((provider) => (
+    (modelData.modelsByProvider.get(provider) ?? []).map((model) => ({
+      provider,
+      id: model,
+      name: model,
+    }))
+  )), [modelData.modelsByProvider, modelData.providers]);
+
+  const withDraftSettings = (plugin: PsmPluginStatus): PsmPluginStatus => {
+    const draftSettings = draftSettingsByPluginId[plugin.id];
+    if (!draftSettings) return plugin;
+    return {
+      ...plugin,
+      settings: {
+        ...(plugin.settings ?? {}),
+        ...draftSettings,
+      },
+    };
+  };
+
+  const syncMarketInstalledFlag = (nextPlugins: PsmPluginStatus[]) => {
+    const installedPackages = new Set(
+      nextPlugins
+        .filter((plugin) => plugin.source === "npm" && typeof plugin.packageName === "string")
+        .map((plugin) => plugin.packageName as string),
+    );
+    setMarketResults((current) => current.map((entry) => ({
+      ...entry,
+      installed: installedPackages.has(entry.packageName),
+    })));
+  };
+
+  const applyPluginsSnapshot = (nextPlugins: PsmPluginStatus[]) => {
+    setPlugins(nextPlugins);
+    setDraftSettingsByPluginId({});
+    syncMarketInstalledFlag(nextPlugins);
+  };
 
   const reload = async () => {
     setLoading(true);
@@ -110,7 +182,7 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
         psmPluginHost.reload(),
         getPsmPluginPaths(),
       ]);
-      setPlugins(nextPlugins);
+      applyPluginsSnapshot(nextPlugins);
       setPaths(nextPaths);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -119,8 +191,28 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
     }
   };
 
+  const searchMarket = async (rawQuery?: string) => {
+    setMarketLoading(true);
+    setMarketError(null);
+    try {
+      const response = await searchPsmPluginMarket({
+        query: rawQuery ?? trimmedMarketQuery,
+        size: 12,
+      });
+      setMarketTotal(response.results.length);
+      setMarketResults(response.results);
+    } catch (err) {
+      setMarketError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMarketLoading(false);
+    }
+  };
+
   useEffect(() => {
-    void reload();
+    void Promise.all([
+      reload(),
+      searchMarket("psm plugin"),
+    ]);
   }, []);
 
   const togglePlugin = async (plugin: PsmPluginStatus, enabled: boolean) => {
@@ -134,7 +226,7 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
         packageName: plugin.packageName ?? null,
         entryPath: plugin.source === "path" ? (plugin.entryPath ?? plugin.sourceId) : null,
       });
-      setPlugins(await psmPluginHost.reload());
+      applyPluginsSnapshot(await psmPluginHost.reload());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -146,9 +238,10 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
     if (!trimmedPackageName) return;
     setNpmAction("install");
     setError(null);
+    setMarketError(null);
     try {
       await installPsmPlugin(trimmedPackageName);
-      setPlugins(await psmPluginHost.reload());
+      applyPluginsSnapshot(await psmPluginHost.reload());
       setPackageNameInput("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -163,7 +256,7 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
     setError(null);
     try {
       await addPathPsmPlugin(trimmedPath);
-      setPlugins(await psmPluginHost.reload());
+      applyPluginsSnapshot(await psmPluginHost.reload());
       setPathInput("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -177,7 +270,7 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
     setError(null);
     try {
       await updatePsmPlugins();
-      setPlugins(await psmPluginHost.reload());
+      applyPluginsSnapshot(await psmPluginHost.reload());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -188,6 +281,10 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
   const updatePluginSettings = async (plugin: PsmPluginStatus, nextSettings: Record<string, PsmPluginSettingValue>) => {
     setUpdatingId(`settings:${plugin.id}`);
     setError(null);
+    setDraftSettingsByPluginId((current) => ({
+      ...current,
+      [plugin.id]: nextSettings,
+    }));
     try {
       await setPsmPluginSettings({
         pluginId: plugin.id,
@@ -196,8 +293,13 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
         packageName: plugin.packageName ?? null,
         entryPath: plugin.source === "path" ? (plugin.entryPath ?? plugin.sourceId) : null,
       });
-      setPlugins(await psmPluginHost.reload());
+      applyPluginsSnapshot(await psmPluginHost.reload());
     } catch (err) {
+      setDraftSettingsByPluginId((current) => {
+        const next = { ...current };
+        delete next[plugin.id];
+        return next;
+      });
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setUpdatingId(null);
@@ -205,34 +307,46 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
   };
 
   const updatePluginSetting = async (plugin: PsmPluginStatus, key: string, value: PsmPluginSettingValue) => {
+    const resolvedPlugin = withDraftSettings(plugin);
     await updatePluginSettings(plugin, {
-      ...(plugin.settings ?? {}),
+      ...(resolvedPlugin.settings ?? {}),
       [key]: value,
     });
   };
 
-  const updateModelProviderSetting = async (plugin: PsmPluginStatus, definition: PsmPluginSettingDefinition, provider: string) => {
-    const modelKey = definition.modelKey ?? "model";
-    const currentModel = String(settingValueByKey(plugin, modelKey) ?? "");
-    const providerModels = provider ? (modelData.modelsByProvider.get(provider) ?? []) : [];
-    const nextModel = provider && currentModel && providerModels.includes(currentModel) ? currentModel : "";
+  const updateModelIdSetting = async (plugin: PsmPluginStatus, definition: PsmPluginSettingDefinition, model: RPCModel | null) => {
+    const resolvedPlugin = withDraftSettings(plugin);
+    const providerKey = definition.providerKey ?? "provider";
 
     await updatePluginSettings(plugin, {
-      ...(plugin.settings ?? {}),
-      [definition.key]: provider,
-      [modelKey]: nextModel,
+      ...(resolvedPlugin.settings ?? {}),
+      [providerKey]: model?.provider ?? "",
+      [definition.key]: model?.id ?? "",
     });
   };
 
-  const updateModelIdSetting = async (plugin: PsmPluginStatus, definition: PsmPluginSettingDefinition, rawValue: string) => {
-    const providerKey = definition.providerKey ?? "provider";
-    const parsed = rawValue.includes("::") ? rawValue.split("::", 2) : null;
+  const findLinkedModelDefinition = (plugin: PsmPluginStatus, providerDefinition: PsmPluginSettingDefinition) => {
+    const modelKey = providerDefinition.modelKey ?? "model";
+    return plugin.manifest?.configuration?.properties?.find((property) => (
+      property.type === "model-id"
+      && property.key === modelKey
+      && (property.providerKey ?? "provider") === providerDefinition.key
+    ));
+  };
 
-    await updatePluginSettings(plugin, {
-      ...(plugin.settings ?? {}),
-      ...(parsed ? { [providerKey]: parsed[0] } : {}),
-      [definition.key]: parsed ? parsed[1] : rawValue,
-    });
+  const findLinkedProviderDefinition = (plugin: PsmPluginStatus, modelDefinition: PsmPluginSettingDefinition) => {
+    const providerKey = modelDefinition.providerKey ?? "provider";
+    return plugin.manifest?.configuration?.properties?.find((property) => (
+      property.type === "model-provider"
+      && property.key === providerKey
+      && (property.modelKey ?? "model") === modelDefinition.key
+    ));
+  };
+
+  const navigateToModelConfigCenter = () => {
+    window.dispatchEvent(new CustomEvent(SETTINGS_NAVIGATE_EVENT, {
+      detail: { section: "models" },
+    }));
   };
 
   const removePlugin = async (plugin: PsmPluginStatus) => {
@@ -242,18 +356,36 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
     if (plugin.source === "path") setPathAction(action);
     else setNpmAction(action);
     setError(null);
+    setMarketError(null);
     try {
       if (plugin.source === "npm" && plugin.packageName) {
         await uninstallPsmPlugin(plugin.packageName);
       } else if (plugin.source === "path") {
         await removePathPsmPlugin(plugin.entryPath ?? plugin.sourceId);
       }
-      setPlugins(await psmPluginHost.reload());
+      applyPluginsSnapshot(await psmPluginHost.reload());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setNpmAction(null);
       setPathAction(null);
+    }
+  };
+
+  const installMarketPlugin = async (entry: PsmPluginMarketEntry) => {
+    if (entry.installed) return;
+    setNpmAction(`market-install:${entry.packageName}`);
+    setError(null);
+    setMarketError(null);
+    try {
+      await installPsmPlugin(entry.packageName);
+      applyPluginsSnapshot(await psmPluginHost.reload());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setMarketError(message);
+    } finally {
+      setNpmAction(null);
     }
   };
 
@@ -319,10 +451,17 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
   );
 
   const renderSettingControl = (plugin: PsmPluginStatus, definition: PsmPluginSettingDefinition) => {
-    const value = settingValue(plugin, definition);
+    const resolvedPlugin = withDraftSettings(plugin);
+    const linkedProviderDefinition = definition.type === "model-id"
+      ? findLinkedProviderDefinition(plugin, definition)
+      : null;
+    if (definition.type === "model-provider" && findLinkedModelDefinition(plugin, definition)) {
+      return null;
+    }
+    const value = settingValue(resolvedPlugin, definition);
     const fieldId = `${plugin.id}-${definition.key}`;
     const searchId = `${pluginSearchPrefix(plugin)}-${definition.key}`;
-    const currentSettings = plugin.settings ?? {};
+    const currentSettings = resolvedPlugin.settings ?? {};
     const base = pluginI18nBase(plugin);
     const title = t(`${base}.settings.${definition.key}.title`, definition.title);
     const description = definition.description
@@ -330,6 +469,27 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
       : "";
     const disabled = updatingId === `settings:${plugin.id}`;
     const autoLabel = t("settings.psmPlugins.modelAuto", "Auto");
+    const currentProvider = linkedProviderDefinition
+      ? String(settingValueByKey(resolvedPlugin, linkedProviderDefinition.key) ?? "")
+      : "";
+    const currentModel = String(value);
+    const autoProvider = piSettings.settings?.defaultProvider?.trim() || "";
+    const autoModel = piSettings.settings?.defaultModel?.trim() || "";
+    const autoModelOption =
+      autoProvider && autoModel
+        ? modelSelectorOptions.find(
+            (option) =>
+              option.provider === autoProvider && option.id === autoModel,
+          ) ?? {
+            provider: autoProvider,
+            id: autoModel,
+            name: autoModel,
+          }
+        : null;
+    const currentModelOption = currentModel
+      ? modelSelectorOptions.find((option) => option.provider === currentProvider && option.id === currentModel)
+        ?? (currentProvider ? { provider: currentProvider, id: currentModel, name: currentModel } : null)
+      : autoModelOption;
 
     return (
       <div
@@ -342,67 +502,41 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
           {description && <div className="mt-1 text-xs leading-5 text-muted-foreground">{description}</div>}
         </label>
         <div className="min-w-0">
-          {definition.type === "model-provider" ? (
-            <select
-              id={fieldId}
-              value={String(value)}
-              disabled={disabled}
-              onChange={(event) => void updateModelProviderSetting(plugin, definition, event.target.value)}
-              className="h-9 w-full rounded-md border border-border bg-background/70 px-2.5 text-sm text-foreground outline-none focus:border-info disabled:opacity-60"
-            >
-              <option value="">{autoLabel}</option>
-              {String(value) && !modelData.providers.includes(String(value)) ? (
-                <option value={String(value)}>{String(value)}</option>
-              ) : null}
-              {modelData.providers.map((provider) => (
-                <option key={`${definition.key}-${provider}`} value={provider}>
-                  {provider}
-                </option>
-              ))}
-            </select>
-          ) : definition.type === "model-id" ? (
-            <select
-              id={fieldId}
-              value={String(value)}
-              disabled={disabled}
-              onChange={(event) => void updateModelIdSetting(plugin, definition, event.target.value)}
-              className="h-9 w-full rounded-md border border-border bg-background/70 px-2.5 text-sm text-foreground outline-none focus:border-info disabled:opacity-60"
-            >
-              <option value="">{autoLabel}</option>
-              {(() => {
-                const providerKey = definition.providerKey ?? "provider";
-                const provider = String(settingValueByKey(plugin, providerKey) ?? "");
-                const current = String(value);
-                const providerModels = provider ? (modelData.modelsByProvider.get(provider) ?? []) : [];
-                const modelOptions = provider
-                  ? providerModels
-                  : modelData.providers.flatMap((item) => (modelData.modelsByProvider.get(item) ?? []).map((model) => `${item}::${model}`));
-                const currentValueInOptions = provider
-                  ? providerModels.includes(current)
-                  : modelOptions.some((option) => option.endsWith(`::${current}`));
-
-                return (
-                  <>
-                    {current && !currentValueInOptions ? <option value={current}>{current}</option> : null}
-                    {provider
-                      ? providerModels.map((model) => (
-                        <option key={`${definition.key}-${provider}-${model}`} value={model}>
-                          {model}
-                        </option>
-                      ))
-                      : modelData.providers.map((item) => (
-                        <optgroup key={`${definition.key}-${item}`} label={item}>
-                          {(modelData.modelsByProvider.get(item) ?? []).map((model) => (
-                            <option key={`${definition.key}-${item}-${model}`} value={`${item}::${model}`}>
-                              {model}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                  </>
-                );
-              })()}
-            </select>
+          {definition.type === "model-id" && linkedProviderDefinition ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <ModelSelector
+                  buttonId={fieldId}
+                  models={modelSelectorOptions}
+                  currentModel={currentModelOption}
+                  onSelect={(nextModel) => void updateModelIdSetting(plugin, definition, nextModel)}
+                  loading={modelData.loading}
+                  disabled={disabled || modelData.loading}
+                />
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => void updateModelIdSetting(plugin, definition, null)}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 text-xs text-muted-foreground hover:bg-surface-hover hover:text-foreground disabled:opacity-60"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  {autoLabel}
+                </button>
+                <button
+                  type="button"
+                  onClick={navigateToModelConfigCenter}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 text-xs text-foreground hover:bg-surface-hover"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {t("settings.modelConfigCenter.title", "Model Config Center")}
+                </button>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {currentModelOption
+                  ? `${currentModelOption.provider}/${currentModelOption.id}`
+                  : t("settings.psmPlugins.modelConfigHint", "Models are managed centrally in the Model Config Center (~/.pi/agent/models.json).")}
+              </div>
+            </div>
           ) : definition.type === "select" ? (
             <select
               id={fieldId}
@@ -565,6 +699,125 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
             </div>
             <div className="mt-2 truncate text-xs text-muted-foreground">
               <span className="font-mono text-foreground">npm install --prefix {installPrefix} &lt;package&gt;</span>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-border/60 bg-background/40 p-3">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="text"
+                value={marketQueryInput}
+                onChange={(event) => setMarketQueryInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void searchMarket();
+                }}
+                placeholder={t("settings.psmPlugins.marketQueryPlaceholder", "search npm plugins")}
+                disabled={marketLoading}
+                className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-info disabled:opacity-60"
+              />
+              <button
+                type="button"
+                onClick={() => void searchMarket()}
+                disabled={marketLoading}
+                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+              >
+                <Search className="h-3.5 w-3.5" />
+                {t("settings.psmPlugins.marketSearch", "Search")}
+              </button>
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <span>
+                {t("settings.psmPlugins.marketResultCount", "Matched {{count}} PSM plugins", {
+                  count: marketTotal,
+                })}
+              </span>
+              <span>
+                {t("settings.psmPlugins.marketQuery", "Query")} <span className="font-mono text-foreground">{trimmedMarketQuery || "psm plugin"}</span>
+              </span>
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {t("settings.psmPlugins.marketFilterHint", "Only packages declaring psm.extensions are shown.")}
+            </div>
+
+            {marketError ? (
+              <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {marketError}
+              </div>
+            ) : null}
+
+            <div className="mt-3 space-y-2">
+              {marketResults.length === 0 && !marketLoading ? (
+                <div className="rounded-md border border-dashed border-border px-3 py-5 text-center text-xs text-muted-foreground">
+                  {t("settings.psmPlugins.marketEmpty", "No marketplace results.")}
+                </div>
+              ) : (
+                marketResults.map((entry) => {
+                  const publishedAt = formatPublishedDate(entry.publishedAt);
+                  const busy = npmBusy || npmAction === `market-install:${entry.packageName}`;
+                  return (
+                    <div key={entry.packageName} className="flex gap-3 rounded-md border border-border/60 bg-surface/35 p-2.5">
+                      <img
+                        src={entry.imageUrl ?? `https://api.dicebear.com/9.x/shapes/svg?seed=${encodeURIComponent(entry.packageName)}`}
+                        alt={entry.packageName}
+                        className="h-10 w-10 shrink-0 rounded-md border border-border/60 bg-background object-cover"
+                        loading="lazy"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-medium text-foreground">{entry.packageName}</span>
+                          {entry.packageVersion ? (
+                            <span className="text-[11px] text-muted-foreground">v{entry.packageVersion}</span>
+                          ) : null}
+                          {entry.installed ? (
+                            <span className="rounded border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-300">
+                              {t("settings.psmPlugins.marketInstalled", "Installed")}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                          {entry.description || t("settings.psmPlugins.marketNoDescription", "No description")}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          <span>
+                            {t("settings.psmPlugins.marketDownloads", "Weekly")} {formatWeeklyDownloads(entry.weeklyDownloads)}
+                          </span>
+                          {publishedAt ? (
+                            <span>{t("settings.psmPlugins.marketPublished", "Published")} {publishedAt}</span>
+                          ) : null}
+                          {entry.psmExtensionExports.length > 0 ? (
+                            <span>{t("settings.psmPlugins.marketExports", "{{count}} exports", { count: entry.psmExtensionExports.length })}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-start gap-1">
+                        {entry.npmUrl ? (
+                          <a
+                            href={entry.npmUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/50 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                            title={t("settings.psmPlugins.marketOpenNpm", "Open npm page")}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => void installMarketPlugin(entry)}
+                          disabled={busy || entry.installed}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background/50 px-2.5 text-[11px] font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          {entry.installed
+                            ? t("settings.psmPlugins.marketInstalled", "Installed")
+                            : t("settings.psmPlugins.install", "Install")}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 

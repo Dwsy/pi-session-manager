@@ -19,8 +19,8 @@ Implement the first proof-of-concept for issue #36: lightweight PSM plugin API p
     - sessions: scan/list/readEntries/readFileChunk/getLabels/open
     - records: get/list/search/upsert/refreshSessionIntelligence
     - search: fulltext/pluginRecords
-    - kanban: listTags/createTag/assignTag/removeTag/listSessionTags
-  - Added `kanban:read` and `kanban:write` permission declarations.
+    - tags: listTags/createTag/assignTag/removeTag/listSessionTags
+  - Added `tags:read` and `tags:write` permission declarations.
 
 - `27a75f0` `pi-agent: AI summary POC`
   - Added `refresh_session_intelligence_record` command.

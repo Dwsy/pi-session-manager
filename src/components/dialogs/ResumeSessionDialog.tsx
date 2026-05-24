@@ -127,7 +127,7 @@ export default function ResumeSessionDialog({
               type="button"
               onClick={() => handleSubmit(option.slug)}
               disabled={submitting}
-              className={`flex w-full items-start justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-all ${
+              className={`flex w-full items-start justify-between gap-3 rounded-lg border px-4 py-3 text-left motion-context ${
                 target === option.slug
                   ? "border-primary/40 bg-primary/10"
                   : "border-border/60 bg-secondary/20 hover:bg-secondary/50"

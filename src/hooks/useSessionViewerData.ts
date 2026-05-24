@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import { invoke, listen } from "@/transport";
+import { psmRuntimeEventBus } from "@/plugins/runtime-host/eventBus";
 import type { SessionEntry, SessionsDiff } from "@/types";
+import type {
+  PiLiveChatEventPayload,
+  PiLiveSessionDisconnectedPayload,
+  PiLiveSessionRegisteredPayload,
+} from "@/types/pi-live";
 import { trimMarkdownCacheOnSessionSwitch } from "@/utils/markdown";
 import { getCachedSettings } from "@/utils/settingsApi";
 import { parseSessionEntriesWithLineCount } from "@/utils/session";
@@ -550,14 +556,16 @@ export function useSessionViewerData({
     if (!shouldListenRuntimeSessionEvents()) return;
 
     let unlistenSessionsChanged: (() => void) | null = null;
-    let unlistenLiveEntry: (() => void) | null = null;
-    let unlistenLiveRegister: (() => void) | null = null;
+    let unlistenLiveEvents: (() => void) | null = null;
 
     const setup = async () => {
       const sessionId = extractSessionId(sessionPath);
 
       // Track live session registration — when live, skip file-watcher disk reads
-      const listenReg = await listen<any>("pi-live:session_registered", (event) => {
+      const listenReg = psmRuntimeEventBus.subscribe<
+        "pi-live:session_registered",
+        PiLiveSessionRegisteredPayload
+      >("pi-live:session_registered", (event) => {
         const payload = event.payload;
         if (
           payload.sessionId.includes(sessionPath) ||
@@ -566,17 +574,17 @@ export function useSessionViewerData({
           isLiveRef.current = true;
           // When bridge connects/reconnects, it sends the full entries list. Sync it!
           if (Array.isArray(payload.entries) && payload.entries.length > 0) {
-            setEntries(payload.entries);
+            setEntries(payload.entries as SessionEntry[]);
           }
         }
       });
-      const listenDisc = await listen<{ sessionId: string }>(
+      const listenDisc = psmRuntimeEventBus.subscribe<
         "pi-live:session_disconnected",
-        ({ payload }) => {
-          if (payload.sessionId === sessionId) isLiveRef.current = false;
-        },
-      );
-      unlistenLiveRegister = () => {
+        PiLiveSessionDisconnectedPayload
+      >("pi-live:session_disconnected", ({ payload }) => {
+        if (payload.sessionId === sessionId) isLiveRef.current = false;
+      });
+      unlistenLiveEvents = () => {
         listenReg();
         listenDisc();
       };
@@ -923,14 +931,14 @@ export function useSessionViewerData({
         "turn_start",
         "turn_end",
       ] as const;
-      const liveEventUnsubs = await Promise.all(
-        liveEventNames.map((eventName) =>
-          listen<any>(eventName, ({ payload }) => {
-            handleLiveEvent(eventName, payload);
-          }),
-        ),
+      const liveEventUnsubs = liveEventNames.map((eventName) =>
+        psmRuntimeEventBus.subscribe<string, PiLiveChatEventPayload>(eventName, ({ payload }) => {
+          handleLiveEvent(eventName, payload);
+        }),
       );
-      unlistenLiveEntry = () => {
+      const prevLiveEvents = unlistenLiveEvents;
+      unlistenLiveEvents = () => {
+        prevLiveEvents?.();
         liveEventUnsubs.forEach((dispose) => dispose());
       };
     };
@@ -940,8 +948,7 @@ export function useSessionViewerData({
     return () => {
       isLiveRef.current = false;
       unlistenSessionsChanged?.();
-      unlistenLiveEntry?.();
-      unlistenLiveRegister?.();
+      unlistenLiveEvents?.();
     };
   }, [loadMoreHistory, loading, sessionPath, isAtBottomRef]);
 

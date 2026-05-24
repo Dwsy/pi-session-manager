@@ -522,13 +522,24 @@ pub(super) async fn get_session_preview_entries_impl(session_path: String) -> Re
 
             let timestamp: chrono::DateTime<chrono::Utc> = chrono::DateTime::parse_from_rfc3339(&timestamp_str).map(|dt| dt.with_timezone(&chrono::Utc)).unwrap_or_else(|_| chrono::Utc::now());
 
-            let content = if content_text.trim().is_empty() { Vec::new() } else { vec![crate::types::Content { content_type: "text".to_string(), text: Some(content_text) }] };
+            let content = if content_text.trim().is_empty() { Vec::new() } else { vec![crate::types::Content { content_type: "text".to_string(), id: None, name: None, arguments: None, text: Some(content_text) }] };
 
             if content.is_empty() {
                 continue;
             }
 
-            all_entries.push(SessionEntry { entry_type: "message".to_string(), id: entry_id, parent_id: None, timestamp, message: Some(crate::types::Message { role, content, model: None, provider: None, usage: None }), target_id: None, label: None, name: None, provider: None, model_id: None });
+            all_entries.push(SessionEntry {
+                entry_type: "message".to_string(),
+                id: entry_id,
+                parent_id: None,
+                timestamp,
+                message: Some(crate::types::Message { role, content, tool_call_id: None, tool_name: None, is_error: None, model: None, provider: None, usage: None }),
+                target_id: None,
+                label: None,
+                name: None,
+                provider: None,
+                model_id: None,
+            });
         }
         Ok(all_entries)
     })

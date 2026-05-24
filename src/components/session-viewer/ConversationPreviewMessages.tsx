@@ -114,10 +114,10 @@ interface ProcessSummaryItem {
 
 function getToolIconKind(label: string): ProcessSummaryItem["icon"] {
   const normalized = label.toLowerCase();
-  if (normalized === "bash") return "bash";
-  if (normalized === "read") return "read";
-  if (normalized === "write") return "write";
-  if (normalized === "edit") return "edit";
+  if (normalized === "bash" || normalized === "shell" || normalized === "exec") return "bash";
+  if (normalized === "read" || normalized === "read_file") return "read";
+  if (normalized === "write" || normalized === "write_file") return "write";
+  if (normalized === "edit" || normalized === "edit_file" || normalized === "multiedit" || normalized === "apply_patch") return "edit";
   return "tool";
 }
 

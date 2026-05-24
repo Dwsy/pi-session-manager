@@ -52,6 +52,65 @@
     transition-timing-function: var(--motion-ease-standard);
   }
 
+  .motion-context {
+    transition-property: opacity, transform, color, background-color, border-color;
+    transition-duration: var(--motion-duration-base);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .motion-drill {
+    transition-property: opacity, transform;
+    transition-duration: var(--motion-duration-overlay);
+    transition-timing-function: var(--motion-ease-enter);
+    will-change: transform, opacity;
+  }
+
+  .motion-continuity {
+    transition-property: transform, opacity, border-radius, box-shadow;
+    transition-duration: var(--motion-duration-overlay);
+    transition-timing-function: var(--motion-ease-enter);
+    will-change: transform, opacity;
+  }
+
+  .motion-layout {
+    transition-property: width, max-width, flex-basis, transform, opacity;
+    transition-duration: var(--motion-duration-data);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .motion-overlay-backdrop {
+    transition-property: opacity, background-color, backdrop-filter;
+    transition-duration: var(--motion-duration-overlay);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .motion-overlay-surface {
+    transition-property: transform, opacity;
+    transition-duration: var(--motion-duration-overlay);
+    transition-timing-function: var(--motion-ease-enter);
+    will-change: transform, opacity;
+  }
+
+  .motion-context-enter {
+    animation: ui-fade-in var(--motion-duration-base) var(--motion-ease-standard)
+      both;
+  }
+
+  .motion-drill-enter {
+    animation: ui-slide-in-from-right var(--motion-duration-overlay)
+      var(--motion-ease-enter) both;
+  }
+
+  .motion-overlay-enter {
+    animation: ui-fade-in var(--motion-duration-overlay)
+      var(--motion-ease-standard) both;
+  }
+
+  .motion-overlay-surface-enter {
+    animation: zoomIn var(--motion-duration-overlay) var(--motion-ease-enter)
+      both;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .motion-color,
     .motion-opacity,
@@ -60,6 +119,12 @@
     .motion-width,
     .motion-transform,
     .motion-transform-opacity,
+    .motion-context,
+    .motion-drill,
+    .motion-continuity,
+    .motion-layout,
+    .motion-overlay-backdrop,
+    .motion-overlay-surface,
     .glass-card-hover {
       transition-duration: 1ms !important;
       transition-delay: 0ms !important;
@@ -73,7 +138,11 @@
     .ui-enter-fade,
     .ui-enter-zoom,
     .ui-exit-fade,
-    .ui-exit-zoom {
+    .ui-exit-zoom,
+    .motion-context-enter,
+    .motion-drill-enter,
+    .motion-overlay-enter,
+    .motion-overlay-surface-enter {
       animation: none !important;
     }
   }

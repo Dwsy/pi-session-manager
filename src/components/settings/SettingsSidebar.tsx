@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ArrowRight,
@@ -17,6 +17,11 @@ import type {
   SettingsSections,
 } from "./SettingsPanelTypes";
 import type { SettingsSearchResult } from "./settingsSearchIndex";
+
+interface SettingsNavItem {
+  item: SettingsSections[number];
+  children: SettingsSections[number][];
+}
 
 interface SettingsSidebarProps {
   settingsAreas: SettingsAreas;
@@ -55,6 +60,9 @@ export default function SettingsSidebar({
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const hasSearchResults = !!trimmedQuery && searchResults.length > 0;
   const hasNoResults = !!trimmedQuery && searchResults.length === 0;
+  const [collapsedSections, setCollapsedSections] = useState<
+    Set<SettingsSection>
+  >(new Set());
 
   const filteredGroups = useMemo(() => {
     if (!trimmedQuery || hasSearchResults) return menuGroups;
@@ -72,24 +80,75 @@ export default function SettingsSidebar({
       .filter((group) => group.sections.length > 0);
   }, [menuGroups, menuItems, trimmedQuery, t, hasSearchResults]);
 
+  const navGroups = useMemo(
+    () =>
+      filteredGroups.map((group) => {
+        const items = group.sections
+          .map((id) => menuItems.find((item) => item.id === id))
+          .filter(Boolean) as SettingsSections;
+        const byId = new Map(items.map((item) => [item.id, item]));
+        const consumed = new Set<SettingsSection>();
+        const navItems: SettingsNavItem[] = [];
+
+        for (const item of items) {
+          if (consumed.has(item.id) || item.id.startsWith("psm-plugin:")) {
+            continue;
+          }
+          const children =
+            item.id === "psm-plugins"
+              ? items.filter((candidate) =>
+                  candidate.id.startsWith("psm-plugin:"),
+                )
+              : [];
+          children.forEach((child) => consumed.add(child.id));
+          navItems.push({ item: byId.get(item.id) || item, children });
+        }
+
+        return { ...group, navItems };
+      }),
+    [filteredGroups, menuItems],
+  );
+
+  useEffect(() => {
+    if (!activeSection.startsWith("psm-plugin:")) return;
+    setCollapsedSections((prev) => {
+      if (!prev.has("psm-plugins")) return prev;
+      const next = new Set(prev);
+      next.delete("psm-plugins");
+      return next;
+    });
+  }, [activeSection]);
+
+  const toggleCollapsed = (section: SettingsSection) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) {
+        next.delete(section);
+      } else {
+        next.add(section);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="w-64 bg-background/95 border-r border-border flex flex-col overflow-y-auto">
-      <div className="p-5 border-b border-border/80 flex-shrink-0">
-        <h2 className="text-lg font-semibold text-foreground tracking-tight">
+      <div className="px-5 py-4 border-b border-border/80 flex-shrink-0">
+        <h2 className="text-base font-semibold text-foreground tracking-tight">
           {t("settings.title", "Settings")}
         </h2>
-        <p className="text-xs text-muted-foreground mt-1.5">
+        <p className="text-[11px] text-muted-foreground mt-1">
           {t("settings.subtitle", "Customize your experience")}
         </p>
       </div>
 
-      <div className="px-3 pt-3 pb-1 flex-shrink-0">
+      <div className="px-3 pt-2.5 pb-1 flex-shrink-0">
         <div className="mb-2 grid grid-cols-2 gap-1 rounded-lg bg-surface p-1">
           {settingsAreas.map((area) => (
             <button
               key={area.id}
               onClick={() => onAreaChange(area.id)}
-              className={`min-h-[36px] rounded-md px-3 text-xs font-medium motion-color motion-press focus-ring ${
+              className={`min-h-[32px] rounded-md px-2.5 text-xs font-medium motion-color motion-press focus-ring ${
                 activeArea === area.id
                   ? "bg-info text-white shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -106,7 +165,7 @@ export default function SettingsSidebar({
             value={searchQuery}
             onChange={onSearchChange}
             placeholder={t("settings.searchPlaceholder", "Search settings...")}
-            className="w-full pl-8 pr-3 py-2 text-sm bg-surface/60 border border-border/60 rounded-lg text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-info/50 focus:ring-1 focus:ring-info/20 transition-colors"
+            className="w-full pl-8 pr-3 py-1.5 text-sm bg-surface/60 border border-border/60 rounded-lg text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-info/50 focus:ring-1 focus:ring-info/20 transition-colors"
           />
           {searchQuery && (
             <button
@@ -119,7 +178,7 @@ export default function SettingsSidebar({
         </div>
       </div>
 
-      <nav className="flex-1 p-2 space-y-4 overflow-y-auto">
+      <nav className="flex-1 p-2 space-y-2.5 overflow-y-auto">
         {/* Search results from index */}
         {trimmedQuery && searchResults.length > 0 && (
           <div className="space-y-1">
@@ -159,54 +218,111 @@ export default function SettingsSidebar({
 
         {/* Regular section navigation (when no search query) */}
         {!trimmedQuery &&
-          filteredGroups.map((group) => (
-            <section key={group.id} className="space-y-1.5">
-              <div className="px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          navGroups.map((group) => (
+            <section key={group.id} className="space-y-1">
+              <div className="px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                 {t(group.labelKey, group.fallbackLabel)}
               </div>
               <div className="space-y-0.5">
-                {group.sections
-                  .map((id) => menuItems.find((item) => item.id === id))
-                  .filter(Boolean)
-                  .map((item) => {
-                    const isPluginChild = item!.id.startsWith("psm-plugin:");
+                {group.navItems.map(({ item, children }) => {
+                    const isExpanded = !collapsedSections.has(item.id);
+                    const hasChildren = children.length > 0;
+                    const isActive =
+                      activeSection === item.id ||
+                      children.some((child) => child.id === activeSection);
                     return (
-                    <button
-                      key={item!.id}
-                      onClick={() => onSectionChange(item!.id)}
-                      className={`w-full flex items-center gap-3 rounded-lg motion-surface motion-color motion-press focus-ring ${
-                        isPluginChild ? "ml-6 w-[calc(100%-1.5rem)] px-2.5 py-2 text-xs" : "px-3 py-2.5 text-sm"
-                      } ${
-                        activeSection === item!.id
-                          ? "bg-info/15 text-foreground ring-1 ring-info/30"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface/80"
-                      }`}
-                    >
-                      <span className={activeSection === item!.id ? "text-info" : ""}>
-                        {item!.icon}
-                      </span>
-                      <span className="flex-1 text-left">
-                        {t(item!.labelKey, item!.fallbackLabel)}
-                      </span>
-                      {!isPluginChild && (
-                        <ChevronRight
-                          className={`h-4 w-4 motion-transform text-muted-foreground/50 ${
-                            activeSection === item!.id ? "rotate-90 text-info/70" : ""
+                      <div key={item.id} className="space-y-0.5">
+                        <button
+                          onClick={() => onSectionChange(item.id)}
+                          className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm motion-surface motion-color motion-press focus-ring ${
+                            activeSection === item.id
+                              ? "bg-info/15 text-foreground ring-1 ring-info/30"
+                              : isActive
+                                ? "text-foreground bg-surface/55"
+                                : "text-muted-foreground hover:text-foreground hover:bg-surface/80"
                           }`}
-                        />
-                      )}
-                    </button>
-                  )})}
+                        >
+                          <span
+                            className={
+                              activeSection === item.id || isActive
+                                ? "text-info"
+                                : ""
+                            }
+                          >
+                            {item.icon}
+                          </span>
+                          <span className="flex-1 text-left">
+                            {t(item.labelKey, item.fallbackLabel)}
+                          </span>
+                          {hasChildren && (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleCollapsed(item.id);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  toggleCollapsed(item.id);
+                                }
+                              }}
+                              className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-secondary hover:text-foreground"
+                              aria-label={
+                                isExpanded
+                                  ? t("common.collapse", "Collapse")
+                                  : t("common.expand", "Expand")
+                              }
+                            >
+                              <ChevronRight
+                                className={`h-3.5 w-3.5 motion-transform ${
+                                  isExpanded ? "rotate-90" : ""
+                                }`}
+                              />
+                            </span>
+                          )}
+                        </button>
+                        {hasChildren && isExpanded && (
+                          <div className="space-y-0.5 pl-6">
+                            {children.map((child) => (
+                              <button
+                                key={child.id}
+                                onClick={() => onSectionChange(child.id)}
+                                className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs motion-surface motion-color motion-press focus-ring ${
+                                  activeSection === child.id
+                                    ? "bg-info/15 text-foreground ring-1 ring-info/30"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-surface/80"
+                                }`}
+                              >
+                                <span
+                                  className={
+                                    activeSection === child.id ? "text-info" : ""
+                                  }
+                                >
+                                  {child.icon}
+                                </span>
+                                <span className="flex-1 text-left">
+                                  {t(child.labelKey, child.fallbackLabel)}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             </section>
           ))}
       </nav>
 
-      <div className="p-3 border-t border-border/80 flex-shrink-0 space-y-2">
+      <div className="p-2.5 border-t border-border/80 flex-shrink-0 space-y-1.5">
         {canOpenConfigFolder && (
           <button
             onClick={onOpenConfigFolder}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
           >
             <FolderOpen className="h-4 w-4" />
             {t("settings.openConfigFolder", "Open Config Folder")}
@@ -214,7 +330,7 @@ export default function SettingsSidebar({
         )}
         <button
           onClick={onReset}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
         >
           <RefreshCw className="h-4 w-4" />
           {t("settings.reset", "Reset Settings")}

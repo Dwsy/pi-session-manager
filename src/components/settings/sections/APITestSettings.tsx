@@ -8,15 +8,16 @@ import {
   RefreshCw,
   Server,
   XCircle,
-  AlertTriangle,
 } from 'lucide-react'
+
 import SettingsCard from '@/components/settings/SettingsCard'
 import { invoke } from '@/transport'
 
-type TestStatus = 'success' | 'error' | 'warning' | 'pending'
+type TestStatus = 'success' | 'error' | 'pending'
 
 interface TestResult {
-  endpoint: string
+  probe: string
+  command: string
   status: TestStatus
   latency: number
   message: string
@@ -28,40 +29,15 @@ interface ValidationResult {
   message: string
 }
 
-interface EndpointStatus {
+interface InvokeProbe {
   name: string
-  endpoint: string
-  method: 'GET' | 'POST'
-  body?: Record<string, unknown>
+  command: string
+  payload?: Record<string, unknown>
   validate: (payload: unknown) => ValidationResult
-}
-
-interface ServerSettings {
-  http_port: number
-  bind_addr: string
-}
-
-const DEFAULT_API_TEST_BASE_URL = 'http://127.0.0.1:52131'
-
-function toApiBaseUrl(settings: ServerSettings): string {
-  const host = settings.bind_addr === '0.0.0.0' ? '127.0.0.1' : settings.bind_addr
-  return `http://${host}:${settings.http_port}`
-}
-
-function getHttpOriginBaseUrl(): string | null {
-  if (typeof window === 'undefined') return null
-  const protocol = window.location.protocol
-  if (protocol !== 'http:' && protocol !== 'https:') return null
-  return `${protocol}//${window.location.host}`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
-}
-
-function getObjectField(obj: Record<string, unknown>, key: string): Record<string, unknown> | null {
-  const value = obj[key]
-  return isRecord(value) ? value : null
 }
 
 function getArrayField(obj: Record<string, unknown>, key: string): unknown[] | null {
@@ -79,186 +55,126 @@ function getStringField(obj: Record<string, unknown>, key: string): string | nul
   return typeof value === 'string' ? value : null
 }
 
-function ensureSuccessEnvelope(payload: unknown): Record<string, unknown> | null {
-  if (!isRecord(payload)) return null
-  return payload.success === true ? payload : null
+function validateServerSettings(payload: unknown): ValidationResult {
+  if (!isRecord(payload)) return { valid: false, message: 'server settings response is not an object' }
+  const port = getNumberField(payload, 'http_port')
+  const bindAddr = getStringField(payload, 'bind_addr')
+  if (port === null) return { valid: false, message: 'http_port is not a number' }
+  if (!bindAddr) return { valid: false, message: 'bind_addr is not a string' }
+  return { valid: true, message: `bind=${bindAddr}, port=${port}` }
 }
 
-function validateSessions(payload: unknown): ValidationResult {
-  const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: 'Response missing success=true' }
-  const data = envelope.data
-  if (!Array.isArray(data)) return { valid: false, message: 'sessions.data is not an array' }
-  return { valid: true, message: `Returned ${data.length} sessions` }
+function validatePaginatedSessions(payload: unknown): ValidationResult {
+  if (!isRecord(payload)) return { valid: false, message: 'paginated sessions response is not an object' }
+  const sessions = getArrayField(payload, 'sessions')
+  const total = getNumberField(payload, 'total')
+  if (!sessions) return { valid: false, message: 'sessions is not an array' }
+  if (total === null) return { valid: false, message: 'total is not a number' }
+  return { valid: true, message: `Returned ${sessions.length} sessions, total=${total}` }
 }
 
 function validateFullText(payload: unknown): ValidationResult {
-  const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: 'Response missing success=true' }
-  const data = isRecord(envelope.data) ? envelope.data : null
-  if (!data) return { valid: false, message: 'search.data is not an object' }
-  const hits = getArrayField(data, 'hits')
-  const totalHits = getNumberField(data, 'total_hits')
-  if (!hits) return { valid: false, message: 'search.data.hits is not an array' }
-  if (totalHits === null) return { valid: false, message: 'search.data.total_hits is not a number' }
+  if (!isRecord(payload)) return { valid: false, message: 'full text response is not an object' }
+  const hits = getArrayField(payload, 'hits')
+  const totalHits = getNumberField(payload, 'total_hits')
+  if (!hits) return { valid: false, message: 'hits is not an array' }
+  if (totalHits === null) return { valid: false, message: 'total_hits is not a number' }
   return { valid: true, message: `Hit ${hits.length} results, total_hits=${totalHits}` }
 }
 
-function validateMemoryRecall(payload: unknown): ValidationResult {
-  const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: 'Response missing success=true' }
-  const data = isRecord(envelope.data) ? envelope.data : null
-  if (!data) return { valid: false, message: 'memory_recall.data is not an object' }
-  const evidence = getArrayField(data, 'evidence')
-  const intent = getStringField(data, 'intent')
-  const routePlan = getArrayField(data, 'route_plan')
-  const nextActions = getArrayField(data, 'next_actions')
-  if (!evidence) return { valid: false, message: 'memory_recall.data.evidence is not an array' }
-  if (!intent) return { valid: false, message: 'memory_recall.data.intent is not a string' }
-  if (!routePlan && !nextActions) {
-    return { valid: false, message: 'memory_recall missing route_plan/next_actions' }
+function validateStringArray(payload: unknown): ValidationResult {
+  if (!Array.isArray(payload)) return { valid: false, message: 'response is not an array' }
+  if (!payload.every((item) => typeof item === 'string')) {
+    return { valid: false, message: 'array contains non-string items' }
   }
-  return { valid: true, message: `intent=${intent}, evidence=${evidence.length}` }
+  return { valid: true, message: `Returned ${payload.length} items` }
 }
 
-function validateMemoryUnified(payload: unknown): ValidationResult {
-  const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: 'Response missing success=true' }
-  const data = isRecord(envelope.data) ? envelope.data : null
-  if (!data) return { valid: false, message: 'memory_unified.data is not an object' }
-  const evidence = getArrayField(data, 'evidence')
-  const experience = getArrayField(data, 'experience')
-  if (!evidence) return { valid: false, message: 'memory_unified.data.evidence is not an array' }
-  if (!experience) return { valid: false, message: 'memory_unified.data.experience is not an array' }
-  return { valid: true, message: `evidence=${evidence.length}, experience=${experience.length}` }
+function validateProviders(payload: unknown): ValidationResult {
+  if (!Array.isArray(payload)) return { valid: false, message: 'providers response is not an array' }
+  const invalid = payload.some((item) => !isRecord(item) || !getStringField(item, 'slug'))
+  if (invalid) return { valid: false, message: 'provider item is missing slug' }
+  return { valid: true, message: `Returned ${payload.length} providers` }
 }
 
-function validateAnalytics(payload: unknown): ValidationResult {
-  const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: 'Response missing success=true' }
-  const data = isRecord(envelope.data) ? envelope.data : null
-  if (!data) return { valid: false, message: 'analytics.data is not an object' }
-  const sessions = getNumberField(data, 'sessions')
-  if (sessions === null) return { valid: false, message: 'analytics.data.sessions is not a number' }
-  return { valid: true, message: `Total sessions=${sessions}` }
+function validatePluginRecords(payload: unknown): ValidationResult {
+  if (!Array.isArray(payload)) return { valid: false, message: 'plugin records response is not an array' }
+  return { valid: true, message: `Returned ${payload.length} records` }
 }
 
-function validateObservability(payload: unknown): ValidationResult {
-  const envelope = ensureSuccessEnvelope(payload)
-  if (!envelope) return { valid: false, message: 'Response missing success=true' }
-  const data = isRecord(envelope.data) ? envelope.data : null
-  if (!data) return { valid: false, message: 'observability.data is not an object' }
-  const endpoints = getArrayField(data, 'endpoints')
-  const capabilities = getObjectField(data, 'capabilities')
-  if (!endpoints) return { valid: false, message: 'observability.data.endpoints is not an array' }
-  if (!capabilities) return { valid: false, message: 'observability.data.capabilities is not an object' }
-  return { valid: true, message: `External API list ${endpoints.length} endpoints` }
-}
-
-const ENDPOINTS: EndpointStatus[] = [
-  { name: 'Sessions List', endpoint: '/v1/sessions?limit=2', method: 'GET', validate: validateSessions },
+const PROBES: InvokeProbe[] = [
+  {
+    name: 'Transport Settings',
+    command: 'load_server_settings',
+    validate: validateServerSettings,
+  },
+  {
+    name: 'Sessions Page',
+    command: 'scan_sessions_paginated',
+    payload: { offset: 0, limit: 2, sortBy: 'updated_desc' },
+    validate: validatePaginatedSessions,
+  },
   {
     name: 'FullText Search',
-    endpoint: '/v1/search/fulltext',
-    method: 'POST',
-    body: { query: 'test', role_filter: 'all', page: 0, page_size: 5, match_mode: 'any' },
+    command: 'full_text_search',
+    payload: {
+      query: 'test',
+      roleFilter: 'all',
+      sourceFilter: 'all',
+      globPattern: null,
+      projectPath: null,
+      page: 0,
+      pageSize: 5,
+      matchMode: 'any',
+      sortOrder: 'newest',
+    },
     validate: validateFullText,
   },
   {
-    name: 'Memory Recall',
-    endpoint: '/v1/memory/recall',
-    method: 'POST',
-    body: { query: 'test', top_k: 5 },
-    validate: validateMemoryRecall,
+    name: 'Session Sources',
+    command: 'get_all_session_dirs',
+    validate: validateStringArray,
   },
   {
-    name: 'Memory Unified',
-    endpoint: '/v1/memory/unified',
-    method: 'POST',
-    body: { query: 'test', top_k: 5, experience_limit: 5 },
-    validate: validateMemoryUnified,
+    name: 'Session Providers',
+    command: 'list_supported_session_providers',
+    validate: validateProviders,
   },
-  { name: 'Analytics Overview', endpoint: '/v1/analytics/overview', method: 'GET', validate: validateAnalytics },
   {
-    name: 'Observability Summary',
-    endpoint: '/v1/observability/summary',
-    method: 'GET',
-    validate: validateObservability,
+    name: 'Plugin Records',
+    command: 'search_plugin_records',
+    payload: { query: 'test', limit: 5 },
+    validate: validatePluginRecords,
   },
 ]
 
 export default function APITestSettings() {
   const { t } = useTranslation()
-  const [baseUrl, setBaseUrl] = useState(getHttpOriginBaseUrl() || DEFAULT_API_TEST_BASE_URL)
-  const [baseUrlBootstrapped, setBaseUrlBootstrapped] = useState(false)
   const [results, setResults] = useState<TestResult[]>([])
   const [isTesting, setIsTesting] = useState(false)
   const [overallStatus, setOverallStatus] = useState<'idle' | 'running' | 'completed'>('idle')
 
-  const testEndpoint = async (ep: EndpointStatus): Promise<TestResult> => {
+  const testProbe = async (probe: InvokeProbe): Promise<TestResult> => {
     const startTime = performance.now()
     try {
-      const url = `${baseUrl}${ep.endpoint}`
-      const options: RequestInit = {
-        method: ep.method,
-        headers: { 'Content-Type': 'application/json' },
-      }
-
-      if (ep.method === 'POST' && ep.body) {
-        options.body = JSON.stringify(ep.body)
-      }
-
-      const response = await fetch(url, options)
+      const payload = await invoke<unknown>(probe.command, probe.payload)
       const latency = Math.round(performance.now() - startTime)
-      const contentType = response.headers.get('content-type') || ''
-      const bodyText = await response.text()
+      const validation = probe.validate(payload)
 
-      if (!response.ok) {
-        return {
-          endpoint: ep.name,
-          status: 'error',
-          latency,
-          message: `${response.status} ${response.statusText}`,
-          detail: bodyText.slice(0, 180),
-        }
-      }
-
-      if (!contentType.includes('application/json')) {
-        return {
-          endpoint: ep.name,
-          status: 'error',
-          latency,
-          message: `Response is not JSON: ${contentType || 'unknown'}`,
-          detail: bodyText.slice(0, 180),
-        }
-      }
-
-      let payload: unknown
-      try {
-        payload = JSON.parse(bodyText)
-      } catch {
-        return {
-          endpoint: ep.name,
-          status: 'error',
-          latency,
-          message: 'JSON parse failed',
-          detail: bodyText.slice(0, 180),
-        }
-      }
-
-      const validation = ep.validate(payload)
       if (!validation.valid) {
         return {
-          endpoint: ep.name,
+          probe: probe.name,
+          command: probe.command,
           status: 'error',
           latency,
           message: validation.message,
-          detail: bodyText.slice(0, 180),
+          detail: JSON.stringify(payload).slice(0, 180),
         }
       }
 
       return {
-        endpoint: ep.name,
+        probe: probe.name,
+        command: probe.command,
         status: 'success',
         latency,
         message: validation.message,
@@ -266,10 +182,11 @@ export default function APITestSettings() {
     } catch (error) {
       const latency = Math.round(performance.now() - startTime)
       return {
-        endpoint: ep.name,
+        probe: probe.name,
+        command: probe.command,
         status: 'error',
         latency,
-        message: error instanceof Error ? error.message : 'Connection failed',
+        message: error instanceof Error ? error.message : 'Invoke failed',
       }
     }
   }
@@ -280,8 +197,8 @@ export default function APITestSettings() {
     setResults([])
 
     const newResults: TestResult[] = []
-    for (const ep of ENDPOINTS) {
-      const result = await testEndpoint(ep)
+    for (const probe of PROBES) {
+      const result = await testProbe(probe)
       newResults.push(result)
       setResults([...newResults])
     }
@@ -290,79 +207,43 @@ export default function APITestSettings() {
     setIsTesting(false)
   }
 
-  const runSingleTest = async (ep: EndpointStatus) => {
+  const runSingleTest = async (probe: InvokeProbe) => {
     setIsTesting(true)
-    const result = await testEndpoint(ep)
+    const result = await testProbe(probe)
     setResults((prev) => {
-      const filtered = prev.filter((r) => r.endpoint !== ep.name)
+      const filtered = prev.filter((item) => item.probe !== probe.name)
       return [...filtered, result]
     })
     setIsTesting(false)
   }
 
   useEffect(() => {
-    const originBase = getHttpOriginBaseUrl()
-    if (originBase) {
-      setBaseUrl(originBase)
-      setBaseUrlBootstrapped(true)
-      return
-    }
-
-    let active = true
-    invoke<ServerSettings>('load_server_settings')
-      .then((settings) => {
-        if (!active) return
-        setBaseUrl(toApiBaseUrl(settings))
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!active) return
-        setBaseUrlBootstrapped(true)
-      })
-
-    return () => {
-      active = false
-    }
+    runAllTests()
   }, [])
 
-  useEffect(() => {
-    if (!baseUrlBootstrapped) return
-    runAllTests()
-  }, [baseUrlBootstrapped])
-
-  const successCount = results.filter((r) => r.status === 'success').length
-  const warningCount = results.filter((r) => r.status === 'warning').length
-  const errorCount = results.filter((r) => r.status === 'error').length
+  const successCount = results.filter((result) => result.status === 'success').length
+  const errorCount = results.filter((result) => result.status === 'error').length
 
   return (
     <div className="space-y-6">
       <SettingsCard
         icon={<Activity className="h-5 w-5" />}
-        title={t('settings.apiTest.title', 'API Connection Test')}
-        description={t('settings.apiTest.description', 'Test real connectivity and response structure of external session retrieval API')}
+        title={t('settings.apiTest.title', 'Invoke Connection Test')}
+        description={t('settings.apiTest.description', 'Test the current runtime invoke transport and command response structure')}
       >
         <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground/80">
-              {t('settings.apiTest.baseUrl', 'Server Address')}
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                className="flex-1 px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-info/50"
-                placeholder={DEFAULT_API_TEST_BASE_URL}
-              />
-              <button
-                onClick={runAllTests}
-                disabled={isTesting}
-                className="px-4 py-2 bg-info text-info-foreground rounded-md text-sm font-medium hover:bg-info/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                {t('settings.apiTest.testAll', 'Test All')}
-              </button>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs text-muted-foreground">
+              {t('settings.apiTest.transportHint', 'Uses the same IPC / HTTP / WebSocket invoke path as the application runtime.')}
             </div>
+            <button
+              onClick={runAllTests}
+              disabled={isTesting}
+              className="px-4 py-2 bg-info text-info-foreground rounded-md text-sm font-medium hover:bg-info/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {t('settings.apiTest.testAll', 'Test All')}
+            </button>
           </div>
 
           {overallStatus === 'completed' && (
@@ -386,7 +267,6 @@ export default function APITestSettings() {
                       success: successCount,
                       total: results.length,
                     })}
-                    {warningCount > 0 ? `, warning=${warningCount}` : ''}
                   </p>
                 </div>
               </div>
@@ -394,41 +274,35 @@ export default function APITestSettings() {
           )}
 
           <div className="grid gap-3">
-            {ENDPOINTS.map((ep) => {
-              const result = results.find((r) => r.endpoint === ep.name)
+            {PROBES.map((probe) => {
+              const result = results.find((item) => item.probe === probe.name)
               const status = result?.status || 'pending'
               const statusClass =
                 status === 'success'
                   ? 'bg-success/5 border-success/20'
-                  : status === 'warning'
-                    ? 'bg-warning/5 border-warning/20'
-                    : status === 'error'
-                      ? 'bg-destructive/5 border-destructive/20'
-                      : 'bg-muted/50 border-border'
+                  : status === 'error'
+                    ? 'bg-destructive/5 border-destructive/20'
+                    : 'bg-muted/50 border-border'
 
               return (
-                <div key={ep.name} className={`p-4 rounded-lg border motion-surface motion-color ${statusClass}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                <div key={probe.name} className={`p-4 rounded-lg border motion-surface motion-color ${statusClass}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       {status === 'success' ? (
-                        <CheckCircle className="h-5 w-5 text-success" />
-                      ) : status === 'warning' ? (
-                        <AlertTriangle className="h-5 w-5 text-warning" />
+                        <CheckCircle className="h-5 w-5 text-success shrink-0" />
                       ) : status === 'error' ? (
-                        <XCircle className="h-5 w-5 text-destructive" />
+                        <XCircle className="h-5 w-5 text-destructive shrink-0" />
                       ) : (
-                        <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
+                        <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30 shrink-0" />
                       )}
 
-                      <div>
-                        <p className="font-medium text-sm">{ep.name}</p>
-                        <p className="text-xs text-muted-foreground font-mono">
-                          {ep.method} {ep.endpoint}
-                        </p>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{probe.name}</p>
+                        <p className="text-xs text-muted-foreground font-mono truncate">invoke({probe.command})</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 shrink-0">
                       {result && (
                         <span
                           className={`text-xs font-mono flex items-center gap-1 ${
@@ -441,7 +315,7 @@ export default function APITestSettings() {
                       )}
 
                       <button
-                        onClick={() => runSingleTest(ep)}
+                        onClick={() => runSingleTest(probe)}
                         disabled={isTesting}
                         className="px-3 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded-md disabled:opacity-50"
                       >
@@ -453,11 +327,7 @@ export default function APITestSettings() {
                   {result && (
                     <p
                       className={`mt-2 text-xs pl-8 ${
-                        result.status === 'success'
-                          ? 'text-success'
-                          : result.status === 'warning'
-                            ? 'text-warning'
-                            : 'text-destructive'
+                        result.status === 'success' ? 'text-success' : 'text-destructive'
                       }`}
                     >
                       {result.message}
@@ -480,10 +350,10 @@ export default function APITestSettings() {
               {t('settings.apiTest.troubleshooting', 'Troubleshooting')}
             </p>
             <ul className="list-disc list-inside text-muted-foreground space-y-1 text-xs">
-              <li>{t('settings.apiTest.help1', 'Ensure pi-session-manager CLI is running')}</li>
-              <li>{t('settings.apiTest.help2', 'Check if server address and port are correct')}</li>
-              <li>{t('settings.apiTest.help3', 'Confirm API returns JSON, not frontend HTML fallback page')}</li>
-              <li>{t('settings.apiTest.help4', 'Only exposes session retrieval APIs, embedding related interfaces are disabled by default')}</li>
+              <li>{t('settings.apiTest.help1', 'This page no longer calls removed HTTP routes directly.')}</li>
+              <li>{t('settings.apiTest.help2', 'Desktop uses Tauri IPC; web and mobile use the same command contract through HTTP or WebSocket invoke.')}</li>
+              <li>{t('settings.apiTest.help3', 'If a command fails, check the transport banner and backend command logs.')}</li>
+              <li>{t('settings.apiTest.help4', 'Probe failures usually mean a command contract changed or runtime transport is unavailable.')}</li>
             </ul>
           </div>
         </div>

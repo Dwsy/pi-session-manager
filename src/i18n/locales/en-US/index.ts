@@ -19,7 +19,6 @@ import { plugins } from './plugins'
 import { time } from './time'
 import { auth } from './auth'
 import { piAgent } from './piAgent'
-import { kanban } from './kanban'
 
 export const enUS = {
   common,
@@ -43,7 +42,6 @@ export const enUS = {
   time,
   auth,
   piAgent,
-  kanban,
   connection: {
     disconnected: 'Cannot connect to server — is the app running?',
     connecting: 'Reconnecting…',

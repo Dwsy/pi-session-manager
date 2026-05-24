@@ -8,7 +8,7 @@ export interface ResolveDesktopMainContentOptions {
   sidebarMode: AppDesktopSidebarMode;
   standaloneDatasetRuntime: boolean;
   renderSessionViewer: () => ReactNode;
-  renderKanban: () => ReactNode;
+  renderAppView: () => ReactNode;
   renderStandaloneDatasetOverview: () => ReactNode;
   renderDashboard: () => ReactNode;
 }
@@ -18,12 +18,12 @@ export function resolveDesktopMainContent({
   sidebarMode,
   standaloneDatasetRuntime,
   renderSessionViewer,
-  renderKanban,
+  renderAppView,
   renderStandaloneDatasetOverview,
   renderDashboard,
 }: ResolveDesktopMainContentOptions): ReactNode {
   if (selectedSession) return renderSessionViewer();
-  if (sidebarMode === "kanban") return renderKanban();
+  if (sidebarMode === "app") return renderAppView();
   if (standaloneDatasetRuntime) return renderStandaloneDatasetOverview();
   return renderDashboard();
 }

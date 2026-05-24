@@ -6,6 +6,7 @@ vi.mock('@/transport', () => ({
 }))
 
 import { toolRenderRegistry } from '@/plugins/tools-render/registry'
+import { psmRuntimeEventBus } from '../eventBus'
 import { builtinPsmPluginEntries } from '../builtins'
 import { PsmPluginHost } from '../host'
 import type { PsmPluginLoadEntry, PsmPluginsConfig } from '../types'
@@ -17,6 +18,7 @@ function config(plugins: PsmPluginsConfig['plugins'] = {}): PsmPluginsConfig {
 afterEach(() => {
   toolRenderRegistry.unregister('test-renderer')
   toolRenderRegistry.unregister('shared-renderer')
+  psmRuntimeEventBus.clear()
 })
 
 function entry(id: string, activate = true): PsmPluginLoadEntry {
@@ -53,7 +55,9 @@ describe('PsmPluginHost', () => {
     expect(sourceIds).toContain('extensions/psm-ask-user-question-renderer')
     expect(sourceIds).toContain('extensions/psm-loop-renderer')
     expect(sourceIds).toContain('extensions/psm-subagent-renderer')
+    expect(sourceIds).toContain('extensions/psm-cross-agent-tool-renderer')
     expect(sourceIds).toContain('extensions/psm-session-graph')
+    expect(sourceIds).not.toContain('extensions/psm-word-cloud')
   })
 
   it('activates enabled plugins and exposes commands/tools', async () => {
@@ -76,6 +80,111 @@ describe('PsmPluginHost', () => {
     })
     expect(await host.executeCommand('builtin.test.command')).toEqual({ ok: true, id: 'builtin.test' })
     expect(await host.runTool('builtin.test_tool')).toEqual({ ok: true, id: 'builtin.test' })
+  })
+
+  it('returns a cached command snapshot between reload notifications', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [entry('builtin.test')],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const initialSnapshot = host.listCommands()
+    expect(host.listCommands()).toBe(initialSnapshot)
+
+    await host.reload()
+
+    const loadedSnapshot = host.listCommands()
+    expect(loadedSnapshot).toMatchObject([{ id: 'builtin.test.command' }])
+    expect(host.listCommands()).toBe(loadedSnapshot)
+  })
+
+  it('subscribes plugin event listeners and tears them down on reload', async () => {
+    let subscribeEvents = true
+    const handler = vi.fn()
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/event-listener',
+          async load() {
+            return {
+              manifest: {
+                manifestVersion: 1,
+                id: 'builtin.event-listener',
+                name: 'Event Listener',
+                version: '1.0.0',
+                permissions: ['events:read'],
+              },
+              activate: (ctx: any) => {
+                if (!subscribeEvents) return
+                ctx.events.subscribe('pi-live:session_registered', handler)
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    await host.reload()
+    psmRuntimeEventBus.emit('pi-live:session_registered', { sessionId: 'session-1' })
+    expect(handler).toHaveBeenCalledWith({
+      name: 'pi-live:session_registered',
+      payload: { sessionId: 'session-1' },
+    })
+
+    subscribeEvents = false
+    await host.reload()
+    psmRuntimeEventBus.emit('pi-live:session_registered', { sessionId: 'session-2' })
+
+    expect(handler).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects event subscriptions without events:read permission', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/event-denied',
+          async load() {
+            return {
+              manifest: {
+                manifestVersion: 1,
+                id: 'builtin.event-denied',
+                name: 'Event Denied',
+                version: '1.0.0',
+              },
+              activate: (ctx: any) => {
+                ctx.events.subscribe('pi-live:session_registered', vi.fn())
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(plugins[0]).toMatchObject({
+      id: 'builtin.event-denied',
+      state: 'error',
+      diagnostics: [
+        {
+          level: 'error',
+          message: 'Failed to activate plugin: Plugin builtin.event-denied must declare events:read to subscribe to pi-live:session_registered',
+        },
+      ],
+    })
   })
 
   it('keeps disabled built-ins discovered without activating contributions', async () => {
@@ -168,6 +277,49 @@ describe('PsmPluginHost', () => {
         { level: 'warn', message: 'Tool already registered: shared_tool' },
       ],
     })
+  })
+
+  it('exposes a plugin logger that prefixes console output', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
+
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/logger-test',
+          async load() {
+            return {
+              manifest: { manifestVersion: 1, id: 'builtin.logger-test', name: 'Logger Test', version: '1.0.0' },
+              activate: (ctx: any) => {
+                ctx.log.info('hello', { value: 1 })
+                ctx.log.warn('careful')
+                ctx.log.error('boom', { reason: 'test' })
+                ctx.log.debug('trace')
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    await host.reload()
+
+    expect(infoSpy).toHaveBeenCalledWith('[PSM plugins:builtin.logger-test] hello', { value: 1 })
+    expect(warnSpy).toHaveBeenCalledWith('[PSM plugins:builtin.logger-test] careful', undefined)
+    expect(errorSpy).toHaveBeenCalledWith('[PSM plugins:builtin.logger-test] boom', { reason: 'test' })
+    expect(debugSpy).toHaveBeenCalledWith('[PSM plugins:builtin.logger-test] trace', undefined)
+
+    infoSpy.mockRestore()
+    warnSpy.mockRestore()
+    errorSpy.mockRestore()
+    debugSpy.mockRestore()
   })
 
   it('passes plugin settings defaults and saved values into activation context and status', async () => {
@@ -263,6 +415,8 @@ describe('PsmPluginHost', () => {
             return {
               manifest: { manifestVersion: 1, id: 'builtin.ui.first', name: 'UI First', version: '1.0.0' },
               activate: (ctx: any) => {
+                ctx.ui.registerAppView({ id: 'app.notes', title: 'Notes', route: '/notes', render: () => 'notes' })
+                ctx.ui.registerAppSidebarView({ id: 'app.notes.sidebar', title: 'Notes Sidebar', appViewId: 'app.notes', route: '/notes', render: () => 'sidebar' })
                 ctx.ui.registerSessionToolbarItem({ id: 'session.ask', title: 'Ask', render: () => 'ask' })
                 ctx.ui.registerSessionPanel({ id: 'session.ask.panel', title: 'Ask Panel', render: () => 'panel' })
               },
@@ -276,6 +430,8 @@ describe('PsmPluginHost', () => {
             return {
               manifest: { manifestVersion: 1, id: 'builtin.ui.second', name: 'UI Second', version: '1.0.0' },
               activate: (ctx: any) => {
+                ctx.ui.registerAppView({ id: 'app.notes', title: 'Notes Duplicate', route: '/notes', render: () => 'duplicate' })
+                ctx.ui.registerAppSidebarView({ id: 'app.notes.sidebar', title: 'Notes Sidebar Duplicate', appViewId: 'app.notes', route: '/notes', render: () => 'duplicate' })
                 ctx.ui.registerSessionToolbarItem({ id: 'session.ask', title: 'Ask Duplicate', render: () => 'duplicate' })
                 ctx.ui.registerSessionPanel({ id: 'session.ask.panel', title: 'Ask Panel Duplicate', render: () => 'duplicate' })
               },
@@ -294,9 +450,13 @@ describe('PsmPluginHost', () => {
 
     expect(host.listSessionToolbarItems()).toHaveLength(1)
     expect(host.listSessionPanels()).toHaveLength(1)
+    expect(host.listAppViews()).toHaveLength(1)
+    expect(host.listAppSidebarViews()).toHaveLength(1)
     expect(second).toMatchObject({
       state: 'active',
       diagnostics: [
+        { level: 'warn', message: 'App view already registered: app.notes' },
+        { level: 'warn', message: 'App sidebar view already registered: app.notes.sidebar' },
         { level: 'warn', message: 'Session toolbar item already registered: session.ask' },
         { level: 'warn', message: 'Session panel already registered: session.ask.panel' },
       ],
@@ -550,6 +710,68 @@ describe('PsmPluginHost', () => {
         pluginId: 'builtin.trace',
       },
     ])
+  })
+
+  it('registers app view contributions in the UI snapshot', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/notes',
+          async load() {
+            return {
+              manifest: { manifestVersion: 1, id: 'builtin.notes', name: 'Notes', version: '1.0.0' },
+              activate: (ctx: any) => {
+                ctx.ui.registerAppView({
+                  id: 'builtin.notes.view',
+                  title: 'Notes',
+                  route: '/notes',
+                  icon: 'notebook',
+                  shortcut: 'Cmd+Shift+N',
+                  render: () => 'notes',
+                })
+                ctx.ui.registerAppSidebarView({
+                  id: 'builtin.notes.sidebar',
+                  title: 'Notes Sidebar',
+                  appViewId: 'builtin.notes.view',
+                  route: '/notes',
+                  render: () => 'sidebar',
+                })
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    await host.reload()
+
+    expect(host.getSessionUiSnapshot()).toMatchObject({
+      ready: true,
+      appViews: [
+        {
+          id: 'builtin.notes.view',
+          title: 'Notes',
+          route: '/notes',
+          icon: 'notebook',
+          shortcut: 'Cmd+Shift+N',
+          pluginId: 'builtin.notes',
+        },
+      ],
+      appSidebarViews: [
+        {
+          id: 'builtin.notes.sidebar',
+          title: 'Notes Sidebar',
+          appViewId: 'builtin.notes.view',
+          route: '/notes',
+          pluginId: 'builtin.notes',
+        },
+      ],
+    })
   })
 
   it('loads path entries through module source bundles', async () => {

@@ -176,23 +176,23 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     section: "session-viewer",
     labelKey: "settings.session.defaultViewMode",
     fallbackLabel: "Default View Mode",
-    keywords: ["view", "mode", "list", "directory", "project", "kanban"],
+    keywords: ["view", "mode", "list", "directory", "project", "app"],
   },
   {
     id: "session-sourceMode",
-    section: "data-sources",
+    section: "local-session-paths",
     labelKey: "settings.session.sourceMode",
     fallbackLabel: "Session source",
     extraKeys: ["settings.session.sourceModeHelp"],
-    keywords: ["source", "local", "dataset", "mode"],
+    keywords: ["source", "local", "dataset", "mode", "会话来源"],
   },
   {
     id: "session-scanOtherAgentJsonl",
-    section: "data-sources",
+    section: "external-agent-sessions",
     labelKey: "settings.session.scanOtherAgentJsonl",
     fallbackLabel: "Scan other agent JSONL",
     extraKeys: ["settings.session.scanOtherAgentJsonlHelp"],
-    keywords: ["scan", "agent", "jsonl", "external", "other"],
+    keywords: ["scan", "agent", "jsonl", "external", "other", "provider", "claude", "codex", "gemini"],
   },
   {
     id: "session-showMessagePreview",
@@ -259,35 +259,35 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   // ── External Sessions ──
   {
     id: "external-sessions-includeInStats",
-    section: "data-sources",
+    section: "external-agent-sessions",
     labelKey: "settings.externalSessions.includeInStats",
     fallbackLabel: "Include external sessions in statistics",
     extraKeys: ["settings.externalSessions.includeInStatsHelp"],
-    keywords: ["external", "stats", "statistics", "dashboard", "include"],
+    keywords: ["external", "agent", "provider", "stats", "statistics", "dashboard", "include"],
   },
   {
     id: "external-sessions-includeInSearch",
-    section: "data-sources",
+    section: "external-agent-sessions",
     labelKey: "settings.externalSessions.includeInSearch",
     fallbackLabel: "Include external sessions in search",
     extraKeys: ["settings.externalSessions.includeInSearchHelp"],
-    keywords: ["external", "search", "include"],
+    keywords: ["external", "agent", "provider", "search", "include", "claude", "codex", "gemini"],
   },
   {
     id: "external-sessions-showAgentIcon",
-    section: "data-sources",
+    section: "external-agent-sessions",
     labelKey: "settings.externalSessions.showAgentIconInSessionBadge",
     fallbackLabel: "Show agent icon in SessionBadge",
     extraKeys: ["settings.externalSessions.showAgentIconInSessionBadgeHelp"],
-    keywords: ["agent", "icon", "badge", "show"],
+    keywords: ["agent", "provider", "icon", "badge", "show"],
   },
   {
     id: "external-sessions-defaultResumeTarget",
-    section: "data-sources",
+    section: "resume-targets",
     labelKey: "settings.externalSessions.defaultExternalResumeTarget",
     fallbackLabel: "Default external resume target",
     extraKeys: ["settings.externalSessions.defaultExternalResumeTargetHelp"],
-    keywords: ["external", "resume", "target", "default", "cli"],
+    keywords: ["external", "agent", "provider", "resume", "target", "default", "cli", "claude", "codex", "gemini"],
   },
 
   // ── Search ──
@@ -450,7 +450,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "advanced-sessionDir",
-    section: "data-sources",
+    section: "local-session-paths",
     labelKey: "settings.advanced.sessionDir",
     fallbackLabel: "Session Directories",
     extraKeys: ["settings.advanced.sessionDirHelp"],
@@ -474,13 +474,13 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     keywords: ["tag", "label", "category", "color", "organize"],
   },
 
-  // ── API Test ──
+  // ── Invoke Transport Test ──
   {
-    id: "api-test",
+    id: "invoke-test",
     section: "diagnostics-maintenance",
     labelKey: "settings.sections.diagnosticsMaintenance",
     fallbackLabel: "Diagnostics & Maintenance",
-    keywords: ["api", "test", "endpoint", "http", "debug"],
+    keywords: ["invoke", "transport", "ipc", "http", "websocket", "debug"],
   },
 
   // ── Import/Export (Config Bundle) ──

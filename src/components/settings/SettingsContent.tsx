@@ -35,8 +35,8 @@ export default function SettingsContent({
   const area = activeItem ? getSettingsAreaMeta(activeItem.area) : null;
 
   return (
-    <div className="flex-1 flex flex-col bg-surface-dark/30">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-background/50">
+    <div className="flex-1 flex flex-col bg-surface-dark/20">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border/70 bg-background/70">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
             {area && <span>{t(area.labelKey, area.fallbackLabel)}</span>}
@@ -64,14 +64,14 @@ export default function SettingsContent({
             <Loader2 className="h-8 w-8 animate-spin text-info" />
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="mx-auto w-full max-w-5xl space-y-6">
             {renderSettingsSection(activeSection, settings, onUpdate)}
           </div>
         )}
       </div>
 
       {saveMode === "app-settings" ? (
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border/80 bg-background/80">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border/70 bg-background/85">
           <button
             onClick={onClose}
             className="px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg motion-color motion-press focus-ring"
@@ -94,7 +94,7 @@ export default function SettingsContent({
           </button>
         </div>
       ) : (
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-border/80 bg-background/80">
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-border/70 bg-background/85">
           <p className="min-w-0 text-xs text-muted-foreground">
             {saveMode === "inline"
               ? t(

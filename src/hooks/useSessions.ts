@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { listen } from "@/transport";
 import { useTranslation } from "react-i18next";
 import { useNotification } from "@/hooks/useNotification";
+import { psmRuntimeEventBus } from "@/plugins/runtime-host/eventBus";
 import type { SessionInfo, SessionsDiff } from "@/types";
+import type {
+  PiLiveSessionDisconnectedPayload,
+  PiLiveSessionRegisteredPayload,
+} from "@/types/pi-live";
 import type {
   DeleteSessionAnchorPoint,
   DeleteSessionRequestOptions,
@@ -585,58 +589,56 @@ export function useSessions(): UseSessionsReturn {
   useEffect(() => {
     if (getSessionRuntimeMode() !== "backend") return;
 
-    let unlisten: (() => void) | null = null;
-    const setupSubscriptions = async () => {
-      const u1 = await listen<any>("pi-live:session_registered", ({ payload }) => {
-        const sessionId = payload?.sessionId;
-        if (!sessionId) return;
-        // Patch in a lightweight stub; the next file-watcher diff will fill details.
-        const now = new Date().toISOString();
-        // Extract a meaningful display name from path/cwd, fallback to sessionId
-        const sessionPath = payload.sessionPath || "";
-        const displayName = sessionPath.split("/").pop()?.replace(/\.jsonl$/, "") || payload.cwd?.split("/").pop() || sessionId;
-        patchSessions({
-          updated: [{
-            id: sessionId,
-            path: sessionPath,
-            cwd: payload.cwd || "",
-            name: displayName,
-            created: now,
-            modified: now,
-            message_count: payload.entries?.length || 0,
-            first_message: "",
-            user_messages_text: "",
-            assistant_messages_text: "",
-            last_message: "",
-            last_message_role: "assistant",
-            parent_session_path: undefined,
-            isLive: true,
-            pid: payload.pid,
-          }],
-          removed: [],
-        });
+    const unsubscribeRegistered = psmRuntimeEventBus.subscribe<
+      "pi-live:session_registered",
+      PiLiveSessionRegisteredPayload
+    >("pi-live:session_registered", ({ payload }) => {
+      const sessionId = payload?.sessionId;
+      if (!sessionId) return;
+      // Patch in a lightweight stub; the next file-watcher diff will fill details.
+      const now = new Date().toISOString();
+      // Extract a meaningful display name from path/cwd, fallback to sessionId
+      const sessionPath = payload.sessionPath || "";
+      const displayName = sessionPath.split("/").pop()?.replace(/\.jsonl$/, "") || payload.cwd?.split("/").pop() || sessionId;
+      patchSessions({
+        updated: [{
+          id: sessionId,
+          path: sessionPath,
+          cwd: payload.cwd || "",
+          name: displayName,
+          created: now,
+          modified: now,
+          message_count: payload.entries?.length || 0,
+          first_message: "",
+          user_messages_text: "",
+          assistant_messages_text: "",
+          last_message: "",
+          last_message_role: "assistant",
+          parent_session_path: undefined,
+          isLive: true,
+          pid: payload.pid,
+        }],
+        removed: [],
       });
-      const u2 = await listen<any>("pi-live:session_disconnected", ({ payload }) => {
-        const sessionId = payload?.sessionId;
-        if (!sessionId) return;
-        // Just mark as not-live; no full rescan needed.
-        setSessions((prev) => {
-          const next = prev.map((s) =>
-            s.id === sessionId ? { ...s, isLive: false, pid: undefined } : s,
-          );
-          sessionsRef.current = next;
-          return next;
-        });
+    });
+    const unsubscribeDisconnected = psmRuntimeEventBus.subscribe<
+      "pi-live:session_disconnected",
+      PiLiveSessionDisconnectedPayload
+    >("pi-live:session_disconnected", ({ payload }) => {
+      const sessionId = payload?.sessionId;
+      if (!sessionId) return;
+      // Just mark as not-live; no full rescan needed.
+      setSessions((prev) => {
+        const next = prev.map((s) =>
+          s.id === sessionId ? { ...s, isLive: false, pid: undefined } : s,
+        );
+        sessionsRef.current = next;
+        return next;
       });
-      unlisten = () => {
-        if (u1) u1();
-        if (u2) u2();
-      };
-    };
-
-    setupSubscriptions();
+    });
     return () => {
-      if (unlisten) unlisten();
+      unsubscribeRegistered();
+      unsubscribeDisconnected();
     };
   }, [patchSessions]);
 

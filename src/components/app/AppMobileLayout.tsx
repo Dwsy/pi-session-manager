@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import type { ReactNode, RefObject } from "react";
 import {
-  Columns3,
   Database,
   FolderOpen,
   LayoutDashboard,
@@ -12,13 +11,21 @@ import { useTranslation } from "react-i18next";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import { triggerHaptic } from "@/utils/haptics";
 import type { SessionInfo } from "@/types";
+import AppViewIcon from "./AppViewIcon";
 
 export type MobileTab =
   | "list"
   | "projects"
-  | "kanban"
   | "dashboard"
-  | "settings";
+  | "settings"
+  | `app:${string}`;
+
+export interface AppMobileAppViewItem {
+  id: string;
+  tabId: MobileTab;
+  label: string;
+  icon?: string;
+}
 
 export interface AppMobileLayoutProps {
   selectedSession: SessionInfo | null;
@@ -28,7 +35,8 @@ export interface AppMobileLayoutProps {
   renderSessionViewer: () => ReactNode;
   renderSessionList: () => ReactNode;
   renderProjectList: () => ReactNode;
-  renderKanban: () => ReactNode;
+  appViewItems?: AppMobileAppViewItem[];
+  renderAppView: (viewId: string) => ReactNode;
   renderDashboard: () => ReactNode;
   renderSettings: () => ReactNode;
   routeSessionPending?: boolean;
@@ -55,7 +63,8 @@ function AppMobileLayout({
   renderSessionViewer,
   renderSessionList,
   renderProjectList,
-  renderKanban,
+  appViewItems = [],
+  renderAppView,
   renderDashboard,
   renderSettings,
   routeSessionPending = false,
@@ -81,12 +90,15 @@ function AppMobileLayout({
         icon: <FolderOpen className="h-5 w-5" />,
         label: t("app.viewMode.project", "project"),
       },
-      {
-        id: "kanban",
-        icon: <Columns3 className="h-5 w-5" />,
-        label: t("tags.kanban.title", "Kanban"),
-      },
     ];
+
+    for (const item of appViewItems) {
+      next.push({
+        id: item.tabId,
+        icon: <AppViewIcon icon={item.icon} className="h-5 w-5" />,
+        label: item.label,
+      });
+    }
 
     if (showDashboardTab) {
       next.push({
@@ -103,7 +115,7 @@ function AppMobileLayout({
     });
 
     return next;
-  }, [settingsActionOnly, settingsIcon, settingsLabel, showDashboardTab, t]);
+  }, [appViewItems, settingsActionOnly, settingsIcon, settingsLabel, showDashboardTab, t]);
 
   const showSessionLayer = !!selectedSession || routeSessionPending;
 
@@ -114,7 +126,7 @@ function AppMobileLayout({
       {showSessionLayer && (
         <div
           ref={mobileViewerRef}
-          className="absolute inset-0 z-30 flex flex-col bg-background"
+          className="absolute inset-0 z-30 flex flex-col bg-background motion-drill motion-drill-enter"
         >
           <div className="flex-1 overflow-hidden">
             {selectedSession
@@ -130,7 +142,7 @@ function AppMobileLayout({
       >
         {mobileTab === "list" && renderSessionList()}
         {mobileTab === "projects" && renderProjectList()}
-        {mobileTab === "kanban" && renderKanban()}
+        {mobileTab.startsWith("app:") && renderAppView(mobileTab.slice(4))}
         {showDashboardTab && mobileTab === "dashboard" && renderDashboard()}
         {!settingsActionOnly && mobileTab === "settings" && renderSettings()}
       </div>

@@ -3,8 +3,11 @@ export type PsmPermission =
   | 'records:read'
   | 'records:write'
   | 'search:read'
-  | 'kanban:read'
-  | 'kanban:write'
+  | 'tags:read'
+  | 'tags:write'
+  | 'config:read'
+  | 'config:write'
+  | 'events:read'
   | 'model:invoke'
 
 export interface PsmPermissionContext {
@@ -84,6 +87,13 @@ export interface PsmPluginI18nClient {
   t(key: string, fallback: string, options?: Record<string, unknown>): string
 }
 
+export interface PsmPluginLogger {
+  debug(message: string, details?: Record<string, unknown>): void
+  info(message: string, details?: Record<string, unknown>): void
+  warn(message: string, details?: Record<string, unknown>): void
+  error(message: string, details?: Record<string, unknown>): void
+}
+
 export interface PsmPluginManifest {
   manifestVersion?: PsmPluginManifestVersion
   id: string
@@ -113,9 +123,57 @@ export interface PsmPluginDisposable {
   dispose(): void | Promise<void>
 }
 
+export interface PsmPluginEventEnvelope<Name extends string = string, Payload = unknown> {
+  name: Name
+  payload: Payload
+}
+
+export type PsmPluginEventHandler<Name extends string = string, Payload = unknown> = (
+  event: PsmPluginEventEnvelope<Name, Payload>,
+) => void | Promise<void>
+
+export interface PsmPluginEventsClient {
+  subscribe<Name extends string, Payload = unknown>(
+    eventName: Name,
+    handler: PsmPluginEventHandler<Name, Payload>,
+  ): () => void
+}
+
 export interface PsmPluginToolRegistration {
   description: string
   run(args: Record<string, unknown>): Promise<unknown>
+}
+
+export type PsmPluginCommandScope = 'global' | 'project' | 'session' | 'selection'
+
+export interface PsmPluginCommandContext {
+  selectedSession?: PsmSessionReference | null
+  selectedProject?: string | null
+  query?: string
+  closeCommandMenu?: () => void
+  navigate?: {
+    openAppView?: (viewId: string) => void
+    openSession?: (sessionPath: string) => void
+    openProject?: (projectPath: string) => void
+  }
+}
+
+export type PsmPluginCommandHandler = (
+  args: Record<string, unknown>,
+  context?: PsmPluginCommandContext,
+) => Promise<unknown> | unknown
+
+export interface PsmPluginCommandRegistration {
+  id: string
+  title: string
+  description?: string
+  category?: string
+  icon?: string
+  keywords?: string[]
+  shortcut?: string
+  scope?: PsmPluginCommandScope
+  when?: (context: PsmPluginCommandContext) => boolean
+  run: PsmPluginCommandHandler
 }
 
 export interface PsmToolCallContent {
@@ -268,7 +326,34 @@ export interface PsmSessionMainViewRegistration {
   render(props: PsmSessionUiRenderProps): unknown
 }
 
+export interface PsmAppViewRenderProps<TData = unknown> {
+  viewId: string
+  active: boolean
+  data?: TData
+}
+
+export interface PsmAppViewRegistration<TData = unknown> {
+  id: string
+  title: string
+  route?: string
+  icon?: string
+  shortcut?: string
+  render(props: PsmAppViewRenderProps<TData>): unknown
+}
+
+export type PsmAppSidebarViewRenderProps<TData = unknown> = PsmAppViewRenderProps<TData>
+
+export interface PsmAppSidebarViewRegistration<TData = unknown> {
+  id: string
+  title: string
+  appViewId?: string
+  route?: string
+  render(props: PsmAppSidebarViewRenderProps<TData>): unknown
+}
+
 export interface PsmPluginUiRegistry {
+  registerAppView(view: PsmAppViewRegistration): void
+  registerAppSidebarView(view: PsmAppSidebarViewRegistration): void
   registerSessionToolbarItem(item: PsmSessionToolbarItemRegistration): void
   registerSessionPanel(panel: PsmSessionPanelRegistration): void
   registerSessionTreeView(view: PsmSessionTreeViewRegistration): void
@@ -285,10 +370,12 @@ export interface PsmPluginHostContext {
   manifest: PsmPluginManifest
   psm: PsmCapabilityClient
   permissions: PsmPermissionContext
+  events: PsmPluginEventsClient
   settings: PsmPluginSettingsClient
   i18n: PsmPluginI18nClient
+  log: PsmPluginLogger
   ui: PsmPluginUiRegistry
-  registerCommand(name: string, handler: (args: Record<string, unknown>) => Promise<unknown>): void
+  registerCommand(command: string | PsmPluginCommandRegistration, handler?: PsmPluginCommandHandler): void
   registerTool(name: string, tool: PsmPluginToolRegistration): void
 }
 
@@ -470,7 +557,7 @@ export interface PsmCreateTagParams {
   parentId?: string
 }
 
-export interface PsmKanbanClient {
+export interface PsmTagsClient {
   listTags(): Promise<PsmTag[]>
   createTag(params: PsmCreateTagParams): Promise<PsmTag>
   assignTag(sessionId: string, tagId: string): Promise<void>
@@ -559,6 +646,15 @@ export interface PsmModelsClient {
   listOptions(): Promise<PsmModelOption[]>
 }
 
+export interface PsmJsonConfigReadOptions<TDefault = unknown> {
+  defaultValue?: TDefault
+}
+
+export interface PsmJsonConfigClient {
+  read<T = unknown>(key: string, options?: PsmJsonConfigReadOptions<T>): Promise<T>
+  write<T = unknown>(key: string, value: T): Promise<void>
+}
+
 export interface PsmCapabilityClient {
   records: PsmRecordsClient
   sessions: PsmSessionsClient
@@ -566,7 +662,8 @@ export interface PsmCapabilityClient {
   ai: PsmAiClient
   sidechat: PsmSideChatClient
   models: PsmModelsClient
-  kanban: PsmKanbanClient
+  tags: PsmTagsClient
+  config: PsmJsonConfigClient
 }
 
 export interface CreatePsmClientOptions {

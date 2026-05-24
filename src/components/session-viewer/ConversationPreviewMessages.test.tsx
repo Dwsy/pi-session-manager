@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SessionViewProvider } from "@/contexts/SessionViewContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
+import { registerBuiltinToolPlugins } from "@/plugins/tools-render";
 import type { SessionEntry } from "@/types";
 import ConversationPreviewMessages, { buildConversationPreviewTurns } from "./ConversationPreviewMessages";
 
@@ -36,7 +37,7 @@ function toolCall(id: string, name: string): SessionEntry {
     timestamp: "2026-05-19T00:00:00.000Z",
     message: {
       role: "assistant",
-      content: [{ type: "toolCall", id, name, args: {} }],
+      content: [{ type: "toolCall", id, name, arguments: {} }],
     },
   };
 }
@@ -47,6 +48,7 @@ describe("buildConversationPreviewTurns", () => {
   });
 
   beforeEach(() => {
+    registerBuiltinToolPlugins();
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: false,
       media: query,
@@ -165,5 +167,57 @@ describe("buildConversationPreviewTurns", () => {
     consoleError.mockRestore();
 
     expect(duplicateKeyWarning).toBe(false);
+  });
+
+  it("shows linked tool output after expanding a process entry", () => {
+    const toolResult: SessionEntry = {
+      type: "message",
+      id: "tool-result-bash",
+      timestamp: "2026-05-19T00:00:01.000Z",
+      message: {
+        role: "toolResult",
+        toolCallId: "call-bash",
+        content: [{ type: "text", text: "tests passed" }],
+      },
+    };
+
+    const { container } = render(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={[
+            message("user-1", "user", "Run tests"),
+            {
+              type: "message",
+              id: "assistant-tool",
+              timestamp: "2026-05-19T00:00:00.000Z",
+              message: {
+                role: "assistant",
+                content: [
+                  {
+                    type: "toolCall",
+                    id: "call-bash",
+                    name: "bash",
+                    arguments: { command: "pnpm test" },
+                  },
+                ],
+              },
+            },
+            message("assistant-1", "assistant", "Done"),
+          ]}
+          toolResultByCallId={new Map([["call-bash", toolResult]])}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+        />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getByText("Show"));
+    const toolHeader = container.querySelector(".tool-header-bash");
+    expect(toolHeader).toBeTruthy();
+    fireEvent.click(toolHeader!);
+
+    expect(document.body.textContent).toContain("tests passed");
   });
 });

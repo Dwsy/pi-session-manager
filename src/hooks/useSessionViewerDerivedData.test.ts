@@ -32,4 +32,25 @@ describe("useSessionViewerDerivedData", () => {
       "assistant-1",
     ]);
   });
+
+  it("indexes tool results by tool call id", () => {
+    const entries = [
+      message("assistant-1", "assistant", "Running tool"),
+      {
+        type: "message",
+        id: "tool-result-1",
+        parentId: "assistant-1",
+        timestamp: "2026-05-19T00:00:01.000Z",
+        message: {
+          role: "toolResult",
+          toolCallId: "call-1",
+          content: [{ type: "text", text: "file contents" }],
+        },
+      } satisfies SessionEntry,
+    ];
+
+    const { result } = renderHook(() => useSessionViewerDerivedData(entries, "tool-result-1"));
+
+    expect(result.current.toolResultByCallId.get("call-1")?.id).toBe("tool-result-1");
+  });
 });

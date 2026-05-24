@@ -23,7 +23,7 @@ import type { TerminalType } from '@/components/settings/types'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
 import SearchFilterBar from '@/components/search/SearchFilterBar'
-import SessionPreviewModal from './SessionPreviewModal'
+import SessionPreviewModal from '@/components/session-preview/SessionPreviewModal'
 import TimeRangeSelector from './TimeRangeSelector'
 import type { TimeRange } from '@/utils/sessionFilters'
 import { filterSessions } from '@/utils/sessionFilters'
@@ -334,7 +334,7 @@ export default function KanbanBoard({
       <div className="h-full flex flex-col">
         <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/40 flex-shrink-0 relative z-20" data-tauri-drag-region>
           <h2 className="text-sm font-medium text-foreground shrink-0">
-            {t('tags.kanban.title')}
+            {t('plugins.kanbanBoard.title', 'Kanban Board')}
           </h2>
         </div>
         <div className="flex-1 flex items-center justify-center">
@@ -349,7 +349,7 @@ export default function KanbanBoard({
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/40 flex-shrink-0 relative z-20" data-tauri-drag-region>
         <h2 className="text-sm font-medium text-foreground shrink-0">
-          {t('tags.kanban.title')}
+          {t('plugins.kanbanBoard.title', 'Kanban Board')}
         </h2>
         {projectFilter ? (
           <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 text-[11px] shrink-0">
@@ -357,7 +357,7 @@ export default function KanbanBoard({
           </span>
         ) : (
           <span className="text-[10px] text-muted-foreground shrink-0">
-            {t('tags.kanban.allProjects', 'All Projects')}
+            {t('plugins.kanbanBoard.allProjects', 'All Projects')}
           </span>
         )}
         <div className="flex-1 min-w-0 max-w-[480px]">
@@ -384,10 +384,10 @@ export default function KanbanBoard({
           <button
             onClick={() => onNewSession(projectFilter || '')}
             className="flex items-center gap-1 px-2.5 py-1 rounded-md border border-accent/25 bg-accent/15 text-foreground hover:bg-accent/25 hover:border-accent/40 text-[11px] shrink-0 motion-color motion-press focus-ring"
-            title={t('kanban.newSession', 'New Session')}
+            title={t('plugins.kanbanBoard.newSession', 'New Session')}
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>{t('kanban.newSession', 'New')}</span>
+            <span>{t('plugins.kanbanBoard.newSessionShort', 'New')}</span>
           </button>
         )}
       </div>
@@ -416,7 +416,7 @@ export default function KanbanBoard({
                       : 'text-muted-foreground'
                   }`}
                 >
-                  {col.tag?.name || t('tags.kanban.untagged')}
+                  {col.tag?.name || t('plugins.kanbanBoard.untagged', 'Unlabeled')}
                   <span className="text-[9px] opacity-60">{col.sessions.length}</span>
                 </button>
               ))}
@@ -449,9 +449,12 @@ export default function KanbanBoard({
         ) : (
           /* Desktop: horizontal scroll */
           <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-4">
-            <div className="kanban-board flex items-stretch gap-3 h-full min-h-0">
+            <div
+              className="flex items-stretch gap-3 h-full min-h-0 overflow-x-auto"
+              style={{ WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory' }}
+            >
               {columns.map(col => (
-                <div key={col.id} className="kanban-column h-full min-h-0">
+                <div key={col.id} className="h-full min-h-0 min-w-[280px]" style={{ scrollSnapAlign: 'start' }}>
                   <KanbanColumn
                     id={col.id}
                     tag={col.tag}

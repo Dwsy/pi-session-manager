@@ -302,15 +302,13 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
   }, [pendingCommand, activeTabId, onCommandConsumed])
 
   const closeTab = useCallback((tabId: string) => {
-    setTabs(prev => {
-      const next = prev.filter(t => t.id !== tabId)
-      setActiveTabId(current =>
-        current === tabId ? (next.length > 0 ? next[next.length - 1].id : null) : current
-      )
-      if (next.length === 0) onClose()
-      return next
-    })
-  }, [onClose])
+    const nextTabs = tabs.filter(t => t.id !== tabId)
+    setTabs(nextTabs)
+    setActiveTabId(current =>
+      current === tabId ? (nextTabs.length > 0 ? nextTabs[nextTabs.length - 1].id : null) : current
+    )
+    if (nextTabs.length === 0) onClose()
+  }, [onClose, tabs])
 
   // Dismiss shell menu
   useEffect(() => {
@@ -322,11 +320,10 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
 
   // Maximize toggle
   const toggleMaximize = useCallback(() => {
-    setMaximized(v => {
-      onMaximizedChange?.(!v)
-      return !v
-    })
-  }, [onMaximizedChange])
+    const next = !maximized
+    setMaximized(next)
+    onMaximizedChange?.(next)
+  }, [maximized, onMaximizedChange])
 
   // Drag resize
   const handleResizeStart = useCallback((e: React.MouseEvent) => {

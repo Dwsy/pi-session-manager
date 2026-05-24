@@ -241,9 +241,9 @@ export default function VersionDowngradeDialog({
           <button
             onClick={handleBackup}
             disabled={state.phase === 'backing_up' || state.phase === 'resetting'}
-            className="w-full px-4 py-3 bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all flex items-center justify-center gap-2 group"
+            className="w-full px-4 py-3 bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl motion-context flex items-center justify-center gap-2 group"
           >
-            <Download className="h-4 w-4 group-hover:scale-110 transition-transform" />
+            <Download className="h-4 w-4 group-hover:scale-110 motion-transform" />
             <span className="font-medium">
               {state.phase === 'backing_up'
                 ? t('versionDowngrade.backingUp', 'Backing up...')
@@ -257,9 +257,9 @@ export default function VersionDowngradeDialog({
           <button
             onClick={handleReset}
             disabled={state.phase === 'backing_up' || state.phase === 'resetting' || state.phase === 'reset_success'}
-            className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all flex items-center justify-center gap-2 group shadow-lg shadow-orange-500/25"
+            className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl motion-context flex items-center justify-center gap-2 group shadow-lg shadow-orange-500/25"
           >
-            <RefreshCw className="h-4 w-4 group-hover:rotate-180 transition-transform duration-500" />
+            <RefreshCw className="h-4 w-4 group-hover:rotate-180 motion-transform" />
             <span className="font-medium">
               {state.phase === 'resetting'
                 ? t('versionDowngrade.resetting', 'Resetting...')

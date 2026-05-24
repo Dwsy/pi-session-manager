@@ -9,7 +9,7 @@ fn text_entry(id: &str, role: &str, text: &str) -> SessionEntry {
         id: id.to_string(),
         parent_id: None,
         timestamp: chrono::Utc::now(),
-        message: Some(Message { role: role.to_string(), content: vec![Content { content_type: "text".to_string(), text: Some(text.to_string()) }], model: None, provider: None, usage: None }),
+        message: Some(Message { role: role.to_string(), content: vec![Content { content_type: "text".to_string(), id: None, name: None, arguments: None, text: Some(text.to_string()) }], tool_call_id: None, tool_name: None, is_error: None, model: None, provider: None, usage: None }),
         target_id: None,
         label: None,
         name: None,

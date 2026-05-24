@@ -10,11 +10,26 @@ interface RouteSyncOptions {
   selectedSession: SessionInfo | null;
   sessions: SessionInfo[];
   sessionsLoading: boolean;
+  viewMode: AppSidebarViewMode;
   setViewMode: (mode: AppSidebarViewMode) => void;
   setSelectedProject: (project: string | null) => void;
   setShowSettings: (show: boolean) => void;
   setShowTerminal: (show: boolean) => void;
   setShowFavorites: (show: boolean) => void;
+  setActiveAppViewId: (viewId: string | null) => void;
+  appRoutes: Array<{ id: string; route?: string }>;
+  appRoutesReady: boolean;
+}
+
+function normalizeRoutePath(path?: string) {
+  if (!path) return null;
+  const [pathname] = path.split(/[?#]/);
+  const normalized = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return normalized.replace(/\/+$/, '') || '/';
+}
+
+function fallbackAppRoute(viewId: string) {
+  return `/app/${encodeURIComponent(viewId)}`;
 }
 
 export function useRouteSync({
@@ -22,11 +37,15 @@ export function useRouteSync({
   selectedSession,
   sessions,
   sessionsLoading,
+  viewMode,
   setViewMode,
   setSelectedProject,
   setShowSettings,
   setShowTerminal,
   setShowFavorites,
+  setActiveAppViewId,
+  appRoutes,
+  appRoutesReady,
 }: RouteSyncOptions) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,6 +56,16 @@ export function useRouteSync({
   const pendingSessionRoute =
     parsedRoute.route === 'session' &&
     selectedSession?.id !== parsedRoute.sessionId;
+  const matchingAppRoute = useMemo(() => {
+    if (parsedRoute.route !== 'app') return null;
+    const routePath = normalizeRoutePath(parsedRoute.path);
+    return appRoutes.find((view) => {
+      const viewRoute = normalizeRoutePath(view.route) ?? fallbackAppRoute(view.id);
+      return viewRoute === routePath;
+    }) ?? null;
+  }, [appRoutes, parsedRoute]);
+  const pendingAppRoute =
+    parsedRoute.route === 'app' && (!appRoutesReady || !matchingAppRoute);
   const prevPathnameRef = useRef(location.pathname);
 
   // ─── URL → State (single source of truth) ─────────────
@@ -49,6 +78,7 @@ export function useRouteSync({
 
     switch (parsedRoute.route) {
       case 'session': {
+        setActiveAppViewId(null);
         const session = sessions.find(s => s.id === parsedRoute.sessionId);
         if (session) {
           if (selectedSession?.id !== session.id) {
@@ -78,6 +108,7 @@ export function useRouteSync({
       case 'project': {
         // Sync project view
         setSelectedSession(null);
+        setActiveAppViewId(null);
         setSelectedProject(parsedRoute.projectPath);
         setViewMode('project');
         setShowFavorites(false);
@@ -91,6 +122,7 @@ export function useRouteSync({
       case 'feature': {
         // Clear session selection for feature pages
         setSelectedSession(null);
+        setActiveAppViewId(null);
         if (routeChanged) {
           setShowSettings(false);
         }
@@ -98,9 +130,6 @@ export function useRouteSync({
         setShowFavorites(false);
 
         switch (parsedRoute.feature) {
-          case 'kanban':
-            setViewMode('kanban');
-            break;
           case 'dashboard':
             // viewMode controls sidebar content only; main content always shows Dashboard
             // when no session is selected (see renderDesktopMainContent)
@@ -120,9 +149,34 @@ export function useRouteSync({
         break;
       }
 
+      case 'app': {
+        if (!appRoutesReady) {
+          break;
+        }
+        if (!matchingAppRoute) {
+          navigate('/', { replace: true });
+          break;
+        }
+
+        setSelectedSession(null);
+        setSelectedProject(null);
+        setActiveAppViewId(matchingAppRoute.id);
+        setViewMode('app');
+        if (routeChanged) {
+          setShowSettings(false);
+        }
+        setShowTerminal(false);
+        setShowFavorites(false);
+        break;
+      }
+
       case 'root': {
         // Home: clear session, keep current viewMode unless it's a feature-specific one
         setSelectedSession(null);
+        setActiveAppViewId(null);
+        if (viewMode === 'app') {
+          setViewMode('list');
+        }
         if (routeChanged) {
           setShowSettings(false);
         }
@@ -135,7 +189,7 @@ export function useRouteSync({
     // selectedSession is intentionally NOT in deps to avoid circular updates.
     // We only read it to check if a sync is needed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, parsedRoute, sessions, sessionsLoading, navigate]);
+  }, [location.pathname, parsedRoute, sessions, sessionsLoading, navigate, appRoutesReady, matchingAppRoute, viewMode]);
 
   // ─── Navigation helpers ───────────────────────────────────
   const navigateToSession = useCallback(
@@ -153,5 +207,6 @@ export function useRouteSync({
     navigateToSessions,
     navigateToFeature,
     pendingSessionRoute,
+    pendingAppRoute,
   };
 }

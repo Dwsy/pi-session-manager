@@ -55,6 +55,12 @@ pub struct SessionEntry {
 pub struct Message {
     pub role: String,
     pub content: Vec<Content>,
+    #[serde(rename = "toolCallId", default, skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+    #[serde(rename = "toolName", default, skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+    #[serde(rename = "isError", default, skip_serializing_if = "Option::is_none")]
+    pub is_error: Option<bool>,
     /// Model name (e.g. "gpt-5", "claude-sonnet-4-20250514")
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
@@ -70,6 +76,13 @@ pub struct Message {
 pub struct Content {
     #[serde(rename = "type")]
     pub content_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
 }
 

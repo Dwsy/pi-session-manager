@@ -200,7 +200,7 @@ export default function KanbanColumn({
           <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-muted-foreground/30" />
         )}
         <span className="text-xs font-medium text-foreground flex-1 truncate">
-          {tag?.name || t('tags.kanban.untagged')}
+          {tag?.name || t('plugins.kanbanBoard.untagged', 'Unlabeled')}
         </span>
         <span className="text-[10px] text-muted-foreground tabular-nums px-1.5 py-0.5 rounded bg-muted/50">
           {sessions.length}
@@ -234,7 +234,7 @@ export default function KanbanColumn({
             {renderCards()}
             {sessions.length === 0 && (
               <div className="text-[10px] text-muted-foreground/50 text-center py-6">
-                Drop sessions here
+                {t('plugins.kanbanBoard.dropSessionsHere', 'Drop sessions here')}
               </div>
             )}
           </SortableContext>

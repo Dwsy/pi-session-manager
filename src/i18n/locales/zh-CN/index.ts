@@ -18,7 +18,6 @@ import { tags } from './tags'
 import { plugins } from './plugins'
 import { time } from './time'
 import { auth } from './auth'
-import { kanban } from './kanban'
 import { piAgent } from './piAgent'
 
 export const zhCN = {
@@ -42,7 +41,6 @@ export const zhCN = {
   plugins,
   time,
   auth,
-  kanban,
   piAgent,
   connection: {
     disconnected: '无法连接到服务，请检查应用是否运行',

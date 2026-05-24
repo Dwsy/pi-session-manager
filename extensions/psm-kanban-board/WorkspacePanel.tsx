@@ -1,23 +1,42 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import {
+  Check,
+  ChevronDown,
+  Filter,
+  Folder,
+  FolderKanban,
+  FolderOpen,
+  LayoutGrid,
+  Loader2,
+  Plus,
+  Search,
+  Settings,
+  Tag,
+  Trash2,
+} from 'lucide-react'
+
 import CompositionInput from '@/components/ui/CompositionInput'
-import { FolderOpen, Folder, Check, Search, Plus, Settings, Trash2, ChevronDown, Filter, Tag, LayoutGrid, FolderKanban } from 'lucide-react'
+import type { AppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
 import type { SessionInfo } from '@/types'
-import type { KanbanWorkspace } from '@/hooks/useWorkspaces'
 import { getDirectoryName } from '@/utils/sessionDisplay'
+import { filterSessions } from '@/utils/sessionFilters'
+
+import WorkspaceEditor from './WorkspaceEditor'
+import type { KanbanWorkspace, KanbanWorkspaceStore } from './workspaceStore'
+import { useKanbanWorkspaceSnapshot } from './workspaceStore'
 
 interface WorkspacePanelProps {
-  sessions: SessionInfo[]
-  workspaceSessions?: SessionInfo[]
-  selectedProject: string | null
-  onSelectProject: (project: string | null) => void
-  workspaces: KanbanWorkspace[]
-  activeWorkspace: KanbanWorkspace
-  activeWorkspaceId: string
-  onSelectWorkspace: (id: string) => void
-  onCreateWorkspace: () => void
-  onEditWorkspace: (workspace: KanbanWorkspace) => void
-  onDeleteWorkspace: (id: string) => void
+  data: Pick<
+    AppPluginSurfaceData,
+    | 'sessions'
+    | 'tags'
+    | 'sessionTags'
+    | 'sourceOptions'
+    | 'getDescendantIds'
+    | 'onClearSelectedSession'
+  >
+  workspaceStore: KanbanWorkspaceStore
 }
 
 interface Project {
@@ -28,23 +47,34 @@ interface Project {
 }
 
 export default function WorkspacePanel({
-  sessions,
-  workspaceSessions,
-  selectedProject,
-  onSelectProject,
-  workspaces,
-  activeWorkspace,
-  activeWorkspaceId,
-  onSelectWorkspace,
-  onCreateWorkspace,
-  onEditWorkspace,
-  onDeleteWorkspace,
+  data,
+  workspaceStore,
 }: WorkspacePanelProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState('')
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false)
+  const [showEditor, setShowEditor] = useState(false)
+  const [editingWorkspace, setEditingWorkspace] = useState<KanbanWorkspace | null>(null)
+  const {
+    workspaces,
+    activeWorkspace,
+    activeWorkspaceId,
+    selectedProject,
+    loading,
+  } = useKanbanWorkspaceSnapshot(workspaceStore)
 
-  const effectiveSessions = workspaceSessions ?? sessions
+  const effectiveProjectFilter = activeWorkspace.config.projectFilter ?? selectedProject
+  const effectiveSessions = useMemo(() => (
+    filterSessions({
+      sessions: data.sessions,
+      projectFilter: activeWorkspace.config.projectFilter,
+      filterTagIds: activeWorkspace.config.filterTagIds,
+      sourceFilterSlugs: activeWorkspace.config.sourceFilterSlugs,
+      sessionTags: data.sessionTags,
+      getDescendantIds: data.getDescendantIds,
+      timeRange: 'any',
+    })
+  ), [activeWorkspace, data.getDescendantIds, data.sessionTags, data.sessions])
 
   const projects: Project[] = useMemo(() => {
     const projectMap = effectiveSessions.reduce((acc, session) => {
@@ -61,11 +91,9 @@ export default function WorkspacePanel({
         dir,
         dirName: getDirectoryName(dir),
         sessionCount: dirSessions.length,
-        lastModified: Math.max(
-          ...dirSessions.map((s) => new Date(s.modified).getTime()),
-        ),
+        lastModified: Math.max(...dirSessions.map((session) => new Date(session.modified).getTime())),
       }))
-      .filter(p => !searchQuery || p.dirName.toLowerCase().includes(searchQuery.toLowerCase()))
+      .filter((project) => !searchQuery || project.dirName.toLowerCase().includes(searchQuery.toLowerCase()))
       .sort((a, b) => b.lastModified - a.lastModified)
   }, [effectiveSessions, searchQuery, t])
 
@@ -74,9 +102,31 @@ export default function WorkspacePanel({
     activeWorkspace.config.filterTagIds.length > 0 ||
     activeWorkspace.config.sourceFilterSlugs.length > 0
 
+  const openCreateEditor = () => {
+    setEditingWorkspace(null)
+    setShowEditor(true)
+  }
+
+  const openEditEditor = (workspace: KanbanWorkspace) => {
+    setEditingWorkspace(workspace)
+    setShowEditor(true)
+  }
+
+  const selectProject = (project: string | null) => {
+    workspaceStore.selectProject(project)
+    data.onClearSelectedSession()
+  }
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-card border-r border-border/10">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex flex-col bg-card border-r border-border/10">
-      {/* Workspace Switcher */}
       <div className="px-2 py-2 border-b border-border/10 relative">
         <button
           onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
@@ -93,37 +143,63 @@ export default function WorkspacePanel({
 
         {isWorkspaceOpen && (
           <div className="absolute z-50 top-full left-2 right-2 mt-1 bg-popover border border-border rounded-md shadow-lg py-1 animate-in fade-in-0 zoom-in-95">
-            {workspaces.map(w => (
-              <div key={w.id} className={`flex items-center group px-1 ${w.id === activeWorkspaceId ? 'bg-primary/5' : ''}`}>
+            {workspaces.map((workspace) => (
+              <div key={workspace.id} className={`flex items-center group px-1 ${workspace.id === activeWorkspaceId ? 'bg-primary/5' : ''}`}>
                 <button
-                  onClick={() => { onSelectWorkspace(w.id); setIsWorkspaceOpen(false) }}
+                  onClick={() => {
+                    workspaceStore.selectWorkspace(workspace.id)
+                    setIsWorkspaceOpen(false)
+                  }}
                   className="flex-1 flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted rounded-sm"
                 >
-                  {w.id === '__default__' ? (
+                  {workspace.id === '__default__' ? (
                     <LayoutGrid className="h-3.5 w-3.5 text-muted-foreground" />
                   ) : (
                     <FolderKanban className="h-3.5 w-3.5 text-primary/80" />
                   )}
-                  <span className="truncate">{w.name}</span>
+                  <span className="truncate">{workspace.name}</span>
                 </button>
-                {w.id !== '__default__' && (
+                {workspace.id !== '__default__' && (
                   <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); onEditWorkspace(w); setIsWorkspaceOpen(false) }} className="p-1 hover:text-primary"><Settings className="h-3 w-3" /></button>
-                    <button onClick={(e) => { e.stopPropagation(); onDeleteWorkspace(w.id) }} className="p-1 hover:text-destructive"><Trash2 className="h-3 w-3" /></button>
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openEditEditor(workspace)
+                        setIsWorkspaceOpen(false)
+                      }}
+                      className="p-1 hover:text-primary"
+                    >
+                      <Settings className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void workspaceStore.deleteWorkspace(workspace.id)
+                      }}
+                      className="p-1 hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
                   </div>
                 )}
               </div>
             ))}
             <div className="border-t border-border/10 mt-1 pt-1 px-1">
-              <button onClick={() => { onCreateWorkspace(); setIsWorkspaceOpen(false) }} className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-sm">
-                <Plus className="h-3 w-3" /> {t('kanban.workspace.create')}
+              <button
+                onClick={() => {
+                  openCreateEditor()
+                  setIsWorkspaceOpen(false)
+                }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-sm"
+              >
+                <Plus className="h-3 w-3" />
+                {t('plugins.kanbanBoard.workspace.create')}
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Active Filter Badges */}
       {hasFilters && (
         <div className="px-2 py-1.5 border-b border-border/10 flex flex-wrap gap-1">
           {activeWorkspace.config.projectFilter && (
@@ -147,7 +223,6 @@ export default function WorkspacePanel({
         </div>
       )}
 
-      {/* Search Input */}
       <div className="px-2 py-1.5 border-b border-border/10">
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -161,25 +236,24 @@ export default function WorkspacePanel({
         </div>
       </div>
 
-      {/* Project List */}
       <div className="flex-1 overflow-y-auto">
         <button
-          onClick={() => onSelectProject(null)}
+          onClick={() => selectProject(null)}
           className={`w-full px-3 py-2 flex items-center gap-2 text-xs border-b border-border/5 ${
-            selectedProject === null ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted text-muted-foreground'
+            effectiveProjectFilter === null ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted text-muted-foreground'
           }`}
         >
           <Folder className="h-3.5 w-3.5" />
           <span className="flex-1 text-left">{t('project.filter.allProjects')}</span>
-          {selectedProject === null && <Check className="h-3 w-3" />}
+          {effectiveProjectFilter === null && <Check className="h-3 w-3" />}
         </button>
 
-        {projects.map(project => (
+        {projects.map((project) => (
           <button
             key={project.dir}
-            onClick={() => onSelectProject(project.dir)}
+            onClick={() => selectProject(project.dir)}
             className={`w-full px-3 py-2 flex items-center gap-2 text-xs border-b border-border/5 ${
-              selectedProject === project.dir ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted text-muted-foreground'
+              effectiveProjectFilter === project.dir ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted text-muted-foreground'
             }`}
           >
             <FolderOpen className="h-3.5 w-3.5 opacity-60" />
@@ -194,6 +268,17 @@ export default function WorkspacePanel({
           </div>
         )}
       </div>
+
+      {showEditor && (
+        <WorkspaceEditor
+          workspace={editingWorkspace}
+          sessions={data.sessions}
+          tags={data.tags}
+          sourceOptions={data.sourceOptions}
+          onSave={(workspace) => workspaceStore.saveWorkspace(workspace)}
+          onClose={() => setShowEditor(false)}
+        />
+      )}
     </div>
   )
 }

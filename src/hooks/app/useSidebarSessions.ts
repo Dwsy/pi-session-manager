@@ -9,7 +9,7 @@ import { filterSessions } from "@/utils/sessionFilters";
 import { getDirectoryName } from "@/utils/sessionDisplay";
 import { usePaginatedSessions } from "@/hooks/usePaginatedSessions";
 
-export type AppSidebarViewMode = "list" | "project" | "kanban";
+export type AppSidebarViewMode = "list" | "project" | "app";
 
 export interface SidebarSelectedProjectSummary {
   projectName: string;

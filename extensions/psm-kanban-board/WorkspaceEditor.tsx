@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Tag, FolderInput, Database } from 'lucide-react'
-import type { KanbanWorkspace } from '@/hooks/useWorkspaces'
-import type { SessionInfo, Tag as TagType } from '@/types'
+import { Database, FolderInput, Tag, X } from 'lucide-react'
+
 import TagBadge from '@/components/tags/TagBadge'
+import type { SessionInfo, Tag as TagType } from '@/types'
+
+import type { KanbanWorkspace, KanbanWorkspaceDraft } from './workspaceStore'
 
 interface WorkspaceEditorProps {
   workspace?: KanbanWorkspace | null
   sessions: SessionInfo[]
   tags: TagType[]
   sourceOptions?: Array<{ slug: string; label: string }>
-  onSave: (workspace: Omit<KanbanWorkspace, 'createdAt' | 'updatedAt'>) => void
+  onSave: (workspace: KanbanWorkspaceDraft) => void | Promise<void>
   onClose: () => void
 }
 
@@ -28,28 +30,28 @@ export default function WorkspaceEditor({
   const [filterTagIds, setFilterTagIds] = useState<string[]>(workspace?.config.filterTagIds || [])
   const [sourceFilterSlugs, setSourceFilterSlugs] = useState<string[]>(workspace?.config.sourceFilterSlugs || [])
 
-  const projects = Array.from(new Set(sessions.map(s => s.cwd).filter(Boolean)))
+  const projects = Array.from(new Set(sessions.map((session) => session.cwd).filter(Boolean))).sort()
 
   const handleToggleTag = (tagId: string) => {
-    setFilterTagIds(prev =>
+    setFilterTagIds((prev) => (
       prev.includes(tagId)
-        ? prev.filter(id => id !== tagId)
+        ? prev.filter((id) => id !== tagId)
         : [...prev, tagId]
-    )
+    ))
   }
 
   const handleToggleSource = (slug: string) => {
-    setSourceFilterSlugs(prev =>
+    setSourceFilterSlugs((prev) => (
       prev.includes(slug)
-        ? prev.filter(s => s !== slug)
+        ? prev.filter((item) => item !== slug)
         : [...prev, slug]
-    )
+    ))
   }
 
   const handleSave = () => {
     if (!name.trim()) return
 
-    onSave({
+    void onSave({
       id: workspace?.id || '__new__',
       name: name.trim(),
       config: {
@@ -66,7 +68,7 @@ export default function WorkspaceEditor({
       <div className="bg-card rounded-lg shadow-2xl border border-border w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
           <h3 className="text-sm font-medium text-foreground">
-            {workspace ? t('kanban.workspace.edit') : t('kanban.workspace.create')}
+            {workspace ? t('plugins.kanbanBoard.workspace.edit') : t('plugins.kanbanBoard.workspace.create')}
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted text-muted-foreground">
             <X className="h-4 w-4" />
@@ -76,14 +78,14 @@ export default function WorkspaceEditor({
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              {t('kanban.workspace.name')}
+              {t('plugins.kanbanBoard.workspace.name')}
             </label>
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(event) => setName(event.target.value)}
               className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:ring-1 focus:ring-ring focus:border-primary outline-none"
-              placeholder={t('kanban.workspace.namePlaceholder')}
+              placeholder={t('plugins.kanbanBoard.workspace.namePlaceholder')}
               autoFocus
             />
           </div>
@@ -91,15 +93,15 @@ export default function WorkspaceEditor({
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
               <FolderInput className="h-3 w-3" />
-              {t('kanban.workspace.projectFilter')}
+              {t('plugins.kanbanBoard.workspace.projectFilter')}
             </label>
             <select
               value={projectFilter || ''}
-              onChange={(e) => setProjectFilter(e.target.value || null)}
+              onChange={(event) => setProjectFilter(event.target.value || null)}
               className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:ring-1 focus:ring-ring outline-none"
             >
-              <option value="">{t('kanban.workspace.allProjects')}</option>
-              {projects.map(project => (
+              <option value="">{t('plugins.kanbanBoard.workspace.allProjects')}</option>
+              {projects.map((project) => (
                 <option key={project} value={project}>
                   {project?.split('/').pop()}
                 </option>
@@ -110,10 +112,10 @@ export default function WorkspaceEditor({
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
               <Tag className="h-3 w-3" />
-              {t('kanban.workspace.tagFilters')}
+              {t('plugins.kanbanBoard.workspace.tagFilters')}
             </label>
             <div className="flex flex-wrap gap-2">
-              {tags.map(tag => (
+              {tags.map((tag) => (
                 <button
                   key={tag.id}
                   onClick={() => handleToggleTag(tag.id)}
@@ -134,10 +136,10 @@ export default function WorkspaceEditor({
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
                 <Database className="h-3 w-3" />
-                {t('kanban.workspace.sourceFilters')}
+                {t('plugins.kanbanBoard.workspace.sourceFilters')}
               </label>
               <div className="flex flex-wrap gap-2">
-                {sourceOptions.map(source => (
+                {sourceOptions.map((source) => (
                   <button
                     key={source.slug}
                     onClick={() => handleToggleSource(source.slug)}

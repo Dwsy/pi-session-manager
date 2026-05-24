@@ -1,5 +1,6 @@
 use crate::data::sqlite::{DbPluginRecord, DbPluginRecordIndexValue, PluginRecordSearchHit};
 use serde::Deserialize;
+use tracing::{error, info};
 
 fn get_conn() -> Result<rusqlite::Connection, String> {
     let config = crate::config::load_config()?;
@@ -41,12 +42,16 @@ pub async fn search_plugin_records(query: String, record_type: Option<String>, p
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn refresh_session_intelligence_record(path: String, provider: Option<String>, model: Option<String>, language: Option<String>) -> Result<DbPluginRecord, String> {
     let conn = get_conn()?;
+    info!(target: "session_summary", path = %path, provider = provider.as_deref().unwrap_or("auto"), model = model.as_deref().unwrap_or("auto"), language = language.as_deref().unwrap_or("auto"), "Refreshing session intelligence record");
     let entries = crate::commands::session_file::get_session_entries_impl(path.clone()).await?;
     let context = crate::domain::session_summary::build_summary_context(&entries);
     if context.trim().is_empty() {
+        error!(target: "session_summary", path = %path, "Session has no user or assistant text to summarize");
         return Err("Session has no user or assistant text to summarize".to_string());
     }
 
     let (summary, provider_name, model_id) = crate::domain::session_summary::generate_session_summary_with_language(&context, provider.as_deref(), model.as_deref(), language.as_deref()).await?;
-    crate::domain::session_summary::refresh_session_intelligence_record_from_summary(&conn, &path, &entries, summary, &provider_name, &model_id)
+    let record = crate::domain::session_summary::refresh_session_intelligence_record_from_summary(&conn, &path, &entries, summary, &provider_name, &model_id)?;
+    info!(target: "session_summary", path = %path, record_id = %record.id, provider = %provider_name, model = %model_id, "Session intelligence record refreshed");
+    Ok(record)
 }

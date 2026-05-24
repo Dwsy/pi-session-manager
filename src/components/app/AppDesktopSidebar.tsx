@@ -1,10 +1,21 @@
+import { Fragment } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { Columns3, FolderOpen, LayoutDashboard, List, Search, Settings, Star, Terminal } from "lucide-react";
+import { FolderOpen, LayoutDashboard, List, Search, Settings, Star, Terminal } from "lucide-react";
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
+import AppViewIcon from "./AppViewIcon";
 
-export type AppDesktopSidebarMode = "list" | "project" | "kanban" | "pi-live";
+export type AppDesktopSidebarMode = "list" | "project" | "app" | "pi-live";
+
+export interface AppDesktopSidebarAppViewItem {
+  id: string;
+  label: string;
+  icon?: string;
+  shortcut?: string;
+  active: boolean;
+  onSelect: () => void;
+}
 
 export interface AppDesktopSidebarProps {
   isTauriRuntime: boolean;
@@ -17,14 +28,14 @@ export interface AppDesktopSidebarProps {
   onShowDashboard: () => void;
   onSelectListView: () => void;
   onSelectProjectView: () => void;
-  onSelectKanbanView: () => void;
+  appViewItems?: AppDesktopSidebarAppViewItem[];
   onToggleFavorites: () => void;
   onOpenCommandPalette: () => void;
   onToggleTerminal: () => void;
   onOpenSettings: () => void;
   settingsLabel?: string;
   settingsIcon?: ReactNode;
-  searchBar: ReactNode;
+  searchBar?: ReactNode;
   content: ReactNode;
   listScrollRef: RefObject<HTMLDivElement>;
 }
@@ -40,7 +51,7 @@ function AppDesktopSidebar({
   onShowDashboard,
   onSelectListView,
   onSelectProjectView,
-  onSelectKanbanView,
+  appViewItems = [],
   onToggleFavorites,
   onOpenCommandPalette,
   onToggleTerminal,
@@ -112,19 +123,31 @@ function AppDesktopSidebar({
                 <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </KbdTooltip>
-            <KbdTooltip shortcut="Cmd+B" label={t("tags.kanban.title")}>
-              <button
-                type="button"
-                onClick={onSelectKanbanView}
-                role="radio"
-                aria-checked={sidebarMode === "kanban" && !showFavorites}
-                aria-label={t("tags.kanban.title")}
-                className={`p-1 rounded motion-color motion-press focus-ring ${sidebarMode === "kanban" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
-                title={t("tags.kanban.title")}
-              >
-                <Columns3 className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            </KbdTooltip>
+            {appViewItems.map((item) => {
+              const button = (
+                <button
+                  type="button"
+                  onClick={item.onSelect}
+                  role="radio"
+                  aria-checked={item.active && !showFavorites}
+                  aria-label={item.label}
+                  className={`p-1 rounded motion-color motion-press focus-ring ${item.active && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
+                  title={item.label}
+                >
+                  <AppViewIcon icon={item.icon} />
+                </button>
+              );
+
+              return item.shortcut ? (
+                <KbdTooltip key={item.id} shortcut={item.shortcut} label={item.label}>
+                  {button}
+                </KbdTooltip>
+              ) : (
+                <Fragment key={item.id}>
+                  {button}
+                </Fragment>
+              );
+            })}
           </div>
           <button
             type="button"
@@ -187,7 +210,7 @@ function AppDesktopSidebar({
         </div>
       </div>
 
-      {!showFavorites && (
+      {!showFavorites && searchBar && (
         <div className="app-desktop-sidebar__search px-3 py-1.5 border-b border-border/50">
           {searchBar}
         </div>

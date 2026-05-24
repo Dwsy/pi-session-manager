@@ -15,12 +15,14 @@ export default function sessionSummaryPlugin(ctx: PsmPluginHostContext) {
   async function refresh(args: Record<string, unknown>) {
     const path = readStringArg(args, 'path') ?? readStringArg(args, 'sessionPath')
     if (!path) {
+      ctx.log.error('session summary refresh rejected: missing path', { args })
       throw new Error('path is required')
     }
 
     const language = readStringArg(args, 'language') ?? ctx.settings.get('language', 'auto')
     const provider = readStringArg(args, 'provider') ?? readStringArg(ctx.settings.all(), 'provider')
     const model = readStringArg(args, 'model') ?? readStringArg(ctx.settings.all(), 'model')
+    ctx.log.info('session summary refresh requested', { path, provider: provider ?? 'auto', model: model ?? 'auto', language })
     return ctx.psm.records.refreshSessionIntelligence({
       path,
       provider,
@@ -32,7 +34,17 @@ export default function sessionSummaryPlugin(ctx: PsmPluginHostContext) {
   ctx.registerCommand('session-summary.refresh', refresh)
   ctx.registerTool('session_summary_refresh', {
     description: 'Generate an AI summary for a PSM session and persist it as a session.intelligence plugin record.',
-    run: refresh,
+    run: async (args) => {
+      ctx.log.debug('session summary tool invoked', { args })
+      try {
+        const record = await refresh(args)
+        ctx.log.info('session summary tool completed', { recordId: (record as { id?: string }).id })
+        return record
+      } catch (error) {
+        ctx.log.error('session summary tool failed', { error: error instanceof Error ? error.message : String(error) })
+        throw error
+      }
+    },
   })
   const panelSettings = {
     provider: ctx.settings.get('provider', ''),

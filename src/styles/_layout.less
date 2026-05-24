@@ -107,7 +107,7 @@
   top: 0;
   bottom: 0;
   background: transparent;
-  transition: background 0.2s ease;
+  transition: background-color var(--motion-duration-base) var(--motion-ease-standard);
   z-index: 30;
 }
 
@@ -138,7 +138,11 @@
   background: rgba(var(--accent-rgb), 0.2);
   border-radius: 1px;
   opacity: 0;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    height var(--motion-duration-base) var(--motion-ease-standard),
+    width var(--motion-duration-base) var(--motion-ease-standard),
+    opacity var(--motion-duration-base) var(--motion-ease-standard),
+    background-color var(--motion-duration-base) var(--motion-ease-standard);
 }
 
 .sidebar-resize-handle:hover .sidebar-resize-handle-inner {

@@ -125,6 +125,13 @@ fn codex_mixed_event_array_discards_bootstrap_and_keeps_conversation_chain() {
 
     assert_eq!(roles.first().map(String::as_str), Some("user"));
     assert!(roles.iter().filter(|role| role.as_str() == "toolResult").count() >= 1, "expected at least one toolResult node");
+    let tool_call = entries.iter().flat_map(|entry| entry["message"]["content"].as_array().into_iter().flatten()).find(|content| content["type"] == "toolCall").expect("tool call content");
+    assert_eq!(tool_call["id"], Value::String("call_1".to_string()));
+    assert_eq!(tool_call["name"], Value::String("read_file".to_string()));
+    assert_eq!(tool_call["arguments"]["path"], Value::String("src/auth.ts".to_string()));
+
+    let tool_result = entries.iter().find(|entry| entry["message"]["role"] == "toolResult").expect("tool result entry");
+    assert_eq!(tool_result["message"]["toolCallId"], Value::String("call_1".to_string()));
     for pair in entries.windows(2) {
         assert_eq!(pair[1]["parentId"], pair[0]["id"]);
     }
@@ -192,6 +199,13 @@ fn claude_tool_result_chain_survives_pi_preview() {
     assert!(roles.contains(&"user"));
     assert!(roles.contains(&"assistant"));
     assert!(roles.contains(&"toolResult"));
+    let tool_call = entries.iter().flat_map(|entry| entry["message"]["content"].as_array().into_iter().flatten()).find(|content| content["type"] == "toolCall").expect("tool call content");
+    assert_eq!(tool_call["id"], Value::String("toolu_1".to_string()));
+    assert_eq!(tool_call["name"], Value::String("Read".to_string()));
+    assert_eq!(tool_call["arguments"]["file_path"], Value::String("src/auth.ts".to_string()));
+
+    let tool_result = entries.iter().find(|entry| entry["message"]["role"] == "toolResult").expect("tool result entry");
+    assert_eq!(tool_result["message"]["toolCallId"], Value::String("toolu_1".to_string()));
     for pair in entries.windows(2) {
         assert_eq!(pair[1]["parentId"], pair[0]["id"]);
     }
@@ -239,6 +253,15 @@ fn canonical_entries_form_single_chain_for_viewer() {
     assert!(entries[0].parent_id.is_none());
     assert_eq!(entries[1].parent_id.as_deref(), Some(entries[0].id.as_str()));
     assert_eq!(entries[2].parent_id.as_deref(), Some(entries[1].id.as_str()));
+    let assistant = entries[1].message.as_ref().expect("assistant message");
+    let tool_call = assistant.content.iter().find(|content| content.content_type == "toolCall").expect("tool call content");
+    assert_eq!(tool_call.id.as_deref(), Some("call_1"));
+    assert_eq!(tool_call.name.as_deref(), Some("read_file"));
+    assert_eq!(tool_call.arguments.as_ref().and_then(|value| value.get("path")).and_then(Value::as_str), Some("src/auth.ts"));
+
+    let tool_result = entries[2].message.as_ref().expect("tool result message");
+    assert_eq!(tool_result.tool_call_id.as_deref(), Some("call_1"));
+    assert_eq!(tool_result.is_error, Some(false));
 }
 
 #[test]

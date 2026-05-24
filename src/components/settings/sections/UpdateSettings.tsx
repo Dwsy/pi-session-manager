@@ -317,14 +317,14 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
               <div className="flex items-center justify-between">
                 <button
                   onClick={handleReset}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-context"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   {t('settings.update.later', 'Remind me later')}
                 </button>
                 <button
                   onClick={openReleasePage}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-info hover:text-info/80 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-info hover:text-info/80 motion-color"
                 >
                   <ArrowUpRight className="h-3.5 w-3.5" />
                   {t('settings.update.viewOnGitHub', 'View on GitHub')}
@@ -361,7 +361,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
               {/* Progress bar */}
               <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-info to-info/60 rounded-full transition-all duration-300 ease-out"
+                  className="h-full bg-gradient-to-r from-info to-info/60 rounded-full motion-width"
                   style={{ width: `${Math.min(progress, 100)}%` }}
                 />
               </div>
@@ -405,7 +405,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
             {/* Skip option */}
             <button
               onClick={handleReset}
-              className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="w-full text-center text-xs text-muted-foreground hover:text-foreground motion-color"
             >
               {t('settings.update.cancel', 'Cancel')}
             </button>
@@ -436,14 +436,14 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
             <div className="flex items-center gap-2">
               <button
                 onClick={handleCheck}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-context"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 {t('settings.update.retry', 'Retry')}
               </button>
               <button
                 onClick={openReleasePage}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-info hover:text-info/80 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-info hover:text-info/80 motion-color"
               >
                 <ArrowUpRight className="h-3.5 w-3.5" />
                 {t('settings.update.viewOnGitHub', 'View on GitHub')}

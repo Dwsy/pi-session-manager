@@ -10,7 +10,7 @@ describe('runtime-sdk manifest contract', () => {
       id: 'builtin.session-summary',
       name: 'Session Summary',
       version: '0.1.0',
-      permissions: ['sessions:read', 'records:read', 'records:write'],
+      permissions: ['sessions:read', 'records:read', 'records:write', 'config:read', 'config:write'],
       records: [
         {
           type: 'session.intelligence',
@@ -50,6 +50,17 @@ describe('runtime-sdk manifest contract', () => {
           schemaVersion: 1,
         },
       ],
+    }
+
+    expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
+  })
+
+  it('accepts event subscription permissions', () => {
+    const manifest: PsmPluginManifest = {
+      id: 'builtin.event-listener',
+      name: 'Event Listener',
+      version: '1.0.0',
+      permissions: ['events:read'],
     }
 
     expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
@@ -120,8 +131,53 @@ describe('PSM package manifest contract', () => {
 describe('plugin capability client', () => {
   const pluginPermissions: PsmPermissionContext = {
     pluginId: 'builtin.session-summary',
-    permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+    permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
   }
+
+  it('reads and writes plugin-scoped JSON config through the PSM transport', async () => {
+    const calls: Array<{ command: string; payload?: unknown }> = []
+    const configPermissions: PsmPermissionContext = {
+      pluginId: 'builtin.config-test',
+      permissions: ['config:read', 'config:write'],
+    }
+    const transport: PsmTransport = {
+      invoke: async (command, payload) => {
+        calls.push({ command, payload })
+        if (command === 'read_psm_plugin_json_config') return { layout: 'compact' }
+        return null
+      },
+    }
+
+    const client = createPluginCapabilityClient({ transport, permissions: configPermissions })
+    const result = await client.config.read('workspace', { defaultValue: { layout: 'default' } })
+    await client.config.write('workspace', { layout: 'wide' })
+
+    expect(result).toEqual({ layout: 'compact' })
+    expect(calls).toEqual([
+      {
+        command: 'read_psm_plugin_json_config',
+        payload: {
+          key: 'workspace',
+          defaultValue: { layout: 'default' },
+          __psm: {
+            pluginId: 'builtin.config-test',
+            permissions: ['config:read', 'config:write'],
+          },
+        },
+      },
+      {
+        command: 'write_psm_plugin_json_config',
+        payload: {
+          key: 'workspace',
+          value: { layout: 'wide' },
+          __psm: {
+            pluginId: 'builtin.config-test',
+            permissions: ['config:read', 'config:write'],
+          },
+        },
+      },
+    ])
+  })
 
   it('sends typed record RPC through the provided PSM transport', async () => {
     const calls: Array<{ command: string; payload?: unknown }> = []
@@ -166,7 +222,7 @@ describe('plugin capability client', () => {
           limit: 5,
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
           },
         },
       },
@@ -214,7 +270,7 @@ describe('plugin capability client', () => {
           limit: 1,
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
           },
         },
       },
@@ -222,7 +278,7 @@ describe('plugin capability client', () => {
     expect(result[0].payload).toEqual({ summary: 'Existing summary', status: 'active' })
   })
 
-  it('sends session, search, and kanban commands with backend-compatible payloads', async () => {
+  it('sends session, search, and tag commands with backend-compatible payloads', async () => {
     const calls: Array<{ command: string; payload?: unknown }> = []
     const transport: PsmTransport = {
       invoke: async (command, payload) => {
@@ -275,11 +331,11 @@ describe('plugin capability client', () => {
     await client.search.fulltext({ query: 'summary', roleFilter: 'all', page: 0, pageSize: 20, matchMode: 'smart', sortOrder: 'newest' })
     await client.sidechat.ask({ sessionPath: '/repo/session.jsonl', question: 'What is blocked?', language: 'zh-CN', provider: 'openai', model: 'gpt-5.5', thinkingLevel: 'high', limit: 8 })
     await client.models.listOptions()
-    await client.kanban.listTags()
-    await client.kanban.createTag({ name: 'Active', color: '#22c55e' })
-    await client.kanban.assignTag('/repo/session.jsonl', 'tag-active')
-    await client.kanban.removeTag('/repo/session.jsonl', 'tag-active')
-    await client.kanban.listSessionTags('/repo/session.jsonl')
+    await client.tags.listTags()
+    await client.tags.createTag({ name: 'Active', color: '#22c55e' })
+    await client.tags.assignTag('/repo/session.jsonl', 'tag-active')
+    await client.tags.removeTag('/repo/session.jsonl', 'tag-active')
+    await client.tags.listSessionTags('/repo/session.jsonl')
 
     expect(calls).toEqual([
       {
@@ -294,13 +350,13 @@ describe('plugin capability client', () => {
           sortBy: 'modified_desc',
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
           },
         },
       },
-      { command: 'read_session_file_chunk', payload: { path: '/repo/session.jsonl', offset: 0, maxBytes: 1024, __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'get_session_labels', payload: { path: '/repo/session.jsonl', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'open_session_in_browser', payload: { path: '/repo/session.jsonl', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'read_session_file_chunk', payload: { path: '/repo/session.jsonl', offset: 0, maxBytes: 1024, __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
+      { command: 'get_session_labels', payload: { path: '/repo/session.jsonl', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
+      { command: 'open_session_in_browser', payload: { path: '/repo/session.jsonl', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
       {
         command: 'full_text_search',
         payload: {
@@ -317,7 +373,7 @@ describe('plugin capability client', () => {
           to: undefined,
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
           },
         },
       },
@@ -327,7 +383,7 @@ describe('plugin capability client', () => {
           path: '/repo/session.jsonl',
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
           },
         },
       },
@@ -341,16 +397,16 @@ describe('plugin capability client', () => {
           reasoning: 'high',
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
           },
         },
       },
-      { command: 'list_model_options_fast', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'get_all_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'create_tag', payload: { name: 'Active', color: '#22c55e', icon: undefined, parentId: undefined, __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'assign_tag', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'remove_tag_from_session', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
-      { command: 'get_all_session_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'] } } },
+      { command: 'list_model_options_fast', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
+      { command: 'get_all_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
+      { command: 'create_tag', payload: { name: 'Active', color: '#22c55e', icon: undefined, parentId: undefined, __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
+      { command: 'assign_tag', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
+      { command: 'remove_tag_from_session', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
+      { command: 'get_all_session_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
     ])
   })
 
@@ -392,7 +448,7 @@ describe('plugin capability client', () => {
           language: 'zh-CN',
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
           },
         },
       },
@@ -445,7 +501,7 @@ describe('plugin capability client', () => {
           path: '/repo/session.jsonl',
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
           },
         },
       },
@@ -461,7 +517,7 @@ describe('plugin capability client', () => {
           reasoning: 'high',
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'kanban:read', 'kanban:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
           },
         },
       },

@@ -6,7 +6,7 @@ import ActiveFilterChips from "@/components/search/ActiveFilterChips";
 import type { SessionTag, Tag, DateRange } from "@/types";
 import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
 
-export type AppDesktopSearchBarViewMode = "list" | "project" | "kanban";
+export type AppDesktopSearchBarViewMode = "list" | "project" | "app";
 
 export interface AppDesktopSearchBarProps {
   searchQuery: string;

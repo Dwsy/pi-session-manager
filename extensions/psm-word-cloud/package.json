@@ -1,0 +1,21 @@
+{
+  "name": "@local/psm-word-cloud",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "wordcloud": "1.2.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^8.0.14"
+  },
+  "psm": {
+    "extensions": [
+      "./dist/index.mjs"
+    ]
+  }
+}

@@ -243,9 +243,13 @@ function convertClaudeLineToSessionEntry(line: any): SessionEntry | null {
         ? 'toolResult'
         : 'user'
 
-  const content = normalizeClaudeContent(message.content)
+  const toolResult = extractClaudeToolResult(message.content)
+  const content = toolResult
+    ? [{ type: 'text' as const, text: toolResult.text }]
+    : normalizeClaudeContent(message.content)
   const timestamp =
     typeof line.timestamp === 'string' ? line.timestamp : new Date().toISOString()
+  const resolvedRole = toolResult ? 'toolResult' : role
 
   return {
     type: 'message',
@@ -253,15 +257,51 @@ function convertClaudeLineToSessionEntry(line: any): SessionEntry | null {
     parentId: line.parentUuid || undefined,
     timestamp,
     message: {
-      role,
+      role: resolvedRole,
       content,
-      model: typeof message.model === 'string' ? message.model : undefined,
-      provider: role === 'assistant' ? 'anthropic' : undefined,
+      toolCallId: toolResult?.toolCallId,
+      isError: toolResult?.isError,
+      model: resolvedRole === 'assistant' && typeof message.model === 'string' ? message.model : undefined,
+      provider: resolvedRole === 'assistant' ? 'anthropic' : undefined,
       usage: normalizeTokenUsage(message.usage),
       stopReason:
         typeof message.stop_reason === 'string' ? message.stop_reason : undefined,
     },
   }
+}
+
+function extractClaudeToolResult(value: unknown): { toolCallId: string; text: string; isError?: boolean } | null {
+  const items = Array.isArray(value) ? value : [value]
+  const toolResults = items
+    .filter((item): item is Record<string, any> =>
+      Boolean(item && typeof item === 'object' && (item as Record<string, any>).type === 'tool_result')
+    )
+  if (toolResults.length === 0 || toolResults.length !== items.length) return null
+
+  const first = toolResults[0]
+  const toolCallId = typeof first.tool_use_id === 'string' ? first.tool_use_id : ''
+  if (!toolCallId) return null
+
+  return {
+    toolCallId,
+    text: toolResults.map(item => stringifyClaudeToolResultContent(item.content)).join('\n\n'),
+    isError: typeof first.is_error === 'boolean' ? first.is_error : undefined,
+  }
+}
+
+function stringifyClaudeToolResultContent(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    return value
+      .map(item => {
+        if (item && typeof item === 'object' && typeof (item as Record<string, any>).text === 'string') {
+          return (item as Record<string, any>).text
+        }
+        return JSON.stringify(item)
+      })
+      .join('\n')
+  }
+  return JSON.stringify(value)
 }
 
 function normalizeTokenUsage(value: unknown) {
@@ -385,6 +425,8 @@ function convertCodexResponseItem(payload: any): SessionEntry | null {
       timestamp,
       message: {
         role: 'toolResult',
+        toolCallId: payload.call_id,
+        isError: typeof payload.is_error === 'boolean' ? payload.is_error : undefined,
         content: [
           {
             type: 'text',
@@ -394,6 +436,32 @@ function convertCodexResponseItem(payload: any): SessionEntry | null {
                 : JSON.stringify(payload.output),
           },
         ],
+      },
+    }
+  }
+
+  if (payloadType === 'function_call') {
+    const timestamp =
+      typeof payload.timestamp === 'string'
+        ? payload.timestamp
+        : new Date().toISOString()
+    return {
+      type: 'message',
+      id: payload.id || payload.call_id || generateFallbackId('codex-tool-call'),
+      timestamp,
+      message: {
+        role: 'assistant',
+        content: [
+          {
+            type: 'toolCall',
+            id: payload.call_id,
+            name: payload.name,
+            arguments: payload.arguments,
+            text: payload.name || 'function call',
+          },
+        ],
+        model: 'gpt-5.4',
+        provider: 'openai-codex',
       },
     }
   }

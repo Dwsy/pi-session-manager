@@ -5,11 +5,13 @@ import {
   Brain,
   Database,
   Download,
+  FolderOpen,
   Globe,
   Keyboard,
   Palette,
   MessageCircleQuestion,
   Puzzle,
+  Repeat2,
   Search,
   Server,
   Settings2,
@@ -30,6 +32,7 @@ import AppearanceSettings from "./sections/AppearanceSettings";
 import { ConfigBundleManager } from "./sections/ConfigBundleManager";
 import DataSourcesSettings from "./sections/DataSourcesSettings";
 import DiagnosticsMaintenanceSettings from "./sections/DiagnosticsMaintenanceSettings";
+import ExternalSessionsSettings from "./sections/ExternalSessionsSettings";
 import ModelSettings from "./sections/ModelSettings";
 import PiAgentSettings from "./sections/PiAgentSettings";
 import PsmPluginsSettings from "./sections/PsmPluginsSettings";
@@ -220,9 +223,42 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     group: "sources",
     icon: <Database className="h-4 w-4" />,
     labelKey: "settings.sections.dataSources",
-    fallbackLabel: "Data Sources",
+    fallbackLabel: "Session Sources",
     descriptionKey: "settings.sectionDescriptions.dataSources",
-    fallbackDescription: "Local paths, datasets and external agent sessions",
+    fallbackDescription: "Local paths, external agent sessions and resume targets",
+    saveMode: "app-settings",
+  },
+  {
+    id: "local-session-paths",
+    area: "config-center",
+    group: "sources",
+    icon: <FolderOpen className="h-4 w-4" />,
+    labelKey: "settings.sections.localSessionPaths",
+    fallbackLabel: "Local Session Paths",
+    descriptionKey: "settings.sectionDescriptions.localSessionPaths",
+    fallbackDescription: "Pi session directories scanned by the app",
+    saveMode: "app-settings",
+  },
+  {
+    id: "external-agent-sessions",
+    area: "config-center",
+    group: "sources",
+    icon: <Bot className="h-4 w-4" />,
+    labelKey: "settings.sections.externalAgentSessions",
+    fallbackLabel: "External Agent Sessions",
+    descriptionKey: "settings.sectionDescriptions.externalAgentSessions",
+    fallbackDescription: "Claude Code, Codex, Gemini CLI and other local sessions",
+    saveMode: "app-settings",
+  },
+  {
+    id: "resume-targets",
+    area: "config-center",
+    group: "sources",
+    icon: <Repeat2 className="h-4 w-4" />,
+    labelKey: "settings.sections.resumeTargets",
+    fallbackLabel: "Resume Targets",
+    descriptionKey: "settings.sectionDescriptions.resumeTargets",
+    fallbackDescription: "Default CLI target for resume commands",
     saveMode: "app-settings",
   },
   {
@@ -288,7 +324,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     labelKey: "settings.sections.diagnosticsMaintenance",
     fallbackLabel: "Diagnostics & Maintenance",
     descriptionKey: "settings.sectionDescriptions.diagnosticsMaintenance",
-    fallbackDescription: "Cache, debug and external API diagnostics",
+    fallbackDescription: "Cache, debug and invoke transport diagnostics",
     saveMode: "app-settings",
   },
 ];
@@ -326,8 +362,8 @@ export const SETTINGS_GROUPS: SettingsGroupMeta[] = [
     id: "sources",
     area: "config-center",
     labelKey: "settings.groups.sources",
-    fallbackLabel: "Sources",
-    sections: ["data-sources"],
+    fallbackLabel: "Sessions",
+    sections: ["local-session-paths", "external-agent-sessions", "resume-targets"],
   },
   {
     id: "agent",
@@ -361,6 +397,9 @@ const STANDALONE_DATASET_SECTION_IDS: SettingsSection[] = [
   "shortcuts",
   "app-behavior",
   "data-sources",
+  "local-session-paths",
+  "external-agent-sessions",
+  "resume-targets",
 ];
 
 const STANDALONE_DATASET_SECTION_SET = new Set(STANDALONE_DATASET_SECTION_IDS);
@@ -461,6 +500,30 @@ export function renderSettingsSection(
       return <AppBehaviorSettings settings={settings} onUpdate={onUpdate} />;
     case "data-sources":
       return <DataSourcesSettings settings={settings} onUpdate={onUpdate} />;
+    case "local-session-paths":
+      return (
+        <DataSourcesSettings
+          settings={settings}
+          onUpdate={onUpdate}
+          mode="local-paths"
+        />
+      );
+    case "external-agent-sessions":
+      return (
+        <ExternalSessionsSettings
+          settings={settings}
+          onUpdate={onUpdate}
+          mode="agents"
+        />
+      );
+    case "resume-targets":
+      return (
+        <ExternalSessionsSettings
+          settings={settings}
+          onUpdate={onUpdate}
+          mode="resume"
+        />
+      );
     case "pi-agent":
       return <PiAgentSettings settings={settings} onUpdate={onUpdate} />;
     case "models":

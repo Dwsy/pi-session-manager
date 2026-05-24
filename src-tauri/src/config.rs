@@ -166,7 +166,13 @@ impl Config {
     }
 
     pub fn effective_active_dataset_ids(&self) -> Vec<String> {
-        let mut values = self.active_dataset_ids.iter().map(|value| value.trim().to_string()).filter(|value| !value.is_empty()).collect::<Vec<_>>();
+        let mut values = Vec::new();
+        for value in &self.active_dataset_ids {
+            let normalized = value.trim().to_string();
+            if !normalized.is_empty() && !values.contains(&normalized) {
+                values.push(normalized);
+            }
+        }
 
         if values.is_empty() {
             if let Some(value) = self.active_dataset_id.as_ref().map(|value| value.trim().to_string()).filter(|value| !value.is_empty()) {
@@ -174,8 +180,6 @@ impl Config {
             }
         }
 
-        values.sort();
-        values.dedup();
         values
     }
 
@@ -234,4 +238,23 @@ pub fn reset_config() -> Result<Config, String> {
     let default_config = Config::default();
     save_config(&default_config)?;
     Ok(default_config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn active_dataset_ids_preserve_selection_order() {
+        let config = Config { active_dataset_id: Some("legacy/fallback".to_string()), active_dataset_ids: vec!["owner/b".to_string(), " owner/a ".to_string(), "owner/b".to_string(), " ".to_string()], ..Config::default() };
+
+        assert_eq!(config.effective_active_dataset_ids(), vec!["owner/b".to_string(), "owner/a".to_string()]);
+    }
+
+    #[test]
+    fn active_dataset_ids_fall_back_to_legacy_single_id() {
+        let config = Config { active_dataset_id: Some(" owner/legacy ".to_string()), ..Config::default() };
+
+        assert_eq!(config.effective_active_dataset_ids(), vec!["owner/legacy".to_string()]);
+    }
 }

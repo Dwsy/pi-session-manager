@@ -2,12 +2,21 @@
 
 This directory contains Pi Agent extensions and PSM browser-plugin examples.
 
+For plugin authoring workflow, see [`agent-docs/06-plugins.md`](../agent-docs/06-plugins.md).
 For the PSM plugin SDK, see [`docs/PSM_PLUGIN_SDK.md`](../docs/PSM_PLUGIN_SDK.md).
 For the current SDK capability audit and contract gaps, see [`docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md`](../docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md).
 
+The Settings -> PSM Plugins page is a source-grouped list:
+
+| Source | Shown as | Where it comes from |
+| --- | --- | --- |
+| `builtin` | Built-in | `extensions/psm-*` in this repo |
+| `npm` | npm | managed workspace under `~/.pi/pi-session-manager/extensions/npm` |
+| `path` | Local | explicit `.js` / `.mjs` entries in `plugins.json#customPaths` |
+
 Built-in PSM plugins live under `extensions/psm-*`. They are discovered at startup and can be disabled through the Settings UI or `~/.pi/pi-session-manager/plugins.json`.
 
-External PSM plugins can be loaded in two ways:
+External PSM plugins are loaded in two ways:
 
 - install an npm package into the managed npm workspace
 - add an explicit local `.js` or `.mjs` entry path through Settings -> PSM Plugins
@@ -19,6 +28,9 @@ npm install --prefix ~/.pi/pi-session-manager/extensions/npm <package>
 A plugin package declares browser-compatible ESM entries through `package.json#psm.extensions`.
 A path plugin points directly to a built browser-compatible ESM file such as
 `/absolute/path/to/my-psm-plugin/dist/index.mjs`.
+If the plugin renders React UI, follow the host React pattern used by
+`extensions/psm-cache-usage-path`: read `globalThis.__PSM_HOST_REACT__` through a
+small `hostReact()` helper instead of importing a separate React runtime.
 
 ---
 
@@ -26,9 +38,11 @@ A path plugin points directly to a built browser-compatible ESM file such as
 
 | Plugin | Purpose | Permissions |
 | --- | --- | --- |
+| [psm-kanban-board](./psm-kanban-board/) | Provides an app-level board view plus a sidebar bound with `appViewId` through `ctx.ui.registerAppView(...)` / `ctx.ui.registerAppSidebarView(...)` | `sessions:read`, `tags:read`, `tags:write`, `config:read`, `config:write` |
 | [psm-session-summary](./psm-session-summary/) | Generates session intelligence and writes `session.intelligence` plugin records | `sessions:read`, `records:read`, `records:write`, `model:invoke` |
 | [psm-sidechat](./psm-sidechat/) | Session Q&A command/tool and toolbar panel example | `sessions:read`, `model:invoke`, `records:read`, `records:write` |
 | [psm-trace](./psm-trace/) | Session trace analytics main view parsed in the plugin runtime | `sessions:read` |
+| [psm-word-cloud](./psm-word-cloud/) | Demonstrates Cmd+K plugin commands plus global/project user-message word cloud app views from session-list preview fields | `config:read`, `config:write` |
 
 ### SDK Capability Notes
 
@@ -37,7 +51,7 @@ The public SDK package is `@pi-session-manager/plugin-sdk`. It intentionally exp
 - manifest and package validation helpers
 - plugin host context and activation types
 - command/tool registration
-- session toolbar, main-view, and right-panel UI contributions
+- app-view, app-sidebar, session toolbar, main-view, and right-panel UI contributions
 - plugin settings and i18n clients
 - the `ctx.psm` capability client for selected plugin-safe PSM operations
 
@@ -52,7 +66,8 @@ Current `ctx.psm` namespaces:
 | `search` | `fulltext`, `pluginRecords` |
 | `sidechat` | `ask` |
 | `models` | `listOptions` |
-| `kanban` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` |
+| `tags` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` |
+| `config` | `read`, `write` |
 
 The SDK is not intended to expose every backend dispatch command. Commands such as database reset, API key management, raw terminal I/O, app settings, devtools, and plugin installation remain host-internal or privileged.
 
@@ -150,7 +165,7 @@ Features:
 - cwd filtering for the current project
 - details panel with model, token usage, and cost
 - message preview with left/right navigation
-- Kanban tag display
+- Session tag display
 
 ```bash
 # Use
@@ -165,7 +180,7 @@ Features:
 | cwd filter | Shows sessions from the current project directory |
 | Details panel | Displays model, input/output tokens, and cost |
 | Message preview | Browse conversation preview with left/right keys |
-| Kanban tags | Shows session Kanban tags |
+| Session tags | Shows session tags |
 
 ---
 

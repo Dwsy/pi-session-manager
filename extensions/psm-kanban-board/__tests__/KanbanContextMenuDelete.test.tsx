@@ -22,8 +22,8 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-import KanbanContextMenu from '../kanban/KanbanContextMenu'
-import type { SessionInfo } from '../../types'
+import KanbanContextMenu from '../KanbanContextMenu'
+import type { SessionInfo } from '@/types'
 
 const session: SessionInfo = {
   id: 'session-1',

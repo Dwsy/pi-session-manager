@@ -173,12 +173,12 @@
     rgba(10, 12, 16, 0.58);
   backdrop-filter: blur(7px) saturate(110%);
   -webkit-backdrop-filter: blur(7px) saturate(110%);
-  animation: subagent-fade-in 0.24s ease-out;
+  animation: subagent-fade-in var(--motion-duration-overlay) var(--motion-ease-enter);
   will-change: opacity;
 }
 
 .subagent-modal-backdrop.closing {
-  animation: subagent-fade-out 0.18s ease-in forwards;
+  animation: subagent-fade-out var(--motion-duration-fast) var(--motion-ease-exit) forwards;
 }
 
 // ============================================
@@ -200,13 +200,13 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: subagent-scale-in 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: subagent-scale-in var(--motion-duration-overlay) var(--motion-ease-enter);
   transform-origin: center;
   will-change: transform, opacity;
 }
 
 .subagent-modal-backdrop.closing .subagent-modal {
-  animation: subagent-scale-out 0.18s ease-in forwards;
+  animation: subagent-scale-out var(--motion-duration-fast) var(--motion-ease-exit) forwards;
 }
 
 // Modal Header
@@ -350,7 +350,7 @@
 }
 
 .subagent-entry-item {
-  animation: subagent-entry-in 0.24s ease-out both;
+  animation: subagent-entry-in var(--motion-duration-base) var(--motion-ease-enter) both;
   content-visibility: auto;
   contain-intrinsic-size: 140px;
 }

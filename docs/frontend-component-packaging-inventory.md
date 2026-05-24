@@ -21,7 +21,7 @@
 
 ### `app/`
 
-`AppDashboardPane.tsx`, `AppDesktopContent.tsx`, `AppDesktopSearchBar.tsx`, `AppDesktopSidebar.tsx`, `AppDesktopSidebarContent.tsx`, `AppKanbanPane.tsx`, `AppMobileFilterBar.tsx`, `AppMobileLayout.tsx`, `AppOverlays.tsx`, `AppProjectListPane.tsx`, `AppSessionListPane.tsx`, `AppSessionViewerPane.tsx`, `AppSettingsPane.tsx`, `AppTerminalPane.tsx`, `resolveDesktopMainContent.ts`
+`AppDashboardPane.tsx`, `AppDesktopContent.tsx`, `AppDesktopSearchBar.tsx`, `AppDesktopSidebar.tsx`, `AppDesktopSidebarContent.tsx`, `AppMobileFilterBar.tsx`, `AppMobileLayout.tsx`, `AppOverlays.tsx`, `AppPluginSidebarPane.tsx`, `AppPluginSurfaceData.tsx`, `AppPluginViewPane.tsx`, `AppProjectListPane.tsx`, `AppSessionListPane.tsx`, `AppSessionViewerPane.tsx`, `AppSettingsPane.tsx`, `AppTerminalPane.tsx`, `AppViewIcon.tsx`, `resolveDesktopMainContent.ts`
 
 本轮已把 shell/sidebar/content 作为显式视觉包处理：`app-shell`、`app-desktop-sidebar`、`app-desktop-content`、`data-runtime`。vibrancy 专用属性和样式已移除，桌面布局回到稳定的不透明主题表面。
 
@@ -49,11 +49,11 @@
 
 已有 barrel：`index.ts`。测试文件：`DeleteSessionPopover.test.tsx`。
 
-### `kanban/`
+### 插件 App View
 
-`KanbanBoard.tsx`, `KanbanCard.tsx`, `KanbanColumn.tsx`, `KanbanContextMenu.tsx`, `SessionPreviewModal.tsx`, `TimeRangeSelector.tsx`, `WorkspaceEditor.tsx`, `WorkspacePanel.tsx`, `WorkspaceSwitcher.tsx`
-
-无 barrel。该包含拖拽与工作区编辑，后续打包时应先固定公开入口：board、workspace shell、editor、modal。
+宿主不保留具体 App View 的业务组件。`src/components/app/AppPluginViewPane.tsx`
+和 `src/components/app/AppPluginSidebarPane.tsx` 只负责渲染插件注册的通用入口；
+具体内置视图组件放在对应的 `extensions/psm-*` 目录。
 
 ### `messages/`
 

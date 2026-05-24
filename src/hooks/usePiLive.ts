@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { invoke, listen } from '@/transport'
+import { emitPsmRuntimeEvent } from '@/plugins/runtime-host/eventBus'
 import { getCachedSettings } from '@/utils/settingsApi'
 import type {
   PiLiveSession,
@@ -339,11 +340,13 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
           entryCount: payload.entries?.length ?? 0,
           lastSeen: new Date().toISOString(),
         })
+        emitPsmRuntimeEvent('pi-live:session_registered', payload)
       }).then(f => unsubs.push(f))
 
       listen<PiLiveSessionDisconnectedPayload>('pi-live:session_disconnected', ({ payload }) => {
         removeSession(payload.sessionId)
         setConnectionState('disconnected')
+        emitPsmRuntimeEvent('pi-live:session_disconnected', payload)
       }).then(f => unsubs.push(f))
 
       listen<PiLiveStateUpdatedPayload>('pi-live:state_updated', ({ payload }) => {
@@ -358,6 +361,7 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
           tags: payload.tags,
           lastSeen: new Date().toISOString(),
         })
+        emitPsmRuntimeEvent('pi-live:state_updated', payload)
       }).then(f => unsubs.push(f))
 
       listen<PiLiveQueueUpdatePayload>('queue_update', ({ payload }) => {
@@ -367,6 +371,7 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
           pendingMessageCount: payload.steering.length + payload.followUp.length,
           lastSeen: new Date().toISOString(),
         })
+        emitPsmRuntimeEvent('queue_update', payload)
       }).then(f => unsubs.push(f))
 
       const liveEventNames = [
@@ -388,6 +393,7 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
       for (const eventName of liveEventNames) {
         listen<PiLiveChatEventPayload>(eventName, ({ payload }) => {
           setSessions((prev) => applyPiLiveChatEvent(prev, eventName, payload.sessionId, matchesSessionId))
+          emitPsmRuntimeEvent(eventName, payload)
         }).then(f => unsubs.push(f))
       }
     }

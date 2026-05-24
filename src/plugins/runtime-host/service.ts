@@ -4,6 +4,7 @@ import { invoke as httpInvoke, isTauri } from '@/transport'
 
 import type {
   PsmNpmPluginEntry,
+  PsmPluginMarketSearchResult,
   PsmPathPluginEntry,
   PsmPluginNpmOperationResult,
   PsmPluginPaths,
@@ -66,6 +67,18 @@ export async function listNpmPsmPluginEntries(): Promise<PsmNpmPluginEntry[]> {
 
 export async function listPathPsmPluginEntries(): Promise<PsmPathPluginEntry[]> {
   return invokePluginCommand<PsmPathPluginEntry[]>('list_path_psm_plugin_entries')
+}
+
+export async function searchPsmPluginMarket(options?: {
+  query?: string
+  size?: number
+  from?: number
+}): Promise<PsmPluginMarketSearchResult> {
+  return invokePluginCommand<PsmPluginMarketSearchResult>('search_psm_plugin_market', {
+    ...(options?.query !== undefined ? { query: options.query } : {}),
+    ...(options?.size !== undefined ? { size: options.size } : {}),
+    ...(options?.from !== undefined ? { from: options.from } : {}),
+  })
 }
 
 export async function addPathPsmPlugin(entryPath: string): Promise<PsmPluginsConfig> {

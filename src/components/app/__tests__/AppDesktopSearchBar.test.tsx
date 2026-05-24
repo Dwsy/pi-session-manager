@@ -51,7 +51,7 @@ describe('AppDesktopSearchBar select mode trigger', () => {
     rerender(<AppDesktopSearchBar {...baseProps} sidebarMode="project" selectedProject="/tmp/project" />)
     expect(screen.getByRole('button', { name: /select mode/i })).toBeTruthy()
 
-    rerender(<AppDesktopSearchBar {...baseProps} sidebarMode="kanban" selectedProject={null} />)
+    rerender(<AppDesktopSearchBar {...baseProps} sidebarMode="app" selectedProject={null} />)
     expect(screen.queryByRole('button', { name: /select mode/i })).toBeNull()
   })
 })

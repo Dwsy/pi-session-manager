@@ -20,3 +20,5 @@ export function usePsmPluginSessionUi(): PsmPluginSessionUiSnapshot {
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
+
+export const usePsmPluginUi = usePsmPluginSessionUi

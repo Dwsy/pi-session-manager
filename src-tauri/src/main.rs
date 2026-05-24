@@ -2,6 +2,7 @@
 
 use pi_session_manager::cli_common::{self, CommonCliArgs};
 use pi_session_manager::resolve_window_dimensions;
+use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Listener, Manager};
 
 // Window dimension helpers are in lib.rs — used by both main and tray
@@ -89,6 +90,51 @@ fn print_help() {
     );
 }
 
+const MENU_VIEW_RELOAD: &str = "view_reload";
+const MENU_VIEW_TOGGLE_DEVTOOLS: &str = "view_toggle_devtools";
+
+fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
+    let handle = app.handle();
+    let reload_item = MenuItemBuilder::with_id(MENU_VIEW_RELOAD, "Reload").accelerator("CmdOrCtrl+R").build(handle)?;
+    let devtools_item = MenuItemBuilder::with_id(MENU_VIEW_TOGGLE_DEVTOOLS, "Developer Tools").accelerator("CmdOrCtrl+Shift+I").build(handle)?;
+    let view_menu = SubmenuBuilder::new(handle, "View").item(&reload_item).separator().item(&devtools_item).build()?;
+
+    let menu = MenuBuilder::new(handle);
+
+    #[cfg(target_os = "macos")]
+    let menu = {
+        let app_menu = SubmenuBuilder::new(handle, "Pi Session Manager").about(None).separator().services().separator().hide().hide_others().show_all().separator().quit().build()?;
+        let edit_menu = SubmenuBuilder::new(handle, "Edit").undo().redo().separator().cut().copy().paste().select_all().build()?;
+        let window_menu = SubmenuBuilder::new(handle, "Window").minimize().fullscreen().separator().close_window().build()?;
+        menu.item(&app_menu).item(&edit_menu).item(&view_menu).item(&window_menu)
+    };
+
+    #[cfg(not(target_os = "macos"))]
+    let menu = menu.item(&view_menu);
+
+    app.set_menu(menu.build()?)?;
+    Ok(())
+}
+
+fn handle_native_menu_event(app: &tauri::AppHandle, event: tauri::menu::MenuEvent) {
+    let Some(window) = app.get_webview_window("main") else {
+        log::debug!("Ignoring menu event before main window exists: {:?}", event.id());
+        return;
+    };
+
+    if event.id() == MENU_VIEW_RELOAD {
+        if let Err(error) = window.reload() {
+            log::warn!("Failed to reload main window from native menu: {error}");
+        }
+    } else if event.id() == MENU_VIEW_TOGGLE_DEVTOOLS {
+        if window.is_devtools_open() {
+            window.close_devtools();
+        } else {
+            window.open_devtools();
+        }
+    }
+}
+
 fn main() {
     tracing_subscriber::fmt::init();
 
@@ -118,6 +164,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init())
+        .on_menu_event(handle_native_menu_event)
         .setup(move |app| {
             let app_handle = app.handle().clone();
 
@@ -142,6 +189,12 @@ fn main() {
             let app_state = pi_session_manager::app_state::create_app_state(app_handle);
             app.manage(app_state.clone());
             let deep_link_state = pi_session_manager::deep_link::DeepLinkState::new();
+
+            if !cli_mode {
+                if let Err(error) = install_native_menu(app) {
+                    log::warn!("Failed to install native menu: {error}");
+                }
+            }
 
             if !cli_mode {
                 let app_handle_dl = app.handle().clone();
@@ -322,6 +375,7 @@ fn main() {
                 let deep_link_ready_state = deep_link_state.clone();
                 app.listen("frontend://ready", move |_event| {
                     let _ = window_clone.show();
+                    #[cfg(not(target_os = "macos"))]
                     let _ = window_clone.set_focus();
                     pi_session_manager::deep_link::mark_frontend_ready(&app_handle_ready, &deep_link_ready_state);
                 });
@@ -392,6 +446,7 @@ fn main() {
             pi_session_manager::set_psm_plugin_settings,
             pi_session_manager::list_npm_psm_plugin_entries,
             pi_session_manager::list_path_psm_plugin_entries,
+            pi_session_manager::search_psm_plugin_market,
             pi_session_manager::add_path_psm_plugin,
             pi_session_manager::remove_path_psm_plugin,
             pi_session_manager::install_psm_plugin,
@@ -401,6 +456,8 @@ fn main() {
             pi_session_manager::read_npm_psm_plugin_module_source,
             pi_session_manager::read_path_psm_plugin_module_source,
             pi_session_manager::get_psm_plugin_paths,
+            pi_session_manager::read_psm_plugin_json_config,
+            pi_session_manager::write_psm_plugin_json_config,
             pi_session_manager::full_text_search,
             pi_session_manager::delete_session,
             pi_session_manager::delete_sessions,
@@ -502,9 +559,6 @@ fn main() {
             pi_session_manager::list_config_versions,
             pi_session_manager::get_config_version,
             pi_session_manager::restore_config_version,
-            pi_session_manager::get_workspaces,
-            pi_session_manager::save_workspace,
-            pi_session_manager::delete_workspace,
             pi_session_manager::send_notification,
             pi_session_manager::backup_database,
             pi_session_manager::reset_database,

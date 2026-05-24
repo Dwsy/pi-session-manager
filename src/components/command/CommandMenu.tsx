@@ -10,14 +10,17 @@ import { useTranslation } from "react-i18next";
 import { ArrowUpRight, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { SearchPluginResult, SearchContext } from "@/plugins/types";
 import { useSearchPlugins } from "@/hooks/useSearchPlugins";
+import { psmPluginHost, usePsmPluginCommands } from "@/plugins/runtime-host";
 import { getPathBasename } from "@/utils/path";
 import { formatSourceFilterToken } from "@/utils/search";
 import type { MessageSearchPluginOptions } from "@/plugins/message/MessageSearchPlugin";
 import type { FullTextSearchSourceFilter } from "@/types";
 import CommandSearchInput from "./CommandSearchInput";
 import CommandFilterBar from "./CommandFilterBar";
+import CommandActionList from "./CommandActionList";
 import CommandResultList from "./CommandResultList";
 import SessionPreviewPanel from "./SessionPreviewPanel";
+import type { CommandActionItem, CommandPaletteMode } from "./commandActions";
 import { useCommandSearch } from "./hooks/useCommandSearch";
 import { TABS, type TabType } from "./utils";
 
@@ -59,7 +62,11 @@ export default memo(function CommandMenu({
 }: CommandMenuProps) {
   const { t } = useTranslation();
   const { registry, search } = useSearchPlugins(context);
+  const pluginCommands = usePsmPluginCommands();
   const [activeTab, setActiveTab] = useState<TabType>("all");
+  const [mode, setMode] = useState<CommandPaletteMode>("search");
+  const [selectedAction, setSelectedAction] = useState<CommandActionItem | null>(null);
+  const [commandError, setCommandError] = useState<string | null>(null);
 
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
 
@@ -129,6 +136,68 @@ export default memo(function CommandMenu({
     );
   }, [results]);
 
+  const commandContext = useMemo(() => ({
+    selectedProject: context.selectedProject,
+    selectedSession: context.selectedSession
+      ? {
+          path: context.selectedSession.path,
+          id: context.selectedSession.id,
+          name: context.selectedSession.name,
+          cwd: context.selectedSession.cwd,
+        }
+      : null,
+    query,
+    closeCommandMenu: onClose,
+    navigate: {
+      openAppView: context.openAppView,
+      openSession: (sessionPath: string) => {
+        const session = context.sessions.find((item) => item.path === sessionPath)
+        if (session) context.setSelectedSession(session)
+      },
+      openProject: context.setSelectedProject,
+    },
+  }), [context, onClose, query]);
+
+  const commandActions = useMemo<CommandActionItem[]>(() => {
+    const normalized = query.trim().toLowerCase()
+    return pluginCommands
+      .map((command): CommandActionItem => {
+        let disabledReason: string | undefined
+        if (command.scope === 'project' && !context.selectedProject && !context.selectedSession?.cwd) {
+          disabledReason = t('command.commands.requiresProject', 'Requires an active project')
+        }
+        if (command.scope === 'session' && !context.selectedSession) {
+          disabledReason = t('command.commands.requiresSession', 'Requires an active session')
+        }
+        if (!disabledReason && command.when && !command.when(commandContext)) {
+          disabledReason = t('command.commands.unavailable', 'Unavailable in the current context')
+        }
+        return {
+          id: command.id,
+          title: command.title,
+          description: command.description,
+          category: command.category ?? command.pluginId,
+          pluginId: command.pluginId,
+          shortcut: command.shortcut,
+          disabled: Boolean(disabledReason),
+          disabledReason,
+          command,
+        }
+      })
+      .filter((action) => {
+        if (!normalized) return true
+        const haystack = [
+          action.title,
+          action.description,
+          action.category,
+          action.command.id,
+          action.pluginId,
+          ...(action.command.keywords ?? []),
+        ].filter(Boolean).join(' ').toLowerCase()
+        return haystack.includes(normalized)
+      })
+  }, [commandContext, context.selectedProject, context.selectedSession, pluginCommands, query, t]);
+
   const tabCounts = useMemo(() => {
     return TABS.reduce(
       (acc: Record<TabType, number>, tab) => {
@@ -152,23 +221,100 @@ export default memo(function CommandMenu({
     onClose();
   }, [selectedResult, selectedPlugin, context, onClose]);
 
+  const handleRunCommand = useCallback(() => {
+    const action = selectedAction;
+    if (!action || action.disabled) return;
+    setCommandError(null);
+    onClose();
+    void psmPluginHost.executeCommand(action.command.id, {}, commandContext).catch((error) => {
+      console.error("[PSM plugins] Failed to execute command:", error);
+    });
+  }, [commandContext, onClose, selectedAction]);
+
+  useEffect(() => {
+    if (mode !== 'commands') return;
+    setSelectedAction(commandActions[0] ?? null);
+  }, [commandActions, mode]);
+
   const inputPlaceholder =
-    effectiveSourceFilter === "labels_only"
+    mode === 'commands'
+      ? t("command.commands.placeholder", "Search plugin commands...")
+      : effectiveSourceFilter === "labels_only"
       ? t("search.fullText.labelsPlaceholder", "Browse all labels...")
       : t("command.placeholder", "Search sessions, projects, messages...");
 
   const handleInputKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLInputElement>) => {
       if (
+        mode === 'search' &&
         sourceFilterSuggestions.length > 0 &&
         (event.key === "Tab" || event.key === "Enter")
       ) {
         event.preventDefault();
         applySuggestedSourceFilter(sourceFilterSuggestions[0]);
+        return;
+      }
+
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        setMode((value) => value === 'search' ? 'commands' : 'search');
+        setCommandError(null);
+        return;
+      }
+
+      if (mode === 'commands' && (event.key === 'Enter' || event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+        event.preventDefault();
+        if (event.key === 'Enter') {
+          void handleRunCommand();
+          return;
+        }
+        const currentIndex = selectedAction
+          ? commandActions.findIndex((action) => action.id === selectedAction.id)
+          : -1;
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex = commandActions.length === 0
+          ? -1
+          : (currentIndex + delta + commandActions.length) % commandActions.length;
+        setSelectedAction(nextIndex >= 0 ? commandActions[nextIndex] : null);
       }
     },
-    [applySuggestedSourceFilter, sourceFilterSuggestions],
+    [applySuggestedSourceFilter, commandActions, handleRunCommand, mode, selectedAction, sourceFilterSuggestions],
   );
+
+  useEffect(() => {
+    if (mode !== 'commands') return;
+
+    const handleWindowKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (event.key === 'Enter' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (event.key === 'Enter') {
+          handleRunCommand();
+          return;
+        }
+        const currentIndex = selectedAction
+          ? commandActions.findIndex((action) => action.id === selectedAction.id)
+          : -1;
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex = commandActions.length === 0
+          ? -1
+          : (currentIndex + delta + commandActions.length) % commandActions.length;
+        setSelectedAction(nextIndex >= 0 ? commandActions[nextIndex] : null);
+      }
+    };
+
+    window.addEventListener('keydown', handleWindowKeyDown);
+    return () => window.removeEventListener('keydown', handleWindowKeyDown);
+  }, [commandActions, handleRunCommand, mode, selectedAction]);
 
   return (
     <div className="w-full h-full min-h-0 flex flex-col overflow-hidden bg-background">
@@ -187,6 +333,8 @@ export default memo(function CommandMenu({
         />
 
         <CommandFilterBar
+          mode={mode}
+          setMode={setMode}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           tabCounts={tabCounts}
@@ -201,25 +349,35 @@ export default memo(function CommandMenu({
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <div
-          className={`${previewCollapsed ? "flex-1 w-auto" : "w-[400px] flex-shrink-0"} border-r border-border/70 flex flex-col h-full overflow-hidden bg-surface/[0.22]`}
+          className={`${previewCollapsed || mode === 'commands' ? "flex-1 w-auto" : "w-[400px] flex-shrink-0"} border-r border-border/70 flex flex-col h-full overflow-hidden bg-surface/[0.22]`}
         >
-          <CommandResultList
-            results={results}
-            isSearching={isSearching}
-            searchError={searchError}
-            normalizedQuery={normalizedQuery}
-            isLabelsBrowseMode={isLabelsBrowseMode}
-            activeTab={activeTab}
-            selectedResult={selectedResult}
-            setSelectedResult={setSelectedResult}
-            registry={registry}
-            loadMore={loadMore}
-          />
+          {mode === 'commands' ? (
+            <CommandActionList
+              actions={commandActions}
+              query={query}
+              selectedAction={selectedAction}
+              setSelectedAction={setSelectedAction}
+              error={commandError}
+            />
+          ) : (
+            <CommandResultList
+              results={results}
+              isSearching={isSearching}
+              searchError={searchError}
+              normalizedQuery={normalizedQuery}
+              isLabelsBrowseMode={isLabelsBrowseMode}
+              activeTab={activeTab}
+              selectedResult={selectedResult}
+              setSelectedResult={setSelectedResult}
+              registry={registry}
+              loadMore={loadMore}
+            />
+          )}
         </div>
         <div
-          className={`${previewCollapsed ? "flex-none w-0" : "flex-1 w-auto"} h-full min-h-0 overflow-hidden bg-background transition-[width] duration-200 ease-in-out`}
+          className={`${previewCollapsed || mode === 'commands' ? "flex-none w-0" : "flex-1 w-auto"} h-full min-h-0 overflow-hidden bg-background motion-layout`}
         >
-          {!previewCollapsed && (
+          {!previewCollapsed && mode === 'search' && (
             <SessionPreviewPanel
               result={selectedResult}
               context={context}
@@ -232,6 +390,14 @@ export default memo(function CommandMenu({
 
       <div className="flex items-center justify-between px-5 py-3 border-t border-border/70 bg-background flex-shrink-0">
         <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/40 px-2.5 py-1">
+            <kbd className="text-[10px] font-mono">Tab</kbd>
+            <span className="text-[11px]">
+              {mode === 'search'
+                ? t("command.actions.commands", "Commands")
+                : t("command.actions.search", "Search")}
+            </span>
+          </div>
           <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/40 px-2.5 py-1">
             <kbd className="text-[10px] font-mono">↑↓</kbd>
             <span className="text-[11px]">
@@ -246,7 +412,7 @@ export default memo(function CommandMenu({
           </div>
           <button
             onClick={togglePreview}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/40 px-2.5 py-1 hover:bg-surface/60 motion-color transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/40 px-2.5 py-1 hover:bg-surface/60 motion-color"
             title={previewCollapsed ? t("command.actions.showPreview", "Show preview") : t("command.actions.hidePreview", "Hide preview")}
           >
             {previewCollapsed ? (
@@ -260,19 +426,19 @@ export default memo(function CommandMenu({
           </button>
         </div>
         <button
-          onClick={handleSelect}
-          disabled={!selectedResult}
-          className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[12px] font-medium transition-all ${
-            selectedResult
+          onClick={mode === 'commands' ? () => void handleRunCommand() : handleSelect}
+          disabled={mode === 'commands' ? !selectedAction || selectedAction.disabled : !selectedResult}
+          className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[12px] font-medium motion-surface motion-color ${
+            mode === 'commands' ? selectedAction && !selectedAction.disabled : selectedResult
               ? "border-foreground/10 bg-foreground text-background hover:opacity-90"
               : "border-border/60 text-muted-foreground/45 cursor-not-allowed bg-surface/30"
           }`}
         >
           <ArrowUpRight className="w-4 h-4" />
-          <span>{t("command.actions.go")}</span>
+          <span>{mode === 'commands' ? t("command.actions.run", "Run") : t("command.actions.go")}</span>
           <kbd
             className={`rounded-full px-2 py-0.5 text-[10px] font-mono ${
-              selectedResult
+              mode === 'commands' ? selectedAction && !selectedAction.disabled : selectedResult
                 ? "bg-background/10 text-background/90"
                 : "bg-surface text-muted-foreground/55"
             }`}

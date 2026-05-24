@@ -194,24 +194,24 @@ export default function SessionPreviewModal({
         <button
           onClick={handleMinimize}
           className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors no-drag"
-          title={t("kanban.minimize", "Minimize")}
-          aria-label={t("kanban.minimize", "Minimize")}
+          title={t("session.preview.minimize", "Minimize")}
+          aria-label={t("session.preview.minimize", "Minimize")}
         >
           <Minus className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={handleMaximize}
           className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors no-drag"
-          title={t("kanban.maximize", "Maximize")}
-          aria-label={t("kanban.maximize", "Maximize")}
+          title={t("session.preview.maximize", "Maximize")}
+          aria-label={t("session.preview.maximize", "Maximize")}
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={handleClose}
           className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors no-drag"
-          title={t("kanban.close", "Close")}
-          aria-label={t("kanban.close", "Close")}
+          title={t("session.preview.close", "Close")}
+          aria-label={t("session.preview.close", "Close")}
         >
           <X className="w-3.5 h-3.5" />
         </button>

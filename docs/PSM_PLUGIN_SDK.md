@@ -35,9 +35,9 @@ entry paths. `builtin` is reserved for repo-local first-party plugins under
 |  Plugin activate(ctx)                                                        |
 |     |                                                                        |
 |     | registerCommand / registerTool                                          |
-|     | ctx.ui.registerSessionToolbarItem / registerSessionPanel                |
+|     | ctx.ui.registerAppView / registerSessionToolbarItem / registerSessionPanel |
 |     | ctx.ui.registerToolRenderer                                             |
-|     | ctx.psm.sessions / records / search / sidechat / models / kanban        |
+|     | ctx.psm.sessions / records / search / sidechat / models / tags / config |
 |     v                                                                        |
 |  @pi-session-manager/plugin-sdk                                              |
 |     |                                                                        |
@@ -105,8 +105,8 @@ The public SDK package is:
 ```
 
 It exports only `packages/runtime-sdk/src/index.ts`: manifest/types, validation helpers,
-UI contribution types, and the capability client factory. It does not export app transport,
-the runtime host, Tauri APIs, or desktop-private implementation.
+UI contribution types, host event subscription types, and the capability client factory.
+It does not export app transport, the runtime host, Tauri APIs, or desktop-private implementation.
 
 ## Source Policy
 
@@ -223,10 +223,13 @@ Logic contributions:
 - `ctx.psm.search`
 - `ctx.psm.sidechat`
 - `ctx.psm.models`
-- `ctx.psm.kanban`
+- `ctx.psm.tags`
+- `ctx.psm.config`
 
 UI contributions:
 
+- `ctx.ui.registerAppView({ id, title, route?, icon?, shortcut?, render })`
+- `ctx.ui.registerAppSidebarView({ id, title, appViewId?, route?, render })`
 - `ctx.ui.registerSessionToolbarItem({ id, title, panelId?, mainViewId?, render })`
 - `ctx.ui.registerSessionMainView({ id, title, render })`
 - `ctx.ui.registerSessionPanel({ id, title, side: 'right', render })`
@@ -236,6 +239,11 @@ Tool renderers customize how session tool calls are displayed. `match` may be an
 name, a `RegExp`, or a predicate over the raw tool call. `component` receives resolved tool
 data, search query, and the host-owned render context for expansion, clipboard, theme, mobile,
 and i18n state.
+
+App views are first-class app surfaces. The host uses the registered `route`, `title`, `icon`,
+and `shortcut` to build navigation; when `route` is omitted, the host can still address the
+view through `/app/{viewId}`. An app sidebar view can bind directly to its main app view with
+`appViewId`, which avoids host-side feature-specific matching.
 
 ```ts
 export function activate(ctx: PsmPluginHostContext) {
@@ -261,6 +269,12 @@ Configuration contributions:
 - `manifest.configuration`
 - `ctx.settings.get(key, fallback)`
 - `ctx.settings.all()`
+- `ctx.psm.config.read(key, { defaultValue? })`
+- `ctx.psm.config.write(key, value)`
+
+`manifest.configuration` is for scalar settings rendered in Settings -> PSM Plugins.
+`ctx.psm.config` is for plugin-owned JSON documents stored under the host PSM config root
+and isolated by plugin id. Use the `config:read` and `config:write` permissions for this API.
 
 I18n contributions:
 
@@ -399,6 +413,11 @@ NPM bundles must not:
 
 The app shell renders these through runtime-host UI contributions; it no longer hard-codes
 sidechat or summary UI in `AppSessionViewerPane`.
+
+`extensions/psm-kanban-board` registers both the app-level `/kanban` view and its
+matching app sidebar view. Workspace state is plugin-owned JSON config via
+`ctx.psm.config`, while the app shell only provides generic app-surface data to
+registered app UI contributions.
 
 ## Local Debugging
 

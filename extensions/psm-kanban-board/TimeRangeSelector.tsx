@@ -24,12 +24,12 @@ export default function TimeRangeSelector({ value, onChange, compact }: TimeRang
   })
 
   const labels: Record<TimeRange, string> = {
-    any: t('kanban.timeRange.any', 'Any time'),
-    '1h': t('kanban.timeRange.1h', 'Last hour'),
-    '24h': t('kanban.timeRange.24h', 'Last 24 hours'),
-    '2d': t('kanban.timeRange.2d', 'Last 2 days'),
-    '7d': t('kanban.timeRange.7d', 'Last 7 days'),
-    '30d': t('kanban.timeRange.30d', 'Last 30 days'),
+    any: t('plugins.kanbanBoard.timeRange.any', 'Any time'),
+    '1h': t('plugins.kanbanBoard.timeRange.1h', 'Last hour'),
+    '24h': t('plugins.kanbanBoard.timeRange.24h', 'Last 24 hours'),
+    '2d': t('plugins.kanbanBoard.timeRange.2d', 'Last 2 days'),
+    '7d': t('plugins.kanbanBoard.timeRange.7d', 'Last 7 days'),
+    '30d': t('plugins.kanbanBoard.timeRange.30d', 'Last 30 days'),
   }
 
   // Position menu below trigger

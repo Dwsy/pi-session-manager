@@ -27,8 +27,8 @@ It exposes these public groups:
 | Validation | `validatePsmPluginManifest`, `assertPsmPluginManifest`, `validatePsmPackageManifest`, `assertPsmPackageManifest` |
 | Host context | `manifest`, `psm`, `permissions`, `settings`, `i18n`, `ui`, `registerCommand`, `registerTool` |
 | Capability client | `createPluginCapabilityClient(options)` |
-| UI contributions | session toolbar item, session main view, session right panel |
-| Settings | `manifest.configuration`, `ctx.settings.get(...)`, `ctx.settings.all()` |
+| UI contributions | app view, app sidebar view bound by `appViewId`, session toolbar item, session main view, session right panel |
+| Settings/config | `manifest.configuration`, `ctx.settings.get(...)`, `ctx.settings.all()`, plugin-scoped JSON config |
 | I18n | `manifest.i18n`, `ctx.i18n.t(...)`, `ctx.i18n.language` |
 
 The injected `ctx.psm` client currently has these namespaces:
@@ -40,7 +40,8 @@ The injected `ctx.psm` client currently has these namespaces:
 | `search` | `fulltext`, `pluginRecords` |
 | `sidechat` | `ask` |
 | `models` | `listOptions` |
-| `kanban` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` |
+| `tags` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` |
+| `config` | `read`, `write` |
 
 The SDK does not export the app transport, runtime host, Tauri APIs, npm plugin management, or desktop-private implementation.
 
@@ -55,7 +56,7 @@ The current exposed command set is centered on:
 - full-text search
 - sidechat ask
 - model option list
-- basic kanban tag operations
+- basic tag operations
 
 Large command families are not exposed:
 
@@ -65,7 +66,7 @@ Large command families are not exposed:
 | API keys | `list_api_keys`, `create_api_key`, `revoke_api_key` | no |
 | Raw terminal | `terminal_create`, `terminal_write`, `terminal_resize`, `terminal_close` | no |
 | Pi Live control | `pi_agent_prompt`, `pi_agent_steer`, `pi_agent_abort` | privileged only |
-| Settings/config | `save_app_settings`, `save_server_settings`, `restore_config_version` | host-internal by default |
+| Settings/config | `save_app_settings`, `save_server_settings`, `restore_config_version`; plugin-scoped JSON config is exposed through `ctx.psm.config` | host-internal by default except plugin-scoped JSON |
 | File/session mutation | `delete_sessions`, `rename_session`, `fork_session`, `export_session` | privileged only |
 | Plugin management | `install_psm_plugin`, `uninstall_psm_plugin`, `read_npm_psm_plugin_module_source` | host-internal |
 
@@ -95,8 +96,10 @@ Current permissions:
 | `records:read` | read/search plugin records |
 | `records:write` | upsert plugin records |
 | `search:read` | full-text search |
-| `kanban:read` | read tags and session tags |
-| `kanban:write` | create/assign/remove tags |
+| `tags:read` | read tags and session tags |
+| `tags:write` | create/assign/remove tags |
+| `config:read` | read plugin-owned JSON config |
+| `config:write` | write plugin-owned JSON config |
 | `model:invoke` | invoke model-backed operations or list model options |
 
 This is the right foundation, but it should be expanded into a declarative capability table that records command name, permission, exposure level, request type, and response type.
@@ -107,7 +110,7 @@ Do not expose raw dispatch wholesale. Classify each command first.
 
 | Exposure level | Meaning | Examples |
 | --- | --- | --- |
-| `public` | safe for normal plugins with declared permission | session read, record read/write, search, sidechat, model list, kanban read/write |
+| `public` | safe for normal plugins with declared permission | session read, record read/write, search, sidechat, model list, tag read/write |
 | `privileged` | useful but mutating or high impact; requires explicit grant and UI confirmation | rename/fork/export sessions, Pi Live prompt/steer, workspace mutation |
 | `host-internal` | app maintenance or desktop-private operation | settings writes, npm plugin install, database backup/reset, devtools |
 | `unsafe` | should stay unavailable to third-party browser plugins | raw terminal write, arbitrary file open/write, API key management |

@@ -51,7 +51,7 @@ vi.mock('@/components/session-viewer/SessionContextMenu', () => ({
   default: () => null,
 }))
 
-vi.mock('@/components/kanban/SessionPreviewModal', () => ({
+vi.mock('@/components/session-preview/SessionPreviewModal', () => ({
   default: () => null,
 }))
 

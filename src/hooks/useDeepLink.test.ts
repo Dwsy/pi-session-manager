@@ -9,10 +9,10 @@ describe('deepLinkUrlToRoute', () => {
   });
 
   it('parses feature links', () => {
-    expect(deepLinkUrlToRoute('pi-session://kanban')).toBe('/kanban');
+    expect(deepLinkUrlToRoute('pi-session://dashboard')).toBe('/dashboard');
   });
 
-  it('falls back to home for unsupported links', () => {
-    expect(deepLinkUrlToRoute('pi-session://unknown/path')).toBe('/');
+  it('keeps plugin routes routable', () => {
+    expect(deepLinkUrlToRoute('pi-session://boards/work')).toBe('/boards/work');
   });
 });

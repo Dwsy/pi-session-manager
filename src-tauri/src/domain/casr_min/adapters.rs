@@ -62,17 +62,25 @@ pub fn canonical_to_session_entries(canonical: &CanonicalSession) -> Vec<Session
 
         if !message.content.trim().is_empty() {
             let content_type = if message.author.as_deref() == Some("reasoning") { "thinking".to_string() } else { "text".to_string() };
-            content.push(Content { content_type, text: Some(message.content.trim().to_string()) });
+            content.push(Content { content_type, id: None, name: None, arguments: None, text: Some(message.content.trim().to_string()) });
         }
         for tool_call in &message.tool_calls {
-            content.push(Content { content_type: "toolCall".to_string(), text: Some(tool_call.name.clone()) });
+            content.push(Content { content_type: "toolCall".to_string(), id: tool_call.id.clone(), name: Some(tool_call.name.clone()), arguments: Some(tool_call.arguments.clone()), text: Some(tool_call.name.clone()) });
         }
+        let mut tool_call_id = None;
+        let mut tool_name = None;
+        let mut is_error = None;
         if matches!(message.role, MessageRole::Tool) {
+            if let Some(tool_result) = message.tool_results.first() {
+                tool_call_id = tool_result.call_id.clone();
+                is_error = Some(tool_result.is_error);
+            }
             for tool_result in &message.tool_results {
                 if !tool_result.content.trim().is_empty() {
-                    content.push(Content { content_type: "text".to_string(), text: Some(tool_result.content.trim().to_string()) });
+                    content.push(Content { content_type: "text".to_string(), id: None, name: None, arguments: None, text: Some(tool_result.content.trim().to_string()) });
                 }
             }
+            tool_name = message.extra.get("toolName").and_then(Value::as_str).map(String::from);
         }
         if content.is_empty() {
             continue;
@@ -97,7 +105,18 @@ pub fn canonical_to_session_entries(canonical: &CanonicalSession) -> Vec<Session
             (None, None, None)
         };
 
-        entries.push(SessionEntry { entry_type: "message".to_string(), id: id.clone(), parent_id: previous_id.clone(), timestamp, message: Some(Message { role, content, model, provider, usage }), target_id: None, label: None, name: None, provider: None, model_id: None });
+        entries.push(SessionEntry {
+            entry_type: "message".to_string(),
+            id: id.clone(),
+            parent_id: previous_id.clone(),
+            timestamp,
+            message: Some(Message { role, content, tool_call_id, tool_name, is_error, model, provider, usage }),
+            target_id: None,
+            label: None,
+            name: None,
+            provider: None,
+            model_id: None,
+        });
         previous_id = Some(id);
     }
 

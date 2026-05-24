@@ -18,7 +18,6 @@ import { tags } from './tags'
 import { plugins } from './plugins'
 import { time } from './time'
 import { auth } from './auth'
-import { kanban } from './kanban'
 import { piAgent } from './piAgent'
 
 export const esES = {
@@ -42,7 +41,6 @@ export const esES = {
   plugins,
   time,
   auth,
-  kanban,
   piAgent,
   connection: {
     disconnected: 'No se puede conectar al servidor — ¿está la aplicación en ejecución?',

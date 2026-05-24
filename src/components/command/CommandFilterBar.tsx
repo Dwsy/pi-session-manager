@@ -8,6 +8,7 @@ import {
   ArrowUpDown,
   Star,
   Globe,
+  Command,
 } from 'lucide-react'
 import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
 import type { FullTextSearchSourceFilter } from '@/types'
@@ -20,8 +21,11 @@ import {
   getSourceFilterLabel,
   getSortLabel,
 } from './utils'
+import type { CommandPaletteMode } from './commandActions'
 
 interface CommandFilterBarProps {
+  mode: CommandPaletteMode
+  setMode: (mode: CommandPaletteMode) => void
   activeTab: 'all' | 'message' | 'session' | 'project'
   setActiveTab: (tab: 'all' | 'message' | 'session' | 'project') => void
   tabCounts: Record<'all' | 'message' | 'session' | 'project', number>
@@ -34,6 +38,8 @@ interface CommandFilterBarProps {
 }
 
 export default function CommandFilterBar({
+  mode,
+  setMode,
   activeTab,
   setActiveTab,
   tabCounts,
@@ -49,8 +55,29 @@ export default function CommandFilterBar({
 
   return (
     <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="flex items-center gap-1 rounded-full border border-border/70 bg-background p-1">
+        {(['search', 'commands'] as const).map((value) => {
+          const isActive = mode === value
+          const Icon = value === 'search' ? Search : Command
+          return (
+            <button
+              key={value}
+              onClick={() => setMode(value)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                isActive
+                  ? 'bg-foreground/[0.06] text-foreground font-medium'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span>{value === 'search' ? t('command.mode.search', 'Search') : t('command.mode.commands', 'Commands')}</span>
+            </button>
+          )
+        })}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
-        {TABS.map((tab) => {
+        {mode === 'search' && TABS.map((tab) => {
           const isActive = activeTab === tab.id
           return (
             <button
@@ -80,7 +107,7 @@ export default function CommandFilterBar({
         })}
       </div>
 
-      {showAdvancedMessageFilters && (
+      {mode === 'search' && showAdvancedMessageFilters && (
         <>
           <div className="h-5 w-px bg-border/70" />
           <div className="flex flex-wrap items-center gap-2">
@@ -165,7 +192,7 @@ export default function CommandFilterBar({
         </>
       )}
 
-      <div className="ml-auto flex min-w-[190px] items-center gap-2 rounded-full border border-border/70 bg-background px-3 py-2">
+      {mode === 'search' && <div className="ml-auto flex min-w-[190px] items-center gap-2 rounded-full border border-border/70 bg-background px-3 py-2">
         <Globe className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />
         <CompositionInput
           type="text"
@@ -180,7 +207,7 @@ export default function CommandFilterBar({
           placeholder="path..."
           className="w-full bg-transparent text-[12px] text-foreground placeholder:text-muted-foreground/55 outline-none"
         />
-      </div>
+      </div>}
     </div>
   )
 }

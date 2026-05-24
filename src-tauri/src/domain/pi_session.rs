@@ -332,7 +332,19 @@ fn parse_message_entry(value: &Value, base: RawEntryBase) -> Option<RawPiEntry> 
     let provider = message_value.get("provider").and_then(Value::as_str).map(String::from);
     let usage = message_value.get("usage").cloned();
 
-    Some(RawPiEntry::Message { base, message: Message { role, content, model, provider, usage } })
+    Some(RawPiEntry::Message {
+        base,
+        message: Message {
+            role,
+            content,
+            tool_call_id: message_value.get("toolCallId").and_then(Value::as_str).map(String::from),
+            tool_name: message_value.get("toolName").and_then(Value::as_str).map(String::from),
+            is_error: message_value.get("isError").and_then(Value::as_bool),
+            model,
+            provider,
+            usage,
+        },
+    })
 }
 
 fn parse_label_entry(value: &Value, base: RawEntryBase) -> Option<RawPiEntry> {
@@ -341,14 +353,21 @@ fn parse_label_entry(value: &Value, base: RawEntryBase) -> Option<RawPiEntry> {
 
 fn parse_message_content(content: Option<&Value>) -> Vec<Content> {
     match content {
-        Some(Value::String(text)) => vec![Content { content_type: "text".to_string(), text: Some(text.clone()) }],
+        Some(Value::String(text)) => vec![Content { content_type: "text".to_string(), id: None, name: None, arguments: None, text: Some(text.clone()) }],
         Some(Value::Array(items)) => items
             .iter()
             .filter_map(|item| {
                 let item_type = item.get("type").and_then(Value::as_str)?;
                 match item_type {
-                    "text" => item.get("text").and_then(Value::as_str).map(|text| Content { content_type: "text".to_string(), text: Some(text.to_string()) }),
-                    "thinking" => item.get("thinking").and_then(Value::as_str).map(|thinking| Content { content_type: "thinking".to_string(), text: Some(thinking.to_string()) }),
+                    "text" => item.get("text").and_then(Value::as_str).map(|text| Content { content_type: "text".to_string(), id: None, name: None, arguments: None, text: Some(text.to_string()) }),
+                    "thinking" => item.get("thinking").and_then(Value::as_str).map(|thinking| Content { content_type: "thinking".to_string(), id: None, name: None, arguments: None, text: Some(thinking.to_string()) }),
+                    "toolCall" => Some(Content {
+                        content_type: "toolCall".to_string(),
+                        id: item.get("id").and_then(Value::as_str).map(String::from),
+                        name: item.get("name").and_then(Value::as_str).map(String::from),
+                        arguments: item.get("arguments").cloned(),
+                        text: item.get("text").and_then(Value::as_str).map(String::from),
+                    }),
                     _ => None,
                 }
             })

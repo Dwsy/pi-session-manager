@@ -42,11 +42,15 @@ import StandaloneDatasetOverview from "./components/dataset/StandaloneDatasetOve
 import { useTags } from "./hooks/useTags";
 import type { SessionConvertTarget, SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
-import { initializePsmPluginHost, psmPluginHost } from "./plugins/runtime-host";
+import {
+  initializePsmPluginHost,
+  type PsmAppViewRuntimeRegistration,
+  psmPluginHost,
+  usePsmPluginUi,
+} from "./plugins/runtime-host";
 import { invoke, isTauri } from "./transport";
 import { getCachedSettings } from "./utils/settingsApi";
 import { getSessionSourceSlug } from "./utils/session";
-import { filterSessions } from "./utils/sessionFilters";
 import {
   buildPiResumeCommand,
   buildPiForkCommand,
@@ -58,15 +62,18 @@ import { shouldSkipOnboardingForRuntime } from "./runtime-data/mode";
 import AppMobileLayout, {
   type MobileTab,
 } from "./components/app/AppMobileLayout";
-import AppDesktopSidebar from "./components/app/AppDesktopSidebar";
+import AppDesktopSidebar, {
+  type AppDesktopSidebarAppViewItem,
+} from "./components/app/AppDesktopSidebar";
 import AppDesktopContent from "./components/app/AppDesktopContent";
 import AppDesktopSearchBar from "./components/app/AppDesktopSearchBar";
 import { usePiLive } from "./hooks/usePiLive";
 import AppDesktopSidebarContent from "./components/app/AppDesktopSidebarContent";
+import { AppPluginSurfaceDataProvider } from "./components/app/AppPluginSurfaceData";
 import AppOverlays from "./components/app/AppOverlays";
 import AppSessionListPane from "./components/app/AppSessionListPane";
 import AppProjectListPane from "./components/app/AppProjectListPane";
-import AppKanbanPane from "./components/app/AppKanbanPane";
+import AppPluginViewPane from "./components/app/AppPluginViewPane";
 import AppDashboardPane from "./components/app/AppDashboardPane";
 import AppSessionViewerPane from "./components/app/AppSessionViewerPane";
 import AppMobileFilterBar from "./components/app/AppMobileFilterBar";
@@ -75,8 +82,6 @@ import AppTerminalPane from "./components/app/AppTerminalPane";
 import { resolveDesktopMainContent } from "./components/app/resolveDesktopMainContent";
 import DeleteSessionPopover from "./components/dialogs/DeleteSessionPopover";
 import type { DeleteSessionRequestOptions } from "./components/dialogs/deleteSessionTypes";
-import { useWorkspaces, type KanbanWorkspace } from "./hooks/useWorkspaces";
-import WorkspaceEditor from "./components/kanban/WorkspaceEditor";
 import {
   BROWSER_DATASET_REFRESHED_EVENT,
   DEFAULT_STANDALONE_DATASET_ID,
@@ -103,7 +108,6 @@ const GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY = [
   // allow destructive or session-launch actions to fire from text inputs.
   "cmd+l",
   "cmd+p",
-  "cmd+b",
   "cmd+,",
   "cmd+`",
   "cmd+shift+f",
@@ -111,9 +115,36 @@ const GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY = [
   "f12",
 ];
 
+function normalizeShortcutKey(shortcut?: string) {
+  return shortcut
+    ?.trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/^command\+/, "cmd+")
+    .replace(/^⌘/, "cmd+");
+}
+
+function normalizeAppRoute(route?: string) {
+  if (!route) return null;
+  const [pathname] = route.split(/[?#]/);
+  const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  return normalized.replace(/\/+$/, "") || "/";
+}
+
+function getAppViewRoute(view: Pick<PsmAppViewRuntimeRegistration, "id" | "route">) {
+  return normalizeAppRoute(view.route) ?? `/app/${encodeURIComponent(view.id)}`;
+}
+
+function appViewMobileTabId(viewId: string): MobileTab {
+  return `app:${viewId}`;
+}
+
+function appViewIdFromMobileTab(tab: MobileTab) {
+  return tab.startsWith("app:") ? tab.slice(4) : null;
+}
+
 // Lazy load heavy components
 const Dashboard = lazy(() => import("./components/dashboard/Dashboard"));
-const KanbanBoard = lazy(() => import("./components/kanban/KanbanBoard"));
 const SettingsPanel = lazy(() => import("./components/settings/SettingsPanel"));
 const TerminalPanel = lazy(() => import("./components/terminal/TerminalPanel"));
 const CommandPalette = lazy(() =>
@@ -235,19 +266,16 @@ function App() {
     : runtimeLiveSessionIds;
 
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [sidebarMode, setSidebarMode] = useState<"list" | "project" | "kanban">(
+  const [sidebarMode, setSidebarMode] = useState<"list" | "project" | "app">(
     () => {
       if (standaloneDatasetRuntime) {
         return "list";
       }
       const saved = getCachedSettings().session?.defaultViewMode;
-      return saved === "list"
-        ? "list"
-        : saved === "kanban"
-          ? "kanban"
-          : "project";
+      return saved === "list" ? "list" : "project";
     },
   );
+  const [activeAppViewId, setActiveAppViewId] = useState<string | null>(null);
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [sourceFilterSlugs, setSourceFilterSlugs] = useState<string[]>(() => {
     try {
@@ -318,6 +346,7 @@ function App() {
       setDateRange(null);
       setSidebarSearchQuery("");
       setShowFavorites(false);
+      setActiveAppViewId(null);
       setSidebarMode("list");
       if (isMobile) {
         setMobileTab("list");
@@ -365,24 +394,116 @@ function App() {
   }, [loadSettings, loadSessions, loadTags]);
 
   const navigate = useNavigate();
+  const {
+    ready: pluginUiReady,
+    appViews,
+  } = usePsmPluginUi();
+  const appRoutes = useMemo(
+    () => appViews.map((view) => ({ id: view.id, route: view.route })),
+    [appViews],
+  );
 
   // Route sync for deep linking and URL-based navigation
   const {
     navigateToSession,
     navigateToSessions,
-    navigateToFeature,
     pendingSessionRoute,
+    pendingAppRoute,
   } = useRouteSync({
     setSelectedSession,
     selectedSession,
     sessions,
     sessionsLoading: loading,
-    setViewMode: setSidebarMode as (mode: 'list' | 'project' | 'kanban') => void,
+    viewMode: sidebarMode,
+    setViewMode: setSidebarMode,
     setSelectedProject,
     setShowSettings,
     setShowTerminal,
     setShowFavorites,
+    setActiveAppViewId,
+    appRoutes,
+    appRoutesReady: pluginUiReady,
   });
+
+  const openPluginAppView = useCallback(
+    (view: PsmAppViewRuntimeRegistration) => {
+      setSidebarMode("app");
+      setActiveAppViewId(view.id);
+      setSelectedSession(null);
+      setSelectedProject(null);
+      setShowFavorites(false);
+      navigate(getAppViewRoute(view));
+    },
+    [navigate, setSelectedSession],
+  );
+  const openPluginAppViewById = useCallback(
+    (viewId: string) => {
+      const view = appViews.find((item) => item.id === viewId);
+      if (view) openPluginAppView(view);
+    },
+    [appViews, openPluginAppView],
+  );
+  const appViewItems = useMemo<AppDesktopSidebarAppViewItem[]>(
+    () => appViews.map((view) => ({
+        id: view.id,
+        label: view.title,
+        icon: view.icon,
+        shortcut: view.shortcut,
+        active: sidebarMode === "app" && activeAppViewId === view.id && !showFavorites,
+        onSelect: () => openPluginAppView(view),
+      })),
+    [activeAppViewId, appViews, openPluginAppView, showFavorites, sidebarMode],
+  );
+  const mobileAppViewItems = useMemo(
+    () => appViews.map((view) => ({
+      id: view.id,
+      tabId: appViewMobileTabId(view.id),
+      label: view.title,
+      icon: view.icon,
+    })),
+    [appViews],
+  );
+  const handleMobileTabChange = useCallback(
+    (tab: MobileTab) => {
+      const appViewId = appViewIdFromMobileTab(tab);
+      if (appViewId) {
+        const appView = appViews.find((view) => view.id === appViewId);
+        setMobileTab(tab);
+        if (appView) {
+          openPluginAppView(appView);
+        }
+        return;
+      }
+
+      setActiveAppViewId(null);
+      if (tab === "list") {
+        setSidebarMode("list");
+      } else if (tab === "projects") {
+        setSidebarMode("project");
+      }
+      setMobileTab(tab);
+    },
+    [appViews, openPluginAppView],
+  );
+  useEffect(() => {
+    if (!isMobile || sidebarMode !== "app" || !activeAppViewId) return;
+    setMobileTab(appViewMobileTabId(activeAppViewId));
+  }, [activeAppViewId, isMobile, sidebarMode]);
+  const appViewShortcuts = useMemo(
+    () => Object.fromEntries(
+      appViewItems
+        .map((item) => [normalizeShortcutKey(item.shortcut), item.onSelect] as const)
+        .filter((entry): entry is readonly [string, () => void] => Boolean(entry[0])),
+    ),
+    [appViewItems],
+  );
+  const shortcutsAllowedInTextEntry = useMemo(
+    () => [
+      ...GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY,
+      ...Object.keys(appViewShortcuts),
+    ],
+    [appViewShortcuts],
+  );
 
   // Deep link: pi-session://sessions/{id} etc.
   const handleDeepLink = useCallback((path: string) => navigate(path), [navigate]);
@@ -462,53 +583,6 @@ function App() {
     removeFavorite,
     toggleFavorite,
   } = useFavorites({ enabled: isInitialized });
-  const {
-    workspaces,
-    activeWorkspace,
-    activeWorkspaceId,
-    saveWorkspace,
-    deleteWorkspace,
-    selectWorkspace,
-  } = useWorkspaces();
-
-  // Sync selectedProject to workspace config when active workspace changes.
-  useEffect(() => {
-    if (activeWorkspace.config.projectFilter) {
-      setSelectedProject(activeWorkspace.config.projectFilter);
-    } else if (activeWorkspace.id === "__default__") {
-      setSelectedProject(null);
-    }
-  }, [activeWorkspace]);
-
-  const kanbanProjectFilter = useMemo(
-    () => activeWorkspace.config.projectFilter ?? selectedProject,
-    [activeWorkspace, selectedProject],
-  );
-
-  const kanbanFilterTagIds = useMemo(
-    () => activeWorkspace.config.filterTagIds,
-    [activeWorkspace],
-  );
-
-  const kanbanSourceFilterSlugs = useMemo(
-    () => activeWorkspace.config.sourceFilterSlugs,
-    [activeWorkspace],
-  );
-
-  const workspaceSessions = useMemo(() => {
-    return filterSessions({
-      sessions,
-      projectFilter: activeWorkspace.config.projectFilter,
-      filterTagIds: activeWorkspace.config.filterTagIds,
-      sourceFilterSlugs: activeWorkspace.config.sourceFilterSlugs,
-      sessionTags,
-      getDescendantIds,
-      timeRange: "any",
-    });
-  }, [sessions, activeWorkspace, sessionTags, getDescendantIds]);
-
-  const [showWorkspaceEditor, setShowWorkspaceEditor] = useState(false);
-  const [editingWorkspace, setEditingWorkspace] = useState<KanbanWorkspace | null>(null);
   const { updateInfo, closeUpdateNotice, openUpdateReleasePage } =
     useUpdateChecker();
   useAppUiEffects({
@@ -703,22 +777,19 @@ function App() {
           }),
       "cmd+l": () => {
         setSidebarMode("list");
+        setActiveAppViewId(null);
         setSelectedProject(null);
         setShowFavorites(false);
         navigateToSessions();
       },
       "cmd+p": () => {
         setSidebarMode("project");
+        setActiveAppViewId(null);
         setSelectedProject(null);
         setShowFavorites(false);
         navigateToSessions();
       },
-      "cmd+b": () => {
-        setSidebarMode("kanban");
-        setSelectedSession(null);
-        setShowFavorites(false);
-        navigateToFeature('kanban');
-      },
+      ...appViewShortcuts,
       "cmd+,": () => setShowSettings(true),
       "cmd+`": () => {
         if (!standaloneDatasetRuntime && terminalConfig.enabled) {
@@ -784,7 +855,7 @@ function App() {
       standaloneDatasetRuntime,
       terminalConfig.enabled,
       navigateToSessions,
-      navigateToFeature,
+      appViewShortcuts,
     ],
   );
 
@@ -794,7 +865,7 @@ function App() {
 
   useKeyboardShortcuts(shortcuts, {
     shouldHandleEvent: shouldHandleGlobalShortcutEvent,
-    allowInTextEntry: GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY,
+    allowInTextEntry: shortcutsAllowedInTextEntry,
   });
 
   // Wrap setSelectedSession to also update URL
@@ -813,7 +884,8 @@ function App() {
       selectedSession,
       setSelectedSession: selectSessionAndNavigate,
       setSelectedProject,
-      setViewMode: setSidebarMode as (mode: 'list' | 'project' | 'kanban') => void,
+      setViewMode: setSidebarMode,
+      openAppView: openPluginAppViewById,
       closeCommandMenu: () => {},
       setPendingScrollEntryId,
       searchCurrentProjectOnly: false,
@@ -825,6 +897,7 @@ function App() {
       selectedSession,
       t,
       selectSessionAndNavigate,
+      openPluginAppViewById,
       setPendingScrollEntryId,
     ],
   );
@@ -996,6 +1069,64 @@ function App() {
     return Array.from(models).sort();
   }, [sessions]);
 
+  const pluginSurfaceData = useMemo(
+    () => ({
+      sessions,
+      tags,
+      sessionTags,
+      selectedSession,
+      onSelectSession: handleSelectSession,
+      onMoveSession: moveSession,
+      getTagsForSession,
+      onToggleTag: handleToggleSessionTag,
+      onDeleteSession: standaloneDatasetRuntime ? undefined : handleDeleteSession,
+      onConvertSession: standaloneDatasetRuntime ? undefined : handleStartConvertSession,
+      onResumeSession: standaloneDatasetRuntime ? undefined : requestResumeSession,
+      onCopyResumeSession: standaloneDatasetRuntime ? undefined : requestCopyResumeCommand,
+      onNewSession: standaloneDatasetRuntime ? undefined : handleNewSession,
+      favorites,
+      onToggleFavorite: toggleFavorite,
+      terminal: standaloneDatasetRuntime ? undefined : terminal,
+      piPath: standaloneDatasetRuntime ? undefined : piPath,
+      customCommand: standaloneDatasetRuntime ? undefined : customCommand,
+      resumeCommand: standaloneDatasetRuntime ? undefined : resumeCommand,
+      liveSessionIds,
+      onCreateTag: createTag,
+      sourceOptions,
+      getDescendantIds,
+      onClearSelectedSession: () => setSelectedSession(null),
+      loading,
+    }),
+    [
+      sessions,
+      tags,
+      sessionTags,
+      selectedSession,
+      handleSelectSession,
+      moveSession,
+      getTagsForSession,
+      handleToggleSessionTag,
+      standaloneDatasetRuntime,
+      handleDeleteSession,
+      handleStartConvertSession,
+      requestResumeSession,
+      requestCopyResumeCommand,
+      handleNewSession,
+      favorites,
+      toggleFavorite,
+      terminal,
+      piPath,
+      customCommand,
+      resumeCommand,
+      liveSessionIds,
+      createTag,
+      sourceOptions,
+      getDescendantIds,
+      setSelectedSession,
+      loading,
+    ],
+  );
+
   const renderMobileFilterBar = (placeholder?: string, showSort = true) => (
     <AppMobileFilterBar
       searchQuery={sidebarSearchQuery}
@@ -1080,38 +1211,8 @@ function App() {
     />
   );
 
-  const renderKanban = () => (
-    <AppKanbanPane
-      fallback={<LoadingSpinner />}
-      KanbanBoardComponent={KanbanBoard}
-      loading={loading}
-      sessions={sessions}
-      tags={tags}
-      sessionTags={sessionTags}
-      selectedSession={selectedSession}
-      onSelectSession={handleSelectSession}
-      onMoveSession={moveSession}
-      getTagsForSession={getTagsForSession}
-      onToggleTag={handleToggleSessionTag}
-      onDeleteSession={standaloneDatasetRuntime ? undefined : handleDeleteSession}
-      onConvertSession={standaloneDatasetRuntime ? undefined : handleStartConvertSession}
-      onResumeSession={standaloneDatasetRuntime ? undefined : requestResumeSession}
-      onCopyResumeSession={standaloneDatasetRuntime ? undefined : requestCopyResumeCommand}
-      onNewSession={standaloneDatasetRuntime ? undefined : handleNewSession}
-      favorites={favorites}
-      onToggleFavorite={toggleFavorite}
-      terminal={standaloneDatasetRuntime ? undefined : terminal}
-      piPath={standaloneDatasetRuntime ? undefined : piPath}
-      customCommand={standaloneDatasetRuntime ? undefined : customCommand}
-      resumeCommand={standaloneDatasetRuntime ? undefined : resumeCommand}
-      onCreateTag={createTag}
-      projectFilter={kanbanProjectFilter}
-      filterTagIds={kanbanFilterTagIds}
-      sourceFilterSlugs={kanbanSourceFilterSlugs}
-      onFilterChange={setFilterTagIds}
-      getDescendantIds={getDescendantIds}
-      liveSessionIds={liveSessionIds}
-    />
+  const renderAppView = () => (
+    <AppPluginViewPane viewId={activeAppViewId} fallback={<LoadingSpinner />} />
   );
 
   const handleDatasetOverviewProjectSelect = (path: string) => {
@@ -1120,6 +1221,7 @@ function App() {
       setMobileTab("projects");
       return;
     }
+    setActiveAppViewId(null);
     setSidebarMode("project");
     setShowFavorites(false);
   };
@@ -1243,22 +1345,19 @@ function App() {
   const {
     onSelectListView: handleSidebarSelectListView,
     onSelectProjectView: handleSidebarSelectProjectView,
-    onSelectKanbanView: handleSidebarSelectKanbanView,
     onToggleFavorites: handleSidebarToggleFavorites,
     onOpenCommandPalette: handleSidebarOpenCommandPalette,
     onToggleTerminal: handleSidebarToggleTerminal,
     onOpenSettings: handleSidebarOpenSettings,
-    onSelectKanbanFilterProject: handleSelectKanbanFilterProject,
     onSelectFavoriteProject: handleSelectFavoriteProject,
   } = useDesktopSidebarActions({
     setViewMode: setSidebarMode,
+    setActiveAppViewId,
     setSelectedProject,
-    setSelectedSession,
     setShowFavorites,
     setShowTerminal,
     setShowSettings,
     navigateToSessions,
-    navigateToFeature,
   });
 
   // ═══════════════════════════════════
@@ -1266,23 +1365,26 @@ function App() {
   // ═══════════════════════════════════
   if (isMobile) {
     return (
-      <>
+      <AppPluginSurfaceDataProvider value={pluginSurfaceData}>
         <AppMobileLayout
           selectedSession={selectedSession}
           mobileViewerRef={mobileViewerRef}
           mobileTab={mobileTab}
-          onMobileTabChange={setMobileTab}
+          onMobileTabChange={handleMobileTabChange}
           renderSessionViewer={renderSessionViewer}
           renderSessionList={renderSessionList}
           renderProjectList={renderProjectList}
-          renderKanban={renderKanban}
+          appViewItems={mobileAppViewItems}
+          renderAppView={(viewId) => (
+            <AppPluginViewPane viewId={viewId} fallback={<LoadingSpinner />} />
+          )}
           renderDashboard={
             standaloneDatasetRuntime
               ? renderStandaloneDatasetOverview
               : renderDashboard
           }
           renderSettings={renderSettings}
-          routeSessionPending={pendingSessionRoute}
+          routeSessionPending={pendingSessionRoute || pendingAppRoute}
           renderRouteSessionPending={LoadingSpinner}
           showDashboardTab={!standaloneDatasetRuntime}
           renderOverlays={renderOverlays}
@@ -1292,12 +1394,13 @@ function App() {
           onClose={closeUpdateNotice}
           onOpenRelease={openUpdateReleasePage}
         />
-      </>
+      </AppPluginSurfaceDataProvider>
     );
   }
 
   const handleSidebarShowDashboard = () => {
     setSidebarMode("list");
+    setActiveAppViewId(null);
     setSelectedProject(null);
     setShowFavorites(false);
     setShowSettings(false);
@@ -1306,43 +1409,45 @@ function App() {
     navigateToSessions();
   };
 
-  const desktopSearchBar = (
-    <AppDesktopSearchBar
-      searchQuery={sidebarSearchQuery}
-      onSearchChange={setSidebarSearchQuery}
-      tags={tags}
-      sessionTags={sessionTags}
-      filterTagIds={filterTagIds}
-      onFilterChange={setFilterTagIds}
-      sourceOptions={sourceOptions}
-      selectedSourceSlugs={sourceFilterSlugs}
-      onSourceFilterChange={setSourceFilterSlugs}
-      modelOptions={modelOptions}
-      selectedModel={modelFilter}
-      onModelFilterChange={setModelFilter}
-      dateRange={dateRange}
-      onDateRangeChange={setDateRange}
-      onCreateTag={(name, color, parentId) => {
-        void createTag(name, color, undefined, parentId);
-      }}
-      getDescendantIds={getDescendantIds}
-      totalCount={sessions.length}
-      filteredCount={filteredSessions.length}
-      sidebarMode={sidebarMode}
-      selectedProject={selectedProject}
-      sortBy={sessionSortBy}
-      sortOrder={sessionSortOrder}
-      onSortByChange={setSessionSortBy}
-      onSortOrderChange={setSessionSortOrder}
-      onSelectModeTrigger={triggerSelectionMode}
-    />
-  );
+  const desktopSearchBar =
+    sidebarMode === "app" ? null : (
+      <AppDesktopSearchBar
+        searchQuery={sidebarSearchQuery}
+        onSearchChange={setSidebarSearchQuery}
+        tags={tags}
+        sessionTags={sessionTags}
+        filterTagIds={filterTagIds}
+        onFilterChange={setFilterTagIds}
+        sourceOptions={sourceOptions}
+        selectedSourceSlugs={sourceFilterSlugs}
+        onSourceFilterChange={setSourceFilterSlugs}
+        modelOptions={modelOptions}
+        selectedModel={modelFilter}
+        onModelFilterChange={setModelFilter}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        onCreateTag={(name, color, parentId) => {
+          void createTag(name, color, undefined, parentId);
+        }}
+        getDescendantIds={getDescendantIds}
+        totalCount={sessions.length}
+        filteredCount={filteredSessions.length}
+        sidebarMode={sidebarMode}
+        selectedProject={selectedProject}
+        sortBy={sessionSortBy}
+        sortOrder={sessionSortOrder}
+        onSortByChange={setSessionSortBy}
+        onSortOrderChange={setSessionSortOrder}
+        onSelectModeTrigger={triggerSelectionMode}
+      />
+    );
 
   const desktopSidebarContent = (
-    <AppDesktopSidebarContent
-      showFavorites={showFavorites}
-      sidebarMode={sidebarMode}
-      sessions={sessions}
+      <AppDesktopSidebarContent
+        showFavorites={showFavorites}
+        sidebarMode={sidebarMode}
+        activeAppViewId={activeAppViewId}
+        sessions={sessions}
       selectedProject={selectedProject}
       selectedSession={selectedSession}
       selectedProjectSummary={selectedProjectSummary}
@@ -1358,38 +1463,23 @@ function App() {
       listScrollRef={listScrollRef}
       sessionListCommonProps={runtimeSessionListCommonProps}
       onLoadMoreSidebarSessions={loadMoreSidebarSessions}
-      onSelectKanbanFilterProject={handleSelectKanbanFilterProject}
       onSelectFavoriteProject={handleSelectFavoriteProject}
       onSelectSession={handleSelectSession}
       onSelectProject={setSelectedProject}
       onRemoveFavorite={removeFavorite}
       onToggleFavorite={toggleFavorite}
       liveSessionIds={liveSessionIds}
-      workspaces={workspaces}
-      activeWorkspace={activeWorkspace}
-      activeWorkspaceId={activeWorkspaceId}
-      workspaceSessions={workspaceSessions}
-      onSelectWorkspace={selectWorkspace}
-      onCreateWorkspace={() => {
-        setEditingWorkspace(null);
-        setShowWorkspaceEditor(true);
-      }}
-      onEditWorkspace={(w) => {
-        setEditingWorkspace(w);
-        setShowWorkspaceEditor(true);
-      }}
-      onDeleteWorkspace={deleteWorkspace}
     />
   );
 
-  const desktopMainContent = pendingSessionRoute
+  const desktopMainContent = pendingSessionRoute || pendingAppRoute
     ? <LoadingSpinner />
     : resolveDesktopMainContent({
         selectedSession,
         sidebarMode,
         standaloneDatasetRuntime,
         renderSessionViewer,
-        renderKanban,
+        renderAppView,
         renderStandaloneDatasetOverview,
         renderDashboard,
       });
@@ -1451,88 +1541,77 @@ function App() {
   // Desktop layout: sidebar + content
   // ═══════════════════════════════════
   return (
-    <div
-      className="app-shell flex flex-col h-screen-safe bg-background text-foreground"
-      data-runtime={appRuntime}
-    >
-      <ConnectionBanner />
+    <AppPluginSurfaceDataProvider value={pluginSurfaceData}>
+      <div
+        className="app-shell flex flex-col h-screen-safe bg-background text-foreground"
+        data-runtime={appRuntime}
+      >
+        <ConnectionBanner />
 
-      {/* Version Downgrade Dialog */}
-      {versionDowngradeInfo && (
-        <VersionDowngradeDialog
-          downgradeInfo={versionDowngradeInfo}
-          currentVersion={versionDowngradeInfo.current_app_version}
-          onClose={() => setVersionDowngradeInfo(null)}
-          onContinue={handleContinueVersionDowngrade}
-          onResetComplete={() => {
-            setVersionDowngradeInfo(null);
-            // Reload the app after reset
-            window.location.reload();
-          }}
-        />
-      )}
-
-      <div className="flex flex-1 min-h-0">
-        <AppDesktopSidebar
-          isTauriRuntime={isTauriRuntime}
-          startDragging={startDragging}
-          sidebarMode={sidebarMode}
-          showFavorites={showFavorites}
-          showDashboardButton={!standaloneDatasetRuntime}
-          terminalEnabled={!standaloneDatasetRuntime && terminalConfig.enabled}
-          showTerminal={showTerminal}
-          onShowDashboard={handleSidebarShowDashboard}
-          onSelectListView={handleSidebarSelectListView}
-          onSelectProjectView={handleSidebarSelectProjectView}
-          onSelectKanbanView={handleSidebarSelectKanbanView}
-          onToggleFavorites={handleSidebarToggleFavorites}
-          onOpenCommandPalette={handleSidebarOpenCommandPalette}
-          onToggleTerminal={handleSidebarToggleTerminal}
-          onOpenSettings={handleSidebarOpenSettings}
-          searchBar={desktopSearchBar}
-          content={desktopSidebarContent}
-          listScrollRef={listScrollRef}
-        />
-
-        <AppDesktopContent
-          isTauriRuntime={isTauriRuntime}
-          showTerminal={showTerminal}
-          terminalMaximized={terminalMaximized}
-          mainContent={desktopMainContent}
-          terminalPanel={desktopTerminalPanel}
-        />
-
-        {renderOverlays()}
-
-        {pendingDeleteSession && (
-          <DeleteSessionPopover
-            sessions={pendingDeleteSession.sessions}
-            anchorRef={pendingDeleteSession.anchorRef}
-            anchorPoint={pendingDeleteSession.anchorPoint}
-            onConfirm={confirmDeleteSession}
-            onCancel={cancelDeleteSession}
+        {/* Version Downgrade Dialog */}
+        {versionDowngradeInfo && (
+          <VersionDowngradeDialog
+            downgradeInfo={versionDowngradeInfo}
+            currentVersion={versionDowngradeInfo.current_app_version}
+            onClose={() => setVersionDowngradeInfo(null)}
+            onContinue={handleContinueVersionDowngrade}
+            onResetComplete={() => {
+              setVersionDowngradeInfo(null);
+              // Reload the app after reset
+              window.location.reload();
+            }}
           />
         )}
-      </div>
-      <UpdateNoticeToast
-        update={updateInfo}
-        onClose={closeUpdateNotice}
-        onOpenRelease={openUpdateReleasePage}
-      />
-      {showWorkspaceEditor && (
-        <WorkspaceEditor
-          workspace={editingWorkspace}
-          sessions={sessions}
-          tags={tags}
-          sourceOptions={sourceOptions}
-          onSave={async (w) => {
-            await saveWorkspace(w);
-            setShowWorkspaceEditor(false);
-          }}
-          onClose={() => setShowWorkspaceEditor(false)}
+
+        <div className="flex flex-1 min-h-0">
+          <AppDesktopSidebar
+            isTauriRuntime={isTauriRuntime}
+            startDragging={startDragging}
+            sidebarMode={sidebarMode}
+            showFavorites={showFavorites}
+            showDashboardButton={!standaloneDatasetRuntime}
+            terminalEnabled={!standaloneDatasetRuntime && terminalConfig.enabled}
+            showTerminal={showTerminal}
+            onShowDashboard={handleSidebarShowDashboard}
+            onSelectListView={handleSidebarSelectListView}
+            onSelectProjectView={handleSidebarSelectProjectView}
+            appViewItems={appViewItems}
+            onToggleFavorites={handleSidebarToggleFavorites}
+            onOpenCommandPalette={handleSidebarOpenCommandPalette}
+            onToggleTerminal={handleSidebarToggleTerminal}
+            onOpenSettings={handleSidebarOpenSettings}
+            searchBar={desktopSearchBar}
+            content={desktopSidebarContent}
+            listScrollRef={listScrollRef}
+          />
+
+          <AppDesktopContent
+            isTauriRuntime={isTauriRuntime}
+            showTerminal={showTerminal}
+            terminalMaximized={terminalMaximized}
+            mainContent={desktopMainContent}
+            terminalPanel={desktopTerminalPanel}
+          />
+
+          {renderOverlays()}
+
+          {pendingDeleteSession && (
+            <DeleteSessionPopover
+              sessions={pendingDeleteSession.sessions}
+              anchorRef={pendingDeleteSession.anchorRef}
+              anchorPoint={pendingDeleteSession.anchorPoint}
+              onConfirm={confirmDeleteSession}
+              onCancel={cancelDeleteSession}
+            />
+          )}
+        </div>
+        <UpdateNoticeToast
+          update={updateInfo}
+          onClose={closeUpdateNotice}
+          onOpenRelease={openUpdateReleasePage}
         />
-      )}
-    </div>
+      </div>
+    </AppPluginSurfaceDataProvider>
   );
 }
 

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   setPsmPluginEnabled: vi.fn(),
   setPsmPluginSettings: vi.fn(),
   removePathPsmPlugin: vi.fn(),
+  searchPsmPluginMarket: vi.fn(),
   uninstallPsmPlugin: vi.fn(),
   updatePsmPlugins: vi.fn(),
   invoke: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('@/plugins/runtime-host', () => ({
   psmPluginHost: { reload: mocks.reload },
   setPsmPluginEnabled: mocks.setPsmPluginEnabled,
   setPsmPluginSettings: mocks.setPsmPluginSettings,
+  searchPsmPluginMarket: mocks.searchPsmPluginMarket,
   removePathPsmPlugin: mocks.removePathPsmPlugin,
   uninstallPsmPlugin: mocks.uninstallPsmPlugin,
   updatePsmPlugins: mocks.updatePsmPlugins,
@@ -132,6 +134,7 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
     mocks.reload.mockReset()
     mocks.setPsmPluginEnabled.mockReset()
     mocks.setPsmPluginSettings.mockReset()
+    mocks.searchPsmPluginMarket.mockReset()
     mocks.removePathPsmPlugin.mockReset()
     mocks.uninstallPsmPlugin.mockReset()
     mocks.updatePsmPlugins.mockReset()
@@ -145,6 +148,7 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
     mocks.addPathPsmPlugin.mockResolvedValue({ version: 1, plugins: {}, customPaths: ['/Users/test/plugins/local-plugin.mjs'] })
     mocks.removePathPsmPlugin.mockResolvedValue({ version: 1, plugins: {}, customPaths: [] })
     mocks.installPsmPlugin.mockResolvedValue({ entries: [], stdout: '', stderr: '' })
+    mocks.searchPsmPluginMarket.mockResolvedValue({ query: 'psm plugin', total: 0, results: [] })
     mocks.uninstallPsmPlugin.mockResolvedValue({ entries: [], stdout: '', stderr: '' })
     mocks.updatePsmPlugins.mockResolvedValue({ entries: [], stdout: '', stderr: '' })
     mocks.setPsmPluginSettings.mockResolvedValue({ version: 1, plugins: {} })
@@ -215,7 +219,7 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
     }))
   })
 
-  it('renders model settings as provider and model selectors', async () => {
+  it('renders model settings as a unified selector sourced from model config center', async () => {
     mocks.reload.mockResolvedValueOnce([builtinPlugin, npmPlugin]).mockResolvedValueOnce([
       { ...builtinPlugin, settings: { provider: 'anthropic', model: '', thinkingLevel: 'medium', limit: 8 } },
       npmPlugin,
@@ -223,23 +227,80 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
 
     render(<PsmPluginsSettings pluginId="builtin.sidechat" />)
 
-    const provider = await screen.findByLabelText('Default provider')
+    expect(screen.queryByLabelText('Default provider')).toBeNull()
+
     const model = await screen.findByLabelText('Default model')
+    expect(model.tagName).toBe('BUTTON')
+    expect(model.textContent).toContain('openai/gpt-4o')
 
-    expect(provider.tagName).toBe('SELECT')
-    expect(model.tagName).toBe('SELECT')
-    expect((provider as HTMLSelectElement).value).toBe('openai')
-    expect((model as HTMLSelectElement).value).toBe('gpt-4o')
-
-    fireEvent.change(provider, { target: { value: 'anthropic' } })
+    fireEvent.click(model)
+    fireEvent.change(await screen.findByPlaceholderText('Search models...'), { target: { value: 'claude' } })
+    fireEvent.click(await screen.findByRole('button', { name: /anthropic\/claude-sonnet-4-5/i }))
 
     await waitFor(() => expect(mocks.setPsmPluginSettings).toHaveBeenCalledWith({
       pluginId: 'builtin.sidechat',
-      settings: { provider: 'anthropic', model: '', thinkingLevel: 'medium', limit: 8 },
+      settings: { provider: 'anthropic', model: 'claude-sonnet-4-5', thinkingLevel: 'medium', limit: 8 },
       source: 'builtin',
       packageName: null,
       entryPath: null,
     }))
+  })
+
+  it('searches all models and saves the provider/model pair from model selection', async () => {
+    const autoPlugin = { ...builtinPlugin, settings: { provider: '', model: '', thinkingLevel: 'medium', limit: 8 } }
+    mocks.reload.mockResolvedValueOnce([autoPlugin, npmPlugin]).mockResolvedValueOnce([
+      { ...autoPlugin, settings: { provider: 'anthropic', model: 'claude-sonnet-4-5', thinkingLevel: 'medium', limit: 8 } },
+      npmPlugin,
+    ])
+
+    render(<PsmPluginsSettings pluginId="builtin.sidechat" />)
+
+    const model = await screen.findByLabelText('Default model')
+    fireEvent.click(model)
+    fireEvent.change(await screen.findByPlaceholderText('Search models...'), { target: { value: 'claude' } })
+    fireEvent.click(await screen.findByRole('button', { name: /anthropic\/claude-sonnet-4-5/i }))
+
+    await waitFor(() => expect(mocks.setPsmPluginSettings).toHaveBeenCalledWith({
+      pluginId: 'builtin.sidechat',
+      settings: { provider: 'anthropic', model: 'claude-sonnet-4-5', thinkingLevel: 'medium', limit: 8 },
+      source: 'builtin',
+      packageName: null,
+      entryPath: null,
+    }))
+  })
+
+  it('keeps the selected model visible while plugin settings are reloading', async () => {
+    const autoPlugin = { ...builtinPlugin, settings: { provider: '', model: '', thinkingLevel: 'medium', limit: 8 } }
+    let resolveReload: ((value: typeof autoPlugin[]) => void) | null = null
+    const pendingReload = new Promise<typeof autoPlugin[]>((resolve) => {
+      resolveReload = resolve
+    })
+
+    mocks.reload.mockResolvedValueOnce([autoPlugin, npmPlugin]).mockImplementationOnce(() => pendingReload)
+
+    render(<PsmPluginsSettings pluginId="builtin.sidechat" />)
+
+    const model = await screen.findByLabelText('Default model')
+    fireEvent.click(model)
+    fireEvent.change(await screen.findByPlaceholderText('Search models...'), { target: { value: 'claude' } })
+    fireEvent.click(await screen.findByRole('button', { name: /anthropic\/claude-sonnet-4-5/i }))
+
+    await waitFor(() => expect(mocks.setPsmPluginSettings).toHaveBeenCalledWith({
+      pluginId: 'builtin.sidechat',
+      settings: { provider: 'anthropic', model: 'claude-sonnet-4-5', thinkingLevel: 'medium', limit: 8 },
+      source: 'builtin',
+      packageName: null,
+      entryPath: null,
+    }))
+
+    expect(screen.getByLabelText('Default model').textContent).toContain('anthropic/claude-sonnet-4-5')
+
+    resolveReload?.([
+      { ...autoPlugin, settings: { provider: 'anthropic', model: 'claude-sonnet-4-5', thinkingLevel: 'medium', limit: 8 } },
+      npmPlugin,
+    ])
+
+    await waitFor(() => expect(screen.getByLabelText('Default model').textContent).toContain('anthropic/claude-sonnet-4-5'))
   })
 
   it('shows remove controls for npm and path plugins and refreshes after removal', async () => {

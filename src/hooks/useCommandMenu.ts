@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type { SearchPluginResult } from '@/plugins/types'
 
 interface UseCommandMenuReturn {
@@ -26,37 +26,55 @@ export function useCommandMenu(): UseCommandMenuReturn {
   const [results, setResults] = useState<SearchPluginResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const open = useCallback(() => {
-    setIsOpen(true)
+  const clearResetTimer = useCallback(() => {
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current)
+      resetTimerRef.current = null
+    }
   }, [])
 
+  const open = useCallback(() => {
+    clearResetTimer()
+    setIsOpen(true)
+  }, [clearResetTimer])
+
   const close = useCallback(() => {
+    clearResetTimer()
     setIsOpen(false)
     // Delay state reset, wait for close animation to complete
-    setTimeout(() => {
+    resetTimerRef.current = setTimeout(() => {
       setQuery('')
       setResults([])
       setSelectedIndex(0)
       setIsSearching(false)
-    }, 200)
-  }, [])
+      resetTimerRef.current = null
+    }, 320)
+  }, [clearResetTimer])
 
   const toggle = useCallback(() => {
     setIsOpen(prev => !prev)
   }, [])
 
   const reset = useCallback(() => {
+    clearResetTimer()
     setQuery('')
     setResults([])
     setSelectedIndex(0)
     setIsSearching(false)
-  }, [])
+  }, [clearResetTimer])
 
   // Reset selected index when results change
   useEffect(() => {
     setSelectedIndex(0)
   }, [results])
+
+  useEffect(() => {
+    return () => {
+      clearResetTimer()
+    }
+  }, [clearResetTimer])
 
   return {
     isOpen,

@@ -7,11 +7,11 @@ import { listen } from '@tauri-apps/api/event';
  * Supported routes:
  *   pi-session://                          → /#/  (home)
  *   pi-session://sessions/{sessionId}      → /#/sessions/{sessionId}
- *   pi-session://kanban                    → /#/kanban
  *   pi-session://dashboard                 → /#/dashboard
  *   pi-session://settings                  → /#/settings
  *   pi-session://terminal                  → /#/terminal
  *   pi-session://favorites                 → /#/favorites
+ *   pi-session://{plugin-route}            → /#/{plugin-route}
  */
 export function useDeepLink({
   onNavigate,
@@ -64,9 +64,8 @@ export function deepLinkUrlToRoute(url: string): string {
     return '/projects/' + encodeURIComponent(decodeURIComponent(parts[1]));
   }
 
-  const FEATURES = new Set(['kanban', 'dashboard', 'settings', 'terminal', 'favorites']);
-  if (parts[0] && FEATURES.has(parts[0])) {
-    return '/' + parts[0];
+  if (parts[0]) {
+    return '/' + parts.map((part) => encodeURIComponent(decodeURIComponent(part))).join('/');
   }
 
   return '/';

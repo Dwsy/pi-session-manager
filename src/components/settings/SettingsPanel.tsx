@@ -11,6 +11,7 @@ import { defaultSettings } from "./types";
 import { loadAppSettings, saveAppSettings } from "@/utils/settingsApi";
 import { applyPiChatTheme, resolvePiThemeColorScheme } from "@/utils/piTheme";
 import { useSettings as useAppSettingsContext } from "@/hooks/useSettings";
+import { SETTINGS_NAVIGATE_EVENT } from "./navigation";
 import {
   getAvailableSettingsGroups,
   getAvailableSettingsAreas,
@@ -75,11 +76,6 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       setPluginRegistryVersion((version) => version + 1);
     });
   }, [standaloneDatasetRuntime]);
-
-  useEffect(() => {
-    if (!isOpen || standaloneDatasetRuntime) return;
-    void psmPluginHost.reload();
-  }, [isOpen, standaloneDatasetRuntime]);
 
   // Build section labels map for search results
   const sectionLabels = useMemo(() => {
@@ -181,6 +177,22 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<{ section?: SettingsSection }>).detail;
+      if (!detail?.section) return;
+      const section = getSettingsSectionMeta(detail.section);
+      if (!section) return;
+      setActiveArea(section.area);
+      setActiveSection(detail.section);
+    };
+
+    window.addEventListener(SETTINGS_NAVIGATE_EVENT, handleNavigate as EventListener);
+    return () => window.removeEventListener(SETTINGS_NAVIGATE_EVENT, handleNavigate as EventListener);
+  }, [isOpen]);
 
   const settingsRef = useRef(settings);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -345,7 +357,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   return (
     <div
-      className={`settings-modal-no-press fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-200 ease-out ${
+      className={`settings-modal-no-press fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm motion-overlay-backdrop ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
@@ -356,7 +368,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             : "w-[95vw] h-[95vh] rounded-xl"
         } bg-surface-dark border border-border shadow-2xl flex ${
           isMobile ? "flex-col" : ""
-        } overflow-hidden transition-all duration-200 ease-out ${
+        } overflow-hidden motion-overlay-surface ${
           visible
             ? "translate-y-0 scale-100 opacity-100"
             : "translate-y-2 scale-[0.985] opacity-0"

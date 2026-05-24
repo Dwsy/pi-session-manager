@@ -2,10 +2,14 @@ import {
   assertPsmPluginManifest,
   createPluginCapabilityClient,
   type PsmPluginDisposable,
+  type PsmPluginEventEnvelope,
+  type PsmPluginEventsClient,
   type PsmPluginHostContext,
   type PsmPluginI18nClient,
   type PsmPluginManifest,
   type PsmPluginModule,
+  type PsmPluginLogger,
+  type PsmPermissionContext,
   type PsmPluginSettingValue,
   type PsmPluginSettingsClient,
   type PsmPluginToolRegistration,
@@ -17,6 +21,7 @@ import { toolRenderRegistry } from '@/plugins/tools-render/registry'
 import type { ToolRenderPlugin } from '@/plugins/tools-render/types'
 
 import { appPsmTransport } from './appTransport'
+import { psmRuntimeEventBus } from './eventBus'
 
 import { builtinPsmPluginEntries } from './builtins'
 import {
@@ -27,10 +32,13 @@ import {
   readPathPsmPluginModuleSource,
 } from './service'
 import type {
-  PsmPluginCommandHandler,
   PsmPluginConfigEntry,
+  PsmPluginCommandContext,
+  PsmPluginCommandRuntimeRegistration,
   PsmPluginDiagnostic,
   PsmPathPluginEntry,
+  PsmAppSidebarViewRuntimeRegistration,
+  PsmAppViewRuntimeRegistration,
   PsmPluginLoadEntry,
   PsmPluginSessionUiSnapshot,
   PsmPluginSource,
@@ -51,6 +59,7 @@ interface ActivePlugin {
   packageName?: string
   disposable?: PsmPluginDisposable
   deactivate?: () => void | Promise<void>
+  cleanup: Array<() => void | Promise<void>>
 }
 
 interface PsmPluginHostServices {
@@ -137,6 +146,34 @@ function i18nClient(): PsmPluginI18nClient {
   }
 }
 
+function loggerClient(pluginId: string): PsmPluginLogger {
+  const prefix = `[PSM plugins:${pluginId}]`
+  const emit = (level: 'debug' | 'info' | 'warn' | 'error', message: string, details?: Record<string, unknown>) => {
+    const payload = details && Object.keys(details).length > 0 ? { ...details } : undefined
+    const output = payload ? `${prefix} ${message}` : `${prefix} ${message}`
+    if (level === 'error') {
+      console.error(output, payload)
+      return
+    }
+    if (level === 'warn') {
+      console.warn(output, payload)
+      return
+    }
+    if (level === 'info') {
+      console.info(output, payload)
+      return
+    }
+    console.debug(output, payload)
+  }
+
+  return {
+    debug: (message, details) => emit('debug', message, details),
+    info: (message, details) => emit('info', message, details),
+    warn: (message, details) => emit('warn', message, details),
+    error: (message, details) => emit('error', message, details),
+  }
+}
+
 function settingsClient(values: Record<string, PsmPluginSettingValue>): PsmPluginSettingsClient {
   return {
     get(key, fallback) {
@@ -159,6 +196,42 @@ function diagnosticsMatch(a: PsmPluginDiagnostic, b: PsmPluginDiagnostic) {
 
 function diagnostic(level: PsmPluginDiagnostic['level'], message: string): PsmPluginDiagnostic {
   return { level, message }
+}
+
+function hasEventPermission(permissions: PsmPermissionContext | { permissions?: string[] }) {
+  return (permissions.permissions ?? []).includes('events:read')
+}
+
+async function runCleanup(cleanup: Array<() => void | Promise<void>>, pluginId: string) {
+  for (const dispose of cleanup.reverse()) {
+    try {
+      await dispose()
+    } catch (error) {
+      console.warn(`[PSM plugins] Failed to clean up event subscriptions for ${pluginId}:`, error)
+    }
+  }
+  cleanup.length = 0
+}
+
+function createPluginEventsClient(
+  pluginId: string,
+  permissions: PsmPermissionContext,
+  cleanup: Array<() => void | Promise<void>>,
+): PsmPluginEventsClient {
+  return {
+    subscribe<Name extends string, Payload = unknown>(
+      eventName: Name,
+      handler: (event: PsmPluginEventEnvelope<Name, Payload>) => void | Promise<void>,
+    ) {
+      if (!hasEventPermission(permissions)) {
+        throw new Error(`Plugin ${pluginId} must declare events:read to subscribe to ${String(eventName)}`)
+      }
+
+      const unsubscribe = psmRuntimeEventBus.subscribe(eventName, handler)
+      cleanup.push(unsubscribe)
+      return unsubscribe
+    },
+  }
 }
 
 function metadataFor(entry: PsmPluginLoadEntry) {
@@ -228,14 +301,17 @@ function pathEntryToLoadEntry(entry: PsmPathPluginEntry, readModuleSource: (entr
 export class PsmPluginHost {
   private readonly builtinEntries: PsmPluginLoadEntry[]
   private readonly services: PsmPluginHostServices
-  private commands = new Map<string, { pluginId: string; handler: PsmPluginCommandHandler }>()
+  private commands = new Map<string, PsmPluginCommandRuntimeRegistration>()
   private tools = new Map<string, PsmPluginToolRuntimeRegistration>()
   private toolRenderers = new Map<string, PsmToolRendererRuntimeRegistration>()
+  private appViews = new Map<string, PsmAppViewRuntimeRegistration>()
+  private appSidebarViews = new Map<string, PsmAppSidebarViewRuntimeRegistration>()
   private sessionToolbarItems = new Map<string, PsmSessionToolbarItemRuntimeRegistration>()
   private sessionPanels = new Map<string, PsmSessionPanelRuntimeRegistration>()
   private sessionTreeViews = new Map<string, PsmSessionTreeViewRuntimeRegistration>()
   private sessionMainViews = new Map<string, PsmSessionMainViewRuntimeRegistration>()
-  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
+  private commandSnapshot: PsmPluginCommandRuntimeRegistration[] = []
+  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
   private listeners = new Set<() => void>()
   private activePlugins = new Map<string, ActivePlugin>()
   private statuses = new Map<string, PsmPluginStatus>()
@@ -250,6 +326,7 @@ export class PsmPluginHost {
     if (this.reloadPromise) return this.reloadPromise
     this.reloadPromise = this.reloadInternal()
       .then((plugins) => {
+        this.refreshCommandSnapshot()
         this.refreshSessionUiSnapshot()
         this.notify()
         return plugins
@@ -268,12 +345,24 @@ export class PsmPluginHost {
     return Array.from(this.commands.keys()).sort()
   }
 
+  listCommands(): PsmPluginCommandRuntimeRegistration[] {
+    return this.commandSnapshot
+  }
+
   getToolNames(): string[] {
     return Array.from(this.tools.keys()).sort()
   }
 
   getToolRendererIds(): string[] {
     return Array.from(this.toolRenderers.keys()).sort()
+  }
+
+  listAppViews(): PsmAppViewRuntimeRegistration[] {
+    return Array.from(this.appViews.values()).sort((a, b) => a.id.localeCompare(b.id))
+  }
+
+  listAppSidebarViews(): PsmAppSidebarViewRuntimeRegistration[] {
+    return Array.from(this.appSidebarViews.values()).sort((a, b) => a.id.localeCompare(b.id))
   }
 
   listSessionToolbarItems(): PsmSessionToolbarItemRuntimeRegistration[] {
@@ -319,11 +408,18 @@ export class PsmPluginHost {
 
   private refreshSessionUiSnapshot() {
     this.sessionUiSnapshot = {
+      ready: true,
+      appViews: this.listAppViews(),
+      appSidebarViews: this.listAppSidebarViews(),
       toolbarItems: this.listSessionToolbarItems(),
       panels: this.listSessionPanels(),
       treeViews: this.listSessionTreeViews(),
       mainViews: this.listSessionMainViews(),
     }
+  }
+
+  private refreshCommandSnapshot() {
+    this.commandSnapshot = Array.from(this.commands.values()).sort((a, b) => a.title.localeCompare(b.title))
   }
 
   private unregisterToolRenderers(ids: string[] = Array.from(this.toolRenderers.keys())) {
@@ -337,10 +433,14 @@ export class PsmPluginHost {
     for (const listener of this.listeners) listener()
   }
 
-  async executeCommand(name: string, args: Record<string, unknown> = {}): Promise<unknown> {
+  async executeCommand(
+    name: string,
+    args: Record<string, unknown> = {},
+    context?: PsmPluginCommandContext,
+  ): Promise<unknown> {
     const command = this.commands.get(name)
     if (!command) throw new Error(`PSM plugin command not found: ${name}`)
-    return command.handler(args)
+    return command.run(args, context)
   }
 
   async runTool(name: string, args: Record<string, unknown> = {}): Promise<unknown> {
@@ -354,6 +454,8 @@ export class PsmPluginHost {
     this.unregisterToolRenderers()
     this.commands.clear()
     this.tools.clear()
+    this.appViews.clear()
+    this.appSidebarViews.clear()
     this.sessionToolbarItems.clear()
     this.sessionPanels.clear()
     this.sessionTreeViews.clear()
@@ -476,6 +578,8 @@ export class PsmPluginHost {
     const commandNames: string[] = []
     const toolNames: string[] = []
     const toolRendererIds: string[] = []
+    const appViewIds: string[] = []
+    const appSidebarViewIds: string[] = []
     const toolbarItemIds: string[] = []
     const panelIds: string[] = []
     const treeViewIds: string[] = []
@@ -485,14 +589,33 @@ export class PsmPluginHost {
       pluginId: manifest.id,
       permissions: manifest.permissions ?? [],
     }
+    const cleanup: Array<() => void | Promise<void>> = []
 
     const context: PsmPluginHostContext = {
       manifest,
       permissions,
+      events: createPluginEventsClient(manifest.id, permissions, cleanup),
       psm: createPluginCapabilityClient({ transport: appPsmTransport, permissions }),
       settings: settingsClient(settings),
       i18n: i18nClient(),
+      log: loggerClient(manifest.id),
       ui: {
+        registerAppView: (view) => {
+          if (this.appViews.has(view.id)) {
+            diagnostics.push(diagnostic('warn', `App view already registered: ${view.id}`))
+            return
+          }
+          this.appViews.set(view.id, { ...view, pluginId: manifest.id })
+          appViewIds.push(view.id)
+        },
+        registerAppSidebarView: (view) => {
+          if (this.appSidebarViews.has(view.id)) {
+            diagnostics.push(diagnostic('warn', `App sidebar view already registered: ${view.id}`))
+            return
+          }
+          this.appSidebarViews.set(view.id, { ...view, pluginId: manifest.id })
+          appSidebarViewIds.push(view.id)
+        },
         registerSessionToolbarItem: (item) => {
           if (this.sessionToolbarItems.has(item.id)) {
             diagnostics.push(diagnostic('warn', `Session toolbar item already registered: ${item.id}`))
@@ -535,13 +658,27 @@ export class PsmPluginHost {
           toolRendererIds.push(renderer.id)
         },
       },
-      registerCommand: (name, handler) => {
-        if (this.commands.has(name)) {
-          diagnostics.push(diagnostic('warn', `Command already registered: ${name}`))
+      registerCommand: (commandOrName, handler) => {
+        if (typeof commandOrName === 'string' && !handler) {
+          diagnostics.push(diagnostic('warn', `Command registration is missing a handler: ${commandOrName}`))
           return
         }
-        this.commands.set(name, { pluginId: manifest.id, handler })
-        commandNames.push(name)
+
+        const command = typeof commandOrName === 'string'
+          ? {
+              id: commandOrName,
+              title: commandOrName,
+              category: manifest.name,
+              run: handler!,
+            }
+          : commandOrName
+
+        if (this.commands.has(command.id)) {
+          diagnostics.push(diagnostic('warn', `Command already registered: ${command.id}`))
+          return
+        }
+        this.commands.set(command.id, { ...command, pluginId: manifest.id })
+        commandNames.push(command.id)
       },
       registerTool: (name, tool: PsmPluginToolRegistration) => {
         if (this.tools.has(name)) {
@@ -563,6 +700,7 @@ export class PsmPluginHost {
         packageName: configEntry.packageName ?? undefined,
         disposable: disposable && typeof disposable === 'object' ? disposable : undefined,
         deactivate: module.deactivate,
+        cleanup,
       })
       this.statuses.set(manifest.id, {
         id: manifest.id,
@@ -577,6 +715,8 @@ export class PsmPluginHost {
         manifest,
         commands: commandNames,
         tools: toolNames,
+        appViews: appViewIds,
+        appSidebarViews: appSidebarViewIds,
         toolRenderers: toolRendererIds,
         diagnostics,
         settings,
@@ -584,9 +724,12 @@ export class PsmPluginHost {
         ...metadataFor(entry),
       })
     } catch (error) {
+      await runCleanup(cleanup, manifest.id)
       for (const name of commandNames) this.commands.delete(name)
       for (const name of toolNames) this.tools.delete(name)
       this.unregisterToolRenderers(toolRendererIds)
+      for (const id of appViewIds) this.appViews.delete(id)
+      for (const id of appSidebarViewIds) this.appSidebarViews.delete(id)
       for (const id of toolbarItemIds) this.sessionToolbarItems.delete(id)
       for (const id of panelIds) this.sessionPanels.delete(id)
       for (const id of treeViewIds) this.sessionTreeViews.delete(id)
@@ -617,6 +760,7 @@ export class PsmPluginHost {
     this.activePlugins.clear()
     for (const plugin of active.reverse()) {
       try {
+        await runCleanup(plugin.cleanup, plugin.manifest.id)
         await plugin.disposable?.dispose()
         await plugin.deactivate?.()
       } catch (error) {

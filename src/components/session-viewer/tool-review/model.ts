@@ -57,6 +57,24 @@ function getStringArg(
   return "";
 }
 
+function normalizeReviewToolName(name: string) {
+  const normalized = name.toLowerCase();
+  if (normalized === "bash" || normalized === "shell" || normalized === "exec") {
+    return "bash";
+  }
+  if (normalized === "read" || normalized === "read_file") return "read";
+  if (normalized === "write" || normalized === "write_file") return "write";
+  if (
+    normalized === "edit" ||
+    normalized === "edit_file" ||
+    normalized === "multiedit" ||
+    normalized === "apply_patch"
+  ) {
+    return "edit";
+  }
+  return normalized;
+}
+
 export function stringifyArgs(args: Record<string, unknown>) {
   try {
     return JSON.stringify(args, null, 2) || "{}";
@@ -416,7 +434,7 @@ export function extractFileOperations(
         name?: string;
         arguments?: Record<string, unknown>;
       };
-      const toolName = (toolCall.name || "unknown").toLowerCase();
+      const toolName = normalizeReviewToolName(toolCall.name || "unknown");
       if (!["write", "edit", "read", "bash", "task"].includes(toolName)) return;
 
       const resolved = defaultResolveData(

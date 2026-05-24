@@ -65,10 +65,7 @@ pub async fn invoke_model_text_stream(app_state: crate::app_state::SharedAppStat
     match result {
         Ok(mut response) => {
             response.text = response.text.trim().to_string();
-            app_state
-                .app_handle
-                .emit(&event_name, ModelTextStreamEvent { r#type: "done".to_string(), delta: None, response: Some(response.clone()), error: None })
-                .map_err(|error| format!("Failed to emit model stream completion: {error}"))?;
+            app_state.app_handle.emit(&event_name, ModelTextStreamEvent { r#type: "done".to_string(), delta: None, response: Some(response.clone()), error: None }).map_err(|error| format!("Failed to emit model stream completion: {error}"))?;
             Ok(response)
         }
         Err(error) => {
@@ -83,13 +80,7 @@ where
     F: FnMut(&str) + Send,
 {
     let script = pi_model_text_script_path()?;
-    let mut child = TokioCommand::new("node")
-        .arg(script)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("Failed to start Pi AI SDK helper: {error}"))?;
+    let mut child = TokioCommand::new("node").arg(script).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().map_err(|error| format!("Failed to start Pi AI SDK helper: {error}"))?;
 
     let request = serde_json::json!({
         "systemPrompt": system_prompt,

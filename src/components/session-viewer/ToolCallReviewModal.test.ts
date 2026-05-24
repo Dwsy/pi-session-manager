@@ -158,6 +158,46 @@ describe("ToolCallReviewModal data model", () => {
     expect(operations[1].filePath).toBe("src/App.tsx");
   });
 
+  it("normalizes converted Codex and Claude Code tool aliases for review", () => {
+    const operations = extractFileOperations(
+      [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-claude-read",
+            name: "Read",
+            arguments: { file_path: "src/App.tsx" },
+          },
+          {
+            type: "toolCall",
+            id: "call-codex-edit",
+            name: "edit_file",
+            arguments: { path: "src/App.tsx", new_string: "const next = 1;" },
+          },
+          {
+            type: "toolCall",
+            id: "call-codex-shell",
+            name: "shell",
+            arguments: { command: "pnpm test" },
+          },
+        ]),
+      ],
+      new Map(),
+    );
+
+    expect(operations.map((operation) => operation.toolName)).toEqual([
+      "read",
+      "edit",
+      "bash",
+    ]);
+    expect(operations.map((operation) => operation.filePath)).toEqual([
+      "src/App.tsx",
+      "src/App.tsx",
+      "pnpm test",
+    ]);
+  });
+
+
   it("extracts edit operations with resolved diff metrics", () => {
     const operations = extractFileOperations(
       [

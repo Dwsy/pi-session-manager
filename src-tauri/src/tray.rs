@@ -102,6 +102,7 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let window_clone = window.clone();
     app.listen("frontend://ready", move |_event| {
         let _ = window_clone.show();
+        #[cfg(not(target_os = "macos"))]
         let _ = window_clone.set_focus();
     });
 

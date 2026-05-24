@@ -66,7 +66,7 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
                   <button
                     key={mode}
                     onClick={() => onUpdate("session", "defaultViewMode", mode)}
-                    className={`rounded-lg border py-2 text-sm transition-all ${
+                    className={`rounded-lg border py-2 text-sm motion-context ${
                       settings.session.defaultViewMode === mode
                         ? "border-info bg-info/10 text-foreground"
                         : "border-border text-muted-foreground hover:border-border-hover"
@@ -224,7 +224,7 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
                     onClick={() =>
                       onUpdate("session", "openPosition", position)
                     }
-                    className={`rounded-lg border py-2 text-sm transition-all ${
+                    className={`rounded-lg border py-2 text-sm motion-context ${
                       settings.session.openPosition === position
                         ? "border-info bg-info/10 text-foreground"
                         : "border-border text-muted-foreground hover:border-border-hover"

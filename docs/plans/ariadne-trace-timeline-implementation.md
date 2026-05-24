@@ -85,7 +85,7 @@ Transform Pi Session Manager from a **session browser** into an **Agent behavior
 
 | Feature | PSM Current | Ariadne Target | Gap |
 |---------|-------------|----------------|-----|
-| Session list | List/Kanban/Project views | Sortable table with Duration/Cost/Tokens/Tools | Medium — need to compute duration + aggregate tool count |
+| Session list | List/Board/Project views | Sortable table with Duration/Cost/Tokens/Tools | Medium — need to compute duration + aggregate tool count |
 | Session overview cards | Basic stats | 7-card dashboard (Sessions/Cost/Tokens/Avg/Projects/Tools/Disk) | Small — mostly reuse existing stats |
 | Chat replay | Full chat view | Lighter "trace" view with event-type coloring | Small — new render mode |
 | Details panel | None | Duration/Cost/Tokens/Messages/Tools + charts | Medium — new component + data |

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Circle } from "lucide-react";
+import { BarChart3, CheckCircle2, Circle, Search, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import SettingsCard from "@/components/settings/SettingsCard";
-import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
+import SettingsListSection, {
+  type SettingsListRow,
+} from "@/components/settings/SettingsListSection";
 import Toggle from "@/components/ui/Toggle";
 import { AgentIcon } from "@/components/session-viewer/AgentIcon";
 import type { SessionSettingsProps } from "@/components/settings/types";
@@ -13,7 +15,8 @@ import { listSupportedSessionProviders } from "@/utils/sessionProvidersApi";
 export default function ExternalSessionsSettings({
   settings,
   onUpdate,
-}: SessionSettingsProps) {
+  mode = "all",
+}: SessionSettingsProps & { mode?: "all" | "agents" | "resume" }) {
   const { t } = useTranslation();
   const [supportedProviders, setSupportedProviders] = useState<
     SessionProviderInfo[]
@@ -55,6 +58,59 @@ export default function ExternalSessionsSettings({
   const selectedResumeTarget = promptEnabled
     ? null
     : settings.session.defaultExternalResumeTarget;
+  const behaviorRows: SettingsListRow[] = [
+    {
+      id: "include-stats",
+      kind: "toggle",
+      icon: <BarChart3 />,
+      title: t(
+        "settings.externalSessions.includeInStats",
+        "Include external sessions in statistics",
+      ),
+      description: t(
+        "settings.externalSessions.includeInStatsHelp",
+        "When disabled, external agent sessions are excluded from dashboard and day statistics.",
+      ),
+      checked: settings.session.externalSessionsIncludeInStats === true,
+      onChange: (checked) =>
+        onUpdate("session", "externalSessionsIncludeInStats", checked),
+      searchKey: "external-sessions-includeInStats",
+    },
+    {
+      id: "include-search",
+      kind: "toggle",
+      icon: <Search />,
+      title: t(
+        "settings.externalSessions.includeInSearch",
+        "Include external sessions in search",
+      ),
+      description: t(
+        "settings.externalSessions.includeInSearchHelp",
+        "When disabled, external agent sessions are excluded from sidebar search and full-text search.",
+      ),
+      checked: settings.session.externalSessionsIncludeInSearch === true,
+      onChange: (checked) =>
+        onUpdate("session", "externalSessionsIncludeInSearch", checked),
+      searchKey: "external-sessions-includeInSearch",
+    },
+    {
+      id: "agent-icon",
+      kind: "toggle",
+      icon: <Sparkles />,
+      title: t(
+        "settings.externalSessions.showAgentIconInSessionBadge",
+        "Show agent icon in SessionBadge",
+      ),
+      description: t(
+        "settings.externalSessions.showAgentIconInSessionBadgeHelp",
+        "Display the provider icon next to the source badge in session cards.",
+      ),
+      checked: settings.session.showAgentIconInSessionBadge !== false,
+      onChange: (checked) =>
+        onUpdate("session", "showAgentIconInSessionBadge", checked),
+      searchKey: "external-sessions-showAgentIcon",
+    },
+  ];
 
   const handleResumeTargetToggle = (providerSlug: string, checked: boolean) => {
     if (!checked) {
@@ -97,55 +153,63 @@ export default function ExternalSessionsSettings({
   return (
     <div className="space-y-6">
       <SettingsCard
-        title={t(
-          "settings.externalSessions.title",
-          "Other external sessions",
-        )}
+        title={
+          mode === "resume"
+            ? t("settings.sections.resumeTargets", "Resume Targets")
+            : t(
+                "settings.externalSessions.title",
+                "External agent sessions",
+              )
+        }
         description={t(
-          "settings.externalSessions.description",
-          "Control whether sessions from other supported coding agents should be scanned and shown in the app.",
+          mode === "resume"
+            ? "settings.sectionDescriptions.resumeTargets"
+            : "settings.externalSessions.description",
+          mode === "resume"
+            ? "Default target CLI for resume commands."
+            : "Scan supported local coding-agent sessions and choose the default resume target.",
         )}
+        contentClassName="p-4"
       >
-        <div className="space-y-4">
-          <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="space-y-1">
             <div className="text-sm font-medium text-foreground">
-              {t(
-                "settings.externalSessions.providerMatrixTitle",
-                "Providers",
-              )}
+              {mode === "resume"
+                ? t(
+                    "settings.externalSessions.resumeTargetsTitle",
+                    "Resume targets",
+                  )
+                : t("settings.externalSessions.providerMatrixTitle", "Agent providers")}
             </div>
             <div className="text-xs text-muted-foreground">
-              {t(
-                "settings.externalSessions.providerMatrixHelp",
-                "Manage each provider in one place: enable scanning for external sessions, or set it as the default resume target.",
-              )}
+              {mode === "resume"
+                ? t(
+                    "settings.externalSessions.resumeTargetsHelp",
+                    "Choose the default CLI used when resuming or copying resume commands.",
+                  )
+                : t(
+                    "settings.externalSessions.providerMatrixHelp",
+                    "Turn on providers to show their local sessions. Pick one default CLI for resume commands.",
+                  )}
             </div>
             {mergedProviders.length > 0 ? (
-              <div className="rounded-lg border border-border/60 bg-background/40 divide-y divide-border/50">
-                <div className="grid grid-cols-[minmax(0,1fr)_110px_140px] gap-3 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  <div>
-                    {t("settings.externalSessions.providerColumn", "Provider")}
-                  </div>
-                  <div className="text-center">
-                    {t(
-                      "settings.externalSessions.scanColumn",
-                      "Show / Scan",
-                    )}
-                  </div>
-                  <div className="text-center">
-                    {t(
-                      "settings.externalSessions.resumeColumn",
-                      "Default Resume",
-                    )}
-                  </div>
-                </div>
+              <div className="mt-3 rounded-xl border border-border/60 bg-background/35 divide-y divide-border/50 overflow-hidden">
                 {mergedProviders.map((provider) => {
                   const providerEnabled = enabledProviders.has(provider.slug);
                   const resumeChecked = selectedResumeTarget === provider.slug;
+                  const statusLabel = provider.canScan
+                    ? providerEnabled
+                      ? t("settings.externalSessions.scanEnabled", "Scanning")
+                      : t("settings.externalSessions.scanDisabled", "Off")
+                    : t("settings.externalSessions.resumeOnly", "Resume only");
                   return (
                     <div
                       key={provider.slug}
-                      className="grid grid-cols-[minmax(0,1fr)_110px_140px] items-center gap-3 px-3 py-3"
+                      className={`grid items-center gap-3 px-4 py-3 max-md:grid-cols-[minmax(0,1fr)_auto] ${
+                        mode === "resume"
+                          ? "grid-cols-[minmax(0,1fr)_140px]"
+                          : "grid-cols-[minmax(0,1fr)_86px_140px]"
+                      }`}
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -153,8 +217,17 @@ export default function ExternalSessionsSettings({
                           <span className="text-sm font-medium text-foreground truncate">
                             {provider.display_name}
                           </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                              provider.canScan && providerEnabled
+                                ? "bg-info/15 text-info"
+                                : "bg-secondary/70 text-muted-foreground"
+                            }`}
+                          >
+                            {statusLabel}
+                          </span>
                         </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
+                        <div className="mt-1 text-xs text-muted-foreground truncate">
                           {provider.canScan
                             ? t(
                                 "settings.externalSessions.providerEnabledHelp",
@@ -166,26 +239,28 @@ export default function ExternalSessionsSettings({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-center">
-                        {provider.canScan ? (
-                          <Toggle
-                            checked={providerEnabled}
-                            onChange={(checked) =>
-                              handleProviderToggle(provider.slug, checked)
-                            }
-                            size="sm"
-                          />
-                        ) : (
-                          <span className="text-[11px] text-muted-foreground">
-                            {t(
-                              "settings.externalSessions.scanNotApplicable",
-                              "Built-in",
-                            )}
-                          </span>
-                        )}
-                      </div>
+                      {mode !== "resume" && (
+                        <div className="flex items-center justify-center max-md:justify-end">
+                          {provider.canScan ? (
+                            <Toggle
+                              checked={providerEnabled}
+                              onChange={(checked) =>
+                                handleProviderToggle(provider.slug, checked)
+                              }
+                              size="sm"
+                            />
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground">
+                              {t(
+                                "settings.externalSessions.scanNotApplicable",
+                                "Built-in",
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      )}
 
-                      <div className="flex items-center justify-center">
+                      <div className="flex items-center justify-center max-md:col-span-2 max-md:justify-start">
                         <button
                           type="button"
                           onClick={() =>
@@ -193,12 +268,12 @@ export default function ExternalSessionsSettings({
                           }
                           className={`inline-flex min-w-[124px] items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
                             resumeChecked
-                              ? "border-primary/40 bg-primary/10 text-foreground"
+                              ? "border-info/40 bg-info/15 text-foreground"
                               : "border-border/60 bg-background/40 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
                           }`}
                         >
                           {resumeChecked ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                            <CheckCircle2 className="h-3.5 w-3.5 text-info" />
                           ) : (
                             <Circle className="h-3.5 w-3.5" />
                           )}
@@ -229,7 +304,8 @@ export default function ExternalSessionsSettings({
             )}
           </div>
 
-          <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
+          {mode !== "agents" && (
+            <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
             {promptEnabled
               ? t(
                   "settings.externalSessions.resumePromptFallback",
@@ -239,58 +315,10 @@ export default function ExternalSessionsSettings({
                   "settings.externalSessions.defaultExternalResumeTargetHelp",
                   "When prompt is disabled, sessions will be resumed into this target CLI.",
                 )}
-          </div>
+            </div>
+          )}
 
-          <SettingsToggleRow
-            title={t(
-              "settings.externalSessions.includeInStats",
-              "Include external sessions in statistics",
-            )}
-            description={t(
-              "settings.externalSessions.includeInStatsHelp",
-              "When disabled, external agent sessions are excluded from dashboard and day statistics.",
-            )}
-            checked={settings.session.externalSessionsIncludeInStats === true}
-            onChange={(checked) =>
-              onUpdate("session", "externalSessionsIncludeInStats", checked)
-            }
-            className="items-start py-0"
-            searchKey="external-sessions-includeInStats"
-          />
-
-          <SettingsToggleRow
-            title={t(
-              "settings.externalSessions.includeInSearch",
-              "Include external sessions in search",
-            )}
-            description={t(
-              "settings.externalSessions.includeInSearchHelp",
-              "When disabled, external agent sessions are excluded from sidebar search and full-text search.",
-            )}
-            checked={settings.session.externalSessionsIncludeInSearch === true}
-            onChange={(checked) =>
-              onUpdate("session", "externalSessionsIncludeInSearch", checked)
-            }
-            className="items-start py-0"
-            searchKey="external-sessions-includeInSearch"
-          />
-
-          <SettingsToggleRow
-            title={t(
-              "settings.externalSessions.showAgentIconInSessionBadge",
-              "Show agent icon in SessionBadge",
-            )}
-            description={t(
-              "settings.externalSessions.showAgentIconInSessionBadgeHelp",
-              "Display the provider icon next to the source badge in session cards.",
-            )}
-            checked={settings.session.showAgentIconInSessionBadge !== false}
-            onChange={(checked) =>
-              onUpdate("session", "showAgentIconInSessionBadge", checked)
-            }
-            className="items-start py-0"
-            searchKey="external-sessions-showAgentIcon"
-          />
+          {mode !== "resume" && <SettingsListSection rows={behaviorRows} />}
         </div>
       </SettingsCard>
     </div>

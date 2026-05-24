@@ -23,6 +23,7 @@ import {
   readPathPsmPluginModuleSource,
   reloadPsmPlugins,
   removePathPsmPlugin,
+  searchPsmPluginMarket,
   uninstallPsmPlugin,
   updatePsmPlugins,
 } from '../service'
@@ -51,6 +52,19 @@ describe('runtime-host service plugin lifecycle commands', () => {
     })
     expect(mocks.invoke).toHaveBeenNthCalledWith(3, 'update_psm_plugins', undefined)
     expect(mocks.invoke).toHaveBeenNthCalledWith(4, 'reload_psm_plugins', undefined)
+  })
+
+  it('maps npm market search calls to Tauri commands with camelCase payloads', async () => {
+    mocks.isTauri.mockReturnValue(true)
+    mocks.invoke.mockResolvedValue({ query: 'psm', total: 0, results: [] })
+
+    await searchPsmPluginMarket({ query: 'psm', size: 8, from: 2 })
+
+    expect(mocks.invoke).toHaveBeenCalledWith('search_psm_plugin_market', {
+      query: 'psm',
+      size: 8,
+      from: 2,
+    })
   })
 
   it('maps path plugin calls to Tauri commands with camelCase payloads', async () => {
@@ -82,18 +96,21 @@ describe('runtime-host service plugin lifecycle commands', () => {
       .mockResolvedValueOnce({ version: 1, plugins: {}, customPaths: ['/tmp/local-plugin.mjs'] })
       .mockResolvedValueOnce({ version: 1, plugins: {}, customPaths: [] })
       .mockResolvedValueOnce('export default {}')
+      .mockResolvedValueOnce({ query: 'psm plugin', total: 0, results: [] })
 
     await expect(loadPsmPluginConfig()).resolves.toMatchObject({ customPaths: ['/tmp/local-plugin.mjs'] })
     await expect(listPathPsmPluginEntries()).resolves.toEqual([{ entryPath: '/tmp/local-plugin.mjs' }])
     await expect(addPathPsmPlugin('/tmp/local-plugin.mjs')).resolves.toMatchObject({ customPaths: ['/tmp/local-plugin.mjs'] })
     await expect(removePathPsmPlugin('/tmp/local-plugin.mjs')).resolves.toMatchObject({ customPaths: [] })
     await expect(readPathPsmPluginModuleSource('/tmp/local-plugin.mjs')).resolves.toBe('export default {}')
+    await expect(searchPsmPluginMarket({ query: 'psm plugin' })).resolves.toEqual({ query: 'psm plugin', total: 0, results: [] })
 
     expect(mocks.httpInvoke).toHaveBeenNthCalledWith(1, 'load_psm_plugin_config', undefined)
     expect(mocks.httpInvoke).toHaveBeenNthCalledWith(2, 'list_path_psm_plugin_entries', undefined)
     expect(mocks.httpInvoke).toHaveBeenNthCalledWith(3, 'add_path_psm_plugin', { entryPath: '/tmp/local-plugin.mjs' })
     expect(mocks.httpInvoke).toHaveBeenNthCalledWith(4, 'remove_path_psm_plugin', { entryPath: '/tmp/local-plugin.mjs' })
     expect(mocks.httpInvoke).toHaveBeenNthCalledWith(5, 'read_path_psm_plugin_module_source', { entryPath: '/tmp/local-plugin.mjs' })
+    expect(mocks.httpInvoke).toHaveBeenNthCalledWith(6, 'search_psm_plugin_market', { query: 'psm plugin' })
     expect(mocks.invoke).not.toHaveBeenCalled()
   })
 })

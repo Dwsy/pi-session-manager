@@ -68,11 +68,11 @@ mod tests {
 
     #[test]
     fn parses_single_url_payload() {
-        assert_eq!(parse_deep_link_payload("\"pi-session://kanban\""), vec!["pi-session://kanban"]);
+        assert_eq!(parse_deep_link_payload("\"pi-session://plugin-view\""), vec!["pi-session://plugin-view"]);
     }
 
     #[test]
     fn parses_url_array_payload() {
-        assert_eq!(parse_deep_link_payload("[\"pi-session://kanban\",\"pi-session://settings\"]"), vec!["pi-session://kanban", "pi-session://settings"]);
+        assert_eq!(parse_deep_link_payload("[\"pi-session://plugin-view\",\"pi-session://settings\"]"), vec!["pi-session://plugin-view", "pi-session://settings"]);
     }
 }

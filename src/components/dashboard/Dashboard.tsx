@@ -26,7 +26,7 @@ import TimeDistribution from "./TimeDistribution";
 import DashboardInsightModal from "./DashboardInsightModal";
 import type { DashboardInsightMode } from "./DashboardInsightModal";
 import TokenTrendChart from "./TokenTrendChart";
-import SessionPreviewModal from "@/components/kanban/SessionPreviewModal";
+import SessionPreviewModal from "@/components/session-preview/SessionPreviewModal";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
 import {
   getRuntimeDayStats,

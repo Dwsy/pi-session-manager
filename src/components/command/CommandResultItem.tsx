@@ -44,7 +44,7 @@ export default function CommandResultItem({
       role="option"
       aria-selected={isSelected}
       className={[
-        "group relative rounded-2xl border transition-all",
+        "group relative rounded-2xl border motion-context",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-info/30 focus-visible:ring-offset-0",
         isSelected
           ? "border-info/20 bg-info/[0.03] shadow-sm"

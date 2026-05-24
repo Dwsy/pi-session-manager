@@ -3,7 +3,7 @@
 use crate::data::sqlite::DbPluginRecord;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{error, info, warn};
 
 const SUMMARY_PROMPT: &str = r#"You are a session analysis assistant. Given a conversation between a user and an AI assistant, produce a JSON object with these fields:
 
@@ -86,26 +86,35 @@ pub async fn generate_session_summary(context: &str, provider: Option<&str>, mod
 /// Call LLM to generate a session summary in the requested UI language.
 pub async fn generate_session_summary_with_language(context: &str, provider: Option<&str>, model: Option<&str>, language: Option<&str>) -> Result<(SessionSummaryResult, String, String), String> {
     let prompt = summary_prompt_for_language(language);
+    let provider_name = provider.unwrap_or("auto");
+    let model_name = model.unwrap_or("auto");
+    info!(target: "session_summary", provider = provider_name, model = model_name, context_chars = context.len(), "Generating session summary");
 
-    info!("Generating summary through Pi AI SDK helper");
+    let response = crate::invoke_model_text(prompt, context.to_string(), provider.map(str::to_string), model.map(str::to_string), None).await?;
+    info!(target: "session_summary", provider = response.provider.as_str(), model = response.model.as_str(), response_chars = response.text.len(), "Received summary response");
 
-    let response = crate::invoke_model_text(
-        prompt,
-        context.to_string(),
-        provider.map(str::to_string),
-        model.map(str::to_string),
-        None,
-    )
-    .await?;
-
-    // Parse JSON from text (strip markdown fences if present)
-    let json_str = strip_markdown_fences(&response.text);
-    let result: SessionSummaryResult = serde_json::from_str(json_str).map_err(|e| format!("Failed to parse summary JSON: {e}. Raw text: {}", truncate(&response.text, 300)))?;
-
+    let result = parse_summary_response(&response.text).map_err(|error| {
+        error!(target: "session_summary", provider = response.provider.as_str(), model = response.model.as_str(), response_chars = response.text.len(), raw_preview = %truncate(&response.text, 500), "Failed to parse summary response");
+        error
+    })?;
+    info!(target: "session_summary", provider = response.provider.as_str(), model = response.model.as_str(), topics = result.topics.len(), unresolved_tasks = result.unresolved_tasks.len(), "Parsed session summary");
     Ok((result, response.provider, response.model))
 }
 
-fn strip_markdown_fences(text: &str) -> &str {
+pub(crate) fn parse_summary_response(text: &str) -> Result<SessionSummaryResult, String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Err("Session summary model returned empty text".to_string());
+    }
+
+    let json_str = extract_json_payload(trimmed).ok_or_else(|| {
+        warn!(target: "session_summary", response_chars = trimmed.len(), raw_preview = %truncate(trimmed, 200), "Summary response did not contain JSON");
+        "Session summary response did not contain a JSON object".to_string()
+    })?;
+    serde_json::from_str(json_str).map_err(|error| format!("Failed to parse summary JSON: {error}. Raw text: {}", truncate(trimmed, 300)))
+}
+
+fn extract_json_payload(text: &str) -> Option<&str> {
     let trimmed = text.trim();
     if trimmed.starts_with("```") {
         // Find first newline after opening fence
@@ -113,12 +122,24 @@ fn strip_markdown_fences(text: &str) -> &str {
             let after_fence = &trimmed[start + 1..];
             // Remove closing fence
             if let Some(end) = after_fence.rfind("```") {
-                return after_fence[..end].trim();
+                let fenced = after_fence[..end].trim();
+                return Some(fenced);
             }
-            return after_fence.trim();
+            return Some(after_fence.trim());
         }
     }
-    trimmed
+
+    if trimmed.starts_with('{') {
+        return Some(trimmed);
+    }
+
+    let start = trimmed.find('{')?;
+    let end = trimmed.rfind('}')?;
+    if end <= start {
+        return None;
+    }
+
+    Some(trimmed[start..=end].trim())
 }
 
 fn truncate(s: &str, max: usize) -> &str {
@@ -172,4 +193,32 @@ pub fn refresh_session_intelligence_record_from_summary(conn: &rusqlite::Connect
     let record = to_session_intelligence_record_with_message_count(session_path, &summary, provider, model, Some(message_count));
     crate::data::sqlite::upsert_plugin_record(conn, &record, &[])?;
     Ok(record)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_summary_response_accepts_plain_json() {
+        let result = parse_summary_response(r#"{"summary":"ok","topics":["rust"],"status":"active","unresolved_tasks":[]}"#).expect("parse");
+        assert_eq!(result.summary, "ok");
+        assert_eq!(result.topics, vec!["rust"]);
+        assert_eq!(result.status, "active");
+        assert!(result.unresolved_tasks.is_empty());
+    }
+
+    #[test]
+    fn parse_summary_response_accepts_fenced_json_with_wrapping_text() {
+        let result = parse_summary_response("Here is the summary:\n```json\n{\"summary\":\"ok\",\"topics\":[\"debugging\"],\"status\":\"blocked\",\"unresolved_tasks\":[\"Fix parser\"]}\n```").expect("parse");
+        assert_eq!(result.status, "blocked");
+        assert_eq!(result.topics, vec!["debugging"]);
+        assert_eq!(result.unresolved_tasks, vec!["Fix parser"]);
+    }
+
+    #[test]
+    fn parse_summary_response_rejects_empty_text() {
+        let error = parse_summary_response("   ").expect_err("empty text rejected");
+        assert!(error.contains("empty text"));
+    }
 }

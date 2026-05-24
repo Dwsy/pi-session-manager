@@ -426,7 +426,7 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
         return invoke<PsmModelOption[]>('list_model_options_fast')
       },
     },
-    kanban: {
+    tags: {
       listTags() {
         return invoke('get_all_tags')
       },
@@ -443,6 +443,20 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
         const tags = await invoke<Array<{ sessionId?: string; session_id?: string; tagId?: string; tag_id?: string; position: number; assignedAt?: string; assigned_at?: string }>>('get_all_session_tags')
         if (!sessionId) return tags
         return tags.filter((tag) => (tag.sessionId ?? tag.session_id) === sessionId)
+      },
+    },
+    config: {
+      read(key, options) {
+        return invoke('read_psm_plugin_json_config', {
+          key,
+          defaultValue: options?.defaultValue,
+        })
+      },
+      async write(key, value) {
+        await invoke<void>('write_psm_plugin_json_config', {
+          key,
+          value,
+        })
       },
     },
   }

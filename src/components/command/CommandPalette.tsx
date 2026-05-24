@@ -11,6 +11,11 @@ interface CommandPaletteProps {
 
 export default function CommandPalette({ context }: CommandPaletteProps) {
   const { isOpen, open, close, query, setQuery, results, setResults, isSearching, setIsSearching } = useCommandMenu()
+  const [shouldRender, setShouldRender] = useState(isOpen)
+  const [visible, setVisible] = useState(false)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const enterFrameRef = useRef<number | null>(null)
+  const enterFrame2Ref = useRef<number | null>(null)
 
   const [searchCurrentProjectOnly, setSearchCurrentProjectOnly] = useState(false)
   const [ftsOptions, setFtsOptions] = useState<MessageSearchPluginOptions>({
@@ -34,6 +39,54 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
     closeCommandMenu: close,
     searchCurrentProjectOnly,
   }), [context, close, searchCurrentProjectOnly])
+
+  useEffect(() => {
+    if (enterFrameRef.current !== null) {
+      cancelAnimationFrame(enterFrameRef.current)
+      enterFrameRef.current = null
+    }
+    if (enterFrame2Ref.current !== null) {
+      cancelAnimationFrame(enterFrame2Ref.current)
+      enterFrame2Ref.current = null
+    }
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+
+    if (isOpen) {
+      setShouldRender(true)
+      enterFrameRef.current = requestAnimationFrame(() => {
+        enterFrame2Ref.current = requestAnimationFrame(() => {
+          setVisible(true)
+          enterFrame2Ref.current = null
+        })
+        enterFrameRef.current = null
+      })
+      return
+    }
+
+    setVisible(false)
+    closeTimerRef.current = setTimeout(() => {
+      setShouldRender(false)
+      closeTimerRef.current = null
+    }, 320)
+
+    return () => {
+      if (enterFrameRef.current !== null) {
+        cancelAnimationFrame(enterFrameRef.current)
+        enterFrameRef.current = null
+      }
+      if (enterFrame2Ref.current !== null) {
+        cancelAnimationFrame(enterFrame2Ref.current)
+        enterFrame2Ref.current = null
+      }
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current)
+        closeTimerRef.current = null
+      }
+    }
+  }, [isOpen])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -132,11 +185,17 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
     return () => window.removeEventListener('keydown', handleActionKeys)
   }, [isOpen, selectedResult, handleNavigate])
 
-  if (!isOpen) return null
+  if (!shouldRender) return null
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-start justify-center px-4 pt-[3vh] sm:px-6 sm:pt-[5vh] bg-black/35 backdrop-blur-[6px] animate-in fade-in" onClick={close}>
-      <div className="w-full max-w-[1380px] h-[92vh] sm:h-[90vh] bg-background/98 border border-border/80 rounded-[20px] shadow-[0_24px_80px_rgba(15,23,42,0.18)] overflow-hidden animate-in zoom-in-95 flex flex-col min-h-0" onClick={(e) => e.stopPropagation()}>
+    <div
+      className={`fixed inset-0 z-[9998] flex items-start justify-center px-4 pt-[3vh] sm:px-6 sm:pt-[5vh] bg-black/35 backdrop-blur-[6px] motion-overlay-backdrop ${visible ? 'opacity-100' : 'opacity-0'}`}
+      onClick={close}
+    >
+      <div
+        className={`w-full max-w-[1380px] h-[92vh] sm:h-[90vh] bg-background/98 border border-border/80 rounded-[20px] shadow-[0_24px_80px_rgba(15,23,42,0.18)] overflow-hidden motion-overlay-surface flex flex-col min-h-0 ${visible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.985] opacity-0'}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <CommandMenu
           query={query}
           setQuery={setQuery}

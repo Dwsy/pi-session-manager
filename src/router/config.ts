@@ -15,7 +15,6 @@ export const ROUTES = {
   PROJECT: '/projects/:projectPath',
 
   // Feature views
-  KANBAN: '/kanban',
   DASHBOARD: '/dashboard',
   SETTINGS: '/settings',
   TERMINAL: '/terminal',
@@ -30,11 +29,11 @@ export type RouteKey = keyof typeof ROUTES;
 export type ParsedRoute =
   | { route: 'session'; sessionId: string }
   | { route: 'project'; projectPath: string }
-  | { route: 'feature'; feature: 'kanban' | 'dashboard' | 'settings' | 'terminal' | 'favorites' }
+  | { route: 'feature'; feature: 'dashboard' | 'settings' | 'terminal' | 'favorites' }
+  | { route: 'app'; path: string }
   | { route: 'root' };
 
-const FEATURE_ROUTES: Record<string, 'kanban' | 'dashboard' | 'settings' | 'terminal' | 'favorites'> = {
-  kanban: 'kanban',
+const FEATURE_ROUTES: Record<string, 'dashboard' | 'settings' | 'terminal' | 'favorites'> = {
   dashboard: 'dashboard',
   settings: 'settings',
   terminal: 'terminal',
@@ -57,6 +56,10 @@ export function parseRoute(pathname: string): ParsedRoute {
 
   if (parts[0] && parts[0] in FEATURE_ROUTES) {
     return { route: 'feature', feature: FEATURE_ROUTES[parts[0] as keyof typeof FEATURE_ROUTES] };
+  }
+
+  if (parts[0]) {
+    return { route: 'app', path: pathname.startsWith('/') ? pathname : `/${pathname}` };
   }
 
   return { route: 'root' };

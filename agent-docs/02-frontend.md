@@ -28,7 +28,8 @@ src/
 | `AppMobileFilterBar.tsx` | Mobile filter bar |
 | `AppOverlays.tsx` | Modal/overlay layer |
 | `AppSessionListPane.tsx` | Session list pane |
-| `AppKanbanPane.tsx` | Kanban pane |
+| `AppPluginViewPane.tsx` | Plugin app view pane |
+| `AppPluginSidebarPane.tsx` | Plugin sidebar pane |
 | `AppDashboardPane.tsx` | Dashboard pane |
 | `AppSessionViewerPane.tsx` | Session viewer pane |
 | `AppSettingsPane.tsx` | Settings pane |
@@ -72,15 +73,11 @@ src/
 | `WeeklyComparison.tsx` | Week comparison |
 | `Achievements.tsx` | Achievement badges |
 
-### Kanban (kanban/)
+### Plugin App Views
 
-| Component | Description |
-|-----------|-------------|
-| `KanbanBoard.tsx` | Main board |
-| `KanbanCard.tsx` | Card component |
-| `KanbanColumn.tsx` | Column component |
-| `KanbanContextMenu.tsx` | Right-click menu |
-| `SessionPreviewModal.tsx` | Preview modal |
+Host app-level plugin views are rendered through `src/components/app/AppPluginViewPane.tsx`
+and sidebars through `src/components/app/AppPluginSidebarPane.tsx`. Built-in app
+view implementations live under `extensions/psm-*`.
 
 ### Messages (messages/)
 
@@ -328,6 +325,18 @@ src/
 | `tools-render/extensions/` | subagent |
 | `tools-render/utils/` | resolveData, searchSegments |
 
+### PSM Browser Plugins
+
+For writing PSM browser plugins, start with [Plugin Authoring](06-plugins.md). It links the public SDK contract, capability audit, extension examples, build/install shape, and verification checklist.
+
+Key local boundaries:
+
+- First-party built-ins live in `extensions/psm-*` and are discovered through `src/plugins/runtime-host/builtins.ts`.
+- External npm/path plugins must build browser-compatible ESM and use only `@pi-session-manager/plugin-sdk` as the public API.
+- Plugin UI should register host contributions through `ctx.ui`, read settings through `ctx.settings`, and use injected `ctx.i18n` for text.
+- Published bundles must not import app aliases or host internals such as `@/components`, `@/types`, runtime host files, app transport, Tauri APIs, or desktop-private code.
+- Heavy or experimental dependencies belong inside plugin packages, not the main app dependency graph.
+
 ## Utils (utils/)
 
 | File | Description |
@@ -335,7 +344,6 @@ src/
 | `assistantContent.ts` | Assistant content parsing |
 | `format.ts` | Formatting utilities |
 | `haptics.ts` | Haptic feedback |
-| `kanbanPreviewDebug.ts` | Debug utils |
 | `markdown.ts` | Markdown rendering |
 | `path.ts` | Path utilities |
 | `piTheme.ts` | Pi theme |

@@ -29,7 +29,7 @@ import { SessionBadge } from "@/components/session-viewer/SessionBadge";
 import TagBadge from "@/components/tags/TagBadge";
 import TagPicker from "@/components/tags/TagPicker";
 import SessionContextMenu from "@/components/session-viewer/SessionContextMenu";
-import SessionPreviewModal from "@/components/kanban/SessionPreviewModal";
+import SessionPreviewModal from "@/components/session-preview/SessionPreviewModal";
 import type { DeleteSessionRequestOptions } from "@/components/dialogs/deleteSessionTypes";
 import DeleteConfirmButton from "@/components/ui/DeleteConfirmButton";
 import {

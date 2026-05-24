@@ -144,7 +144,7 @@ export default function ConvertSessionDialog({
               key={option.slug}
               type="button"
               onClick={() => setTarget(option.slug)}
-              className={`w-full rounded-lg border px-4 py-3 text-left transition-all ${
+              className={`w-full rounded-lg border px-4 py-3 text-left motion-context ${
                 target === option.slug
                   ? 'border-primary/40 bg-primary/10'
                   : 'border-border/60 bg-secondary/20 hover:bg-secondary/50'

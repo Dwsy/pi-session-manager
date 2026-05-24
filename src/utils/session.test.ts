@@ -79,4 +79,69 @@ describe('parseSessionEntriesWithLineCount', () => {
       entries.every((entry) => !entry.parentId || entryIds.has(entry.parentId)),
     ).toBe(true);
   });
+
+  it('links raw Codex function call output to its tool call id', () => {
+    const content = [
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'read_file',
+          arguments: { path: 'src/auth.ts' },
+        },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'function_call_output',
+          call_id: 'call_1',
+          output: 'file contents',
+        },
+      }),
+    ].join('\n');
+
+    const { entries } = parseSessionEntriesWithLineCount(content);
+
+    expect(entries[0].message?.content[0]).toMatchObject({
+      type: 'toolCall',
+      id: 'call_1',
+      name: 'read_file',
+      arguments: { path: 'src/auth.ts' },
+    });
+    expect(entries[1].message).toMatchObject({
+      role: 'toolResult',
+      toolCallId: 'call_1',
+      content: [{ type: 'text', text: 'file contents' }],
+    });
+  });
+
+  it('maps raw Claude Code tool_result content to a linked tool result message', () => {
+    const content = JSON.stringify({
+      type: 'user',
+      uuid: 'tool-result-1',
+      timestamp: '2026-04-09T10:00:00Z',
+      message: {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'toolu_1',
+            content: 'file contents',
+            is_error: false,
+          },
+        ],
+      },
+    });
+
+    const { entries } = parseSessionEntriesWithLineCount(content);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].message).toMatchObject({
+      role: 'toolResult',
+      toolCallId: 'toolu_1',
+      isError: false,
+      content: [{ type: 'text', text: 'file contents' }],
+    });
+  });
 });

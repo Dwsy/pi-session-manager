@@ -20,8 +20,10 @@ enum PluginPermission {
     RecordsRead,
     RecordsWrite,
     SearchRead,
-    KanbanRead,
-    KanbanWrite,
+    TagsRead,
+    TagsWrite,
+    ConfigRead,
+    ConfigWrite,
     ModelInvoke,
 }
 
@@ -54,8 +56,10 @@ fn parse_plugin_permission(value: &str) -> Option<PluginPermission> {
         "records:read" => Some(PluginPermission::RecordsRead),
         "records:write" => Some(PluginPermission::RecordsWrite),
         "search:read" => Some(PluginPermission::SearchRead),
-        "kanban:read" => Some(PluginPermission::KanbanRead),
-        "kanban:write" => Some(PluginPermission::KanbanWrite),
+        "tags:read" => Some(PluginPermission::TagsRead),
+        "tags:write" => Some(PluginPermission::TagsWrite),
+        "config:read" => Some(PluginPermission::ConfigRead),
+        "config:write" => Some(PluginPermission::ConfigWrite),
         "model:invoke" => Some(PluginPermission::ModelInvoke),
         _ => None,
     }
@@ -79,8 +83,10 @@ fn required_permissions_for_command(command: &str) -> &'static [PluginPermission
         "upsert_plugin_record" => &[PluginPermission::RecordsWrite],
         "refresh_session_intelligence_record" => &[PluginPermission::RecordsWrite, PluginPermission::ModelInvoke],
         "full_text_search" => &[PluginPermission::SearchRead],
-        "get_all_tags" | "get_all_session_tags" => &[PluginPermission::KanbanRead],
-        "create_tag" | "assign_tag" | "remove_tag_from_session" => &[PluginPermission::KanbanWrite],
+        "get_all_tags" | "get_all_session_tags" => &[PluginPermission::TagsRead],
+        "create_tag" | "assign_tag" | "remove_tag_from_session" => &[PluginPermission::TagsWrite],
+        "read_psm_plugin_json_config" => &[PluginPermission::ConfigRead],
+        "write_psm_plugin_json_config" => &[PluginPermission::ConfigWrite],
         "invoke_model_text" | "invoke_model_text_stream" => &[PluginPermission::ModelInvoke],
         "list_model_options_fast" => &[PluginPermission::ModelInvoke],
         _ => &[],
@@ -104,6 +110,10 @@ fn enforce_plugin_permission(command: &str, payload: &Value) -> Result<(), Strin
 
     let plugin_name = ctx.plugin_id.unwrap_or_else(|| "unknown-plugin".to_string());
     Err(format!("Plugin permission denied: {plugin_name} cannot call {command}"))
+}
+
+fn extract_plugin_id(payload: &Value) -> Result<String, String> {
+    payload.get("__psm").and_then(|psm| psm.get("pluginId")).and_then(Value::as_str).map(str::to_string).ok_or_else(|| "Missing PSM plugin identity".to_string())
 }
 
 /// Dispatch a command to the appropriate handler.
@@ -560,6 +570,13 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::list_path_psm_plugin_entries().await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
+        "search_psm_plugin_market" => {
+            let query = extract_optional_string(payload, "query");
+            let size = payload.get("size").and_then(|value| value.as_u64()).and_then(|value| usize::try_from(value).ok());
+            let from = payload.get("from").and_then(|value| value.as_u64()).and_then(|value| usize::try_from(value).ok());
+            let result = crate::search_psm_plugin_market(query, size, from).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
         "add_path_psm_plugin" => {
             let entry_path = extract(payload, "entryPath")?;
             let result = crate::add_path_psm_plugin(entry_path).await?;
@@ -601,6 +618,20 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         "get_psm_plugin_paths" => {
             let result = crate::get_psm_plugin_paths().await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "read_psm_plugin_json_config" => {
+            let plugin_id = extract_plugin_id(payload)?;
+            let key = extract(payload, "key")?;
+            let default_value = payload.get("defaultValue").or_else(|| payload.get("default_value")).cloned();
+            let result = crate::read_psm_plugin_json_config(plugin_id, key, default_value).await?;
+            Ok(result)
+        }
+        "write_psm_plugin_json_config" => {
+            let plugin_id = extract_plugin_id(payload)?;
+            let key = extract(payload, "key")?;
+            let value = payload.get("value").cloned().unwrap_or(Value::Null);
+            crate::write_psm_plugin_json_config(plugin_id, key, value).await?;
+            Ok(Value::Null)
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -736,24 +767,6 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             {
                 Err("Streaming model text requires GUI app state".to_string())
             }
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // Workspaces
-        // ═══════════════════════════════════════════════════════════════
-        "get_workspaces" => {
-            let result = crate::get_workspaces().await?;
-            Ok(to_val(result, "serialize result")?)
-        }
-        "save_workspace" => {
-            let workspace = payload.get("workspace").cloned().unwrap_or(Value::Object(Default::default()));
-            crate::save_workspace(workspace).await?;
-            Ok(Value::Null)
-        }
-        "delete_workspace" => {
-            let id = extract(payload, "id")?;
-            crate::delete_workspace(id).await?;
-            Ok(Value::Null)
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -1170,6 +1183,19 @@ mod tests {
         let result = enforce_plugin_permission("scan_sessions_paginated", &payload);
 
         assert!(result.is_ok(), "expected permissioned plugin scan to pass permission checks, got {result:?}");
+    }
+
+    #[tokio::test]
+    async fn dispatch_allows_plugin_json_config_with_declared_permission() {
+        let payload = serde_json::json!({
+            "__psm": {
+                "pluginId": "builtin.config-test",
+                "permissions": ["config:read"]
+            }
+        });
+        let result = enforce_plugin_permission("read_psm_plugin_json_config", &payload);
+
+        assert!(result.is_ok(), "expected plugin config read to pass permission checks, got {result:?}");
     }
 
     #[tokio::test]

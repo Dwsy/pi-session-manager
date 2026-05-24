@@ -81,7 +81,7 @@ export interface AppSettings {
   session: {
     autoRefresh: boolean;
     refreshInterval: number;
-    defaultViewMode: "list" | "directory" | "project" | "kanban";
+    defaultViewMode: "list" | "directory" | "project";
     conversationModeEnabled: boolean;
     sourceMode: "local" | "dataset";
     activeDatasetId: string;
@@ -223,6 +223,9 @@ export type SettingsSection =
   | "search-export"
   | "app-behavior"
   | "data-sources"
+  | "local-session-paths"
+  | "external-agent-sessions"
+  | "resume-targets"
   | "pi-agent"
   | "psm-plugins"
   | `psm-plugin:${string}`

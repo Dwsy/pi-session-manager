@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { invoke, listen } from "@/transport";
+import { invoke } from "@/transport";
 import type { SessionInfo } from "@/types";
 import {
   DEFAULT_SESSION_SORT_BY,
@@ -14,6 +14,7 @@ import {
   BROWSER_DATASET_REFRESHED_EVENT,
   isBrowserDatasetModeEnabled,
 } from "@/browser-dataset";
+import { psmRuntimeEventBus } from "@/plugins/runtime-host/eventBus";
 
 const DEFAULT_PAGE_SIZE = 100;
 
@@ -364,12 +365,12 @@ export function usePaginatedSessions({
           refresh({ silent: true });
         }, 5000);
       };
-      const u1 = listen("pi-live:session_registered", debouncedRefresh);
-      const u2 = listen("pi-live:session_disconnected", debouncedRefresh);
+      const unsubscribeRegistered = psmRuntimeEventBus.subscribe("pi-live:session_registered", debouncedRefresh);
+      const unsubscribeDisconnected = psmRuntimeEventBus.subscribe("pi-live:session_disconnected", debouncedRefresh);
       return () => {
         if (liveDebounce) clearTimeout(liveDebounce);
-        u1.then((f) => f());
-        u2.then((f) => f());
+        unsubscribeRegistered();
+        unsubscribeDisconnected();
       };
     }
   }, [enabled, requestPage, shouldUseBackend, refresh]);

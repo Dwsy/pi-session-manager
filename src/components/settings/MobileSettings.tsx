@@ -238,7 +238,7 @@ export default function MobileSettings({
           </div>
 
           <div className="flex-1 overflow-y-auto overscroll-contain">
-            <div className="space-y-4 px-3 py-3">
+            <div className="space-y-3 px-3 py-3">
               {/* Mobile search results */}
               {mobileTrimmedQuery && mobileSearchResults.length > 0 && (
                 <div className="space-y-1">
@@ -285,11 +285,11 @@ export default function MobileSettings({
                 if (items.length === 0) return null;
 
                 return (
-                  <section key={group.id} className="space-y-2">
-                    <div className="px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  <section key={group.id} className="space-y-1.5">
+                    <div className="px-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                       {t(group.labelKey, group.fallbackLabel)}
                     </div>
-                    <div className="overflow-hidden rounded-xl border border-border/70 bg-background/35">
+                    <div className="overflow-hidden rounded-xl border border-border/60 bg-background/45">
                       {items.map((item, index) => {
                         if (!item) return null;
                         const isActive = activeSection === item.id;
@@ -300,7 +300,7 @@ export default function MobileSettings({
                             key={item.id}
                             onClick={() => handleSectionClick(item.id)}
                             className={`w-full flex items-center gap-3 text-left motion-color focus-ring ${
-                              isPluginChild ? "px-7 py-2.5 text-xs" : "px-4 py-3 text-sm"
+                              isPluginChild ? "px-7 py-2 text-xs" : "px-3 py-2.5 text-sm"
                             } ${
                               index !== items.length - 1
                                 ? "border-b border-border/60"
@@ -407,7 +407,7 @@ export default function MobileSettings({
                 <Loader2 className="h-8 w-8 animate-spin text-info" />
               </div>
             ) : (
-              <div className="space-y-5">
+              <div className="mx-auto w-full max-w-3xl space-y-5">
                 {renderSettingsSection(activeSection, settings, onUpdate)}
               </div>
             )}

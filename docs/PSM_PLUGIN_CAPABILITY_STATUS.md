@@ -41,7 +41,8 @@ The current plugin-facing record substrate is:
 - `sessions`
 - `records`
 - `search`
-- `kanban`
+- `tags`
+- `events`
 - `sidechat`
 - `models`
 
@@ -104,7 +105,7 @@ Stable enough to design against now:
 | `PsmRecordDeclaration` | Stable V1 record declaration format | Uses JSON text payloads and Rust-owned projection/indexing. |
 | `PsmTransport` | Stable interface | Plugins receive a host-provided transport; they should not import app-local transport modules. |
 | `createPluginCapabilityClient(...)` | Stable V1 client factory | Adds `__psm` only when the host/plugin supplies permission context. |
-| `PsmPluginHostContext` and activation types | First-pass host contract | Describes activation, command/tool registration, session UI registration, and disposal hooks for npm-installed plugins. |
+| `PsmPluginHostContext` and activation types | First-pass host contract | Describes activation, command/tool registration, session UI registration, event subscription, and disposal hooks for npm-installed plugins. |
 
 Not part of the publishable SDK package:
 

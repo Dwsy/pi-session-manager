@@ -186,11 +186,7 @@ fn dataset_file_url(source: &ParsedDatasetSource, relative_path: &str) -> String
 }
 
 fn is_dataset_session_jsonl(path: &str) -> bool {
-    Path::new(path)
-        .file_name()
-        .and_then(|value| value.to_str())
-        .is_some_and(|filename| filename != "manifest.jsonl")
-        && path.ends_with(".jsonl")
+    Path::new(path).file_name().and_then(|value| value.to_str()).is_some_and(|filename| filename != "manifest.jsonl") && path.ends_with(".jsonl")
 }
 
 fn remove_existing_dataset_artifacts(slug: &str) -> Result<(), String> {
@@ -316,10 +312,7 @@ async fn run_dataset_import(task_id: String, source: ParsedDatasetSource) -> Res
 
     let client = reqwest::Client::builder().user_agent("pi-session-manager/0.5").build().map_err(|e| format!("Failed to create HTTP client: {e}"))?;
     let tree = fetch_dataset_tree(&client, &source).await?;
-    let jsonl_files: Vec<HuggingFaceTreeEntry> = tree
-        .into_iter()
-        .filter(|entry| entry.entry_type == "file" && is_dataset_session_jsonl(&entry.path))
-        .collect();
+    let jsonl_files: Vec<HuggingFaceTreeEntry> = tree.into_iter().filter(|entry| entry.entry_type == "file" && is_dataset_session_jsonl(&entry.path)).collect();
 
     if jsonl_files.is_empty() {
         return Err("No JSONL files found in dataset".to_string());

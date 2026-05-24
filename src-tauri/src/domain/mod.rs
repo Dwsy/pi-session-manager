@@ -14,4 +14,3 @@ pub mod session_list;
 pub mod session_summary;
 pub mod stats;
 pub mod terminal;
-pub mod workspaces;

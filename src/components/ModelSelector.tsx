@@ -19,6 +19,7 @@ export interface RPCModel {
 }
 
 interface ModelSelectorProps {
+  buttonId?: string
   models: RPCModel[]
   currentModel: RPCModel | null
   onSelect: (model: RPCModel) => void
@@ -102,6 +103,7 @@ function fuzzyFilter<T>(
 }
 
 export default function ModelSelector({
+  buttonId,
   models,
   currentModel,
   onSelect,
@@ -289,7 +291,9 @@ export default function ModelSelector({
     const active = menuRef.current?.querySelector<HTMLButtonElement>(
       '[data-model-item="selected"]',
     )
-    active?.scrollIntoView({ block: 'nearest' })
+    if (typeof active?.scrollIntoView === 'function') {
+      active.scrollIntoView({ block: 'nearest' })
+    }
   }, [open, selectedIndex])
 
   const handleSelect = (model: RPCModel) => {
@@ -417,6 +421,7 @@ export default function ModelSelector({
   return (
     <div ref={wrapperRef} className="relative">
       <button
+        id={buttonId}
         ref={triggerRef}
         type="button"
         disabled={disabled}

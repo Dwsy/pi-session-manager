@@ -222,7 +222,7 @@ export default function SessionDatasetSettings({
                         (!!importStatus &&
                           !["completed", "failed"].includes(importStatus.phase))
                       }
-                      className="rounded-lg border border-info bg-info/10 px-4 py-2 text-sm text-foreground transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-lg border border-info bg-info/10 px-4 py-2 text-sm text-foreground motion-context disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {importStatus &&
                       !["completed", "failed"].includes(importStatus.phase)
@@ -241,7 +241,7 @@ export default function SessionDatasetSettings({
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-border/60">
                     <button
                       onClick={onClearBrowserCache}
-                      className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-red-400 transition-colors hover:bg-red-500/20"
+                      className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-red-400 motion-color hover:bg-red-500/20"
                     >
                       {t(
                         "settings.session.clearBrowserCache",
@@ -250,7 +250,7 @@ export default function SessionDatasetSettings({
                     </button>
                     <button
                       onClick={onClearAllBrowserCaches}
-                      className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-red-700 dark:text-red-300 transition-colors hover:bg-red-500/15"
+                      className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-red-700 dark:text-red-300 motion-color hover:bg-red-500/15"
                     >
                       {t(
                         "settings.session.clearAllBrowserCache",
@@ -323,7 +323,7 @@ export default function SessionDatasetSettings({
                     return (
                       <label
                         key={dataset.id}
-                        className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-3 transition-colors ${
+                        className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-3 motion-color ${
                           checked
                             ? "border-info bg-info/10"
                             : "border-border bg-background/50 hover:border-border-hover"
@@ -455,7 +455,7 @@ export default function SessionDatasetSettings({
                     (!!importStatus &&
                       !["completed", "failed"].includes(importStatus.phase))
                   }
-                  className="rounded-lg border border-info bg-info/10 px-4 py-2 text-sm text-foreground transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-lg border border-info bg-info/10 px-4 py-2 text-sm text-foreground motion-context disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {importStatus &&
                   !["completed", "failed"].includes(importStatus.phase)

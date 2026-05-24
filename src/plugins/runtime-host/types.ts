@@ -1,7 +1,11 @@
 import type {
   PsmPluginManifest,
   PsmPluginSettingValue,
+  PsmAppSidebarViewRegistration,
+  PsmAppViewRegistration,
   PsmSessionMainViewRegistration,
+  PsmPluginCommandContext,
+  PsmPluginCommandRegistration,
   PsmPluginToolRegistration,
   PsmSessionPanelRegistration,
   PsmSessionToolbarItemRegistration,
@@ -54,6 +58,28 @@ export interface PsmPluginNpmOperationResult {
   stderr: string
 }
 
+export interface PsmPluginMarketEntry {
+  packageName: string
+  packageVersion?: string | null
+  description?: string | null
+  author?: string | null
+  keywords: string[]
+  npmUrl?: string | null
+  homepageUrl?: string | null
+  repositoryUrl?: string | null
+  imageUrl?: string | null
+  weeklyDownloads?: number | null
+  publishedAt?: string | null
+  psmExtensionExports: string[]
+  installed: boolean
+}
+
+export interface PsmPluginMarketSearchResult {
+  query: string
+  total: number
+  results: PsmPluginMarketEntry[]
+}
+
 export interface PsmPluginLoadEntry {
   source: PsmPluginSource
   sourceId: string
@@ -83,6 +109,8 @@ export interface PsmPluginStatus {
   manifest?: PsmPluginManifest
   commands: string[]
   tools: string[]
+  appViews?: string[]
+  appSidebarViews?: string[]
   toolRenderers?: string[]
   diagnostics: PsmPluginDiagnostic[]
   settings?: Record<string, PsmPluginSettingValue>
@@ -92,6 +120,18 @@ export interface PsmPluginStatus {
 }
 
 export interface PsmPluginToolRuntimeRegistration extends PsmPluginToolRegistration {
+  pluginId: string
+}
+
+export interface PsmPluginCommandRuntimeRegistration extends PsmPluginCommandRegistration {
+  pluginId: string
+}
+
+export interface PsmAppViewRuntimeRegistration extends PsmAppViewRegistration {
+  pluginId: string
+}
+
+export interface PsmAppSidebarViewRuntimeRegistration extends PsmAppSidebarViewRegistration {
   pluginId: string
 }
 
@@ -116,10 +156,13 @@ export interface PsmToolRendererRuntimeRegistration extends PsmToolRendererRegis
 }
 
 export interface PsmPluginSessionUiSnapshot {
+  ready: boolean
+  appViews: PsmAppViewRuntimeRegistration[]
+  appSidebarViews: PsmAppSidebarViewRuntimeRegistration[]
   toolbarItems: PsmSessionToolbarItemRuntimeRegistration[]
   panels: PsmSessionPanelRuntimeRegistration[]
   treeViews: PsmSessionTreeViewRuntimeRegistration[]
   mainViews: PsmSessionMainViewRuntimeRegistration[]
 }
 
-export type PsmPluginCommandHandler = (args: Record<string, unknown>) => Promise<unknown>
+export type { PsmPluginCommandContext }

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -9,9 +9,13 @@ use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 
 const PLUGINS_CONFIG_FILE: &str = "plugins.json";
+const PLUGIN_JSON_CONFIG_DIR: &str = "plugin-config";
 const NPM_EXTENSIONS_DIR: &str = "extensions/npm";
 const NPM_COMMAND_TIMEOUT_SECS: u64 = 300;
 const PLUGIN_MODULE_SOURCE_LIMIT_BYTES: usize = 2 * 1024 * 1024;
+const NPM_MARKET_SEARCH_DEFAULT_SIZE: usize = 12;
+const NPM_MARKET_SEARCH_MAX_SIZE: usize = 30;
+const NPM_MARKET_REQUEST_TIMEOUT_SECS: u64 = 15;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -88,8 +92,117 @@ pub struct PsmPluginNpmOperationResult {
     pub stderr: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PsmPluginMarketSearchResult {
+    pub query: String,
+    pub total: u64,
+    pub results: Vec<PsmPluginMarketEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PsmPluginMarketEntry {
+    pub package_name: String,
+    pub package_version: Option<String>,
+    pub description: Option<String>,
+    pub author: Option<String>,
+    pub keywords: Vec<String>,
+    pub npm_url: Option<String>,
+    pub homepage_url: Option<String>,
+    pub repository_url: Option<String>,
+    pub image_url: Option<String>,
+    pub weekly_downloads: Option<u64>,
+    pub published_at: Option<String>,
+    pub psm_extension_exports: Vec<String>,
+    pub installed: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct NpmSearchResponse {
+    #[serde(default)]
+    total: u64,
+    #[serde(default)]
+    objects: Vec<NpmSearchObject>,
+}
+
+#[derive(Debug, Deserialize)]
+struct NpmSearchObject {
+    package: NpmSearchPackage,
+}
+
+#[derive(Debug, Deserialize)]
+struct NpmSearchPackage {
+    name: String,
+    #[serde(default)]
+    version: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    keywords: Vec<String>,
+    #[serde(default)]
+    date: Option<String>,
+    #[serde(default)]
+    links: NpmPackageLinks,
+    #[serde(default)]
+    publisher: Option<NpmPackagePublisher>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct NpmPackageLinks {
+    #[serde(default)]
+    npm: Option<String>,
+    #[serde(default)]
+    homepage: Option<String>,
+    #[serde(default)]
+    repository: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct NpmPackagePublisher {
+    #[serde(default)]
+    username: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct NpmDownloadsResponse {
+    #[serde(default)]
+    downloads: u64,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct NpmLatestPackageMeta {
+    #[serde(default)]
+    psm: Option<NpmPsmMetadata>,
+    #[serde(default)]
+    repository: Option<RepositoryField>,
+    #[serde(default)]
+    homepage: Option<String>,
+    #[serde(default)]
+    icon: Option<String>,
+    #[serde(default)]
+    logo: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct NpmPsmMetadata {
+    #[serde(default)]
+    extensions: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum RepositoryField {
+    Url(String),
+    Object { url: Option<String> },
+}
+
 fn plugins_config_path() -> Result<PathBuf, String> {
     Ok(crate::paths::psm_root_dir()?.join(PLUGINS_CONFIG_FILE))
+}
+
+fn plugin_json_config_root() -> Result<PathBuf, String> {
+    Ok(crate::paths::psm_root_dir()?.join(PLUGIN_JSON_CONFIG_DIR))
 }
 
 fn npm_extensions_dir() -> Result<PathBuf, String> {
@@ -177,6 +290,29 @@ fn expand_home_path(raw: &str) -> Result<PathBuf, String> {
     Ok(PathBuf::from(trimmed))
 }
 
+fn validate_plugin_config_token(raw: &str, label: &str) -> Result<String, String> {
+    let value = raw.trim();
+    if value.is_empty() {
+        return Err(format!("{label} is required"));
+    }
+    if value == "." || value == ".." || value.starts_with('.') {
+        return Err(format!("{label} must not start with '.'"));
+    }
+    if value.contains('/') || value.contains('\\') || value.contains("..") {
+        return Err(format!("{label} must be a single safe path segment"));
+    }
+    if value.chars().any(|ch| !(ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))) {
+        return Err(format!("{label} contains unsupported characters"));
+    }
+    Ok(value.to_string())
+}
+
+fn plugin_json_config_path(plugin_id: &str, key: &str) -> Result<PathBuf, String> {
+    let plugin_id = validate_plugin_config_token(plugin_id, "pluginId")?;
+    let key = validate_plugin_config_token(key, "config key")?;
+    Ok(plugin_json_config_root()?.join(plugin_id).join(format!("{key}.json")))
+}
+
 fn ensure_plugin_module_file(path: &Path) -> Result<PathBuf, String> {
     let path = path.canonicalize().map_err(|e| format!("Failed to resolve PSM plugin module: {e}"))?;
     let extension = path.extension().and_then(|value| value.to_str()).unwrap_or_default();
@@ -192,6 +328,27 @@ fn ensure_plugin_module_file(path: &Path) -> Result<PathBuf, String> {
 
 fn normalize_path_plugin_entry_path(entry_path: &str) -> Result<String, String> {
     Ok(ensure_plugin_module_file(&expand_home_path(entry_path)?)?.to_string_lossy().to_string())
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn read_psm_plugin_json_config(plugin_id: String, key: String, default_value: Option<Value>) -> Result<Value, String> {
+    let path = plugin_json_config_path(&plugin_id, &key)?;
+    if !path.exists() {
+        return Ok(default_value.unwrap_or(Value::Null));
+    }
+
+    let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read PSM plugin JSON config: {e}"))?;
+    serde_json::from_str(&content).map_err(|e| format!("Failed to parse PSM plugin JSON config: {e}"))
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn write_psm_plugin_json_config(plugin_id: String, key: String, value: Value) -> Result<(), String> {
+    let path = plugin_json_config_path(&plugin_id, &key)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create PSM plugin JSON config dir: {e}"))?;
+    }
+    let content = serde_json::to_string_pretty(&value).map_err(|e| format!("Failed to serialize PSM plugin JSON config: {e}"))?;
+    fs::write(&path, format!("{content}\n")).map_err(|e| format!("Failed to write PSM plugin JSON config: {e}"))
 }
 
 fn list_npm_entries_internal() -> Result<Vec<PsmNpmPluginEntry>, String> {
@@ -302,6 +459,158 @@ fn remove_path_plugin_config_entries(config: &mut PsmPluginsConfig, entry_path: 
     config.plugins.retain(|_, entry| entry.source != "path" || entry.entry_path.as_deref() != Some(entry_path));
 }
 
+fn clamp_market_size(size: Option<usize>) -> usize {
+    let size = size.unwrap_or(NPM_MARKET_SEARCH_DEFAULT_SIZE);
+    size.clamp(1, NPM_MARKET_SEARCH_MAX_SIZE)
+}
+
+fn normalize_market_query(query: &str) -> String {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        "psm plugin".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn normalize_repository_url(url: &str) -> Option<String> {
+    let trimmed = url.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let without_git_prefix = trimmed.strip_prefix("git+").unwrap_or(trimmed);
+    let normalized = if let Some(path) = without_git_prefix.strip_prefix("git://github.com/") {
+        format!("https://github.com/{path}")
+    } else if let Some(path) = without_git_prefix.strip_prefix("ssh://git@github.com/") {
+        format!("https://github.com/{path}")
+    } else if let Some(path) = without_git_prefix.strip_prefix("git@github.com:") {
+        format!("https://github.com/{path}")
+    } else if let Some(path) = without_git_prefix.strip_prefix("github:") {
+        format!("https://github.com/{path}")
+    } else {
+        without_git_prefix.to_string()
+    };
+
+    Some(normalized.trim_end_matches(".git").to_string())
+}
+
+fn parse_github_repository(url: &str) -> Option<(String, String)> {
+    let normalized = normalize_repository_url(url)?;
+    let path = normalized.strip_prefix("https://github.com/").or_else(|| normalized.strip_prefix("http://github.com/"))?;
+    let mut segments = path.split('/').filter(|segment| !segment.is_empty());
+    let owner = segments.next()?;
+    let repo = segments.next()?;
+    Some((owner.to_string(), repo.trim_end_matches(".git").to_string()))
+}
+
+fn repository_field_to_url(repository: Option<&RepositoryField>) -> Option<String> {
+    let raw = match repository {
+        Some(RepositoryField::Url(url)) => Some(url.as_str()),
+        Some(RepositoryField::Object { url }) => url.as_deref(),
+        None => None,
+    }?;
+    normalize_repository_url(raw)
+}
+
+fn normalize_market_asset_url(value: Option<String>) -> Option<String> {
+    let value = value?;
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") || trimmed.starts_with("data:") {
+        return Some(trimmed.to_string());
+    }
+    if let Some(rest) = trimmed.strip_prefix("//") {
+        return Some(format!("https://{rest}"));
+    }
+    None
+}
+
+fn build_market_image_url(package_name: &str, repository_url: Option<&str>, author: Option<&str>) -> String {
+    if let Some((owner, _repo)) = repository_url.and_then(parse_github_repository) {
+        return format!("https://github.com/{owner}.png");
+    }
+
+    if let Some(author) = author {
+        let author = author.trim();
+        if !author.is_empty() {
+            return format!("https://api.dicebear.com/9.x/shapes/svg?seed={}", urlencoding::encode(author));
+        }
+    }
+
+    format!("https://api.dicebear.com/9.x/shapes/svg?seed={}", urlencoding::encode(package_name))
+}
+
+fn market_http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder().user_agent("pi-session-manager/psm-market").timeout(Duration::from_secs(NPM_MARKET_REQUEST_TIMEOUT_SECS)).build().map_err(|e| format!("Failed to create npm market HTTP client: {e}"))
+}
+
+async fn fetch_weekly_downloads(client: &reqwest::Client, package_name: &str) -> Option<u64> {
+    let encoded = urlencoding::encode(package_name);
+    let url = format!("https://api.npmjs.org/downloads/point/last-week/{encoded}");
+    let response = client.get(url).send().await.ok()?.error_for_status().ok()?;
+    response.json::<NpmDownloadsResponse>().await.ok().map(|value| value.downloads)
+}
+
+async fn fetch_latest_package_meta(client: &reqwest::Client, package_name: &str) -> Option<NpmLatestPackageMeta> {
+    let encoded = urlencoding::encode(package_name);
+    let url = format!("https://registry.npmjs.org/{encoded}/latest");
+    let response = client.get(url).send().await.ok()?.error_for_status().ok()?;
+    response.json::<NpmLatestPackageMeta>().await.ok()
+}
+
+async fn search_psm_plugin_market_internal(query: &str, size: Option<usize>, from: Option<usize>) -> Result<PsmPluginMarketSearchResult, String> {
+    let query = normalize_market_query(query);
+    let size = clamp_market_size(size);
+    let from = from.unwrap_or(0);
+
+    let client = market_http_client()?;
+    let url = format!("https://registry.npmjs.org/-/v1/search?text={}&size={size}&from={from}", urlencoding::encode(&query));
+    let response = client.get(url).send().await.map_err(|e| format!("Failed to search npm marketplace: {e}"))?.error_for_status().map_err(|e| format!("Failed to search npm marketplace: {e}"))?;
+    let search_response = response.json::<NpmSearchResponse>().await.map_err(|e| format!("Failed to parse npm marketplace response: {e}"))?;
+
+    let installed_packages: BTreeSet<String> = list_npm_entries_internal()?.into_iter().map(|entry| entry.package_name).collect();
+
+    let mut results = Vec::with_capacity(search_response.objects.len());
+    for item in search_response.objects {
+        let package = item.package;
+        let package_name = package.name.clone();
+        let author = package.publisher.and_then(|publisher| publisher.username);
+        let search_repository_url = package.links.repository.as_deref().and_then(normalize_repository_url);
+        let (weekly_downloads, latest_meta) = tokio::join!(fetch_weekly_downloads(&client, &package_name), fetch_latest_package_meta(&client, &package_name));
+
+        let latest_repository_url = latest_meta.as_ref().and_then(|meta| repository_field_to_url(meta.repository.as_ref()));
+        let repository_url = latest_repository_url.or(search_repository_url);
+        let homepage_url = latest_meta.as_ref().and_then(|meta| meta.homepage.clone()).or(package.links.homepage);
+        let image_url = latest_meta.as_ref().and_then(|meta| normalize_market_asset_url(meta.icon.clone().or(meta.logo.clone()))).or_else(|| Some(build_market_image_url(&package_name, repository_url.as_deref(), author.as_deref())));
+
+        let psm_extension_exports = latest_meta.and_then(|meta| meta.psm.map(|psm| psm.extensions)).unwrap_or_default().into_iter().filter(|item| !item.trim().is_empty()).collect::<Vec<_>>();
+        if psm_extension_exports.is_empty() {
+            continue;
+        }
+
+        results.push(PsmPluginMarketEntry {
+            package_name: package_name.clone(),
+            package_version: package.version,
+            description: package.description,
+            author,
+            keywords: package.keywords,
+            npm_url: package.links.npm,
+            homepage_url,
+            repository_url,
+            image_url,
+            weekly_downloads,
+            published_at: package.date,
+            psm_extension_exports,
+            installed: installed_packages.contains(&package_name),
+        });
+    }
+
+    Ok(PsmPluginMarketSearchResult { query, total: results.len() as u64, results })
+}
+
 async fn run_npm_command(command: &str, package_name: Option<&str>) -> Result<(String, String), String> {
     let npm_dir = npm_extensions_dir()?;
     fs::create_dir_all(&npm_dir).map_err(|e| format!("Failed to create PSM npm extensions dir: {e}"))?;
@@ -373,6 +682,11 @@ pub async fn list_npm_psm_plugin_entries() -> Result<Vec<PsmNpmPluginEntry>, Str
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn list_path_psm_plugin_entries() -> Result<Vec<PsmPathPluginEntry>, String> {
     list_path_entries_internal()
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn search_psm_plugin_market(query: Option<String>, size: Option<usize>, from: Option<usize>) -> Result<PsmPluginMarketSearchResult, String> {
+    search_psm_plugin_market_internal(query.as_deref().unwrap_or_default(), size, from).await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -534,6 +848,31 @@ mod tests {
     }
 
     #[test]
+    fn reads_and_writes_scoped_plugin_json_config() {
+        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let home = tempfile::tempdir().unwrap();
+        let old_home = env::var("HOME").ok();
+        env::set_var("HOME", home.path());
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let missing = runtime.block_on(read_psm_plugin_json_config("builtin.config-test".to_string(), "workspace".to_string(), Some(serde_json::json!({ "items": [] })))).unwrap();
+        assert_eq!(missing["items"], serde_json::json!([]));
+
+        runtime.block_on(write_psm_plugin_json_config("builtin.config-test".to_string(), "workspace".to_string(), serde_json::json!({ "active": "default" }))).unwrap();
+        let stored = runtime.block_on(read_psm_plugin_json_config("builtin.config-test".to_string(), "workspace".to_string(), None)).unwrap();
+        assert_eq!(stored["active"], "default");
+
+        let unsafe_key = runtime.block_on(write_psm_plugin_json_config("builtin.config-test".to_string(), "folder/workspace".to_string(), serde_json::json!({}))).unwrap_err();
+        assert!(unsafe_key.contains("single safe path segment"));
+
+        if let Some(old_home) = old_home {
+            env::set_var("HOME", old_home);
+        } else {
+            env::remove_var("HOME");
+        }
+    }
+
+    #[test]
     fn builds_safe_npm_command_args() {
         let npm_dir = PathBuf::from("/tmp/psm-npm");
 
@@ -542,6 +881,34 @@ mod tests {
 
         assert!(npm_command_args("install", Some("--registry=https://evil.example"), &npm_dir).is_err());
         assert!(npm_command_args("install", Some("@acme/psm sidechat"), &npm_dir).is_err());
+    }
+
+    #[test]
+    fn parses_github_repository_urls() {
+        assert_eq!(parse_github_repository("git://github.com/acme/psm-plugin.git"), Some(("acme".to_string(), "psm-plugin".to_string())));
+        assert_eq!(parse_github_repository("github:acme/psm-plugin"), Some(("acme".to_string(), "psm-plugin".to_string())));
+        assert_eq!(parse_github_repository("https://github.com/acme/psm-plugin"), Some(("acme".to_string(), "psm-plugin".to_string())));
+        assert_eq!(parse_github_repository("https://example.com/acme/psm-plugin"), None);
+    }
+
+    #[test]
+    fn builds_market_image_url_with_github_priority() {
+        let github = build_market_image_url("@acme/psm-sidechat", Some("git://github.com/acme/psm-sidechat.git"), Some("fallback-author"));
+        assert_eq!(github, "https://github.com/acme.png");
+
+        let author = build_market_image_url("@acme/psm-sidechat", None, Some("acme-author"));
+        assert!(author.starts_with("https://api.dicebear.com/9.x/shapes/svg?seed="));
+
+        let fallback = build_market_image_url("@acme/psm-sidechat", None, None);
+        assert!(fallback.starts_with("https://api.dicebear.com/9.x/shapes/svg?seed="));
+    }
+
+    #[test]
+    fn normalizes_market_asset_urls() {
+        assert_eq!(normalize_market_asset_url(Some("https://example.com/icon.png".to_string())).as_deref(), Some("https://example.com/icon.png"));
+        assert_eq!(normalize_market_asset_url(Some("//example.com/icon.png".to_string())).as_deref(), Some("https://example.com/icon.png"));
+        assert_eq!(normalize_market_asset_url(Some("/icon.png".to_string())), None);
+        assert_eq!(normalize_market_asset_url(Some("".to_string())), None);
     }
 
     #[test]

@@ -775,6 +775,17 @@ Overlay:    320ms  — Modal entry/exit, major state changes
 Data:       480ms  — Width changes, layout shifts
 ```
 
+### Transition Families
+| Family | When to use | Stable anchor | Utility classes |
+|--------|-------------|---------------|-----------------|
+| Context | Same view, local content/state changes | surrounding frame | `motion-context`, `motion-context-enter` |
+| Drill | Moving one level deeper, e.g. list to detail | parent navigation relation | `motion-drill`, `motion-drill-enter` |
+| Continuity | Same visual object persists while expanding/morphing | shared element identity | `motion-continuity` |
+| Overlay | Modal, command palette, popover surfaces | background app shell | `motion-overlay-backdrop`, `motion-overlay-surface`, `motion-overlay-enter`, `motion-overlay-surface-enter` |
+| Layout | Width/flex-basis/panel resizing | app shell geometry | `motion-layout`, `motion-width` |
+
+Use semantic classes before Tailwind `duration-*` and `ease-*` utilities. New motion should reference `--motion-*` tokens and honor `prefers-reduced-motion`.
+
 ### Easing Functions
 ```
 Standard:  cubic-bezier(0.4, 0, 0.2, 1)  — Default for most transitions
@@ -930,7 +941,7 @@ All components support `env(safe-area-inset-*)` for mobile notches and keyboards
 | Directory | Key Components | Design Notes |
 |-----------|---------------|-------------|
 | `components/dashboard/` | `StatCard`, `ActivityHeatmap`, `TokenTrendChart`, `TopModelsChart`, `RecentSessions` | Glass cards, stat cards with glow effects, charts |
-| `components/kanban/` | `KanbanCard`, `KanbanColumn`, `KanbanContextMenu` | Drag-drop cards, colored column dots, sortable |
+| `components/app/` plugin panes | `AppPluginViewPane`, `AppPluginSidebarPane` | App-level plugin view shell and sidebar shell |
 | `components/settings/` | `SettingsPanel`, `SettingsToggleRow`, `SettingsSliderField`, `SettingsRadioCardGroup` | Form inputs, modals, sliders, toggles |
 | `components/dialogs/` | `DeleteSessionConfirmDialog`, `ExportDialog`, `ForkDialog`, `RenameDialog` | Modal dialogs, backdrop blur |
 | `components/onboarding/` | `OnboardingStepContent` | Wizard overlay, multi-step progress |

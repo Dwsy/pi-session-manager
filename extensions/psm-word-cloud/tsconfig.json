@@ -1,0 +1,4 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": ["index.tsx", "__tests__/**/*.tsx", "vite.config.ts"]
+}

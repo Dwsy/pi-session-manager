@@ -18,7 +18,6 @@ import { tags } from './tags'
 import { plugins } from './plugins'
 import { time } from './time'
 import { auth } from './auth'
-import { kanban } from './kanban'
 import { piAgent } from './piAgent'
 
 export const deDE = {
@@ -42,7 +41,6 @@ export const deDE = {
   plugins,
   time,
   auth,
-  kanban,
   piAgent,
   connection: {
     disconnected: 'Keine Verbindung zum Server — läuft die App?',

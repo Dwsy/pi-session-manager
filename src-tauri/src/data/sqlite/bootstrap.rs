@@ -95,7 +95,9 @@ pub fn get_db_path_for_config(config: &Config) -> Result<PathBuf, String> {
                 Err(_) => dirs::home_dir().ok_or("Cannot find home directory")?,
             };
             let mut hasher = DefaultHasher::new();
-            active_dataset_ids.hash(&mut hasher);
+            let mut hashed_dataset_ids = active_dataset_ids.clone();
+            hashed_dataset_ids.sort();
+            hashed_dataset_ids.hash(&mut hasher);
             let selection_hash = format!("{:016x}", hasher.finish());
             let selection_dir = home.join(".pi").join("agent").join("sessions").join("datasets").join("__selection__");
             fs::create_dir_all(&selection_dir).map_err(|e| format!("Failed to create selection dir: {e}"))?;
