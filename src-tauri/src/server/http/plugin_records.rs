@@ -42,17 +42,6 @@ pub(crate) struct RefreshSessionIntelligenceRequest {
     pub(crate) language: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct AskSessionSidechatRequest {
-    pub(crate) path: String,
-    pub(crate) question: String,
-    pub(crate) provider: Option<String>,
-    pub(crate) model: Option<String>,
-    pub(crate) language: Option<String>,
-    pub(crate) thinking_level: Option<String>,
-    pub(crate) limit: Option<usize>,
-}
-
 pub(crate) async fn v1_get_plugin_record(Path(id): Path<String>, ConnectInfo(addr): ConnectInfo<SocketAddr>, headers: HeaderMap, uri: Uri) -> Response {
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return unauthorized_response();
@@ -94,17 +83,6 @@ pub(crate) async fn v1_refresh_session_intelligence_record(ConnectInfo(addr): Co
 
     match crate::refresh_session_intelligence_record(req.path, req.provider, req.model, req.language).await {
         Ok(record) => json_success_response(record),
-        Err(error) => json_error_response(StatusCode::BAD_REQUEST, error),
-    }
-}
-
-pub(crate) async fn v1_ask_session_sidechat(ConnectInfo(addr): ConnectInfo<SocketAddr>, headers: HeaderMap, uri: Uri, Json(req): Json<AskSessionSidechatRequest>) -> Response {
-    if !is_authorized(&addr.ip(), &headers, &uri) {
-        return unauthorized_response();
-    }
-
-    match crate::ask_session_sidechat(req.path, req.question, req.provider, req.model, req.language, req.thinking_level, req.limit).await {
-        Ok(response) => json_success_response(response),
         Err(error) => json_error_response(StatusCode::BAD_REQUEST, error),
     }
 }

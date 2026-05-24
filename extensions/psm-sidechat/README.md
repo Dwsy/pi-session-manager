@@ -8,7 +8,7 @@ This plugin registers:
 - tool: `sidechat_ask`
 - session toolbar button: `builtin.sidechat.toolbar`
 - session right panel: `builtin.sidechat.panel`
-- permission: `sidechat:ask`
+- permissions: `sessions:read`, `model:invoke`, `records:read`, `records:write`
 
 ## UI Stack
 

@@ -13,7 +13,7 @@ export const manifest: PsmPluginManifest = {
     name: '@example/psm-plugin-sidechat',
     export: './dist/index.js',
   },
-  permissions: ['sidechat:ask'],
+  permissions: ['sessions:read', 'model:invoke'],
 }
 
 function asString(value: unknown) {
