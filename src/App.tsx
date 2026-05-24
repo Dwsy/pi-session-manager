@@ -322,6 +322,16 @@ function App() {
     checkVersion();
   }, [standaloneDatasetRuntime]);
 
+  const handleContinueVersionDowngrade = useCallback(async () => {
+    try {
+      await invoke('allow_version_downgrade', { allow: true });
+      setVersionDowngradeInfo(null);
+      await Promise.allSettled([loadSettings(), loadSessions(), loadTags()]);
+    } catch (err) {
+      console.error('Failed to continue after version downgrade warning:', err);
+    }
+  }, [loadSettings, loadSessions, loadTags]);
+
   const navigate = useNavigate();
 
   // Route sync for deep linking and URL-based navigation
@@ -1420,6 +1430,7 @@ function App() {
           downgradeInfo={versionDowngradeInfo}
           currentVersion={versionDowngradeInfo.current_app_version}
           onClose={() => setVersionDowngradeInfo(null)}
+          onContinue={handleContinueVersionDowngrade}
           onResetComplete={() => {
             setVersionDowngradeInfo(null);
             // Reload the app after reset

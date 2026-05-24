@@ -6,6 +6,17 @@ use super::schema::{ensure_app_version_info_table, ensure_schema_version_table, 
 use rusqlite::OpenFlags;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static ALLOW_VERSION_DOWNGRADE: AtomicBool = AtomicBool::new(false);
+
+pub fn set_version_downgrade_override(allow: bool) {
+    ALLOW_VERSION_DOWNGRADE.store(allow, Ordering::Relaxed);
+}
+
+fn version_downgrade_override_enabled() -> bool {
+    ALLOW_VERSION_DOWNGRADE.load(Ordering::Relaxed)
+}
 
 /// Compare two semver version strings.
 /// Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal.
@@ -352,7 +363,7 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
         let current_app_version = env!("CARGO_PKG_VERSION");
         if let Some((stored_app_version, stored_schema_version, _)) = get_app_version_info(&conn)? {
             // Only check schema version - this is the real compatibility indicator
-            if stored_schema_version > LATEST_SCHEMA_VERSION {
+            if stored_schema_version > LATEST_SCHEMA_VERSION && !version_downgrade_override_enabled() {
                 return Err(format!(
                     "VERSION_DOWNGRADE: Database schema is v{} (from app v{}), \
                      but current app (v{}) only supports up to v{}. \
@@ -376,7 +387,8 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
 
         // Update app version info after successful migrations
         let now = Utc::now().to_rfc3339();
-        set_app_version_info(&conn, current_app_version, LATEST_SCHEMA_VERSION, &now)?;
+        let final_schema_version = get_current_version(&conn)?;
+        set_app_version_info(&conn, current_app_version, final_schema_version, &now)?;
 
         conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id)", []).map_err(|e| format!("Failed to create entry_id index on message_entries: {e}"))?;
 
@@ -452,6 +464,7 @@ pub struct VersionDowngradeInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn uses_primary_db_for_local_mode() {
@@ -519,5 +532,32 @@ mod tests {
         // Test real-world versions
         assert_eq!(compare_versions("0.6.0", "0.5.0"), 1);
         assert_eq!(compare_versions("0.5.0", "0.6.0"), -1);
+    }
+
+    #[test]
+    fn version_downgrade_override_allows_opening_newer_schema_for_current_run() {
+        let _env_lock = crate::paths::test_env_lock().lock().expect("test env lock");
+        set_version_downgrade_override(false);
+
+        let temp_dir = tempdir().expect("tempdir");
+        let db_path = temp_dir.path().join("sessions.db");
+        let conn = Connection::open(&db_path).expect("open seed db");
+
+        ensure_schema_version_table(&conn).expect("ensure schema version table");
+        conn.execute("UPDATE schema_version SET version = ?1", params![LATEST_SCHEMA_VERSION + 1]).expect("seed newer schema version");
+        ensure_app_version_info_table(&conn).expect("ensure app version table");
+        set_app_version_info(&conn, "9.9.9", LATEST_SCHEMA_VERSION + 1, "2026-01-01T00:00:00Z").expect("seed app version info");
+        drop(conn);
+
+        let err = init_db_with_path(&db_path, &Config::default()).expect_err("expected downgrade guard");
+        assert!(err.contains("VERSION_DOWNGRADE"), "unexpected error: {err}");
+
+        set_version_downgrade_override(true);
+        let reopened = init_db_with_path(&db_path, &Config::default()).expect("override should allow opening db");
+        let stored = get_app_version_info(&reopened).expect("read app version info").expect("stored version info");
+        assert_eq!(stored.0, env!("CARGO_PKG_VERSION"));
+        assert_eq!(stored.1, LATEST_SCHEMA_VERSION + 1);
+
+        set_version_downgrade_override(false);
     }
 }

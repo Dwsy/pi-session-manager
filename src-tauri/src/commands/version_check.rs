@@ -22,6 +22,13 @@ pub async fn check_version_downgrade() -> Result<VersionCheckResult, String> {
     }
 }
 
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn allow_version_downgrade(allow: bool) -> Result<(), String> {
+    sqlite::set_version_downgrade_override(allow);
+    crate::core::scanner::invalidate_cache();
+    Ok(())
+}
+
 /// Backup the current database file
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn backup_database() -> Result<String, String> {
@@ -71,6 +78,7 @@ pub async fn reset_database() -> Result<String, String> {
 
     // Re-initialize the database
     let _conn = sqlite::init_db()?;
+    sqlite::set_version_downgrade_override(false);
 
     Ok(format!("Database reset successfully. Backup saved to: {}", backup_path.display()))
 }

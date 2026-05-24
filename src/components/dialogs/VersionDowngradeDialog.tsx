@@ -25,6 +25,7 @@ interface VersionDowngradeDialogProps {
   downgradeInfo: VersionDowngradeInfo
   currentVersion: string
   onClose: () => void
+  onContinue: () => void | Promise<void>
   onResetComplete: () => void
 }
 
@@ -40,6 +41,7 @@ export default function VersionDowngradeDialog({
   downgradeInfo,
   currentVersion,
   onClose,
+  onContinue,
   onResetComplete,
 }: VersionDowngradeDialogProps) {
   const { t } = useTranslation()
@@ -269,7 +271,9 @@ export default function VersionDowngradeDialog({
 
           {/* Continue Anyway (Not Recommended) */}
           <button
-            onClick={onClose}
+            onClick={() => {
+              void onContinue()
+            }}
             className="w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             {t('versionDowngrade.continueAnyway', 'Continue anyway (not recommended)')}

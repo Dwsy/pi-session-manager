@@ -15,7 +15,7 @@ pub mod tags;
 pub mod types;
 mod util;
 
-pub use bootstrap::{check_version_downgrade, get_db_path, get_primary_db_path, init_db, init_db_with_config, init_db_with_path, VersionDowngradeInfo};
+pub use bootstrap::{check_version_downgrade, get_db_path, get_primary_db_path, init_db, init_db_with_config, init_db_with_path, set_version_downgrade_override, VersionDowngradeInfo};
 pub use details_cache::{get_session_details_cache, upsert_session_details_cache, upsert_session_details_cache_in_tx};
 pub use favorites::{add_favorite, get_all_favorites, is_favorite, remove_favorite, toggle_favorite};
 pub use legacy_fts::{full_rebuild_fts, search_fts5};
