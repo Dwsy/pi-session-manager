@@ -1,7 +1,5 @@
 import {
-  Suspense,
   forwardRef,
-  lazy,
   memo,
   useCallback,
   useEffect,
@@ -10,11 +8,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { useTranslation } from "react-i18next";
+import { createPortal } from "react-dom";
 
 import { useSessionTreeLookup } from "@/hooks/useSessionTreeLookup";
 import type { SessionEntry } from "@/types";
 import { parseQuotedQuery } from "@/utils/search";
+import { PluginContributionBoundary, PluginContributionSlot } from "@/plugins/runtime-host";
+import type { PsmSessionTreeViewRuntimeRegistration } from "@/plugins/runtime-host/types";
 import { getCachedSettings } from "@/utils/settingsApi";
 import {
   buildActivePathIds,
@@ -201,11 +201,6 @@ function TreeGutter({ flatNode, stickyShift }: { flatNode: FlatNode; stickyShift
   );
 }
 
-// ─── Lazy flow view ───
-const SessionFlowView = lazy(
-  () => import("../session-viewer/SessionFlowView"),
-);
-
 // ─── Public API ───
 export interface SessionTreeRef {
   focusSearch: () => void;
@@ -216,6 +211,8 @@ interface SessionTreeProps {
   activeLeafId?: string;
   onNodeClick?: (leafId: string, targetId: string) => void;
   resolvedLabelsByTargetId?: Record<string, string>;
+  pluginViews?: PsmSessionTreeViewRuntimeRegistration[];
+  sessionPath?: string;
   filter?:
     | "default"
     | "no-tools"
@@ -232,18 +229,19 @@ const SessionTree = memo(
       activeLeafId,
       onNodeClick,
       resolvedLabelsByTargetId = {},
+      pluginViews = [],
+      sessionPath = "",
       filter = "no-tools",
     },
     ref,
   ) {
-    const { t } = useTranslation();
     const searchRef = useRef<SessionTreeSearchRef>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [currentFilter, setCurrentFilter] = useState(filter);
     const [currentResultIndex, setCurrentResultIndex] = useState(0);
     const [searchResults, setSearchResults] = useState<string[]>([]);
-    const [viewMode, setViewMode] = useState<"tree" | "flow" | "hierarchy">("tree");
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+    const [activePluginViewId, setActivePluginViewId] = useState<string | null>(null);
 
     useImperativeHandle(ref, () => ({
       focusSearch: () => searchRef.current?.focus(),
@@ -388,6 +386,26 @@ const SessionTree = memo(
       navigateToEntry(searchResults[nextIndex]);
     }, [currentResultIndex, navigateToEntry, searchResults]);
 
+    const activePluginView = useMemo(
+      () => pluginViews.find((view) => view.id === activePluginViewId) ?? null,
+      [activePluginViewId, pluginViews],
+    );
+
+    useEffect(() => {
+      if (!activePluginViewId) return;
+
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          setActivePluginViewId(null);
+        }
+      };
+
+      window.addEventListener("keydown", handleKeyDown, { capture: true });
+      return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+    }, [activePluginViewId]);
+
     const colorizeToolCalls =
       getCachedSettings().session?.colorizeToolCalls !== false;
 
@@ -408,26 +426,20 @@ const SessionTree = memo(
           totalResults={searchResults.length}
         />
 
-        <div className="sidebar-filters sidebar-filters-view-mode">
-          <button
-            className={`filter-btn ${viewMode === "tree" ? "active" : ""}`}
-            onClick={() => setViewMode("tree")}
-          >
-            Tree
-          </button>
-          <button
-            className={`filter-btn ${viewMode === "flow" ? "active" : ""}`}
-            onClick={() => setViewMode("flow")}
-          >
-            Flow
-          </button>
-          <button
-            className={`filter-btn ${viewMode === "hierarchy" ? "active" : ""}`}
-            onClick={() => setViewMode("hierarchy")}
-          >
-            Hierarchy
-          </button>
-        </div>
+        {pluginViews.length > 0 ? (
+          <div className="sidebar-filters sidebar-filters-tree-views">
+            {pluginViews.map((view) => (
+              <button
+                key={view.id}
+                className="filter-btn"
+                onClick={() => setActivePluginViewId(view.id)}
+                title={view.title}
+              >
+                {view.title}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <div className="sidebar-filters">
           <button
@@ -462,30 +474,8 @@ const SessionTree = memo(
           </button>
         </div>
 
-        {viewMode === "flow" || viewMode === "hierarchy" ? (
-          <div className="flex-1 min-h-0">
-            <Suspense
-              fallback={
-                <div style={{ padding: 12, color: "var(--color-text-secondary)" }}>
-                  {t("session.tree.loading")}
-                </div>
-              }
-            >
-              <SessionFlowView
-                entries={entries}
-                activeLeafId={activeLeafId}
-                onNodeClick={onNodeClick}
-                filter={currentFilter}
-                viewMode={viewMode === "hierarchy" ? "hierarchy" : "flow"}
-                onViewModeChange={(mode) =>
-                  setViewMode(mode === "hierarchy" ? "hierarchy" : "flow")
-                }
-              />
-            </Suspense>
-          </div>
-        ) : (
-          <>
-            {contextFlatNode ? (
+        <>
+          {contextFlatNode ? (
               <div className="tree-user-sticky">
                 <span className="tree-user-sticky-label">Thread context</span>
                 <span className="tree-user-sticky-text">
@@ -546,8 +536,7 @@ const SessionTree = memo(
               );
             })}
             </div>
-          </>
-        )}
+        </>
 
         <div className="tree-detail-pane">
           {selectedFlatNode ? (() => {
@@ -594,6 +583,42 @@ const SessionTree = memo(
         <div className="tree-status">
           {filteredNodes.length} / {flatNodes.length} entries
         </div>
+
+        {activePluginView && typeof document !== "undefined" ? createPortal(
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
+            <div className="flex h-[100dvh] w-[100vw] min-w-[320px] flex-col overflow-hidden rounded-none border border-border/70 bg-surface-dark/90 shadow-2xl sm:h-[80vh] sm:w-[80vw] sm:rounded-xl" data-no-window-drag>
+              <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/70 bg-background/20 px-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-foreground">{activePluginView.title}</div>
+                  <div className="truncate text-[11px] text-muted-foreground">{entries.length} JSONL entries</div>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-background/35 text-muted-foreground hover:bg-background/55 hover:text-foreground"
+                  onClick={() => setActivePluginViewId(null)}
+                  aria-label="Close"
+                  title="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-hidden bg-background/10">
+                <PluginContributionBoundary pluginId={activePluginView.pluginId} contributionId={activePluginView.id} title={activePluginView.title}>
+                  <PluginContributionSlot render={() => activePluginView.render({
+                    session: { path: sessionPath },
+                    activeEntryId: activeLeafId ?? null,
+                    entries: entries as any,
+                    labelsByTargetId: resolvedLabelsByTargetId,
+                    filter: currentFilter,
+                    closeView: () => setActivePluginViewId(null),
+                    onNavigate: onNodeClick,
+                  })} />
+                </PluginContributionBoundary>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        ) : null}
       </div>
     );
   }),

@@ -141,6 +141,18 @@ describe('SessionViewerSidebar', () => {
     });
   });
 
+  it('renders desktop embedded placement with embedded sidebar classes', () => {
+    mockGetRuntimeSessionLabels.mockResolvedValue({});
+
+    const rendered = renderSidebar({ placement: 'embedded' });
+    const sidebar = rendered.container.querySelector('aside.session-sidebar');
+    const resizeHandle = rendered.container.querySelector('.sidebar-resize-handle');
+
+    expect(sidebar?.classList.contains('session-sidebar--embedded')).toBe(true);
+    expect(resizeHandle?.classList.contains('sidebar-resize-handle--embedded')).toBe(true);
+    expect((resizeHandle as HTMLElement | null)?.style.left).toBe('');
+  });
+
   it('does not reuse labels from the previous session while switching paths', async () => {
     const firstFetch = deferred<Record<string, string>>();
     const secondFetch = deferred<Record<string, string>>();

@@ -19,6 +19,15 @@
   backdrop-filter: blur(8px);
 }
 
+.session-sidebar--embedded {
+  position: relative;
+  left: auto;
+  top: auto;
+  bottom: auto;
+  z-index: auto;
+  box-shadow: none;
+}
+
 // Session Viewer
 .session-viewer {
   padding: 20px;
@@ -100,6 +109,15 @@
   background: transparent;
   transition: background 0.2s ease;
   z-index: 30;
+}
+
+.sidebar-resize-handle--embedded {
+  position: relative;
+  top: auto;
+  bottom: auto;
+  flex: 0 0 4px;
+  align-self: stretch;
+  z-index: 1;
 }
 
 .sidebar-resize-handle:hover {

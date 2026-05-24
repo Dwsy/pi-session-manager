@@ -10,6 +10,7 @@ import {
 import SessionTree, { type SessionTreeRef } from "@/components/session-tree/SessionTree";
 import { getRuntimeSessionLabels } from "@/runtime-data/sessionSource";
 
+import type { PsmSessionTreeViewRuntimeRegistration } from "@/plugins/runtime-host/types";
 import type { SessionEntry } from "@/types";
 
 interface SessionLabelState {
@@ -20,10 +21,12 @@ interface SessionLabelState {
 export interface SessionViewerSidebarProps {
   showSidebar: boolean;
   isMobile: boolean;
+  placement?: "overlay" | "embedded";
   sidebarWidth: number;
   isResizing: boolean;
   entries: SessionEntry[];
   sessionPath: string;
+  pluginViews?: PsmSessionTreeViewRuntimeRegistration[];
   activeEntryId: string | null;
   onCloseSidebar: () => void;
   onNodeClick: (leafId: string, targetId: string) => void;
@@ -38,10 +41,12 @@ export interface SessionViewerSidebarProps {
 export default function SessionViewerSidebar({
   showSidebar,
   isMobile,
+  placement = "overlay",
   sidebarWidth,
   isResizing,
   entries,
   sessionPath,
+  pluginViews = [],
   activeEntryId,
   onCloseSidebar,
   onNodeClick,
@@ -91,6 +96,8 @@ export default function SessionViewerSidebar({
     return null;
   }
 
+  const isEmbedded = placement === "embedded" && !isMobile;
+
   const mobileSidebarStyle: CSSProperties = {
     width: "min(88vw, 420px)",
     maxWidth: "420px",
@@ -117,7 +124,7 @@ export default function SessionViewerSidebar({
       )}
       <aside
         ref={sidebarRef}
-        className={`session-sidebar ${isMobile ? "safe-area-top" : "absolute left-0 top-0 bottom-0 z-20 shadow-xl"}`}
+        className={`session-sidebar ${isMobile ? "safe-area-top" : isEmbedded ? "session-sidebar--embedded" : "absolute left-0 top-0 bottom-0 z-20 shadow-xl"}`}
         style={isMobile ? mobileSidebarStyle : desktopSidebarStyle}
       >
         {isMobile ? (
@@ -155,6 +162,8 @@ export default function SessionViewerSidebar({
             activeLeafId={activeEntryId ?? undefined}
             onNodeClick={onNodeClick}
             resolvedLabelsByTargetId={resolvedLabelsByTargetId}
+            pluginViews={pluginViews}
+            sessionPath={sessionPath}
           />
         </div>
       </aside>
@@ -162,8 +171,8 @@ export default function SessionViewerSidebar({
       {!isMobile && (
         <div
           ref={resizeHandleRef}
-          className={`sidebar-resize-handle absolute z-30 ${isResizing ? "resizing" : ""}`}
-          style={{ left: `${sidebarWidth}px` }}
+          className={`sidebar-resize-handle ${isEmbedded ? "sidebar-resize-handle--embedded" : "absolute z-30"} ${isResizing ? "resizing" : ""}`}
+          style={isEmbedded ? undefined : { left: `${sidebarWidth}px` }}
           onMouseDown={onResizeMouseDown}
         >
           <div className="sidebar-resize-handle-inner" />

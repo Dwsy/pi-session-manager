@@ -67,6 +67,91 @@ afterEach(() => {
 });
 
 describe('SessionTree', () => {
+  it('does not expose Flow or Hierarchy modes while those views are disabled', () => {
+    renderSessionTree({ activeLeafId: 'assistant-1' });
+
+    expect(screen.queryByRole('button', { name: 'Flow' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Hierarchy' })).toBeNull();
+  });
+
+  it('opens contributed Flow and Hierarchy tree views in a large modal with session context', () => {
+    const renderFlow = vi.fn((props: any) => (
+      <div data-testid="plugin-flow-view">{props.entries.length} entries · {props.filter}</div>
+    ));
+    const renderHierarchy = vi.fn((props: any) => (
+      <div data-testid="plugin-hierarchy-view">{props.activeEntryId} · {props.labelsByTargetId['user-1']}</div>
+    ));
+
+    renderSessionTree({
+      activeLeafId: 'assistant-1',
+      sessionPath: '/tmp/session.jsonl',
+      pluginViews: [
+        {
+          id: 'builtin.graph.flow',
+          title: 'Flow',
+          icon: 'Network',
+          pluginId: 'builtin.graph',
+          render: renderFlow,
+        },
+        {
+          id: 'builtin.graph.hierarchy',
+          title: 'Hierarchy',
+          icon: 'GitBranch',
+          pluginId: 'builtin.graph',
+          render: renderHierarchy,
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Flow' }));
+
+    const flowDialog = screen.getByRole('dialog');
+    expect(flowDialog).not.toBeNull();
+    expect(flowDialog.parentElement).toBe(document.body);
+    expect(screen.getByTestId('plugin-flow-view').textContent).toContain('3 entries · no-tools');
+    expect(renderFlow).toHaveBeenCalledWith(expect.objectContaining({
+      activeEntryId: 'assistant-1',
+      labelsByTargetId: { 'user-1': 'Pinned node' },
+      session: { path: '/tmp/session.jsonl' },
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hierarchy' }));
+
+    expect(screen.getByTestId('plugin-hierarchy-view').textContent).toContain('assistant-1 · Pinned node');
+    expect(renderHierarchy).toHaveBeenCalledWith(expect.objectContaining({
+      entries: BASE_ENTRIES,
+      filter: 'no-tools',
+    }));
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('keeps the base tree usable when a contributed tree view fails to render', () => {
+    const renderBrokenView = vi.fn(() => {
+      throw new Error('broken graph');
+    });
+
+    renderSessionTree({
+      activeLeafId: 'assistant-1',
+      pluginViews: [
+        {
+          id: 'builtin.graph.broken',
+          title: 'Broken Graph',
+          pluginId: 'builtin.graph',
+          render: renderBrokenView,
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Broken Graph' }));
+
+    expect(screen.getByText('Plugin UI failed')).not.toBeNull();
+    expect(screen.getAllByText('Assistant reply').length).toBeGreaterThan(0);
+    expect(screen.getByText('Thread context')).not.toBeNull();
+  });
+
   it('shows sticky user context and rich selected-node preview', () => {
     renderSessionTree({ activeLeafId: 'assistant-1' });
 
