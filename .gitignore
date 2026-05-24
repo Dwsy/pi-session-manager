@@ -64,6 +64,8 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+.claude/
+mktemp -d/
 
 # Session data
 session-index.db*
