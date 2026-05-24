@@ -207,7 +207,7 @@ fn cc_owns_session_traversal_returns_none() {
 
     // Path traversal should not find a session.
     let result = ClaudeCode.owns_session("../../etc/passwd");
-    assert!(result.is_none(), "CC owns_session should return None for path traversal; got: {result:?}");
+    assert!(result.is_none(), "CC owns_session should return None for path traversal; got: {:?}", result);
 }
 
 #[test]
@@ -217,7 +217,7 @@ fn codex_owns_session_traversal_returns_none() {
     let _env = EnvGuard::set("CODEX_HOME", tmp.path());
 
     let result = Codex.owns_session("../../etc/passwd");
-    assert!(result.is_none(), "Codex owns_session should return None for path traversal; got: {result:?}");
+    assert!(result.is_none(), "Codex owns_session should return None for path traversal; got: {:?}", result);
 }
 
 #[test]
@@ -227,5 +227,5 @@ fn cc_owns_session_empty_returns_none() {
     let _env = EnvGuard::set("CLAUDE_HOME", tmp.path());
 
     let result = ClaudeCode.owns_session("");
-    assert!(result.is_none(), "CC owns_session should return None for empty string; got: {result:?}");
+    assert!(result.is_none(), "CC owns_session should return None for empty string; got: {:?}", result);
 }

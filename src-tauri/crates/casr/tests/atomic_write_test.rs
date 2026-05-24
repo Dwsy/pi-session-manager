@@ -185,7 +185,7 @@ mod atomic_write_integration {
 
         let session = make_session("/tmp");
         let err = Codex.write_session(&session, &WriteOptions { force: false });
-        assert!(err.is_err(), "writing to read-only dir should fail; got: {err:?}");
+        assert!(err.is_err(), "writing to read-only dir should fail; got: {:?}", err);
     }
 
     #[test]
@@ -201,7 +201,7 @@ mod atomic_write_integration {
 
         let session = make_session("/tmp");
         let err = ClaudeCode.write_session(&session, &WriteOptions { force: false });
-        assert!(err.is_err(), "CC writing to read-only dir should fail; got: {err:?}");
+        assert!(err.is_err(), "CC writing to read-only dir should fail; got: {:?}", err);
     }
 
     #[test]
@@ -217,7 +217,7 @@ mod atomic_write_integration {
 
         let session = make_session("/tmp");
         let err = Gemini.write_session(&session, &WriteOptions { force: false });
-        assert!(err.is_err(), "Gemini writing to read-only dir should fail; got: {err:?}");
+        assert!(err.is_err(), "Gemini writing to read-only dir should fail; got: {:?}", err);
     }
 
     // =====================================================================

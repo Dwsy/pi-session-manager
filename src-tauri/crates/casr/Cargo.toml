@@ -1,10 +1,27 @@
 [package]
-name = "casr"
-version = "0.1.1"
+name = "cross_agent_session_resumer"
+version = "0.2.2"
 edition = "2024"
-description = "Cross Agent Session Resumer — resume AI coding sessions across providers"
+description = "Cross Agent Session Resumer — resume AI coding sessions across providers (CLI binary: casr)"
 license-file = "LICENSE"
 repository = "https://github.com/Dicklesworthstone/cross_agent_session_resumer"
+keywords = ["cli", "agent", "session", "resume", "claude"]
+categories = ["command-line-utilities"]
+readme = "README.md"
+
+# Originally intended to publish on crates.io as `casr`, but that short
+# name is held by an unrelated project (anfedotoff's CASR crash analyzer),
+# so the package itself goes out under the longer canonical name. All the
+# internal `casr::...` crate-path references throughout main.rs/tests/etc
+# stay on the short name because we keep `casr` as both the lib name (for
+# `casr::*` paths) and the binary entry point.
+[lib]
+name = "casr"
+path = "src/lib.rs"
+
+[[bin]]
+name = "casr"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1"
@@ -14,7 +31,7 @@ clap_complete = "4"
 colored = "3"
 dirs = "6"
 glob = "0.3"
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.33", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 serde_json = "1"

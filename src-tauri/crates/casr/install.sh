@@ -125,7 +125,7 @@ run_with_spinner() {
     local err_log="$TMP/gum-error.log"
     # Execute the command inside a bash subshell to securely pipe its output to a log file
     # while preserving the exact argument vector ($@) without stringification loss.
-    if ! gum spin --spinner dot --title "$title" -- bash -c '"$@" > "$0" 2>&1' "$err_log" "$@"; then
+    if ! gum spin --spinner dot --title "$title" -- bash -c "\"\$@\" > \"\$0\" 2>&1" "$err_log" "$@"; then
       exit_code=1
     fi
     if [ "$exit_code" -ne 0 ]; then
@@ -762,10 +762,35 @@ check_installed_version() {
   local target_clean="${target_version#v}"
   local installed_clean="${installed_version#v}"
 
-  if [ "$target_clean" = "$installed_clean" ]; then
-    return 0
+  INSTALLED_CASR_VERSION="$installed_clean"
+  version_at_least "$installed_clean" "$target_clean"
+}
+
+version_at_least() {
+  local installed="$1"
+  local target="$2"
+  local installed_major installed_minor installed_patch
+  local target_major target_minor target_patch
+
+  IFS=. read -r installed_major installed_minor installed_patch _ <<< "$installed"
+  IFS=. read -r target_major target_minor target_patch _ <<< "$target"
+
+  for part in \
+    "$installed_major" "$installed_minor" "$installed_patch" \
+    "$target_major" "$target_minor" "$target_patch"
+  do
+    [[ "$part" =~ ^[0-9]+$ ]] || return 1
+  done
+
+  if ((10#$installed_major != 10#$target_major)); then
+    ((10#$installed_major > 10#$target_major))
+    return $?
   fi
-  return 1
+  if ((10#$installed_minor != 10#$target_minor)); then
+    ((10#$installed_minor > 10#$target_minor))
+    return $?
+  fi
+  ((10#$installed_patch >= 10#$target_patch))
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1183,10 +1208,11 @@ trap cleanup EXIT
 
 # Check if already at target version.
 # Keep post-install steps idempotent so installer still refreshes local setup.
+INSTALLED_CASR_VERSION=""
 if [ "$FORCE_INSTALL" -eq 0 ] && check_installed_version "$VERSION"; then
-  ok "casr $VERSION is already installed at $DEST/$BINARY_NAME"
+  ok "casr $INSTALLED_CASR_VERSION is already installed at $DEST/$BINARY_NAME (target $VERSION)"
   info "Use --force to reinstall"
-  INSTALL_SOURCE="already installed ($VERSION)"
+  INSTALL_SOURCE="already installed ($INSTALLED_CASR_VERSION)"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1259,9 +1285,11 @@ if [ -z "$INSTALL_SOURCE" ] && [ "$FROM_SOURCE" -eq 1 ]; then
   ensure_rust
   run_with_spinner "Cloning repository..." \
     git clone --depth 1 "https://github.com/${OWNER}/${REPO}.git" "$TMP/src"
+  BUILD_TARGET_DIR="$TMP/src/target"
   run_with_spinner "Building from source (this takes a few minutes)..." \
-    bash -c "cd '$TMP/src' && cargo build --release"
-  BIN="$TMP/src/target/release/$BINARY_NAME"
+    bash -c "cd \"\$1\" && CARGO_TARGET_DIR=\"\$2\" cargo build --release --bin \"\$3\"" \
+      _ "$TMP/src" "$BUILD_TARGET_DIR" "$BINARY_NAME"
+  BIN="$BUILD_TARGET_DIR/release/$BINARY_NAME"
   [ -x "$BIN" ] || { err "Build failed: binary not found at $BIN"; exit 1; }
   install -m 0755 "$BIN" "$DEST/$BINARY_NAME"
   ok "Installed to $DEST/$BINARY_NAME (source build)"

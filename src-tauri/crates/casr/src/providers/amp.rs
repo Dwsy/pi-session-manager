@@ -336,7 +336,7 @@ impl Amp {
         }
         if let Some(ws) = session.workspace.as_ref() {
             let ws_str = ws.display().to_string();
-            let file_uri = format!("file://{ws_str}");
+            let file_uri = format!("file://{}", ws_str);
             thread_obj.insert(
                 "env".to_string(),
                 serde_json::json!({

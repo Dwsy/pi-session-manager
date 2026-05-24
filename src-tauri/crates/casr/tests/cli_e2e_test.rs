@@ -380,7 +380,7 @@ fn cli_resume_dry_run_does_not_write() {
     let codex_sessions = tmp.path().join("codex/sessions");
     if codex_sessions.exists() {
         let entries: Vec<_> = walkdir::WalkDir::new(&codex_sessions).into_iter().filter_map(Result::ok).filter(|e| e.file_type().is_file()).collect();
-        assert!(entries.is_empty(), "Dry run should not write any files, but found: {entries:?}");
+        assert!(entries.is_empty(), "Dry run should not write any files, but found: {:?}", entries);
     }
 }
 

@@ -462,12 +462,21 @@ mod codex_golden {
     }
 
     #[test]
-    fn golden_codex_session_meta_timestamp_is_numeric() {
+    fn golden_codex_session_meta_timestamp_is_present() {
+        // After bd-AMP→Codex (6152b9a) session_meta carries an RFC3339 string
+        // timestamp; pre-existing items still emit numeric epoch seconds.
+        // Accept either form as long as it's parseable.
         let (_, content) = write_codex_session(&simple_session());
         let first: serde_json::Value = serde_json::from_str(content.lines().next().unwrap()).unwrap();
 
-        let ts = first["timestamp"].as_f64().unwrap();
-        assert!(is_epoch_seconds(ts), "Codex session_meta timestamp should be epoch seconds, got: {ts}");
+        let ts = &first["timestamp"];
+        if let Some(epoch) = ts.as_f64() {
+            assert!(is_epoch_seconds(epoch), "Codex session_meta numeric timestamp out of range: {epoch}");
+        } else if let Some(iso) = ts.as_str() {
+            assert!(chrono::DateTime::parse_from_rfc3339(iso).is_ok(), "Codex session_meta timestamp must be RFC3339-parseable: {iso}");
+        } else {
+            panic!("Codex session_meta missing or unsupported timestamp: {ts}");
+        }
     }
 
     #[test]
@@ -491,20 +500,33 @@ mod codex_golden {
         assert_eq!(lines[2]["type"], "response_item");
         assert_eq!(lines[2]["payload"]["role"], "assistant");
 
+        // Assistant turns serialize as `output_text` content blocks. Pre-bd-AMP
+        // Codex emitted `input_text` for both roles; the conversion was fixed
+        // in 6152b9a / f868918 to align with the native Codex schema.
         let content_blocks = lines[2]["payload"]["content"].as_array().unwrap();
         assert!(!content_blocks.is_empty());
-        assert_eq!(content_blocks[0]["type"], "input_text");
+        assert_eq!(content_blocks[0]["type"], "output_text");
         assert_eq!(content_blocks[0]["text"], "Sure, I can help.");
     }
 
     #[test]
-    fn golden_codex_all_timestamps_are_numeric() {
+    fn golden_codex_every_entry_has_a_timestamp() {
+        // Codex JSONL accepts both numeric epoch seconds and RFC3339 strings
+        // for the "timestamp" field. After bd-AMP→Codex (6152b9a) we emit
+        // RFC3339 strings on session_meta entries; native item entries may
+        // continue to be numeric. The contract is "timestamp is present and
+        // either a plausible epoch or a parseable RFC3339 string".
         let (_, content) = write_codex_session(&simple_session());
         for (i, line) in content.lines().enumerate() {
             let entry: serde_json::Value = serde_json::from_str(line).unwrap();
-            let ts = entry["timestamp"].as_f64();
-            assert!(ts.is_some(), "Codex entry {i} should have numeric timestamp");
-            assert!(is_epoch_seconds(ts.unwrap()), "Codex entry {i} timestamp out of range: {ts:?}");
+            let ts = &entry["timestamp"];
+            if let Some(epoch) = ts.as_f64() {
+                assert!(is_epoch_seconds(epoch), "Codex entry {i} numeric timestamp out of range: {epoch}");
+            } else if let Some(iso) = ts.as_str() {
+                assert!(chrono::DateTime::parse_from_rfc3339(iso).is_ok(), "Codex entry {i} timestamp must be RFC3339-parseable: {iso}");
+            } else {
+                panic!("Codex entry {i} missing or unsupported timestamp: {ts}");
+            }
         }
     }
 
