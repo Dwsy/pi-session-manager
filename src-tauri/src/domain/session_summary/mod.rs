@@ -93,9 +93,8 @@ pub async fn generate_session_summary_with_language(context: &str, provider: Opt
     let response = crate::invoke_model_text(prompt, context.to_string(), provider.map(str::to_string), model.map(str::to_string), None).await?;
     info!(target: "session_summary", provider = response.provider.as_str(), model = response.model.as_str(), response_chars = response.text.len(), "Received summary response");
 
-    let result = parse_summary_response(&response.text).map_err(|error| {
+    let result = parse_summary_response(&response.text).inspect_err(|_| {
         error!(target: "session_summary", provider = response.provider.as_str(), model = response.model.as_str(), response_chars = response.text.len(), raw_preview = %truncate(&response.text, 500), "Failed to parse summary response");
-        error
     })?;
     info!(target: "session_summary", provider = response.provider.as_str(), model = response.model.as_str(), topics = result.topics.len(), unresolved_tasks = result.unresolved_tasks.len(), "Parsed session summary");
     Ok((result, response.provider, response.model))

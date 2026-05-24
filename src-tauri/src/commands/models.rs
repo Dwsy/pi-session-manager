@@ -124,7 +124,7 @@ where
     let output = child.wait_with_output().await.map_err(|error| format!("Failed to wait for Pi AI helper: {error}"))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(helper_error.or_else(|| if stderr.is_empty() { None } else { Some(stderr) }).unwrap_or_else(|| format!("Pi AI helper exited with {}", output.status)));
+        return Err(helper_error.or(if stderr.is_empty() { None } else { Some(stderr) }).unwrap_or_else(|| format!("Pi AI helper exited with {}", output.status)));
     }
 
     final_response.ok_or_else(|| helper_error.unwrap_or_else(|| "Pi AI helper did not return a final response".to_string()))
