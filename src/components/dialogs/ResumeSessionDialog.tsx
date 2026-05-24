@@ -60,11 +60,12 @@ export default function ResumeSessionDialog({
     };
   }, [defaultTarget]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (selectedTarget = target) => {
     if (submitting) return;
+    setTarget(selectedTarget);
     setSubmitting(true);
     try {
-      await onResume(target);
+      await onResume(selectedTarget);
       onClose();
     } finally {
       setSubmitting(false);
@@ -124,7 +125,8 @@ export default function ResumeSessionDialog({
             <button
               key={option.slug}
               type="button"
-              onClick={() => setTarget(option.slug)}
+              onClick={() => handleSubmit(option.slug)}
+              disabled={submitting}
               className={`flex w-full items-start justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-all ${
                 target === option.slug
                   ? "border-primary/40 bg-primary/10"
@@ -164,19 +166,6 @@ export default function ResumeSessionDialog({
             className="px-3 py-2 text-sm rounded-lg border border-border/70 bg-secondary hover:bg-secondary-hover transition-colors"
           >
             {t("common.cancel")}
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="px-3 py-2 text-sm rounded-lg border border-primary/40 bg-primary/10 hover:bg-primary/15 text-foreground transition-colors inline-flex items-center gap-2 disabled:opacity-60"
-          >
-            <Play className="h-4 w-4" />
-            {submitting
-              ? t("common.loading")
-              : mode === "copy"
-                ? t("common.copy", "Copy")
-                : t("session.resume", "Resume")}
           </button>
         </div>
       </div>

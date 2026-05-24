@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ChangeEvent, type CompositionEvent, type InputHTMLAttributes, forwardRef } from 'react'
+import { forwardRef, useCallback, useEffect, useRef, useState, type ChangeEvent, type CompositionEvent, type InputHTMLAttributes } from 'react'
 
 interface CompositionInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
   value: string
@@ -8,10 +8,9 @@ interface CompositionInputProps extends Omit<InputHTMLAttributes<HTMLInputElemen
 /**
  * Input component with automatic IME composition handling.
  *
- * During IME composition (e.g. Chinese pinyin input), the input temporarily
- * becomes uncontrolled so the DOM can display intermediate characters without
- * React reverting them. After composition ends, the final value is synced
- * back to the parent via onChange.
+ * During IME composition (e.g. Chinese pinyin input), keep an internal draft
+ * value so intermediate characters can render without switching the input
+ * between controlled and uncontrolled modes.
  */
 const CompositionInput = forwardRef(function CompositionInput({
   value,
@@ -21,35 +20,42 @@ const CompositionInput = forwardRef(function CompositionInput({
   ...props
 }: CompositionInputProps, ref: React.Ref<HTMLInputElement>) {
   const [isComposing, setIsComposing] = useState(false)
+  const [draftValue, setDraftValue] = useState(value)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
 
+  useEffect(() => {
+    setDraftValue(value)
+  }, [value])
+
   const handleCompositionStart = useCallback((e: CompositionEvent<HTMLInputElement>) => {
     setIsComposing(true)
+    setDraftValue(e.currentTarget.value)
     onCompositionStart?.(e)
   }, [onCompositionStart])
 
   const handleCompositionEnd = useCallback((e: CompositionEvent<HTMLInputElement>) => {
-    setIsComposing(false)
     const finalValue = e.currentTarget.value
+    setDraftValue(finalValue)
+    setIsComposing(false)
     onChangeRef.current(finalValue)
     onCompositionEnd?.(e)
   }, [onCompositionEnd])
 
   const handleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const nextValue = e.target.value
+    setDraftValue(nextValue)
+
     if (!isComposing) {
-      onChangeRef.current(e.target.value)
+      onChangeRef.current(nextValue)
     }
-    // During composition: do nothing — DOM manages its own value
   }, [isComposing])
 
   return (
     <input
       {...props}
       ref={ref}
-      // During composition, omit `value` so the input is temporarily uncontrolled.
-      // This prevents React from reverting the DOM value and breaking IME.
-      {...(isComposing ? {} : { value })}
+      value={isComposing ? draftValue : value}
       onChange={handleChange}
       onCompositionStart={handleCompositionStart}
       onCompositionEnd={handleCompositionEnd}
