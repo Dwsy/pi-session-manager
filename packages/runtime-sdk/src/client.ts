@@ -2,6 +2,7 @@ import type {
   CreatePsmClientOptions,
   DbPluginRecord,
   PluginRecord,
+  PluginRecordIndexValue,
   PluginRecordListParams,
   PluginRecordSearchHit,
   PluginRecordSearchParams,
@@ -78,6 +79,18 @@ function toCreateTagPayload(params: PsmCreateTagParams) {
     icon: params.icon,
     parentId: params.parentId,
   }
+}
+
+function toPluginRecordIndexValues(params: PluginRecordUpsertParams): PluginRecordIndexValue[] | undefined {
+  return params.indexValues?.map((value): PluginRecordIndexValue => ({
+    recordId: value.recordId || `${params.pluginId}:${params.scopeType}:${params.scopeId}:${params.recordType}`,
+    pluginId: value.pluginId,
+    recordType: value.recordType,
+    indexName: value.indexName,
+    valueText: value.valueText ?? null,
+    valueNumber: value.valueNumber ?? null,
+    valueDatetime: value.valueDatetime ?? null,
+  }))
 }
 
 function toSideChatPayload(params: PsmSideChatAskParams) {
@@ -273,6 +286,7 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
+        indexValues: toPluginRecordIndexValues(params),
       })
     },
 
@@ -369,10 +383,10 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
       list(params) {
         return invoke('scan_sessions_paginated', toSessionListPayload(params))
       },
-      readEntries(sessionPath, _readOptions) {
+      readEntries(sessionPath, options) {
         return invoke<unknown[]>('get_session_entries', {
           path: sessionPath,
-        })
+        }).then((entries) => (options?.limit === undefined ? entries : entries.slice(0, options.limit)))
       },
       readFileChunk(sessionPath, readOptions?: PsmSessionReadChunkOptions) {
         return invoke('read_session_file_chunk', {

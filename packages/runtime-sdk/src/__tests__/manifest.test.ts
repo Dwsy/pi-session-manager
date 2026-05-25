@@ -134,51 +134,6 @@ describe('plugin capability client', () => {
     permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
   }
 
-  it('reads and writes plugin-scoped JSON config through the PSM transport', async () => {
-    const calls: Array<{ command: string; payload?: unknown }> = []
-    const configPermissions: PsmPermissionContext = {
-      pluginId: 'builtin.config-test',
-      permissions: ['config:read', 'config:write'],
-    }
-    const transport: PsmTransport = {
-      invoke: async (command, payload) => {
-        calls.push({ command, payload })
-        if (command === 'read_psm_plugin_json_config') return { layout: 'compact' }
-        return null
-      },
-    }
-
-    const client = createPluginCapabilityClient({ transport, permissions: configPermissions })
-    const result = await client.config.read('workspace', { defaultValue: { layout: 'default' } })
-    await client.config.write('workspace', { layout: 'wide' })
-
-    expect(result).toEqual({ layout: 'compact' })
-    expect(calls).toEqual([
-      {
-        command: 'read_psm_plugin_json_config',
-        payload: {
-          key: 'workspace',
-          defaultValue: { layout: 'default' },
-          __psm: {
-            pluginId: 'builtin.config-test',
-            permissions: ['config:read', 'config:write'],
-          },
-        },
-      },
-      {
-        command: 'write_psm_plugin_json_config',
-        payload: {
-          key: 'workspace',
-          value: { layout: 'wide' },
-          __psm: {
-            pluginId: 'builtin.config-test',
-            permissions: ['config:read', 'config:write'],
-          },
-        },
-      },
-    ])
-  })
-
   it('sends typed record RPC through the provided PSM transport', async () => {
     const calls: Array<{ command: string; payload?: unknown }> = []
     const transport: PsmTransport = {

@@ -431,6 +431,16 @@ export interface PluginRecordListParams {
   limit?: number
 }
 
+export interface PluginRecordIndexValue {
+  recordId: string
+  pluginId: string
+  recordType: string
+  indexName: string
+  valueText?: string | null
+  valueNumber?: number | null
+  valueDatetime?: string | null
+}
+
 export interface PluginRecordUpsertParams {
   pluginId: string
   scopeType: PsmRecordScope
@@ -439,6 +449,7 @@ export interface PluginRecordUpsertParams {
   schemaVersion: number
   payload: unknown
   searchableText?: string
+  indexValues?: PluginRecordIndexValue[]
 }
 
 export interface PsmRecordsClient {
